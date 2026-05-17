@@ -53,6 +53,7 @@ codex-usage-tracker summary --preset today
 codex-usage-tracker summary --preset last-7-days
 codex-usage-tracker summary --preset expensive
 codex-usage-tracker expensive --limit 10
+codex-usage-tracker pricing-coverage
 ```
 
 Show one session:
@@ -102,6 +103,7 @@ Restart Codex after registration so it can discover the plugin. The installer sy
 - `usage_summary`
 - `session_usage`
 - `most_expensive_usage_calls`
+- `usage_pricing_coverage`
 - `generate_usage_dashboard`
 - `export_usage_csv`
 - `init_usage_pricing_config`
@@ -127,5 +129,6 @@ python -m compileall src
 codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
 codex-usage-tracker doctor
 codex-usage-tracker dashboard --output /tmp/codex-usage-dashboard.html
+codex-usage-tracker pricing-coverage
 codex-usage-tracker expensive --limit 5
 ```

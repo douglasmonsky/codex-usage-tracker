@@ -90,6 +90,36 @@ def format_doctor(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def format_pricing_coverage(report: dict[str, Any], limit: int = 20) -> str:
+    rows = report.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return "No Codex usage records found. Run refresh_usage_index first."
+
+    lines = [
+        "Codex pricing coverage",
+        "",
+        f"Models: {_fmt_int(report.get('model_count'))} "
+        f"({_fmt_int(report.get('priced_model_count'))} priced, "
+        f"{_fmt_int(report.get('unpriced_model_count'))} unpriced)",
+        f"Token coverage: {_fmt_pct(report.get('priced_token_ratio'))} priced "
+        f"({_fmt_int(report.get('priced_tokens'))} of {_fmt_int(report.get('total_tokens'))} tokens)",
+        f"Estimated total cost: {_fmt_money(report.get('estimated_cost_usd'))}",
+        "",
+    ]
+    for row in rows[:limit]:
+        model = row.get("model") or "Unknown"
+        status = "unpriced"
+        if row.get("pricing_estimated"):
+            status = f"estimated as {row.get('priced_as')}"
+        elif row.get("priced_as"):
+            status = f"priced as {row.get('priced_as')}"
+        lines.append(
+            f"- {model}: {status}; {_fmt_int(row.get('total_tokens'))} tokens"
+            f"{_cost_suffix(row)}"
+        )
+    return "\n".join(lines)
+
+
 def _fmt_int(value: object) -> str:
     try:
         return f"{int(value):,}"

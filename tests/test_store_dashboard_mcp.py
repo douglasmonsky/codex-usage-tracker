@@ -82,6 +82,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     summary = mcp_server.usage_summary(group_by="thread")
     model_summary = mcp_server.usage_summary(preset="by-model")
     expensive = mcp_server.most_expensive_usage_calls(limit=1)
+    pricing_coverage = mcp_server.usage_pricing_coverage()
     session = mcp_server.session_usage(session_id=SESSION_ID)
     dashboard = mcp_server.generate_usage_dashboard()
     pricing_update = mcp_server.update_usage_pricing_config()
@@ -91,6 +92,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert "Add Codex token tracking" in summary
     assert "estimated cost" in model_summary
     assert "Most expensive Codex calls" in expensive
+    assert "Codex pricing coverage" in pricing_coverage
     assert SESSION_ID in session
     assert dashboard["dashboard_path"] == str(dashboard_path)
     assert pricing_update["model_count"] == 1

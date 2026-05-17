@@ -10,7 +10,13 @@ from pathlib import Path
 
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
-from codex_usage_tracker.formatting import format_calls, format_doctor, format_session, format_summary
+from codex_usage_tracker.formatting import (
+    format_calls,
+    format_doctor,
+    format_pricing_coverage,
+    format_session,
+    format_summary,
+)
 from codex_usage_tracker.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
@@ -22,6 +28,7 @@ from codex_usage_tracker.pricing import (
     VALID_PRICING_TIERS,
     annotate_rows_with_efficiency,
     load_pricing_config,
+    summarize_pricing_coverage,
     update_pricing_from_openai_docs,
     write_pricing_template,
 )
@@ -91,6 +98,18 @@ def main() -> int:
         "--preset",
         choices=["today", "last-7-days"],
         help="Convenience date window",
+    )
+
+    pricing_coverage = subparsers.add_parser(
+        "pricing-coverage", help="Show priced, estimated, and unpriced token coverage"
+    )
+    pricing_coverage.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    pricing_coverage.add_argument("--limit", type=int, default=20)
+    pricing_coverage.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Return the coverage report as JSON",
     )
 
     export = subparsers.add_parser("export", help="Export aggregate usage CSV")
@@ -182,6 +201,13 @@ def main() -> int:
         pricing = load_pricing_config(args.pricing)
         rows = query_most_expensive_calls(args.db, limit=args.limit, since=since)
         print(format_calls(annotate_rows_with_efficiency(rows, pricing)))
+        return 0
+
+    if args.command == "pricing-coverage":
+        pricing = load_pricing_config(args.pricing)
+        rows = query_summary(args.db, group_by="model", limit=1000, since=args.since)
+        report = summarize_pricing_coverage(rows, pricing=pricing)
+        print(json.dumps(report, indent=2) if args.as_json else format_pricing_coverage(report, args.limit))
         return 0
 
     if args.command == "export":

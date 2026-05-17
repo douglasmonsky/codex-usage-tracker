@@ -37,6 +37,7 @@ python -m compileall src
 codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
 codex-usage-tracker doctor
 codex-usage-tracker dashboard --output /tmp/codex-usage-dashboard.html
+codex-usage-tracker pricing-coverage
 codex-usage-tracker expensive --limit 5
 ```
 
@@ -55,4 +56,5 @@ codex-usage-tracker expensive --limit 5
 - MCP tool functions return concise aggregate data.
 - Dashboard is generated from aggregate-only JSON.
 - Doctor, summary presets, dashboard, and expensive-call views work from CLI and MCP wrappers.
+- Pricing coverage clearly separates configured, estimated, and unpriced model usage.
 - Tests and compile checks pass.

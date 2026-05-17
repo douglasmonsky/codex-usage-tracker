@@ -17,6 +17,7 @@ The tracker is aggregate-only. It should never return prompts, assistant message
 - Use `usage_doctor` when setup, plugin discovery, MCP launch, dashboard output, or pricing estimates look wrong.
 - Use `usage_summary` for high-level totals by date, model, effort, cwd, thread, or session.
 - Use `usage_summary` presets `today`, `last-7-days`, `by-model`, `by-cwd`, `by-thread`, and `expensive` for common requests.
+- Use `usage_pricing_coverage` when the user asks whether costs are fully priced or which models use estimated or missing pricing.
 - Use `session_usage` for per-call and per-turn detail for one session.
 - Use `most_expensive_usage_calls` to identify high-token calls and aggregate efficiency signals.
 - Use `generate_usage_dashboard` when the user wants a visual hoverable report.

@@ -10,7 +10,13 @@ from mcp.server.fastmcp import FastMCP
 
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
-from codex_usage_tracker.formatting import format_calls, format_doctor, format_session, format_summary
+from codex_usage_tracker.formatting import (
+    format_calls,
+    format_doctor,
+    format_pricing_coverage,
+    format_session,
+    format_summary,
+)
 from codex_usage_tracker.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
@@ -20,6 +26,7 @@ from codex_usage_tracker.paths import (
 from codex_usage_tracker.pricing import (
     annotate_rows_with_efficiency,
     load_pricing_config,
+    summarize_pricing_coverage,
     update_pricing_from_openai_docs,
     write_pricing_template,
 )
@@ -102,6 +109,22 @@ def most_expensive_usage_calls(
         DEFAULT_DB_PATH, limit=limit, since=_resolve_since(preset, since)
     )
     return format_calls(annotate_rows_with_efficiency(rows, pricing))
+
+
+@mcp.tool()
+def usage_pricing_coverage(
+    limit: int = 20,
+    since: str | None = None,
+    response_format: str = "markdown",
+) -> str | dict[str, Any]:
+    """Show priced, estimated, and unpriced token coverage by model."""
+
+    pricing = load_pricing_config(DEFAULT_PRICING_PATH)
+    rows = query_summary(DEFAULT_DB_PATH, group_by="model", limit=1000, since=since)
+    report = summarize_pricing_coverage(rows, pricing=pricing)
+    if response_format == "json":
+        return report
+    return format_pricing_coverage(report, limit=limit)
 
 
 @mcp.tool()

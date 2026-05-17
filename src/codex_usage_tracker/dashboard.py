@@ -75,7 +75,7 @@ def _html(payload: str) -> str:
     main {{ padding: 22px 28px 36px; }}
     .filters {{
       display: grid;
-      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
       margin-bottom: 18px;
     }}
@@ -92,7 +92,7 @@ def _html(payload: str) -> str:
     }}
     .cards {{
       display: grid;
-      grid-template-columns: repeat(5, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: 12px;
       margin-bottom: 18px;
     }}
@@ -186,6 +186,7 @@ def _html(payload: str) -> str:
       <label>Search<input id="search" type="search" placeholder="Thread, cwd, model, session"></label>
       <label>Model<select id="model"><option value="">All models</option></select></label>
       <label>Reasoning<select id="effort"><option value="">All efforts</option></select></label>
+      <label>Pricing<select id="pricingStatus"><option value="">All pricing</option><option value="official">Official/configured</option><option value="estimated">Estimated</option><option value="unpriced">Unpriced</option></select></label>
       <label>Sort<select id="sort"><option value="total">Most tokens</option><option value="cost">Highest estimated cost</option><option value="time">Newest calls</option><option value="cache">Lowest cache ratio</option><option value="context">Highest context use</option></select></label>
     </div>
     <div class="cards">
@@ -194,6 +195,9 @@ def _html(payload: str) -> str:
       <div class="card"><span>Cached Input</span><strong id="cachedTokens">0</strong></div>
       <div class="card"><span>Reasoning Output</span><strong id="reasoningTokens">0</strong></div>
       <div class="card"><span>Estimated Cost</span><strong id="estimatedCost">$0.00</strong></div>
+      <div class="card"><span>Price Coverage</span><strong id="priceCoverage">0.0%</strong></div>
+      <div class="card"><span>Estimated Tokens</span><strong id="estimatedTokens">0</strong></div>
+      <div class="card"><span>Unpriced Tokens</span><strong id="unpricedTokens">0</strong></div>
     </div>
     <div class="grid">
       <section>
@@ -224,6 +228,7 @@ def _html(payload: str) -> str:
     const searchEl = document.getElementById('search');
     const modelEl = document.getElementById('model');
     const effortEl = document.getElementById('effort');
+    const pricingStatusEl = document.getElementById('pricingStatus');
     const sortEl = document.getElementById('sort');
     const number = new Intl.NumberFormat();
     const money = (value, missingLabel = 'No price') => {{
@@ -267,9 +272,14 @@ def _html(payload: str) -> str:
       const term = searchEl.value.trim().toLowerCase();
       const model = modelEl.value;
       const effort = effortEl.value;
+      const pricingStatus = pricingStatusEl.value;
       const rows = data.filter(row => {{
         const haystack = [row.thread_name, row.cwd, row.model, row.effort, row.session_id, row.turn_id].join(' ').toLowerCase();
-        return (!term || haystack.includes(term)) && (!model || row.model === model) && (!effort || row.effort === effort);
+        const statusMatches = !pricingStatus
+          || (pricingStatus === 'official' && row.pricing_model && !row.pricing_estimated)
+          || (pricingStatus === 'estimated' && row.pricing_estimated)
+          || (pricingStatus === 'unpriced' && !row.pricing_model);
+        return (!term || haystack.includes(term)) && (!model || row.model === model) && (!effort || row.effort === effort) && statusMatches;
       }});
       rows.sort((a, b) => {{
         if (sortEl.value === 'cost') return Number(b.estimated_cost_usd || 0) - Number(a.estimated_cost_usd || 0);
@@ -288,7 +298,14 @@ def _html(payload: str) -> str:
       document.getElementById('cachedTokens').textContent = number.format(rows.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0));
       document.getElementById('reasoningTokens').textContent = number.format(rows.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0));
       const estimatedCost = rows.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
+      const pricedTokens = rows.reduce((sum, row) => sum + (row.pricing_model ? Number(row.total_tokens || 0) : 0), 0);
+      const estimatedTokens = rows.reduce((sum, row) => sum + (row.pricing_estimated ? Number(row.total_tokens || 0) : 0), 0);
+      const unpricedTokens = rows.reduce((sum, row) => sum + (!row.pricing_model ? Number(row.total_tokens || 0) : 0), 0);
+      const totalTokens = rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
       document.getElementById('estimatedCost').textContent = pricingConfigured ? money(estimatedCost) : 'Not configured';
+      document.getElementById('priceCoverage').textContent = pct(totalTokens ? pricedTokens / totalTokens : 0);
+      document.getElementById('estimatedTokens').textContent = number.format(estimatedTokens);
+      document.getElementById('unpricedTokens').textContent = number.format(unpricedTokens);
       for (const row of rows.slice(0, 500)) {{
         const tr = document.createElement('tr');
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
@@ -333,7 +350,7 @@ def _html(payload: str) -> str:
       ];
       detailEl.innerHTML = '<dl>' + fields.map(([key, value]) => `<dt>${{escapeHtml(key)}}</dt><dd>${{escapeHtml(short(value))}}</dd>`).join('') + '</dl>';
     }}
-    [searchEl, modelEl, effortEl, sortEl].forEach(el => el.addEventListener('input', render));
+    [searchEl, modelEl, effortEl, pricingStatusEl, sortEl].forEach(el => el.addEventListener('input', render));
     render();
   </script>
 </body>
