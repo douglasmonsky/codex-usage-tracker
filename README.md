@@ -16,13 +16,38 @@ Local Codex plugin and dashboard for tracking aggregate token usage from Codex s
 
 The tracker intentionally does not store prompts, assistant messages, tool outputs, pasted secrets, or raw transcript snippets in SQLite, CSV exports, or generated dashboard HTML. The optional localhost server can read redacted, size-limited context from the original JSONL file on demand.
 
-## Setup
+## Quick Install
+
+Recommended install path after the repository is public:
 
 ```bash
+brew install pipx
+pipx ensurepath
+pipx install "git+https://github.com/douglasmonsky/codex-usage-tracker.git"
+codex-usage-tracker install-plugin
+codex-usage-tracker update-pricing
+codex-usage-tracker refresh
+codex-usage-tracker serve-dashboard --open
+```
+
+After a PyPI release, the install command becomes:
+
+```bash
+pipx install codex-usage-tracker
+```
+
+`install-plugin` creates `~/plugins/codex-usage-tracker`, writes a package-owned `.mcp.json` that points at the installed Python executable, and updates `~/.agents/plugins/marketplace.json`. Restart Codex after registration so it discovers the plugin.
+
+## Development Setup
+
+```bash
+git clone https://github.com/douglasmonsky/codex-usage-tracker.git
+cd codex-usage-tracker
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install ".[dev]"
+codex-usage-tracker install-plugin --python .venv/bin/python
 ```
 
 ## Usage
@@ -107,13 +132,31 @@ Edit `~/.codex-usage-tracker/pricing.json` with USD-per-million-token rates for 
 
 ## Install As A Local Codex Plugin
 
-After installing the Python package in the repo-local `.venv`, register the plugin locally:
+After installing the Python package, register the plugin locally:
 
 ```bash
-python scripts/install_local_plugin.py
+codex-usage-tracker install-plugin
 ```
 
-Restart Codex after registration so it can discover the plugin. The installer symlinks this repo into `~/plugins/codex-usage-tracker` and updates `~/.agents/plugins/marketplace.json` without removing existing entries.
+For a source checkout that should use the repo-local virtual environment:
+
+```bash
+codex-usage-tracker install-plugin --python .venv/bin/python
+```
+
+If you previously installed the older source-checkout symlink, replace it once:
+
+```bash
+codex-usage-tracker install-plugin --python .venv/bin/python --force
+```
+
+The compatibility script remains available for local development:
+
+```bash
+python scripts/install_local_plugin.py --python .venv/bin/python
+```
+
+Restart Codex after registration so it can discover the plugin.
 
 ## MCP Tools
 
@@ -147,6 +190,8 @@ Cost estimates are calculated only from aggregate token fields and your local pr
 ```bash
 python -m pytest
 python -m compileall src
+python -m build
+git diff --check
 codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
 codex-usage-tracker doctor
 codex-usage-tracker dashboard --output /tmp/codex-usage-dashboard.html

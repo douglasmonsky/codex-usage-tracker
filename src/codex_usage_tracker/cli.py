@@ -22,8 +22,11 @@ from codex_usage_tracker.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
+    DEFAULT_MARKETPLACE_PATH,
+    DEFAULT_PLUGIN_LINK,
     DEFAULT_PRICING_PATH,
 )
+from codex_usage_tracker.plugin_installer import install_plugin
 from codex_usage_tracker.pricing import (
     OPENAI_PRICING_MD_URL,
     VALID_PRICING_TIERS,
@@ -51,6 +54,25 @@ def main() -> int:
 
     doctor = subparsers.add_parser("doctor", help="Check local setup without writing files")
     doctor.add_argument("--json", action="store_true", dest="as_json")
+
+    install_plugin_cmd = subparsers.add_parser(
+        "install-plugin",
+        help="Register this installed package as a local Codex plugin",
+    )
+    install_plugin_cmd.add_argument("--plugin-dir", type=Path, default=DEFAULT_PLUGIN_LINK)
+    install_plugin_cmd.add_argument("--marketplace", type=Path, default=DEFAULT_MARKETPLACE_PATH)
+    install_plugin_cmd.add_argument(
+        "--python",
+        type=Path,
+        default=None,
+        dest="python_executable",
+        help="Python executable Codex should use for the MCP server.",
+    )
+    install_plugin_cmd.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace an existing generated plugin directory or source-checkout symlink.",
+    )
 
     refresh = subparsers.add_parser("refresh", help="Scan Codex logs into SQLite")
     refresh.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
@@ -194,6 +216,20 @@ def main() -> int:
         report = run_doctor(db_path=args.db, pricing_path=args.pricing)
         print(json.dumps(report, indent=2) if args.as_json else format_doctor(report))
         return 0 if report["status"] != "fail" else 1
+
+    if args.command == "install-plugin":
+        result = install_plugin(
+            plugin_dir=args.plugin_dir,
+            marketplace_path=args.marketplace,
+            python_executable=args.python_executable,
+            force=args.force,
+        )
+        replacement_note = " Replaced existing plugin path." if result.replaced_existing else ""
+        print(f"Installed Codex Usage Tracker plugin at {result.plugin_dir}.{replacement_note}")
+        print(f"MCP Python: {result.python_executable}")
+        print(f"Updated marketplace: {result.marketplace_path}")
+        print("Restart Codex to discover the plugin.")
+        return 0
 
     if args.command == "refresh":
         result = refresh_usage_index(

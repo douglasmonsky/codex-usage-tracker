@@ -45,7 +45,7 @@ def run_doctor(
 ) -> dict[str, Any]:
     """Run read-only setup checks and return a structured report."""
 
-    root = repo_root or find_project_root()
+    root = repo_root or find_project_root() or _resolve_plugin_root(plugin_link)
     checks = [
         _check_package_import(),
         _check_codex_sessions(codex_home),
@@ -80,6 +80,17 @@ def find_project_root() -> Path | None:
         ).exists():
             return candidate
     return None
+
+
+def _looks_like_plugin_root(path: Path) -> bool:
+    return (path / ".codex-plugin" / "plugin.json").exists() and (path / ".mcp.json").exists()
+
+
+def _resolve_plugin_root(plugin_link: Path) -> Path | None:
+    if not plugin_link.exists() and not plugin_link.is_symlink():
+        return None
+    target = plugin_link.resolve() if plugin_link.is_symlink() else plugin_link
+    return target if _looks_like_plugin_root(target) else None
 
 
 def _check_package_import() -> DoctorCheck:
@@ -179,38 +190,51 @@ def _check_pricing(pricing_path: Path) -> DoctorCheck:
 def _check_project_root(repo_root: Path | None) -> DoctorCheck:
     if repo_root is None:
         return DoctorCheck(
-            "Project root",
+            "Plugin root",
             "warn",
             "Could not find .codex-plugin/plugin.json and .mcp.json from current paths.",
-            "Run doctor from the codex-usage-tracker repo or local plugin cwd.",
+            "Run from the codex-usage-tracker repo, or install with: codex-usage-tracker install-plugin",
         )
-    return DoctorCheck("Project root", "pass", f"Detected project root: {repo_root}")
+    return DoctorCheck("Plugin root", "pass", f"Detected plugin root: {repo_root}")
 
 
 def _check_plugin_link(plugin_link: Path, repo_root: Path | None) -> DoctorCheck:
     if not plugin_link.exists() and not plugin_link.is_symlink():
         return DoctorCheck(
-            "Plugin symlink",
+            "Plugin registration",
             "warn",
-            f"Plugin link is missing: {plugin_link}",
-            "Run: python scripts/install_local_plugin.py",
+            f"Plugin path is missing: {plugin_link}",
+            "Run: codex-usage-tracker install-plugin",
+        )
+    if plugin_link.is_symlink():
+        target = plugin_link.resolve()
+        if _looks_like_plugin_root(target):
+            kind = "source checkout" if repo_root and target == repo_root.resolve() else "plugin wrapper"
+            return DoctorCheck(
+                "Plugin registration",
+                "pass",
+                f"Plugin symlink points to a {kind}: {target}.",
+            )
+        return DoctorCheck(
+            "Plugin registration",
+            "fail",
+            f"Plugin symlink points to {target}, but no plugin manifest and MCP config were found there.",
+            "Replace it with: codex-usage-tracker install-plugin --force",
+        )
+    if plugin_link.is_dir() and _looks_like_plugin_root(plugin_link):
+        return DoctorCheck(
+            "Plugin registration",
+            "pass",
+            f"Plugin directory exists: {plugin_link}.",
         )
     if not plugin_link.is_symlink():
         return DoctorCheck(
-            "Plugin symlink",
+            "Plugin registration",
             "fail",
-            f"Plugin path exists but is not a symlink: {plugin_link}",
-            "Move the existing path or install manually.",
+            f"Plugin path exists but is not a generated plugin directory or symlink: {plugin_link}",
+            "Move the existing path or install with: codex-usage-tracker install-plugin --force",
         )
-    target = plugin_link.resolve()
-    if repo_root and target != repo_root.resolve():
-        return DoctorCheck(
-            "Plugin symlink",
-            "fail",
-            f"Plugin link points to {target}, expected {repo_root}.",
-            "Re-run scripts/install_local_plugin.py after removing the wrong link.",
-        )
-    return DoctorCheck("Plugin symlink", "pass", f"Plugin link points to {target}.")
+    return DoctorCheck("Plugin registration", "pass", f"Plugin path exists: {plugin_link}.")
 
 
 def _check_marketplace(marketplace_path: Path) -> DoctorCheck:
@@ -219,7 +243,7 @@ def _check_marketplace(marketplace_path: Path) -> DoctorCheck:
             "Marketplace entry",
             "warn",
             f"Marketplace file is missing: {marketplace_path}",
-            "Run: python scripts/install_local_plugin.py",
+            "Run: codex-usage-tracker install-plugin",
         )
     try:
         data = json.loads(marketplace_path.read_text(encoding="utf-8"))
@@ -249,7 +273,7 @@ def _check_marketplace(marketplace_path: Path) -> DoctorCheck:
         "Marketplace entry",
         "warn",
         f"No {PLUGIN_NAME} entry found in {marketplace_path}.",
-        "Run: python scripts/install_local_plugin.py",
+        "Run: codex-usage-tracker install-plugin",
     )
 
 
@@ -259,7 +283,7 @@ def _check_mcp_config(repo_root: Path | None) -> DoctorCheck:
             "MCP config",
             "warn",
             "Cannot check .mcp.json without a detected project root.",
-            "Run doctor from the codex-usage-tracker repo or local plugin cwd.",
+            "Run from the codex-usage-tracker repo, or install with: codex-usage-tracker install-plugin",
         )
     config_path = repo_root / ".mcp.json"
     if not config_path.exists():
@@ -293,7 +317,7 @@ def _check_mcp_config(repo_root: Path | None) -> DoctorCheck:
             "MCP config",
             "fail",
             "MCP server command is missing.",
-            "Set the command to ./.venv/bin/python.",
+            "Set the command to a Python executable that can import codex_usage_tracker.",
         )
     command_path = (repo_root / command).resolve() if command.startswith(".") else Path(command)
     if command.startswith(".") and not command_path.exists():

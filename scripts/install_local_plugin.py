@@ -1,87 +1,48 @@
 #!/usr/bin/env python3
-"""Register this repo as a home-local Codex plugin."""
+"""Compatibility wrapper for registering the local Codex plugin."""
 
 from __future__ import annotations
 
-import json
+import argparse
 import sys
 from pathlib import Path
-from typing import Any
 
-PLUGIN_NAME = "codex-usage-tracker"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from codex_usage_tracker.paths import DEFAULT_MARKETPLACE_PATH, DEFAULT_PLUGIN_LINK  # noqa: E402
+from codex_usage_tracker.plugin_installer import install_plugin  # noqa: E402
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[1]
-    plugin_parent = Path.home() / "plugins"
-    plugin_link = plugin_parent / PLUGIN_NAME
-    marketplace_path = Path.home() / ".agents" / "plugins" / "marketplace.json"
-
-    plugin_parent.mkdir(parents=True, exist_ok=True)
-    if plugin_link.exists() or plugin_link.is_symlink():
-        if plugin_link.resolve() != repo_root:
-            print(
-                f"Refusing to overwrite existing plugin path: {plugin_link}",
-                file=sys.stderr,
-            )
-            return 1
-    else:
-        plugin_link.symlink_to(repo_root, target_is_directory=True)
-
-    marketplace_path.parent.mkdir(parents=True, exist_ok=True)
-    marketplace = _load_marketplace(marketplace_path)
-    _upsert_marketplace_entry(marketplace)
-    marketplace_path.write_text(
-        json.dumps(marketplace, indent=2, sort_keys=False) + "\n",
-        encoding="utf-8",
+    parser = argparse.ArgumentParser(
+        description=(
+            "Register Codex Usage Tracker as a local Codex plugin. "
+            "Prefer `codex-usage-tracker install-plugin` for installed packages."
+        )
     )
+    parser.add_argument("--plugin-dir", type=Path, default=DEFAULT_PLUGIN_LINK)
+    parser.add_argument("--marketplace", type=Path, default=DEFAULT_MARKETPLACE_PATH)
+    parser.add_argument("--python", type=Path, default=Path(sys.executable), dest="python_executable")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace an existing generated plugin directory or source-checkout symlink.",
+    )
+    args = parser.parse_args()
 
-    print(f"Registered {PLUGIN_NAME} at {plugin_link}")
-    print(f"Updated {marketplace_path}")
+    result = install_plugin(
+        plugin_dir=args.plugin_dir,
+        marketplace_path=args.marketplace,
+        python_executable=args.python_executable,
+        force=args.force,
+    )
+    replacement_note = " Replaced existing plugin path." if result.replaced_existing else ""
+    print(f"Installed Codex Usage Tracker plugin at {result.plugin_dir}.{replacement_note}")
+    print(f"MCP Python: {result.python_executable}")
+    print(f"Updated marketplace: {result.marketplace_path}")
     print("Restart Codex to discover the plugin.")
     return 0
-
-
-def _load_marketplace(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {
-            "name": "local",
-            "interface": {"displayName": "Local Plugins"},
-            "plugins": [],
-        }
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"Invalid marketplace JSON at {path}: {exc}") from exc
-    if not isinstance(data, dict):
-        raise SystemExit(f"Marketplace JSON must be an object: {path}")
-    data.setdefault("name", "local")
-    data.setdefault("interface", {"displayName": "Local Plugins"})
-    data.setdefault("plugins", [])
-    if not isinstance(data["plugins"], list):
-        raise SystemExit(f"Marketplace plugins field must be a list: {path}")
-    return data
-
-
-def _upsert_marketplace_entry(marketplace: dict[str, Any]) -> None:
-    entry = {
-        "name": PLUGIN_NAME,
-        "source": {
-            "source": "local",
-            "path": f"./plugins/{PLUGIN_NAME}",
-        },
-        "policy": {
-            "installation": "AVAILABLE",
-            "authentication": "ON_INSTALL",
-        },
-        "category": "Productivity",
-    }
-    plugins = marketplace["plugins"]
-    for index, existing in enumerate(plugins):
-        if isinstance(existing, dict) and existing.get("name") == PLUGIN_NAME:
-            plugins[index] = entry
-            return
-    plugins.append(entry)
 
 
 if __name__ == "__main__":

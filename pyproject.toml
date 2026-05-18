@@ -1,31 +1,66 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-usage-tracker"
-version = "0.1.13"
+version = "0.2.0"
 description = "Local Codex plugin and dashboard for aggregate token usage tracking."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
   { name = "Douglas Monsky" }
 ]
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["codex", "mcp", "tokens", "usage", "dashboard", "openai"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Framework :: Pytest",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: System :: Monitoring",
+]
 dependencies = [
   "mcp>=1.2.0"
 ]
 
+[project.urls]
+Homepage = "https://github.com/douglasmonsky/codex-usage-tracker"
+Repository = "https://github.com/douglasmonsky/codex-usage-tracker"
+Issues = "https://github.com/douglasmonsky/codex-usage-tracker/issues"
+Changelog = "https://github.com/douglasmonsky/codex-usage-tracker/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
+  "build>=1.2",
   "pytest>=8.0"
 ]
 
 [project.scripts]
 codex-usage-tracker = "codex_usage_tracker.cli:main"
 
+[tool.setuptools]
+include-package-data = false
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"codex_usage_tracker.plugin_data" = [
+  "assets/*",
+  "skills/codex-usage-tracker/*",
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__/*", "*.py[cod]"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

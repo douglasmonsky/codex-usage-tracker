@@ -1,0 +1,227 @@
+"""Install a generated local Codex plugin wrapper for the package."""
+
+from __future__ import annotations
+
+import json
+import shutil
+import sys
+from dataclasses import dataclass
+from importlib import resources
+from importlib.resources.abc import Traversable
+from pathlib import Path
+from typing import Any
+
+from codex_usage_tracker import __version__
+from codex_usage_tracker.paths import DEFAULT_MARKETPLACE_PATH, DEFAULT_PLUGIN_LINK
+
+PLUGIN_NAME = "codex-usage-tracker"
+
+
+@dataclass(frozen=True)
+class PluginInstallResult:
+    plugin_dir: Path
+    marketplace_path: Path
+    python_executable: Path
+    replaced_existing: bool
+
+
+def install_plugin(
+    *,
+    plugin_dir: Path = DEFAULT_PLUGIN_LINK,
+    marketplace_path: Path = DEFAULT_MARKETPLACE_PATH,
+    python_executable: Path | None = None,
+    force: bool = False,
+) -> PluginInstallResult:
+    """Create or refresh a local Codex plugin wrapper for this installed package."""
+
+    plugin_dir = plugin_dir.expanduser()
+    marketplace_path = marketplace_path.expanduser()
+    python_path = _absolute_path(Path(python_executable or sys.executable))
+    replaced_existing = _prepare_plugin_dir(plugin_dir, force=force)
+    _write_plugin_files(plugin_dir=plugin_dir, python_executable=python_path)
+    marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+    marketplace = _load_marketplace(marketplace_path)
+    _upsert_marketplace_entry(marketplace, plugin_dir)
+    marketplace_path.write_text(
+        json.dumps(marketplace, indent=2, sort_keys=False) + "\n",
+        encoding="utf-8",
+    )
+    return PluginInstallResult(
+        plugin_dir=plugin_dir,
+        marketplace_path=marketplace_path,
+        python_executable=python_path,
+        replaced_existing=replaced_existing,
+    )
+
+
+def _prepare_plugin_dir(plugin_dir: Path, *, force: bool) -> bool:
+    if plugin_dir.is_symlink():
+        if not force:
+            raise FileExistsError(
+                f"{plugin_dir} is a symlink. Use --force to replace the old source-checkout plugin link."
+            )
+        plugin_dir.unlink()
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+        return True
+    if plugin_dir.exists():
+        marker = plugin_dir / ".codex-plugin" / "plugin.json"
+        if not marker.exists():
+            raise FileExistsError(
+                f"{plugin_dir} exists but does not look like a Codex Usage Tracker plugin."
+            )
+        if not force:
+            return False
+        shutil.rmtree(plugin_dir)
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+        return True
+    plugin_dir.mkdir(parents=True, exist_ok=True)
+    return False
+
+
+def _absolute_path(path: Path) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute():
+        return expanded
+    return Path.cwd() / expanded
+
+
+def _write_plugin_files(*, plugin_dir: Path, python_executable: Path) -> None:
+    (plugin_dir / ".codex-plugin").mkdir(parents=True, exist_ok=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps(_plugin_manifest(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (plugin_dir / ".mcp.json").write_text(
+        json.dumps(_mcp_config(python_executable), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    _copy_tree("assets", plugin_dir / "assets")
+    _copy_tree("skills", plugin_dir / "skills")
+
+
+def _copy_tree(resource_name: str, destination: Path) -> None:
+    source = resources.files("codex_usage_tracker.plugin_data").joinpath(resource_name)
+    if destination.exists():
+        shutil.rmtree(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    _copy_resource_tree(source, destination)
+
+
+def _copy_resource_tree(source: Traversable, destination: Path) -> None:
+    for child in source.iterdir():
+        target = destination / child.name
+        if child.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            _copy_resource_tree(child, target)
+        else:
+            with child.open("rb") as input_file, target.open("wb") as output_file:
+                shutil.copyfileobj(input_file, output_file)
+
+
+def _plugin_manifest() -> dict[str, Any]:
+    return {
+        "name": PLUGIN_NAME,
+        "version": __version__,
+        "description": "Track aggregate Codex token usage from local session logs.",
+        "author": {"name": "Douglas Monsky"},
+        "homepage": "https://github.com/douglasmonsky/codex-usage-tracker",
+        "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
+        "license": "MIT",
+        "keywords": ["codex", "tokens", "usage", "mcp", "dashboard"],
+        "skills": "./skills/",
+        "mcpServers": "./.mcp.json",
+        "interface": {
+            "displayName": "Codex Usage Tracker",
+            "shortDescription": "Local aggregate token usage analytics for Codex",
+            "longDescription": (
+                "Read local Codex session logs, aggregate exact token usage counters, "
+                "and generate summaries, CSV exports, and a hoverable dashboard with "
+                "optional localhost-only raw context loading."
+            ),
+            "developerName": "Douglas Monsky",
+            "category": "Productivity",
+            "capabilities": ["Interactive", "Read", "Write"],
+            "websiteURL": "https://github.com/douglasmonsky/codex-usage-tracker",
+            "privacyPolicyURL": "https://github.com/douglasmonsky/codex-usage-tracker",
+            "termsOfServiceURL": "https://github.com/douglasmonsky/codex-usage-tracker",
+            "defaultPrompt": [
+                "Check my Codex usage tracker setup",
+                "Show my Codex token usage summary",
+                "Show my most expensive Codex calls",
+                "Show my Codex pricing coverage",
+                "Update Codex usage pricing from OpenAI docs",
+                "Generate a Codex usage dashboard",
+                "Generate a threaded Codex usage dashboard",
+                "Serve a Codex dashboard with on-demand context",
+                "Show my Codex subagent usage",
+                "Export my Codex token usage CSV",
+            ],
+            "brandColor": "#2563EB",
+            "composerIcon": "./assets/icon.svg",
+            "logo": "./assets/icon.svg",
+            "screenshots": [],
+        },
+    }
+
+
+def _mcp_config(python_executable: Path) -> dict[str, Any]:
+    return {
+        "mcpServers": {
+            PLUGIN_NAME: {
+                "command": str(python_executable),
+                "args": ["-m", "codex_usage_tracker.mcp_server"],
+                "cwd": ".",
+            }
+        }
+    }
+
+
+def _load_marketplace(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {
+            "name": "local",
+            "interface": {"displayName": "Local Plugins"},
+            "plugins": [],
+        }
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Invalid marketplace JSON at {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit(f"Marketplace JSON must be an object: {path}")
+    data.setdefault("name", "local")
+    data.setdefault("interface", {"displayName": "Local Plugins"})
+    data.setdefault("plugins", [])
+    if not isinstance(data["plugins"], list):
+        raise SystemExit(f"Marketplace plugins field must be a list: {path}")
+    return data
+
+
+def _upsert_marketplace_entry(marketplace: dict[str, Any], plugin_dir: Path) -> None:
+    entry = {
+        "name": PLUGIN_NAME,
+        "source": {
+            "source": "local",
+            "path": _marketplace_plugin_path(plugin_dir),
+        },
+        "policy": {
+            "installation": "AVAILABLE",
+            "authentication": "ON_INSTALL",
+        },
+        "category": "Productivity",
+    }
+    plugins = marketplace["plugins"]
+    for index, existing in enumerate(plugins):
+        if isinstance(existing, dict) and existing.get("name") == PLUGIN_NAME:
+            plugins[index] = entry
+            return
+    plugins.append(entry)
+
+
+def _marketplace_plugin_path(plugin_dir: Path) -> str:
+    default_parent = Path.home() / "plugins"
+    try:
+        relative = plugin_dir.resolve().relative_to(default_parent.resolve())
+    except ValueError:
+        return str(plugin_dir.resolve())
+    return f"./plugins/{relative.as_posix()}"

@@ -15,11 +15,14 @@ This repo builds a local Codex plugin and dashboard that track aggregate token u
 
 - `src/codex_usage_tracker/` - parser, SQLite store, reports, dashboard, CLI, and MCP server.
 - `src/codex_usage_tracker/context.py` - on-demand raw-context reader for one selected usage record.
+- `src/codex_usage_tracker/plugin_installer.py` - package-owned local Codex plugin installer.
+- `src/codex_usage_tracker/plugin_data/` - plugin assets and skill files bundled into wheels.
 - `src/codex_usage_tracker/server.py` - localhost dashboard server with live aggregate refresh and lazy context endpoints.
 - `~/.codex-usage-tracker/pricing.json` - optional local-only pricing config, never committed.
 - `.codex-plugin/plugin.json` - Codex plugin manifest.
 - `.mcp.json` - MCP server configuration for Codex.
-- `scripts/install_local_plugin.py` - local plugin registration script.
+- `scripts/install_local_plugin.py` - compatibility wrapper around `codex-usage-tracker install-plugin`.
+- `.github/workflows/ci.yml` - GitHub Actions test and package build workflow.
 - `tests/` - synthetic fixtures and unit tests.
 
 ## Setup
@@ -29,6 +32,7 @@ python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install ".[dev]"
+codex-usage-tracker install-plugin --python .venv/bin/python
 ```
 
 ## Validation
@@ -36,6 +40,8 @@ python -m pip install ".[dev]"
 ```bash
 python -m pytest
 python -m compileall src
+python -m build
+git diff --check
 codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
 codex-usage-tracker doctor
 codex-usage-tracker dashboard --output /tmp/codex-usage-dashboard.html
@@ -62,6 +68,8 @@ codex-usage-tracker expensive --limit 5
 - MCP tool functions return concise aggregate data.
 - Dashboard is generated from aggregate-only JSON.
 - Doctor, summary presets, dashboard, and expensive-call views work from CLI and MCP wrappers.
+- `codex-usage-tracker install-plugin` can register the installed package without relying on a source-checkout symlink.
+- Wheel and source distribution builds include plugin assets and the Codex skill.
 - Pricing coverage clearly separates configured, estimated, and unpriced model usage.
 - Dashboard Calls and Threads views share filters, totals, and aggregate-only hover details.
 - Dashboard aggregate refresh is localhost-only and keeps generated HTML aggregate-only; context loading is lazy, localhost-only, explicit, redacted, and not embedded in the static HTML payload.
