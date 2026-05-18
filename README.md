@@ -21,6 +21,16 @@ The dashboard is intentionally split into two views:
 - `Calls`: inspect individual model calls, token fields, pricing status, cache ratio, reasoning output, and context-window percentage.
 - `Threads`: group calls by Codex thread, expand a thread chronologically, and see spawned subagents and inferred auto-review work in context.
 
+## Dashboard Preview
+
+These screenshots use synthetic aggregate fixture data. They do not contain prompts, assistant responses, tool output, or real Codex session content.
+
+![Calls view with filters, totals, model-call rows, and the details panel.](docs/assets/dashboard-calls.png)
+
+![Threads view with grouped Codex threads and expanded chronological calls.](docs/assets/dashboard-threads.png)
+
+![Call Details panel showing aggregate token, pricing, context, and thread attachment fields.](docs/assets/dashboard-details.png)
+
 ## Important Pattern: Long Chats Can Bloat Fast
 
 A common pattern this tool makes obvious is that staying in the same Codex chat for a long time can rapidly grow the context carried into later turns.
