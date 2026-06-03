@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>__TITLE__</title>
+  <link rel="stylesheet" href="__STYLESHEET_HREF__">
+</head>
+<body>
+  <header>
+    <div class="header-main">
+      <div>
+        <p class="eyebrow">Local Codex analytics</p>
+        <h1>Usage Dashboard</h1>
+      </div>
+      <div class="live-bar" aria-label="Dashboard refresh controls">
+        <button id="refreshDashboard" class="refresh-button" type="button">Refresh</button>
+        <label class="live-toggle"><input id="autoRefresh" type="checkbox" checked> Live</label>
+        <label class="load-control">Load
+          <select id="loadLimit">
+            <option value="5000">5,000 calls</option>
+            <option value="10000">10,000 calls</option>
+            <option value="20000">20,000 calls</option>
+            <option value="all">All calls</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="header-meta">
+      <span class="disclaimer-chip" title="Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI.">Unofficial project - not affiliated with OpenAI</span>
+      <span class="status-chip">Aggregate only</span>
+      <span id="liveStatus" class="live-status">Static snapshot loaded.</span>
+      <span id="pricingSource" class="source-line"></span>
+      __GUIDE_LINK__
+    </div>
+  </header>
+  <main>
+    <div class="filters">
+      <label>Search<input id="search" type="search" placeholder="Thread, cwd, model, session"></label>
+      <label>Model<select id="model"><option value="">All models</option></select></label>
+      <label>Reasoning<select id="effort"><option value="">All efforts</option></select></label>
+      <label>Pricing<select id="pricingStatus"><option value="">All pricing</option><option value="official">Official/configured</option><option value="estimated">Estimated</option><option value="unpriced">Unpriced</option></select></label>
+      <label>Sort<select id="sort"><option value="time" selected>Newest calls</option><option value="thread">Thread name</option><option value="model">Model</option><option value="effort">Reasoning</option><option value="total">Most tokens</option><option value="cost">Highest estimated cost</option><option value="cache">Lowest cache ratio</option><option value="signals">Most signals</option><option value="context">Highest context use</option></select></label>
+    </div>
+    <div class="cards">
+      <div class="card"><span>Visible Calls</span><strong id="visibleCalls">0</strong></div>
+      <div class="card"><span>Total Tokens</span><strong id="totalTokens">0</strong></div>
+      <div class="card"><span>Cached Input</span><strong id="cachedTokens">0</strong></div>
+      <div class="card"><span>Reasoning Output</span><strong id="reasoningTokens">0</strong></div>
+      <div class="card"><span>Estimated Cost</span><strong id="estimatedCost">$0.00</strong></div>
+      <div class="card"><span>Price Coverage</span><strong id="priceCoverage">0.0%</strong></div>
+      <div class="card"><span>Estimated Tokens</span><strong id="estimatedTokens">0</strong></div>
+      <div class="card"><span>Unpriced Tokens</span><strong id="unpricedTokens">0</strong></div>
+    </div>
+    <div class="grid">
+      <section>
+        <h2 id="tableTitle">Model Calls</h2>
+        <div class="table-tools">
+          <div class="segmented" role="group" aria-label="Dashboard view">
+            <button id="callsView" type="button" aria-pressed="true">Calls</button>
+            <button id="threadsView" type="button" aria-pressed="false">Threads</button>
+          </div>
+          <div id="tableCaption" class="table-caption">Showing individual model calls.</div>
+          <div id="pager" class="pager" aria-label="Table pages">
+            <button id="prevPage" class="pager-button" type="button">Previous</button>
+            <span id="pageStatus">Page 1</span>
+            <button id="nextPage" class="pager-button" type="button">Next</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th data-sort-header="time"><button class="sort-header" type="button" data-sort-key="time">Time <span class="sort-indicator" data-sort-indicator="time"></span></button></th>
+              <th data-sort-header="thread"><button class="sort-header" type="button" data-sort-key="thread">Thread <span class="sort-indicator" data-sort-indicator="thread"></span></button></th>
+              <th data-sort-header="model"><button class="sort-header" type="button" data-sort-key="model">Model <span class="sort-indicator" data-sort-indicator="model"></span></button></th>
+              <th data-sort-header="effort"><button class="sort-header" type="button" data-sort-key="effort">Effort <span class="sort-indicator" data-sort-indicator="effort"></span></button></th>
+              <th class="num" data-sort-header="total"><button class="sort-header" type="button" data-sort-key="total">Tokens <span class="sort-indicator" data-sort-indicator="total"></span></button></th>
+              <th class="num" data-sort-header="cost"><button class="sort-header" type="button" data-sort-key="cost">Cost <span class="sort-indicator" data-sort-indicator="cost"></span></button></th>
+              <th class="num" data-sort-header="cache"><button class="sort-header" type="button" data-sort-key="cache">Cache <span class="sort-indicator" data-sort-indicator="cache"></span></button></th>
+              <th class="num" data-sort-header="signals"><button class="sort-header" type="button" data-sort-key="signals">Signals <span class="sort-indicator" data-sort-indicator="signals"></span></button></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </section>
+      <section class="detail-section">
+        <h2>Call Details</h2>
+        <div id="detail" class="detail">Hover or click a row to inspect aggregate usage fields.</div>
+      </section>
+    </div>
+  </main>
+  <button id="toTop" class="to-top" type="button" aria-label="Back to top">Top</button>
+  <script id="usage-data" type="application/json">__PAYLOAD__</script>
+  <script src="__SCRIPT_SRC__"></script>
+</body>
+</html>

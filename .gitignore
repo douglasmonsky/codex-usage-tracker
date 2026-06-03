@@ -18,6 +18,7 @@ dist/
 *.csv
 *.html
 !src/codex_usage_tracker/plugin_data/docs/dashboard-guide.html
+!src/codex_usage_tracker/plugin_data/dashboard/dashboard_template.html
 
 .DS_Store
 tmp/
