@@ -6,7 +6,6 @@ import argparse
 import json
 import sys
 import webbrowser
-from datetime import date, timedelta
 from pathlib import Path
 
 from codex_usage_tracker import __version__
@@ -14,11 +13,8 @@ from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
-    format_calls,
     format_doctor,
-    format_pricing_coverage,
     format_session,
-    format_summary,
 )
 from codex_usage_tracker.paths import (
     DEFAULT_CODEX_HOME,
@@ -32,17 +28,20 @@ from codex_usage_tracker.plugin_installer import install_plugin
 from codex_usage_tracker.pricing import (
     OPENAI_PRICING_MD_URL,
     VALID_PRICING_TIERS,
-    annotate_rows_with_efficiency,
-    load_pricing_config,
-    summarize_pricing_coverage,
     update_pricing_from_openai_docs,
     write_pricing_template,
 )
+from codex_usage_tracker.reports import (
+    EXPENSIVE_PRESET_CHOICES,
+    SUMMARY_GROUP_BY_CHOICES,
+    SUMMARY_PRESET_CHOICES,
+    build_expensive_calls_report,
+    build_pricing_coverage_report,
+    build_summary_report,
+)
 from codex_usage_tracker.store import (
     export_usage_csv,
-    query_most_expensive_calls,
     query_session_usage,
-    query_summary,
     refresh_usage_index,
 )
 from codex_usage_tracker.server import serve_dashboard
@@ -94,33 +93,12 @@ def _main() -> int:
     summary = subparsers.add_parser("summary", help="Show aggregate usage summary")
     summary.add_argument(
         "--group-by",
-        choices=[
-            "date",
-            "model",
-            "effort",
-            "cwd",
-            "thread",
-            "session",
-            "thread_source",
-            "subagent_type",
-            "agent_role",
-            "parent_session",
-            "parent_thread",
-        ],
+        choices=SUMMARY_GROUP_BY_CHOICES,
         default="thread",
     )
     summary.add_argument(
         "--preset",
-        choices=[
-            "today",
-            "last-7-days",
-            "by-model",
-            "by-cwd",
-            "by-thread",
-            "by-subagent-role",
-            "by-subagent-type",
-            "expensive",
-        ],
+        choices=SUMMARY_PRESET_CHOICES,
         help="Convenience preset for common summaries",
     )
     summary.add_argument("--since", help="Only include calls at or after this ISO date/time")
@@ -186,7 +164,7 @@ def _main() -> int:
     expensive.add_argument("--since", help="Only include calls at or after this ISO date/time")
     expensive.add_argument(
         "--preset",
-        choices=["today", "last-7-days"],
+        choices=EXPENSIVE_PRESET_CHOICES,
         help="Convenience date window",
     )
 
@@ -259,16 +237,15 @@ def _main() -> int:
         return 0
 
     if args.command == "summary":
-        group_by, since = _resolve_summary_options(args.group_by, args.preset, args.since)
-        pricing = load_pricing_config(args.pricing)
-        if args.preset == "expensive":
-            rows = query_most_expensive_calls(args.db, limit=args.limit, since=since)
-            print(format_calls(annotate_rows_with_efficiency(rows, pricing)))
-            return 0
-        rows = query_summary(args.db, group_by, args.limit, since=since)
-        if group_by == "model":
-            rows = annotate_rows_with_efficiency(rows, pricing, model_field="group_key")
-        print(format_summary(rows, group_by))
+        report = build_summary_report(
+            db_path=args.db,
+            pricing_path=args.pricing,
+            group_by=args.group_by,
+            preset=args.preset,
+            since=args.since,
+            limit=args.limit,
+        )
+        print(report.render())
         return 0
 
     if args.command == "session":
@@ -336,17 +313,23 @@ def _main() -> int:
         return 0
 
     if args.command == "expensive":
-        since = _resolve_since(args.preset, args.since)
-        pricing = load_pricing_config(args.pricing)
-        rows = query_most_expensive_calls(args.db, limit=args.limit, since=since)
-        print(format_calls(annotate_rows_with_efficiency(rows, pricing)))
+        report = build_expensive_calls_report(
+            db_path=args.db,
+            pricing_path=args.pricing,
+            limit=args.limit,
+            preset=args.preset,
+            since=args.since,
+        )
+        print(report.render())
         return 0
 
     if args.command == "pricing-coverage":
-        pricing = load_pricing_config(args.pricing)
-        rows = query_summary(args.db, group_by="model", limit=1000, since=args.since)
-        report = summarize_pricing_coverage(rows, pricing=pricing)
-        print(json.dumps(report, indent=2) if args.as_json else format_pricing_coverage(report, args.limit))
+        report = build_pricing_coverage_report(
+            db_path=args.db,
+            pricing_path=args.pricing,
+            since=args.since,
+        )
+        print(json.dumps(report.payload, indent=2) if args.as_json else report.render(args.limit))
         return 0
 
     if args.command == "export":
@@ -382,33 +365,6 @@ def _main() -> int:
 
     parser.error("unknown command")
     return 2
-
-
-def _resolve_summary_options(
-    group_by: str, preset: str | None, since: str | None
-) -> tuple[str, str | None]:
-    if preset == "by-model":
-        group_by = "model"
-    elif preset == "by-cwd":
-        group_by = "cwd"
-    elif preset == "by-thread":
-        group_by = "thread"
-    elif preset == "by-subagent-role":
-        group_by = "agent_role"
-    elif preset == "by-subagent-type":
-        group_by = "subagent_type"
-    return group_by, _resolve_since(preset, since)
-
-
-def _resolve_since(preset: str | None, since: str | None) -> str | None:
-    if since:
-        return since
-    if preset == "today":
-        return date.today().isoformat()
-    if preset == "last-7-days":
-        return (date.today() - timedelta(days=6)).isoformat()
-    return None
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

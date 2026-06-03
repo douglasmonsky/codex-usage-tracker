@@ -331,13 +331,20 @@ def _check_mcp_config(repo_root: Path | None) -> DoctorCheck:
 
 
 def _check_mcp_import() -> DoctorCheck:
-    try:
-        import codex_usage_tracker.mcp_server  # noqa: F401
-    except Exception as exc:  # pragma: no cover - exact SDK import errors vary.
+    module_spec = importlib.util.find_spec("codex_usage_tracker.mcp_server")
+    if module_spec is None:
         return DoctorCheck(
             "MCP module",
             "fail",
-            f"MCP server module could not be imported: {type(exc).__name__}: {exc}",
+            "MCP server module could not be found.",
             'Install dependencies with: python -m pip install ".[dev]"',
         )
-    return DoctorCheck("MCP module", "pass", "MCP server module imports successfully.")
+    sdk_spec = importlib.util.find_spec("mcp.server.fastmcp")
+    if sdk_spec is None:
+        return DoctorCheck(
+            "MCP module",
+            "fail",
+            "FastMCP SDK dependency could not be found.",
+            'Install dependencies with: python -m pip install ".[dev]"',
+        )
+    return DoctorCheck("MCP module", "pass", "MCP server module is discoverable.")

@@ -97,7 +97,7 @@ def _absolute_path(path: Path) -> Path:
 def _write_plugin_files(*, plugin_dir: Path, python_executable: Path) -> None:
     (plugin_dir / ".codex-plugin").mkdir(parents=True, exist_ok=True)
     (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
-        json.dumps(_plugin_manifest(), indent=2) + "\n",
+        json.dumps(plugin_manifest(), indent=2) + "\n",
         encoding="utf-8",
     )
     (plugin_dir / ".mcp.json").write_text(
@@ -127,7 +127,9 @@ def _copy_resource_tree(source: Any, destination: Path) -> None:
                 shutil.copyfileobj(input_file, output_file)
 
 
-def _plugin_manifest() -> dict[str, Any]:
+def plugin_manifest() -> dict[str, Any]:
+    """Return the package-owned Codex plugin manifest."""
+
     return {
         "name": PLUGIN_NAME,
         "version": __version__,

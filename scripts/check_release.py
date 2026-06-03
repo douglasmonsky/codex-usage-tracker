@@ -41,6 +41,9 @@ REQUIRED_FILES = [
     ".mcp.json",
     "skills/codex-usage-tracker/scripts/run_mcp.py",
     "src/codex_usage_tracker/plugin_data/assets/icon.svg",
+    "src/codex_usage_tracker/plugin_data/dashboard/dashboard.css",
+    "src/codex_usage_tracker/plugin_data/dashboard/dashboard.js",
+    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_template.html",
     "src/codex_usage_tracker/plugin_data/docs/dashboard-guide.html",
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-calls.png",
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-threads.png",
@@ -49,6 +52,9 @@ REQUIRED_FILES = [
 ]
 WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/assets/icon.svg",
+    "codex_usage_tracker/plugin_data/dashboard/dashboard.css",
+    "codex_usage_tracker/plugin_data/dashboard/dashboard.js",
+    "codex_usage_tracker/plugin_data/dashboard/dashboard_template.html",
     "codex_usage_tracker/plugin_data/docs/dashboard-guide.html",
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-calls.png",
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-threads.png",
@@ -123,9 +129,15 @@ def _check_docs() -> list[str]:
 
 
 def _check_packaging_metadata() -> list[str]:
+    sys.path.insert(0, str(REPO_ROOT / "src"))
+    from codex_usage_tracker.plugin_installer import plugin_manifest
+
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = pyproject["project"]
     failures: list[str] = []
+    manifest = json.loads((REPO_ROOT / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+    if manifest != plugin_manifest():
+        failures.append(".codex-plugin/plugin.json does not match plugin_installer.plugin_manifest()")
     if project.get("license") != "MIT":
         failures.append("pyproject.toml should use SPDX license = \"MIT\"")
     if "license-files" not in project:

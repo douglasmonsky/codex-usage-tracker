@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -14,11 +13,8 @@ from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
-    format_calls,
     format_doctor,
-    format_pricing_coverage,
     format_session,
-    format_summary,
 )
 from codex_usage_tracker.paths import (
     DEFAULT_CODEX_HOME,
@@ -27,17 +23,17 @@ from codex_usage_tracker.paths import (
     DEFAULT_PRICING_PATH,
 )
 from codex_usage_tracker.pricing import (
-    annotate_rows_with_efficiency,
-    load_pricing_config,
-    summarize_pricing_coverage,
     update_pricing_from_openai_docs,
     write_pricing_template,
 )
+from codex_usage_tracker.reports import (
+    build_expensive_calls_report,
+    build_pricing_coverage_report,
+    build_summary_report,
+)
 from codex_usage_tracker.store import (
     export_usage_csv as export_csv,
-    query_most_expensive_calls,
     query_session_usage,
-    query_summary,
     refresh_usage_index as refresh_index,
 )
 
@@ -81,17 +77,14 @@ def usage_summary(
 ) -> str:
     """Summarize aggregate Codex token usage by date, model, effort, cwd, thread, session, parent thread, or subagent metadata."""
 
-    group_by, since_filter = _resolve_summary_options(group_by, preset, since)
-    pricing = load_pricing_config(DEFAULT_PRICING_PATH)
-    if preset == "expensive":
-        rows = query_most_expensive_calls(DEFAULT_DB_PATH, limit=limit, since=since_filter)
-        return format_calls(annotate_rows_with_efficiency(rows, pricing))
-    rows = query_summary(
-        DEFAULT_DB_PATH, group_by=group_by, limit=limit, since=since_filter
-    )
-    if group_by == "model":
-        rows = annotate_rows_with_efficiency(rows, pricing, model_field="group_key")
-    return format_summary(rows, group_by)
+    return build_summary_report(
+        db_path=DEFAULT_DB_PATH,
+        pricing_path=DEFAULT_PRICING_PATH,
+        group_by=group_by,
+        limit=limit,
+        preset=preset,
+        since=since,
+    ).render()
 
 
 @mcp.tool()
@@ -137,11 +130,13 @@ def most_expensive_usage_calls(
 ) -> str:
     """Show the highest last-call aggregate usage rows with efficiency signals."""
 
-    pricing = load_pricing_config(DEFAULT_PRICING_PATH)
-    rows = query_most_expensive_calls(
-        DEFAULT_DB_PATH, limit=limit, since=_resolve_since(preset, since)
-    )
-    return format_calls(annotate_rows_with_efficiency(rows, pricing))
+    return build_expensive_calls_report(
+        db_path=DEFAULT_DB_PATH,
+        pricing_path=DEFAULT_PRICING_PATH,
+        limit=limit,
+        preset=preset,
+        since=since,
+    ).render()
 
 
 @mcp.tool()
@@ -152,12 +147,14 @@ def usage_pricing_coverage(
 ) -> str | dict[str, Any]:
     """Show priced, estimated, and unpriced token coverage by model."""
 
-    pricing = load_pricing_config(DEFAULT_PRICING_PATH)
-    rows = query_summary(DEFAULT_DB_PATH, group_by="model", limit=1000, since=since)
-    report = summarize_pricing_coverage(rows, pricing=pricing)
+    report = build_pricing_coverage_report(
+        db_path=DEFAULT_DB_PATH,
+        pricing_path=DEFAULT_PRICING_PATH,
+        since=since,
+    )
     if response_format == "json":
-        return report
-    return format_pricing_coverage(report, limit=limit)
+        return report.payload
+    return report.render(limit=limit)
 
 
 @mcp.tool()
@@ -214,33 +211,6 @@ def update_usage_pricing_config(
         "estimated_model_count": result.estimated_model_count,
         "backup_path": str(result.backup_path) if result.backup_path else None,
     }
-
-
-def _resolve_summary_options(
-    group_by: str, preset: str | None, since: str | None
-) -> tuple[str, str | None]:
-    if preset == "by-model":
-        group_by = "model"
-    elif preset == "by-cwd":
-        group_by = "cwd"
-    elif preset == "by-thread":
-        group_by = "thread"
-    elif preset == "by-subagent-role":
-        group_by = "agent_role"
-    elif preset == "by-subagent-type":
-        group_by = "subagent_type"
-    return group_by, _resolve_since(preset, since)
-
-
-def _resolve_since(preset: str | None, since: str | None) -> str | None:
-    if since:
-        return since
-    if preset == "today":
-        return date.today().isoformat()
-    if preset == "last-7-days":
-        return (date.today() - timedelta(days=6)).isoformat()
-    return None
-
 
 if __name__ == "__main__":
     mcp.run()

@@ -170,27 +170,37 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     exported_with_zero_limit = export_usage_csv(output_path=all_csv_path, db_path=db_path, limit=0)
 
     dashboard = dashboard_path.read_text(encoding="utf-8")
+    asset_dir = tmp_path / "codex-usage-tracker-assets"
+    dashboard_js = (asset_dir / "dashboard.js").read_text(encoding="utf-8")
+    dashboard_css = (asset_dir / "dashboard.css").read_text(encoding="utf-8")
+    dashboard_surface = "\n".join([dashboard, dashboard_js, dashboard_css])
     csv_text = csv_path.read_text(encoding="utf-8")
     assert exported == 4
     assert exported_with_zero_limit == 4
     assert "SECRET RAW PROMPT" not in dashboard
+    assert "SECRET RAW PROMPT" not in dashboard_js
+    assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
-    assert "last call" in dashboard.lower()
-    assert "session cumulative" in dashboard.lower()
+    assert 'href="codex-usage-tracker-assets/dashboard.css"' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard.js"' in dashboard
+    assert "last call" in dashboard_js.lower()
+    assert "session cumulative" in dashboard_js.lower()
     assert "Estimated Cost" in dashboard
     assert "estimated_cost_usd" in dashboard
     assert "callsView" in dashboard
     assert "threadsView" in dashboard
-    assert "thread-row" in dashboard
-    assert "thread-call-table" in dashboard
-    assert "Thread attachment" in dashboard
-    assert "Subagent type" in dashboard
-    assert "Auto-review" in dashboard
-    assert "Load context" in dashboard
+    assert "thread-row" in dashboard_surface
+    assert "thread-call-table" in dashboard_surface
+    assert "Thread attachment" in dashboard_js
+    assert "Subagent type" in dashboard_js
+    assert "Auto-review" in dashboard_js
+    assert "Load context" in dashboard_js
     assert "parent_thread_name" in dashboard
-    assert "explicit parent thread" in dashboard
-    assert "spawned from" in dashboard
-    assert "spawned threads" in dashboard
+    assert "thread_attachment_label" in dashboard
+    assert "thread_attachment_relation" in dashboard
+    assert "explicit parent thread" in dashboard_js
+    assert "spawned from" in dashboard_js
+    assert "spawned threads" in dashboard_js
     assert "Aggregate only" in dashboard
     assert "Call Details" in dashboard
     assert "Dashboard guide" in dashboard
@@ -198,24 +208,26 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "codex-usage-tracker-guide/dashboard-guide.html" in dashboard
     assert (tmp_path / "codex-usage-tracker-guide" / "dashboard-guide.html").exists()
     assert (tmp_path / "codex-usage-tracker-guide" / "assets" / "dashboard-calls.png").exists()
+    assert (asset_dir / "dashboard.js").exists()
+    assert (asset_dir / "dashboard.css").exists()
     assert "detail-section" in dashboard
-    assert "time-cell" in dashboard
-    assert "formatTimestamp" in dashboard
-    assert "scrollbar-gutter: stable" in dashboard
-    assert "overflow-y: scroll" in dashboard
-    assert "formatTimestamp(pricingSource.fetched_at)" in dashboard
-    assert "formatTimestamp(nextPayload.refreshed_at)" in dashboard
-    assert "threadModelSummary" in dashboard
-    assert "model-pill" in dashboard
+    assert "time-cell" in dashboard_surface
+    assert "formatTimestamp" in dashboard_js
+    assert "scrollbar-gutter: stable" in dashboard_css
+    assert "overflow-y: scroll" in dashboard_css
+    assert "formatTimestamp(pricingSource.fetched_at)" in dashboard_js
+    assert "formatTimestamp(nextPayload.refreshed_at)" in dashboard_js
+    assert "threadModelSummary" in dashboard_js
+    assert "model-pill" in dashboard_surface
     assert "Back to top" in dashboard
-    assert "updateToTopVisibility" in dashboard
-    assert "Live ·" in dashboard
+    assert "updateToTopVisibility" in dashboard_js
+    assert "Live ·" in dashboard_js
     assert "loadLimit" in dashboard
     assert "pager" in dashboard
-    assert "pagerEl.hidden = !shouldShowPager" in dashboard
-    assert "updatePager(page, 'threads')" in dashboard
+    assert "pagerEl.hidden = !shouldShowPager" in dashboard_js
+    assert "updatePager(page, 'threads')" in dashboard_js
     assert "All calls" in dashboard
-    assert "/api/usage" in dashboard
+    assert "/api/usage" in dashboard_js
     assert 'data-sort-key="time"' in dashboard
     assert 'data-sort-key="thread"' in dashboard
     assert '<option value="time" selected>Newest calls</option>' in dashboard
@@ -233,6 +245,7 @@ def test_dashboard_guide_link_can_use_docs_url_override(tmp_path: Path, monkeypa
     dashboard = dashboard_path.read_text(encoding="utf-8")
     assert 'href="https://example.test/guide"' in dashboard
     assert not (tmp_path / "codex-usage-tracker-guide").exists()
+    assert (tmp_path / "codex-usage-tracker-assets" / "dashboard.js").exists()
 
 
 def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> None:

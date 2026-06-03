@@ -16,46 +16,14 @@ from codex_usage_tracker.parser import (
     parse_usage_events,
 )
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
+from codex_usage_tracker.schema import (
+    USAGE_EVENT_COLUMN_NAMES,
+    USAGE_EVENT_CREATE_COLUMNS_SQL,
+    USAGE_EVENT_REPAIR_COLUMNS,
+)
 
 
-EVENT_COLUMNS = [
-    "record_id",
-    "session_id",
-    "thread_name",
-    "session_updated_at",
-    "event_timestamp",
-    "source_file",
-    "line_number",
-    "turn_id",
-    "turn_timestamp",
-    "cwd",
-    "model",
-    "effort",
-    "current_date",
-    "timezone",
-    "thread_source",
-    "subagent_type",
-    "agent_role",
-    "agent_nickname",
-    "parent_session_id",
-    "parent_thread_name",
-    "parent_session_updated_at",
-    "model_context_window",
-    "input_tokens",
-    "cached_input_tokens",
-    "output_tokens",
-    "reasoning_output_tokens",
-    "total_tokens",
-    "cumulative_input_tokens",
-    "cumulative_cached_input_tokens",
-    "cumulative_output_tokens",
-    "cumulative_reasoning_output_tokens",
-    "cumulative_total_tokens",
-    "uncached_input_tokens",
-    "cache_ratio",
-    "reasoning_output_ratio",
-    "context_window_percent",
-]
+EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
 SCHEMA_VERSION = 1
 
@@ -112,44 +80,9 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 def _migrate_v1(conn: sqlite3.Connection) -> None:
     conn.executescript(
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS usage_events (
-            record_id TEXT PRIMARY KEY,
-            session_id TEXT NOT NULL,
-            thread_name TEXT,
-            session_updated_at TEXT,
-            event_timestamp TEXT NOT NULL,
-            source_file TEXT NOT NULL,
-            line_number INTEGER NOT NULL,
-            turn_id TEXT,
-            turn_timestamp TEXT,
-            cwd TEXT,
-            model TEXT,
-            effort TEXT,
-            current_date TEXT,
-            timezone TEXT,
-            thread_source TEXT,
-            subagent_type TEXT,
-            agent_role TEXT,
-            agent_nickname TEXT,
-            parent_session_id TEXT,
-            parent_thread_name TEXT,
-            parent_session_updated_at TEXT,
-            model_context_window INTEGER,
-            input_tokens INTEGER NOT NULL,
-            cached_input_tokens INTEGER NOT NULL,
-            output_tokens INTEGER NOT NULL,
-            reasoning_output_tokens INTEGER NOT NULL,
-            total_tokens INTEGER NOT NULL,
-            cumulative_input_tokens INTEGER NOT NULL,
-            cumulative_cached_input_tokens INTEGER NOT NULL,
-            cumulative_output_tokens INTEGER NOT NULL,
-            cumulative_reasoning_output_tokens INTEGER NOT NULL,
-            cumulative_total_tokens INTEGER NOT NULL,
-            uncached_input_tokens INTEGER NOT NULL,
-            cache_ratio REAL NOT NULL,
-            reasoning_output_ratio REAL NOT NULL,
-            context_window_percent REAL NOT NULL
+            {USAGE_EVENT_CREATE_COLUMNS_SQL}
         );
 
         CREATE TABLE IF NOT EXISTS refresh_meta (
@@ -158,28 +91,7 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    _ensure_columns(
-        conn,
-        {
-            "thread_name": "TEXT",
-            "session_updated_at": "TEXT",
-            "turn_id": "TEXT",
-            "turn_timestamp": "TEXT",
-            "cwd": "TEXT",
-            "model": "TEXT",
-            "effort": "TEXT",
-            "current_date": "TEXT",
-            "timezone": "TEXT",
-            "thread_source": "TEXT",
-            "subagent_type": "TEXT",
-            "agent_role": "TEXT",
-            "agent_nickname": "TEXT",
-            "parent_session_id": "TEXT",
-            "parent_thread_name": "TEXT",
-            "parent_session_updated_at": "TEXT",
-            "model_context_window": "INTEGER",
-        },
-    )
+    _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
     conn.executescript(
         """
         CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_events(session_id);
