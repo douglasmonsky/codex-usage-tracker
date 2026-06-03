@@ -10,6 +10,8 @@ Codex Usage Tracker reads the JSONL logs already written by Codex, indexes aggre
 
 The dashboard opens with an insight-first summary that ranks threads and calls needing attention before you start sorting tables.
 
+![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png)
+
 ![Calls view with filters, totals, model-call rows, and the details panel.](docs/assets/dashboard-calls.png)
 
 ![Threads view with grouped Codex threads and expanded chronological calls.](docs/assets/dashboard-threads.png)
@@ -108,12 +110,6 @@ codex-usage-tracker refresh
 codex-usage-tracker serve-dashboard --open
 ```
 
-After a PyPI release, the install command becomes:
-
-```bash
-pipx install codex-usage-tracker
-```
-
 `install-plugin` creates `~/plugins/codex-usage-tracker`, writes a package-owned `.mcp.json` that points at the installed Python executable, and updates `~/.agents/plugins/marketplace.json`. Restart Codex after registration so it discovers the plugin.
 
 ## Fastest Useful Workflow
@@ -126,11 +122,12 @@ codex-usage-tracker serve-dashboard --open
 Then:
 
 1. Leave `Live` enabled while working, or click `Refresh` after a Codex run finishes.
-2. Open `Threads` view to find the active work thread and any spawned subagent or auto-review calls.
-3. Sort by `Cost`, `Tokens`, `Cache`, or `Context` depending on the question.
-4. Expand an expensive thread and read calls oldest to newest.
-5. Hover or click rows to inspect exact aggregate fields in `Call Details`.
-6. Use `Load context` only when the aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
+2. Start in `Insights` view and scan the `Needs Attention` cards.
+3. Use an investigation preset when you already know the question: highest-cost threads, context bloat, cache misses, pricing gaps, or estimated-price review.
+4. Open `Threads` view to find the active work thread and any spawned subagent or auto-review calls.
+5. Expand an expensive thread and read calls oldest to newest.
+6. Hover or click rows to inspect exact aggregate fields in `Call Details`.
+7. Use `Load context` only when the aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
 
 For a screenshot-driven walkthrough, see [`docs/dashboard-guide.md`](docs/dashboard-guide.md).
 Generated dashboards also link to a bundled local HTML copy of the guide. Set `CODEX_USAGE_TRACKER_DOCS_URL` if you want generated dashboards to point at a hosted docs page instead.

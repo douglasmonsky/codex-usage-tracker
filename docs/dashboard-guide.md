@@ -28,6 +28,8 @@ Static file mode can still filter, sort, and inspect aggregate call fields. It c
 
 ## Insights View
 
+![Insights view with ranked attention cards, investigation presets, and top threads by attention score.](assets/dashboard-insights.png)
+
 The dashboard opens in `Insights` view. This view is designed to answer "what needs attention?" before you start sorting tables.
 
 - `Needs Attention` cards rank costly threads, low cache reuse, context bloat, unpriced usage, estimated pricing, and reasoning-output spikes from aggregate fields only.
