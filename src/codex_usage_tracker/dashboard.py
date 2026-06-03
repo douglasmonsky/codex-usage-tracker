@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import hashlib
 import json
 import os
 import shutil
@@ -71,6 +72,8 @@ def generate_dashboard(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     guide_href = _dashboard_guide_href(output_path)
     asset_base = _dashboard_assets_href(output_path)
+    stylesheet_href = _versioned_asset_href(output_path, asset_base, "dashboard.css")
+    script_src = _versioned_asset_href(output_path, asset_base, "dashboard.js")
     payload = json.dumps(
         dashboard_payload(
             db_path=db_path,
@@ -85,8 +88,8 @@ def generate_dashboard(
         _html(
             payload,
             guide_href=guide_href,
-            stylesheet_href=f"{asset_base}/dashboard.css",
-            script_src=f"{asset_base}/dashboard.js",
+            stylesheet_href=stylesheet_href,
+            script_src=script_src,
         ),
         encoding="utf-8",
     )
@@ -121,6 +124,15 @@ def _dashboard_assets_href(output_path: Path) -> str:
         shutil.rmtree(assets_target)
     _copy_resource_tree(assets_source, assets_target)
     return "codex-usage-tracker-assets"
+
+
+def _versioned_asset_href(output_path: Path, asset_base: str, filename: str) -> str:
+    asset_path = output_path.parent / asset_base / filename
+    try:
+        digest = hashlib.sha256(asset_path.read_bytes()).hexdigest()[:12]
+    except OSError:
+        return f"{asset_base}/{filename}"
+    return f"{asset_base}/{filename}?v={digest}"
 
 
 def _copy_resource_tree(source: Any, target: Path) -> None:

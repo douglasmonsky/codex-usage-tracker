@@ -181,14 +181,18 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_js
     assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
-    assert 'href="codex-usage-tracker-assets/dashboard.css"' in dashboard
-    assert 'src="codex-usage-tracker-assets/dashboard.js"' in dashboard
+    assert 'href="codex-usage-tracker-assets/dashboard.css?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard.js?v=' in dashboard
     assert "last call" in dashboard_js.lower()
     assert "session cumulative" in dashboard_js.lower()
     assert "Estimated Cost" in dashboard
     assert "estimated_cost_usd" in dashboard
+    assert "Uncached Input" in dashboard
+    assert "uncachedTokens" in dashboard
     assert "Codex Credits" in dashboard
     assert "Usage Remaining" in dashboard
+    assert "Price Coverage" not in dashboard
+    assert "priceCoverage" not in dashboard_surface
     assert "usageCredits" in dashboard
     assert "allowanceImpact" in dashboard
     assert "usage_credits" in dashboard
@@ -218,7 +222,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "explicit parent thread" in dashboard_js
     assert "spawned from" in dashboard_js
     assert "spawned threads" in dashboard_js
-    assert "Aggregate only" in dashboard
+    assert "Aggregate only" not in dashboard
     assert "Call Details" in dashboard
     assert "Dashboard guide" in dashboard
     assert "github.com/douglasmonsky/codex-usage-tracker/blob/main/docs/dashboard-guide.md" not in dashboard
@@ -238,7 +242,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "model-pill" in dashboard_surface
     assert "Back to top" in dashboard
     assert "updateToTopVisibility" in dashboard_js
-    assert "Live ·" in dashboard_js
+    assert "Live refresh every" in dashboard_js
+    assert "Refreshing local usage index" in dashboard_js
     assert "loadLimit" in dashboard
     assert "pager" in dashboard
     assert "pagerEl.hidden = !shouldShowPager" in dashboard_js

@@ -50,8 +50,8 @@ The dashboard opens in `Insights` view. This view is designed to answer "what ne
 
 Use `Calls` view when you want to inspect individual model calls.
 
-- The header stays compact: refresh controls on the right, aggregate/privacy status on the left.
-- The top cards include Codex credit usage and optional usage remaining instead of estimated-token and unpriced-token counters.
+- The header stays compact: refresh controls on the right, and short status chips on the left. Exact refresh time, pricing source, and credit-rate source live in hover titles so live refreshes do not reflow the page.
+- The top cards include cached input, uncached input, Codex credit usage, and optional usage remaining instead of estimated-token, unpriced-token, and price-coverage counters.
 - Search matches thread, cwd, model, session id, turn id, subagent role, and parent thread fields.
 - The cards summarize only the currently visible filtered rows.
 - Time values are shown in your browser's local date/time format while sorting still uses the logged timestamp.
@@ -70,6 +70,7 @@ Useful interpretation notes:
 - `Cached input` and `Uncached input` are split so cache behavior is visible without storing transcript text.
 - A cost with `*` means the pricing row is marked as a best-guess estimate.
 - Codex credits are estimated from aggregate input, cached-input, and output token counters. Direct model matches use the bundled OpenAI Codex rate-card snapshot; inferred labels are marked estimated.
+- `Usage Remaining` is not read from the logged-in account plan. Configure `~/.codex-usage-tracker/allowance.json` with values copied from Codex Settings > Usage, the Codex Usage dashboard, or `/status` when you want current remaining allowance context.
 
 ## Threads View
 
@@ -151,4 +152,4 @@ It does not include:
 
 The screenshots in this guide are produced from synthetic fixture data used by the test suite.
 
-Remaining 5-hour and weekly allowance is not read from Codex logs automatically. Add `~/.codex-usage-tracker/allowance.json` only when you want the dashboard to show current copied allowance state.
+Remaining 5-hour and weekly allowance is not read from Codex logs or inferred from the logged-in account plan automatically. Add `~/.codex-usage-tracker/allowance.json` only when you want the dashboard to show current copied allowance state. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.

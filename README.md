@@ -182,7 +182,7 @@ When served this way, the dashboard gets a `Refresh` button plus a `Live` toggle
 Dashboard behavior:
 
 - The `Insights` view opens first with ranked attention cards, investigation presets, and top threads by attention score.
-- Top cards include Codex credit usage and optional usage remaining, replacing the older estimated-token and unpriced-token cards.
+- Top cards include cached input, uncached input, Codex credit usage, and optional usage remaining, replacing the older estimated-token, unpriced-token, and price-coverage cards.
 - The flat `Calls` view is available for inspecting individual model calls.
 - The `Threads` view groups filtered calls by thread, shows the most recently active thread first by default, and lets multiple threads stay expanded.
 - Investigation presets can jump directly to highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
@@ -263,12 +263,27 @@ Edit `~/.codex-usage-tracker/allowance.json` with the 5-hour and weekly remainin
 
 Credit usage estimates are calculated from Codex's aggregate input, cached-input, and output token counters using the bundled OpenAI Codex rate-card snapshot from `https://help.openai.com/en/articles/20001106-codex-rate-card` and `https://developers.openai.com/codex/pricing`. Direct model matches are marked exact. Local aliases and inferred labels, such as code-review usage mapped to GPT-5.3-Codex, are marked estimated. Normal reports do not contact the network for allowance or credit estimates.
 
+### Usage And Allowance Accuracy
+
+`Codex Credits` is a calculated usage number, not a made-up dashboard unit. The tracker uses Codex's logged aggregate token counters and the official Codex rate card to estimate credits consumed by local Codex calls. Rows with a direct model match are the highest-confidence numbers; inferred aliases, research-preview models, fast-mode behavior, or workspace-specific exceptions should be treated as estimates.
+
+`Usage Remaining` is different. The tracker cannot currently read your logged-in ChatGPT plan, live remaining credits, reset windows, or usage from other agentic surfaces automatically. A plan name such as Free, Plus, or Pro can provide context, but it is not enough to know the current remaining allowance. The dashboard shows exact-looking remaining values only when you copy them into `~/.codex-usage-tracker/allowance.json`.
+
+To configure the usage component:
+
+1. Run `codex-usage-tracker init-allowance`.
+2. Open `~/.codex-usage-tracker/allowance.json`.
+3. Copy the current `remaining_percent` and `reset_at` values from Codex Settings > Usage, the Codex Usage dashboard, or `/status`.
+4. Add `remaining_credits` and `total_credits` only if your plan or workspace exposes exact credit numbers.
+5. Leave fields as `null` when you do not have a trustworthy value; the dashboard will still show credits used, but it will not pretend to know remaining allowance.
+
 ## Current Limitations
 
 - This is a sidecar dashboard and plugin, not a native Codex chat overlay. Native hover tooltips inside Codex chat would require a transcript UI extension point that is not part of this v1 surface.
 - Token counts come from Codex's logged counters. The tracker does not re-tokenize prompts or reconstruct usage from raw text.
 - Pricing is optional and local. Rows are unpriced when no matching model rate is configured, and some Codex-specific labels may use marked best-guess estimates.
-- Remaining 5-hour and weekly allowance is not read automatically from Codex. Add `~/.codex-usage-tracker/allowance.json` when you want the dashboard to show your current copied allowance state.
+- Remaining 5-hour and weekly allowance is not read automatically from Codex or inferred from the logged-in account plan. Add `~/.codex-usage-tracker/allowance.json` when you want the dashboard to show your current copied allowance state.
+- Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
 - Parent-child thread relationships are only as good as the metadata Codex logs. Explicit parent session ids are preferred; inferred auto-review attachments are labeled as inferred.
 - On-demand context loading reads from the original local JSONL source. It is redacted and size-limited, but it is still local raw log context and should be treated as sensitive.
 

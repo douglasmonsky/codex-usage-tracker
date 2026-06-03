@@ -348,10 +348,12 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       const sourceEl = document.getElementById('allowanceSource');
       const sourceName = allowanceSource.name || 'Codex credit rates';
       const coverage = creditCoverageRatio(data);
-      sourceEl.textContent = `Credit rates: ${sourceName}`;
+      sourceEl.textContent = 'Credits';
+      sourceEl.dataset.state = coverage > 0 ? 'ready' : 'missing';
       sourceEl.title = [
         allowanceSource.url ? `Source: ${allowanceSource.url}` : '',
         allowanceSource.fetched_at ? `rate card snapshot ${allowanceSource.fetched_at}` : '',
+        `Credit rates: ${sourceName}.`,
         `Credit coverage ${pct(coverage)} of loaded tokens.`,
         allowanceWindows.length ? `Allowance windows: ${allowanceWindows.map(window => short(window.label || window.key)).join(', ')}` : 'Run codex-usage-tracker init-allowance to add remaining usage windows.',
         allowanceWindows.some(window => window.reset_at) ? `Resets: ${allowanceWindows.map(window => window.reset_at ? `${short(window.label || window.key)} ${formatTimestamp(window.reset_at, window.reset_at)}` : '').filter(Boolean).join('; ')}` : '',
@@ -386,12 +388,14 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
           pricingSource.tier ? `${pricingSource.tier} tier` : '',
           pricingSource.fetched_at ? `fetched ${formatTimestamp(pricingSource.fetched_at)}` : '',
         ].filter(Boolean);
-        sourceEl.textContent = `Costs: ${sourceParts.join(' · ')}`;
+        sourceEl.textContent = 'Costs';
+        sourceEl.dataset.state = 'ready';
         sourceEl.title = pricingSource.fetched_at
-          ? `Fetched from ${pricingSource.url} at ${formatTimestampTitle(pricingSource.fetched_at)}. Internal Codex labels may use marked best-guess estimates.`
-          : 'Internal Codex labels may use marked best-guess estimates.';
+          ? `${sourceParts.join(' · ')}. Fetched from ${pricingSource.url} at ${formatTimestampTitle(pricingSource.fetched_at)}. Internal Codex labels may use marked best-guess estimates.`
+          : `${sourceParts.join(' · ')}. Internal Codex labels may use marked best-guess estimates.`;
       } else {
-        sourceEl.textContent = pricingConfigured ? '' : 'Costs unavailable';
+        sourceEl.textContent = pricingConfigured ? 'Costs' : 'No costs';
+        sourceEl.dataset.state = pricingConfigured ? 'ready' : 'missing';
         sourceEl.title = pricingConfigured ? '' : 'Run codex-usage-tracker update-pricing to configure estimated costs.';
       }
     }
@@ -925,16 +929,18 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       const rows = filtered();
       rowsEl.textContent = '';
       updateSortControls();
-      document.getElementById('visibleCalls').textContent = number.format(rows.length);
-      document.getElementById('totalTokens').textContent = number.format(rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0));
-      document.getElementById('cachedTokens').textContent = number.format(rows.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0));
-      document.getElementById('reasoningTokens').textContent = number.format(rows.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0));
-      const estimatedCost = rows.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
-      const pricedTokens = rows.reduce((sum, row) => sum + (row.pricing_model ? Number(row.total_tokens || 0) : 0), 0);
       const totalTokens = rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
+      const cachedInputTokens = rows.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0);
+      const uncachedInputTokens = rows.reduce((sum, row) => sum + Number(row.uncached_input_tokens || 0), 0);
+      const reasoningOutputTokens = rows.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0);
+      document.getElementById('visibleCalls').textContent = number.format(rows.length);
+      document.getElementById('totalTokens').textContent = number.format(totalTokens);
+      document.getElementById('cachedTokens').textContent = number.format(cachedInputTokens);
+      document.getElementById('uncachedTokens').textContent = number.format(uncachedInputTokens);
+      document.getElementById('reasoningTokens').textContent = number.format(reasoningOutputTokens);
+      const estimatedCost = rows.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
       const usageCredits = sumUsageCredits(rows);
       document.getElementById('estimatedCost').textContent = pricingConfigured ? money(estimatedCost) : 'Not configured';
-      document.getElementById('priceCoverage').textContent = pct(totalTokens ? pricedTokens / totalTokens : 0);
       document.getElementById('usageCredits').textContent = credits(usageCredits);
       document.getElementById('allowanceImpact').textContent = allowanceImpactText(usageCredits);
       document.getElementById('allowanceImpact').title = allowanceWindowText(usageCredits, 'remaining') || 'Add ~/.codex-usage-tracker/allowance.json to show 5h and weekly remaining usage.';
@@ -1335,8 +1341,10 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       currentPage = 1;
       render();
     }
-    function updateLiveStatus(message) {
-      liveStatusEl.textContent = message;
+    function updateLiveStatus(label, detail = '') {
+      liveStatusEl.textContent = label;
+      liveStatusEl.title = detail || label;
+      liveStatusEl.dataset.state = label.toLowerCase().includes('error') ? 'error' : 'ready';
     }
     function updateToTopVisibility() {
       toTopEl.dataset.visible = window.scrollY > 320 ? 'true' : 'false';
@@ -1360,14 +1368,14 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
     }
     async function refreshDashboardData(manual = false) {
       if (!liveRefreshSupported) {
-        updateLiveStatus('Reloading static dashboard snapshot...');
+        updateLiveStatus('Reloading', 'Reloading static dashboard snapshot...');
         window.location.reload();
         return;
       }
       if (refreshInFlight) return;
       refreshInFlight = true;
       refreshDashboardEl.disabled = true;
-      updateLiveStatus(manual ? 'Refreshing local usage index...' : 'Checking for new usage...');
+      updateLiveStatus(manual ? 'Refreshing' : 'Checking', manual ? 'Refreshing local usage index...' : 'Checking for new usage...');
       try {
         const params = new URLSearchParams({ refresh: '1', limit: loadLimitEl.value, _: String(Date.now()) });
         const response = await fetch(`/api/usage?${params.toString()}`, {
@@ -1387,10 +1395,10 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
         const skipped = result.skipped_events
           ? ` Skipped ${number.format(result.skipped_events)} malformed token-count events.`
           : '';
-        updateLiveStatus(`Updated ${formatTimestamp(nextPayload.refreshed_at)}. ${loadedRowsDescription()}.${indexed}${skipped}`);
+        updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Updated', `Updated ${formatTimestamp(nextPayload.refreshed_at)}. ${loadedRowsDescription()}.${indexed}${skipped}`);
       } catch (error) {
         const message = error.message || String(error);
-        updateLiveStatus(`Live refresh unavailable: ${message}${manual ? '. Reload this page after regenerating a static dashboard, or run codex-usage-tracker serve-dashboard.' : ''}`);
+        updateLiveStatus('Refresh error', `Live refresh unavailable: ${message}${manual ? '. Reload this page after regenerating a static dashboard, or run codex-usage-tracker serve-dashboard.' : ''}`);
         if (manual && message === 'HTTP 404') window.location.reload();
       } finally {
         refreshInFlight = false;
@@ -1415,12 +1423,12 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       if (liveRefreshSupported) {
         refreshDashboardData(true);
       } else {
-        updateLiveStatus('Run codex-usage-tracker serve-dashboard to load a different history size from the dashboard.');
+        updateLiveStatus('Static', 'Run codex-usage-tracker serve-dashboard to load a different history size from the dashboard.');
       }
     });
     autoRefreshEl.addEventListener('change', () => {
       scheduleAutoRefresh();
-      updateLiveStatus(autoRefreshEl.checked ? `Live · polls every ${liveRefreshIntervalMs / 1000}s · ${loadedRowsDescription()}` : `Live paused · ${loadedRowsDescription()}`);
+      updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Paused', `${autoRefreshEl.checked ? `Live refresh every ${liveRefreshIntervalMs / 1000}s` : 'Live refresh paused'}. ${loadedRowsDescription()}`);
       if (autoRefreshEl.checked) refreshDashboardData(false);
     });
     document.addEventListener('visibilitychange', () => {
@@ -1473,9 +1481,9 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       autoRefreshEl.checked = false;
       autoRefreshEl.disabled = true;
       loadLimitEl.disabled = true;
-      updateLiveStatus(`Static snapshot · ${loadedRowsDescription()}`);
+      updateLiveStatus('Static', `Static snapshot. ${loadedRowsDescription()}`);
     } else {
-      updateLiveStatus(`Live · polls every ${liveRefreshIntervalMs / 1000}s · ${loadedRowsDescription()}`);
+      updateLiveStatus('Live', `Live refresh every ${liveRefreshIntervalMs / 1000}s. ${loadedRowsDescription()}`);
       scheduleAutoRefresh();
     }
     updateToTopVisibility();

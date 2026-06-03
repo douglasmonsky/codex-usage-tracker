@@ -28,11 +28,12 @@
       </div>
     </div>
     <div class="header-meta">
-      <span class="disclaimer-chip" title="Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI.">Unofficial project - not affiliated with OpenAI</span>
-      <span class="status-chip">Aggregate only</span>
-      <span id="liveStatus" class="live-status">Static snapshot loaded.</span>
-      <span id="pricingSource" class="source-line"></span>
-      <span id="allowanceSource" class="source-line"></span>
+      <div class="meta-chips" aria-label="Dashboard status">
+        <span class="disclaimer-chip" title="Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI.">Unofficial project</span>
+        <span id="liveStatus" class="live-status">Static</span>
+        <span id="pricingSource" class="source-line"></span>
+        <span id="allowanceSource" class="source-line"></span>
+      </div>
       __GUIDE_LINK__
     </div>
   </header>
@@ -48,9 +49,9 @@
       <div class="card"><span>Visible Calls</span><strong id="visibleCalls">0</strong></div>
       <div class="card"><span>Total Tokens</span><strong id="totalTokens">0</strong></div>
       <div class="card"><span>Cached Input</span><strong id="cachedTokens">0</strong></div>
+      <div class="card"><span>Uncached Input</span><strong id="uncachedTokens">0</strong></div>
       <div class="card"><span>Reasoning Output</span><strong id="reasoningTokens">0</strong></div>
       <div class="card"><span>Estimated Cost</span><strong id="estimatedCost">$0.00</strong></div>
-      <div class="card"><span>Price Coverage</span><strong id="priceCoverage">0.0%</strong></div>
       <div class="card"><span>Codex Credits</span><strong id="usageCredits">0</strong></div>
       <div class="card"><span>Usage Remaining</span><strong id="allowanceImpact">Set limits</strong></div>
     </div>

@@ -94,13 +94,14 @@ codex-usage-tracker serve-dashboard --open</code></pre>
 
     <h2>Calls View</h2>
     <img src="assets/dashboard-calls.png" alt="Calls view showing filters, totals, table rows, and details panel.">
-    <p>Use <code>Calls</code> view to inspect individual model calls. Sort by attention, time, thread, model, tokens, cost, highest Codex credits, cache, context, or signals. Hover or click a row to pin grouped aggregate fields in <code>Call Details</code>. Top cards show Codex credit usage and optional usage remaining.</p>
+    <p>Use <code>Calls</code> view to inspect individual model calls. Sort by attention, time, thread, model, tokens, cost, highest Codex credits, cache, context, or signals. Hover or click a row to pin grouped aggregate fields in <code>Call Details</code>. Top cards show cached input, uncached input, Codex credit usage, and optional usage remaining. The header uses short status chips; exact refresh time and source details live in hover titles so live refreshes do not reflow the page.</p>
     <ul>
       <li><code>Last call total</code> is the selected model call.</li>
       <li><code>Session cumulative</code> is the running total Codex logged for that session.</li>
       <li><code>Cached input</code> and <code>Uncached input</code> make cache behavior visible without storing transcript text.</li>
       <li>A cost with <code>*</code> means the pricing row is a marked best-guess estimate.</li>
       <li>Codex credits are estimated from aggregate input, cached-input, and output counters using bundled or locally configured rate-card values.</li>
+      <li><code>Usage Remaining</code> is not read from the logged-in account plan. Configure <code>~/.codex-usage-tracker/allowance.json</code> with values copied from Codex Settings &gt; Usage, the Codex Usage dashboard, or <code>/status</code> when you want current remaining allowance context.</li>
       <li>Raw aggregate identifiers and source file metadata are collapsed until you need them.</li>
     </ul>
 
@@ -117,7 +118,7 @@ codex-usage-tracker serve-dashboard --open</code></pre>
     <p>Watch <code>Cached input</code>, <code>Uncached input</code>, <code>Session cumulative</code>, <code>Context use</code>, and <code>Cache ratio</code> together. When old context is no longer useful, starting a fresh Codex thread may be more efficient than carrying a large cached history forward.</p>
 
     <h2>Privacy Model</h2>
-    <p>The dashboard includes session ids, thread names, cwd values, source file paths, timestamps, model labels, reasoning effort, token counts, cost estimates, Codex credit estimates, optional manually entered allowance windows, and derived ratios. It does not include prompts, assistant responses, raw tool output, pasted secrets, message snippets, or transcript text. Remaining 5-hour and weekly allowance is not read from Codex logs automatically.</p>
+    <p>The dashboard includes session ids, thread names, cwd values, source file paths, timestamps, model labels, reasoning effort, token counts, cost estimates, Codex credit estimates, optional manually entered allowance windows, and derived ratios. It does not include prompts, assistant responses, raw tool output, pasted secrets, message snippets, or transcript text. Remaining 5-hour and weekly allowance is not read from Codex logs or inferred from the logged-in account plan automatically. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.</p>
   </main>
 </body>
 </html>
