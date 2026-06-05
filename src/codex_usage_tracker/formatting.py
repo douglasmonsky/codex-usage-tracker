@@ -178,6 +178,8 @@ def format_pricing_coverage(report: dict[str, Any], limit: int = 20) -> str:
 
 
 def _fmt_int(value: object) -> str:
+    if not isinstance(value, int | float | str):
+        return "0"
     try:
         return f"{int(value):,}"
     except (TypeError, ValueError):
@@ -185,6 +187,8 @@ def _fmt_int(value: object) -> str:
 
 
 def _fmt_pct(value: object) -> str:
+    if not isinstance(value, int | float | str):
+        return "0.0%"
     try:
         return f"{float(value) * 100:.1f}%"
     except (TypeError, ValueError):
@@ -192,6 +196,8 @@ def _fmt_pct(value: object) -> str:
 
 
 def _fmt_money(value: object) -> str:
+    if not isinstance(value, int | float | str):
+        return ""
     try:
         amount = float(value)
     except (TypeError, ValueError):
@@ -204,6 +210,8 @@ def _fmt_money(value: object) -> str:
 
 
 def _fmt_decimal(value: object) -> str:
+    if not isinstance(value, int | float | str):
+        return "0.0"
     try:
         return f"{float(value):.1f}"
     except (TypeError, ValueError):

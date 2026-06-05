@@ -8,6 +8,9 @@
     'effort',
     'confidence',
     'pricing',
+    'date',
+    'from',
+    'to',
     'sort',
     'direction',
     'preset',
@@ -30,6 +33,9 @@
       model: clean(params.get('model')),
       effort: clean(params.get('effort')),
       confidence: clean(params.get('confidence') || params.get('pricing')),
+      datePreset: clean(params.get('date')),
+      dateStart: clean(params.get('from')),
+      dateEnd: clean(params.get('to')),
       sort: clean(params.get('sort')),
       direction: ALLOWED_DIRECTIONS.has(params.get('direction')) ? params.get('direction') : '',
       preset: clean(params.get('preset')),
@@ -49,6 +55,9 @@
     set(params, 'model', state.model);
     set(params, 'effort', state.effort);
     set(params, 'confidence', state.confidence);
+    set(params, 'date', state.datePreset && state.datePreset !== 'all' ? state.datePreset : '');
+    set(params, 'from', state.dateStart);
+    set(params, 'to', state.dateEnd);
     set(params, 'sort', state.sort && state.sort !== 'attention' ? state.sort : '');
     set(params, 'direction', ALLOWED_DIRECTIONS.has(state.direction) ? state.direction : '');
     set(params, 'preset', state.preset);

@@ -14,13 +14,13 @@ Codex Usage Tracker reads the JSONL logs already written by Codex, indexes aggre
 
 The dashboard opens with an insight-first summary that ranks threads and calls needing attention before you start sorting tables.
 
-![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=47d58ee)
+![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=ef703f5)
 
-![Calls view with filters, totals, model-call rows, and the details panel.](docs/assets/dashboard-calls.png?v=47d58ee)
+![Calls view with filters, totals, model-call rows, and the details panel.](docs/assets/dashboard-calls.png?v=ef703f5)
 
-![Threads view with grouped Codex threads and expanded chronological calls.](docs/assets/dashboard-threads.png?v=47d58ee)
+![Threads view with grouped Codex threads and expanded chronological calls.](docs/assets/dashboard-threads.png?v=ef703f5)
 
-![Call Details panel showing aggregate token, pricing, Codex credit, allowance, context, and thread attachment fields.](docs/assets/dashboard-details.png?v=47d58ee)
+![Call Details panel showing aggregate token, pricing, Codex credit, allowance, context, and thread attachment fields.](docs/assets/dashboard-details.png?v=ef703f5)
 
 These screenshots use synthetic aggregate fixture data. They do not contain prompts, assistant responses, tool output, or real Codex session content.
 
@@ -130,11 +130,12 @@ Then:
 1. Leave `Live` enabled while working, or click `Refresh` after a Codex run finishes.
 2. Start in `Insights` view and scan the `Needs Attention` cards.
 3. Optionally run `codex-usage-tracker parse-allowance "5h 79% 6:50 PM Weekly 33% Jun 7"` with values copied from Codex Usage or `/status`.
-4. Use an investigation preset when you already know the question: highest-cost threads, highest-credit calls, context bloat, cache misses, pricing gaps, or estimated-price review.
-5. Open `Threads` view to find the active work thread and any spawned subagent or auto-review calls.
-6. Expand an expensive or high-credit thread and read calls oldest to newest.
-7. Hover or click rows to inspect exact aggregate fields in `Call Details`.
-8. Use `Load context` only when the aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
+4. Use the `Time` preset or calendar fields to focus on today, this week, the last 7 days, this month, or a custom range.
+5. Use an investigation preset when you already know the question: highest-cost threads, highest-credit calls, context bloat, cache misses, pricing gaps, or estimated-price review.
+6. Open `Threads` view to find the active work thread and any spawned subagent or auto-review calls.
+7. Expand an expensive or high-credit thread and read calls oldest to newest.
+8. Hover or click rows to inspect exact aggregate fields in `Call Details`.
+9. Use `Load context` only when the aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
 
 For a screenshot-driven walkthrough, see [`docs/dashboard-guide.md`](docs/dashboard-guide.md).
 Generated dashboards also link to a bundled local HTML copy of the guide. Set `CODEX_USAGE_TRACKER_DOCS_URL` if you want generated dashboards to point at a hosted docs page instead.
@@ -223,7 +224,8 @@ Dashboard behavior:
 - The `Insights` view opens first with ranked attention cards, investigation presets, and top threads by attention score.
 - Top cards include cached input, uncached input, Codex credit usage, and optional usage remaining, replacing the older estimated-token, unpriced-token, and price-coverage cards.
 - The `Confidence` filter separates exact configured cost, estimated cost, unpriced cost, exact credit-rate matches, inferred credit mappings, user credit overrides, and missing credit rates.
-- Filter, sort, active view, active preset, selected row/thread, current page, and expanded threads are reflected in the URL so a copied dashboard link can reopen the same investigation state.
+- The `Time` filter supports all time, today, this week, last 7 days, this month, and custom calendar ranges. Presets are relative to the browser's local date; custom ranges are saved as concrete `from` and `to` dates.
+- Filter, time range, sort, active view, active preset, selected row/thread, current page, and expanded threads are reflected in the URL so a copied dashboard link can reopen the same investigation state.
 - `Copy link` copies the current dashboard state. `Export CSV` downloads the currently filtered aggregate calls, including the rows behind a filtered Threads view.
 - The flat `Calls` view is available for inspecting individual model calls.
 - The `Threads` view groups filtered calls by thread, shows the most recently active thread first by default, and lets multiple threads stay expanded.

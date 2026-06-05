@@ -41,10 +41,13 @@
   </header>
   <main>
     <div class="filters">
-      <label>Search<input id="search" type="search" placeholder="Thread, cwd, model, session"></label>
+      <label>Search<input id="search" type="search" placeholder="Thread, cwd, model"></label>
       <label>Model<select id="model"><option value="">All models</option></select></label>
       <label>Reasoning<select id="effort"><option value="">All efforts</option></select></label>
       <label>Confidence<select id="pricingStatus"><option value="">All confidence</option><option value="official">Exact cost</option><option value="estimated">Estimated cost</option><option value="unpriced">Unpriced cost</option><option value="credit-exact">Exact credit rate</option><option value="credit-estimated">Estimated credit mapping</option><option value="credit-override">User credit override</option><option value="credit-missing">Missing credit rate</option></select></label>
+      <label>Time<select id="datePreset"><option value="all" selected>All time</option><option value="today">Today</option><option value="this-week">This week</option><option value="last-7-days">Last 7 days</option><option value="this-month">This month</option><option value="custom">Custom range</option></select><span id="dateRangeStatus" class="filter-status" aria-live="polite">All time</span></label>
+      <label>Start<input id="dateStart" type="date"></label>
+      <label>End<input id="dateEnd" type="date"></label>
       <label>Sort<select id="sort"><option value="attention" selected>Needs attention</option><option value="time">Newest calls</option><option value="thread">Thread name</option><option value="model">Model</option><option value="effort">Reasoning</option><option value="total">Most tokens</option><option value="cost">Highest estimated cost</option><option value="usage">Highest Codex credits</option><option value="cache">Lowest cache ratio</option><option value="signals">Most signals</option><option value="context">Highest context use</option></select></label>
     </div>
     <div class="cards">

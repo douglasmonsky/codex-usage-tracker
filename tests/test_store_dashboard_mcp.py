@@ -368,6 +368,21 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "parserDiagnostics" in dashboard_js
     assert "privacyMode" in dashboard
     assert "projectMetadataPrivacy" in dashboard_js
+    assert "datePreset" in dashboard
+    assert "dateStart" in dashboard
+    assert "dateEnd" in dashboard
+    assert "dateRangeStatus" in dashboard
+    assert "Today" in dashboard
+    assert "This week" in dashboard
+    assert "Last 7 days" in dashboard
+    assert "This month" in dashboard
+    assert "Custom range" in dashboard
+    assert "currentDateRange" in dashboard_js
+    assert "rowMatchesDateRange" in dashboard_js
+    assert "syncDatePresetInputs" in dashboard_js
+    assert "datePreset: clean(params.get('date'))" in dashboard_state_js
+    assert "dateStart: clean(params.get('from'))" in dashboard_state_js
+    assert "dateEnd: clean(params.get('to'))" in dashboard_state_js
     assert "api_token" in dashboard
     assert "context_api_enabled" in dashboard
     assert "X-Codex-Usage-Token" in dashboard_js

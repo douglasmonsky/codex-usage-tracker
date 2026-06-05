@@ -62,6 +62,10 @@
     const modelEl = document.getElementById('model');
     const effortEl = document.getElementById('effort');
     const pricingStatusEl = document.getElementById('pricingStatus');
+    const datePresetEl = document.getElementById('datePreset');
+    const dateStartEl = document.getElementById('dateStart');
+    const dateEndEl = document.getElementById('dateEnd');
+    const dateRangeStatusEl = document.getElementById('dateRangeStatus');
     const sortEl = document.getElementById('sort');
     const tableTitleEl = document.getElementById('tableTitle');
     const tableCaptionEl = document.getElementById('tableCaption');
@@ -91,6 +95,15 @@
     const liveRefreshSupported = window.location.protocol !== 'file:';
     const liveRefreshIntervalMs = 10000;
     const pageSize = 500;
+    const datePresetLabels = {
+      all: 'All time',
+      today: 'Today',
+      'this-week': 'This week',
+      'last-7-days': 'Last 7 days',
+      'this-month': 'This month',
+      custom: 'Custom range',
+    };
+    const allowedDatePresets = new Set(Object.keys(datePresetLabels));
     let activeView = ['calls', 'threads', 'insights'].includes(initialState.view) ? initialState.view : 'insights';
     let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'attention';
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
@@ -315,6 +328,19 @@
       if (optionValueExists(modelEl, initialState.model)) modelEl.value = initialState.model;
       if (optionValueExists(effortEl, initialState.effort)) effortEl.value = initialState.effort;
       if (optionValueExists(pricingStatusEl, initialState.confidence)) pricingStatusEl.value = initialState.confidence;
+      const initialDatePreset = allowedDatePresets.has(initialState.datePreset) ? initialState.datePreset : '';
+      const initialDateStart = cleanDateInput(initialState.dateStart);
+      const initialDateEnd = cleanDateInput(initialState.dateEnd);
+      if (initialDatePreset && initialDatePreset !== 'custom' && initialDatePreset !== 'all') {
+        datePresetEl.value = initialDatePreset;
+        syncDatePresetInputs();
+      } else if (initialDateStart || initialDateEnd) {
+        datePresetEl.value = 'custom';
+        dateStartEl.value = initialDateStart;
+        dateEndEl.value = initialDateEnd;
+      } else if (initialDatePreset) {
+        datePresetEl.value = initialDatePreset;
+      }
       if (optionValueExists(sortEl, initialState.sort)) {
         sortKey = initialState.sort;
         sortEl.value = sortKey;
@@ -382,7 +408,127 @@
             projectMetadataPrivacy.aliases_preserved ? 'Configured project aliases are treated as explicit display opt-ins.' : '',
           ].filter(Boolean).join(' ');
     }
-    function filtered() {
+    function padDatePart(value) {
+      return String(value).padStart(2, '0');
+    }
+    function localDateKey(date) {
+      return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+    }
+    function localDay(value = new Date()) {
+      return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    }
+    function addDays(date, days) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+    }
+    function parseDateInput(value) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
+      const [year, month, day] = value.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+    }
+    function cleanDateInput(value) {
+      const date = parseDateInput(value);
+      return date ? localDateKey(date) : '';
+    }
+    function weekStart(date) {
+      const day = date.getDay();
+      const offset = day === 0 ? -6 : 1 - day;
+      return addDays(date, offset);
+    }
+    function presetDateRange(preset) {
+      const today = localDay();
+      if (preset === 'today') {
+        return { start: today, endExclusive: addDays(today, 1) };
+      }
+      if (preset === 'this-week') {
+        const start = weekStart(today);
+        return { start, endExclusive: addDays(start, 7) };
+      }
+      if (preset === 'last-7-days') {
+        return { start: addDays(today, -6), endExclusive: addDays(today, 1) };
+      }
+      if (preset === 'this-month') {
+        return {
+          start: new Date(today.getFullYear(), today.getMonth(), 1),
+          endExclusive: new Date(today.getFullYear(), today.getMonth() + 1, 1),
+        };
+      }
+      return { start: null, endExclusive: null };
+    }
+    function syncDatePresetInputs() {
+      const preset = datePresetEl.value;
+      if (preset === 'custom') return;
+      if (preset === 'all') {
+        dateStartEl.value = '';
+        dateEndEl.value = '';
+        return;
+      }
+      const range = presetDateRange(preset);
+      dateStartEl.value = range.start ? localDateKey(range.start) : '';
+      dateEndEl.value = range.endExclusive ? localDateKey(addDays(range.endExclusive, -1)) : '';
+    }
+    function formatDateRangeLabel(prefix, start, end) {
+      const startLabel = start ? localDateKey(start) : '';
+      const endLabel = end ? localDateKey(end) : '';
+      if (startLabel && endLabel && startLabel === endLabel) return `${prefix} ${startLabel}`;
+      if (startLabel && endLabel) return `${prefix} ${startLabel} to ${endLabel}`;
+      if (startLabel) return `${prefix} from ${startLabel}`;
+      if (endLabel) return `${prefix} through ${endLabel}`;
+      return prefix;
+    }
+    function currentDateRange() {
+      const preset = allowedDatePresets.has(datePresetEl.value) ? datePresetEl.value : 'all';
+      if (preset !== 'custom' && preset !== 'all') {
+        const range = presetDateRange(preset);
+        return {
+          active: true,
+          invalid: false,
+          start: range.start,
+          endExclusive: range.endExclusive,
+          label: formatDateRangeLabel(datePresetLabels[preset], range.start, addDays(range.endExclusive, -1)),
+        };
+      }
+      const start = parseDateInput(dateStartEl.value);
+      const end = parseDateInput(dateEndEl.value);
+      if (start && end && start > end) {
+        return {
+          active: true,
+          invalid: true,
+          start,
+          endExclusive: addDays(end, 1),
+          label: 'Invalid date range',
+        };
+      }
+      if (start || end) {
+        return {
+          active: true,
+          invalid: false,
+          start,
+          endExclusive: end ? addDays(end, 1) : null,
+          label: formatDateRangeLabel('Custom', start, end),
+        };
+      }
+      return { active: false, invalid: false, start: null, endExclusive: null, label: 'All time' };
+    }
+    function rowMatchesDateRange(row, range) {
+      if (range.invalid) return false;
+      if (!range.active) return true;
+      const timestamp = row.event_timestamp ? new Date(row.event_timestamp) : null;
+      if (!timestamp || Number.isNaN(timestamp.getTime())) return false;
+      if (range.start && timestamp < range.start) return false;
+      if (range.endExclusive && timestamp >= range.endExclusive) return false;
+      return true;
+    }
+    function updateDateFilterControls() {
+      const range = currentDateRange();
+      dateRangeStatusEl.textContent = range.label;
+      dateRangeStatusEl.dataset.state = range.invalid ? 'error' : range.active ? 'active' : 'idle';
+      return range;
+    }
+    function dateCaptionPrefix(range = currentDateRange()) {
+      return range.active || range.invalid ? `${range.label}. ` : '';
+    }
+    function filtered(dateRange = currentDateRange()) {
       const term = searchEl.value.trim().toLowerCase();
       const model = modelEl.value;
       const effort = effortEl.value;
@@ -416,7 +562,7 @@
           || (pricingStatus === 'credit-estimated' && row.usage_credit_confidence === 'estimated')
           || (pricingStatus === 'credit-override' && row.usage_credit_confidence === 'user_override')
           || (pricingStatus === 'credit-missing' && row.usage_credit_confidence === 'unpriced');
-        return (!term || haystack.includes(term)) && (!model || row.model === model) && (!effort || row.effort === effort) && statusMatches && presetMatchesRow(row);
+        return (!term || haystack.includes(term)) && (!model || row.model === model) && (!effort || row.effort === effort) && statusMatches && rowMatchesDateRange(row, dateRange) && presetMatchesRow(row);
       });
       rows.sort(compareCalls);
       return rows;
@@ -428,6 +574,9 @@
         model: modelEl.value,
         effort: effortEl.value,
         confidence: pricingStatusEl.value,
+        datePreset: datePresetEl.value,
+        dateStart: datePresetEl.value === 'custom' ? dateStartEl.value : '',
+        dateEnd: datePresetEl.value === 'custom' ? dateEndEl.value : '',
         sort: sortKey,
         direction: sortDirection,
         preset: activePreset,
@@ -968,7 +1117,8 @@
       });
     }
     function render() {
-      const rows = filtered();
+      const dateRange = updateDateFilterControls();
+      const rows = filtered(dateRange);
       rowsEl.textContent = '';
       updateSortControls();
       const totalTokens = rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
@@ -1006,7 +1156,7 @@
       tableTitleEl.textContent = 'Model Calls';
       const preset = activePresetDefinition();
       const prefix = preset ? `${preset.caption}. ` : '';
-      tableCaptionEl.textContent = `${prefix}Showing individual model calls sorted by ${tableCaptionEl.dataset.sortDescription}. ${loadedRowsDescription()}.`;
+      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}Showing individual model calls sorted by ${tableCaptionEl.dataset.sortDescription}. ${loadedRowsDescription()}.`;
       for (const row of page.items) {
         const tr = document.createElement('tr');
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
@@ -1065,7 +1215,7 @@
       tableTitleEl.textContent = mode === 'insights' ? 'Top Threads by Attention Score' : 'Threads';
       const preset = activePresetDefinition();
       const prefix = preset ? `${preset.caption}. ` : '';
-      tableCaptionEl.textContent = `${prefix}Showing ${number.format(groups.length)} threads from ${number.format(rows.length)} filtered calls, sorted by ${tableCaptionEl.dataset.sortDescription}. ${loadedRowsDescription()}. Click a thread to expand its calls.`;
+      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}Showing ${number.format(groups.length)} threads from ${number.format(rows.length)} filtered calls, sorted by ${tableCaptionEl.dataset.sortDescription}. ${loadedRowsDescription()}. Click a thread to expand its calls.`;
       for (const group of page.items) {
         const tr = document.createElement('tr');
         const expanded = expandedThreads.has(group.key);
@@ -1594,6 +1744,17 @@
       const row = rowByRecordId.get(callRow.dataset.recordId);
       if (row) selectRow(row);
     });
+    datePresetEl.addEventListener('input', () => {
+      syncDatePresetInputs();
+      currentPage = 1;
+      render();
+    });
+    [dateStartEl, dateEndEl].forEach(el => el.addEventListener('input', () => {
+      if (datePresetEl.value !== 'custom') datePresetEl.value = 'custom';
+      el.value = cleanDateInput(el.value) || el.value;
+      currentPage = 1;
+      render();
+    }));
     [searchEl, modelEl, effortEl, pricingStatusEl].forEach(el => el.addEventListener('input', () => {
       currentPage = 1;
       render();

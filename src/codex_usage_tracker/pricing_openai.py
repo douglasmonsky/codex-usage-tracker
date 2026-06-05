@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -54,12 +55,15 @@ def update_pricing_from_openai_docs(
         )
     fetcher = fetch_text or _fetch_text
     text = fetcher(source_url)
-    models = parse_openai_pricing_markdown(text, tier=tier)
-    if not models:
+    parsed_models = parse_openai_pricing_markdown(text, tier=tier)
+    if not parsed_models:
         raise PricingParseError(
             f"pricing source schema changed: no text-token pricing rows were parsed "
             f"from {source_url} for tier {tier!r}"
         )
+    models: dict[str, dict[str, Any]] = {
+        model: dict(rates) for model, rates in parsed_models.items()
+    }
     aliases = load_existing_aliases(path)
     estimated_model_count = 0
     if include_estimates:

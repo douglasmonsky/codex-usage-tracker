@@ -119,7 +119,8 @@ def pin_pricing_snapshot(
     raw = json.loads(source_path.expanduser().read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError("pricing config must be a JSON object")
-    source = raw.get("_source") if isinstance(raw.get("_source"), dict) else {}
+    source_payload = raw.get("_source")
+    source: dict[str, Any] = source_payload if isinstance(source_payload, dict) else {}
     raw["_source"] = {
         **source,
         "pinned": True,
@@ -147,16 +148,16 @@ def parse_models(raw: object) -> dict[str, dict[str, float]]:
             continue
         if not isinstance(rates, dict):
             continue
-        parsed = {
-            "input_per_million": _required_rate(rates, "input_per_million", model),
-            "cached_input_per_million": _optional_rate(
-                rates, "cached_input_per_million"
+        input_rate = _required_rate(rates, "input_per_million", model)
+        cached_rate = _optional_rate(rates, "cached_input_per_million")
+        output_rate = _required_rate(rates, "output_per_million", model)
+        models[model] = {
+            "input_per_million": float(input_rate),
+            "cached_input_per_million": float(
+                cached_rate if cached_rate is not None else input_rate
             ),
-            "output_per_million": _required_rate(rates, "output_per_million", model),
+            "output_per_million": float(output_rate),
         }
-        if parsed["cached_input_per_million"] is None:
-            parsed["cached_input_per_million"] = parsed["input_per_million"]
-        models[model] = {key: float(value) for key, value in parsed.items()}
     return models
 
 

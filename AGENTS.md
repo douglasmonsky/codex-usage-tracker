@@ -49,6 +49,26 @@ codex-usage-tracker install-plugin --python .venv/bin/python
 
 ## Validation
 
+Run the local CI gate before pushing to `main`:
+
+```bash
+python -m ruff check .
+python -m mypy
+python -m pytest
+python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
+python -m compileall src
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
+python scripts/check_release.py
+git diff --check
+python -m build
+python scripts/check_release.py --dist
+```
+
+Additional smoke checks for touched CLI surfaces:
+
 ```bash
 python -m pytest
 python -m compileall src

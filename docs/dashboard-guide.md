@@ -71,14 +71,15 @@ Use `Calls` view when you want to inspect individual model calls.
 - The header stays compact: refresh controls on the right, and short status chips on the left. Exact refresh time, pricing source, and credit-rate source live in hover titles so live refreshes do not reflow the page.
 - The top cards include cached input, uncached input, Codex credit usage, and optional usage remaining instead of estimated-token, unpriced-token, and price-coverage counters.
 - The `Confidence` filter separates exact cost, estimated cost, unpriced cost, exact credit-rate matches, inferred credit mappings, user credit overrides, and missing credit rates.
-- The URL tracks the active view, filters, sort, preset, selected row or thread, page, and expanded threads. `Copy link` copies that state so the same investigation can be reopened.
+- The `Time` filter supports all time, today, this week, last 7 days, this month, and custom calendar ranges. Presets are relative to your browser's local date. Custom ranges use inclusive start and end dates.
+- The URL tracks the active view, filters, time preset or custom range, sort, preset, selected row or thread, page, and expanded threads. `Copy link` copies that state so the same investigation can be reopened.
 - `Export CSV` downloads the currently filtered aggregate calls. In Threads view, it exports the calls behind the filtered thread list rather than only the visible group headers.
 - A `Parser warnings` chip appears only when the latest refresh reports skipped token events, missing expected token fields, invalid counters, duplicate cumulative snapshots, or unknown event shapes. Use `codex-usage-tracker inspect-log <path>` to inspect a suspect log without writing to SQLite.
 - Search matches thread, cwd, model, session id, turn id, subagent role, and parent thread fields.
 - Search also matches derived project names, project-relative cwd values, tags, branch names, and redacted remote labels.
 - In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.
 - The cards summarize only the currently visible filtered rows.
-- Time values are shown in your browser's local date/time format while sorting still uses the logged timestamp.
+- Time values are shown in your browser's local date/time format while sorting and time filtering still use the logged timestamp.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
 - Hover or click a row to pin its aggregate fields in `Call Details`; on desktop, the details panel stays visible as you scroll.
 - The `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.
@@ -111,7 +112,7 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Expanded calls are ordered oldest to newest by event timestamp, then cumulative token count.
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
 
-The same filters, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, and `Threads` views.
+The same search, time range, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, and `Threads` views.
 
 ## Details And Context
 
@@ -147,12 +148,13 @@ When served from localhost, the details panel includes `Load context` and `Inclu
 2. Use `Refresh` after a Codex run finishes, or leave `Live` enabled while you work.
 3. Optionally run `parse-allowance` with copied values from Codex Usage or `/status`, or initialize and edit `allowance.json` manually.
 4. Start in `Insights` view and review the highest-severity attention cards.
-5. Use a preset when the question is already clear: highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
-6. Use `Threads` view to find the active work thread and any spawned subagent calls.
-7. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
-8. Use `Copy link` when you want to return to the same filter/sort/selection state later.
-9. Use `Export CSV` when the current filtered aggregate calls need spreadsheet review.
-10. Click into a row and use `Load context` only when aggregate fields are not enough to explain the call.
+5. Narrow the `Time` filter when you are investigating a recent spike or a specific work window.
+6. Use a preset when the question is already clear: highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
+7. Use `Threads` view to find the active work thread and any spawned subagent calls.
+8. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
+9. Use `Copy link` when you want to return to the same filter/sort/selection state later.
+10. Use `Export CSV` when the current filtered aggregate calls need spreadsheet review.
+11. Click into a row and use `Load context` only when aggregate fields are not enough to explain the call.
 
 ## Investigating Long Chat Growth
 
