@@ -24,8 +24,11 @@ from codex_usage_tracker.store import (
     query_dashboard_event_count,
     query_dashboard_events,
     query_most_expensive_calls,
+    rebuild_usage_index,
+    schema_state,
     query_session_usage,
     query_summary,
+    refresh_metadata,
     refresh_usage_index,
 )
 
@@ -72,6 +75,13 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_events"] == "4"
     assert meta["skipped_events"] == "0"
     assert meta["inserted_or_updated_events"] == "4"
+    assert meta["parser_adapter"] == "codex-jsonl-v1"
+    assert meta["schema_version"] == "2"
+    assert meta["parser_skipped_events"] == "0"
+    state = schema_state(db_path)
+    assert state["schema_version"] == 2
+    assert state["checksum_matches"] is True
+    assert [row["version"] for row in state["migrations"]] == [1, 2]
 
 
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
@@ -89,6 +99,8 @@ def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
     rows = query_session_usage(db_path=db_path, session_id=SESSION_ID)
 
     assert result.skipped_events == 1
+    assert result.parser_diagnostics["invalid_integer"] == 1
+    assert refresh_metadata(db_path)["parser_invalid_integer"] == "1"
     assert result.parsed_events == 5
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
 
@@ -103,7 +115,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 1
+    assert user_version == 2
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -150,10 +162,33 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
             for row in conn.execute("PRAGMA index_list(usage_events)").fetchall()
         }
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+        migrations = [
+            dict(row)
+            for row in conn.execute(
+                "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
 
     assert {"thread_source", "parent_thread_name", "parent_session_updated_at"} <= columns
     assert "idx_usage_timestamp" in indexes
-    assert user_version == 1
+    assert user_version == 2
+    assert [row["version"] for row in migrations] == [1, 2]
+
+
+def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute("INSERT INTO refresh_meta (key, value) VALUES ('stale', 'yes')")
+        conn.execute("DELETE FROM usage_events")
+
+    result = rebuild_usage_index(codex_home=codex_home, db_path=db_path)
+
+    assert result.parsed_events == 4
+    assert query_dashboard_event_count(db_path=db_path) == 4
+    assert "stale" not in refresh_metadata(db_path)
 
 
 def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
@@ -196,6 +231,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "usageCredits" in dashboard
     assert "allowanceImpact" in dashboard
     assert "usage_credits" in dashboard
+    assert "parser_diagnostics" in dashboard
+    assert "parserDiagnostics" in dashboard_js
     assert "usage_credit_confidence" in dashboard
     assert "Credit rates:" in dashboard_js
     assert "Codex allowance usage" in dashboard_js
@@ -320,6 +357,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
 
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
+    assert limited_payload["refresh_result"]["parser_diagnostics"] == {}
     assert len(limited_payload["rows"]) == 2
     assert limited_payload["loaded_row_count"] == 2
     assert limited_payload["total_available_rows"] == 4
@@ -337,6 +375,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert limited_payload["allowance_source"]["name"] == "OpenAI Codex rate card"
     assert limited_payload["rows"][0]["usage_credits"] is not None
     assert "refreshed_at" in limited_payload
+    assert limited_payload["parser_diagnostics"] == {}
     assert "SECRET RAW PROMPT" not in json.dumps(limited_payload)
 
 

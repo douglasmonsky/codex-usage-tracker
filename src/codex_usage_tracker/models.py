@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass(frozen=True)
@@ -89,3 +89,4 @@ class RefreshResult:
     inserted_or_updated_events: int
     db_path: str
     skipped_events: int = 0
+    parser_diagnostics: dict[str, int] = field(default_factory=dict)

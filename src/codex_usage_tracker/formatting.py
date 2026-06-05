@@ -98,6 +98,11 @@ def format_doctor(report: dict[str, Any]) -> str:
         remediation = check.get("remediation")
         if remediation:
             lines.append(f"  Next: {remediation}")
+    suggestions = report.get("repair_suggestions")
+    if isinstance(suggestions, list) and suggestions:
+        lines.extend(["", "Repair suggestions:"])
+        for suggestion in suggestions:
+            lines.append(f"- {suggestion}")
     return "\n".join(lines)
 
 

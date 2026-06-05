@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 
@@ -58,6 +59,11 @@ USAGE_EVENT_COLUMN_NAMES = tuple(column.name for column in USAGE_EVENT_COLUMNS)
 USAGE_EVENT_CREATE_COLUMNS_SQL = ",\n            ".join(
     f"{column.name} {column.declaration}" for column in USAGE_EVENT_COLUMNS
 )
+USAGE_EVENT_SCHEMA_CHECKSUM = hashlib.sha256(
+    "|".join(f"{column.name}:{column.declaration}" for column in USAGE_EVENT_COLUMNS).encode(
+        "utf-8"
+    )
+).hexdigest()
 USAGE_EVENT_REPAIR_COLUMNS = {
     column.name: column.alter_type
     for column in USAGE_EVENT_COLUMNS

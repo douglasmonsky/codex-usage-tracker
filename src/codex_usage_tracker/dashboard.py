@@ -22,7 +22,11 @@ from codex_usage_tracker.paths import (
     DEFAULT_PRICING_PATH,
 )
 from codex_usage_tracker.pricing import annotate_rows_with_efficiency, load_pricing_config
-from codex_usage_tracker.store import query_dashboard_event_count, query_dashboard_events
+from codex_usage_tracker.store import (
+    query_dashboard_event_count,
+    query_dashboard_events,
+    refresh_metadata,
+)
 from codex_usage_tracker.threads import annotate_thread_attachments
 
 
@@ -46,6 +50,12 @@ def dashboard_payload(
     )
     allowance_summary = summarize_allowance_usage(annotated_rows, allowance)
     normalized_limit = _normalize_limit(limit)
+    metadata = refresh_metadata(db_path)
+    parser_diagnostics = {
+        key.removeprefix("parser_"): _safe_int(value)
+        for key, value in metadata.items()
+        if key.startswith("parser_") and _safe_int(value)
+    }
     return {
         "rows": annotated_rows,
         "pricing_configured": pricing.loaded and not pricing.error,
@@ -58,6 +68,8 @@ def dashboard_payload(
         "total_available_rows": query_dashboard_event_count(db_path=db_path, since=since),
         "limit": normalized_limit,
         "limit_label": "All" if normalized_limit is None else str(normalized_limit),
+        "parser_diagnostics": parser_diagnostics,
+        "parser_adapter": metadata.get("parser_adapter"),
     }
 
 
@@ -170,3 +182,10 @@ def _html(
 def _read_dashboard_asset(name: str) -> str:
     asset = resources.files("codex_usage_tracker.plugin_data").joinpath("dashboard", name)
     return asset.read_text(encoding="utf-8")
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0

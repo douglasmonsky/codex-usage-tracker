@@ -11,6 +11,8 @@ from typing import Any
 
 from codex_usage_tracker.models import RefreshResult, UsageEvent
 from codex_usage_tracker.parser import (
+    PARSER_DIAGNOSTIC_KEYS,
+    compact_parser_diagnostics,
     find_session_logs,
     load_session_index,
     parse_usage_events,
@@ -20,12 +22,17 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_CREATE_COLUMNS_SQL,
     USAGE_EVENT_REPAIR_COLUMNS,
+    USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+MIGRATION_NAMES = {
+    1: "create usage_events aggregate fact table",
+    2: "track schema migration checksum metadata",
+}
 
 
 def refresh_usage_index(
@@ -41,12 +48,14 @@ def refresh_usage_index(
     events = parse_usage_events(logs, session_index=session_index, stats=stats)
     inserted = upsert_usage_events(events, db_path=db_path)
     skipped_events = stats.get("skipped_events", 0)
+    diagnostics = compact_parser_diagnostics(stats)
     record_refresh_metadata(
         db_path=db_path,
         scanned_files=len(logs),
         parsed_events=len(events),
         skipped_events=skipped_events,
         inserted_or_updated_events=inserted,
+        parser_diagnostics=diagnostics,
     )
     return RefreshResult(
         scanned_files=len(logs),
@@ -54,6 +63,25 @@ def refresh_usage_index(
         inserted_or_updated_events=inserted,
         db_path=str(db_path),
         skipped_events=skipped_events,
+        parser_diagnostics=diagnostics,
+    )
+
+
+def rebuild_usage_index(
+    codex_home: Path = DEFAULT_CODEX_HOME,
+    db_path: Path = DEFAULT_DB_PATH,
+    include_archived: bool = False,
+) -> RefreshResult:
+    """Clear aggregate rows and rescan local Codex logs."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute("DELETE FROM usage_events")
+        conn.execute("DELETE FROM refresh_meta")
+    return refresh_usage_index(
+        codex_home=codex_home,
+        db_path=db_path,
+        include_archived=include_archived,
     )
 
 
@@ -71,11 +99,33 @@ def connect(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
 def init_db(conn: sqlite3.Connection) -> None:
     user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-    if user_version < SCHEMA_VERSION:
+    _ensure_migrations_table(conn)
+    if user_version < 1:
         _migrate_v1(conn)
-        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        _record_migration(conn, 1)
     else:
         _migrate_v1(conn)
+        _record_migration_if_missing(conn, 1)
+    if user_version < 2:
+        _migrate_v2(conn)
+        _record_migration(conn, 2)
+    else:
+        _migrate_v2(conn)
+        _record_migration_if_missing(conn, 2)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+def _ensure_migrations_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            checksum TEXT NOT NULL,
+            applied_at TEXT NOT NULL
+        )
+        """
+    )
 
 
 def _migrate_v1(conn: sqlite3.Connection) -> None:
@@ -102,6 +152,37 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    _ensure_migrations_table(conn)
+
+
+def _record_migration(conn: sqlite3.Connection, version: int) -> None:
+    conn.execute(
+        """
+        INSERT INTO schema_migrations (version, name, checksum, applied_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(version) DO UPDATE SET
+            name = excluded.name,
+            checksum = excluded.checksum
+        """,
+        (
+            version,
+            MIGRATION_NAMES[version],
+            USAGE_EVENT_SCHEMA_CHECKSUM,
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        ),
+    )
+
+
+def _record_migration_if_missing(conn: sqlite3.Connection, version: int) -> None:
+    exists = conn.execute(
+        "SELECT 1 FROM schema_migrations WHERE version = ?",
+        (version,),
+    ).fetchone()
+    if exists is None:
+        _record_migration(conn, version)
+
+
 def record_refresh_metadata(
     db_path: Path = DEFAULT_DB_PATH,
     *,
@@ -109,6 +190,7 @@ def record_refresh_metadata(
     parsed_events: int,
     skipped_events: int,
     inserted_or_updated_events: int,
+    parser_diagnostics: dict[str, int] | None = None,
 ) -> None:
     """Record the latest refresh counters in refresh_meta."""
 
@@ -118,7 +200,13 @@ def record_refresh_metadata(
         "parsed_events": str(parsed_events),
         "skipped_events": str(skipped_events),
         "inserted_or_updated_events": str(inserted_or_updated_events),
+        "parser_adapter": "codex-jsonl-v1",
+        "schema_version": str(SCHEMA_VERSION),
+        "usage_events_schema_checksum": USAGE_EVENT_SCHEMA_CHECKSUM,
     }
+    diagnostics = parser_diagnostics or {}
+    for key in PARSER_DIAGNOSTIC_KEYS:
+        values[f"parser_{key}"] = str(int(diagnostics.get(key, 0)))
     with connect(db_path) as conn:
         init_db(conn)
         conn.executemany(
@@ -129,6 +217,52 @@ def record_refresh_metadata(
             """,
             values.items(),
         )
+
+
+def refresh_metadata(db_path: Path = DEFAULT_DB_PATH) -> dict[str, str]:
+    """Return latest refresh metadata and parser diagnostics."""
+
+    if not db_path.exists():
+        return {}
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute("SELECT key, value FROM refresh_meta").fetchall()
+    return {str(row["key"]): str(row["value"]) for row in rows}
+
+
+def schema_state(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
+    """Return database migration and usage_events checksum state."""
+
+    if not db_path.exists():
+        return {
+            "exists": False,
+            "schema_version": None,
+            "expected_schema_version": SCHEMA_VERSION,
+            "expected_checksum": USAGE_EVENT_SCHEMA_CHECKSUM,
+            "migrations": [],
+            "checksum_matches": False,
+        }
+    with connect(db_path) as conn:
+        init_db(conn)
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        rows = conn.execute(
+            """
+            SELECT version, name, checksum, applied_at
+            FROM schema_migrations
+            ORDER BY version
+            """
+        ).fetchall()
+    migrations = [_row_to_dict(row) for row in rows]
+    latest_checksum = migrations[-1]["checksum"] if migrations else None
+    return {
+        "exists": True,
+        "schema_version": version,
+        "expected_schema_version": SCHEMA_VERSION,
+        "expected_checksum": USAGE_EVENT_SCHEMA_CHECKSUM,
+        "latest_checksum": latest_checksum,
+        "checksum_matches": latest_checksum == USAGE_EVENT_SCHEMA_CHECKSUM,
+        "migrations": migrations,
+    }
 
 
 def _ensure_columns(conn: sqlite3.Connection, columns: dict[str, str]) -> None:

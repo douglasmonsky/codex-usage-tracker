@@ -18,6 +18,7 @@ from codex_usage_tracker.paths import (
     DEFAULT_PRICING_PATH,
 )
 from codex_usage_tracker.pricing import load_pricing_config
+from codex_usage_tracker.store import refresh_metadata, schema_state
 
 PLUGIN_NAME = "codex-usage-tracker"
 
@@ -42,6 +43,7 @@ def run_doctor(
     plugin_link: Path = DEFAULT_PLUGIN_LINK,
     marketplace_path: Path = DEFAULT_MARKETPLACE_PATH,
     repo_root: Path | None = None,
+    suggest_repair: bool = False,
 ) -> dict[str, Any]:
     """Run read-only setup checks and return a structured report."""
 
@@ -50,6 +52,8 @@ def run_doctor(
         _check_package_import(),
         _check_codex_sessions(codex_home),
         _check_database(db_path),
+        _check_database_schema(db_path),
+        _check_parser_diagnostics(db_path),
         _check_dashboard_target(dashboard_path),
         _check_pricing(pricing_path),
         _check_project_root(root),
@@ -60,12 +64,19 @@ def run_doctor(
     ]
     fail_count = sum(1 for check in checks if check.status == "fail")
     warn_count = sum(1 for check in checks if check.status == "warn")
-    return {
+    report: dict[str, Any] = {
         "status": "fail" if fail_count else "warn" if warn_count else "pass",
         "failures": fail_count,
         "warnings": warn_count,
         "checks": [check.to_dict() for check in checks],
     }
+    if suggest_repair:
+        report["repair_suggestions"] = [
+            check.remediation
+            for check in checks
+            if check.status in {"warn", "fail"} and check.remediation
+        ]
+    return report
 
 
 def find_project_root() -> Path | None:
@@ -146,6 +157,83 @@ def _check_database(db_path: Path) -> DoctorCheck:
         "warn",
         f"Database directory has not been created yet: {db_path.parent}",
         "Run: codex-usage-tracker refresh",
+    )
+
+
+def _check_database_schema(db_path: Path) -> DoctorCheck:
+    state = schema_state(db_path)
+    if not state["exists"]:
+        return DoctorCheck(
+            "Database schema",
+            "warn",
+            "Database schema has not been initialized yet.",
+            "Run: codex-usage-tracker refresh",
+        )
+    version = state["schema_version"]
+    expected = state["expected_schema_version"]
+    if version != expected:
+        return DoctorCheck(
+            "Database schema",
+            "warn",
+            f"Database schema is at version {version}; expected {expected}.",
+            "Run: codex-usage-tracker rebuild-index if refresh does not migrate it cleanly.",
+        )
+    if not state["checksum_matches"]:
+        return DoctorCheck(
+            "Database schema",
+            "warn",
+            "usage_events schema checksum does not match the package schema.",
+            "Run: codex-usage-tracker rebuild-index after confirming your local aggregate index can be regenerated.",
+        )
+    return DoctorCheck(
+        "Database schema",
+        "pass",
+        f"Schema version {version} is current.",
+    )
+
+
+def _check_parser_diagnostics(db_path: Path) -> DoctorCheck:
+    metadata = refresh_metadata(db_path)
+    if not metadata:
+        return DoctorCheck(
+            "Parser diagnostics",
+            "warn",
+            "No parser diagnostics are available yet.",
+            "Run: codex-usage-tracker refresh",
+        )
+    diagnostics = {
+        key.removeprefix("parser_"): _safe_int(value)
+        for key, value in metadata.items()
+        if key.startswith("parser_")
+    }
+    drift_keys = [
+        key
+        for key in (
+            "missing_last_token_usage",
+            "missing_total_token_usage",
+            "missing_cumulative_total",
+            "unknown_event_shape",
+            "partial_field_count",
+            "invalid_integer",
+        )
+        if diagnostics.get(key, 0)
+    ]
+    skipped = _safe_int(metadata.get("skipped_events"))
+    if skipped or drift_keys:
+        parts = [f"skipped_events={skipped}"] if skipped else []
+        parts.extend(f"{key}={diagnostics[key]}" for key in drift_keys)
+        return DoctorCheck(
+            "Parser diagnostics",
+            "warn",
+            "Schema drift detected in latest refresh: " + ", ".join(parts) + ".",
+            "Run: codex-usage-tracker inspect-log <path> on a skipped log, then rebuild-index after updating parser support.",
+        )
+    parsed = metadata.get("parsed_events", "0")
+    scanned = metadata.get("scanned_files", "0")
+    return DoctorCheck(
+        "Parser diagnostics",
+        "pass",
+        f"Latest refresh parsed {parsed} events from {scanned} files with no drift diagnostics.",
     )
 
 
@@ -348,3 +436,10 @@ def _check_mcp_import() -> DoctorCheck:
             'Install dependencies with: python -m pip install ".[dev]"',
         )
     return DoctorCheck("MCP module", "pass", "MCP server module is discoverable.")
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0

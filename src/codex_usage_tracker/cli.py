@@ -26,6 +26,7 @@ from codex_usage_tracker.paths import (
     DEFAULT_PLUGIN_LINK,
     DEFAULT_PRICING_PATH,
 )
+from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.plugin_installer import install_plugin
 from codex_usage_tracker.pricing import (
     OPENAI_PRICING_MD_URL,
@@ -42,6 +43,7 @@ from codex_usage_tracker.reports import (
     build_summary_report,
 )
 from codex_usage_tracker.store import (
+    rebuild_usage_index,
     export_usage_csv,
     query_session_usage,
     refresh_usage_index,
@@ -79,6 +81,8 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_doctor_parser(subparsers)
     _add_install_plugin_parser(subparsers)
     _add_refresh_parser(subparsers)
+    _add_inspect_log_parser(subparsers)
+    _add_rebuild_index_parser(subparsers)
     _add_summary_parser(subparsers)
     _add_session_parser(subparsers)
     _add_context_parser(subparsers)
@@ -94,6 +98,11 @@ def _build_parser() -> argparse.ArgumentParser:
 def _add_doctor_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     doctor = subparsers.add_parser("doctor", help="Check local setup without writing files")
     doctor.add_argument("--json", action="store_true", dest="as_json")
+    doctor.add_argument(
+        "--suggest-repair",
+        action="store_true",
+        help="Include read-only repair suggestions for warning and failure checks.",
+    )
 
 
 def _add_install_plugin_parser(
@@ -123,6 +132,27 @@ def _add_refresh_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     refresh = subparsers.add_parser("refresh", help="Scan Codex logs into SQLite")
     refresh.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     refresh.add_argument("--include-archived", action="store_true")
+
+
+def _add_inspect_log_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    inspect = subparsers.add_parser(
+        "inspect-log",
+        help="Inspect one Codex JSONL log through the parser without writing to SQLite",
+    )
+    inspect.add_argument("path", type=Path)
+    inspect.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    inspect.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_rebuild_index_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    rebuild = subparsers.add_parser(
+        "rebuild-index",
+        help="Clear aggregate rows and rescan local Codex logs",
+    )
+    rebuild.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    rebuild.add_argument("--include-archived", action="store_true")
 
 
 def _add_summary_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -270,7 +300,11 @@ def _add_allowance_parser(
 
 
 def _run_doctor(args: argparse.Namespace) -> int:
-    report = run_doctor(db_path=args.db, pricing_path=args.pricing)
+    report = run_doctor(
+        db_path=args.db,
+        pricing_path=args.pricing,
+        suggest_repair=args.suggest_repair,
+    )
     print(json.dumps(report, indent=2) if args.as_json else format_doctor(report))
     return 0 if report["status"] != "fail" else 1
 
@@ -302,6 +336,56 @@ def _run_refresh(args: argparse.Namespace) -> int:
     )
     if result.skipped_events:
         print(f"Skipped {result.skipped_events} malformed token-count events.")
+    if result.parser_diagnostics:
+        diagnostics = ", ".join(
+            f"{key}={value}" for key, value in result.parser_diagnostics.items()
+        )
+        print(f"Parser diagnostics: {diagnostics}")
+    return 0
+
+
+def _run_inspect_log(args: argparse.Namespace) -> int:
+    payload = inspect_log(args.path, session_index=load_session_index(args.codex_home))
+    if args.as_json:
+        print(json.dumps(payload, indent=2))
+        return 0
+    print(f"Log: {payload['path']}")
+    print(f"Adapter: {payload['adapter']}")
+    print(f"File session id: {payload['file_session_id'] or 'unknown'}")
+    print(f"Parsed events: {payload['event_count']}")
+    if payload["session_ids"]:
+        print("Sessions: " + ", ".join(str(value) for value in payload["session_ids"]))
+    if payload["models"]:
+        print("Models: " + ", ".join(str(value) for value in payload["models"]))
+    diagnostics = payload["diagnostics"]
+    if diagnostics:
+        print(
+            "Diagnostics: "
+            + ", ".join(f"{key}={value}" for key, value in dict(diagnostics).items())
+        )
+    else:
+        print("Diagnostics: none")
+    return 0
+
+
+def _run_rebuild_index(args: argparse.Namespace) -> int:
+    result = rebuild_usage_index(
+        codex_home=args.codex_home,
+        db_path=args.db,
+        include_archived=args.include_archived,
+    )
+    print(
+        f"Rebuilt aggregate index: scanned {result.scanned_files} files, parsed "
+        f"{result.parsed_events} usage events, upserted "
+        f"{result.inserted_or_updated_events} rows into {result.db_path}."
+    )
+    if result.skipped_events:
+        print(f"Skipped {result.skipped_events} malformed token-count events.")
+    if result.parser_diagnostics:
+        diagnostics = ", ".join(
+            f"{key}={value}" for key, value in result.parser_diagnostics.items()
+        )
+        print(f"Parser diagnostics: {diagnostics}")
     return 0
 
 
@@ -456,6 +540,8 @@ _COMMAND_HANDLERS = {
     "doctor": _run_doctor,
     "install-plugin": _run_install_plugin,
     "refresh": _run_refresh,
+    "inspect-log": _run_inspect_log,
+    "rebuild-index": _run_rebuild_index,
     "summary": _run_summary,
     "session": _run_session,
     "context": _run_context,

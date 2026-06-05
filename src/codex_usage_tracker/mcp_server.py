@@ -57,6 +57,7 @@ def refresh_usage_index(include_archived: bool = False) -> dict[str, Any]:
         "skipped_events": result.skipped_events,
         "inserted_or_updated_events": result.inserted_or_updated_events,
         "db_path": result.db_path,
+        "parser_diagnostics": result.parser_diagnostics,
     }
 
 

@@ -160,9 +160,27 @@ Check setup:
 
 ```bash
 codex-usage-tracker doctor
+codex-usage-tracker doctor --suggest-repair
 codex-usage-tracker --version
 python -m codex_usage_tracker --version
 ```
+
+Inspect a single Codex log without writing to SQLite:
+
+```bash
+codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl
+codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl --json
+```
+
+`inspect-log` reports the parser adapter, aggregate token-count events, session ids, models, and parser diagnostics. It does not store raw prompts, assistant messages, tool output, or transcript snippets.
+
+Rebuild the local aggregate index after parser or schema changes:
+
+```bash
+codex-usage-tracker rebuild-index
+```
+
+`rebuild-index` clears only the local aggregate `usage_events` and refresh metadata tables, then rescans local Codex logs.
 
 Generate the local dashboard:
 
@@ -188,6 +206,7 @@ Dashboard behavior:
 - Investigation presets can jump directly to highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
 - Cost cells show both USD estimates and Codex credit estimates when a model maps to the rate card.
 - The details panel groups primary cost/cache/context/allowance signals first, then thread narrative, token/pricing breakdowns, and collapsed raw aggregate metadata.
+- Parser diagnostics from the latest refresh are surfaced as a compact warning when the parser sees drift, missing expected token fields, invalid counters, duplicate cumulative snapshots, or unknown event shapes.
 - Expanded thread calls are ordered oldest to newest so you can see how usage grew across the conversation.
 - Spawned subagents with logged parent sessions are shown under their parent thread when Codex logs enough metadata.
 - Auto-review sessions do not currently log an explicit parent session id, so the dashboard can infer attachment by cwd and nearby activity and marks that relationship in the details panel.

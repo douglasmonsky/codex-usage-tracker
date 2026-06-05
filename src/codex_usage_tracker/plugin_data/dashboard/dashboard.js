@@ -7,6 +7,7 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
     let allowanceSource = initialPayload.allowance_source || {};
     let allowanceWindows = Array.isArray(initialPayload.allowance_windows) ? initialPayload.allowance_windows : [];
     let allowanceError = initialPayload.allowance_error || '';
+    let parserDiagnostics = initialPayload.parser_diagnostics || {};
     let totalAvailableRows = Number(initialPayload.total_available_rows || data.length);
     let loadedLimit = payloadLimit(initialPayload);
     const rowsEl = document.getElementById('rows');
@@ -398,6 +399,21 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
         sourceEl.dataset.state = pricingConfigured ? 'ready' : 'missing';
         sourceEl.title = pricingConfigured ? '' : 'Run codex-usage-tracker update-pricing to configure estimated costs.';
       }
+    }
+    function updateParserDiagnosticsLine() {
+      const sourceEl = document.getElementById('parserDiagnostics');
+      const entries = Object.entries(parserDiagnostics || {}).filter(([, value]) => Number(value || 0) > 0);
+      if (!entries.length) {
+        sourceEl.hidden = true;
+        sourceEl.textContent = '';
+        sourceEl.title = '';
+        return;
+      }
+      const total = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
+      sourceEl.hidden = false;
+      sourceEl.textContent = 'Parser warnings';
+      sourceEl.dataset.state = 'missing';
+      sourceEl.title = `Latest refresh reported ${number.format(total)} parser diagnostics: ${entries.map(([key, value]) => `${key}=${value}`).join(', ')}. Run codex-usage-tracker inspect-log <path> to investigate schema drift.`;
     }
     function filtered() {
       const term = searchEl.value.trim().toLowerCase();
@@ -1357,12 +1373,14 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       allowanceSource = nextPayload.allowance_source || {};
       allowanceWindows = Array.isArray(nextPayload.allowance_windows) ? nextPayload.allowance_windows : [];
       allowanceError = nextPayload.allowance_error || '';
+      parserDiagnostics = nextPayload.parser_diagnostics || {};
       totalAvailableRows = Number(nextPayload.total_available_rows || data.length);
       loadedLimit = payloadLimit(nextPayload);
       rebuildDashboardIndexes();
       rebuildFilterOptions();
       updatePricingSourceLine();
       updateAllowanceSourceLine();
+      updateParserDiagnosticsLine();
       updateLoadLimitControl();
       render();
     }
@@ -1476,6 +1494,7 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
     rebuildFilterOptions();
     updatePricingSourceLine();
     updateAllowanceSourceLine();
+    updateParserDiagnosticsLine();
     updateLoadLimitControl();
     if (!liveRefreshSupported) {
       autoRefreshEl.checked = false;

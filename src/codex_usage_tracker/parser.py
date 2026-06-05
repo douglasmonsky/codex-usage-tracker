@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from collections.abc import Iterable, MutableMapping
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,41 @@ from codex_usage_tracker.paths import DEFAULT_CODEX_HOME
 SESSION_ID_RE = re.compile(
     r"rollout-[^-]+-[0-9T:-]+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
 )
+
+PARSER_ADAPTER_VERSION = "codex-jsonl-v1"
+PARSER_DIAGNOSTIC_KEYS = (
+    "invalid_json",
+    "missing_payload",
+    "unknown_filename_format",
+    "unknown_event_shape",
+    "missing_info",
+    "missing_last_token_usage",
+    "missing_total_token_usage",
+    "missing_cumulative_total",
+    "duplicate_cumulative_total",
+    "invalid_integer",
+    "partial_field_count",
+    "invalid_model_context_window",
+    "skipped_events",
+)
+
+
+@dataclass(frozen=True)
+class ParserAdapter:
+    """Versioned parser adapter for one Codex log format family."""
+
+    version: str = PARSER_ADAPTER_VERSION
+
+    def parse_file(
+        self,
+        path: Path,
+        session_index: dict[str, SessionInfo] | None = None,
+        stats: MutableMapping[str, int] | None = None,
+    ) -> list[UsageEvent]:
+        return _parse_codex_jsonl_v1(path, session_index=session_index, stats=stats)
+
+
+DEFAULT_PARSER_ADAPTER = ParserAdapter()
 
 
 def load_session_index(codex_home: Path = DEFAULT_CODEX_HOME) -> dict[str, SessionInfo]:
@@ -74,8 +110,78 @@ def parse_usage_events_from_file(
 ) -> list[UsageEvent]:
     """Parse one Codex JSONL log without storing raw message content."""
 
+    return DEFAULT_PARSER_ADAPTER.parse_file(path, session_index=session_index, stats=stats)
+
+
+def inspect_log(
+    path: Path,
+    session_index: dict[str, SessionInfo] | None = None,
+) -> dict[str, object]:
+    """Return aggregate-only parser observations for one log without DB writes."""
+
+    stats = empty_parser_diagnostics()
+    events = parse_usage_events_from_file(path, session_index=session_index, stats=stats)
+    session_ids = sorted({event.session_id for event in events})
+    models = sorted({event.model for event in events if event.model})
+    efforts = sorted({event.effort for event in events if event.effort})
+    first_event = events[0] if events else None
+    last_event = events[-1] if events else None
+    return {
+        "path": str(path),
+        "adapter": DEFAULT_PARSER_ADAPTER.version,
+        "file_session_id": _session_id_from_path(path),
+        "event_count": len(events),
+        "session_ids": session_ids,
+        "models": models,
+        "efforts": efforts,
+        "first_event_timestamp": first_event.event_timestamp if first_event else None,
+        "last_event_timestamp": last_event.event_timestamp if last_event else None,
+        "diagnostics": compact_parser_diagnostics(stats),
+        "events": [
+            {
+                "record_id": event.record_id,
+                "line_number": event.line_number,
+                "event_timestamp": event.event_timestamp,
+                "session_id": event.session_id,
+                "turn_id": event.turn_id,
+                "model": event.model,
+                "effort": event.effort,
+                "input_tokens": event.input_tokens,
+                "cached_input_tokens": event.cached_input_tokens,
+                "uncached_input_tokens": event.uncached_input_tokens,
+                "output_tokens": event.output_tokens,
+                "reasoning_output_tokens": event.reasoning_output_tokens,
+                "total_tokens": event.total_tokens,
+                "cumulative_total_tokens": event.cumulative_total_tokens,
+            }
+            for event in events
+        ],
+    }
+
+
+def empty_parser_diagnostics() -> dict[str, int]:
+    """Return all parser diagnostic counters initialized to zero."""
+
+    return {key: 0 for key in PARSER_DIAGNOSTIC_KEYS}
+
+
+def compact_parser_diagnostics(stats: MutableMapping[str, int]) -> dict[str, int]:
+    """Return non-zero parser diagnostics in stable key order."""
+
+    return {key: int(stats.get(key, 0)) for key in PARSER_DIAGNOSTIC_KEYS if stats.get(key, 0)}
+
+
+def _parse_codex_jsonl_v1(
+    path: Path,
+    session_index: dict[str, SessionInfo] | None = None,
+    stats: MutableMapping[str, int] | None = None,
+) -> list[UsageEvent]:
+    """Parse one Codex JSONL v1 log without storing raw message content."""
+
     index = session_index or {}
     file_session_id = _session_id_from_path(path)
+    if not file_session_id:
+        _increment_stat(stats, "unknown_filename_format")
     session_id = file_session_id
     session_info = index.get(session_id) if session_id else None
     current_turn: dict[str, Any] = {}
@@ -88,10 +194,12 @@ def parse_usage_events_from_file(
             try:
                 envelope = json.loads(line)
             except json.JSONDecodeError:
+                _increment_stat(stats, "invalid_json")
                 continue
 
             payload = envelope.get("payload")
             if not isinstance(payload, dict):
+                _increment_stat(stats, "missing_payload")
                 continue
 
             entry_type = envelope.get("type")
@@ -117,23 +225,38 @@ def parse_usage_events_from_file(
                 continue
 
             if entry_type != "event_msg" or payload.get("type") != "token_count":
+                if entry_type == "event_msg":
+                    _increment_stat(stats, "unknown_event_shape")
                 continue
 
             info = payload.get("info")
             if not isinstance(info, dict):
+                _increment_stat(stats, "missing_info")
                 continue
 
             total_usage = info.get("total_token_usage")
             last_usage = info.get("last_token_usage")
-            if not isinstance(total_usage, dict) or not isinstance(last_usage, dict):
+            if not isinstance(total_usage, dict):
+                _increment_stat(stats, "missing_total_token_usage")
+                _increment_stat(stats, "skipped_events")
+                continue
+            if not isinstance(last_usage, dict):
+                _increment_stat(stats, "missing_last_token_usage")
+                _increment_stat(stats, "skipped_events")
                 continue
 
             try:
-                cumulative_total = _required_int(total_usage.get("total_tokens"))
+                cumulative_total = _required_usage_int(
+                    total_usage,
+                    "total_tokens",
+                    stats=stats,
+                    missing_key="missing_cumulative_total",
+                )
             except ValueError:
                 _increment_stat(stats, "skipped_events")
                 continue
             if cumulative_total <= last_cumulative_total:
+                _increment_stat(stats, "duplicate_cumulative_total")
                 continue
 
             effective_session_id = session_id or "unknown"
@@ -147,9 +270,14 @@ def parse_usage_events_from_file(
                     session_info=session_info,
                     session_meta=session_meta,
                     current_turn=current_turn,
-                    model_context_window=_nullable_int(info.get("model_context_window")),
+                    model_context_window=_nullable_int(
+                        info.get("model_context_window"),
+                        stats=stats,
+                        invalid_key="invalid_model_context_window",
+                    ),
                     last_usage=last_usage,
                     total_usage=total_usage,
+                    stats=stats,
                 )
             except ValueError:
                 _increment_stat(stats, "skipped_events")
@@ -171,13 +299,21 @@ def _build_event(
     model_context_window: int | None,
     last_usage: dict[str, Any],
     total_usage: dict[str, Any],
+    stats: MutableMapping[str, int] | None = None,
 ) -> UsageEvent:
-    input_tokens = _required_int(last_usage.get("input_tokens"))
-    cached_input_tokens = _required_int(last_usage.get("cached_input_tokens"))
-    output_tokens = _required_int(last_usage.get("output_tokens"))
-    reasoning_output_tokens = _required_int(last_usage.get("reasoning_output_tokens"))
-    total_tokens = _required_int(last_usage.get("total_tokens"))
-    cumulative_total_tokens = _required_int(total_usage.get("total_tokens"))
+    input_tokens = _required_usage_int(last_usage, "input_tokens", stats=stats)
+    cached_input_tokens = _required_usage_int(last_usage, "cached_input_tokens", stats=stats)
+    output_tokens = _required_usage_int(last_usage, "output_tokens", stats=stats)
+    reasoning_output_tokens = _required_usage_int(
+        last_usage, "reasoning_output_tokens", stats=stats
+    )
+    total_tokens = _required_usage_int(last_usage, "total_tokens", stats=stats)
+    cumulative_total_tokens = _required_usage_int(
+        total_usage,
+        "total_tokens",
+        stats=stats,
+        missing_key="missing_cumulative_total",
+    )
     record_id = _record_id(
         session_id=session_id,
         turn_id=_optional_str(current_turn.get("turn_id")),
@@ -213,11 +349,13 @@ def _build_event(
         output_tokens=output_tokens,
         reasoning_output_tokens=reasoning_output_tokens,
         total_tokens=total_tokens,
-        cumulative_input_tokens=_required_int(total_usage.get("input_tokens")),
-        cumulative_cached_input_tokens=_required_int(total_usage.get("cached_input_tokens")),
-        cumulative_output_tokens=_required_int(total_usage.get("output_tokens")),
-        cumulative_reasoning_output_tokens=_required_int(
-            total_usage.get("reasoning_output_tokens")
+        cumulative_input_tokens=_required_usage_int(total_usage, "input_tokens", stats=stats),
+        cumulative_cached_input_tokens=_required_usage_int(
+            total_usage, "cached_input_tokens", stats=stats
+        ),
+        cumulative_output_tokens=_required_usage_int(total_usage, "output_tokens", stats=stats),
+        cumulative_reasoning_output_tokens=_required_usage_int(
+            total_usage, "reasoning_output_tokens", stats=stats
         ),
         cumulative_total_tokens=cumulative_total_tokens,
     )
@@ -296,34 +434,56 @@ def _optional_str(value: object) -> str | None:
     return None
 
 
-def _nullable_int(value: object) -> int | None:
+def _nullable_int(
+    value: object,
+    *,
+    stats: MutableMapping[str, int] | None = None,
+    invalid_key: str = "partial_field_count",
+) -> int | None:
     if value is None:
         return None
     try:
-        return _int(value)
+        return _strict_int(value)
     except ValueError:
+        _increment_stat(stats, invalid_key)
+        if invalid_key != "partial_field_count":
+            _increment_stat(stats, "partial_field_count")
         return None
 
 
-def _int(value: object) -> int:
+def _strict_int(value: object) -> int:
     if isinstance(value, bool):
-        return int(value)
+        raise ValueError(f"invalid integer value: {value!r}")
     if isinstance(value, int):
         return value
     if isinstance(value, float):
-        return int(value)
+        raise ValueError(f"invalid integer value: {value!r}")
     if isinstance(value, str) and value.strip():
         try:
             return int(value)
         except ValueError as exc:
             raise ValueError(f"invalid integer value: {value!r}") from exc
-    return 0
+    raise ValueError(f"invalid integer value: {value!r}")
 
 
-def _required_int(value: object) -> int:
-    if value is None:
-        return 0
-    return _int(value)
+def _required_usage_int(
+    values: dict[str, Any],
+    key: str,
+    *,
+    stats: MutableMapping[str, int] | None = None,
+    missing_key: str = "partial_field_count",
+) -> int:
+    if key not in values or values.get(key) is None:
+        _increment_stat(stats, missing_key)
+        if missing_key != "partial_field_count":
+            _increment_stat(stats, "partial_field_count")
+        raise ValueError(f"missing required integer field: {key}")
+    try:
+        return _strict_int(values.get(key))
+    except ValueError:
+        _increment_stat(stats, "invalid_integer")
+        _increment_stat(stats, "partial_field_count")
+        raise
 
 
 def _increment_stat(stats: MutableMapping[str, int] | None, key: str) -> None:

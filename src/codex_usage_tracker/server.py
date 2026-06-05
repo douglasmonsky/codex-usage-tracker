@@ -189,6 +189,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                     "skipped_events": result.skipped_events,
                     "inserted_or_updated_events": result.inserted_or_updated_events,
                     "db_path": result.db_path,
+                    "parser_diagnostics": result.parser_diagnostics,
                 }
             payload = dashboard_payload(
                 db_path=self._db_path,

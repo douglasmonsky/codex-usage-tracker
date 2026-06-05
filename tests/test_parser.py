@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from codex_usage_tracker.models import SessionInfo
 from codex_usage_tracker.parser import (
     find_session_logs,
+    inspect_log,
     load_session_index,
     parse_usage_events_from_file,
 )
@@ -122,8 +126,57 @@ def test_parser_skips_corrupt_token_count_and_continues(tmp_path: Path) -> None:
     events = parse_usage_events_from_file(log_path, stats=stats)
 
     assert stats["skipped_events"] == 1
+    assert stats["invalid_integer"] == 1
+    assert stats["invalid_model_context_window"] == 1
+    assert stats["partial_field_count"] == 2
     assert [event.cumulative_total_tokens for event in events] == [150, 210]
     assert events[0].model_context_window is None
+
+
+def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: Path) -> None:
+    log_path = tmp_path / "unknown-name.jsonl"
+    missing_counter = _token_event(100, 100)
+    del missing_counter["payload"]["info"]["last_token_usage"]["total_tokens"]  # type: ignore[index]
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            missing_counter,
+            _token_event(150, 50),
+        ],
+    )
+
+    payload = inspect_log(log_path)
+
+    assert payload["adapter"] == "codex-jsonl-v1"
+    assert payload["file_session_id"] is None
+    assert payload["event_count"] == 1
+    assert payload["session_ids"] == [SESSION_ID]
+    assert payload["models"] == ["gpt-5.5"]
+    assert payload["diagnostics"] == {
+        "unknown_filename_format": 1,
+        "partial_field_count": 1,
+        "skipped_events": 1,
+    }
+    assert "SECRET" not in json.dumps(payload)
+
+
+def test_cli_inspect_log_outputs_parser_summary(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    _write_jsonl(log_path, [_entry("session_meta", {"id": SESSION_ID}), _token_event(100, 100)])
+
+    result = subprocess.run(
+        [sys.executable, "-m", "codex_usage_tracker", "inspect-log", str(log_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=_subprocess_env(),
+    )
+
+    assert "Adapter: codex-jsonl-v1" in result.stdout
+    assert "Parsed events: 1" in result.stdout
+    assert "Diagnostics: none" in result.stdout
 
 
 def test_session_index_join_and_archived_log_discovery(tmp_path: Path) -> None:
@@ -196,3 +249,15 @@ def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
         "".join(json.dumps(row) + "\n" for row in rows),
         encoding="utf-8",
     )
+
+
+def _subprocess_env() -> dict[str, str]:
+    env = dict(os.environ)
+    repo_root = Path(__file__).resolve().parents[1]
+    src_path = str(repo_root / "src")
+    env["PYTHONPATH"] = (
+        f"{src_path}{os.pathsep}{env['PYTHONPATH']}"
+        if env.get("PYTHONPATH")
+        else src_path
+    )
+    return env
