@@ -179,12 +179,14 @@
       font: inherit;
     }
     .filter-status {
-      min-height: 16px;
       color: var(--muted);
       font-size: 11px;
       font-weight: 720;
       line-height: 1.2;
       overflow-wrap: anywhere;
+    }
+    .filter-status:empty {
+      display: none;
     }
     .filter-status[data-state="active"] {
       color: var(--blue);

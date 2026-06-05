@@ -521,7 +521,9 @@
     }
     function updateDateFilterControls() {
       const range = currentDateRange();
-      dateRangeStatusEl.textContent = range.label;
+      const showStatus = range.active || range.invalid;
+      dateRangeStatusEl.hidden = !showStatus;
+      dateRangeStatusEl.textContent = showStatus ? range.label : '';
       dateRangeStatusEl.dataset.state = range.invalid ? 'error' : range.active ? 'active' : 'idle';
       return range;
     }
