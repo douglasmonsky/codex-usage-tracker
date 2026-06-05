@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security and private data
+    url: https://github.com/douglasmonsky/codex-usage-tracker/security
+    about: Report vulnerabilities or accidental private-data exposure through private security channels when available.

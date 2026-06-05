@@ -844,7 +844,12 @@ def _run_session(args: argparse.Namespace) -> int:
     rows = apply_project_privacy_to_rows(rows, privacy_mode=args.privacy_mode)
     if args.as_json:
         _print_json(
-            session_payload(rows, requested_session_id=args.session_id, limit=args.limit)
+            session_payload(
+                rows,
+                requested_session_id=args.session_id,
+                limit=args.limit,
+                privacy_mode=args.privacy_mode,
+            )
         )
         return 0
     print(format_session(rows))

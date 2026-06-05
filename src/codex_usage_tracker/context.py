@@ -93,6 +93,7 @@ def load_call_context(
         include_tool_output=include_tool_output,
     )
     return {
+        "schema": "codex-usage-tracker-context-v1",
         "loaded_on_demand": True,
         "raw_context_persisted": False,
         "include_tool_output": include_tool_output,

@@ -65,6 +65,7 @@ def run_doctor(
     fail_count = sum(1 for check in checks if check.status == "fail")
     warn_count = sum(1 for check in checks if check.status == "warn")
     report: dict[str, Any] = {
+        "schema": "codex-usage-tracker-doctor-v1",
         "status": "fail" if fail_count else "warn" if warn_count else "pass",
         "failures": fail_count,
         "warnings": warn_count,

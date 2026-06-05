@@ -10,7 +10,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from codex_usage_tracker.allowance import write_allowance_template
-from codex_usage_tracker.api_payloads import session_payload
+from codex_usage_tracker.api_payloads import refresh_result_payload, session_payload
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
@@ -59,14 +59,7 @@ def refresh_usage_index(include_archived: bool = False) -> dict[str, Any]:
         db_path=DEFAULT_DB_PATH,
         include_archived=include_archived,
     )
-    return {
-        "scanned_files": result.scanned_files,
-        "parsed_events": result.parsed_events,
-        "skipped_events": result.skipped_events,
-        "inserted_or_updated_events": result.inserted_or_updated_events,
-        "db_path": result.db_path,
-        "parser_diagnostics": result.parser_diagnostics,
-    }
+    return refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1")
 
 
 @mcp.tool()
@@ -118,7 +111,12 @@ def session_usage(
         privacy_mode=privacy_mode,
     )
     if response_format == "json":
-        return session_payload(rows, requested_session_id=session_id, limit=limit)
+        return session_payload(
+            rows,
+            requested_session_id=session_id,
+            limit=limit,
+            privacy_mode=privacy_mode,
+        )
     return format_session(rows)
 
 
@@ -133,6 +131,7 @@ def usage_call_context(
     if os.environ.get("CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT") != "1":
         return json.dumps(
             {
+                "schema": "codex-usage-tracker-context-disabled-v1",
                 "error": (
                     "Raw context loading through MCP is disabled. Set "
                     "CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1 to opt in for this process."
@@ -248,7 +247,15 @@ def generate_usage_dashboard(
         since=since,
         privacy_mode=privacy_mode,
     )
-    return {"dashboard_path": str(generated), "file_url": generated.resolve().as_uri()}
+    return {
+        "schema": "codex-usage-tracker-dashboard-v1",
+        "dashboard_path": str(generated),
+        "file_url": generated.resolve().as_uri(),
+        "opened": False,
+        "limit": None if limit <= 0 else limit,
+        "since": since,
+        "privacy_mode": privacy_mode,
+    }
 
 
 @mcp.tool()
@@ -266,7 +273,13 @@ def export_usage_csv(
         limit=limit,
         privacy_mode=privacy_mode,
     )
-    return {"rows": rows, "csv_path": str(output), "privacy_mode": privacy_mode}
+    return {
+        "schema": "codex-usage-tracker-export-v1",
+        "rows": rows,
+        "csv_path": str(output),
+        "limit": limit,
+        "privacy_mode": privacy_mode,
+    }
 
 
 @mcp.tool()
@@ -274,7 +287,11 @@ def init_usage_pricing_config(force: bool = False) -> dict[str, Any]:
     """Write a local pricing template for optional cost estimates."""
 
     output = write_pricing_template(DEFAULT_PRICING_PATH, force=force)
-    return {"pricing_path": str(output)}
+    return {
+        "schema": "codex-usage-tracker-init-pricing-v1",
+        "pricing_path": str(output),
+        "created": True,
+    }
 
 
 @mcp.tool()
@@ -282,7 +299,11 @@ def init_usage_allowance_config(force: bool = False) -> dict[str, Any]:
     """Write a local template for optional Codex allowance windows."""
 
     output = write_allowance_template(DEFAULT_ALLOWANCE_PATH, force=force)
-    return {"allowance_path": str(output)}
+    return {
+        "schema": "codex-usage-tracker-init-allowance-v1",
+        "allowance_path": str(output),
+        "created": True,
+    }
 
 
 @mcp.tool()
@@ -297,6 +318,7 @@ def update_usage_pricing_config(
         include_estimates=include_estimates,
     )
     return {
+        "schema": "codex-usage-tracker-update-pricing-v1",
         "pricing_path": str(result.path),
         "source_url": result.source_url,
         "tier": result.tier,

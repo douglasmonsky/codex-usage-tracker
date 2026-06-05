@@ -25,8 +25,9 @@ The only exception is `usage_call_context`, which reads one selected record's lo
    - `most_expensive_usage_calls(..., response_format="json")`
    - `usage_pricing_coverage(..., response_format="json")`
    - `usage_query(...)`
-4. If MCP tools are unavailable, fall back to the CLI equivalents:
-   - `codex-usage-tracker refresh`
+4. Check the top-level `schema` field before interpreting structured output. Known schema ids are documented in `docs/cli-json-schemas.md`.
+5. If MCP tools are unavailable, fall back to the CLI equivalents:
+   - `codex-usage-tracker refresh --json`
    - `codex-usage-tracker summary --json`
    - `codex-usage-tracker query`
    - `codex-usage-tracker session --json`

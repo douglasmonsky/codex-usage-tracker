@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add tested JSON contract validation for stable CLI and MCP payload schemas.
+- Add schema markers to doctor, pricing coverage, MCP dashboard/export/config, and opt-in context payloads.
+- Add Ruff, coverage, and dashboard JavaScript syntax checks to CI.
+- Add issue templates for bugs, parser compatibility, pricing/allowance issues, and feature requests.
+- Expand security guidance for project metadata privacy, support bundles, and localhost dashboard tokens.
+
 ## 0.2.0
 
 - Add project metadata privacy modes for dashboard, query, session, summary, CSV export, MCP, and support-bundle surfaces.

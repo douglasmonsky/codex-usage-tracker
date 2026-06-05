@@ -62,6 +62,7 @@ def summarize_pricing_coverage(
         )
     )
     return {
+        "schema": "codex-usage-tracker-pricing-coverage-v1",
         **totals,
         "pricing_loaded": config.loaded and not config.error,
         "pricing_path": str(config.path),

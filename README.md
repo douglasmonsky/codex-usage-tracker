@@ -2,6 +2,10 @@
 
 Local-first analytics for Codex token usage.
 
+[![CI](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml)
+![Python 3.10-3.13](https://img.shields.io/badge/python-3.10--3.13-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 > **Unofficial project:** Codex Usage Tracker is an independent open-source project. It is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI; this project only reads local log files from your machine.
 
 Codex Usage Tracker reads the JSONL logs already written by Codex, indexes aggregate usage counters into SQLite, and gives you a dashboard, CLI, and MCP tools for understanding where tokens and Codex usage credits are going. It is built for investigating real usage patterns while keeping prompts, assistant messages, tool output, and pasted secrets out of the stored index and generated dashboard HTML.
@@ -267,7 +271,7 @@ codex-usage-tracker summary --group-by model --json
 codex-usage-tracker session <session-id> --json
 ```
 
-See [`docs/cli-json-schemas.md`](docs/cli-json-schemas.md) for the stable CLI and MCP JSON payload shapes and error codes.
+See [`docs/cli-json-schemas.md`](docs/cli-json-schemas.md) for the tested CLI and MCP JSON contract ids, payload shapes, and error codes.
 
 Show one session:
 
@@ -464,7 +468,7 @@ normal analysis and should only be loaded when you explicitly ask for it.
 - `update_usage_pricing_config`
 - `init_usage_allowance_config`
 
-`usage_summary`, `session_usage`, `most_expensive_usage_calls`, and `usage_pricing_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown. `usage_query` always returns JSON.
+`usage_doctor`, `usage_summary`, `session_usage`, `most_expensive_usage_calls`, and `usage_pricing_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown. `refresh_usage_index`, `usage_query`, `generate_usage_dashboard`, `export_usage_csv`, and config-writing MCP tools return JSON dictionaries directly.
 
 ## Data Privacy
 

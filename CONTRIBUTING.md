@@ -16,8 +16,13 @@ python -m pip install ".[dev]"
 Run these before opening a pull request:
 
 ```bash
+python -m ruff check .
 python -m pytest
+python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
+python scripts/check_release.py
 python -m build
 python scripts/check_release.py --dist
 git diff --check

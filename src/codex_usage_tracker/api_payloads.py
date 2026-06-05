@@ -75,6 +75,7 @@ def session_payload(
     *,
     requested_session_id: str | None,
     limit: int,
+    privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Return the stable JSON shape for session usage rows."""
 
@@ -83,6 +84,7 @@ def session_payload(
         "requested_session_id": requested_session_id,
         "resolved_session_id": rows[0].get("session_id") if rows else requested_session_id,
         "limit": limit,
+        "privacy_mode": privacy_mode,
         "row_count": len(rows),
         "rows": rows,
     }

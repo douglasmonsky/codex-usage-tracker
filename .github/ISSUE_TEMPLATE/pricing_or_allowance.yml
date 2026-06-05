@@ -1,0 +1,32 @@
+name: Pricing, credits, or allowance issue
+description: Report estimated pricing, Codex credit, or allowance behavior.
+title: "pricing: "
+labels: ["pricing", "usage-credits"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pricing and Codex credit values can be exact, estimated, user-configured, or unavailable depending on local config and bundled rate-card coverage. Do not paste account screenshots with private details.
+  - type: textarea
+    id: issue
+    attributes:
+      label: What looks wrong?
+      description: Describe the model, credit estimate, pricing status, allowance window, or dashboard field that seems incorrect.
+    validations:
+      required: true
+  - type: textarea
+    id: safe_output
+    attributes:
+      label: Safe aggregate output
+      description: Paste strict-mode output from `codex-usage-tracker --privacy-mode strict pricing-coverage --json` or a filtered strict `query`.
+      render: json
+  - type: textarea
+    id: config
+    attributes:
+      label: Local config context
+      description: Mention whether you configured `pricing.json`, `rate-card.json`, or `allowance.json`. Do not paste private account identifiers.
+  - type: input
+    id: tracker_version
+    attributes:
+      label: Tracker version
+      placeholder: "`codex-usage-tracker --version`"

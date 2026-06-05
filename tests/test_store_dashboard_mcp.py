@@ -12,6 +12,7 @@ from pathlib import Path
 from codex_usage_tracker.context import load_call_context
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
+from codex_usage_tracker.json_contracts import validate_json_payload_contract
 from codex_usage_tracker.models import UsageEvent
 from codex_usage_tracker.pricing import (
     PricingUpdateResult,
@@ -777,16 +778,38 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         privacy_mode="strict",
     )
     pricing_coverage = mcp_server.usage_pricing_coverage()
+    pricing_coverage_json = mcp_server.usage_pricing_coverage(response_format="json")
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
     context_disabled = mcp_server.usage_call_context(record_id=record_id)
+    context_disabled_json = json.loads(context_disabled)
     monkeypatch.setenv("CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT", "1")
     context = mcp_server.usage_call_context(record_id=record_id)
+    context_json = json.loads(context)
     dashboard = mcp_server.generate_usage_dashboard()
+    csv_export = mcp_server.export_usage_csv(str(tmp_path / "usage.csv"), privacy_mode="redacted")
     pricing_update = mcp_server.update_usage_pricing_config()
     allowance = mcp_server.init_usage_allowance_config()
     doctor = mcp_server.usage_doctor()
+    doctor_json = mcp_server.usage_doctor(response_format="json")
+
+    for payload in (
+        refresh,
+        summary_json,
+        expensive_json,
+        query_json,
+        pricing_coverage_json,
+        session_json,
+        context_disabled_json,
+        context_json,
+        dashboard,
+        csv_export,
+        pricing_update,
+        allowance,
+        doctor_json,
+    ):
+        _assert_contract(payload)
 
     assert refresh["parsed_events"] == 4
     assert refresh["skipped_events"] == 0
@@ -804,20 +827,25 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert query_json["rows"][0]["cwd"].startswith("[redacted cwd:")
     assert query_json["rows"][0]["project_relative_cwd"] is None
     assert "Codex pricing coverage" in pricing_coverage
+    assert pricing_coverage_json["schema"] == "codex-usage-tracker-pricing-coverage-v1"
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2
     assert "Raw context loading through MCP is disabled" in context_disabled
+    assert context_disabled_json["schema"] == "codex-usage-tracker-context-disabled-v1"
     assert "SECRET RAW PROMPT" not in context_disabled
     assert "SECRET RAW PROMPT" in context
+    assert context_json["schema"] == "codex-usage-tracker-context-v1"
     assert "sk" + "-proj-" not in context
     assert "[REDACTED_OPENAI_KEY]" in context
     assert dashboard["dashboard_path"] == str(dashboard_path)
+    assert csv_export["privacy_mode"] == "redacted"
     assert pricing_update["model_count"] == 1
     assert pricing_update["source_url"] == "https://example.test/pricing.md"
     assert allowance["allowance_path"] == str(allowance_path)
     assert allowance_path.exists()
     assert "Codex Usage Tracker doctor" in doctor
+    assert doctor_json["schema"] == "codex-usage-tracker-doctor-v1"
 
 
 def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
@@ -1011,6 +1039,10 @@ def _write_pricing(path: Path) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def _assert_contract(payload: object) -> None:
+    assert validate_json_payload_contract(payload) == []
 
 
 def _http_error_json(url: str, headers: dict[str, str] | None = None) -> dict[str, object]:

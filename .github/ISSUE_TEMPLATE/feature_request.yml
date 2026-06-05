@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a new aggregate-only workflow, report, or dashboard improvement.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What usage question should the tracker help answer?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the CLI, MCP, dashboard, CSV, or docs change you want.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Main surface
+      options:
+        - Dashboard
+        - CLI
+        - MCP or companion skill
+        - CSV/export
+        - Parser/index
+        - Documentation
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy considerations
+      description: Note any project metadata, source path, raw context, or sharing risk this feature might introduce.

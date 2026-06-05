@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from codex_usage_tracker.cli import _COMMAND_HANDLERS
+from codex_usage_tracker.json_contracts import known_json_schemas
 
 
 def test_module_cli_version() -> None:
@@ -64,6 +65,15 @@ def test_readme_codex_usage_tracker_commands_reference_known_subcommands() -> No
         "support-bundle",
         "parse-allowance",
     } <= documented
+
+
+def test_cli_json_schema_doc_lists_tracked_contracts() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    docs = (repo_root / "docs" / "cli-json-schemas.md").read_text(encoding="utf-8")
+
+    missing = [schema for schema in known_json_schemas() if schema not in docs]
+
+    assert not missing
 
 
 def _subprocess_env() -> dict[str, str]:

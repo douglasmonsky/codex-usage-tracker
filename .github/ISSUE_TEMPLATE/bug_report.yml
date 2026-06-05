@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a tracker, dashboard, CLI, or MCP bug without sharing private logs.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste real Codex logs, prompts, assistant text, tool output, secrets, private repo names, or full local paths.
+        Prefer synthetic examples and strict privacy mode outputs.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the visible bug and the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include commands, dashboard actions, filters, or MCP calls that reproduce the issue.
+      placeholder: |
+        1. Run `codex-usage-tracker ...`
+        2. Open ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Safe diagnostics
+      description: Paste relevant output from `codex-usage-tracker doctor --json` or `codex-usage-tracker --privacy-mode strict support-bundle --json`. Review it first.
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "`codex-usage-tracker --version`"
+  - type: textarea
+    id: checks
+    attributes:
+      label: Checks tried
+      description: List any validation commands you ran, such as pytest, check_release, or Node syntax checks.

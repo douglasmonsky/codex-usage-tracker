@@ -1,0 +1,38 @@
+name: Parser or log compatibility
+description: Report a Codex log shape the parser does not understand.
+title: "parser: "
+labels: ["parser", "compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach or paste raw Codex JSONL logs. Use synthetic snippets that preserve only the envelope shape and aggregate token counters needed to reproduce the parser issue.
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Parser symptom
+      description: Describe skipped events, diagnostics, missing fields, or changed Codex log behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: inspect
+    attributes:
+      label: inspect-log output
+      description: Paste safe output from `codex-usage-tracker inspect-log <path> --json` after removing private paths and identifiers.
+      render: json
+  - type: textarea
+    id: synthetic
+    attributes:
+      label: Synthetic log shape
+      description: Provide a minimal synthetic JSONL example with fake ids, fake paths, and no conversation content.
+      render: json
+  - type: input
+    id: codex_version
+    attributes:
+      label: Codex version or build
+      description: Include only if available.
+  - type: input
+    id: tracker_version
+    attributes:
+      label: Tracker version
+      placeholder: "`codex-usage-tracker --version`"

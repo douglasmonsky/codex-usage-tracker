@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from codex_usage_tracker.json_contracts import validate_json_payload_contract
+
 SESSION_ID = "019e374d-c19f-7da3-a44f-8de043a7a64e"
 
 
@@ -241,11 +243,17 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     )
 
     assert refresh.returncode == 0
-    assert json.loads(refresh.stdout)["schema"] == "codex-usage-tracker-refresh-v1"
+    refresh_payload = json.loads(refresh.stdout)
     summary_payload = json.loads(summary.stdout)
     query_payload = json.loads(query.stdout)
     session_payload = json.loads(session.stdout)
     expensive_payload = json.loads(expensive.stdout)
+    _assert_contract(refresh_payload)
+    _assert_contract(summary_payload)
+    _assert_contract(query_payload)
+    _assert_contract(session_payload)
+    _assert_contract(expensive_payload)
+    assert refresh_payload["schema"] == "codex-usage-tracker-refresh-v1"
     assert summary_payload["schema"] == "codex-usage-tracker-summary-v1"
     assert summary_payload["rows"][0]["group_key"] == "gpt-5.5"
     assert query_payload["schema"] == "codex-usage-tracker-query-v1"
@@ -263,9 +271,14 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     assert expensive_payload["schema"] == "codex-usage-tracker-summary-v1"
     assert expensive_payload["is_expensive"] is True
     export_payload = json.loads(export.stdout)
+    _assert_contract(export_payload)
     assert export.returncode == 0
     assert export_payload["privacy_mode"] == "redacted"
     assert "[redacted cwd:" in csv_path.read_text(encoding="utf-8")
+
+
+def _assert_contract(payload: object) -> None:
+    assert validate_json_payload_contract(payload) == []
 
 
 def _run_cli(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:

@@ -19,6 +19,42 @@ The skill should separate exact facts from estimates. Remaining allowance is not
 
 Use the global `--privacy-mode redacted` or `--privacy-mode strict` option, or the MCP `privacy_mode` argument, when project metadata should be hidden from JSON answers. The CLI option goes before the subcommand.
 
+## Contract Validation
+
+Stable payload contracts are tracked in `codex_usage_tracker.json_contracts` and covered by tests. Every stable payload includes a top-level `schema` string so agents can distinguish compatible responses from markdown, disabled-context responses, or future versions.
+
+Tracked schema ids:
+
+| Schema | Surface |
+| --- | --- |
+| `codex-usage-tracker-setup-v1` | CLI `setup --json` |
+| `codex-usage-tracker-doctor-v1` | CLI `doctor --json`, MCP `usage_doctor(response_format="json")` |
+| `codex-usage-tracker-plugin-install-v1` | CLI `install-plugin --json`, setup plugin payload |
+| `codex-usage-tracker-plugin-upgrade-v1` | CLI `upgrade-plugin --json` |
+| `codex-usage-tracker-plugin-uninstall-v1` | CLI `uninstall-plugin --json` |
+| `codex-usage-tracker-refresh-v1` | CLI `refresh --json`, MCP `refresh_usage_index()` |
+| `codex-usage-tracker-rebuild-index-v1` | CLI `rebuild-index --json` |
+| `codex-usage-tracker-reset-db-v1` | CLI `reset-db --yes --json` |
+| `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
+| `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
+| `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
+| `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
+| `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
+| `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
+| `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
+| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload |
+| `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
+| `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
+| `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
+| `codex-usage-tracker-update-pricing-v1` | CLI `update-pricing --json`, MCP `update_usage_pricing_config()` |
+| `codex-usage-tracker-pin-pricing-v1` | CLI `pin-pricing --json` |
+| `codex-usage-tracker-init-allowance-v1` | CLI `init-allowance --json`, MCP `init_usage_allowance_config()` |
+| `codex-usage-tracker-parse-allowance-v1` | CLI `parse-allowance --json` |
+| `codex-usage-tracker-update-rate-card-v1` | CLI `update-rate-card --json` |
+| `codex-usage-tracker-init-thresholds-v1` | CLI `init-thresholds --json` |
+| `codex-usage-tracker-init-projects-v1` | CLI `init-projects --json` |
+| `codex-usage-tracker-support-bundle-v1` | CLI `support-bundle --json` |
+
 ## Shared Error Codes
 
 CLI failures print a stable code in stderr:
@@ -128,7 +164,40 @@ Schema: `codex-usage-tracker-session-v1`
   "requested_session_id": "019e374d-c19f-7da3-a44f-8de043a7a64e",
   "resolved_session_id": "019e374d-c19f-7da3-a44f-8de043a7a64e",
   "limit": 200,
+  "privacy_mode": "normal",
   "row_count": 2,
+  "rows": []
+}
+```
+
+## Pricing Coverage
+
+Command:
+
+```bash
+codex-usage-tracker pricing-coverage --json
+```
+
+MCP:
+
+- `usage_pricing_coverage(response_format="json")`
+
+Schema: `codex-usage-tracker-pricing-coverage-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-pricing-coverage-v1",
+  "model_count": 1,
+  "priced_model_count": 1,
+  "unpriced_model_count": 0,
+  "total_tokens": 1000,
+  "priced_tokens": 1000,
+  "unpriced_tokens": 0,
+  "estimated_cost_usd": 0.01,
+  "priced_token_ratio": 1.0,
+  "pricing_loaded": true,
+  "pricing_path": "~/.codex-usage-tracker/pricing.json",
+  "pricing_source": null,
   "rows": []
 }
 ```
@@ -152,4 +221,4 @@ Most setup and file-writing commands accept `--json` and return a schema-specifi
 - `init-thresholds --json`, `init-projects --json`
 - `support-bundle --json`
 
-`context` already returns JSON because it is an explicit on-demand context request. Treat that output as sensitive local context even though it is redacted and size-limited.
+`context` already returns JSON because it is an explicit on-demand context request. Treat `codex-usage-tracker-context-v1` output as sensitive local context even though it is redacted and size-limited. MCP returns `codex-usage-tracker-context-disabled-v1` when raw context loading has not been explicitly enabled with `CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1`.
