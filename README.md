@@ -398,7 +398,11 @@ Marketplace installs use the bundled MCP launcher at
 `skills/codex-usage-tracker/scripts/run_mcp.py`. On first MCP startup it creates
 a cached runtime under `~/.cache/codex-usage-tracker/mcp-runtime/` and installs
 the Python package from GitHub, so it does not require a `.venv` inside the
-plugin directory.
+plugin directory. The launcher stores the GitHub package spec used for that
+runtime and reinstalls when the bundled package pin changes. Set
+`CODEX_USAGE_TRACKER_PACKAGE_SPEC` to test a different Git ref or
+`CODEX_USAGE_TRACKER_RUNTIME_DIR` to use a separate cache while debugging
+plugin startup.
 
 ## MCP Tools
 

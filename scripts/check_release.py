@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -31,6 +32,7 @@ REQUIRED_FILES = [
     "MANIFEST.in",
     "AGENTS.md",
     "docs/dashboard-guide.md",
+    "docs/cli-json-schemas.md",
     "docs/assets/dashboard-insights.png",
     "docs/assets/dashboard-calls.png",
     "docs/assets/dashboard-threads.png",
@@ -40,6 +42,7 @@ REQUIRED_FILES = [
     ".github/workflows/pricing-compat.yml",
     ".codex-plugin/plugin.json",
     ".mcp.json",
+    "skills/codex-usage-tracker/SKILL.md",
     "skills/codex-usage-tracker/scripts/run_mcp.py",
     "src/codex_usage_tracker/plugin_data/assets/icon.svg",
     "src/codex_usage_tracker/plugin_data/dashboard/dashboard.css",
@@ -68,6 +71,11 @@ WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-details.png",
     "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md",
 }
+SDIST_REQUIRED_MEMBERS = {
+    "docs/cli-json-schemas.md",
+    "skills/codex-usage-tracker/SKILL.md",
+    "skills/codex-usage-tracker/scripts/run_mcp.py",
+}
 
 
 def main() -> int:
@@ -86,6 +94,7 @@ def main() -> int:
     failures.extend(_check_packaging_metadata())
     failures.extend(_check_tracked_files_for_secrets())
     if args.dist:
+        failures.extend(_check_sdist())
         failures.extend(_check_wheel())
 
     if failures:
@@ -172,11 +181,29 @@ def _check_packaging_metadata() -> list[str]:
         failures.append(".mcp.json should point at the bundled MCP bootstrap launcher")
     if mcp_server.get("startup_timeout_sec") != 120:
         failures.append(".mcp.json should allow enough startup time for first-run runtime bootstrap")
+    manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+    if "recursive-include skills *.md *.py" not in manifest:
+        failures.append("MANIFEST.in should include Codex skill scripts in the source distribution")
+    source_skill = (REPO_ROOT / "skills/codex-usage-tracker/SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    package_skill = (
+        REPO_ROOT / "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md"
+    ).read_text(encoding="utf-8")
+    if source_skill != package_skill:
+        failures.append("source-tree Codex skill must match packaged plugin_data skill")
     launcher = (REPO_ROOT / "skills/codex-usage-tracker/scripts/run_mcp.py").read_text(
         encoding="utf-8"
     )
     if "codex-usage-tracker.git@main" in launcher:
         failures.append("MCP runtime launcher must pin the package spec instead of tracking main")
+    package_spec = re.search(r"codex-usage-tracker\.git@([0-9a-f]{40})", launcher)
+    if not package_spec:
+        failures.append("MCP runtime launcher must pin a 40-character GitHub commit SHA")
+    elif not _is_ancestor_when_available(package_spec.group(1), "HEAD"):
+        failures.append("MCP runtime launcher package pin is not reachable from HEAD")
+    if "PACKAGE_SPEC_MARKER" not in launcher:
+        failures.append("MCP runtime launcher should invalidate cached runtimes when package spec changes")
     return failures
 
 
@@ -204,6 +231,42 @@ def _tracked_files() -> list[Path]:
         text=True,
     )
     return [REPO_ROOT / line for line in result.stdout.splitlines() if line]
+
+
+def _is_ancestor_when_available(commit: str, ref: str) -> bool:
+    exists = (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            cwd=REPO_ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
+    if not exists:
+        return True
+    return (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", commit, ref],
+            cwd=REPO_ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
+
+
+def _check_sdist() -> list[str]:
+    sdists = sorted((REPO_ROOT / "dist").glob("codex_usage_tracker-*.tar.gz"))
+    if not sdists:
+        return ["dist/ does not contain a codex_usage_tracker source distribution"]
+    with tarfile.open(sdists[-1]) as sdist:
+        names = set(sdist.getnames())
+    return [
+        f"sdist is missing required member: {member}"
+        for member in sorted(SDIST_REQUIRED_MEMBERS)
+        if not any(name.endswith(f"/{member}") for name in names)
+    ]
 
 
 def _check_wheel() -> list[str]:

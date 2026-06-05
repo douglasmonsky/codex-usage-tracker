@@ -2,7 +2,7 @@ include README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md AGENTS.md .mc
 recursive-include .codex-plugin *.json
 recursive-include assets *.svg
 recursive-include docs *.md *.png
-recursive-include skills *.md
+recursive-include skills *.md *.py
 recursive-include scripts *.py
 recursive-include src/codex_usage_tracker/plugin_data/assets *
 recursive-include src/codex_usage_tracker/plugin_data/dashboard *

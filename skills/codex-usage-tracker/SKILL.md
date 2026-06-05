@@ -20,6 +20,7 @@ The only exception is `usage_call_context`, which intentionally reads one select
 - Refresh the index before answering usage questions.
 - Use `usage_doctor` when setup, plugin discovery, MCP launch, dashboard output, or pricing estimates look wrong.
 - Use `usage_summary` for high-level totals by date, model, effort, cwd, thread, or session.
+- Use `usage_query` for stable JSON rows filtered by date, project, model, effort, thread, pricing status, token minimums, or Codex credit minimums.
 - Use `usage_summary` presets `today`, `last-7-days`, `by-model`, `by-cwd`, `by-thread`, and `expensive` for common requests.
 - Use `usage_pricing_coverage` when the user asks whether costs are fully priced or which models use estimated or missing pricing.
 - Use `session_usage` for per-call and per-turn detail for one session.

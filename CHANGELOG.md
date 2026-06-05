@@ -11,6 +11,7 @@
 - Add distribution metadata, source distribution manifest, and CI build checks.
 - Add `python -m codex_usage_tracker` support and CLI `--version` output.
 - Add release-readiness checks for version alignment, required docs, package data, built wheels, and tracked secret patterns.
+- Harden marketplace MCP runtime bootstrapping so cached runtimes refresh when the bundled package pin changes.
 - Harden local dashboard server responses with browser security headers and safer IPv6 localhost URLs.
 - Tighten the dashboard header copy, add click/keyboard row inspection, and keep detailed usage guidance out of the primary UI.
 - Keep call details sticky while scrolling and render timestamps as local human-readable date/time values.
