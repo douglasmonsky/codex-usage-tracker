@@ -11,7 +11,6 @@ from typing import Any
 
 from codex_usage_tracker.paths import DEFAULT_PROJECTS_PATH
 
-
 PROJECT_CONFIG_TEMPLATE: dict[str, object] = {
     "aliases": {},
     "ignored_paths": [],

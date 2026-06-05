@@ -10,7 +10,6 @@ from typing import Any
 
 from codex_usage_tracker.paths import DEFAULT_PRICING_PATH
 
-
 PRICING_SCHEMA = "codex-usage-tracker-pricing-v1"
 PRICING_TEMPLATE = {
     "_comment": (

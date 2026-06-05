@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 OPENAI_CODEX_LAUNCH_URL = "https://openai.com/index/introducing-codex/"
 OPENAI_GPT_53_CODEX_MODEL_URL = "https://developers.openai.com/api/docs/models/gpt-5.3-codex"
 OPENAI_CODEX_RATE_CARD_URL = "https://help.openai.com/en/articles/20001106-codex-rate-card"

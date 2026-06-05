@@ -10,6 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker import __version__
+from codex_usage_tracker.allowance import (
+    update_rate_card,
+    write_allowance_from_text,
+    write_allowance_template,
+)
 from codex_usage_tracker.api_payloads import (
     error_code,
     path_payload,
@@ -18,11 +23,6 @@ from codex_usage_tracker.api_payloads import (
     refresh_result_payload,
     session_payload,
 )
-from codex_usage_tracker.allowance import (
-    update_rate_card,
-    write_allowance_from_text,
-    write_allowance_template,
-)
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
@@ -30,6 +30,7 @@ from codex_usage_tracker.formatting import (
     format_doctor,
     format_session,
 )
+from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
@@ -43,13 +44,7 @@ from codex_usage_tracker.paths import (
     DEFAULT_SUPPORT_BUNDLE_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
-from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.plugin_installer import install_plugin, uninstall_plugin
-from codex_usage_tracker.projects import (
-    PRIVACY_MODE_CHOICES,
-    apply_project_privacy_to_rows,
-    write_project_template,
-)
 from codex_usage_tracker.pricing import (
     OPENAI_PRICING_MD_URL,
     VALID_PRICING_TIERS,
@@ -57,6 +52,12 @@ from codex_usage_tracker.pricing import (
     update_pricing_from_openai_docs,
     write_pricing_template,
 )
+from codex_usage_tracker.projects import (
+    PRIVACY_MODE_CHOICES,
+    apply_project_privacy_to_rows,
+    write_project_template,
+)
+from codex_usage_tracker.recommendations import write_threshold_template
 from codex_usage_tracker.reports import (
     EXPENSIVE_PRESET_CHOICES,
     QUERY_CREDIT_CONFIDENCE_CHOICES,
@@ -68,16 +69,15 @@ from codex_usage_tracker.reports import (
     build_query_report,
     build_summary_report,
 )
-from codex_usage_tracker.recommendations import write_threshold_template
+from codex_usage_tracker.server import serve_dashboard
 from codex_usage_tracker.store import (
-    rebuild_usage_index,
     export_usage_csv,
     query_session_usage,
+    rebuild_usage_index,
     refresh_usage_index,
     reset_usage_database,
 )
 from codex_usage_tracker.support import build_support_bundle
-from codex_usage_tracker.server import serve_dashboard
 
 
 def main() -> int:

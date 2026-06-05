@@ -13,7 +13,6 @@ from typing import Any
 
 from codex_usage_tracker.paths import DEFAULT_ALLOWANCE_PATH, DEFAULT_RATE_CARD_PATH
 
-
 ALLOWANCE_SCHEMA = "codex-usage-tracker-allowance-v1"
 RATE_CARD_SCHEMA = "codex-usage-tracker-codex-rate-card-v1"
 CODEX_RATE_CARD_URL = "https://help.openai.com/en/articles/20001106-codex-rate-card"

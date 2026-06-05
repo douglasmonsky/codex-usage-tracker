@@ -14,7 +14,6 @@ from codex_usage_tracker.pricing import (
     update_pricing_from_openai_docs,
 )
 
-
 OPENAI_PRICING_FIXTURE = """
 <TextTokenPricingTables
   client:load

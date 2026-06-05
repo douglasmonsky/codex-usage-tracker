@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -16,7 +16,6 @@ from codex_usage_tracker import __version__
 from codex_usage_tracker.paths import DEFAULT_PRICING_PATH
 from codex_usage_tracker.pricing_config import PRICING_SCHEMA, load_existing_aliases
 from codex_usage_tracker.pricing_estimates import ESTIMATED_MODEL_PRICES, estimated_model_prices
-
 
 OPENAI_PRICING_MD_URL = "https://developers.openai.com/api/docs/pricing.md"
 VALID_PRICING_TIERS = ("standard", "batch", "flex", "priority")

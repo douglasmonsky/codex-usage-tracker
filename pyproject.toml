@@ -42,6 +42,8 @@ Changelog = "https://github.com/douglasmonsky/codex-usage-tracker/blob/main/CHAN
 dev = [
   "build>=1.2",
   "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.8",
   "tomli>=2.0; python_version < '3.11'"
 ]
 
@@ -71,3 +73,19 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["codex_usage_tracker"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]

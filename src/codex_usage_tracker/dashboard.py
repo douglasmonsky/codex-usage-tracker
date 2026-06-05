@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import html
 import hashlib
+import html
 import json
 import os
 import re
@@ -27,8 +27,8 @@ from codex_usage_tracker.paths import (
 )
 from codex_usage_tracker.pricing import annotate_rows_with_efficiency, load_pricing_config
 from codex_usage_tracker.projects import (
-    apply_project_privacy_to_rows,
     annotate_rows_with_project_identity,
+    apply_project_privacy_to_rows,
     load_project_config,
     project_privacy_metadata,
     validate_privacy_mode,

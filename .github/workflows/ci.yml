@@ -21,10 +21,25 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
+      - uses: actions/setup-node@v4
+        if: matrix.python-version == '3.13'
+        with:
+          node-version: "22"
+      - name: Ruff
+        if: matrix.python-version == '3.13'
+        run: python -m ruff check .
       - name: Test
         run: python -m pytest
+      - name: Coverage
+        if: matrix.python-version == '3.13'
+        run: python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
       - name: Compile
         run: python -m compileall src
+      - name: Dashboard JavaScript syntax
+        if: matrix.python-version == '3.13'
+        run: |
+          node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
+          node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
       - name: Release readiness
         run: python scripts/check_release.py
       - name: Whitespace

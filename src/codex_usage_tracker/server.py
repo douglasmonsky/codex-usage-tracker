@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import hmac
+import json
 import secrets
 import sqlite3
 import threading
@@ -288,9 +288,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return False
         if not _allowed_loopback_host(parsed.hostname):
             return False
-        if parsed.port is not None and parsed.port != self.server.server_port:
-            return False
-        return True
+        return parsed.port is None or parsed.port == self.server.server_port
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool:
         provided = self.headers.get("X-Codex-Usage-Token") or _first(params.get("api_token")) or ""

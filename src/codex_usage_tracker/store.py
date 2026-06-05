@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import csv
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,7 +26,6 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_REPAIR_COLUMNS,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
-
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
@@ -98,16 +98,22 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
 
-def connect(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
+@contextmanager
+def connect(db_path: Path = DEFAULT_DB_PATH) -> Iterator[sqlite3.Connection]:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path, timeout=5.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout = 5000")
-    try:
+    with suppress(sqlite3.DatabaseError):
         conn.execute("PRAGMA journal_mode = WAL")
-    except sqlite3.DatabaseError:
-        pass
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def init_db(conn: sqlite3.Connection) -> None:
@@ -606,4 +612,4 @@ def _normalize_limit(limit: int | None) -> int | None:
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return {key: row[key] for key in row.keys()}
+    return dict(row)

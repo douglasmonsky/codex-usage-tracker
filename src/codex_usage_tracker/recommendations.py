@@ -9,7 +9,6 @@ from typing import Any
 
 from codex_usage_tracker.paths import DEFAULT_THRESHOLDS_PATH
 
-
 DEFAULT_THRESHOLDS: dict[str, float] = {
     "low_cache_ratio": 0.30,
     "high_context_percent": 0.60,

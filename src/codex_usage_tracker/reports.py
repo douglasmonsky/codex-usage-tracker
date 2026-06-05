@@ -16,17 +16,17 @@ from codex_usage_tracker.formatting import (
     format_pricing_coverage,
     format_summary,
 )
+from codex_usage_tracker.paths import DEFAULT_PROJECTS_PATH
 from codex_usage_tracker.pricing import (
     PricingConfig,
     annotate_rows_with_efficiency,
     load_pricing_config,
     summarize_pricing_coverage,
 )
-from codex_usage_tracker.paths import DEFAULT_PROJECTS_PATH
 from codex_usage_tracker.projects import (
+    annotate_rows_with_project_identity,
     apply_project_privacy_to_rows,
     apply_project_privacy_to_summary_rows,
-    annotate_rows_with_project_identity,
     load_project_config,
     validate_privacy_mode,
 )
@@ -37,7 +37,6 @@ from codex_usage_tracker.store import (
     query_summary,
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
-
 
 SUMMARY_GROUP_BY_CHOICES = (
     "date",
@@ -381,9 +380,7 @@ def _query_row_matches(
         return False
     if min_tokens is not None and int(row.get("total_tokens") or 0) < min_tokens:
         return False
-    if min_credits is not None and float(row.get("usage_credits") or 0) < min_credits:
-        return False
-    return True
+    return not (min_credits is not None and float(row.get("usage_credits") or 0) < min_credits)
 
 
 def _project_summary_rows(
