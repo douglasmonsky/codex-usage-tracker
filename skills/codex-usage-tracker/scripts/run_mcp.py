@@ -15,7 +15,7 @@ from pathlib import Path
 
 PACKAGE_SPEC = os.environ.get(
     "CODEX_USAGE_TRACKER_PACKAGE_SPEC",
-    "git+https://github.com/douglasmonsky/codex-usage-tracker.git@0c7f2fc45a3931ade27225fbe20aefc2d94f6340",
+    "git+https://github.com/douglasmonsky/codex-usage-tracker.git@be2a14fb090c29cafc089a202329b6386480e72b",
 )
 RUNTIME_VERSION = "0.2.0"
 PACKAGE_SPEC_MARKER = ".codex-usage-tracker-package-spec"
