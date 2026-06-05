@@ -28,6 +28,9 @@ jobs:
       - name: Ruff
         if: matrix.python-version == '3.13'
         run: python -m ruff check .
+      - name: Type check
+        if: matrix.python-version == '3.13'
+        run: python -m mypy
       - name: Test
         run: python -m pytest
       - name: Coverage

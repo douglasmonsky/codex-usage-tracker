@@ -138,7 +138,7 @@ def resolve_summary_options(
 ) -> tuple[str, str | None]:
     """Resolve summary presets into a group and since filter."""
 
-    return _SUMMARY_PRESET_GROUPS.get(preset, group_by), resolve_since(preset, since)
+    return _SUMMARY_PRESET_GROUPS.get(preset or "", group_by), resolve_since(preset, since)
 
 
 def resolve_since(preset: str | None, since: str | None) -> str | None:

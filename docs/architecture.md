@@ -37,6 +37,7 @@ Use the narrowest useful check first, then the release suite before committing:
 ```bash
 python -m pytest
 python -m compileall src
+python -m mypy
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js

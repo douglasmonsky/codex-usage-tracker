@@ -7,6 +7,7 @@
 - Add ranked CLI/MCP recommendations with severity score, primary recommendation, secondary signals, and thread rollups.
 - Add offset-aware localhost dashboard usage API responses for paged aggregate-row automation.
 - Add a synthetic large-history benchmark script for 10k, 100k, and 500k aggregate-row SQLite fixtures.
+- Add focused mypy coverage for core JSON contract, recommendation, report, schema, model, and store modules.
 - Add Ruff, coverage, and dashboard JavaScript syntax checks to CI.
 - Split dashboard JavaScript helpers into formatting, data, state, and rendering/runtime assets.
 - Add issue templates for bugs, parser compatibility, pricing/allowance issues, and feature requests.

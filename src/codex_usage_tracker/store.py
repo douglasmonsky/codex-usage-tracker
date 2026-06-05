@@ -331,7 +331,8 @@ def query_summary(
     since: str | None = None,
 ) -> list[dict[str, Any]]:
     group_expr = _group_expression(group_by)
-    where_clause, params = _since_where_clause(since)
+    where_clause, raw_params = _since_where_clause(since)
+    params: list[Any] = list(raw_params)
     sql = f"""
         SELECT
             {group_expr} AS group_key,
