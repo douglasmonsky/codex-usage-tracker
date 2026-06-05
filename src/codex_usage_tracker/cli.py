@@ -45,7 +45,11 @@ from codex_usage_tracker.paths import (
 )
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.plugin_installer import install_plugin, uninstall_plugin
-from codex_usage_tracker.projects import write_project_template
+from codex_usage_tracker.projects import (
+    PRIVACY_MODE_CHOICES,
+    apply_project_privacy_to_rows,
+    write_project_template,
+)
 from codex_usage_tracker.pricing import (
     OPENAI_PRICING_MD_URL,
     VALID_PRICING_TIERS,
@@ -105,6 +109,15 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rate-card", type=Path, default=DEFAULT_RATE_CARD_PATH)
     parser.add_argument("--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH)
     parser.add_argument("--projects", type=Path, default=DEFAULT_PROJECTS_PATH)
+    parser.add_argument(
+        "--privacy-mode",
+        choices=PRIVACY_MODE_CHOICES,
+        default="normal",
+        help=(
+            "Project metadata display mode: normal keeps local labels, redacted hides "
+            "raw paths and hashes unnamed projects, strict also hides branch, relative cwd, and tags."
+        ),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_setup_parser(subparsers)
     _add_doctor_parser(subparsers)
@@ -794,6 +807,7 @@ def _run_summary(args: argparse.Namespace) -> int:
         since=args.since,
         limit=args.limit,
         projects_path=args.projects,
+        privacy_mode=args.privacy_mode,
     )
     if args.as_json:
         _print_json(report.payload())
@@ -819,6 +833,7 @@ def _run_query(args: argparse.Namespace) -> int:
         min_tokens=args.min_tokens,
         min_credits=args.min_credits,
         limit=args.limit,
+        privacy_mode=args.privacy_mode,
     )
     _print_json(report.payload)
     return 0
@@ -826,6 +841,7 @@ def _run_query(args: argparse.Namespace) -> int:
 
 def _run_session(args: argparse.Namespace) -> int:
     rows = query_session_usage(args.db, args.session_id, args.limit)
+    rows = apply_project_privacy_to_rows(rows, privacy_mode=args.privacy_mode)
     if args.as_json:
         _print_json(
             session_payload(rows, requested_session_id=args.session_id, limit=args.limit)
@@ -858,6 +874,7 @@ def _run_dashboard(args: argparse.Namespace) -> int:
         since=args.since,
         thresholds_path=args.thresholds,
         projects_path=args.projects,
+        privacy_mode=args.privacy_mode,
     )
     if args.as_json:
         _print_json(
@@ -868,6 +885,7 @@ def _run_dashboard(args: argparse.Namespace) -> int:
                 "opened": args.open,
                 "limit": None if args.limit <= 0 else args.limit,
                 "since": args.since,
+                "privacy_mode": args.privacy_mode,
             }
         )
     else:
@@ -894,6 +912,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
         since=args.since,
         thresholds_path=args.thresholds,
         projects_path=args.projects,
+        privacy_mode=args.privacy_mode,
     )
     if args.as_json:
         _print_json(
@@ -905,6 +924,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
                 "limit": None if args.limit <= 0 else args.limit,
                 "since": args.since,
                 "refresh": refresh_payload,
+                "privacy_mode": args.privacy_mode,
             }
         )
     else:
@@ -925,6 +945,7 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
                 "since": args.since,
                 "context_api": "disabled" if args.no_context_api else args.context_api,
                 "refresh_before_start": args.refresh,
+                "privacy_mode": args.privacy_mode,
             }
         )
     if args.refresh:
@@ -950,6 +971,7 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
         context_api="disabled" if args.no_context_api else args.context_api,
         thresholds_path=args.thresholds,
         projects_path=args.projects,
+        privacy_mode=args.privacy_mode,
     )
     return 0
 
@@ -961,6 +983,7 @@ def _run_expensive(args: argparse.Namespace) -> int:
         limit=args.limit,
         preset=args.preset,
         since=args.since,
+        privacy_mode=args.privacy_mode,
     )
     if args.as_json:
         _print_json(report.payload())
@@ -980,7 +1003,12 @@ def _run_pricing_coverage(args: argparse.Namespace) -> int:
 
 
 def _run_export(args: argparse.Namespace) -> int:
-    count = export_usage_csv(output_path=args.output, db_path=args.db, limit=args.limit)
+    count = export_usage_csv(
+        output_path=args.output,
+        db_path=args.db,
+        limit=args.limit,
+        privacy_mode=args.privacy_mode,
+    )
     if args.as_json:
         _print_json(
             {
@@ -988,6 +1016,7 @@ def _run_export(args: argparse.Namespace) -> int:
                 "rows": count,
                 "csv_path": path_payload(args.output),
                 "limit": args.limit,
+                "privacy_mode": args.privacy_mode,
             }
         )
         return 0
@@ -1172,6 +1201,7 @@ def _run_support_bundle(args: argparse.Namespace) -> int:
         rate_card_path=args.rate_card,
         thresholds_path=args.thresholds,
         projects_path=args.projects,
+        privacy_mode=args.privacy_mode,
     )
     if args.as_json:
         _print_json(
@@ -1183,6 +1213,7 @@ def _run_support_bundle(args: argparse.Namespace) -> int:
                     "contains_prompts": False,
                     "contains_assistant_messages": False,
                     "contains_tool_output": False,
+                    "project_metadata_mode": args.privacy_mode,
                 },
             }
         )

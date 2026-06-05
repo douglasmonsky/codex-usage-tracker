@@ -26,7 +26,13 @@ from codex_usage_tracker.paths import (
     DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.pricing import annotate_rows_with_efficiency, load_pricing_config
-from codex_usage_tracker.projects import annotate_rows_with_project_identity, load_project_config
+from codex_usage_tracker.projects import (
+    apply_project_privacy_to_rows,
+    annotate_rows_with_project_identity,
+    load_project_config,
+    project_privacy_metadata,
+    validate_privacy_mode,
+)
 from codex_usage_tracker.recommendations import (
     annotate_rows_with_recommendations,
     load_threshold_config,
@@ -50,9 +56,11 @@ def dashboard_payload(
     context_api_enabled: bool = False,
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
+    privacy_mode: str = "normal",
 ) -> dict[str, object]:
     """Return aggregate-only dashboard data without rendering HTML."""
 
+    privacy_mode = validate_privacy_mode(privacy_mode)
     rows = annotate_thread_attachments(
         query_dashboard_events(db_path=db_path, limit=limit, since=since)
     )
@@ -66,6 +74,7 @@ def dashboard_payload(
     )
     annotated_rows = annotate_rows_with_recommendations(annotated_rows, thresholds)
     annotated_rows = annotate_rows_with_project_identity(annotated_rows, projects)
+    annotated_rows = apply_project_privacy_to_rows(annotated_rows, privacy_mode=privacy_mode)
     allowance_summary = summarize_allowance_usage(annotated_rows, allowance)
     normalized_limit = _normalize_limit(limit)
     metadata = refresh_metadata(db_path)
@@ -98,6 +107,8 @@ def dashboard_payload(
         "thresholds_error": thresholds.error,
         "project_configured": projects.loaded and not projects.error,
         "project_config_error": projects.error,
+        "privacy_mode": privacy_mode,
+        "project_metadata_privacy": project_privacy_metadata(privacy_mode),
     }
 
 
@@ -113,6 +124,7 @@ def generate_dashboard(
     context_api_enabled: bool = False,
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
+    privacy_mode: str = "normal",
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     guide_href = _dashboard_guide_href(output_path)
@@ -132,6 +144,7 @@ def generate_dashboard(
         context_api_enabled=context_api_enabled,
         thresholds_path=thresholds_path,
         projects_path=projects_path,
+        privacy_mode=privacy_mode,
     )
     payload_dict["pricing_snapshot_warning"] = _pricing_snapshot_warning(
         previous_payload, payload_dict

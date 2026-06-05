@@ -26,6 +26,7 @@ from codex_usage_tracker.paths import (
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
 )
+from codex_usage_tracker.projects import apply_project_privacy_to_rows
 from codex_usage_tracker.pricing import (
     update_pricing_from_openai_docs,
     write_pricing_template,
@@ -81,6 +82,7 @@ def usage_summary(
     preset: str | None = None,
     since: str | None = None,
     response_format: str = "markdown",
+    privacy_mode: str = "normal",
 ) -> str | dict[str, Any]:
     """Summarize aggregate Codex token usage by date, model, effort, cwd, thread, session, parent thread, or subagent metadata."""
 
@@ -91,6 +93,7 @@ def usage_summary(
         limit=limit,
         preset=preset,
         since=since,
+        privacy_mode=privacy_mode,
     )
     if response_format == "json":
         return report.payload()
@@ -102,10 +105,14 @@ def session_usage(
     session_id: str | None = None,
     limit: int = 200,
     response_format: str = "markdown",
+    privacy_mode: str = "normal",
 ) -> str | dict[str, Any]:
     """Show aggregate per-call usage for one session, defaulting to the latest indexed session."""
 
-    rows = query_session_usage(DEFAULT_DB_PATH, session_id=session_id, limit=limit)
+    rows = apply_project_privacy_to_rows(
+        query_session_usage(DEFAULT_DB_PATH, session_id=session_id, limit=limit),
+        privacy_mode=privacy_mode,
+    )
     if response_format == "json":
         return session_payload(rows, requested_session_id=session_id, limit=limit)
     return format_session(rows)
@@ -146,6 +153,7 @@ def most_expensive_usage_calls(
     preset: str | None = None,
     since: str | None = None,
     response_format: str = "markdown",
+    privacy_mode: str = "normal",
 ) -> str | dict[str, Any]:
     """Show the highest last-call aggregate usage rows with efficiency signals."""
 
@@ -155,6 +163,7 @@ def most_expensive_usage_calls(
         limit=limit,
         preset=preset,
         since=since,
+        privacy_mode=privacy_mode,
     )
     if response_format == "json":
         return report.payload()
@@ -174,6 +183,7 @@ def usage_query(
     min_tokens: int | None = None,
     min_credits: float | None = None,
     limit: int = 100,
+    privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Return stable JSON aggregate usage rows with filters for automation."""
 
@@ -193,6 +203,7 @@ def usage_query(
         min_tokens=min_tokens,
         min_credits=min_credits,
         limit=limit,
+        privacy_mode=privacy_mode,
     ).payload
 
 
@@ -216,7 +227,10 @@ def usage_pricing_coverage(
 
 @mcp.tool()
 def generate_usage_dashboard(
-    output_path: str | None = None, limit: int = 5000, since: str | None = None
+    output_path: str | None = None,
+    limit: int = 5000,
+    since: str | None = None,
+    privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Generate a local hoverable HTML dashboard from aggregate-only usage metrics."""
 
@@ -228,17 +242,27 @@ def generate_usage_dashboard(
         pricing_path=DEFAULT_PRICING_PATH,
         allowance_path=DEFAULT_ALLOWANCE_PATH,
         since=since,
+        privacy_mode=privacy_mode,
     )
     return {"dashboard_path": str(generated), "file_url": generated.resolve().as_uri()}
 
 
 @mcp.tool()
-def export_usage_csv(output_path: str, limit: int | None = None) -> dict[str, Any]:
+def export_usage_csv(
+    output_path: str,
+    limit: int | None = None,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
     """Export aggregate Codex token usage rows to a local CSV file."""
 
     output = Path(output_path).expanduser()
-    rows = export_csv(output_path=output, db_path=DEFAULT_DB_PATH, limit=limit)
-    return {"rows": rows, "csv_path": str(output)}
+    rows = export_csv(
+        output_path=output,
+        db_path=DEFAULT_DB_PATH,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+    return {"rows": rows, "csv_path": str(output), "privacy_mode": privacy_mode}
 
 
 @mcp.tool()

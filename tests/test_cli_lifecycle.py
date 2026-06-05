@@ -50,6 +50,8 @@ def test_setup_support_bundle_and_reset_db_cli(tmp_path: Path) -> None:
         str(pricing_path),
         "--allowance",
         str(allowance_path),
+        "--privacy-mode",
+        "strict",
         "support-bundle",
         "--codex-home",
         str(codex_home),
@@ -60,6 +62,8 @@ def test_setup_support_bundle_and_reset_db_cli(tmp_path: Path) -> None:
 
     assert support.returncode == 0
     assert bundle["privacy"]["contains_raw_logs"] is False
+    assert bundle["privacy"]["project_metadata"]["mode"] == "strict"
+    assert bundle["privacy"]["project_metadata"]["relative_cwd_hidden"] is True
     assert bundle["refresh"]["parsed_events"] == "1"
     assert "low_cache_ratio" in bundle["thresholds"]["keys"]
     assert bundle["projects"]["alias_count"] == 0
@@ -196,6 +200,8 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
         str(pricing_path),
         "--allowance",
         str(allowance_path),
+        "--privacy-mode",
+        "strict",
         "query",
         "--model",
         "gpt-5.5",
@@ -221,6 +227,18 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
         "1",
         "--json",
     )
+    csv_path = tmp_path / "redacted.csv"
+    export = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "--privacy-mode",
+        "redacted",
+        "export",
+        "--output",
+        str(csv_path),
+        "--json",
+    )
 
     assert refresh.returncode == 0
     assert json.loads(refresh.stdout)["schema"] == "codex-usage-tracker-refresh-v1"
@@ -232,14 +250,22 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     assert summary_payload["rows"][0]["group_key"] == "gpt-5.5"
     assert query_payload["schema"] == "codex-usage-tracker-query-v1"
     assert query_payload["filters"]["model"] == "gpt-5.5"
+    assert query_payload["filters"]["privacy_mode"] == "strict"
     assert query_payload["row_count"] == 1
     assert query_payload["rows"][0]["model"] == "gpt-5.5"
     assert query_payload["rows"][0]["pricing_model"] == "gpt-5.5"
+    assert query_payload["rows"][0]["cwd"].startswith("[redacted cwd:")
+    assert query_payload["rows"][0]["project_relative_cwd"] is None
+    assert "/tmp/codex-usage-tracker" not in query.stdout
     assert "SECRET RAW PROMPT" not in query.stdout
     assert session_payload["schema"] == "codex-usage-tracker-session-v1"
     assert session_payload["resolved_session_id"] == SESSION_ID
     assert expensive_payload["schema"] == "codex-usage-tracker-summary-v1"
     assert expensive_payload["is_expensive"] is True
+    export_payload = json.loads(export.stdout)
+    assert export.returncode == 0
+    assert export_payload["privacy_mode"] == "redacted"
+    assert "[redacted cwd:" in csv_path.read_text(encoding="utf-8")
 
 
 def _run_cli(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:

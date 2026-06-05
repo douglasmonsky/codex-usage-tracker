@@ -11,6 +11,8 @@ Use this companion skill as the conversational analyst for Codex Usage Tracker d
 
 Normal usage answers must use aggregate-only API data. Do not expose prompts, assistant messages, tool output, pasted secrets, or raw transcript snippets.
 
+When a user plans to share JSON, CSV, dashboards, screenshots, or support bundles, prefer `privacy_mode="strict"` for MCP calls or the CLI global option `--privacy-mode strict` before the subcommand. Explain that configured project aliases are treated as explicit display opt-ins.
+
 The only exception is `usage_call_context`, which reads one selected record's local source JSONL on demand. Use it only when the user explicitly asks to inspect actual logged context, and state that the returned text is local, redacted, size-limited, and not persisted by the tracker.
 
 ## First Steps
@@ -35,6 +37,7 @@ The only exception is `usage_call_context`, which reads one selected record's lo
 
 - "What used the most?" Use `most_expensive_usage_calls(response_format="json")` and `usage_summary(group_by="thread", response_format="json")`.
 - "Which project/thread/model is driving usage?" Use `usage_summary` grouped by `project`, `thread`, or `model`.
+- "Can I share this?" Use redacted or strict privacy mode and avoid `usage_call_context`.
 - "Why did usage spike?" Use `usage_query` with `since`, `project`, `thread`, `model`, `effort`, `min_tokens`, or `min_credits`, then compare timestamps, total tokens, cache ratio, context window percent, and recommendations.
 - "What is unpriced or estimated?" Use `usage_pricing_coverage(response_format="json")` and `usage_query(pricing_status="unpriced")` or `usage_query(credit_confidence="estimated")`.
 - "How does this affect my allowance?" Use rows from `usage_query` and summarize `usage_credits`, `usage_credit_confidence`, and `allowanceImpact`. Explain that remaining allowance is only as accurate as the user's local allowance config.

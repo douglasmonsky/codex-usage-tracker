@@ -10,7 +10,7 @@ Codex Usage Tracker is a local sidecar app. It reads aggregate token counters fr
 - `reports.py` is the application-service layer for summaries, expensive-call reports, pricing coverage, and filtered query payloads. CLI and MCP should call this layer instead of duplicating report assembly.
 - `api_payloads.py` owns stable JSON payload helpers shared by CLI and MCP. Add schema-versioned payload builders here when both surfaces need the same shape.
 - `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows.
-- `projects.py`, `threads.py`, and `recommendations.py` annotate aggregate rows with project identity, thread relationships, and actionable signals.
+- `projects.py`, `threads.py`, and `recommendations.py` annotate aggregate rows with project identity, thread relationships, and actionable signals. Project privacy redaction also belongs in `projects.py` so CLI, MCP, dashboard, CSV, and support-bundle surfaces share the same behavior.
 - `dashboard.py` builds aggregate-only dashboard payloads and writes HTML/assets. `server.py` adds localhost refresh and explicit lazy context loading.
 - `context.py` is the only normal path that reads raw log context, and it does so only for one selected record on demand with redaction and size limits.
 - `plugin_installer.py`, `.mcp.json`, `skills/`, and `scripts/check_release.py` own install and packaging behavior.
@@ -26,6 +26,7 @@ Codex Usage Tracker is a local sidecar app. It reads aggregate token counters fr
 4. Add dashboard-only interactions in `plugin_data/dashboard/dashboard.js` and keep URL state in `dashboard_state.js`.
 5. Keep all examples, screenshots, mocks, and tests synthetic. Never derive fixtures from real logs.
 6. When editing skill instructions, update both the source `skills/...` file and the bundled `src/codex_usage_tracker/plugin_data/skills/...` copy. `scripts/check_release.py` verifies that installable plugin assets stay complete and synced.
+7. When adding fields derived from `cwd`, Git metadata, or source paths, decide how they behave in `normal`, `redacted`, and `strict` privacy modes before exposing them in dashboard, JSON, CSV, MCP, or support-bundle output.
 
 ## Validation
 

@@ -18,6 +18,7 @@ from codex_usage_tracker.parser import (
     parse_usage_events,
 )
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
+from codex_usage_tracker.projects import apply_project_privacy_to_rows, validate_privacy_mode
 from codex_usage_tracker.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_CREATE_COLUMNS_SQL,
@@ -487,9 +488,13 @@ def query_most_expensive_calls(
 
 
 def export_usage_csv(
-    output_path: Path, db_path: Path = DEFAULT_DB_PATH, limit: int | None = None
+    output_path: Path,
+    db_path: Path = DEFAULT_DB_PATH,
+    limit: int | None = None,
+    privacy_mode: str = "normal",
 ) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    privacy_mode = validate_privacy_mode(privacy_mode)
     sql = "SELECT * FROM usage_events ORDER BY event_timestamp, cumulative_total_tokens"
     params: tuple[int, ...] = ()
     normalized_limit = _normalize_limit(limit)
@@ -499,6 +504,7 @@ def export_usage_csv(
     with connect(db_path) as conn:
         init_db(conn)
         rows = [_row_to_dict(row) for row in conn.execute(sql, params)]
+    rows = apply_project_privacy_to_rows(rows, privacy_mode=privacy_mode)
 
     with output_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=EVENT_COLUMNS)

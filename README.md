@@ -338,6 +338,16 @@ codex-usage-tracker init-projects
 
 Edit `~/.codex-usage-tracker/projects.json` to map stable project hashes, repo roots, or project names to friendlier aliases, ignored paths, and tags. The tracker derives project identity from `cwd` and local Git metadata when available: repo root, repo name, current branch, and a hashed remote origin. It does not store or display the full remote URL.
 
+Protect project metadata in shared artifacts:
+
+```bash
+codex-usage-tracker --privacy-mode redacted dashboard --open
+codex-usage-tracker --privacy-mode strict export --output usage-redacted.csv
+codex-usage-tracker --privacy-mode strict query --since 2026-06-01
+```
+
+`--privacy-mode` is a global option, so place it before the subcommand. `normal` keeps local project metadata visible. `redacted` hides raw `cwd` and source paths, hides Git remote labels, and replaces unnamed projects with stable hashed labels such as `Project ab12cd34`; configured project aliases are treated as explicit display opt-ins. `strict` also hides project-relative cwd, Git branch, and project tags. Dashboard payloads and support bundles include the active mode so screenshots and support artifacts make their metadata posture visible.
+
 Credit usage estimates are calculated from Codex's aggregate input, cached-input, and output token counters using the bundled OpenAI Codex rate-card snapshot from `https://help.openai.com/en/articles/20001106-codex-rate-card` and `https://developers.openai.com/codex/pricing`. Direct model matches are marked exact. Local aliases and inferred labels, such as code-review usage mapped to GPT-5.3-Codex, are marked estimated. Local `credit_rates` overrides are marked `user_override`. Normal reports do not contact the network for allowance or credit estimates.
 
 To copy the bundled source-stamped rate card into a local snapshot, run:
@@ -368,6 +378,7 @@ To configure the usage component:
 - Token counts come from Codex's logged counters. The tracker does not re-tokenize prompts or reconstruct usage from raw text.
 - Pricing is optional and local. Rows are unpriced when no matching model rate is configured, and some Codex-specific labels may use marked best-guess estimates.
 - Pricing can change after a report is generated. Use `pin-pricing` and pass the pinned file with `--pricing` when you need reproducible historical cost estimates.
+- Project metadata can reveal private work context through `cwd`, project names, branch names, tags, and source paths. Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing dashboards, CSV exports, JSON query output, or support bundles.
 - Remaining 5-hour and weekly allowance is not read automatically from Codex or inferred from the logged-in account plan. Add `~/.codex-usage-tracker/allowance.json` when you want the dashboard to show your current copied allowance state.
 - Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
 - Parent-child thread relationships are only as good as the metadata Codex logs. Explicit parent session ids are preferred; inferred auto-review attachments are labeled as inferred.

@@ -47,6 +47,7 @@ def serve_dashboard(
     context_api: str = "explicit",
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
+    privacy_mode: str = "normal",
 ) -> None:
     """Generate and serve the dashboard plus a localhost-only context endpoint."""
 
@@ -66,6 +67,7 @@ def serve_dashboard(
         context_api_enabled=context_api_enabled,
         thresholds_path=thresholds_path,
         projects_path=projects_path,
+        privacy_mode=privacy_mode,
     )
     handler = partial(
         _UsageDashboardHandler,
@@ -76,6 +78,7 @@ def serve_dashboard(
         rate_card_path=rate_card_path,
         thresholds_path=thresholds_path,
         projects_path=projects_path,
+        privacy_mode=privacy_mode,
         limit=limit,
         since=since,
         codex_home=codex_home,
@@ -120,6 +123,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         api_token: str,
         context_api_enabled: bool,
         refresh_lock: threading.Lock,
+        privacy_mode: str = "normal",
         rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
         **kwargs: object,
     ) -> None:
@@ -129,6 +133,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._rate_card_path = rate_card_path
         self._thresholds_path = thresholds_path
         self._projects_path = projects_path
+        self._privacy_mode = privacy_mode
         self._limit = limit
         self._since = since
         self._codex_home = codex_home
@@ -251,6 +256,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 rate_card_path=self._rate_card_path,
                 thresholds_path=self._thresholds_path,
                 projects_path=self._projects_path,
+                privacy_mode=self._privacy_mode,
                 since=self._since,
                 api_token=self._api_token,
                 context_api_enabled=self._context_api_enabled,

@@ -85,6 +85,7 @@ codex-usage-tracker serve-dashboard --open</code></pre>
     <p>For optional allowance context, run <code>codex-usage-tracker init-allowance</code> or <code>codex-usage-tracker parse-allowance "5h 79% 6:50 PM Weekly 33% Jun 7"</code> with current values copied from Codex Usage or <code>/status</code>.</p>
     <p>To tune review thresholds locally, run <code>codex-usage-tracker init-thresholds</code> and edit <code>~/.codex-usage-tracker/thresholds.json</code>. These thresholds control low-cache, high-context, high-uncached-input, large-thread, reasoning-spike, low-output, and high-cost recommendations.</p>
     <p>To tune project attribution locally, run <code>codex-usage-tracker init-projects</code> and edit <code>~/.codex-usage-tracker/projects.json</code>. The dashboard derives project name, relative cwd, branch, tags, and a hashed remote origin from aggregate <code>cwd</code> and local Git metadata when available.</p>
+    <p>Before sharing screenshots or generated artifacts, put <code>--privacy-mode redacted</code> or <code>--privacy-mode strict</code> before the subcommand, such as <code>codex-usage-tracker --privacy-mode strict serve-dashboard --open</code>. Redacted mode hides raw cwd/source paths, hides Git remote labels, and hashes unnamed projects while preserving configured aliases. Strict mode also hides project-relative cwd, Git branch, and tags. The dashboard header shows the active metadata mode.</p>
     <p>The server enables live aggregate refresh and on-demand context loading. Static file mode can still filter, sort, and inspect aggregate fields, but cannot refresh logs or load context.</p>
     <p>The localhost server uses a random per-server token for refresh and context API calls, validates loopback <code>Host</code> and <code>Origin</code> headers, and can run as aggregate-only with <code>codex-usage-tracker serve-dashboard --no-context-api</code>.</p>
 
@@ -107,6 +108,7 @@ codex-usage-tracker serve-dashboard --open</code></pre>
       <li>A cost with <code>*</code> means the pricing row is a marked best-guess estimate.</li>
       <li>Codex credits are estimated from aggregate input, cached-input, and output counters using bundled or locally configured rate-card values. Direct matches are exact, inferred mappings are estimated, and local credit-rate overrides are user-provided.</li>
       <li>Search matches derived project names, project-relative cwd values, tags, branch names, and redacted remote labels.</li>
+      <li>In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.</li>
       <li><code>Usage Remaining</code> is not read from the logged-in account plan. Configure <code>~/.codex-usage-tracker/allowance.json</code> with values copied from Codex Settings &gt; Usage, the Codex Usage dashboard, or <code>/status</code> when you want current remaining allowance context.</li>
       <li>Call details include a recommended action and a "why flagged" explanation derived only from aggregate counters and pricing/allowance metadata.</li>
       <li>Raw aggregate identifiers and source file metadata are collapsed until you need them.</li>
@@ -126,6 +128,7 @@ codex-usage-tracker serve-dashboard --open</code></pre>
 
     <h2>Privacy Model</h2>
     <p>The dashboard includes session ids, thread names, cwd values, source file paths, timestamps, model labels, reasoning effort, token counts, cost estimates, Codex credit estimates, optional manually entered allowance windows, and derived ratios. It does not include prompts, assistant responses, raw tool output, pasted secrets, message snippets, or transcript text. Remaining 5-hour and weekly allowance is not read from Codex logs or inferred from the logged-in account plan automatically. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.</p>
+    <p>Use <code>--privacy-mode redacted</code> or <code>--privacy-mode strict</code> before sharing generated dashboards, CSV exports, query JSON, or support bundles. Redacted mode removes raw cwd/source paths and hides unnamed project names behind stable hashes. Strict mode also hides project-relative cwd, branch, and tags. Configured project aliases are treated as explicit display opt-ins in both modes.</p>
     <p>Pricing and Codex credit estimates are source-stamped local calculations. Use <code>codex-usage-tracker pin-pricing --output &lt;path&gt;</code> when a report needs to keep the same USD pricing snapshot over time, and use <code>codex-usage-tracker update-rate-card</code> when you want an explicit local copy of the bundled Codex credit rate-card snapshot.</p>
   </main>
 </body>

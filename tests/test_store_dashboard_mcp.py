@@ -10,7 +10,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from codex_usage_tracker.context import load_call_context
-from codex_usage_tracker.dashboard import generate_dashboard
+from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.pricing import (
     PricingUpdateResult,
@@ -245,6 +245,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "usage_credits" in dashboard
     assert "parser_diagnostics" in dashboard
     assert "parserDiagnostics" in dashboard_js
+    assert "privacyMode" in dashboard
+    assert "projectMetadataPrivacy" in dashboard_js
     assert "api_token" in dashboard
     assert "context_api_enabled" in dashboard
     assert "X-Codex-Usage-Token" in dashboard_js
@@ -347,6 +349,34 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     generate_dashboard(db_path=db_path, output_path=dashboard_path, pricing_path=pricing_path)
     updated_dashboard = dashboard_path.read_text(encoding="utf-8")
     assert "Pricing snapshot changed since the previous dashboard render" in updated_dashboard
+
+
+def test_dashboard_payload_and_csv_privacy_mode_redact_project_metadata(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    csv_path = tmp_path / "usage-redacted.csv"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    payload = dashboard_payload(db_path=db_path, privacy_mode="strict")
+    exported = export_usage_csv(
+        output_path=csv_path,
+        db_path=db_path,
+        privacy_mode="redacted",
+    )
+    csv_text = csv_path.read_text(encoding="utf-8")
+    first_row = payload["rows"][0]
+
+    assert exported == 4
+    assert payload["privacy_mode"] == "strict"
+    assert payload["project_metadata_privacy"]["cwd_redacted"] is True
+    assert first_row["cwd"].startswith("[redacted cwd:")
+    assert first_row["project_name"].startswith("Project ")
+    assert first_row["project_relative_cwd"] is None
+    assert first_row["git_branch"] is None
+    assert first_row["git_remote_label"] is None
+    assert "/tmp/codex-usage-tracker" not in json.dumps(payload)
+    assert "/tmp/codex-usage-tracker" not in csv_text
+    assert "[redacted cwd:" in csv_text
 
 
 def test_dashboard_guide_link_can_use_docs_url_override(tmp_path: Path, monkeypatch) -> None:
@@ -600,7 +630,12 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     model_summary = mcp_server.usage_summary(preset="by-model")
     expensive = mcp_server.most_expensive_usage_calls(limit=1)
     expensive_json = mcp_server.most_expensive_usage_calls(limit=1, response_format="json")
-    query_json = mcp_server.usage_query(model="gpt-5.5", min_tokens=50, limit=2)
+    query_json = mcp_server.usage_query(
+        model="gpt-5.5",
+        min_tokens=50,
+        limit=2,
+        privacy_mode="strict",
+    )
     pricing_coverage = mcp_server.usage_pricing_coverage()
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
@@ -626,6 +661,8 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert query_json["filters"]["model"] == "gpt-5.5"
     assert query_json["row_count"] == 2
     assert query_json["rows"][0]["pricing_model"] == "gpt-5.5"
+    assert query_json["rows"][0]["cwd"].startswith("[redacted cwd:")
+    assert query_json["rows"][0]["project_relative_cwd"] is None
     assert "Codex pricing coverage" in pricing_coverage
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID

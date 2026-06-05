@@ -24,8 +24,11 @@ from codex_usage_tracker.pricing import (
 )
 from codex_usage_tracker.paths import DEFAULT_PROJECTS_PATH
 from codex_usage_tracker.projects import (
+    apply_project_privacy_to_rows,
+    apply_project_privacy_to_summary_rows,
     annotate_rows_with_project_identity,
     load_project_config,
+    validate_privacy_mode,
 )
 from codex_usage_tracker.recommendations import annotate_rows_with_recommendations
 from codex_usage_tracker.store import (
@@ -85,6 +88,7 @@ class SummaryReport:
     rows: list[dict[str, Any]]
     group_by: str
     is_expensive: bool = False
+    privacy_mode: str = "normal"
 
     def render(self) -> str:
         if self.is_expensive:
@@ -96,6 +100,7 @@ class SummaryReport:
             "schema": "codex-usage-tracker-summary-v1",
             "group_by": self.group_by,
             "is_expensive": self.is_expensive,
+            "privacy_mode": self.privacy_mode,
             "row_count": len(self.rows),
             "rows": self.rows,
         }
@@ -147,17 +152,25 @@ def build_summary_report(
     preset: str | None = None,
     since: str | None = None,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
+    privacy_mode: str = "normal",
 ) -> SummaryReport:
     """Build a usage summary or expensive-call preset from aggregate rows."""
 
+    privacy_mode = validate_privacy_mode(privacy_mode)
     resolved_group_by, since_filter = resolve_summary_options(group_by, preset, since)
     pricing = load_pricing_config(pricing_path)
     if preset == "expensive":
         rows = query_most_expensive_calls(db_path, limit=limit, since=since_filter)
         return SummaryReport(
-            rows=annotate_rows_with_recommendations(annotate_rows_with_efficiency(rows, pricing)),
+            rows=apply_project_privacy_to_rows(
+                annotate_rows_with_recommendations(
+                    annotate_rows_with_efficiency(rows, pricing)
+                ),
+                privacy_mode=privacy_mode,
+            ),
             group_by=resolved_group_by,
             is_expensive=True,
+            privacy_mode=privacy_mode,
         )
 
     if resolved_group_by in {"project", "project_tag"}:
@@ -168,8 +181,9 @@ def build_summary_report(
             limit=limit,
             since=since_filter,
             projects_path=projects_path,
+            privacy_mode=privacy_mode,
         )
-        return SummaryReport(rows=rows, group_by=resolved_group_by)
+        return SummaryReport(rows=rows, group_by=resolved_group_by, privacy_mode=privacy_mode)
 
     rows = query_summary(
         db_path,
@@ -179,7 +193,10 @@ def build_summary_report(
     )
     if resolved_group_by == "model":
         rows = annotate_rows_with_efficiency(rows, pricing, model_field="group_key")
-    return SummaryReport(rows=rows, group_by=resolved_group_by)
+    rows = apply_project_privacy_to_summary_rows(
+        rows, group_by=resolved_group_by, privacy_mode=privacy_mode
+    )
+    return SummaryReport(rows=rows, group_by=resolved_group_by, privacy_mode=privacy_mode)
 
 
 def build_expensive_calls_report(
@@ -189,9 +206,11 @@ def build_expensive_calls_report(
     limit: int = 20,
     preset: str | None = None,
     since: str | None = None,
+    privacy_mode: str = "normal",
 ) -> SummaryReport:
     """Build a highest-token-call report with pricing efficiency annotations."""
 
+    privacy_mode = validate_privacy_mode(privacy_mode)
     pricing = load_pricing_config(pricing_path)
     rows = query_most_expensive_calls(
         db_path,
@@ -199,9 +218,13 @@ def build_expensive_calls_report(
         since=resolve_since(preset, since),
     )
     return SummaryReport(
-        rows=annotate_rows_with_recommendations(annotate_rows_with_efficiency(rows, pricing)),
+        rows=apply_project_privacy_to_rows(
+            annotate_rows_with_recommendations(annotate_rows_with_efficiency(rows, pricing)),
+            privacy_mode=privacy_mode,
+        ),
         group_by="call",
         is_expensive=True,
+        privacy_mode=privacy_mode,
     )
 
 
@@ -237,9 +260,11 @@ def build_query_report(
     min_tokens: int | None = None,
     min_credits: float | None = None,
     limit: int = 100,
+    privacy_mode: str = "normal",
 ) -> QueryReport:
     """Build a stable JSON usage query with aggregate-only annotated rows."""
 
+    privacy_mode = validate_privacy_mode(privacy_mode)
     if pricing_status and pricing_status not in QUERY_PRICING_STATUS_CHOICES:
         raise ValueError(
             f"pricing_status must be one of: {', '.join(QUERY_PRICING_STATUS_CHOICES)}"
@@ -270,6 +295,7 @@ def build_query_report(
             min_credits=min_credits,
         )
     ]
+    rows = apply_project_privacy_to_rows(rows, privacy_mode=privacy_mode)
     normalized_limit = None if limit <= 0 else limit
     limited_rows = rows if normalized_limit is None else rows[:normalized_limit]
     return QueryReport(
@@ -287,6 +313,7 @@ def build_query_report(
                 "min_tokens": min_tokens,
                 "min_credits": min_credits,
                 "limit": normalized_limit,
+                "privacy_mode": privacy_mode,
             },
             "row_count": len(limited_rows),
             "total_matched_rows": len(rows),
@@ -356,11 +383,13 @@ def _project_summary_rows(
     limit: int,
     since: str | None,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
+    privacy_mode: str = "normal",
 ) -> list[dict[str, Any]]:
     rows = annotate_rows_with_project_identity(
         annotate_rows_with_efficiency(query_dashboard_events(db_path, limit=0, since=since), pricing),
         load_project_config(projects_path),
     )
+    rows = apply_project_privacy_to_rows(rows, privacy_mode=privacy_mode)
     buckets: dict[str, dict[str, Any]] = {}
     for row in rows:
         if group_by == "project_tag":

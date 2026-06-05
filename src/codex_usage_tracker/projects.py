@@ -18,6 +18,8 @@ PROJECT_CONFIG_TEMPLATE: dict[str, object] = {
     "tags": {},
 }
 
+PRIVACY_MODE_CHOICES = ("normal", "redacted", "strict")
+
 
 @dataclass(frozen=True)
 class ProjectConfig:
@@ -104,6 +106,65 @@ def annotate_rows_with_project_identity(
     return annotated
 
 
+def apply_project_privacy_to_rows(
+    rows: list[dict[str, Any]],
+    privacy_mode: str = "normal",
+) -> list[dict[str, Any]]:
+    """Return copied rows with sensitive project metadata redacted when requested."""
+
+    mode = validate_privacy_mode(privacy_mode)
+    if mode == "normal":
+        return [dict(row) for row in rows]
+    return [_apply_project_privacy_to_row(dict(row), mode) for row in rows]
+
+
+def apply_project_privacy_to_summary_rows(
+    rows: list[dict[str, Any]],
+    *,
+    group_by: str,
+    privacy_mode: str = "normal",
+) -> list[dict[str, Any]]:
+    """Redact summary group labels that are derived from local paths."""
+
+    mode = validate_privacy_mode(privacy_mode)
+    if mode == "normal" or group_by != "cwd":
+        return [dict(row) for row in rows]
+    redacted: list[dict[str, Any]] = []
+    for row in rows:
+        copy = dict(row)
+        copy["group_key"] = _redacted_cwd_label(copy.get("group_key"))
+        copy["privacy_mode"] = mode
+        redacted.append(copy)
+    return redacted
+
+
+def project_privacy_metadata(privacy_mode: str = "normal") -> dict[str, Any]:
+    """Return dashboard/report metadata for the active project privacy mode."""
+
+    mode = validate_privacy_mode(privacy_mode)
+    return {
+        "mode": mode,
+        "project_names_redacted": mode in {"redacted", "strict"},
+        "cwd_redacted": mode in {"redacted", "strict"},
+        "source_paths_redacted": mode in {"redacted", "strict"},
+        "relative_cwd_hidden": mode == "strict",
+        "git_branch_hidden": mode == "strict",
+        "git_remote_label_hidden": mode in {"redacted", "strict"},
+        "tags_hidden": mode == "strict",
+        "aliases_preserved": mode in {"redacted", "strict"},
+    }
+
+
+def validate_privacy_mode(privacy_mode: str = "normal") -> str:
+    """Normalize and validate a project metadata privacy mode."""
+
+    mode = str(privacy_mode or "normal")
+    if mode not in PRIVACY_MODE_CHOICES:
+        allowed = ", ".join(PRIVACY_MODE_CHOICES)
+        raise ValueError(f"privacy_mode must be one of: {allowed}")
+    return mode
+
+
 def project_identity_for_cwd(cwd: str, config: ProjectConfig | None = None) -> dict[str, Any]:
     """Derive project identity from one cwd string."""
 
@@ -114,13 +175,16 @@ def project_identity_for_cwd(cwd: str, config: ProjectConfig | None = None) -> d
     project_root = git_root or path
     project_key = _project_key(project_root)
     default_name = project_root.name if project_root else "Unknown project"
-    project_name = _alias_for(project_root, project_key, default_name, project_config.aliases)
+    project_name, alias_configured = _alias_for(
+        project_root, project_key, default_name, project_config.aliases
+    )
     tags = _tags_for(project_root, project_key, project_name, project_config.tags)
     git = _git_metadata(git_root) if git_root else {}
     return {
         "project_name": project_name,
         "project_key": project_key,
         "project_root_hash": project_key,
+        "project_alias_configured": alias_configured,
         "project_relative_cwd": _relative_cwd(path, project_root),
         "project_ignored": ignored,
         "project_tags": tags,
@@ -202,15 +266,15 @@ def _alias_for(
     key: str,
     default: str,
     aliases: dict[str, str],
-) -> str:
+) -> tuple[str, bool]:
     candidates = [key, default]
     if root:
         resolved = str(_safe_resolve(root))
         candidates.extend([resolved, str(root)])
     for candidate in candidates:
         if candidate in aliases:
-            return aliases[candidate]
-    return default
+            return aliases[candidate], True
+    return default, False
 
 
 def _tags_for(
@@ -245,6 +309,36 @@ def _project_key(path: Path | None) -> str:
 
 def _stable_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _apply_project_privacy_to_row(row: dict[str, Any], mode: str) -> dict[str, Any]:
+    project_key = str(row.get("project_key") or _stable_hash(str(row.get("cwd") or "unknown")))
+    short_key = project_key[:8] if project_key and project_key != "unknown" else "unknown"
+    alias_configured = bool(row.get("project_alias_configured"))
+    if not alias_configured:
+        row["project_name"] = f"Project {short_key}"
+    row["cwd"] = _redacted_cwd_label(project_key)
+    row["source_file"] = _redacted_source_label(row.get("source_file"))
+    row["git_remote_label"] = None
+    row["project_metadata_redacted"] = True
+    row["privacy_mode"] = mode
+    if mode == "strict":
+        row["project_relative_cwd"] = None
+        row["git_branch"] = None
+        row["project_tags"] = []
+    return row
+
+
+def _redacted_cwd_label(value: object) -> str:
+    key = str(value or "unknown")
+    digest = key[:8] if len(key) >= 8 and all(ch in "0123456789abcdef" for ch in key[:8].lower()) else _stable_hash(key)[:8]
+    return f"[redacted cwd:{digest}]"
+
+
+def _redacted_source_label(value: object) -> str | None:
+    if not value:
+        return None
+    return f"[redacted source:{_stable_hash(str(value))[:8]}]"
 
 
 def _safe_resolve(path: Path) -> Path:

@@ -11,6 +11,7 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
     let allowanceWindows = Array.isArray(initialPayload.allowance_windows) ? initialPayload.allowance_windows : [];
     let allowanceError = initialPayload.allowance_error || '';
     let rateCardError = initialPayload.rate_card_error || '';
+    let projectMetadataPrivacy = initialPayload.project_metadata_privacy || { mode: initialPayload.privacy_mode || 'normal' };
     let parserDiagnostics = initialPayload.parser_diagnostics || {};
     let apiToken = initialPayload.api_token || '';
     let contextApiEnabled = Boolean(initialPayload.context_api_enabled);
@@ -453,6 +454,24 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       sourceEl.textContent = 'Parser warnings';
       sourceEl.dataset.state = 'missing';
       sourceEl.title = `Latest refresh reported ${number.format(total)} parser diagnostics: ${entries.map(([key, value]) => `${key}=${value}`).join(', ')}. Run codex-usage-tracker inspect-log <path> to investigate schema drift.`;
+    }
+    function updatePrivacyModeLine() {
+      const sourceEl = document.getElementById('privacyMode');
+      const mode = projectMetadataPrivacy.mode || 'normal';
+      sourceEl.textContent = mode === 'normal' ? 'Metadata normal' : `Metadata ${mode}`;
+      sourceEl.dataset.state = mode === 'normal' ? 'ready' : 'missing';
+      sourceEl.title = mode === 'normal'
+        ? 'Project metadata is shown with local cwd, project, branch, and configured labels.'
+        : [
+            `Project metadata privacy mode: ${mode}.`,
+            projectMetadataPrivacy.cwd_redacted ? 'Raw cwd paths are redacted.' : '',
+            projectMetadataPrivacy.project_names_redacted ? 'Unnamed projects use stable hashed labels.' : '',
+            projectMetadataPrivacy.git_remote_label_hidden ? 'Git remote labels are hidden.' : '',
+            projectMetadataPrivacy.relative_cwd_hidden ? 'Relative cwd is hidden.' : '',
+            projectMetadataPrivacy.git_branch_hidden ? 'Git branch is hidden.' : '',
+            projectMetadataPrivacy.tags_hidden ? 'Project tags are hidden.' : '',
+            projectMetadataPrivacy.aliases_preserved ? 'Configured project aliases are treated as explicit display opt-ins.' : '',
+          ].filter(Boolean).join(' ');
     }
     function filtered() {
       const term = searchEl.value.trim().toLowerCase();
@@ -1609,6 +1628,7 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       allowanceError = nextPayload.allowance_error || '';
       rateCardError = nextPayload.rate_card_error || '';
       parserDiagnostics = nextPayload.parser_diagnostics || {};
+      projectMetadataPrivacy = nextPayload.project_metadata_privacy || { mode: nextPayload.privacy_mode || 'normal' };
       apiToken = nextPayload.api_token || apiToken;
       contextApiEnabled = Boolean(nextPayload.context_api_enabled);
       actionThresholds = nextPayload.action_thresholds || actionThresholds;
@@ -1618,6 +1638,7 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
       rebuildFilterOptions();
       updatePricingSourceLine();
       updateAllowanceSourceLine();
+      updatePrivacyModeLine();
       updateParserDiagnosticsLine();
       updateLoadLimitControl();
       render();
@@ -1751,6 +1772,7 @@ const initialPayload = JSON.parse(document.getElementById('usage-data').textCont
     applyInitialState();
     updatePricingSourceLine();
     updateAllowanceSourceLine();
+    updatePrivacyModeLine();
     updateParserDiagnosticsLine();
     updateLoadLimitControl();
     if (!liveRefreshSupported) {

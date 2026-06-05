@@ -26,6 +26,15 @@ To tune review thresholds locally, run `codex-usage-tracker init-thresholds` and
 
 To tune project attribution locally, run `codex-usage-tracker init-projects` and edit `~/.codex-usage-tracker/projects.json`. The dashboard derives project name, relative cwd, branch, tags, and a hashed remote origin from aggregate `cwd` and local Git metadata when available.
 
+Before sharing screenshots or generated artifacts, use `--privacy-mode redacted` or `--privacy-mode strict` before the subcommand:
+
+```bash
+codex-usage-tracker --privacy-mode strict serve-dashboard --open
+codex-usage-tracker --privacy-mode strict dashboard --open
+```
+
+Redacted mode hides raw cwd/source paths, hides Git remote labels, and hashes unnamed projects while preserving configured aliases. Strict mode also hides project-relative cwd, Git branch, and tags. The dashboard header shows the active metadata mode.
+
 The server keeps the HTML aggregate-only and enables two live features:
 
 - `Refresh` rescans local Codex logs and updates the dashboard rows.
@@ -67,6 +76,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - A `Parser warnings` chip appears only when the latest refresh reports skipped token events, missing expected token fields, invalid counters, duplicate cumulative snapshots, or unknown event shapes. Use `codex-usage-tracker inspect-log <path>` to inspect a suspect log without writing to SQLite.
 - Search matches thread, cwd, model, session id, turn id, subagent role, and parent thread fields.
 - Search also matches derived project names, project-relative cwd values, tags, branch names, and redacted remote labels.
+- In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.
 - The cards summarize only the currently visible filtered rows.
 - Time values are shown in your browser's local date/time format while sorting still uses the logged timestamp.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
@@ -170,6 +180,8 @@ It does not include:
 - prompts, assistant responses, raw tool output, pasted secrets, message snippets, or transcript text
 
 The screenshots in this guide are produced from synthetic fixture data used by the test suite.
+
+Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing generated dashboards, CSV exports, query JSON, or support bundles. Redacted mode removes raw cwd/source paths and hides unnamed project names behind stable hashes. Strict mode also hides project-relative cwd, branch, and tags. Configured project aliases are treated as explicit display opt-ins in both modes.
 
 Remaining 5-hour and weekly allowance is not read from Codex logs or inferred from the logged-in account plan automatically. Add `~/.codex-usage-tracker/allowance.json` only when you want the dashboard to show current copied allowance state. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.
 

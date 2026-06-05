@@ -17,6 +17,8 @@ The installed `codex-usage-api` skill is the recommended conversational entrypoi
 
 The skill should separate exact facts from estimates. Remaining allowance is not native account data; it is only copied local state from `~/.codex-usage-tracker/allowance.json` when configured.
 
+Use the global `--privacy-mode redacted` or `--privacy-mode strict` option, or the MCP `privacy_mode` argument, when project metadata should be hidden from JSON answers. The CLI option goes before the subcommand.
+
 ## Shared Error Codes
 
 CLI failures print a stable code in stderr:
@@ -48,6 +50,7 @@ Schema: `codex-usage-tracker-summary-v1`
   "schema": "codex-usage-tracker-summary-v1",
   "group_by": "model",
   "is_expensive": false,
+  "privacy_mode": "normal",
   "row_count": 1,
   "rows": []
 }
@@ -83,7 +86,8 @@ Schema: `codex-usage-tracker-query-v1`
     "credit_confidence": null,
     "min_tokens": null,
     "min_credits": 1.0,
-    "limit": 100
+    "limit": 100,
+    "privacy_mode": "normal"
   },
   "row_count": 1,
   "total_matched_rows": 1,
@@ -100,6 +104,9 @@ Supported filters:
 - `credit_confidence`: `exact`, `estimated`, `unpriced`, `user_override`
 - `min_tokens`, `min_credits`
 - `limit`; use `0` for all matched rows
+- `privacy_mode`: `normal`, `redacted`, or `strict`
+
+Privacy mode affects returned metadata after matching rows. `redacted` hides raw cwd/source paths, hides Git remote labels, and hashes unnamed project names. `strict` also hides project-relative cwd, Git branch, and tags. Configured project aliases are treated as explicit display opt-ins.
 
 ## Session
 

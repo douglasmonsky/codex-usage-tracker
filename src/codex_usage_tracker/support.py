@@ -22,7 +22,11 @@ from codex_usage_tracker.paths import (
     DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.pricing import load_pricing_config
-from codex_usage_tracker.projects import load_project_config
+from codex_usage_tracker.projects import (
+    load_project_config,
+    project_privacy_metadata,
+    validate_privacy_mode,
+)
 from codex_usage_tracker.recommendations import load_threshold_config
 from codex_usage_tracker.store import refresh_metadata, schema_state
 
@@ -37,6 +41,7 @@ def build_support_bundle(
     rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
+    privacy_mode: str = "normal",
 ) -> Path:
     """Write a local diagnostic bundle without raw logs or transcript content."""
 
@@ -50,6 +55,7 @@ def build_support_bundle(
         rate_card_path=rate_card_path,
         thresholds_path=thresholds_path,
         projects_path=projects_path,
+        privacy_mode=privacy_mode,
     )
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return output_path
@@ -64,9 +70,11 @@ def support_bundle_payload(
     rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
+    privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Return support diagnostics safe to attach to a GitHub issue."""
 
+    privacy_mode = validate_privacy_mode(privacy_mode)
     pricing = load_pricing_config(pricing_path)
     allowance = load_allowance_config(allowance_path, rate_card_path=rate_card_path)
     thresholds = load_threshold_config(thresholds_path)
@@ -82,6 +90,7 @@ def support_bundle_payload(
             "contains_prompts": False,
             "contains_assistant_messages": False,
             "contains_tool_output": False,
+            "project_metadata": project_privacy_metadata(privacy_mode),
         },
         "package": {
             "name": "codex-usage-tracker",

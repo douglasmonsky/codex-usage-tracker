@@ -2,6 +2,7 @@
 
 ## 0.2.0
 
+- Add project metadata privacy modes for dashboard, query, session, summary, CSV export, MCP, and support-bundle surfaces.
 - Add Codex credit estimates and optional local allowance-window context to the dashboard.
 - Add prominent unofficial-project disclaimers to docs, dashboard output, and plugin metadata.
 - Harden malformed token-count parsing, SQLite concurrency, MCP raw-context opt-in, pricing parser diagnostics, bundled dashboard docs, and schema migrations.
