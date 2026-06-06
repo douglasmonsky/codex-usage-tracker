@@ -37,6 +37,10 @@ Want Codex to do it for you? Paste: `Install and configure Codex Usage Tracker f
 
 After plugin discovery, Codex can use the companion usage skill to refresh local aggregates, call the MCP tools, and explain usage patterns conversationally. Examples: [MCP And Codex Skills](docs/mcp.md).
 
+<p align="center">
+  <a href="docs/assets/plugin-thread-leaderboard.png"><img src="docs/assets/plugin-thread-leaderboard.png?v=thread-leaderboard" alt="Synthetic Codex chat preview showing the companion skill ranking threads by token usage after refreshing the local aggregate index." width="86%"></a>
+</p>
+
 If you only want plugin registration after installing the package:
 
 ```bash
@@ -67,7 +71,7 @@ Insights still gives a fast triage layer for costly threads, low cache reuse, co
 
 ![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=4a40e4f)
 
-The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt preview is synthetic. They do not contain prompts from local logs, assistant responses, tool output, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
+The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt and chat previews are synthetic. They do not contain prompts from local logs, assistant responses, tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
 
 If this helped you track Codex usage, starring the repo helps others find it. Issues and feature requests are welcome.
 
