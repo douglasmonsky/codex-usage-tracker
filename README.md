@@ -5,7 +5,7 @@
   <a href="docs/assets/dashboard-calls.png"><img src="docs/assets/dashboard-calls-preview.png?v=usage-dashboard" alt="Codex Usage Tracker dashboard showing filters, usage totals, call rows, and call details." width="49%"></a>
 </p>
 
-Local-first dashboard for understanding where your Codex tokens and usage credits are going.
+Local-first dashboard, and Codex plug-in for understanding where your Codex tokens and usage credits are going.
 
 [![CI](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml)
 ![Python 3.10-3.13](https://img.shields.io/badge/python-3.10--3.13-blue)
