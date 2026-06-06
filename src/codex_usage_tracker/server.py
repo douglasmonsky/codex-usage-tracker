@@ -68,6 +68,7 @@ def serve_dashboard(
         thresholds_path=thresholds_path,
         projects_path=projects_path,
         privacy_mode=privacy_mode,
+        include_archived=include_archived,
     )
     handler = partial(
         _UsageDashboardHandler,
@@ -226,6 +227,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         params = parse_qs(query)
         limit = _parse_limit(_first(params.get("limit")), self._limit)
         offset = _parse_offset(_first(params.get("offset")))
+        include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
         refresh_result = None
         try:
             if _truthy(_first(params.get("refresh"))):
@@ -239,7 +241,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                     result = refresh_usage_index(
                         codex_home=self._codex_home,
                         db_path=self._db_path,
-                        include_archived=self._include_archived,
+                        include_archived=include_archived,
                     )
                 refresh_result = {
                     "scanned_files": result.scanned_files,
@@ -248,6 +250,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                     "inserted_or_updated_events": result.inserted_or_updated_events,
                     "db_path": result.db_path,
                     "parser_diagnostics": result.parser_diagnostics,
+                    "include_archived": include_archived,
                 }
             payload = dashboard_payload(
                 db_path=self._db_path,
@@ -262,6 +265,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 since=self._since,
                 api_token=self._api_token,
                 context_api_enabled=self._context_api_enabled,
+                include_archived=include_archived,
             )
         except sqlite3.Error as exc:
             self._send_json(
@@ -312,6 +316,17 @@ def _first(values: list[str] | None) -> str | None:
 
 def _truthy(value: str | None) -> bool:
     return str(value or "").lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_bool(value: str | None, default: bool) -> bool:
+    if value is None or value == "":
+        return default
+    normalized = value.lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return default
 
 
 def _parse_limit(value: str | None, default: int | None) -> int | None:

@@ -58,6 +58,7 @@ def dashboard_payload(
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
+    include_archived: bool = False,
 ) -> dict[str, object]:
     """Return aggregate-only dashboard data without rendering HTML."""
 
@@ -69,6 +70,7 @@ def dashboard_payload(
             limit=limit,
             offset=normalized_offset,
             since=since,
+            include_archived=include_archived,
         )
     )
     pricing = load_pricing_config(pricing_path)
@@ -84,7 +86,21 @@ def dashboard_payload(
     annotated_rows = apply_project_privacy_to_rows(annotated_rows, privacy_mode=privacy_mode)
     allowance_summary = summarize_allowance_usage(annotated_rows, allowance)
     normalized_limit = _normalize_limit(limit)
-    total_available_rows = query_dashboard_event_count(db_path=db_path, since=since)
+    total_available_rows = query_dashboard_event_count(
+        db_path=db_path,
+        since=since,
+        include_archived=include_archived,
+    )
+    active_available_rows = query_dashboard_event_count(
+        db_path=db_path,
+        since=since,
+        include_archived=False,
+    )
+    all_history_available_rows = query_dashboard_event_count(
+        db_path=db_path,
+        since=since,
+        include_archived=True,
+    )
     metadata = refresh_metadata(db_path)
     parser_diagnostics = {
         key.removeprefix("parser_"): _safe_int(value)
@@ -104,6 +120,11 @@ def dashboard_payload(
         "rate_card_error": allowance_summary["rate_card_error"],
         "loaded_row_count": len(rows),
         "total_available_rows": total_available_rows,
+        "active_available_rows": active_available_rows,
+        "all_history_available_rows": all_history_available_rows,
+        "archived_available_rows": max(all_history_available_rows - active_available_rows, 0),
+        "include_archived": include_archived,
+        "history_scope": "all-history" if include_archived else "active",
         "limit": normalized_limit,
         "offset": normalized_offset,
         "has_more": (
@@ -144,6 +165,7 @@ def generate_dashboard(
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
+    include_archived: bool = False,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     guide_href = _dashboard_guide_href(output_path)
@@ -166,6 +188,7 @@ def generate_dashboard(
         thresholds_path=thresholds_path,
         projects_path=projects_path,
         privacy_mode=privacy_mode,
+        include_archived=include_archived,
     )
     payload_dict["pricing_snapshot_warning"] = _pricing_snapshot_warning(
         previous_payload, payload_dict

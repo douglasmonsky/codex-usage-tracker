@@ -55,6 +55,9 @@
     let contextApiEnabled = Boolean(initialPayload.context_api_enabled);
     let actionThresholds = initialPayload.action_thresholds || {};
     let totalAvailableRows = Number(initialPayload.total_available_rows || data.length);
+    let activeAvailableRows = Number(initialPayload.active_available_rows || data.length);
+    let allHistoryAvailableRows = Number(initialPayload.all_history_available_rows || totalAvailableRows);
+    let archivedAvailableRows = Number(initialPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
     let loadedLimit = payloadLimit(initialPayload);
     const rowsEl = document.getElementById('rows');
     const detailEl = document.getElementById('detail');
@@ -80,6 +83,7 @@
     const refreshDashboardEl = document.getElementById('refreshDashboard');
     const autoRefreshEl = document.getElementById('autoRefresh');
     const loadLimitEl = document.getElementById('loadLimit');
+    const historyScopeEl = document.getElementById('historyScope');
     const liveStatusEl = document.getElementById('liveStatus');
     const copyViewLinkEl = document.getElementById('copyViewLink');
     const exportVisibleEl = document.getElementById('exportVisible');
@@ -93,6 +97,10 @@
     let threadAttachmentByRecordId = new Map();
     const expandedThreads = new Set();
     const liveRefreshSupported = window.location.protocol !== 'file:';
+    const initialPayloadIncludeArchived = Boolean(initialPayload.include_archived);
+    let includeArchived = initialPayloadIncludeArchived;
+    if (liveRefreshSupported && initialState.historyScope === 'all') includeArchived = true;
+    const needsInitialHistoryRefresh = liveRefreshSupported && includeArchived !== initialPayloadIncludeArchived;
     const liveRefreshIntervalMs = 10000;
     const pageSize = 500;
     const datePresetLabels = {
@@ -217,6 +225,23 @@
       const available = number.format(totalAvailableRows || data.length);
       const capped = loadedLimit !== null && totalAvailableRows > data.length;
       return capped ? `${loaded} of ${available} calls loaded` : `${loaded} calls loaded`;
+    }
+    function historyRowsDescription() {
+      const archived = Number(archivedAvailableRows || 0);
+      if (includeArchived) {
+        return archived
+          ? `All history includes ${number.format(archived)} archived calls`
+          : 'All history selected; no archived calls are indexed yet';
+      }
+      return archived
+        ? `Active sessions only; ${number.format(archived)} archived calls hidden`
+        : 'Active sessions only';
+    }
+    function updateHistoryScopeControl() {
+      historyScopeEl.value = includeArchived ? 'all' : 'active';
+      const detail = historyRowsDescription();
+      historyScopeEl.title = detail;
+      historyScopeEl.parentElement.title = `${detail}. Archived sessions are scanned only when All history is selected during live refresh.`;
     }
     function updateLoadLimitControl() {
       const value = limitValue(loadedLimit);
@@ -579,6 +604,7 @@
         datePreset: datePresetEl.value,
         dateStart: datePresetEl.value === 'custom' ? dateStartEl.value : '',
         dateEnd: datePresetEl.value === 'custom' ? dateEndEl.value : '',
+        historyScope: includeArchived ? 'all' : 'active',
         sort: sortKey,
         direction: sortDirection,
         preset: activePreset,
@@ -1617,6 +1643,10 @@
       contextApiEnabled = Boolean(nextPayload.context_api_enabled);
       actionThresholds = nextPayload.action_thresholds || actionThresholds;
       totalAvailableRows = Number(nextPayload.total_available_rows || data.length);
+      activeAvailableRows = Number(nextPayload.active_available_rows || data.length);
+      allHistoryAvailableRows = Number(nextPayload.all_history_available_rows || totalAvailableRows);
+      archivedAvailableRows = Number(nextPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
+      includeArchived = Boolean(nextPayload.include_archived);
       loadedLimit = payloadLimit(nextPayload);
       rebuildDashboardIndexes();
       rebuildFilterOptions();
@@ -1625,6 +1655,7 @@
       updatePrivacyModeLine();
       updateParserDiagnosticsLine();
       updateLoadLimitControl();
+      updateHistoryScopeControl();
       render();
     }
     async function refreshDashboardData(manual = false) {
@@ -1638,7 +1669,12 @@
       refreshDashboardEl.disabled = true;
       updateLiveStatus(manual ? 'Refreshing' : 'Checking', manual ? 'Refreshing local usage index...' : 'Checking for new usage...');
       try {
-        const params = new URLSearchParams({ refresh: '1', limit: loadLimitEl.value, _: String(Date.now()) });
+        const params = new URLSearchParams({
+          refresh: '1',
+          limit: loadLimitEl.value,
+          include_archived: includeArchived ? '1' : '0',
+          _: String(Date.now()),
+        });
         const response = await fetch(`/api/usage?${params.toString()}`, {
           headers: {
             'Accept': 'application/json',
@@ -1659,7 +1695,7 @@
         const skipped = result.skipped_events
           ? ` Skipped ${number.format(result.skipped_events)} malformed token-count events.`
           : '';
-        updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Updated', `Updated ${formatTimestamp(nextPayload.refreshed_at)}. ${loadedRowsDescription()}.${indexed}${skipped}`);
+        updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Updated', `Updated ${formatTimestamp(nextPayload.refreshed_at)}. ${loadedRowsDescription()}. ${historyRowsDescription()}.${indexed}${skipped}`);
       } catch (error) {
         const message = error.message || String(error);
         updateLiveStatus('Refresh error', `Live refresh unavailable: ${message}${manual ? '. Reload this page after regenerating a static dashboard, or run codex-usage-tracker serve-dashboard.' : ''}`);
@@ -1692,9 +1728,20 @@
         updateLiveStatus('Static', 'Run codex-usage-tracker serve-dashboard to load a different history size from the dashboard.');
       }
     });
+    historyScopeEl.addEventListener('change', () => {
+      includeArchived = historyScopeEl.value === 'all';
+      currentPage = 1;
+      updateHistoryScopeControl();
+      syncUrlState();
+      if (liveRefreshSupported) {
+        refreshDashboardData(true);
+      } else {
+        updateLiveStatus('Static', 'Run codex-usage-tracker serve-dashboard to switch between active sessions and all history from the dashboard.');
+      }
+    });
     autoRefreshEl.addEventListener('change', () => {
       scheduleAutoRefresh();
-      updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Paused', `${autoRefreshEl.checked ? `Live refresh every ${liveRefreshIntervalMs / 1000}s` : 'Live refresh paused'}. ${loadedRowsDescription()}`);
+      updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Paused', `${autoRefreshEl.checked ? `Live refresh every ${liveRefreshIntervalMs / 1000}s` : 'Live refresh paused'}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       if (autoRefreshEl.checked) refreshDashboardData(false);
     });
     document.addEventListener('visibilitychange', () => {
@@ -1770,14 +1817,17 @@
     updatePrivacyModeLine();
     updateParserDiagnosticsLine();
     updateLoadLimitControl();
+    updateHistoryScopeControl();
     if (!liveRefreshSupported) {
       autoRefreshEl.checked = false;
       autoRefreshEl.disabled = true;
       loadLimitEl.disabled = true;
-      updateLiveStatus('Static', `Static snapshot. ${loadedRowsDescription()}`);
+      historyScopeEl.disabled = true;
+      updateLiveStatus('Static', `Static snapshot. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
     } else {
-      updateLiveStatus('Live', `Live refresh every ${liveRefreshIntervalMs / 1000}s. ${loadedRowsDescription()}`);
+      updateLiveStatus('Live', `Live refresh every ${liveRefreshIntervalMs / 1000}s. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       scheduleAutoRefresh();
+      if (needsInitialHistoryRefresh) refreshDashboardData(false);
     }
     updateToTopVisibility();
     render();

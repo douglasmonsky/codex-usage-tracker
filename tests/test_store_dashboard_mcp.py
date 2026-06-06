@@ -39,6 +39,7 @@ from codex_usage_tracker.store import (
 SESSION_ID = "019e374d-c19f-7da3-a44f-8de043a7a64e"
 SECOND_SESSION_ID = "019e37d4-c1f1-71aa-b154-2d5d837af92c"
 AUTO_REVIEW_SESSION_ID = "019e37d5-01fd-71df-87f4-ae3e8d60df7a"
+ARCHIVED_SESSION_ID = "019e37d5-bb36-76ba-aa33-ed0beaf4f9ce"
 
 
 def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
@@ -674,6 +675,111 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert "SECRET RAW PROMPT" not in json.dumps(limited_payload)
 
 
+def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    _write_archived_log(codex_home)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_result = refresh_usage_index(
+        codex_home=codex_home,
+        db_path=db_path,
+        include_archived=True,
+    )
+
+    active_payload = dashboard_payload(db_path=db_path, limit=0)
+    all_history_payload = dashboard_payload(db_path=db_path, limit=0, include_archived=True)
+    active_rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=False)
+    all_rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=True)
+
+    assert refresh_result.parsed_events == 5
+    assert active_payload["include_archived"] is False
+    assert active_payload["history_scope"] == "active"
+    assert active_payload["loaded_row_count"] == 4
+    assert active_payload["total_available_rows"] == 4
+    assert active_payload["active_available_rows"] == 4
+    assert active_payload["all_history_available_rows"] == 5
+    assert active_payload["archived_available_rows"] == 1
+    assert all_history_payload["include_archived"] is True
+    assert all_history_payload["history_scope"] == "all-history"
+    assert all_history_payload["loaded_row_count"] == 5
+    assert all_history_payload["total_available_rows"] == 5
+    assert len(active_rows) == 4
+    assert len(all_rows) == 5
+    assert not any("/archived_sessions/" in row["source_file"] for row in active_rows)
+    assert any("/archived_sessions/" in row["source_file"] for row in all_rows)
+
+
+def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    codex_home = _make_codex_home(tmp_path)
+    _write_archived_log(codex_home)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=codex_home,
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/api/usage?refresh=1&limit=all",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            active_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/api/usage?refresh=1&limit=all&include_archived=1",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            all_history_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"http://127.0.0.1:{server.server_port}/api/usage?limit=all&include_archived=0",
+            timeout=5,
+        ) as response:
+            active_after_all_payload = json.loads(response.read().decode("utf-8"))
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert active_payload["include_archived"] is False
+    assert active_payload["loaded_row_count"] == 4
+    assert active_payload["archived_available_rows"] == 0
+    assert active_payload["refresh_result"]["include_archived"] is False
+    assert all_history_payload["include_archived"] is True
+    assert all_history_payload["loaded_row_count"] == 5
+    assert all_history_payload["archived_available_rows"] == 1
+    assert all_history_payload["refresh_result"]["include_archived"] is True
+    assert active_after_all_payload["include_archived"] is False
+    assert active_after_all_payload["loaded_row_count"] == 4
+    assert active_after_all_payload["archived_available_rows"] == 1
+    assert not any(
+        "/archived_sessions/" in row["source_file"]
+        for row in active_after_all_payload["rows"]
+    )
+
+
 def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker import server as server_module
     from codex_usage_tracker.server import _UsageDashboardHandler
@@ -1086,6 +1192,31 @@ def _make_codex_home(tmp_path: Path) -> Path:
         ],
     )
     return codex_home
+
+
+def _write_archived_log(codex_home: Path) -> Path:
+    archived_log_path = (
+        codex_home
+        / "archived_sessions"
+        / f"rollout-2026-05-17T17-00-00-{ARCHIVED_SESSION_ID}.jsonl"
+    )
+    _write_jsonl(
+        archived_log_path,
+        [
+            _entry("session_meta", {"id": ARCHIVED_SESSION_ID}),
+            _entry(
+                "turn_context",
+                {
+                    "turn_id": "turn-archived",
+                    "model": "gpt-5.5",
+                    "effort": "low",
+                    "cwd": "/tmp/codex-usage-tracker",
+                },
+            ),
+            _token_event(900, 900),
+        ],
+    )
+    return archived_log_path
 
 
 def _write_pricing(path: Path) -> Path:

@@ -72,6 +72,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - The top cards include cached input, uncached input, Codex credit usage, and optional usage remaining instead of estimated-token, unpriced-token, and price-coverage counters.
 - The `Confidence` filter separates exact cost, estimated cost, unpriced cost, exact credit-rate matches, inferred credit mappings, user credit overrides, and missing credit rates.
 - The `Time` filter supports all time, today, this week, last 7 days, this month, and custom calendar ranges. Presets are relative to your browser's local date. Custom ranges use inclusive start and end dates.
+- The `History` control defaults to `Active sessions only`. Switch to `All history` only when you want live refresh to scan archived session logs and include any archived rows already present in SQLite.
 - The URL tracks the active view, filters, time preset or custom range, sort, preset, selected row or thread, page, and expanded threads. `Copy link` copies that state so the same investigation can be reopened.
 - `Export CSV` downloads the currently filtered aggregate calls. In Threads view, it exports the calls behind the filtered thread list rather than only the visible group headers.
 - A `Parser warnings` chip appears only when the latest refresh reports skipped token events, missing expected token fields, invalid counters, duplicate cumulative snapshots, or unknown event shapes. Use `codex-usage-tracker inspect-log <path>` to inspect a suspect log without writing to SQLite.
@@ -146,15 +147,16 @@ When served from localhost, the details panel includes `Load context` and `Inclu
 
 1. Start with `serve-dashboard --open`.
 2. Use `Refresh` after a Codex run finishes, or leave `Live` enabled while you work.
-3. Optionally run `parse-allowance` with copied values from Codex Usage or `/status`, or initialize and edit `allowance.json` manually.
-4. Start in `Insights` view and review the highest-severity attention cards.
-5. Narrow the `Time` filter when you are investigating a recent spike or a specific work window.
-6. Use a preset when the question is already clear: highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
-7. Use `Threads` view to find the active work thread and any spawned subagent calls.
-8. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
-9. Use `Copy link` when you want to return to the same filter/sort/selection state later.
-10. Use `Export CSV` when the current filtered aggregate calls need spreadsheet review.
-11. Click into a row and use `Load context` only when aggregate fields are not enough to explain the call.
+3. Leave `History` on `Active sessions only` for current work. Switch to `All history` when you intentionally want archived sessions included in the live refresh.
+4. Optionally run `parse-allowance` with copied values from Codex Usage or `/status`, or initialize and edit `allowance.json` manually.
+5. Start in `Insights` view and review the highest-severity attention cards.
+6. Narrow the `Time` filter when you are investigating a recent spike or a specific work window.
+7. Use a preset when the question is already clear: highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
+8. Use `Threads` view to find the active work thread and any spawned subagent calls.
+9. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
+10. Use `Copy link` when you want to return to the same filter/sort/selection state later.
+11. Use `Export CSV` when the current filtered aggregate calls need spreadsheet review.
+12. Click into a row and use `Load context` only when aggregate fields are not enough to explain the call.
 
 ## Investigating Long Chat Growth
 
@@ -187,5 +189,7 @@ The screenshots in this guide are produced from synthetic fixture data used by t
 Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing generated dashboards, CSV exports, query JSON, or support bundles. Redacted mode removes raw cwd/source paths and hides unnamed project names behind stable hashes. Strict mode also hides project-relative cwd, branch, and tags. Configured project aliases are treated as explicit display opt-ins in both modes.
 
 Remaining 5-hour and weekly allowance is not read from Codex logs or inferred from the logged-in account plan automatically. Add `~/.codex-usage-tracker/allowance.json` only when you want the dashboard to show current copied allowance state. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.
+
+Archived sessions are excluded from dashboard payloads by default. The `All history` mode is an explicit opt-in because archived logs can make refreshes slower and can make current dashboards look inflated by older work.
 
 Pricing and Codex credit estimates are source-stamped local calculations. Use `codex-usage-tracker pin-pricing --output <path>` when a report needs to keep the same USD pricing snapshot over time, and use `codex-usage-tracker update-rate-card` when you want an explicit local copy of the bundled Codex credit rate-card snapshot.

@@ -11,6 +11,7 @@
     'date',
     'from',
     'to',
+    'history',
     'sort',
     'direction',
     'preset',
@@ -36,6 +37,7 @@
       datePreset: clean(params.get('date')),
       dateStart: clean(params.get('from')),
       dateEnd: clean(params.get('to')),
+      historyScope: params.get('history') === 'all' ? 'all' : '',
       sort: clean(params.get('sort')),
       direction: ALLOWED_DIRECTIONS.has(params.get('direction')) ? params.get('direction') : '',
       preset: clean(params.get('preset')),
@@ -58,6 +60,7 @@
     set(params, 'date', state.datePreset && state.datePreset !== 'all' ? state.datePreset : '');
     set(params, 'from', state.dateStart);
     set(params, 'to', state.dateEnd);
+    set(params, 'history', state.historyScope === 'all' ? 'all' : '');
     set(params, 'sort', state.sort && state.sort !== 'attention' ? state.sort : '');
     set(params, 'direction', ALLOWED_DIRECTIONS.has(state.direction) ? state.direction : '');
     set(params, 'preset', state.preset);

@@ -34,6 +34,12 @@ MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
 }
+_ARCHIVED_SOURCE_PATTERNS = (
+    "%/archived_sessions/%",
+    "archived_sessions/%",
+    "%\\archived_sessions\\%",
+    "archived_sessions\\%",
+)
 
 
 def refresh_usage_index(
@@ -426,6 +432,7 @@ def query_dashboard_events(
     effort: str | None = None,
     thread: str | None = None,
     min_tokens: int | None = None,
+    include_archived: bool = True,
 ) -> list[dict[str, Any]]:
     where_clause, params = _usage_where_clause(
         since=since,
@@ -435,11 +442,18 @@ def query_dashboard_events(
         thread=thread,
         min_tokens=min_tokens,
         table_alias="usage_events",
+        include_archived=include_archived,
+    )
+    parent_where_clause, parent_params = _usage_where_clause(include_archived=include_archived)
+    parent_thread_filter = (
+        f"{parent_where_clause} AND thread_name IS NOT NULL"
+        if parent_where_clause
+        else "WHERE thread_name IS NOT NULL"
     )
     normalized_limit = _normalize_limit(limit)
     normalized_offset = _normalize_offset(offset)
     limit_clause = ""
-    query_params = list(params)
+    query_params = [*parent_params, *params]
     if normalized_limit is not None:
         limit_clause = "LIMIT ?"
         query_params.append(normalized_limit)
@@ -470,7 +484,7 @@ def query_dashboard_events(
                     max(thread_name) AS thread_name,
                     max(session_updated_at) AS session_updated_at
                 FROM usage_events
-                WHERE thread_name IS NOT NULL
+                {parent_thread_filter}
                 GROUP BY session_id
             ) AS parent_threads
             ON usage_events.parent_session_id = parent_threads.session_id
@@ -491,6 +505,7 @@ def query_dashboard_event_count(
     effort: str | None = None,
     thread: str | None = None,
     min_tokens: int | None = None,
+    include_archived: bool = True,
 ) -> int:
     """Return total aggregate usage rows available for the dashboard window."""
 
@@ -501,6 +516,7 @@ def query_dashboard_event_count(
         effort=effort,
         thread=thread,
         min_tokens=min_tokens,
+        include_archived=include_archived,
     )
     with connect(db_path) as conn:
         init_db(conn)
@@ -584,7 +600,7 @@ def _group_expression(group_by: str) -> str:
         raise ValueError(f"group_by must be one of: {allowed}") from exc
 
 
-def _since_where_clause(since: str | None) -> tuple[str, list[str]]:
+def _since_where_clause(since: str | None) -> tuple[str, list[Any]]:
     return _usage_where_clause(since=since)
 
 
@@ -597,6 +613,7 @@ def _usage_where_clause(
     thread: str | None = None,
     min_tokens: int | None = None,
     table_alias: str | None = None,
+    include_archived: bool = True,
 ) -> tuple[str, list[Any]]:
     prefix = f"{table_alias}." if table_alias else ""
     clauses: list[str] = []
@@ -625,6 +642,9 @@ def _usage_where_clause(
     if min_tokens is not None:
         clauses.append(f"{prefix}total_tokens >= ?")
         params.append(min_tokens)
+    if not include_archived:
+        clauses.extend([f"{prefix}source_file NOT LIKE ?"] * len(_ARCHIVED_SOURCE_PATTERNS))
+        params.extend(_ARCHIVED_SOURCE_PATTERNS)
     if not clauses:
         return "", []
     return "WHERE " + " AND ".join(clauses), params

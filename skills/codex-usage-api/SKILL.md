@@ -17,7 +17,7 @@ The only exception is `usage_call_context`, which reads one selected record's lo
 
 ## First Steps
 
-1. Refresh before analysis with `refresh_usage_index` unless the user asks for a static historical snapshot.
+1. Refresh before analysis with `refresh_usage_index` unless the user asks for a static historical snapshot. Keep archived sessions excluded unless the user explicitly asks for all history.
 2. Use `usage_doctor(response_format="json")` when setup, indexing, pricing, MCP discovery, or dashboard freshness is uncertain.
 3. Prefer JSON responses for analysis:
    - `usage_summary(..., response_format="json")`

@@ -28,7 +28,7 @@ The only exception is `usage_call_context`, which intentionally reads one select
 - Use `usage_call_context` for one selected model call when the user asks to load actual logged context on demand.
 - Use `most_expensive_usage_calls` to identify high-token calls and aggregate efficiency signals.
 - Use `privacy_mode="redacted"` or `privacy_mode="strict"` for MCP tools, or the CLI global option `--privacy-mode strict` before a subcommand, when the user plans to share dashboards, CSV, JSON, screenshots, or support bundles.
-- Use `generate_usage_dashboard` when the user wants a visual hoverable report, including flat calls, threaded-by-thread views, parent-thread latching for spawned subagents, auto-review attachment details, and controls that can call a localhost context endpoint when the dashboard is served.
+- Use `generate_usage_dashboard` when the user wants a visual hoverable report, including flat calls, threaded-by-thread views, parent-thread latching for spawned subagents, auto-review attachment details, an active-only default, and explicit all-history archived-session opt-in.
 - Use `export_usage_csv` when the user wants local spreadsheet-friendly data.
 - Use `update_usage_pricing_config` when the user wants cost estimates based on OpenAI-published text-token pricing. This refreshes the local pricing cache and does not send local usage data anywhere. Internal Codex labels may include explicitly marked best-guess estimates when no public pricing row exists.
 - Use `init_usage_pricing_config` only when the user wants a manual local pricing template or override file.

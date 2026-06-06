@@ -36,9 +36,23 @@ More install paths: [Install Guide](docs/install.md).
 
 ## Dashboard Preview
 
-![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=935db11)
+The Calls table is the main investigation surface: filter, sort, inspect details, and export the exact aggregate rows you are looking at.
 
-These screenshots use synthetic aggregate fixture data. They do not contain prompts, assistant responses, tool output, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for Calls, Threads, and details-panel screenshots.
+![Calls view showing filters, totals, the model-call table, and the details panel.](docs/assets/dashboard-calls.png?v=aa16502)
+
+Threads view groups related calls so long chats, subagents, and auto-review passes are easier to reason about as one work session.
+
+![Threads view with one expanded thread and its calls in chronological order.](docs/assets/dashboard-threads.png?v=3cd7338)
+
+The details panel keeps the primary cost, cache, context, allowance, and pricing signals visible before raw identifiers.
+
+![Details panel showing aggregate fields for the selected usage row.](docs/assets/dashboard-details.png?v=84cf6dd)
+
+Insights still gives a fast triage layer for costly threads, low cache reuse, context bloat, and pricing gaps.
+
+![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=4a40e4f)
+
+These screenshots use synthetic aggregate fixture data. They do not contain prompts, assistant responses, tool output, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
 
 If this helped you track Codex usage, starring the repo helps others find it. Issues and feature requests are welcome.
 
@@ -101,6 +115,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
 - `Insights`, `Calls`, and `Threads` dashboard views.
+- Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
 - Companion Codex skills for operational setup and conversational usage analysis.

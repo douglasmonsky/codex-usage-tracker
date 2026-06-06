@@ -66,6 +66,8 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 
 `refresh_usage_index`, `usage_query`, `generate_usage_dashboard`, `export_usage_csv`, and config-writing MCP tools return JSON dictionaries directly.
 
+`refresh_usage_index(include_archived=True)` and `generate_usage_dashboard(include_archived=True)` are explicit all-history opt-ins. The default dashboard view excludes archived session rows so older work does not inflate the current usage picture.
+
 ## Raw Context Guard
 
 `usage_call_context` is disabled by default in MCP server processes. To enable it explicitly:

@@ -270,6 +270,7 @@ def generate_usage_dashboard(
     limit: int = 5000,
     since: str | None = None,
     privacy_mode: str = "normal",
+    include_archived: bool = False,
 ) -> dict[str, Any]:
     """Generate a local hoverable HTML dashboard from aggregate-only usage metrics."""
 
@@ -282,6 +283,7 @@ def generate_usage_dashboard(
         allowance_path=DEFAULT_ALLOWANCE_PATH,
         since=since,
         privacy_mode=privacy_mode,
+        include_archived=include_archived,
     )
     return {
         "schema": "codex-usage-tracker-dashboard-v1",
@@ -291,6 +293,7 @@ def generate_usage_dashboard(
         "limit": None if limit <= 0 else limit,
         "since": since,
         "privacy_mode": privacy_mode,
+        "include_archived": include_archived,
     }
 
 

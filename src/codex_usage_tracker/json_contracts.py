@@ -162,6 +162,7 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "limit": (int, NoneType),
             "since": (str, NoneType),
             "privacy_mode": str,
+            "include_archived": bool,
         }
     },
     "codex-usage-tracker-open-dashboard-v1": {
@@ -173,6 +174,7 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "since": (str, NoneType),
             "refresh": (dict, NoneType),
             "privacy_mode": str,
+            "include_archived": bool,
         }
     },
     "codex-usage-tracker-serve-dashboard-v1": {
@@ -185,6 +187,7 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "context_api": str,
             "refresh_before_start": bool,
             "privacy_mode": str,
+            "include_archived": bool,
         }
     },
     "codex-usage-tracker-pricing-coverage-v1": {

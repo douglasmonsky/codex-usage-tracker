@@ -373,6 +373,11 @@ def _add_dashboard_parsers(
     dashboard.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
     dashboard.add_argument("--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all")
     dashboard.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    dashboard.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived session rows already present in the SQLite index.",
+    )
     dashboard.add_argument("--open", action="store_true")
     dashboard.add_argument("--json", action="store_true", dest="as_json")
 
@@ -382,6 +387,11 @@ def _add_dashboard_parsers(
     open_dashboard.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
     open_dashboard.add_argument("--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all")
     open_dashboard.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    open_dashboard.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived sessions when refreshing and in the generated dashboard.",
+    )
     open_dashboard.add_argument(
         "--refresh",
         action="store_true",
@@ -923,6 +933,7 @@ def _run_dashboard(args: argparse.Namespace) -> int:
         thresholds_path=args.thresholds,
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
+        include_archived=args.include_archived,
     )
     if args.as_json:
         _print_json(
@@ -934,6 +945,7 @@ def _run_dashboard(args: argparse.Namespace) -> int:
                 "limit": None if args.limit <= 0 else args.limit,
                 "since": args.since,
                 "privacy_mode": args.privacy_mode,
+                "include_archived": args.include_archived,
             }
         )
     else:
@@ -947,7 +959,11 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
     refresh_payload = None
     if args.refresh:
         refresh_payload = refresh_result_payload(
-            refresh_usage_index(codex_home=args.codex_home, db_path=args.db),
+            refresh_usage_index(
+                codex_home=args.codex_home,
+                db_path=args.db,
+                include_archived=args.include_archived,
+            ),
             schema="codex-usage-tracker-refresh-v1",
         )
     output = generate_dashboard(
@@ -961,6 +977,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
         thresholds_path=args.thresholds,
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
+        include_archived=args.include_archived,
     )
     if args.as_json:
         _print_json(
@@ -973,6 +990,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
                 "since": args.since,
                 "refresh": refresh_payload,
                 "privacy_mode": args.privacy_mode,
+                "include_archived": args.include_archived,
             }
         )
     else:
@@ -994,6 +1012,7 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
                 "context_api": "disabled" if args.no_context_api else args.context_api,
                 "refresh_before_start": args.refresh,
                 "privacy_mode": args.privacy_mode,
+                "include_archived": args.include_archived,
             }
         )
     if args.refresh:
