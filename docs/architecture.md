@@ -1,23 +1,24 @@
 # Architecture
 
-Codex Usage Tracker is a local sidecar app. It reads aggregate token counters from Codex session JSONL logs, stores only aggregate metrics in SQLite, and exposes those metrics through CLI commands, MCP tools, CSV export, and a static or localhost-served dashboard.
+Codex Usage Tracker is a local sidecar app evolving toward AI Usage Tracker. It reads aggregate token counters from supported local coding-agent JSONL logs, stores only aggregate metrics in SQLite, and exposes those metrics through CLI commands, MCP tools, CSV export, and a static or localhost-served dashboard. The package, CLI, and Codex plugin names remain `codex-usage-tracker` for compatibility.
 
 ## Boundaries
 
-- `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It must not persist prompts, assistant text, tool output, or transcript snippets.
+- `parser.py` is the compatibility facade for source adapters that convert local JSONL events into aggregate `UsageEvent` records. It must not persist prompts, assistant text, tool output, or transcript snippets.
+- `adapters/base.py` defines the source-adapter protocol. `adapters/codex_jsonl.py` owns Codex JSONL parsing from `~/.codex/sessions`, and `adapters/claude_code_jsonl.py` owns Claude Code JSONL parsing from `~/.claude/projects`. New sources should add an adapter instead of adding provider-specific logic to store, reports, dashboard, or MCP code.
 - `schema.py` owns persisted `usage_events` columns. Add columns there before changing SQLite migrations or export behavior.
 - `store.py` owns SQLite setup, refresh, rebuild, and query access. Keep filesystem scanning, database writes, SQL prefilters, counts, limits, and offsets here.
 - `reports.py` is the application-service layer for summaries, expensive-call reports, recommendations, pricing coverage, and filtered query payloads. CLI and MCP should call this layer instead of duplicating report assembly.
 - `api_payloads.py` owns stable JSON payload helpers shared by CLI and MCP. `json_contracts.py` owns the lightweight contract checks for schema-versioned CLI/MCP payloads. Add payload builders and contract entries together when both surfaces need the same shape.
-- `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows.
+- `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows. Codex credit estimates are Codex/OpenAI-only; non-Codex rows should be marked not applicable rather than mapped through Codex rate cards.
 - `projects.py`, `threads.py`, and `recommendations.py` annotate aggregate rows with project identity, thread relationships, and actionable signals. Project privacy redaction also belongs in `projects.py` so CLI, MCP, dashboard, CSV, and support-bundle surfaces share the same behavior.
 - `dashboard.py` builds aggregate-only dashboard payloads and writes HTML/assets. `server.py` adds localhost refresh and explicit lazy context loading.
 - `plugin_data/dashboard/dashboard_format.js` owns dashboard formatting primitives. `dashboard_data.js` owns row payload and thread relationship helpers. `dashboard_state.js` owns URL, CSV, and download state utilities. `dashboard.js` owns DOM rendering, event handling, API refresh, and detail-panel behavior.
 - `context.py` is the only normal path that reads raw log context, and it does so only for one selected record on demand with redaction and size limits.
 - `plugin_installer.py`, `.mcp.json`, `skills/`, and `scripts/check_release.py` own install and packaging behavior.
 - `scripts/benchmark_synthetic_history.py` owns generated large-history query timing for 10k, 100k, and 500k aggregate-row fixtures. It must stay synthetic-only and must not read real Codex logs.
-- `skills/codex-usage-tracker/` is the source copy for the operational Codex skill. It should stay focused on setup, dashboard, export, doctor, and direct MCP workflows.
-- `skills/codex-usage-api/` is the source copy for the conversational analyst skill. It should stay focused on aggregate-only API routing, interpretation, and limitations.
+- `skills/codex-usage-tracker/` is the source copy for the operational Codex skill. It should stay focused on setup, source refresh, dashboard, export, doctor, and direct MCP workflows.
+- `skills/codex-usage-api/` is the source copy for the conversational analyst skill. It should stay focused on aggregate-only API routing, source filters, interpretation, and limitations.
 - `src/codex_usage_tracker/plugin_data/skills/` contains the wheel-bundled copies installed by `codex-usage-tracker install-plugin`.
 
 ## Extension Rules

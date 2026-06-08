@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-This repo builds a local Codex plugin and dashboard that track aggregate token usage from Codex session logs.
+This repo builds a local Codex plugin and dashboard that track aggregate token usage from local AI coding-agent logs. It is evolving toward AI Usage Tracker while keeping the `codex-usage-tracker` package, CLI, and Codex plugin names for compatibility. Codex is the default source; Claude Code is supported as an opt-in source.
 
 ## Tech Stack
 
@@ -14,10 +14,11 @@ This repo builds a local Codex plugin and dashboard that track aggregate token u
 ## Repo Layout
 
 - `src/codex_usage_tracker/` - parser, SQLite store, reports, dashboard, CLI, and MCP server.
+- `src/codex_usage_tracker/adapters/` - source-specific log adapters for Codex JSONL and Claude Code JSONL.
 - `src/codex_usage_tracker/context.py` - on-demand raw-context reader for one selected usage record.
 - `src/codex_usage_tracker/reports.py` - shared application/report services used by CLI and MCP wrappers.
 - `src/codex_usage_tracker/api_payloads.py` - shared stable JSON payload builders for CLI and MCP surfaces.
-- `src/codex_usage_tracker/schema.py` - single source of truth for persisted usage-event columns.
+- `src/codex_usage_tracker/schema.py` - single source of truth for persisted usage-event columns, including source provider/app/format identity.
 - `src/codex_usage_tracker/threads.py` - thread attachment inference used by dashboard payload generation.
 - `src/codex_usage_tracker/pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `costing.py` - pricing config, source parsing, estimate policy, and cost calculations behind the `pricing.py` facade.
 - `src/codex_usage_tracker/allowance.py` - Codex credit-rate and optional local allowance-window helpers.
@@ -95,18 +96,18 @@ codex-usage-tracker expensive --limit 5
 
 ## Privacy Rules
 
-- Never commit real Codex session logs.
+- Never commit real Codex, Claude Code, or other coding-agent session logs.
 - Never store raw prompts, assistant text, tool outputs, pasted secrets, or message snippets.
 - Raw context may be read only on demand from original local JSONL files; never persist it to SQLite, CSV, generated HTML, fixtures based on real logs, or commits.
 - Store only selected aggregate session metadata for subagents, including parent thread labels; do not persist raw session instructions or source JSON.
 - Keep fixture data synthetic.
 - Keep local SQLite databases, CSV exports, HTML dashboards, caches, and virtualenvs out of git.
 - Do not hard-code real current USD model pricing in source; refresh the local config from OpenAI's published pricing docs or use manual local overrides. Internal Codex model estimates must be explicitly marked as estimates with source and rationale metadata.
-- Source-stamped Codex credit rate-card snapshots must include source/date metadata, confidence labels, and local override support. Manually copied allowance remaining values stay in local config only.
+- Source-stamped Codex credit rate-card snapshots must include source/date metadata, confidence labels, and local override support. Codex credits apply only to Codex/OpenAI rows; non-Codex rows must stay clearly marked as not applicable. Manually copied allowance remaining values stay in local config only.
 
 ## Definition Of Done
 
-- Parser handles synthetic session logs without reading raw message content.
+- Parser adapters handle synthetic session logs without reading raw message content.
 - SQLite refresh is idempotent.
 - MCP tool functions return concise aggregate data.
 - Dashboard is generated from aggregate-only JSON.
@@ -115,8 +116,9 @@ codex-usage-tracker expensive --limit 5
 - `python -m codex_usage_tracker` and `codex-usage-tracker --version` both work.
 - Wheel and source distribution builds include plugin assets and the Codex skill.
 - `scripts/check_release.py --dist` passes before any public release.
-- Pricing coverage clearly separates configured, estimated, and unpriced model usage.
-- Codex credit coverage clearly separates exact rate-card matches, inferred aliases, and missing credit rates.
+- Pricing coverage clearly separates configured, estimated, and unpriced model usage across sources.
+- Codex credit coverage clearly separates exact rate-card matches, inferred aliases, missing credit rates, and non-Codex rows where credits are not applicable.
+- Source filters and source grouping work consistently across CLI, MCP, dashboard, CSV, and JSON payloads.
 - Dashboard Calls and Threads views share filters, totals, and aggregate-only hover details.
 - Dashboard usage docs are updated when the visible dashboard workflow changes, and screenshots must be generated from synthetic data only.
 - Dashboard aggregate refresh is localhost-only and keeps generated HTML aggregate-only; context loading is lazy, localhost-only, explicit, redacted, and not embedded in the static HTML payload.

@@ -1,12 +1,12 @@
 # Privacy Guide
 
-Codex Usage Tracker is designed around aggregate local analysis. It reads Codex logs already written on your machine and avoids storing raw transcript content.
+Codex Usage Tracker is designed around aggregate local analysis for local AI coding-agent usage. It reads supported source logs already written on your machine and avoids storing raw transcript content.
 
 ## Stored In SQLite
 
 The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by default and contains aggregate metrics:
 
-- session id, thread name, cwd, source file, turn id, timestamps
+- session id, thread name, cwd, source file, source provider/app/format, turn id, timestamps
 - model, reasoning effort, context window
 - token counts and derived efficiency ratios
 - subagent source, role, nickname, parent session id, and parent thread name when present
@@ -24,6 +24,8 @@ The parser intentionally does not store:
 - raw logged context
 
 Those fields are not written to SQLite, CSV exports, generated dashboard HTML, or synthetic screenshots.
+
+Claude Code support follows the same aggregate-only rule. The indexer reads local JSONL files under `~/.claude/projects`, extracts usage counters and metadata-like identifiers, and does not persist prompts, assistant text, or tool output.
 
 ## On-Demand Context
 
@@ -73,9 +75,9 @@ Dashboard payloads and support bundles include the active mode so screenshots an
 
 ## Costs, Credits, And Allowance
 
-Cost estimates are calculated only from aggregate token fields and your local pricing config. They are omitted when no matching model price is configured. Pricing refreshes pull only OpenAI's public pricing markdown and do not send local usage data anywhere.
+Cost estimates are calculated only from aggregate token fields and your local pricing config. They are omitted when no matching model price is configured. Pricing refreshes pull only OpenAI's public pricing markdown and do not send local usage data anywhere. Non-OpenAI model prices can be added through local manual pricing overrides.
 
-Codex credit estimates are calculated only from aggregate token fields and bundled or locally configured rate-card values.
+Codex credit estimates are calculated only from aggregate token fields and bundled or locally configured rate-card values. They apply only to Codex/OpenAI rows; Claude Code and other non-Codex rows are marked `not_applicable` for credit confidence.
 
 The optional allowance config is local and stores only the remaining percentages, reset times, or credit totals you manually enter.
 

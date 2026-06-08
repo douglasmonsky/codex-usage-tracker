@@ -77,6 +77,22 @@ def test_cli_json_schema_doc_lists_tracked_contracts() -> None:
     assert not missing
 
 
+def test_docs_mention_claude_source_support() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    docs = "\n".join(
+        [
+            (repo_root / "README.md").read_text(encoding="utf-8"),
+            (repo_root / "docs" / "cli-reference.md").read_text(encoding="utf-8"),
+            (repo_root / "docs" / "privacy.md").read_text(encoding="utf-8"),
+        ]
+    )
+
+    assert "AI Usage Tracker" in docs
+    assert "--source claude-code" in docs
+    assert "~/.claude/projects" in docs
+    assert "Claude Code" in docs
+
+
 def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(

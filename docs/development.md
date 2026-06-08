@@ -14,7 +14,8 @@ codex-usage-tracker install-plugin --python .venv/bin/python
 
 ## Repo Layout
 
-- `src/codex_usage_tracker/`: parser, SQLite store, reports, dashboard, CLI, and MCP server.
+- `src/codex_usage_tracker/`: parser facade, SQLite store, reports, dashboard, CLI, and MCP server.
+- `src/codex_usage_tracker/adapters/`: source-specific JSONL adapters for Codex and Claude Code.
 - `src/codex_usage_tracker/plugin_data/`: plugin assets, dashboard assets, bundled docs, rate cards, and packaged skill files.
 - `skills/`: source skill files copied into package data.
 - `docs/`: user documentation, architecture notes, JSON schemas, and synthetic screenshots.
@@ -51,6 +52,8 @@ codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
 codex-usage-tracker update-rate-card --output /tmp/codex-usage-rate-card.json
 codex-usage-tracker doctor
 codex-usage-tracker doctor --suggest-repair
+codex-usage-tracker refresh --source all --json
+codex-usage-tracker refresh --source claude-code --claude-home /tmp/empty-claude-home --json
 codex-usage-tracker dashboard --output /tmp/codex-usage-dashboard.html
 codex-usage-tracker serve-dashboard --help
 codex-usage-tracker init-allowance --output /tmp/codex-usage-allowance.json
@@ -59,6 +62,7 @@ codex-usage-tracker init-thresholds --output /tmp/codex-usage-thresholds.json
 codex-usage-tracker init-projects --output /tmp/codex-usage-projects.json
 codex-usage-tracker support-bundle --output /tmp/codex-usage-support.json
 codex-usage-tracker pricing-coverage
+codex-usage-tracker summary --group-by source_app
 codex-usage-tracker summary --preset by-subagent-role
 codex-usage-tracker expensive --limit 5
 ```
@@ -77,7 +81,7 @@ Use the synthetic benchmark script when changing SQLite filters, dashboard paylo
 python scripts/benchmark_synthetic_history.py --rows 10000 100000 500000
 ```
 
-The script creates synthetic aggregate-only SQLite databases and times common filtered dashboard query paths. It does not read real Codex logs.
+The script creates synthetic aggregate-only SQLite databases and times common filtered dashboard query paths. It does not read real Codex, Claude Code, or other coding-agent logs.
 
 ## Release Checklist
 

@@ -8,21 +8,25 @@ Refresh the local aggregate index:
 
 ```bash
 codex-usage-tracker refresh
+codex-usage-tracker refresh --source all
+codex-usage-tracker refresh --source claude-code --claude-home ~/.claude
 ```
 
 Rebuild the local aggregate index after parser or schema changes:
 
 ```bash
 codex-usage-tracker rebuild-index
+codex-usage-tracker rebuild-index --source all
 ```
 
-`rebuild-index` clears only the local aggregate `usage_events` and refresh metadata tables, then rescans local Codex logs.
+`refresh` defaults to the Codex source at `~/.codex/sessions`. `--source claude-code` scans Claude Code JSONL files under `~/.claude/projects`, and `--source all` scans every supported source. `rebuild-index` clears only the local aggregate `usage_events` and refresh metadata tables, then rescans the selected local sources.
 
-Inspect one Codex log without writing to SQLite:
+Inspect one source log without writing to SQLite:
 
 ```bash
 codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl
 codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl --json
+codex-usage-tracker inspect-log ~/.claude/projects/<project>/<session>.jsonl --json
 ```
 
 `inspect-log` reports parser adapter, aggregate token-count events, session ids, models, and parser diagnostics. It does not store raw prompts, assistant messages, tool output, or transcript snippets.
@@ -47,6 +51,8 @@ The localhost `/api/usage` endpoint accepts `limit` and `offset` query parameter
 
 ```bash
 codex-usage-tracker summary --group-by model
+codex-usage-tracker summary --group-by source_app
+codex-usage-tracker summary --group-by source_provider
 codex-usage-tracker summary --group-by project
 codex-usage-tracker summary --group-by project_tag
 codex-usage-tracker summary --group-by thread --limit 20
@@ -65,6 +71,7 @@ Useful investigations:
 - Sort by `Cache` to find threads that are mostly new context versus mostly reused context.
 - Sort by `Context` to find calls approaching the model context window.
 - Filter by model or reasoning effort to compare usage patterns across model choices.
+- Group by `source_app` or `source_provider` to compare Codex and Claude Code aggregate usage.
 - Use `summary --preset by-subagent-role` to see whether delegated work is driving a large share of usage.
 - Use `expensive --limit 10` for a quick list of the highest-cost calls.
 - Use `recommendations --json` for ranked action rows and thread rollups with severity score, primary recommendation, and secondary signals.
@@ -73,13 +80,16 @@ Useful investigations:
 
 ```bash
 codex-usage-tracker query --since 2026-06-01 --project codex-usage-tracker --min-credits 1
+codex-usage-tracker query --source-app claude-code
+codex-usage-tracker query --source-provider anthropic --limit 0
 codex-usage-tracker query --pricing-status unpriced --limit 0
 codex-usage-tracker recommendations --since 2026-06-01 --json
+codex-usage-tracker recommendations --source-app codex --json
 codex-usage-tracker summary --group-by model --json
 codex-usage-tracker session <session-id> --json
 ```
 
-Use `query` when you need stable JSON for automation across project, model, effort, thread, pricing, token, or credit filters.
+Use `query` when you need stable JSON for automation across source provider/app, project, model, effort, thread, pricing, token, or credit filters.
 
 ## Session And Context
 
@@ -120,6 +130,8 @@ codex-usage-tracker init-projects
 ```
 
 Local config files live under `~/.codex-usage-tracker/` and are never committed by this project.
+
+`update-pricing` still refreshes OpenAI-published text-token pricing only. Configure non-OpenAI model prices manually in `~/.codex-usage-tracker/pricing.json` when you want USD estimates for Claude Code rows.
 
 ## Privacy Mode
 

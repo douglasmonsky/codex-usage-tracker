@@ -5,7 +5,7 @@
   <a href="docs/assets/dashboard-calls.png"><img src="docs/assets/dashboard-calls-preview.png?v=usage-dashboard" alt="Codex Usage Tracker dashboard showing filters, usage totals, call rows, and call details." width="49%"></a>
 </p>
 
-Local-first dashboard, Codex plugin, and companion skill for understanding where your Codex tokens and usage credits are going.
+Local-first dashboard, Codex plugin, and companion skill for understanding where your AI coding-agent tokens and usage credits are going.
 
 [![CI](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml)
 ![Python 3.10-3.13](https://img.shields.io/badge/python-3.10--3.13-blue)
@@ -13,9 +13,9 @@ Local-first dashboard, Codex plugin, and companion skill for understanding where
 
 > **Unofficial project:** Codex Usage Tracker is an independent open-source project. It is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI; this project only reads local log files from your machine.
 
-Codex Usage Tracker reads the JSONL logs already written by Codex, indexes aggregate usage counters into SQLite, and gives you a dashboard, CLI, and MCP tools for investigating real usage patterns. It keeps prompts, assistant messages, tool output, pasted secrets, and raw transcript content out of SQLite, CSV exports, and generated dashboard HTML.
+Codex Usage Tracker is evolving into AI Usage Tracker. It reads JSONL logs already written by supported local coding agents, indexes aggregate usage counters into SQLite, and gives you a dashboard, CLI, and MCP tools for investigating real usage patterns. It keeps prompts, assistant messages, tool output, pasted secrets, and raw transcript content out of SQLite, CSV exports, and generated dashboard HTML.
 
-Built for developers using Codex locally who want to know which threads, models, subagents, and long chats are driving usage without uploading logs anywhere.
+Built for developers using local coding agents who want to know which sources, threads, models, subagents, and long chats are driving usage without uploading logs anywhere.
 
 After install, you get a localhost dashboard, a local SQLite aggregate index, CLI reports, MCP tools, and a companion Codex skill for asking questions like "what drove my usage this week?"
 
@@ -53,6 +53,15 @@ More install paths: [Install Guide](docs/install.md).
 
 The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and localhost server are Python-based and CI-tested on Ubuntu for Python 3.10-3.13. It defaults to `~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data; pass `--codex-home` or `--db` when your local layout differs. Codex plugin discovery depends on Codex's local plugin directories on your machine, so run `codex-usage-tracker doctor` after setup if plugin registration does not appear in Codex.
 
+## Source Support
+
+The tracker is evolving into AI Usage Tracker. The current CLI and package name remain `codex-usage-tracker` for compatibility.
+
+- Codex: default source, read from `~/.codex/sessions`.
+- Claude Code: opt-in source, read from `~/.claude/projects`.
+
+Use `codex-usage-tracker refresh --source all` to index both supported sources, or `codex-usage-tracker refresh --source claude-code --claude-home ~/.claude` for Claude Code only. Query and summary views can filter or group by `source_provider` and `source_app`.
+
 ## Dashboard Preview
 
 The Calls table is the main investigation surface: filter, sort, inspect details, and export the exact aggregate rows you are looking at.
@@ -73,15 +82,15 @@ Insights still gives a fast triage layer for costly threads, low cache reuse, co
 
 The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt and chat previews are synthetic. They do not contain prompts from local logs, assistant responses, tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
 
-If this helped you track Codex usage, starring the repo helps others find it. Issues and feature requests are welcome.
+If this helped you track local AI usage, starring the repo helps others find it. Issues and feature requests are welcome.
 
 ## Why This Exists
 
-Codex can quietly burn usage through long-running chats, low cache reuse, reasoning spikes, spawned subagents, and auto-review passes. This tool turns the aggregate counters already on your machine into an insight-first dashboard and scriptable local APIs.
+Local coding agents can quietly burn usage through long-running chats, low cache reuse, reasoning spikes, spawned subagents, and auto-review passes. This tool turns the aggregate counters already on your machine into an insight-first dashboard and scriptable local APIs.
 
 Use it to answer:
 
-- Which threads used the most tokens, estimated cost, or Codex credits?
+- Which sources, threads, or models used the most tokens, estimated cost, or Codex credits?
 - Are long chats bloating because of accumulated context?
 - Which model or reasoning effort is driving usage?
 - Are subagents or auto-review passes adding unexpected cost?
@@ -109,6 +118,7 @@ Practical takeaway: when old context is no longer useful, starting a fresh threa
 codex-usage-tracker update-pricing
 codex-usage-tracker update-rate-card
 codex-usage-tracker setup
+codex-usage-tracker refresh --source all
 codex-usage-tracker serve-dashboard --open
 ```
 
@@ -135,6 +145,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
 - `Insights`, `Calls`, and `Threads` dashboard views.
+- Source-aware provider/app filters for Codex and Claude Code rows.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
@@ -145,6 +156,8 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 ```bash
 codex-usage-tracker summary --preset last-7-days
+codex-usage-tracker summary --group-by source_app
+codex-usage-tracker query --source-app claude-code
 codex-usage-tracker query --since 2026-06-01 --min-credits 1
 codex-usage-tracker session <session-id>
 codex-usage-tracker export --output usage.csv
@@ -156,7 +169,7 @@ Full command reference: [CLI Reference](docs/cli-reference.md).
 
 ## Data Privacy
 
-The tracker stores aggregate metrics only: session ids, timestamps, local source paths, thread labels, cwd/project metadata, model labels, reasoning effort, token counters, pricing/credit annotations, and derived ratios.
+The tracker stores aggregate metrics only: session ids, timestamps, local source paths, source provider/app/format labels, thread labels, cwd/project metadata, model labels, reasoning effort, token counters, pricing/credit annotations, and derived ratios.
 
 It does **not** store prompts, assistant messages, tool output, pasted secrets, raw transcript snippets, or raw context in SQLite, CSV exports, generated dashboard HTML, or synthetic screenshots.
 
@@ -203,10 +216,10 @@ This is optional. The normal shell install above is the fastest trusted path for
 ## Current Limitations
 
 - This is a sidecar dashboard and plugin, not a native Codex chat overlay.
-- Token counts come from Codex's logged counters; the tracker does not re-tokenize prompts.
-- Pricing and Codex credit estimates depend on local rate data and confidence labels.
+- Token counts come from each supported source's logged counters; the tracker does not re-tokenize prompts.
+- Pricing and Codex credit estimates depend on local rate data and confidence labels. Codex credits apply only to Codex/OpenAI rows; Claude Code rows are marked not applicable for Codex credit calculations.
 - Remaining 5-hour and weekly allowance is not read automatically from the logged-in account.
-- Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
+- Local logs may not include usage from other agentic surfaces that share the same allowance.
 - Parent-child thread relationships are only as good as the metadata Codex logs; inferred auto-review attachments are labeled as inferred.
 
 ## Roadmap
@@ -216,6 +229,7 @@ This is optional. The normal shell install above is the fastest trusted path for
 - Clarify top-card token accounting by showing output tokens and reasoning output as a subset instead of implying all token cards add together.
 - Add more insight presets for cache drift, context growth, subagent-heavy workflows, and pricing/credit confidence gaps.
 - Keep the allowance provider boundary ready for an official usage or allowance API if one becomes available.
+- Add more source adapters, including Gemini CLI and opencode/deepseek, behind the same aggregate-only source contract.
 - Continue reducing setup friction for pipx installs, local plugin discovery, and Codex companion skill usage.
 
 ## Development

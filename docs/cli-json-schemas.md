@@ -1,6 +1,6 @@
 # CLI and MCP JSON Schemas
 
-Codex Usage Tracker exposes aggregate-only JSON for automation through CLI `--json` flags and MCP tools. These payloads do not include prompts, assistant messages, tool output, or raw transcript snippets.
+Codex Usage Tracker exposes aggregate-only JSON for automation through CLI `--json` flags and MCP tools. The project is evolving toward AI Usage Tracker, so payloads include source provider/app fields while the schema ids keep the `codex-usage-tracker` prefix for compatibility. These payloads do not include prompts, assistant messages, tool output, or raw transcript snippets.
 
 ## Companion Skill Usage
 
@@ -9,14 +9,14 @@ The installed `codex-usage-api` skill is the recommended conversational entrypoi
 | Question | Preferred JSON surface |
 | --- | --- |
 | What used the most? | `most_expensive_usage_calls(response_format="json")`, then `usage_summary(group_by="thread", response_format="json")` |
-| Which project, thread, or model is driving usage? | `usage_summary(group_by="project" \| "thread" \| "model", response_format="json")` |
-| Why did usage spike? | `usage_query(...)` with `since`, `project`, `thread`, `model`, `effort`, `min_tokens`, or `min_credits` filters |
+| Which source, project, thread, or model is driving usage? | `usage_summary(group_by="source_app" \| "project" \| "thread" \| "model", response_format="json")` |
+| Why did usage spike? | `usage_query(...)` with `since`, `source_provider`, `source_app`, `project`, `thread`, `model`, `effort`, `min_tokens`, or `min_credits` filters |
 | What should I inspect next? | `usage_recommendations(response_format="json")` |
 | What is estimated or unpriced? | `usage_pricing_coverage(response_format="json")`, `usage_query(pricing_status="unpriced")`, or `usage_query(credit_confidence="estimated")` |
 | How does this affect my allowance? | `usage_query(...)` rows with `usage_credits`, `usage_credit_confidence`, and allowance annotations |
 | What happened in one session? | `session_usage(session_id=..., response_format="json")` |
 
-The skill should separate exact facts from estimates. Remaining allowance is not native account data; it is only copied local state from `~/.codex-usage-tracker/allowance.json` when configured.
+The skill should separate exact facts from estimates. Remaining allowance is not native account data; it is only copied local state from `~/.codex-usage-tracker/allowance.json` when configured. Codex credit fields apply only to Codex/OpenAI rows; Claude Code rows are returned with `usage_credit_confidence` set to `not_applicable`.
 
 Use the global `--privacy-mode redacted` or `--privacy-mode strict` option, or the MCP `privacy_mode` argument, when project metadata should be hidden from JSON answers. The CLI option goes before the subcommand.
 
@@ -73,6 +73,7 @@ Commands:
 
 ```bash
 codex-usage-tracker summary --group-by model --json
+codex-usage-tracker summary --group-by source_app --json
 codex-usage-tracker expensive --limit 10 --json
 ```
 
@@ -86,7 +87,7 @@ Schema: `codex-usage-tracker-summary-v1`
 ```json
 {
   "schema": "codex-usage-tracker-summary-v1",
-  "group_by": "model",
+  "group_by": "source_app",
   "is_expensive": false,
   "privacy_mode": "normal",
   "row_count": 1,
@@ -101,6 +102,7 @@ Schema: `codex-usage-tracker-summary-v1`
 Command:
 
 ```bash
+codex-usage-tracker query --since 2026-06-01 --source-app claude-code
 codex-usage-tracker query --since 2026-06-01 --project codex-usage-tracker --min-credits 1
 ```
 
@@ -119,11 +121,13 @@ Schema: `codex-usage-tracker-query-v1`
     "model": null,
     "effort": null,
     "thread": null,
-    "project": "codex-usage-tracker",
+    "project": null,
+    "source_provider": null,
+    "source_app": "claude-code",
     "pricing_status": null,
     "credit_confidence": null,
     "min_tokens": null,
-    "min_credits": 1.0,
+    "min_credits": null,
     "limit": 100,
     "privacy_mode": "normal"
   },
@@ -137,9 +141,10 @@ Schema: `codex-usage-tracker-query-v1`
 Supported filters:
 
 - `since`, `until`
+- `source_provider`, `source_app`
 - `project`, `model`, `effort`, `thread`
 - `pricing_status`: `priced`, `estimated`, `unpriced`
-- `credit_confidence`: `exact`, `estimated`, `unpriced`, `user_override`
+- `credit_confidence`: `exact`, `estimated`, `unpriced`, `user_override`, `not_applicable`
 - `min_tokens`, `min_credits`
 - `limit`; use `0` for all matched rows
 - `privacy_mode`: `normal`, `redacted`, or `strict`
@@ -151,7 +156,7 @@ Privacy mode affects returned metadata after matching rows. `redacted` hides raw
 Command:
 
 ```bash
-codex-usage-tracker recommendations --since 2026-06-01 --limit 10 --json
+codex-usage-tracker recommendations --since 2026-06-01 --source-app codex --limit 10 --json
 ```
 
 MCP:
@@ -170,6 +175,8 @@ Schema: `codex-usage-tracker-recommendations-v1`
     "effort": null,
     "thread": null,
     "project": null,
+    "source_provider": null,
+    "source_app": "codex",
     "min_score": null,
     "limit": 10,
     "privacy_mode": "normal"
