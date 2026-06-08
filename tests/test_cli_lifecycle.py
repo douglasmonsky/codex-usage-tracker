@@ -297,6 +297,28 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     assert "[redacted cwd:" in csv_path.read_text(encoding="utf-8")
 
 
+def test_refresh_cli_accepts_claude_source(tmp_path: Path) -> None:
+    claude_home = _make_claude_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    result = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "refresh",
+        "--source",
+        "claude-code",
+        "--claude-home",
+        str(claude_home),
+        "--json",
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["schema"] == "codex-usage-tracker-refresh-v1"
+    assert payload["parsed_events"] == 2
+    assert payload["source_results"]["claude-code"]["source_provider"] == "anthropic"
+
+
 def _assert_contract(payload: object) -> None:
     assert validate_json_payload_contract(payload) == []
 
@@ -342,6 +364,55 @@ def _make_codex_home(tmp_path: Path) -> Path:
         ],
     )
     return codex_home
+
+
+def _make_claude_home(tmp_path: Path) -> Path:
+    claude_home = tmp_path / ".claude"
+    log_path = claude_home / "projects" / "project-a" / "session.jsonl"
+    rows = [
+        _claude_assistant_entry(
+            "msg-001",
+            input_tokens=100,
+            cache_creation_input_tokens=20,
+            cache_read_input_tokens=50,
+            output_tokens=30,
+        ),
+        _claude_assistant_entry(
+            "msg-002",
+            input_tokens=40,
+            cache_read_input_tokens=10,
+            output_tokens=60,
+        ),
+    ]
+    _write_jsonl(log_path, rows)
+    return claude_home
+
+
+def _claude_assistant_entry(
+    message_id: str,
+    *,
+    input_tokens: int,
+    output_tokens: int,
+    cache_creation_input_tokens: int = 0,
+    cache_read_input_tokens: int = 0,
+) -> dict[str, object]:
+    return {
+        "type": "assistant",
+        "timestamp": "2026-06-08T12:00:00.000Z",
+        "sessionId": "claude-session-1",
+        "cwd": "/tmp/claude-project",
+        "message": {
+            "id": message_id,
+            "role": "assistant",
+            "model": "claude-sonnet-4-20250514",
+            "usage": {
+                "input_tokens": input_tokens,
+                "cache_creation_input_tokens": cache_creation_input_tokens,
+                "cache_read_input_tokens": cache_read_input_tokens,
+                "output_tokens": output_tokens,
+            },
+        },
+    }
 
 
 def _token_event(cumulative_total: int, last_total: int) -> dict[str, object]:

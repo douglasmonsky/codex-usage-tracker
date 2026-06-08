@@ -16,10 +16,12 @@ from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from codex_usage_tracker.adapters.base import SOURCE_CODEX
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_CLAUDE_HOME,
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
     DEFAULT_PRICING_PATH,
@@ -43,6 +45,8 @@ def serve_dashboard(
     context_chars: int = DEFAULT_CONTEXT_CHARS,
     open_browser: bool = False,
     codex_home: Path = DEFAULT_CODEX_HOME,
+    claude_home: Path = DEFAULT_CLAUDE_HOME,
+    source: str = SOURCE_CODEX,
     include_archived: bool = False,
     context_api: str = "explicit",
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
@@ -83,6 +87,8 @@ def serve_dashboard(
         limit=limit,
         since=since,
         codex_home=codex_home,
+        claude_home=claude_home,
+        source=source,
         include_archived=include_archived,
         dashboard_name=output.name,
         context_chars=context_chars,
@@ -124,6 +130,8 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         api_token: str,
         context_api_enabled: bool,
         refresh_lock: threading.Lock,
+        claude_home: Path = DEFAULT_CLAUDE_HOME,
+        source: str = SOURCE_CODEX,
         privacy_mode: str = "normal",
         rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
         **kwargs: object,
@@ -138,6 +146,8 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._limit = limit
         self._since = since
         self._codex_home = codex_home
+        self._claude_home = claude_home
+        self._source = source
         self._include_archived = include_archived
         self._dashboard_name = dashboard_name
         self._context_chars = context_chars
@@ -240,8 +250,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 with self._refresh_lock:
                     result = refresh_usage_index(
                         codex_home=self._codex_home,
+                        claude_home=self._claude_home,
                         db_path=self._db_path,
                         include_archived=include_archived,
+                        source=self._source,
                     )
                 refresh_result = {
                     "scanned_files": result.scanned_files,
@@ -250,6 +262,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                     "inserted_or_updated_events": result.inserted_or_updated_events,
                     "db_path": result.db_path,
                     "parser_diagnostics": result.parser_diagnostics,
+                    "source_results": result.source_results,
                     "include_archived": include_archived,
                 }
             payload = dashboard_payload(

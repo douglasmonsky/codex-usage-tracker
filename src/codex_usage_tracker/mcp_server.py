@@ -20,6 +20,7 @@ from codex_usage_tracker.formatting import (
 )
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_CLAUDE_HOME,
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
@@ -52,13 +53,18 @@ mcp = FastMCP("codex-usage-tracker")
 
 
 @mcp.tool()
-def refresh_usage_index(include_archived: bool = False) -> dict[str, Any]:
-    """Scan local Codex logs and upsert aggregate usage metrics into SQLite."""
+def refresh_usage_index(
+    source: str = "codex",
+    include_archived: bool = False,
+) -> dict[str, Any]:
+    """Scan local usage logs and upsert aggregate usage metrics into SQLite."""
 
     result = refresh_index(
         codex_home=DEFAULT_CODEX_HOME,
+        claude_home=DEFAULT_CLAUDE_HOME,
         db_path=DEFAULT_DB_PATH,
         include_archived=include_archived,
+        source=source,
     )
     return refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1")
 

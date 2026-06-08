@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker import __version__
+from codex_usage_tracker.adapters.base import SOURCE_CHOICES, SOURCE_CODEX
 from codex_usage_tracker.allowance import (
     update_rate_card,
     write_allowance_from_text,
@@ -33,6 +34,7 @@ from codex_usage_tracker.formatting import (
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_CLAUDE_HOME,
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
@@ -244,7 +246,7 @@ def _add_uninstall_plugin_parser(
 
 def _add_refresh_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     refresh = subparsers.add_parser("refresh", help="Scan Codex logs into SQLite")
-    refresh.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    _add_source_refresh_args(refresh)
     refresh.add_argument("--include-archived", action="store_true")
     refresh.add_argument("--json", action="store_true", dest="as_json")
 
@@ -266,7 +268,7 @@ def _add_rebuild_index_parser(
         "rebuild-index",
         help="Clear aggregate rows and rescan local Codex logs",
     )
-    rebuild.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    _add_source_refresh_args(rebuild)
     rebuild.add_argument("--include-archived", action="store_true")
     rebuild.add_argument("--json", action="store_true", dest="as_json")
 
@@ -398,6 +400,7 @@ def _add_dashboard_parsers(
         help="Refresh the SQLite index before generating the dashboard",
     )
     open_dashboard.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    _add_source_refresh_args(open_dashboard, include_codex_home=False)
     open_dashboard.add_argument("--json", action="store_true", dest="as_json")
 
     serve = subparsers.add_parser(
@@ -428,6 +431,7 @@ def _add_dashboard_parsers(
         help="Refresh the SQLite index before generating and serving the dashboard",
     )
     serve.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    _add_source_refresh_args(serve, include_codex_home=False)
     serve.add_argument("--include-archived", action="store_true")
     serve.add_argument(
         "--json",
@@ -435,6 +439,17 @@ def _add_dashboard_parsers(
         dest="as_json",
         help="Accepted for API consistency; serve-dashboard still runs as a long-lived server.",
     )
+
+
+def _add_source_refresh_args(
+    parser: argparse.ArgumentParser,
+    *,
+    include_codex_home: bool = True,
+) -> None:
+    if include_codex_home:
+        parser.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default=SOURCE_CODEX)
+    parser.add_argument("--claude-home", type=Path, default=DEFAULT_CLAUDE_HOME)
 
 
 def _add_expensive_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -744,8 +759,10 @@ def _run_uninstall_plugin(args: argparse.Namespace) -> int:
 def _run_refresh(args: argparse.Namespace) -> int:
     result = refresh_usage_index(
         codex_home=args.codex_home,
+        claude_home=args.claude_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        source=args.source,
     )
     if args.as_json:
         _print_json(refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1"))
@@ -791,8 +808,10 @@ def _run_inspect_log(args: argparse.Namespace) -> int:
 def _run_rebuild_index(args: argparse.Namespace) -> int:
     result = rebuild_usage_index(
         codex_home=args.codex_home,
+        claude_home=args.claude_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        source=args.source,
     )
     if args.as_json:
         _print_json(refresh_result_payload(result, schema="codex-usage-tracker-rebuild-index-v1"))
@@ -961,8 +980,10 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
         refresh_payload = refresh_result_payload(
             refresh_usage_index(
                 codex_home=args.codex_home,
+                claude_home=args.claude_home,
                 db_path=args.db,
                 include_archived=args.include_archived,
+                source=args.source,
             ),
             schema="codex-usage-tracker-refresh-v1",
         )
@@ -1018,8 +1039,10 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
     if args.refresh:
         refresh_usage_index(
             codex_home=args.codex_home,
+            claude_home=args.claude_home,
             db_path=args.db,
             include_archived=args.include_archived,
+            source=args.source,
         )
     serve_dashboard(
         db_path=args.db,
@@ -1034,6 +1057,8 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
         context_chars=args.context_chars,
         open_browser=args.open,
         codex_home=args.codex_home,
+        claude_home=args.claude_home,
+        source=args.source,
         include_archived=args.include_archived,
         context_api="disabled" if args.no_context_api else args.context_api,
         thresholds_path=args.thresholds,
