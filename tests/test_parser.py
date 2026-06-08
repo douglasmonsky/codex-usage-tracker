@@ -89,6 +89,11 @@ def test_parser_skips_missing_info_and_duplicate_snapshots(tmp_path: Path) -> No
 
     assert [event.cumulative_total_tokens for event in events] == [100, 150, 210]
     assert [event.total_tokens for event in events] == [100, 50, 60]
+    assert events[0].source_provider == "openai"
+    assert events[0].source_app == "codex"
+    assert events[0].source_format == "codex-jsonl-v1"
+    assert events[0].provider_request_id is None
+    assert events[0].cache_creation_input_tokens == 0
     assert events[0].turn_id == "turn-a"
     assert events[-1].turn_id == "turn-b"
     assert events[-1].effort == "high"
@@ -150,6 +155,8 @@ def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: P
     payload = inspect_log(log_path)
 
     assert payload["adapter"] == "codex-jsonl-v1"
+    assert payload["source_provider"] == "openai"
+    assert payload["source_app"] == "codex"
     assert payload["file_session_id"] is None
     assert payload["event_count"] == 1
     assert payload["session_ids"] == [SESSION_ID]
