@@ -81,6 +81,7 @@
       cache: 'asc',
       effort: 'asc',
       model: 'asc',
+      source: 'asc',
       thread: 'asc',
     }[key] || 'desc';
   }

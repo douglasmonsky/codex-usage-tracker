@@ -499,6 +499,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "last call" in dashboard_js.lower()
     assert "session cumulative" in dashboard_js.lower()
     assert "Estimated Cost" in dashboard
+    assert "AI Usage Dashboard" in dashboard
+    assert "source_provider" in dashboard
+    assert "source_app" in dashboard
+    assert "Source" in dashboard
+    assert "providerEl" in dashboard_js
+    assert "appEl" in dashboard_js
+    assert "source_app" in csv_text
+    assert "cache_creation_input_tokens" in csv_text
     assert "estimated_cost_usd" in dashboard
     assert "pricing_snapshot" in dashboard
     assert "rates_fingerprint" in dashboard

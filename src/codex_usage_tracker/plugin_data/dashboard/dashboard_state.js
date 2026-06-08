@@ -5,6 +5,8 @@
     'view',
     'q',
     'model',
+    'provider',
+    'app',
     'effort',
     'confidence',
     'pricing',
@@ -32,6 +34,8 @@
       view: ALLOWED_VIEWS.has(params.get('view')) ? params.get('view') : '',
       search: clean(params.get('q')),
       model: clean(params.get('model')),
+      sourceProvider: clean(params.get('provider')),
+      sourceApp: clean(params.get('app')),
       effort: clean(params.get('effort')),
       confidence: clean(params.get('confidence') || params.get('pricing')),
       datePreset: clean(params.get('date')),
@@ -55,6 +59,8 @@
     set(params, 'view', ALLOWED_VIEWS.has(state.view) && state.view !== 'insights' ? state.view : '');
     set(params, 'q', state.search);
     set(params, 'model', state.model);
+    set(params, 'provider', state.sourceProvider);
+    set(params, 'app', state.sourceApp);
     set(params, 'effort', state.effort);
     set(params, 'confidence', state.confidence);
     set(params, 'date', state.datePreset && state.datePreset !== 'all' ? state.datePreset : '');

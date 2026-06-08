@@ -360,7 +360,7 @@ def _html(
         else ""
     )
     return (
-        template.replace("__TITLE__", html.escape("Codex Usage Dashboard"))
+        template.replace("__TITLE__", html.escape("AI Usage Dashboard"))
         .replace("__STYLESHEET_HREF__", html.escape(stylesheet_href, quote=True))
         .replace("__GUIDE_LINK__", guide_link)
         .replace("__PAYLOAD__", payload)

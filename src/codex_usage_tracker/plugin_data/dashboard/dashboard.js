@@ -29,6 +29,7 @@
       isAutoReview,
       isSubagent,
       sourceLabel,
+      usageSourceLabel,
       resolvedParentThreadName,
       resolvedParentSessionUpdatedAt,
       resolveThreadAttachment,
@@ -63,6 +64,8 @@
     const detailEl = document.getElementById('detail');
     const searchEl = document.getElementById('search');
     const modelEl = document.getElementById('model');
+    const providerEl = document.getElementById('sourceProvider');
+    const appEl = document.getElementById('sourceApp');
     const effortEl = document.getElementById('effort');
     const pricingStatusEl = document.getElementById('pricingStatus');
     const datePresetEl = document.getElementById('datePreset');
@@ -351,12 +354,16 @@
     }
     function rebuildFilterOptions() {
       rebuildSelectOptions(modelEl, data.map(row => row.model), 'All models');
+      rebuildSelectOptions(providerEl, data.map(row => row.source_provider), 'All providers');
+      rebuildSelectOptions(appEl, data.map(row => row.source_app), 'All apps');
       rebuildSelectOptions(effortEl, data.map(row => row.effort), 'All efforts');
     }
     function applyInitialState() {
       if (!initialState) return;
       searchEl.value = initialState.search || '';
       if (optionValueExists(modelEl, initialState.model)) modelEl.value = initialState.model;
+      if (optionValueExists(providerEl, initialState.sourceProvider)) providerEl.value = initialState.sourceProvider;
+      if (optionValueExists(appEl, initialState.sourceApp)) appEl.value = initialState.sourceApp;
       if (optionValueExists(effortEl, initialState.effort)) effortEl.value = initialState.effort;
       if (optionValueExists(pricingStatusEl, initialState.confidence)) pricingStatusEl.value = initialState.confidence;
       const initialDatePreset = allowedDatePresets.has(initialState.datePreset) ? initialState.datePreset : '';
@@ -564,6 +571,8 @@
     function filtered(dateRange = currentDateRange()) {
       const term = searchEl.value.trim().toLowerCase();
       const model = modelEl.value;
+      const sourceProvider = providerEl.value;
+      const sourceApp = appEl.value;
       const effort = effortEl.value;
       const pricingStatus = pricingStatusEl.value;
       const rows = data.filter(row => {
@@ -575,6 +584,9 @@
           Array.isArray(row.project_tags) ? row.project_tags.join(' ') : '',
           row.git_branch,
           row.git_remote_label,
+          row.source_provider,
+          row.source_app,
+          row.source_format,
           row.model,
           row.effort,
           row.session_id,
@@ -596,7 +608,14 @@
           || (pricingStatus === 'credit-override' && row.usage_credit_confidence === 'user_override')
           || (pricingStatus === 'credit-missing' && row.usage_credit_confidence === 'unpriced')
           || (pricingStatus === 'credit-not-applicable' && row.usage_credit_confidence === 'not_applicable');
-        return (!term || haystack.includes(term)) && (!model || row.model === model) && (!effort || row.effort === effort) && statusMatches && rowMatchesDateRange(row, dateRange) && presetMatchesRow(row);
+        return (!term || haystack.includes(term))
+          && (!model || row.model === model)
+          && (!sourceProvider || row.source_provider === sourceProvider)
+          && (!sourceApp || row.source_app === sourceApp)
+          && (!effort || row.effort === effort)
+          && statusMatches
+          && rowMatchesDateRange(row, dateRange)
+          && presetMatchesRow(row);
       });
       rows.sort(compareCalls);
       return rows;
@@ -606,6 +625,8 @@
         view: activeView,
         search: searchEl.value.trim(),
         model: modelEl.value,
+        sourceProvider: providerEl.value,
+        sourceApp: appEl.value,
         effort: effortEl.value,
         confidence: pricingStatusEl.value,
         datePreset: datePresetEl.value,
@@ -649,10 +670,15 @@
         { label: 'timestamp', field: 'event_timestamp' },
         { label: 'thread', field: row => rowThreadLabel(row) },
         { label: 'project', field: 'project_name' },
+        { label: 'source_provider', field: 'source_provider' },
+        { label: 'source_app', field: 'source_app' },
+        { label: 'source_format', field: 'source_format' },
+        { label: 'provider_request_id', field: 'provider_request_id' },
         { label: 'model', field: 'model' },
         { label: 'effort', field: 'effort' },
         { label: 'total_tokens', field: 'total_tokens' },
         { label: 'input_tokens', field: 'input_tokens' },
+        { label: 'cache_creation_input_tokens', field: 'cache_creation_input_tokens' },
         { label: 'cached_input_tokens', field: 'cached_input_tokens' },
         { label: 'uncached_input_tokens', field: 'uncached_input_tokens' },
         { label: 'output_tokens', field: 'output_tokens' },
@@ -747,6 +773,7 @@
       if (key === 'effort') return textValue(row.effort);
       if (key === 'model') return textValue(row.model);
       if (key === 'signals') return Array.isArray(row.efficiency_flags) ? row.efficiency_flags.length : 0;
+      if (key === 'source') return textValue(usageSourceLabel(row));
       if (key === 'thread') return textValue(rowThreadLabel(row));
       if (key === 'time') return String(row.event_timestamp || '');
       if (key === 'usage') return Number(row.usage_credits || 0);
@@ -777,6 +804,7 @@
       if (key === 'effort') return textValue(group.effortSummary);
       if (key === 'model') return textValue(group.modelSummary);
       if (key === 'signals') return group.signalCount;
+      if (key === 'source') return textValue(group.sourceSummary);
       if (key === 'thread') return textValue(group.label);
       if (key === 'time') return String(group.latestActivity || '');
       if (key === 'usage') return group.usageCredits;
@@ -952,6 +980,7 @@
         const attachedCount = calls.filter(row => rowAttachment(row).relation !== 'direct' && rowAttachment(row).relation !== 'session').length;
         const modelSummary = threadModelSummary(calls);
         const effortSummary = compactListSummary(calls.map(row => row.effort), 'efforts');
+        const sourceSummary = compactListSummary(calls.map(usageSourceLabel), 'sources');
         const parentThreadLabel = dominantParentThread(calls, group.label);
         const lifecycle = threadLifecycle(calls);
         return {
@@ -963,6 +992,7 @@
           parentThreadLabel,
           modelSummary,
           effortSummary,
+          sourceSummary,
           totalTokens,
           estimatedCost,
           usageCredits,
@@ -1204,6 +1234,7 @@
         tr.innerHTML = `
           <td>${renderTimeCell(row.event_timestamp)}</td>
           <td title="${escapeHtml(short(row.session_id))}">${escapeHtml(truncate(rowThreadLabel(row)))}</td>
+          <td><span class="pill" data-full-label="${escapeHtml(short(usageSourceLabel(row)))}">${escapeHtml(short(usageSourceLabel(row)))}</span></td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
           <td>${escapeHtml(short(row.effort))}</td>
           <td class="num">${number.format(row.total_tokens || 0)}</td>
@@ -1233,7 +1264,7 @@
         showDetail(page.items[0]);
       }
       if (!rows.length) {
-        rowsEl.innerHTML = '<tr><td class="empty-state" colspan="8">No calls match the current filters.</td></tr>';
+        rowsEl.innerHTML = '<tr><td class="empty-state" colspan="9">No calls match the current filters.</td></tr>';
       }
     }
     function renderThreads(rows, mode = 'threads') {
@@ -1281,10 +1312,11 @@
               </span>
             </div>
           </td>
+          <td><span class="pill" data-full-label="${escapeHtml(short(group.sourceSummary))}">${escapeHtml(short(group.sourceSummary))}</span></td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(group.modelSummary))}">${escapeHtml(short(group.modelSummary))}</span></td>
           <td>${escapeHtml(truncate(group.effortSummary, 28))}</td>
           <td class="num">${number.format(group.totalTokens)}</td>
-          <td class="num">${costUsageCell(pricingConfigured ? money(group.estimatedCost) : 'Not configured', group.usageCredits)}</td>
+          <td class="num">${costUsageCell(pricingConfigured ? money(group.estimatedCost) : 'Not configured', { usage_credits: group.usageCredits })}</td>
           <td class="num">${pct(group.cacheRatio)}</td>
           <td class="num">${number.format(group.signalCount)}</td>
         `;
@@ -1310,7 +1342,7 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = '<tr><td class="empty-state" colspan="8">No threads match the current filters.</td></tr>';
+        rowsEl.innerHTML = '<tr><td class="empty-state" colspan="9">No threads match the current filters.</td></tr>';
       }
       if (!initialDetailApplied && selectedThreadKey) {
         const selected = groups.find(group => group.key === selectedThreadKey);
@@ -1343,7 +1375,7 @@
         `;
       }).join('');
       tr.innerHTML = `
-        <td class="child-cell" colspan="8">
+        <td class="child-cell" colspan="9">
           <table class="thread-call-table" aria-label="${escapeHtml(group.label)} calls">
             <thead><tr><th>Time</th><th>Model</th><th>Effort</th><th>Source</th><th class="num">Last Call</th><th class="num">Cost</th><th class="num">Cache</th><th>Signals</th></tr></thead>
             <tbody>${calls}</tbody>
@@ -1521,6 +1553,7 @@
               ['Project tags', Array.isArray(row.project_tags) && row.project_tags.length ? row.project_tags.join(', ') : 'None'],
               ['Thread attachment', attachment.relation],
               ['Source', sourceLabel(row)],
+              ['Usage source', usageSourceLabel(row)],
               ['Parent thread', resolvedParentThreadName(row) || 'None'],
               ['Timestamp', formatTimestamp(row.event_timestamp)],
             ])}
@@ -1531,6 +1564,7 @@
               ['Last call total', number.format(row.total_tokens || 0)],
               ['Last call input', number.format(row.input_tokens || 0)],
               ['Cached input', number.format(row.cached_input_tokens || 0)],
+              ['Cache creation input', number.format(row.cache_creation_input_tokens || 0)],
               ['Output', number.format(row.output_tokens || 0)],
               ['Reasoning output', number.format(row.reasoning_output_tokens || 0)],
               ['Session cumulative', number.format(row.cumulative_total_tokens || 0)],
@@ -1551,6 +1585,10 @@
               ['Subagent type', row.subagent_type || 'None'],
               ['Agent role', row.agent_role || 'None'],
               ['Agent nickname', row.agent_nickname || 'None'],
+              ['Source app', row.source_app || 'Unknown'],
+              ['Source provider', row.source_provider || 'Unknown'],
+              ['Source format', row.source_format || 'Unknown'],
+              ['Provider request id', row.provider_request_id || 'None'],
               ['Credit note', row.usage_credit_note || 'None'],
               ['Parent session', row.parent_session_id || 'None'],
             ['Parent updated', resolvedParentSessionUpdatedAt(row) ? formatTimestamp(resolvedParentSessionUpdatedAt(row)) : 'None'],
@@ -1618,6 +1656,7 @@
             ['Total tokens', number.format(group.totalTokens)],
             ['Efficiency signals', number.format(group.signalCount)],
             ['Model mix', group.modelSummary],
+            ['Source mix', group.sourceSummary],
             ['Reasoning mix', group.effortSummary],
           ])}
         </div>
@@ -1813,7 +1852,7 @@
       currentPage = 1;
       render();
     }));
-    [searchEl, modelEl, effortEl, pricingStatusEl].forEach(el => el.addEventListener('input', () => {
+    [searchEl, modelEl, providerEl, appEl, effortEl, pricingStatusEl].forEach(el => el.addEventListener('input', () => {
       currentPage = 1;
       render();
     }));

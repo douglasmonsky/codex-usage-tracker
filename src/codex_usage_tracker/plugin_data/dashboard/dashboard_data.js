@@ -68,6 +68,10 @@
     return 'User';
   }
 
+  function usageSourceLabel(row) {
+    return [row.source_app, row.source_provider].filter(Boolean).join(' / ') || 'unknown source';
+  }
+
   function resolvedParentThreadName(row) {
     return row.resolved_parent_thread_name || row.parent_thread_name || '';
   }
@@ -147,6 +151,7 @@
     isAutoReview,
     isSubagent,
     sourceLabel,
+    usageSourceLabel,
     resolvedParentThreadName,
     resolvedParentSessionUpdatedAt,
     resolveThreadAttachment,
