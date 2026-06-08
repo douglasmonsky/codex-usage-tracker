@@ -875,6 +875,11 @@
       cursor: pointer;
     }
     .context-button:hover { background: #eff6ff; }
+    .context-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+      background: var(--panel);
+    }
     .context-button.secondary { color: var(--muted); }
     .context-result {
       margin-top: 12px;

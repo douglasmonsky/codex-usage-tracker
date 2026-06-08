@@ -35,6 +35,8 @@ codex-usage-tracker --privacy-mode strict dashboard --open
 
 Redacted mode hides raw cwd/source paths, hides Git remote labels, and hashes unnamed projects while preserving configured aliases. Strict mode also hides project-relative cwd, Git branch, and tags. The dashboard header shows the active metadata mode.
 
+`serve-dashboard` refreshes active-session logs before opening by default. Use `--no-refresh` only when you intentionally want a cached view of the existing local index.
+
 The server keeps the HTML aggregate-only and enables two live features:
 
 - `Refresh` rescans local Codex logs and updates the dashboard rows.
@@ -43,12 +45,12 @@ The server keeps the HTML aggregate-only and enables two live features:
 For a static snapshot, use:
 
 ```bash
-codex-usage-tracker dashboard --open
+codex-usage-tracker open-dashboard
 ```
 
-Static file mode can still filter, sort, and inspect aggregate call fields. It cannot refresh from logs or load raw context until you open the dashboard through `serve-dashboard`.
+Static file mode can still filter, sort, and inspect aggregate call fields. `open-dashboard` refreshes before writing the snapshot unless you pass `--no-refresh`. Static files cannot refresh from logs or load raw context after opening; use `serve-dashboard` when you want those live controls.
 
-The localhost server uses a random per-server token for refresh and context API calls, validates loopback `Host` and `Origin` headers, and can run as aggregate-only with `codex-usage-tracker serve-dashboard --no-context-api`.
+The localhost server uses a random per-server token for refresh and context API calls, validates loopback `Host` and `Origin` headers, and can start with context loading off through `codex-usage-tracker serve-dashboard --no-context-api`.
 
 ## Insights View
 
@@ -141,12 +143,12 @@ When served from localhost, the details panel includes `Load context` and `Inclu
 - `Load context` fetches a size-limited, redacted context excerpt for only that call.
 - `Include tool output` repeats the request with tool output included, still redacted and capped.
 - Raw context is not written to SQLite, CSV, or the generated dashboard HTML.
-- If the server was started with `--no-context-api`, the context buttons stay disabled and the dashboard remains aggregate-only.
+- If the server was started with `--no-context-api`, context loading starts off. Use `Enable context loading` in the details panel when you want to allow explicit row actions without restarting the dashboard server.
 
 ## Practical Workflow
 
 1. Start with `serve-dashboard --open`.
-2. Use `Refresh` after a Codex run finishes, or leave `Live` enabled while you work.
+2. Leave `Live` enabled while you work, or click `Refresh` after a Codex run finishes.
 3. Leave `History` on `Active sessions only` for current work. Switch to `All history` when you intentionally want archived sessions included in the live refresh.
 4. Optionally run `parse-allowance` with copied values from Codex Usage or `/status`, or initialize and edit `allowance.json` manually.
 5. Start in `Insights` view and review the highest-severity attention cards.

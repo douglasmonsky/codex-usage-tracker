@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Make `open-dashboard` and `serve-dashboard` refresh active-session logs by default, with `--no-refresh` as the explicit cached-index mode.
+- Add a token-protected dashboard action for enabling context loading without restarting a localhost server that started with context loading off.
+
 ## 0.3.1 - 2026-06-08
 
 - Fix packaged Codex Usage Tracker skills so dashboard-open requests start the live localhost dashboard instead of a static snapshot.

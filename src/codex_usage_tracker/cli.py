@@ -394,8 +394,12 @@ def _add_dashboard_parsers(
     )
     open_dashboard.add_argument(
         "--refresh",
-        action="store_true",
-        help="Refresh the SQLite index before generating the dashboard",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Refresh the SQLite index before generating the dashboard. "
+            "This is the default; use --no-refresh to open the cached index only."
+        ),
     )
     open_dashboard.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     open_dashboard.add_argument("--json", action="store_true", dest="as_json")
@@ -419,13 +423,17 @@ def _add_dashboard_parsers(
     serve.add_argument(
         "--no-context-api",
         action="store_true",
-        help="Serve aggregate dashboard refresh only and disable /api/context.",
+        help="Start with dashboard context loading off; it can be enabled from the local dashboard.",
     )
     serve.add_argument("--open", action="store_true")
     serve.add_argument(
         "--refresh",
-        action="store_true",
-        help="Refresh the SQLite index before generating and serving the dashboard",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Refresh the SQLite index before generating and serving the dashboard. "
+            "This is the default; use --no-refresh to serve the cached index only."
+        ),
     )
     serve.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     serve.add_argument("--include-archived", action="store_true")

@@ -29,11 +29,13 @@ Those fields are not written to SQLite, CSV exports, generated dashboard HTML, o
 
 `usage_call_context`, `codex-usage-tracker context`, and the `serve-dashboard` context endpoint read a single source JSONL file only when explicitly requested. Returned context is redacted for common secret patterns and capped in size.
 
-The context API can be disabled:
+Dashboard context loading can start off and then be enabled from the local details panel without restarting:
 
 ```bash
 codex-usage-tracker serve-dashboard --no-context-api --open
 ```
+
+The enable action is still token-protected, localhost-only, and does not load any context until you click a row-level context action.
 
 For MCP users, `usage_call_context` is additionally disabled unless the MCP server process has this environment variable:
 

@@ -833,42 +833,83 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
     assert "Database error" in context_error["payload"]["error"]
 
 
-def test_dashboard_server_can_disable_context_api(tmp_path: Path) -> None:
-    from codex_usage_tracker.server import _UsageDashboardHandler
+def test_dashboard_server_can_enable_context_api_at_runtime(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _ContextApiState, _UsageDashboardHandler
+
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
+    context_api_state = _ContextApiState(False)
 
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
-        db_path=tmp_path / "usage.sqlite3",
+        db_path=db_path,
         pricing_path=tmp_path / "pricing.json",
         allowance_path=tmp_path / "allowance.json",
         thresholds_path=tmp_path / "thresholds.json",
         projects_path=tmp_path / "projects.json",
         limit=5000,
         since=None,
-        codex_home=tmp_path / ".codex",
+        codex_home=codex_home,
         include_archived=False,
         dashboard_name="dashboard.html",
         context_chars=2000,
         api_token="test-token",
-        context_api_enabled=False,
+        context_api_state=context_api_state,
         refresh_lock=threading.Lock(),
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        context_error = _http_error_json(
-            f"http://127.0.0.1:{server.server_port}/api/context?record_id=abc",
+        disabled_error = _http_error_json(
+            f"http://127.0.0.1:{server.server_port}/api/context?record_id={record_id}",
             headers={"X-Codex-Usage-Token": "test-token"},
         )
+        enable_without_token = _http_error_json(
+            f"http://127.0.0.1:{server.server_port}/api/context-settings?enabled=1"
+        )
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/api/context-settings?enabled=1",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            settings_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/api/usage?limit=1",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            usage_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/api/context?record_id={record_id}",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            context_payload = json.loads(response.read().decode("utf-8"))
     finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
 
-    assert context_error["status"] == 403
-    assert "disabled" in context_error["payload"]["error"]
+    assert disabled_error["status"] == 403
+    assert disabled_error["payload"]["context_api_enabled"] is False
+    assert disabled_error["payload"]["can_enable_context_api"] is True
+    assert enable_without_token["status"] == 403
+    assert settings_payload["schema"] == "codex-usage-tracker-context-settings-v1"
+    assert settings_payload["context_api_enabled"] is True
+    assert settings_payload["raw_context_persisted"] is False
+    assert usage_payload["context_api_enabled"] is True
+    assert context_payload["loaded_on_demand"] is True
+    assert context_payload["raw_context_persisted"] is False
 
 
 def test_dashboard_query_limit_zero_loads_all_rows(tmp_path: Path) -> None:

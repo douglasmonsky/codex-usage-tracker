@@ -26,6 +26,8 @@ Package naming: the public PyPI distribution is [`codex-usage-tracking`](https:/
 
 Restart Codex after plugin registration if you want Codex to discover the MCP tools in a fresh session. The localhost dashboard can run immediately.
 
+`serve-dashboard` and `open-dashboard` refresh active-session usage before opening by default. Add `--no-refresh` only when you intentionally want to inspect the cached local index without scanning logs first.
+
 ## Platform Support
 
 The CLI, SQLite index, dashboard generator, and localhost server are Python-based and are not macOS-only. CI runs the package on Ubuntu with Python 3.10, 3.11, 3.12, and 3.13.
@@ -107,8 +109,8 @@ codex-usage-tracker install-plugin --python .venv/bin/python --force
 Generate a static dashboard:
 
 ```bash
-codex-usage-tracker dashboard --open
 codex-usage-tracker open-dashboard
+codex-usage-tracker open-dashboard --no-refresh
 ```
 
 Serve the dashboard with live aggregate refresh and lazy context loading:
@@ -119,6 +121,9 @@ codex-usage-tracker serve-dashboard --no-context-api --open
 ```
 
 The server binds to localhost, requires a per-server token for refresh/context endpoints, and rejects non-loopback `Host` or cross-origin `Origin` headers.
+`--no-context-api` starts context loading off; the details panel can enable it later without restarting the server.
+
+`open-dashboard` and `serve-dashboard` refresh active-session logs before opening by default. The lower-level `dashboard --open` command writes from the current SQLite index when you need a fully static file-generation step.
 
 ## Setup Checks
 

@@ -32,6 +32,8 @@ codex-usage-tracker serve-dashboard --open
 
 Use your normal Python launcher for your platform: `python3` is common on macOS/Linux, and `py` may be preferable on Windows. On macOS with Homebrew, `brew install pipx` is also fine.
 
+`serve-dashboard` refreshes active-session usage before opening by default. Use `--no-refresh` only when you intentionally want to inspect the cached local index.
+
 Package naming: the PyPI distribution is `codex-usage-tracking`; the installed command is `codex-usage-tracker`; the GitHub repository remains `douglasmonsky/codex-usage-tracker`. The `codex-usage-tracker` PyPI name is not this project, so avoid similarly named packages when following these docs.
 
 Source install for development or branch testing:
@@ -157,7 +159,7 @@ codex-usage-tracker summary --preset last-7-days
 codex-usage-tracker query --since 2026-06-01 --min-credits 1
 codex-usage-tracker session <session-id>
 codex-usage-tracker export --output usage.csv
-codex-usage-tracker dashboard --open
+codex-usage-tracker open-dashboard
 codex-usage-tracker support-bundle --output ~/.codex-usage-tracker/support-bundle.json
 ```
 
@@ -169,7 +171,7 @@ The tracker stores aggregate metrics only: session ids, timestamps, local source
 
 It does **not** store prompts, assistant messages, tool output, pasted secrets, raw transcript snippets, or raw context in SQLite, CSV exports, generated dashboard HTML, or synthetic screenshots.
 
-On-demand context loading reads a single original local JSONL file only after an explicit row action, redacts common secret patterns, caps returned text size, and can be disabled with:
+On-demand context loading reads a single original local JSONL file only after an explicit row action, redacts common secret patterns, caps returned text size, and can start off until you enable it from the details panel:
 
 ```bash
 codex-usage-tracker serve-dashboard --no-context-api --open

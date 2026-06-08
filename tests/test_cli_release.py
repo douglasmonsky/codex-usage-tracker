@@ -91,13 +91,27 @@ def test_usage_skills_prefer_live_dashboard_for_open_requests() -> None:
 
     for skill_path in skill_paths:
         skill_text = skill_path.read_text(encoding="utf-8")
-        live_command_index = skill_text.find("serve-dashboard --refresh --context-api explicit --open")
-        static_command_index = skill_text.find("open-dashboard --refresh")
+        live_command_index = skill_text.find("serve-dashboard --context-api explicit --open")
+        static_command_index = skill_text.find("open-dashboard")
 
         assert live_command_index != -1, skill_path
         assert static_command_index != -1, skill_path
         assert live_command_index < static_command_index, skill_path
+        assert "Refresh is the default" in skill_text
         assert "Live requires `serve-dashboard`" in skill_text
+
+
+def test_dashboard_launch_commands_refresh_by_default() -> None:
+    from codex_usage_tracker.cli import _build_parser
+
+    parser = _build_parser()
+
+    assert parser.parse_args(["open-dashboard"]).refresh is True
+    assert parser.parse_args(["open-dashboard", "--refresh"]).refresh is True
+    assert parser.parse_args(["open-dashboard", "--no-refresh"]).refresh is False
+    assert parser.parse_args(["serve-dashboard"]).refresh is True
+    assert parser.parse_args(["serve-dashboard", "--refresh"]).refresh is True
+    assert parser.parse_args(["serve-dashboard", "--no-refresh"]).refresh is False
 
 
 def test_cli_json_schema_doc_lists_tracked_contracts() -> None:

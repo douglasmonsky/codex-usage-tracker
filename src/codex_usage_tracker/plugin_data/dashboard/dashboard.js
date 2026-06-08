@@ -1345,17 +1345,24 @@
     }
     function contextControls(row) {
       const fileMode = window.location.protocol === 'file:';
-      const apiUnavailable = !contextApiEnabled || !apiToken;
-      const disabled = fileMode || apiUnavailable ? ' disabled' : '';
+      const apiMissing = !apiToken;
+      const apiDisabled = !contextApiEnabled;
+      const disabled = fileMode || apiMissing || apiDisabled ? ' disabled' : '';
       const hint = fileMode
         ? 'Open this dashboard with codex-usage-tracker serve-dashboard to load raw context on demand.'
-        : apiUnavailable
-          ? 'Context loading is disabled for this dashboard server. Restart with --context-api explicit to enable explicit row actions.'
+        : apiMissing
+          ? 'Context loading requires a localhost dashboard API token.'
+          : apiDisabled
+            ? 'Context loading is off for this dashboard server. Enable it here to load local JSONL context on demand.'
           : 'Context is not embedded in this dashboard. Press a button to read this call from the local JSONL source.';
+      const enableButton = !fileMode && !apiMissing && apiDisabled
+        ? '<button class="context-button" type="button" data-context-enable>Enable context loading</button>'
+        : '';
       return `
         <div class="context-actions">
           <button class="context-button" type="button" data-context-load${disabled}>Load context</button>
           <button class="context-button secondary" type="button" data-context-load-output${disabled}>Include tool output</button>
+          ${enableButton}
         </div>
         <div id="contextResult" class="context-result"><p class="context-note">${escapeHtml(hint)}</p></div>
       `;
@@ -1363,8 +1370,38 @@
     function bindContextButtons(row) {
       const loadButton = detailEl.querySelector('[data-context-load]');
       const outputButton = detailEl.querySelector('[data-context-load-output]');
+      const enableButton = detailEl.querySelector('[data-context-enable]');
       if (loadButton) loadButton.addEventListener('click', () => loadContext(row, false));
       if (outputButton) outputButton.addEventListener('click', () => loadContext(row, true));
+      if (enableButton) enableButton.addEventListener('click', () => enableContextApi(row));
+    }
+    async function enableContextApi(row) {
+      const target = document.getElementById('contextResult');
+      if (!target) return;
+      target.innerHTML = '<p class="context-note">Enabling context loading for this dashboard server...</p>';
+      try {
+        const params = new URLSearchParams({ enabled: '1', _: String(Date.now()) });
+        const response = await fetch(`/api/context-settings?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken,
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          throw new Error(`Context settings returned HTTP ${response.status}.`);
+        }
+        const payload = await response.json();
+        if (payload.error) throw new Error(payload.error);
+        contextApiEnabled = Boolean(payload.context_api_enabled);
+        showDetail(row);
+        const nextTarget = document.getElementById('contextResult');
+        if (nextTarget && contextApiEnabled) {
+          nextTarget.innerHTML = '<p class="context-note">Context loading is enabled. Press Load context to read this call from the local JSONL source.</p>';
+        }
+      } catch (error) {
+        target.innerHTML = `<p class="context-note">${escapeHtml(error.message || String(error))}</p>`;
+      }
     }
     async function loadContext(row, includeToolOutput) {
       const target = document.getElementById('contextResult');

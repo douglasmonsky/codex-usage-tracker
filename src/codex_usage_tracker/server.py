@@ -30,6 +30,21 @@ from codex_usage_tracker.paths import (
 from codex_usage_tracker.store import refresh_usage_index
 
 
+class _ContextApiState:
+    def __init__(self, enabled: bool) -> None:
+        self._enabled = enabled
+        self._lock = threading.Lock()
+
+    @property
+    def enabled(self) -> bool:
+        with self._lock:
+            return self._enabled
+
+    def set_enabled(self, enabled: bool) -> None:
+        with self._lock:
+            self._enabled = enabled
+
+
 def serve_dashboard(
     db_path: Path,
     output_path: Path = DEFAULT_DASHBOARD_PATH,
@@ -55,6 +70,7 @@ def serve_dashboard(
     _validate_context_api_mode(context_api)
     api_token = secrets.token_urlsafe(32)
     context_api_enabled = context_api != "disabled"
+    context_api_state = _ContextApiState(context_api_enabled)
     output = generate_dashboard(
         db_path=db_path,
         output_path=output_path,
@@ -87,13 +103,17 @@ def serve_dashboard(
         dashboard_name=output.name,
         context_chars=context_chars,
         api_token=api_token,
-        context_api_enabled=context_api_enabled,
+        context_api_state=context_api_state,
         refresh_lock=threading.Lock(),
     )
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{_url_host(host)}:{port}/{output.name}"
     print(f"Serving Codex usage dashboard at {url}")
-    context_mode = "enabled for explicit row actions" if context_api_enabled else "disabled"
+    context_mode = (
+        "enabled for explicit row actions"
+        if context_api_enabled
+        else "disabled until enabled from the dashboard"
+    )
     print("Aggregate rows refresh through /api/usage with a per-server token.")
     print(f"Raw context API is {context_mode}; context is never embedded in the dashboard HTML.")
     if open_browser:
@@ -122,8 +142,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         dashboard_name: str,
         context_chars: int,
         api_token: str,
-        context_api_enabled: bool,
         refresh_lock: threading.Lock,
+        context_api_enabled: bool = False,
+        context_api_state: _ContextApiState | None = None,
         privacy_mode: str = "normal",
         rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
         **kwargs: object,
@@ -142,7 +163,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._dashboard_name = dashboard_name
         self._context_chars = context_chars
         self._api_token = api_token
-        self._context_api_enabled = context_api_enabled
+        self._context_api_state = context_api_state or _ContextApiState(context_api_enabled)
         self._refresh_lock = refresh_lock
         super().__init__(*args, **kwargs)
 
@@ -153,6 +174,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/context":
             self._handle_context(parsed.query)
+            return
+        if parsed.path == "/api/context-settings":
+            self._handle_context_settings(parsed.query)
             return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
@@ -179,10 +203,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
 
     def _handle_context(self, query: str) -> None:
         params = parse_qs(query)
-        if not self._context_api_enabled:
+        if not self._context_api_state.enabled:
             self._send_json(
                 HTTPStatus.FORBIDDEN,
-                {"error": "Context API is disabled for this dashboard server."},
+                {
+                    "error": "Context loading is disabled for this dashboard server.",
+                    "context_api_enabled": False,
+                    "can_enable_context_api": True,
+                },
             )
             return
         if not self._has_valid_api_token(params):
@@ -222,6 +250,22 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             )
             return
         self._send_json(HTTPStatus.OK, payload)
+
+    def _handle_context_settings(self, query: str) -> None:
+        params = parse_qs(query)
+        if not self._has_valid_api_token(params):
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token is required"})
+            return
+        enabled = _parse_bool(_first(params.get("enabled")), True)
+        self._context_api_state.set_enabled(enabled)
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "schema": "codex-usage-tracker-context-settings-v1",
+                "context_api_enabled": self._context_api_state.enabled,
+                "raw_context_persisted": False,
+            },
+        )
 
     def _handle_usage(self, query: str) -> None:
         params = parse_qs(query)
@@ -264,7 +308,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 privacy_mode=self._privacy_mode,
                 since=self._since,
                 api_token=self._api_token,
-                context_api_enabled=self._context_api_enabled,
+                context_api_enabled=self._context_api_state.enabled,
                 include_archived=include_archived,
             )
         except sqlite3.Error as exc:

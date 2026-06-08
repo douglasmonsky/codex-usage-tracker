@@ -33,11 +33,15 @@ codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl --
 codex-usage-tracker dashboard --open
 codex-usage-tracker dashboard --include-archived --open
 codex-usage-tracker open-dashboard
+codex-usage-tracker open-dashboard --no-refresh
 codex-usage-tracker serve-dashboard --open
+codex-usage-tracker serve-dashboard --no-refresh --open
 codex-usage-tracker serve-dashboard --no-context-api --open
 ```
 
-`serve-dashboard --context-api explicit` is the default and keeps context loading as an explicit per-row action. `serve-dashboard --no-context-api` or `--context-api disabled` serves live aggregate refresh while disabling `/api/context` entirely.
+`serve-dashboard --context-api explicit` is the default and keeps context loading as an explicit per-row action. `serve-dashboard --no-context-api` or `--context-api disabled` starts with context loading off; a token-protected button in the local details panel can enable it without restarting the server.
+
+`open-dashboard` and `serve-dashboard` refresh active-session logs before opening by default. Use `--no-refresh` only for an intentionally cached snapshot. The lower-level `dashboard` command writes from the current SQLite index and does not rescan logs.
 
 Dashboards default to active sessions only. Use `--include-archived` for an all-history static/opened dashboard, or switch the served dashboard's `History` control from `Active sessions only` to `All history` when you intentionally want archived logs scanned and included.
 
