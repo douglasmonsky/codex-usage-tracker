@@ -16,6 +16,7 @@ REFRESH_RESULT_FIELDS = {
     "inserted_or_updated_events": int,
     "db_path": str,
     "parser_diagnostics": dict,
+    "source_results": dict,
 }
 
 PLUGIN_INSTALL_FIELDS = {

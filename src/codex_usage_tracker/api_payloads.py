@@ -41,6 +41,7 @@ def refresh_result_payload(result: Any, *, schema: str) -> dict[str, Any]:
         "inserted_or_updated_events": result.inserted_or_updated_events,
         "db_path": result.db_path,
         "parser_diagnostics": result.parser_diagnostics,
+        "source_results": getattr(result, "source_results", {}),
     }
 
 

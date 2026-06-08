@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, suppress
@@ -10,15 +11,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.adapters.base import (
+    SOURCE_ALL,
+    SOURCE_CHOICES,
+    SOURCE_CLAUDE_CODE,
+    SOURCE_CODEX,
+    UsageSourceAdapter,
+)
+from codex_usage_tracker.adapters.claude_code_jsonl import (
+    ClaudeCodeJsonlAdapter,
+    compact_claude_diagnostics,
+)
+from codex_usage_tracker.adapters.codex_jsonl import CodexJsonlAdapter
 from codex_usage_tracker.models import RefreshResult, UsageEvent
 from codex_usage_tracker.parser import (
     PARSER_DIAGNOSTIC_KEYS,
     compact_parser_diagnostics,
-    find_session_logs,
-    load_session_index,
-    parse_usage_events,
 )
-from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
+from codex_usage_tracker.paths import DEFAULT_CLAUDE_HOME, DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
 from codex_usage_tracker.projects import apply_project_privacy_to_rows, validate_privacy_mode
 from codex_usage_tracker.schema import (
     USAGE_EVENT_COLUMN_NAMES,
@@ -43,35 +53,89 @@ _ARCHIVED_SOURCE_PATTERNS = (
 )
 
 
+def _adapters_for_source(source: str) -> list[tuple[str, UsageSourceAdapter]]:
+    if source not in SOURCE_CHOICES:
+        raise ValueError(f"source must be one of: {', '.join(SOURCE_CHOICES)}")
+    adapters: dict[str, UsageSourceAdapter] = {
+        SOURCE_CODEX: CodexJsonlAdapter(),
+        SOURCE_CLAUDE_CODE: ClaudeCodeJsonlAdapter(),
+    }
+    if source == SOURCE_ALL:
+        return [
+            (SOURCE_CODEX, adapters[SOURCE_CODEX]),
+            (SOURCE_CLAUDE_CODE, adapters[SOURCE_CLAUDE_CODE]),
+        ]
+    return [(source, adapters[source])]
+
+
+def _root_for_source(source_name: str, *, codex_home: Path, claude_home: Path) -> Path:
+    if source_name == SOURCE_CLAUDE_CODE:
+        return claude_home
+    return codex_home
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    *,
+    claude_home: Path = DEFAULT_CLAUDE_HOME,
+    source: str = SOURCE_CODEX,
 ) -> RefreshResult:
-    """Scan Codex logs and upsert aggregate usage events."""
+    """Scan local usage logs and upsert aggregate usage events."""
 
-    logs = find_session_logs(codex_home=codex_home, include_archived=include_archived)
-    session_index = load_session_index(codex_home)
-    stats: dict[str, int] = {}
-    events = parse_usage_events(logs, session_index=session_index, stats=stats)
-    inserted = upsert_usage_events(events, db_path=db_path)
-    skipped_events = stats.get("skipped_events", 0)
-    diagnostics = compact_parser_diagnostics(stats)
+    all_events: list[UsageEvent] = []
+    source_results: dict[str, dict[str, object]] = {}
+    combined_stats: dict[str, int] = {}
+    scanned_files = 0
+    skipped_events = 0
+    for source_name, adapter in _adapters_for_source(source):
+        root = _root_for_source(source_name, codex_home=codex_home, claude_home=claude_home)
+        logs = adapter.discover_logs(root, include_archived=include_archived)
+        session_index = adapter.load_session_index(root)
+        stats: dict[str, int] = {}
+        events: list[UsageEvent] = []
+        for log_path in logs:
+            events.extend(adapter.parse_file(log_path, session_index=session_index, stats=stats))
+        diagnostics = (
+            compact_claude_diagnostics(stats)
+            if source_name == SOURCE_CLAUDE_CODE
+            else compact_parser_diagnostics(stats)
+        )
+        source_results[source_name] = {
+            "source_provider": adapter.source_provider,
+            "source_app": adapter.source_app,
+            "source_format": adapter.source_format,
+            "scanned_files": len(logs),
+            "parsed_events": len(events),
+            "skipped_events": int(stats.get("skipped_events", 0)),
+            "parser_diagnostics": diagnostics,
+        }
+        scanned_files += len(logs)
+        skipped_events += int(stats.get("skipped_events", 0))
+        for key, value in diagnostics.items():
+            combined_stats[key] = combined_stats.get(key, 0) + int(value)
+        all_events.extend(events)
+    inserted = upsert_usage_events(all_events, db_path=db_path)
+    diagnostics = compact_parser_diagnostics(combined_stats)
     record_refresh_metadata(
         db_path=db_path,
-        scanned_files=len(logs),
-        parsed_events=len(events),
+        source=source,
+        source_results=source_results,
+        scanned_files=scanned_files,
+        parsed_events=len(all_events),
         skipped_events=skipped_events,
         inserted_or_updated_events=inserted,
         parser_diagnostics=diagnostics,
     )
     return RefreshResult(
-        scanned_files=len(logs),
-        parsed_events=len(events),
+        scanned_files=scanned_files,
+        parsed_events=len(all_events),
         inserted_or_updated_events=inserted,
         db_path=str(db_path),
         skipped_events=skipped_events,
         parser_diagnostics=diagnostics,
+        source_results=source_results,
     )
 
 
@@ -79,8 +143,11 @@ def rebuild_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    *,
+    claude_home: Path = DEFAULT_CLAUDE_HOME,
+    source: str = SOURCE_CODEX,
 ) -> RefreshResult:
-    """Clear aggregate rows and rescan local Codex logs."""
+    """Clear aggregate rows and rescan local usage logs."""
 
     with connect(db_path) as conn:
         init_db(conn)
@@ -90,6 +157,8 @@ def rebuild_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
+        claude_home=claude_home,
+        source=source,
     )
 
 
@@ -235,6 +304,8 @@ def record_refresh_metadata(
     parsed_events: int,
     skipped_events: int,
     inserted_or_updated_events: int,
+    source: str = SOURCE_CODEX,
+    source_results: dict[str, dict[str, object]] | None = None,
     parser_diagnostics: dict[str, int] | None = None,
 ) -> None:
     """Record the latest refresh counters in refresh_meta."""
@@ -246,6 +317,8 @@ def record_refresh_metadata(
         "skipped_events": str(skipped_events),
         "inserted_or_updated_events": str(inserted_or_updated_events),
         "parser_adapter": "codex-jsonl-v1",
+        "source": source,
+        "source_results": json.dumps(source_results or {}, sort_keys=True),
         "schema_version": str(SCHEMA_VERSION),
         "usage_events_schema_checksum": USAGE_EVENT_SCHEMA_CHECKSUM,
     }

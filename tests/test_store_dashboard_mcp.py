@@ -90,6 +90,32 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert [row["version"] for row in state["migrations"]] == [1, 2, 3]
 
 
+def test_refresh_all_indexes_codex_and_claude_sources(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    claude_home = _make_claude_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    result = refresh_usage_index(
+        codex_home=codex_home,
+        claude_home=claude_home,
+        db_path=db_path,
+        source="all",
+    )
+    second = refresh_usage_index(
+        codex_home=codex_home,
+        claude_home=claude_home,
+        db_path=db_path,
+        source="all",
+    )
+    rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=True)
+
+    assert result.source_results["codex"]["parsed_events"] == 4
+    assert result.source_results["claude-code"]["parsed_events"] == 2
+    assert result.parsed_events == 6
+    assert second.inserted_or_updated_events == 6
+    assert {row["source_app"] for row in rows} == {"codex", "claude-code"}
+
+
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -1281,6 +1307,50 @@ def _make_codex_home(tmp_path: Path) -> Path:
         ],
     )
     return codex_home
+
+
+def _make_claude_home(tmp_path: Path) -> Path:
+    claude_home = tmp_path / ".claude"
+    log_path = claude_home / "projects" / "project-a" / "session.jsonl"
+    log_path.parent.mkdir(parents=True)
+    rows = [
+        {
+            "type": "assistant",
+            "timestamp": "2026-06-08T12:00:00.000Z",
+            "sessionId": "claude-session-1",
+            "cwd": "/tmp/claude-project",
+            "message": {
+                "id": "msg-001",
+                "role": "assistant",
+                "model": "claude-sonnet-4-20250514",
+                "usage": {
+                    "input_tokens": 100,
+                    "cache_creation_input_tokens": 20,
+                    "cache_read_input_tokens": 50,
+                    "output_tokens": 30,
+                },
+                "content": [{"type": "text", "text": "SECRET CLAUDE TEXT"}],
+            },
+        },
+        {
+            "type": "assistant",
+            "timestamp": "2026-06-08T12:05:00.000Z",
+            "sessionId": "claude-session-1",
+            "cwd": "/tmp/claude-project",
+            "message": {
+                "id": "msg-002",
+                "role": "assistant",
+                "model": "claude-sonnet-4-20250514",
+                "usage": {
+                    "input_tokens": 40,
+                    "cache_read_input_tokens": 10,
+                    "output_tokens": 60,
+                },
+            },
+        },
+    ]
+    log_path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    return claude_home
 
 
 def _write_archived_log(codex_home: Path) -> Path:

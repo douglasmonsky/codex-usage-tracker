@@ -95,3 +95,4 @@ class RefreshResult:
     db_path: str
     skipped_events: int = 0
     parser_diagnostics: dict[str, int] = field(default_factory=dict)
+    source_results: dict[str, dict[str, object]] = field(default_factory=dict)
