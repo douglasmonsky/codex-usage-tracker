@@ -299,6 +299,7 @@ def _add_summary_parser(subparsers: argparse._SubParsersAction[argparse.Argument
         help="Convenience preset for common summaries",
     )
     summary.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    _add_source_filter_args(summary)
     summary.add_argument("--limit", type=int, default=20)
     summary.add_argument("--json", action="store_true", dest="as_json")
 
@@ -314,6 +315,7 @@ def _add_query_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     query.add_argument("--effort")
     query.add_argument("--thread")
     query.add_argument("--project")
+    _add_source_filter_args(query)
     query.add_argument("--pricing-status", choices=QUERY_PRICING_STATUS_CHOICES)
     query.add_argument("--credit-confidence", choices=QUERY_CREDIT_CONFIDENCE_CHOICES)
     query.add_argument("--min-tokens", type=int)
@@ -340,6 +342,7 @@ def _add_recommendations_parser(
     recommendations.add_argument("--effort")
     recommendations.add_argument("--thread")
     recommendations.add_argument("--project")
+    _add_source_filter_args(recommendations)
     recommendations.add_argument("--min-score", type=float)
     recommendations.add_argument("--limit", type=int, default=20, help="Maximum rows to return; use 0 for all")
     recommendations.add_argument("--json", action="store_true", dest="as_json")
@@ -452,10 +455,16 @@ def _add_source_refresh_args(
     parser.add_argument("--claude-home", type=Path, default=DEFAULT_CLAUDE_HOME)
 
 
+def _add_source_filter_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--source-provider")
+    parser.add_argument("--source-app")
+
+
 def _add_expensive_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     expensive = subparsers.add_parser("expensive", help="Show largest last-call usage rows")
     expensive.add_argument("--limit", type=int, default=20)
     expensive.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    _add_source_filter_args(expensive)
     expensive.add_argument(
         "--preset",
         choices=EXPENSIVE_PRESET_CHOICES,
@@ -854,6 +863,8 @@ def _run_summary(args: argparse.Namespace) -> int:
         group_by=args.group_by,
         preset=args.preset,
         since=args.since,
+        source_provider=args.source_provider,
+        source_app=args.source_app,
         limit=args.limit,
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
@@ -877,6 +888,8 @@ def _run_query(args: argparse.Namespace) -> int:
         effort=args.effort,
         thread=args.thread,
         project=args.project,
+        source_provider=args.source_provider,
+        source_app=args.source_app,
         pricing_status=args.pricing_status,
         credit_confidence=args.credit_confidence,
         min_tokens=args.min_tokens,
@@ -900,6 +913,8 @@ def _run_recommendations(args: argparse.Namespace) -> int:
         effort=args.effort,
         thread=args.thread,
         project=args.project,
+        source_provider=args.source_provider,
+        source_app=args.source_app,
         min_score=args.min_score,
         limit=args.limit,
         privacy_mode=args.privacy_mode,
@@ -1075,6 +1090,8 @@ def _run_expensive(args: argparse.Namespace) -> int:
         limit=args.limit,
         preset=args.preset,
         since=args.since,
+        source_provider=args.source_provider,
+        source_app=args.source_app,
         privacy_mode=args.privacy_mode,
     )
     if args.as_json:

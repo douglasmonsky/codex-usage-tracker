@@ -85,6 +85,8 @@ def usage_summary(
     limit: int = 20,
     preset: str | None = None,
     since: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     response_format: str = "markdown",
     privacy_mode: str = "normal",
 ) -> str | dict[str, Any]:
@@ -97,6 +99,8 @@ def usage_summary(
         limit=limit,
         preset=preset,
         since=since,
+        source_provider=source_provider,
+        source_app=source_app,
         privacy_mode=privacy_mode,
     )
     if response_format == "json":
@@ -162,6 +166,8 @@ def most_expensive_usage_calls(
     limit: int = 20,
     preset: str | None = None,
     since: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     response_format: str = "markdown",
     privacy_mode: str = "normal",
 ) -> str | dict[str, Any]:
@@ -173,6 +179,8 @@ def most_expensive_usage_calls(
         limit=limit,
         preset=preset,
         since=since,
+        source_provider=source_provider,
+        source_app=source_app,
         privacy_mode=privacy_mode,
     )
     if response_format == "json":
@@ -188,6 +196,8 @@ def usage_query(
     effort: str | None = None,
     thread: str | None = None,
     project: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     pricing_status: str | None = None,
     credit_confidence: str | None = None,
     min_tokens: int | None = None,
@@ -208,6 +218,8 @@ def usage_query(
         effort=effort,
         thread=thread,
         project=project,
+        source_provider=source_provider,
+        source_app=source_app,
         pricing_status=pricing_status,
         credit_confidence=credit_confidence,
         min_tokens=min_tokens,
@@ -225,6 +237,8 @@ def usage_recommendations(
     effort: str | None = None,
     thread: str | None = None,
     project: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     min_score: float | None = None,
     limit: int = 20,
     response_format: str = "markdown",
@@ -243,6 +257,8 @@ def usage_recommendations(
         effort=effort,
         thread=thread,
         project=project,
+        source_provider=source_provider,
+        source_app=source_app,
         min_score=min_score,
         limit=limit,
         privacy_mode=privacy_mode,

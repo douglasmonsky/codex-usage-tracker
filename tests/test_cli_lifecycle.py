@@ -319,6 +319,74 @@ def test_refresh_cli_accepts_claude_source(tmp_path: Path) -> None:
     assert payload["source_results"]["claude-code"]["source_provider"] == "anthropic"
 
 
+def test_query_and_recommendations_cli_accept_source_filters(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    claude_home = _make_claude_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    allowance_path = tmp_path / "allowance.json"
+    pricing_path = tmp_path / "pricing.json"
+
+    refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "refresh",
+        "--source",
+        "all",
+        "--codex-home",
+        str(codex_home),
+        "--claude-home",
+        str(claude_home),
+        "--json",
+    )
+    query = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "--pricing",
+        str(pricing_path),
+        "--allowance",
+        str(allowance_path),
+        "query",
+        "--source-provider",
+        "anthropic",
+        "--source-app",
+        "claude-code",
+        "--limit",
+        "0",
+    )
+    recommendations = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "--pricing",
+        str(pricing_path),
+        "--allowance",
+        str(allowance_path),
+        "recommendations",
+        "--source-provider",
+        "anthropic",
+        "--source-app",
+        "claude-code",
+        "--limit",
+        "0",
+        "--json",
+    )
+
+    assert refresh.returncode == 0
+    query_payload = json.loads(query.stdout)
+    recommendations_payload = json.loads(recommendations.stdout)
+    _assert_contract(query_payload)
+    _assert_contract(recommendations_payload)
+    assert query_payload["filters"]["source_provider"] == "anthropic"
+    assert query_payload["filters"]["source_app"] == "claude-code"
+    assert query_payload["row_count"] == 2
+    assert {row["source_app"] for row in query_payload["rows"]} == {"claude-code"}
+    assert recommendations_payload["filters"]["source_provider"] == "anthropic"
+    assert recommendations_payload["filters"]["source_app"] == "claude-code"
+    assert recommendations_payload["row_count"] == 2
+
+
 def _assert_contract(payload: object) -> None:
     assert validate_json_payload_contract(payload) == []
 

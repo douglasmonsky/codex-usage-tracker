@@ -41,6 +41,8 @@ from codex_usage_tracker.threads import annotate_thread_attachments
 
 SUMMARY_GROUP_BY_CHOICES = (
     "date",
+    "source_provider",
+    "source_app",
     "model",
     "effort",
     "cwd",
@@ -58,6 +60,8 @@ SUMMARY_PRESET_CHOICES = (
     "today",
     "last-7-days",
     "by-model",
+    "by-source-provider",
+    "by-source-app",
     "by-cwd",
     "by-project",
     "by-project-tag",
@@ -72,6 +76,8 @@ QUERY_CREDIT_CONFIDENCE_CHOICES = ("exact", "estimated", "unpriced", "user_overr
 
 _SUMMARY_PRESET_GROUPS = {
     "by-model": "model",
+    "by-source-provider": "source_provider",
+    "by-source-app": "source_app",
     "by-cwd": "cwd",
     "by-project": "project",
     "by-project-tag": "project_tag",
@@ -161,6 +167,8 @@ def build_summary_report(
     limit: int = 20,
     preset: str | None = None,
     since: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
 ) -> SummaryReport:
@@ -170,7 +178,13 @@ def build_summary_report(
     resolved_group_by, since_filter = resolve_summary_options(group_by, preset, since)
     pricing = load_pricing_config(pricing_path)
     if preset == "expensive":
-        rows = query_most_expensive_calls(db_path, limit=limit, since=since_filter)
+        rows = query_most_expensive_calls(
+            db_path,
+            limit=limit,
+            since=since_filter,
+            source_provider=source_provider,
+            source_app=source_app,
+        )
         return SummaryReport(
             rows=apply_project_privacy_to_rows(
                 annotate_rows_with_recommendations(
@@ -190,6 +204,8 @@ def build_summary_report(
             group_by=resolved_group_by,
             limit=limit,
             since=since_filter,
+            source_provider=source_provider,
+            source_app=source_app,
             projects_path=projects_path,
             privacy_mode=privacy_mode,
         )
@@ -200,6 +216,8 @@ def build_summary_report(
         group_by=resolved_group_by,
         limit=limit,
         since=since_filter,
+        source_provider=source_provider,
+        source_app=source_app,
     )
     if resolved_group_by == "model":
         rows = annotate_rows_with_efficiency(rows, pricing, model_field="group_key")
@@ -216,6 +234,8 @@ def build_expensive_calls_report(
     limit: int = 20,
     preset: str | None = None,
     since: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     privacy_mode: str = "normal",
 ) -> SummaryReport:
     """Build a highest-token-call report with pricing efficiency annotations."""
@@ -226,6 +246,8 @@ def build_expensive_calls_report(
         db_path,
         limit=limit,
         since=resolve_since(preset, since),
+        source_provider=source_provider,
+        source_app=source_app,
     )
     return SummaryReport(
         rows=apply_project_privacy_to_rows(
@@ -265,6 +287,8 @@ def build_query_report(
     effort: str | None = None,
     thread: str | None = None,
     project: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     pricing_status: str | None = None,
     credit_confidence: str | None = None,
     min_tokens: int | None = None,
@@ -293,6 +317,8 @@ def build_query_report(
             effort=effort,
             thread=thread,
             min_tokens=min_tokens,
+            source_provider=source_provider,
+            source_app=source_app,
         )
     )
     pricing = load_pricing_config(pricing_path)
@@ -310,6 +336,8 @@ def build_query_report(
             effort=effort,
             thread=thread,
             project=project,
+            source_provider=source_provider,
+            source_app=source_app,
             pricing_status=pricing_status,
             credit_confidence=credit_confidence,
             min_tokens=min_tokens,
@@ -329,6 +357,8 @@ def build_query_report(
                 "effort": effort,
                 "thread": thread,
                 "project": project,
+                "source_provider": source_provider,
+                "source_app": source_app,
                 "pricing_status": pricing_status,
                 "credit_confidence": credit_confidence,
                 "min_tokens": min_tokens,
@@ -356,6 +386,8 @@ def build_recommendations_report(
     effort: str | None = None,
     thread: str | None = None,
     project: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     min_score: float | None = None,
     limit: int = 20,
     privacy_mode: str = "normal",
@@ -372,6 +404,8 @@ def build_recommendations_report(
             model=model,
             effort=effort,
             thread=thread,
+            source_provider=source_provider,
+            source_app=source_app,
         )
     )
     pricing = load_pricing_config(pricing_path)
@@ -391,6 +425,8 @@ def build_recommendations_report(
             effort=effort,
             thread=thread,
             project=project,
+            source_provider=source_provider,
+            source_app=source_app,
             pricing_status=None,
             credit_confidence=None,
             min_tokens=None,
@@ -411,6 +447,8 @@ def build_recommendations_report(
                 "effort": effort,
                 "thread": thread,
                 "project": project,
+                "source_provider": source_provider,
+                "source_app": source_app,
                 "min_score": min_score,
                 "limit": normalized_limit,
                 "privacy_mode": privacy_mode,
@@ -521,6 +559,8 @@ def _query_row_matches(
     effort: str | None,
     thread: str | None,
     project: str | None,
+    source_provider: str | None,
+    source_app: str | None,
     pricing_status: str | None,
     credit_confidence: str | None,
     min_tokens: int | None,
@@ -550,6 +590,10 @@ def _query_row_matches(
         }
         if project not in project_values and project not in (row.get("project_tags") or []):
             return False
+    if source_provider and str(row.get("source_provider") or "") != source_provider:
+        return False
+    if source_app and str(row.get("source_app") or "") != source_app:
+        return False
     if pricing_status == "priced" and not row.get("pricing_model"):
         return False
     if pricing_status == "estimated" and not row.get("pricing_estimated"):
@@ -570,11 +614,22 @@ def _project_summary_rows(
     group_by: str,
     limit: int,
     since: str | None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
 ) -> list[dict[str, Any]]:
     rows = annotate_rows_with_project_identity(
-        annotate_rows_with_efficiency(query_dashboard_events(db_path, limit=0, since=since), pricing),
+        annotate_rows_with_efficiency(
+            query_dashboard_events(
+                db_path,
+                limit=0,
+                since=since,
+                source_provider=source_provider,
+                source_app=source_app,
+            ),
+            pricing,
+        ),
         load_project_config(projects_path),
     )
     rows = apply_project_privacy_to_rows(rows, privacy_mode=privacy_mode)

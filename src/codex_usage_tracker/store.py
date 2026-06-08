@@ -425,9 +425,15 @@ def query_summary(
     group_by: str = "thread",
     limit: int = 20,
     since: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
 ) -> list[dict[str, Any]]:
     group_expr = _group_expression(group_by)
-    where_clause, raw_params = _since_where_clause(since)
+    where_clause, raw_params = _usage_where_clause(
+        since=since,
+        source_provider=source_provider,
+        source_app=source_app,
+    )
     params: list[Any] = list(raw_params)
     sql = f"""
         SELECT
@@ -522,6 +528,8 @@ def query_dashboard_events(
     effort: str | None = None,
     thread: str | None = None,
     min_tokens: int | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     include_archived: bool = True,
 ) -> list[dict[str, Any]]:
     where_clause, params = _usage_where_clause(
@@ -531,6 +539,8 @@ def query_dashboard_events(
         effort=effort,
         thread=thread,
         min_tokens=min_tokens,
+        source_provider=source_provider,
+        source_app=source_app,
         table_alias="usage_events",
         include_archived=include_archived,
     )
@@ -595,6 +605,8 @@ def query_dashboard_event_count(
     effort: str | None = None,
     thread: str | None = None,
     min_tokens: int | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     include_archived: bool = True,
 ) -> int:
     """Return total aggregate usage rows available for the dashboard window."""
@@ -606,6 +618,8 @@ def query_dashboard_event_count(
         effort=effort,
         thread=thread,
         min_tokens=min_tokens,
+        source_provider=source_provider,
+        source_app=source_app,
         include_archived=include_archived,
     )
     with connect(db_path) as conn:
@@ -622,11 +636,19 @@ def query_dashboard_event_count(
 
 
 def query_most_expensive_calls(
-    db_path: Path = DEFAULT_DB_PATH, limit: int = 20, since: str | None = None
+    db_path: Path = DEFAULT_DB_PATH,
+    limit: int = 20,
+    since: str | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return the largest aggregate model calls by last-call token count."""
 
-    where_clause, params = _since_where_clause(since)
+    where_clause, params = _usage_where_clause(
+        since=since,
+        source_provider=source_provider,
+        source_app=source_app,
+    )
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(
@@ -672,6 +694,8 @@ def export_usage_csv(
 def _group_expression(group_by: str) -> str:
     mapping = {
         "date": "substr(event_timestamp, 1, 10)",
+        "source_provider": "coalesce(source_provider, 'unknown provider')",
+        "source_app": "coalesce(source_app, 'unknown app')",
         "model": "coalesce(model, 'Unknown model')",
         "effort": "coalesce(effort, 'Unknown effort')",
         "cwd": "coalesce(cwd, 'Unknown cwd')",
@@ -702,6 +726,8 @@ def _usage_where_clause(
     effort: str | None = None,
     thread: str | None = None,
     min_tokens: int | None = None,
+    source_provider: str | None = None,
+    source_app: str | None = None,
     table_alias: str | None = None,
     include_archived: bool = True,
 ) -> tuple[str, list[Any]]:
@@ -732,6 +758,12 @@ def _usage_where_clause(
     if min_tokens is not None:
         clauses.append(f"{prefix}total_tokens >= ?")
         params.append(min_tokens)
+    if source_provider:
+        clauses.append(f"{prefix}source_provider = ?")
+        params.append(source_provider)
+    if source_app:
+        clauses.append(f"{prefix}source_app = ?")
+        params.append(source_app)
     if not include_archived:
         clauses.extend([f"{prefix}source_file NOT LIKE ?"] * len(_ARCHIVED_SOURCE_PATTERNS))
         params.extend(_ARCHIVED_SOURCE_PATTERNS)

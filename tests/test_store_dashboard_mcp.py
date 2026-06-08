@@ -116,6 +116,40 @@ def test_refresh_all_indexes_codex_and_claude_sources(tmp_path: Path) -> None:
     assert {row["source_app"] for row in rows} == {"codex", "claude-code"}
 
 
+def test_provider_and_app_filters_work_for_dashboard_queries(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    claude_home = _make_claude_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    refresh_usage_index(
+        codex_home=codex_home,
+        claude_home=claude_home,
+        db_path=db_path,
+        source="all",
+    )
+
+    anthropic_rows = query_dashboard_events(
+        db_path=db_path,
+        limit=0,
+        source_provider="anthropic",
+    )
+    claude_rows = query_dashboard_events(
+        db_path=db_path,
+        limit=0,
+        source_app="claude-code",
+    )
+    openai_count = query_dashboard_event_count(
+        db_path=db_path,
+        source_provider="openai",
+    )
+    app_summary = query_summary(db_path=db_path, group_by="source_app")
+
+    assert len(anthropic_rows) == 2
+    assert len(claude_rows) == 2
+    assert openai_count == 4
+    assert {row["group_key"] for row in app_summary} == {"codex", "claude-code"}
+
+
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"

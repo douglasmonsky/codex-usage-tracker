@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from codex_usage_tracker.json_contracts import validate_json_payload_contract
+from codex_usage_tracker.json_contracts import (
+    JSON_PAYLOAD_CONTRACTS,
+    validate_json_payload_contract,
+)
 
 
 def test_json_contract_validation_accepts_nested_query_contract() -> None:
@@ -13,6 +16,8 @@ def test_json_contract_validation_accepts_nested_query_contract() -> None:
             "effort": None,
             "thread": None,
             "project": None,
+            "source_provider": "anthropic",
+            "source_app": "claude-code",
             "pricing_status": None,
             "credit_confidence": None,
             "min_tokens": 100,
@@ -27,6 +32,20 @@ def test_json_contract_validation_accepts_nested_query_contract() -> None:
     }
 
     assert validate_json_payload_contract(payload) == []
+
+
+def test_json_contract_validation_tracks_source_filters() -> None:
+    query_filters = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker-query-v1"]["nested"][
+        "filters"
+    ]
+    recommendation_filters = JSON_PAYLOAD_CONTRACTS[
+        "codex-usage-tracker-recommendations-v1"
+    ]["nested"]["filters"]
+
+    assert query_filters["source_provider"] == (str, type(None))
+    assert query_filters["source_app"] == (str, type(None))
+    assert recommendation_filters["source_provider"] == (str, type(None))
+    assert recommendation_filters["source_app"] == (str, type(None))
 
 
 def test_json_contract_validation_reports_schema_and_type_errors() -> None:
