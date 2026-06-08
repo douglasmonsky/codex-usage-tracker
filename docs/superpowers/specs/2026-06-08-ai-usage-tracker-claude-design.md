@@ -44,7 +44,7 @@ Existing Codex rows migrate with:
 
 Existing stable token columns stay intact. For Claude Code rows:
 
-- `input_tokens` stores normal uncached input tokens plus cache creation tokens when Claude reports them.
+- `input_tokens` stores total Claude input tokens: normal input, cache creation, and cache read tokens.
 - `cached_input_tokens` stores Claude cache-read tokens.
 - `cache_creation_input_tokens` stores Claude cache-write tokens.
 - `uncached_input_tokens` remains the derived field `max(input_tokens - cached_input_tokens, 0)`.
