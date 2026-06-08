@@ -7,6 +7,7 @@ from codex_usage_tracker.adapters.base import (
     SOURCE_CODEX,
     UsageSourceAdapter,
 )
+from codex_usage_tracker.adapters.claude_code_jsonl import ClaudeCodeJsonlAdapter
 from codex_usage_tracker.adapters.codex_jsonl import CodexJsonlAdapter
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     "SOURCE_CHOICES",
     "SOURCE_CLAUDE_CODE",
     "SOURCE_CODEX",
+    "ClaudeCodeJsonlAdapter",
     "CodexJsonlAdapter",
     "UsageSourceAdapter",
 ]
