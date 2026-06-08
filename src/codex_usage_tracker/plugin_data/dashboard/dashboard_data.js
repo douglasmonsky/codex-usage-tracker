@@ -29,6 +29,7 @@
   }
 
   function usageCreditStatusText(row) {
+    if (row.usage_credit_confidence === 'not_applicable') return 'Not applicable';
     if (usageCreditValue(row) === null) return 'No mapped Codex credit rate';
     if (row.usage_credit_confidence === 'exact') return 'Official rate-card match';
     if (row.usage_credit_confidence === 'estimated') return 'Inferred model mapping';
@@ -44,8 +45,9 @@
   }
 
   function creditCoverageRatio(rows) {
-    const totalTokens = rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
-    const ratedTokens = rows.reduce((sum, row) => sum + (usageCreditValue(row) === null ? 0 : Number(row.total_tokens || 0)), 0);
+    const applicableCreditRows = rows.filter(row => row.usage_credit_confidence !== 'not_applicable');
+    const totalTokens = applicableCreditRows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
+    const ratedTokens = applicableCreditRows.reduce((sum, row) => sum + (usageCreditValue(row) === null ? 0 : Number(row.total_tokens || 0)), 0);
     return totalTokens ? ratedTokens / totalTokens : 0;
   }
 

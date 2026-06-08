@@ -55,6 +55,28 @@ def test_allowance_marks_inferred_auto_review_mapping() -> None:
     assert rows[0]["usage_credits"] == 0.0590625
 
 
+def test_allowance_does_not_apply_codex_credits_to_claude_rows() -> None:
+    config = load_allowance_config(Path("missing-allowance.json"))
+    rows = [
+        {
+            "source_provider": "anthropic",
+            "source_app": "claude-code",
+            "model": "gpt-5.3-codex",
+            "input_tokens": 100,
+            "cached_input_tokens": 0,
+            "uncached_input_tokens": 100,
+            "output_tokens": 20,
+            "total_tokens": 120,
+        }
+    ]
+
+    annotated = annotate_rows_with_allowance(rows, config)
+
+    assert annotated[0]["usage_credits"] is None
+    assert annotated[0]["usage_credit_confidence"] == "not_applicable"
+    assert "only apply to Codex" in annotated[0]["usage_credit_note"]
+
+
 def test_allowance_config_loads_windows_and_local_aliases(tmp_path: Path) -> None:
     path = tmp_path / "allowance.json"
     path.write_text(

@@ -72,7 +72,13 @@ SUMMARY_PRESET_CHOICES = (
 )
 EXPENSIVE_PRESET_CHOICES = ("today", "last-7-days")
 QUERY_PRICING_STATUS_CHOICES = ("priced", "estimated", "unpriced")
-QUERY_CREDIT_CONFIDENCE_CHOICES = ("exact", "estimated", "unpriced", "user_override")
+QUERY_CREDIT_CONFIDENCE_CHOICES = (
+    "exact",
+    "estimated",
+    "unpriced",
+    "user_override",
+    "not_applicable",
+)
 
 _SUMMARY_PRESET_GROUPS = {
     "by-model": "model",

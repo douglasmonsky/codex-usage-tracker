@@ -259,10 +259,15 @@
       threadAttachmentByRecordId = new Map(data.map(row => [row.record_id, resolveThreadAttachment(row)]));
     }
     function usageCreditsWithStatus(row) {
+      if (row.usage_credit_confidence === 'not_applicable') return 'Not applicable';
       const value = usageCreditValue(row);
       return value === null ? 'No mapped rate' : `${credits(value)} credits · ${usageCreditStatusText(row)}`;
     }
-    function costUsageCell(costText, creditValue) {
+    function costUsageCell(costText, row) {
+      const creditValue = usageCreditValue(row);
+      if (row.usage_credit_confidence === 'not_applicable') {
+        return `<span class="metric-stack"><span>${escapeHtml(costText)}</span><span class="metric-sub">Not applicable</span></span>`;
+      }
       const usage = creditValue === null || creditValue === undefined ? 'No credit rate' : `${credits(creditValue)} cr`;
       return `<span class="metric-stack"><span>${escapeHtml(costText)}</span><span class="metric-sub">${escapeHtml(usage)}</span></span>`;
     }
@@ -305,6 +310,7 @@
       return allowanceConfigured ? 'Allowance configured' : 'Set limits';
     }
     function rowAllowanceImpact(row) {
+      if (row.usage_credit_confidence === 'not_applicable') return 'Codex credit rates do not apply to this source.';
       const value = usageCreditValue(row);
       if (value === null) return 'No mapped Codex credit rate';
       const impact = allowanceWindowText(value, 'impact');
@@ -588,7 +594,8 @@
           || (pricingStatus === 'credit-exact' && row.usage_credit_confidence === 'exact')
           || (pricingStatus === 'credit-estimated' && row.usage_credit_confidence === 'estimated')
           || (pricingStatus === 'credit-override' && row.usage_credit_confidence === 'user_override')
-          || (pricingStatus === 'credit-missing' && row.usage_credit_confidence === 'unpriced');
+          || (pricingStatus === 'credit-missing' && row.usage_credit_confidence === 'unpriced')
+          || (pricingStatus === 'credit-not-applicable' && row.usage_credit_confidence === 'not_applicable');
         return (!term || haystack.includes(term)) && (!model || row.model === model) && (!effort || row.effort === effort) && statusMatches && rowMatchesDateRange(row, dateRange) && presetMatchesRow(row);
       });
       rows.sort(compareCalls);
@@ -867,11 +874,13 @@
       return 'Configured';
     }
     function creditStatusFor(rows) {
-      const rated = rows.filter(row => usageCreditValue(row) !== null);
-      const estimated = rows.filter(row => row.usage_credit_confidence === 'estimated');
+      const applicableCreditRows = rows.filter(row => row.usage_credit_confidence !== 'not_applicable');
+      const rated = applicableCreditRows.filter(row => usageCreditValue(row) !== null);
+      const estimated = applicableCreditRows.filter(row => row.usage_credit_confidence === 'estimated');
+      if (applicableCreditRows.length === 0) return 'Not applicable';
       if (rated.length === 0) return 'No mapped rate';
-      if (estimated.length === rows.length) return 'Estimated mapping';
-      if (estimated.length > 0 || rated.length < rows.length) return 'Mixed';
+      if (estimated.length === applicableCreditRows.length) return 'Estimated mapping';
+      if (estimated.length > 0 || rated.length < applicableCreditRows.length) return 'Mixed';
       return 'Official rate-card match';
     }
     function threadLifecycle(calls) {
@@ -1198,7 +1207,7 @@
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
           <td>${escapeHtml(short(row.effort))}</td>
           <td class="num">${number.format(row.total_tokens || 0)}</td>
-          <td class="num">${costUsageCell(row.pricing_estimated ? `${money(row.estimated_cost_usd)}*` : money(row.estimated_cost_usd), usageCreditValue(row))}</td>
+          <td class="num">${costUsageCell(row.pricing_estimated ? `${money(row.estimated_cost_usd)}*` : money(row.estimated_cost_usd), row)}</td>
           <td class="num">${pct(row.cache_ratio)}</td>
           <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(flag)}</span>`).join('')}</div></td>
         `;
@@ -1327,7 +1336,7 @@
             <td>${escapeHtml(short(row.effort))}</td>
             <td>${escapeHtml(sourceLabel(row))}</td>
             <td class="num">${number.format(row.total_tokens || 0)}</td>
-            <td class="num">${costUsageCell(row.pricing_estimated ? `${money(row.estimated_cost_usd)}*` : money(row.estimated_cost_usd), usageCreditValue(row))}</td>
+            <td class="num">${costUsageCell(row.pricing_estimated ? `${money(row.estimated_cost_usd)}*` : money(row.estimated_cost_usd), row)}</td>
             <td class="num">${pct(row.cache_ratio)}</td>
             <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(flag)}</span>`).join('')}</div></td>
           </tr>
@@ -1460,7 +1469,7 @@
             <div class="timeline-time">${escapeHtml(formatTimestamp(row.event_timestamp, 'Unknown'))}</div>
             <div>
               <div class="timeline-title">${escapeHtml(sourceLabel(row))} · ${escapeHtml(short(row.model))}</div>
-              <div class="timeline-meta">${escapeHtml(number.format(row.total_tokens || 0))} tokens · ${escapeHtml(money(row.estimated_cost_usd))} · ${escapeHtml(usageCreditValue(row) === null ? 'no credit rate' : `${credits(usageCreditValue(row))} credits`)} · cache ${escapeHtml(pct(row.cache_ratio))}</div>
+              <div class="timeline-meta">${escapeHtml(number.format(row.total_tokens || 0))} tokens · ${escapeHtml(money(row.estimated_cost_usd))} · ${escapeHtml(usageCreditsWithStatus(row))} · cache ${escapeHtml(pct(row.cache_ratio))}</div>
               <div class="timeline-meta">${escapeHtml(recommendationSummary(row))}</div>
               <div class="signal-strip">
                 <span class="flag">context ${escapeHtml(pct(contextUse))}</span>

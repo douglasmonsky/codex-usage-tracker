@@ -355,6 +355,20 @@ def test_query_and_recommendations_cli_accept_source_filters(tmp_path: Path) -> 
         "--limit",
         "0",
     )
+    query_by_credit = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "--pricing",
+        str(pricing_path),
+        "--allowance",
+        str(allowance_path),
+        "query",
+        "--credit-confidence",
+        "not_applicable",
+        "--limit",
+        "0",
+    )
     recommendations = _run_cli(
         tmp_path,
         "--db",
@@ -375,13 +389,20 @@ def test_query_and_recommendations_cli_accept_source_filters(tmp_path: Path) -> 
 
     assert refresh.returncode == 0
     query_payload = json.loads(query.stdout)
+    query_by_credit_payload = json.loads(query_by_credit.stdout)
     recommendations_payload = json.loads(recommendations.stdout)
     _assert_contract(query_payload)
+    _assert_contract(query_by_credit_payload)
     _assert_contract(recommendations_payload)
     assert query_payload["filters"]["source_provider"] == "anthropic"
     assert query_payload["filters"]["source_app"] == "claude-code"
     assert query_payload["row_count"] == 2
     assert {row["source_app"] for row in query_payload["rows"]} == {"claude-code"}
+    assert query_by_credit_payload["filters"]["credit_confidence"] == "not_applicable"
+    assert query_by_credit_payload["row_count"] == 2
+    assert {row["usage_credit_confidence"] for row in query_by_credit_payload["rows"]} == {
+        "not_applicable"
+    }
     assert recommendations_payload["filters"]["source_provider"] == "anthropic"
     assert recommendations_payload["filters"]["source_app"] == "claude-code"
     assert recommendations_payload["row_count"] == 2

@@ -335,6 +335,21 @@ def annotate_rows_with_allowance(
     annotated: list[dict[str, Any]] = []
     for row in rows:
         copy = dict(row)
+        if not _row_supports_codex_credits(copy):
+            copy.update(
+                {
+                    "usage_credits": None,
+                    "usage_credit_model": None,
+                    "usage_credit_confidence": "not_applicable",
+                    "usage_credit_source": "Codex credit rates",
+                    "usage_credit_source_url": None,
+                    "usage_credit_fetched_at": None,
+                    "usage_credit_tier": None,
+                    "usage_credit_note": "Codex credit rates only apply to Codex rows.",
+                }
+            )
+            annotated.append(copy)
+            continue
         model = copy.get(model_field)
         match = resolve_credit_rate(model, resolved)
         if match is None:
@@ -367,6 +382,14 @@ def annotate_rows_with_allowance(
             )
         annotated.append(copy)
     return annotated
+
+
+def _row_supports_codex_credits(row: dict[str, Any]) -> bool:
+    source_app = row.get("source_app")
+    source_provider = row.get("source_provider")
+    if source_app is None and source_provider is None:
+        return True
+    return source_provider == "openai" and source_app == "codex"
 
 
 def summarize_allowance_usage(

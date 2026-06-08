@@ -545,6 +545,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Project tags" in dashboard_js
     assert "Git branch" in dashboard_js
     assert "usage_credit_confidence" in dashboard
+    assert "usage_credit_confidence === 'not_applicable'" in dashboard_data_js
+    assert "Not applicable" in dashboard_data_js
+    assert "applicableCreditRows" in dashboard_js
+    assert "credit-not-applicable" in dashboard
+    assert "pricingStatus === 'credit-not-applicable'" in dashboard_js
     assert "Credit rates:" in dashboard_js
     assert "Codex allowance usage" in dashboard_js
     assert "Highest Codex credits" in dashboard
