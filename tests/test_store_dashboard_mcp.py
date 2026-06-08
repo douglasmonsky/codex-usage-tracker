@@ -82,12 +82,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["skipped_events"] == "0"
     assert meta["inserted_or_updated_events"] == "4"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "2"
+    assert meta["schema_version"] == "3"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 2
+    assert state["schema_version"] == 3
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3]
 
 
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
@@ -121,7 +121,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 2
+    assert user_version == 3
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -179,8 +179,88 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_timestamp" in indexes
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
-    assert user_version == 2
-    assert [row["version"] for row in migrations] == [1, 2]
+    assert user_version == 3
+    assert [row["version"] for row in migrations] == [1, 2, 3]
+
+
+def test_init_db_backfills_provider_columns_for_existing_rows(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    raw = sqlite3.connect(db_path)
+    try:
+        raw.execute(
+            """
+            CREATE TABLE usage_events (
+                record_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                thread_name TEXT,
+                session_updated_at TEXT,
+                event_timestamp TEXT NOT NULL,
+                source_file TEXT NOT NULL,
+                line_number INTEGER NOT NULL,
+                turn_id TEXT,
+                turn_timestamp TEXT,
+                cwd TEXT,
+                model TEXT,
+                effort TEXT,
+                current_date TEXT,
+                timezone TEXT,
+                thread_source TEXT,
+                subagent_type TEXT,
+                agent_role TEXT,
+                agent_nickname TEXT,
+                parent_session_id TEXT,
+                parent_thread_name TEXT,
+                parent_session_updated_at TEXT,
+                model_context_window INTEGER,
+                input_tokens INTEGER NOT NULL,
+                cached_input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                reasoning_output_tokens INTEGER NOT NULL,
+                total_tokens INTEGER NOT NULL,
+                cumulative_input_tokens INTEGER NOT NULL,
+                cumulative_cached_input_tokens INTEGER NOT NULL,
+                cumulative_output_tokens INTEGER NOT NULL,
+                cumulative_reasoning_output_tokens INTEGER NOT NULL,
+                cumulative_total_tokens INTEGER NOT NULL,
+                uncached_input_tokens INTEGER NOT NULL,
+                cache_ratio REAL NOT NULL,
+                reasoning_output_ratio REAL NOT NULL,
+                context_window_percent REAL NOT NULL
+            )
+            """
+        )
+        raw.execute(
+            """
+            INSERT INTO usage_events (
+                record_id, session_id, event_timestamp, source_file, line_number,
+                input_tokens, cached_input_tokens, output_tokens, reasoning_output_tokens,
+                total_tokens, cumulative_input_tokens, cumulative_cached_input_tokens,
+                cumulative_output_tokens, cumulative_reasoning_output_tokens,
+                cumulative_total_tokens, uncached_input_tokens, cache_ratio,
+                reasoning_output_ratio, context_window_percent
+            )
+            VALUES (
+                'legacy-record', 'session-a', '2026-05-17T18:58:27Z',
+                '/tmp/log.jsonl', 1, 100, 20, 10, 0, 110, 100, 20, 10, 0,
+                110, 80, 0.2, 0.0, 0.0
+            )
+            """
+        )
+        raw.commit()
+    finally:
+        raw.close()
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            "SELECT * FROM usage_events WHERE record_id = 'legacy-record'"
+        ).fetchone()
+
+    assert row["source_provider"] == "openai"
+    assert row["source_app"] == "codex"
+    assert row["source_format"] == "codex-jsonl-v1"
+    assert row["provider_request_id"] is None
+    assert row["cache_creation_input_tokens"] == 0
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:
@@ -242,6 +322,10 @@ def test_large_history_query_prefilter_uses_sql_indexes(tmp_path: Path) -> None:
             event_timestamp=f"2026-05-{(index % 28) + 1:02d}T12:00:00Z",
             source_file=f"/tmp/synthetic/{index}.jsonl",
             line_number=index + 1,
+            source_provider="openai",
+            source_app="codex",
+            source_format="codex-jsonl-v1",
+            provider_request_id=None,
             turn_id=f"turn-{index}",
             turn_timestamp=f"2026-05-{(index % 28) + 1:02d}T12:00:00Z",
             cwd=f"/tmp/project-{index % 10}",
@@ -257,6 +341,7 @@ def test_large_history_query_prefilter_uses_sql_indexes(tmp_path: Path) -> None:
             parent_thread_name=None,
             parent_session_updated_at=None,
             model_context_window=200000,
+            cache_creation_input_tokens=0,
             input_tokens=1000 + index,
             cached_input_tokens=200,
             output_tokens=100,

@@ -25,6 +25,10 @@ class UsageEvent:
     event_timestamp: str
     source_file: str
     line_number: int
+    source_provider: str
+    source_app: str
+    source_format: str
+    provider_request_id: str | None
     turn_id: str | None
     turn_timestamp: str | None
     cwd: str | None
@@ -40,6 +44,7 @@ class UsageEvent:
     parent_thread_name: str | None
     parent_session_updated_at: str | None
     model_context_window: int | None
+    cache_creation_input_tokens: int
     input_tokens: int
     cached_input_tokens: int
     output_tokens: int
