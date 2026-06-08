@@ -119,7 +119,7 @@ def test_install_plugin_force_replaces_existing_symlink(tmp_path: Path) -> None:
     source_plugin.mkdir()
     plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
     plugin_dir.parent.mkdir()
-    plugin_dir.symlink_to(source_plugin, target_is_directory=True)
+    _symlink_or_skip(plugin_dir, source_plugin)
 
     result = install_plugin(
         plugin_dir=plugin_dir,
@@ -224,3 +224,10 @@ def _fake_python(tmp_path: Path, *, exit_code: int = 0) -> Path:
     path.write_text(f"#!/bin/sh\nexit {exit_code}\n", encoding="utf-8")
     path.chmod(0o755)
     return path
+
+
+def _symlink_or_skip(link_path: Path, target_path: Path) -> None:
+    try:
+        link_path.symlink_to(target_path, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlinks are unavailable on this platform: {exc}")
