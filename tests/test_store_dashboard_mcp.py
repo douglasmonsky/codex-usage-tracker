@@ -863,8 +863,8 @@ def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Pat
     assert all_history_payload["total_available_rows"] == 5
     assert len(active_rows) == 4
     assert len(all_rows) == 5
-    assert not any("/archived_sessions/" in row["source_file"] for row in active_rows)
-    assert any("/archived_sessions/" in row["source_file"] for row in all_rows)
+    assert not any(_is_archived_source_file(row["source_file"]) for row in active_rows)
+    assert any(_is_archived_source_file(row["source_file"]) for row in all_rows)
 
 
 def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> None:
@@ -934,7 +934,7 @@ def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> No
     assert active_after_all_payload["loaded_row_count"] == 4
     assert active_after_all_payload["archived_available_rows"] == 1
     assert not any(
-        "/archived_sessions/" in row["source_file"]
+        _is_archived_source_file(row["source_file"])
         for row in active_after_all_payload["rows"]
     )
 
@@ -1215,7 +1215,15 @@ def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
     )
     plugin_link = tmp_path / "plugins" / "codex-usage-tracker"
     plugin_link.parent.mkdir()
-    plugin_link.symlink_to(repo_root, target_is_directory=True)
+    (plugin_link / ".codex-plugin").mkdir(parents=True)
+    (plugin_link / ".codex-plugin" / "plugin.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
+    (plugin_link / ".mcp.json").write_text(
+        (repo_root / ".mcp.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     marketplace_path = tmp_path / "marketplace.json"
     marketplace_path.write_text(
         json.dumps({"plugins": [{"name": "codex-usage-tracker"}]}),
@@ -1423,6 +1431,10 @@ def _write_archived_log(codex_home: Path) -> Path:
         ],
     )
     return archived_log_path
+
+
+def _is_archived_source_file(source_file: str) -> bool:
+    return "archived_sessions" in Path(source_file).parts
 
 
 def _write_pricing(path: Path) -> Path:

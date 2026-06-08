@@ -41,7 +41,7 @@ The only exception is `usage_call_context`, which reads one selected record's lo
    - `codex-usage-tracker recommendations --json`
    - `codex-usage-tracker pricing-coverage --json`
 9. If the `codex-usage-tracker` command is missing, run `codex-usage-tracker doctor --suggest-repair --json` only if the command is available through an absolute path or known environment. Otherwise report that the CLI is not on `PATH` and ask the user to run `codex-usage-tracker setup` or reinstall with `pipx`.
-10. Use source-checkout fallbacks only when you are already inside the repo checkout: `PYTHONPATH=src .venv/bin/python -m codex_usage_tracker.cli <command>`. Do not use `PYTHONPATH=src` outside that checkout, and do not keep exploring plugin files after a setup failure.
+10. Use source-checkout fallbacks only when you are already inside the repo checkout. On PowerShell, run `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m codex_usage_tracker.cli <command>`. On POSIX shells, run `PYTHONPATH=src .venv/bin/python -m codex_usage_tracker.cli <command>`. Do not use `PYTHONPATH=src` outside that checkout, and do not keep exploring plugin files after a setup failure.
 
 ## Routing Questions To API Calls
 

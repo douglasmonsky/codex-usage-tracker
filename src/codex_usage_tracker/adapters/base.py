@@ -17,9 +17,20 @@ SOURCE_CHOICES = (SOURCE_CODEX, SOURCE_CLAUDE_CODE, SOURCE_ALL)
 
 
 class UsageSourceAdapter(Protocol):
-    source_provider: str
-    source_app: str
-    source_format: str
+    @property
+    def source_provider(self) -> str:
+        """Provider identifier for rows emitted by this source."""
+        ...
+
+    @property
+    def source_app(self) -> str:
+        """Application identifier for rows emitted by this source."""
+        ...
+
+    @property
+    def source_format(self) -> str:
+        """Source log format version for rows emitted by this source."""
+        ...
 
     def discover_logs(self, root: Path, *, include_archived: bool = False) -> list[Path]:
         """Return local log paths for this source."""

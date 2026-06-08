@@ -13,10 +13,10 @@ codex-usage-tracker setup
 codex-usage-tracker update-pricing
 codex-usage-tracker update-rate-card
 codex-usage-tracker refresh --source all
-codex-usage-tracker serve-dashboard --open
+codex-usage-tracker serve-dashboard --source all --open
 ```
 
-Use `codex-usage-tracker serve-dashboard --source all --open` when you want live refresh to scan both Codex and Claude Code logs. Use `--source claude-code --claude-home ~/.claude` for a Claude Code-only dashboard.
+Use `codex-usage-tracker serve-dashboard --open` for the default Codex-only dashboard. Use `--source claude-code --claude-home ~/.claude` for a Claude Code-only dashboard.
 
 For optional allowance context, initialize a local template and copy values from Codex Usage or `/status`:
 

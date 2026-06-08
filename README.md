@@ -119,8 +119,10 @@ codex-usage-tracker update-pricing
 codex-usage-tracker update-rate-card
 codex-usage-tracker setup
 codex-usage-tracker refresh --source all
-codex-usage-tracker serve-dashboard --open
+codex-usage-tracker serve-dashboard --source all --open
 ```
+
+For a Codex-only dashboard, omit `--source all` from `refresh` and `serve-dashboard`.
 
 Then:
 
@@ -220,7 +222,7 @@ This is optional. The normal shell install above is the fastest trusted path for
 - Pricing and Codex credit estimates depend on local rate data and confidence labels. Codex credits apply only to Codex/OpenAI rows; Claude Code rows are marked not applicable for Codex credit calculations.
 - Remaining 5-hour and weekly allowance is not read automatically from the logged-in account.
 - Local logs may not include usage from other agentic surfaces that share the same allowance.
-- Parent-child thread relationships are only as good as the metadata Codex logs; inferred auto-review attachments are labeled as inferred.
+- Parent-child thread relationships are only as good as the metadata each source logs; inferred auto-review attachments are labeled as inferred.
 
 ## Roadmap
 
