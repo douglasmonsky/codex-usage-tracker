@@ -36,7 +36,7 @@ Not guaranteed:
 ## 2. Upgrade And Migration
 
 - [x] Add synthetic legacy SQLite fixture test proving `init_db` upgrades without data loss: `python -m pytest tests/test_store_migrations.py`.
-- [ ] Add synthetic v0.3-style SQLite fixture if schema drift requires it: `python -m pytest tests/test_store_migrations.py`.
+- [x] Reassess whether a synthetic v0.3-style SQLite fixture is required; the current legacy migration fixture covers active schema drift, so no separate v0.3 fixture is currently needed: `python -m pytest tests/test_store_migrations.py`.
 - [x] Verify `schema_state` reports expected version and checksum after migration: `python -m pytest tests/test_store_migrations.py`.
 - [x] Verify `rebuild-index` clears only tracker-owned aggregate tables: `python -m pytest tests/test_store_dashboard_mcp.py`.
 - [x] Verify `reset-db` does not touch raw Codex logs: `python -m pytest tests/test_cli_lifecycle.py`.
@@ -87,7 +87,7 @@ Not guaranteed:
 - [x] Verify dashboard formatting helpers: `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js`.
 - [x] Verify dashboard data helpers: `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js`.
 - [x] Verify active-history and all-history state labels: `python -m pytest tests/test_cli_release.py tests/test_store_dashboard_mcp.py`.
-- [ ] Run a manual localhost dashboard smoke before release: `codex-usage-tracker serve-dashboard --open`.
+- [x] Run a manual localhost dashboard smoke before release with temporary aggregate-only paths: `codex-usage-tracker serve-dashboard --open` plus `curl -fsS http://127.0.0.1:8897/dashboard.html`.
 
 ## 9. Privacy And Sharing Safety
 
@@ -118,7 +118,7 @@ Not guaranteed:
 - [x] Verify publish workflow uses Trusted Publishing, not API tokens: `python scripts/check_release.py`.
 - [x] Verify TestPyPI and PyPI jobs exist and publish only on workflow dispatch or release events: `python scripts/check_release.py`.
 - [x] Verify manual PyPI workflow dispatch is restricted to `main` or tag refs: `python scripts/check_release.py`.
-- [ ] Verify PyPI job is gated by environment `pypi`: manual GitHub environment check.
+- [x] Verify PyPI job is gated by environment `pypi`: `gh api repos/douglasmonsky/codex-usage-tracker/environments/pypi`.
 - [x] Verify dist filenames match `codex_usage_tracking`: `python -m build && python scripts/check_release.py --dist`.
 - [ ] Verify TestPyPI process: run `Publish Python package` with `target=testpypi` only when intentionally testing release publication.
 - [ ] Verify PyPI process: publish a GitHub Release or run workflow dispatch with `target=pypi` only when intentionally publishing a reviewed release.
@@ -147,6 +147,7 @@ These references are the concrete proof behind completed checklist items. Public
 ### Upgrade And Migration
 
 - Legacy SQLite migration, schema state, migration idempotence, malformed legacy schema handling, and migration CSV shape are proven by `tests/test_store_migrations.py`.
+- The v0.3 fixture decision is covered by `tests/test_store_migrations.py`; no additional v0.3-specific fixture is currently required because the active pre-1.0 migration path is already represented by the legacy fixture.
 - `rebuild-index` clearing only tracker-owned aggregate rows is proven by `tests/test_store_dashboard_mcp.py::test_rebuild_index_clears_aggregate_rows_before_rescan`.
 - `reset-db` preserving raw Codex logs is proven by `tests/test_cli_lifecycle.py::test_setup_support_bundle_and_reset_db_cli`.
 - Refresh metadata and parser diagnostics are proven by `tests/test_store_migrations.py`, `tests/test_parser.py`, and `tests/test_store_dashboard_mcp.py::test_refresh_reports_skipped_corrupt_token_events`.
@@ -191,6 +192,7 @@ These references are the concrete proof behind completed checklist items. Public
 - Active/all-history payload behavior is proven by `tests/test_store_dashboard_mcp.py::test_dashboard_history_scope_excludes_archived_rows_by_default` and `tests/test_store_dashboard_mcp.py::test_dashboard_server_usage_api_switches_history_scope`.
 - Active/all-history user-facing labels are proven by `tests/test_cli_release.py::test_dashboard_history_scope_labels_remain_user_facing`.
 - No-context startup and runtime context enablement are proven by `tests/test_store_dashboard_mcp.py::test_dashboard_server_can_enable_context_api_at_runtime` and `tests/test_privacy.py::test_context_server_requires_loopback_origin_token_and_enablement`.
+- Manual localhost smoke is proven by running `codex-usage-tracker serve-dashboard --open` against temporary database, config, output, and Codex-home paths on `127.0.0.1:8897`, then probing `/dashboard.html` with `curl -fsS`.
 
 ### Privacy And Sharing Safety
 
@@ -215,6 +217,7 @@ These references are the concrete proof behind completed checklist items. Public
 
 - Normal CI package build plus `twine check` and dist verification are proven by `.github/workflows/ci.yml` and enforced by `scripts/check_release.py::_check_ci_workflow`.
 - Publish workflow package name, Trusted Publishing, TestPyPI/PyPI job presence, event guards, no push/PR publishing, no token/password publishing, and manual PyPI main/tag preflight are proven by `scripts/check_release.py::_check_publish_workflow`.
+- The GitHub `pypi` environment gate is proven by `gh api repos/douglasmonsky/codex-usage-tracker/environments/pypi`, which reports a `required_reviewers` protection rule and `can_admins_bypass=false`.
 - Dist filename and wheel/sdist member checks are proven by `python -m build`, `python -m twine check dist/*`, and `python scripts/check_release.py --dist`.
 - Release recovery documentation is proven by `scripts/check_release.py` required-file and docs checks.
 
