@@ -128,6 +128,31 @@ python -m twine check dist/*
 python scripts/check_release.py --dist
 ```
 
+## Installed Package Smoke
+
+Run the installed-package smoke whenever package data, console entry points, plugin installation, release metadata, or public install behavior changes:
+
+```bash
+python scripts/smoke_installed_package.py
+```
+
+The script builds this checkout into a temporary dist directory, installs the wheel into a clean temporary virtual environment, checks version/help commands, validates bundled dashboard/docs/rate-card/plugin/skill resources, and performs a temporary `install-plugin` run.
+
+For cleaner release verification, prefer Docker when available:
+
+```bash
+python scripts/smoke_installed_package.py --docker
+```
+
+To verify the public PyPI package instead of the local checkout:
+
+```bash
+python scripts/smoke_installed_package.py --from-pypi --version 0.3.2
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.3.2
+```
+
+Docker avoids local toolchain side effects during install testing. Keep one local `pipx` smoke for platform-specific PATH and plugin-discovery behavior, but use Docker for repeatable Linux package verification.
+
 For documentation-only branches, at minimum run:
 
 ```bash
@@ -199,9 +224,8 @@ python scripts/check_release.py --dist
 Then verify the local package install path:
 
 ```bash
-python -m pip install ".[dev]"
-codex-usage-tracker --version
-codex-usage-tracker install-plugin --plugin-dir /tmp/codex-usage-tracker-plugin-smoke --marketplace /tmp/codex-usage-marketplace-smoke.json --python .venv/bin/python --force
+python scripts/smoke_installed_package.py
+python scripts/smoke_installed_package.py --docker
 ```
 
 The release checker verifies version alignment, required public docs, packaged plugin assets, wheel contents, and obvious tracked secret patterns. It does not publish anything.

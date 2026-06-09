@@ -164,6 +164,7 @@ node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
 python -m build
 python scripts/check_release.py --dist
 git diff --check
+python scripts/smoke_installed_package.py
 codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
 codex-usage-tracker update-rate-card --output /tmp/codex-usage-rate-card.json
 codex-usage-tracker doctor
