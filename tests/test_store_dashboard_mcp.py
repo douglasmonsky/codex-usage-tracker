@@ -93,7 +93,7 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
-    log_path = next((codex_home / "sessions").glob("**/*.jsonl"))
+    log_path = next(path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name)
     corrupt = _token_event(600, 300)
     corrupt["payload"]["info"]["last_token_usage"]["total_tokens"] = "bad-total"  # type: ignore[index]
     valid = _token_event(650, 50)
