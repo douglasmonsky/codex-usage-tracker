@@ -29,7 +29,7 @@ Not guaranteed:
 - [x] Verify installed package resources in Linux Docker: `python scripts/smoke_installed_package.py --docker`.
 - [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version <version>`.
 - [ ] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
-- [ ] Add Python 3.14 as an official support target only after CI, package classifiers, docs, and installed-package smoke coverage pass. Track this in issue #12.
+- [ ] Add Python 3.14 as a near-term official support target only after CI, package classifiers, docs, and installed-package smoke coverage pass. Track this in issue #12.
 
 ## 2. Upgrade And Migration
 
@@ -89,12 +89,12 @@ Not guaranteed:
 
 ## 9. Privacy And Sharing Safety
 
-- [ ] Verify dashboard payloads in normal, redacted, and strict modes: `python -m pytest tests/test_privacy.py`.
-- [ ] Verify query JSON in normal, redacted, and strict modes: `python -m pytest tests/test_privacy.py`.
-- [ ] Verify session JSON in normal, redacted, and strict modes: `python -m pytest tests/test_privacy.py`.
-- [ ] Verify CSV export in redacted and strict modes: `python -m pytest tests/test_privacy.py`.
-- [ ] Verify strict mode does not leak raw cwd, source paths, branch, remote labels, project tags, or synthetic private project names: `python -m pytest tests/test_privacy.py`.
-- [ ] Verify raw context fields never appear in SQLite, CSV, dashboard payloads, support bundles, docs, screenshots, or synthetic fixtures: `python -m pytest tests/test_privacy.py scripts/check_release.py`.
+- [x] Verify dashboard payloads in normal, redacted, and strict modes: `python -m pytest tests/test_privacy.py`.
+- [x] Verify query JSON in normal, redacted, and strict modes: `python -m pytest tests/test_privacy.py`.
+- [x] Verify session JSON in normal, redacted, and strict modes: `python -m pytest tests/test_privacy.py`.
+- [x] Verify CSV export in redacted and strict modes: `python -m pytest tests/test_privacy.py`.
+- [x] Verify strict mode does not leak raw cwd, source paths, branch, remote labels, project tags, or synthetic private project names: `python -m pytest tests/test_privacy.py`.
+- [x] Verify raw context fields never appear in SQLite, CSV, dashboard payloads, support bundles, generated static HTML, docs, or screenshots: `python -m pytest tests/test_privacy.py scripts/check_release.py`.
 
 ## 10. Support-Bundle Safety
 

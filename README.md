@@ -63,7 +63,7 @@ More install paths: [Install Guide](docs/install.md).
 
 ## Platform Support
 
-The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and localhost server are Python-based and CI-tested on Ubuntu for Python 3.10-3.13. It defaults to `~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data; pass `--codex-home` or `--db` when your local layout differs. Codex plugin discovery depends on Codex's local plugin directories on your machine, so run `codex-usage-tracker doctor` after setup if plugin registration does not appear in Codex.
+The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and localhost server are Python-based and CI-tested on Ubuntu for Python 3.10-3.13. Python 3.14 support is a near-term roadmap item, but it is not an official target until CI, package classifiers, docs, and installed-package smoke coverage pass. It defaults to `~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data; pass `--codex-home` or `--db` when your local layout differs. Codex plugin discovery depends on Codex's local plugin directories on your machine, so run `codex-usage-tracker doctor` after setup if plugin registration does not appear in Codex.
 
 ## Dashboard Preview
 
@@ -224,6 +224,7 @@ This is optional. The normal shell install above is the fastest trusted path for
 
 ## Roadmap
 
+- Add official Python 3.14 support once CI, package metadata, docs, and installed-package smoke tests are green ([tracking issue #12](https://github.com/douglasmonsky/codex-usage-tracker/issues/12)).
 - Improve the `Set limits` flow with a paste/import experience for 5-hour and weekly allowance snapshots.
 - Track allowance snapshot history so local Codex credits can be compared against visible remaining-usage changes over time.
 - Clarify top-card token accounting by showing output tokens and reasoning output as a subset instead of implying all token cards add together.
