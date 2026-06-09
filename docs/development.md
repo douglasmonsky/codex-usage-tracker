@@ -24,9 +24,91 @@ The public PyPI distribution is [`codex-usage-tracking`](https://pypi.org/projec
 - `scripts/check_release.py`: release-readiness checks for docs, versions, packaging, wheel contents, and tracked secret patterns.
 - `scripts/benchmark_synthetic_history.py`: synthetic benchmark for large aggregate histories.
 
+## Branch And PR Model
+
+This repository uses trunk-based development with protected `main`, short-lived task branches, and release branches only when preparing a release. Do not use a permanent `develop` branch.
+
+`main` should always be releasable: tests pass, package builds, dashboard assets are valid, docs are coherent, and any tag from `main` would be publishable.
+
+Use one branch per coherent task or issue:
+
+```text
+feature/<issue-number>-short-description
+fix/<issue-number>-short-description
+docs/<issue-number>-short-description
+chore/<issue-number>-short-description
+test/<issue-number>-short-description
+release/0.4.0
+hotfix/0.3.3
+```
+
+Start work from current `main`:
+
+```bash
+git switch main
+git pull --ff-only
+git switch -c fix/125-wheel-package-data
+```
+
+Keep each branch focused. Do not mix release prep with unrelated features, and do not push directly to `main`. Push the branch, open a PR, use the PR template, and merge only after required checks pass.
+
+For solo-maintainer work, the PR itself is still the review artifact. Prefer squash merge for ordinary task PRs so `main` remains readable.
+
+Recommended `main` protection:
+
+- Require pull request before merging.
+- Require status checks before merging.
+- Require branches to be up to date before merging.
+- Require conversation resolution.
+- Require linear history if it fits the current workflow.
+- Disable force pushes.
+- Disable branch deletion.
+- Keep production PyPI publication behind the protected `pypi` GitHub environment.
+
+## Issue And Milestone Model
+
+Use issues for non-trivial work so Codex sessions stay focused.
+
+Recommended labels:
+
+```text
+bug
+docs
+packaging
+release
+privacy
+security
+performance
+dashboard
+cli
+mcp
+parser-compat
+good-first-issue
+blocked
+1.0-blocker
+```
+
+Recommended milestones:
+
+```text
+0.4.0
+1.0-readiness
+1.0.0
+```
+
+Suggested 1.0-readiness issues:
+
+- Installed-package smoke script.
+- Strict privacy regression tests.
+- Upgrade and migration tests.
+- JSON contract documentation parity.
+- Benchmark thresholds.
+- Support-bundle safety tests.
+- Release recovery docs.
+
 ## Local CI Gate
 
-Run the local CI gate before pushing to `main`:
+Run focused tests first, then broader checks. Run the full local CI gate before opening or updating PRs that touch release, packaging, CLI contracts, MCP behavior, dashboard behavior, privacy behavior, schemas, generated docs/assets, or bundled plugin/skill files:
 
 ```bash
 python -m ruff check .
@@ -44,6 +126,13 @@ rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-
 python -m build
 python -m twine check dist/*
 python scripts/check_release.py --dist
+```
+
+For documentation-only branches, at minimum run:
+
+```bash
+python scripts/check_release.py
+git diff --check
 ```
 
 ## Additional Smoke Checks
@@ -85,7 +174,9 @@ The script creates synthetic aggregate-only SQLite databases and times common fi
 
 ## Release Checklist
 
-Before publishing a package:
+Use a release branch only for version/changelog/pinning/publish prep. It should include release-specific changes such as version bumps, `CHANGELOG.md`, install/version wording, runtime package pins, publish workflow tweaks, release notes, and final smoke-test fixes. It should not include unrelated features.
+
+Before opening a release PR:
 
 ```bash
 python -m ruff check .
@@ -114,6 +205,17 @@ codex-usage-tracker install-plugin --plugin-dir /tmp/codex-usage-tracker-plugin-
 ```
 
 The release checker verifies version alignment, required public docs, packaged plugin assets, wheel contents, and obvious tracked secret patterns. It does not publish anything.
+
+After the release branch merges, tag from updated `main`, not from an unreviewed branch:
+
+```bash
+git switch main
+git pull --ff-only
+git tag -a v0.4.0 -m "codex-usage-tracker 0.4.0"
+git push origin v0.4.0
+```
+
+Do not create or push release tags without maintainer approval.
 
 ## Publishing
 
