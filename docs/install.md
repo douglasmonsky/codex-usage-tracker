@@ -145,7 +145,9 @@ codex-usage-tracker setup
 codex-usage-tracker upgrade-plugin
 codex-usage-tracker uninstall-plugin
 codex-usage-tracker reset-db --yes
-codex-usage-tracker support-bundle --output ~/.codex-usage-tracker/support-bundle.json
+codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json
 ```
 
-`support-bundle` writes package, Python, OS, doctor, database schema, parser diagnostics, pricing status, and allowance status. It does not include raw logs, prompts, assistant messages, tool output, or context text.
+`support-bundle` writes package, Python, OS/platform, doctor status, database schema, parser diagnostics, pricing status, allowance status, threshold status, project config status, and privacy metadata. It does not include raw logs, prompts, assistant messages, tool output, context text, or aggregate rows.
+
+Default `support-bundle` mode keeps local diagnostic paths because they can help troubleshoot setup on your machine. Use `--privacy-mode strict` before sharing: strict mode redacts local diagnostic path strings in the bundle and doctor details while preserving existence flags, counts, parser diagnostics, and status fields.

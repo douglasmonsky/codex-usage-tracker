@@ -98,9 +98,9 @@ Not guaranteed:
 
 ## 10. Support-Bundle Safety
 
-- [ ] Verify support bundles include package version, Python version, OS/platform, doctor status, schema state, parser diagnostics, pricing status, allowance status, threshold status, project config status, and privacy metadata: `python -m pytest tests/test_support.py`.
-- [ ] Verify support bundles exclude raw logs, prompt text, assistant text, tool output, context text, and raw source paths in strict mode: `python -m pytest tests/test_support.py`.
-- [ ] Update issue templates to request only strict-mode support bundles: manual review of `.github/ISSUE_TEMPLATE/`.
+- [x] Verify support bundles include package version, Python version, OS/platform, doctor status, schema state, parser diagnostics, pricing status, allowance status, threshold status, project config status, and privacy metadata: `python -m pytest tests/test_support.py`.
+- [x] Verify support bundles exclude raw logs, prompt text, assistant text, tool output, context text, and raw source paths in strict mode: `python -m pytest tests/test_support.py`.
+- [x] Update issue templates to request only strict-mode support bundles: manual review of `.github/ISSUE_TEMPLATE/`.
 
 ## 11. Large-History Performance
 

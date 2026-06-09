@@ -73,6 +73,20 @@ codex-usage-tracker --privacy-mode strict query --since 2026-06-01
 
 Dashboard payloads and support bundles include the active mode so screenshots and support artifacts make their metadata posture visible.
 
+## Support Bundles
+
+Support bundles are designed for diagnostics without raw conversation content. They include package version, Python version, OS/platform, path existence checks, database schema state, refresh/parser diagnostics, pricing status, allowance status, threshold status, project config status, doctor results, and privacy metadata.
+
+They do not include raw logs, aggregate rows, prompts, assistant messages, tool output, on-demand context text, or pasted transcript content. Known secret-like patterns are redacted from string fields before the bundle is written.
+
+Default support bundles keep local diagnostic paths for troubleshooting. Before sharing a bundle publicly, generate it in strict mode:
+
+```bash
+codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json
+```
+
+Strict mode redacts local diagnostic path strings in the bundle and doctor details while keeping booleans, counts, statuses, and parser diagnostics available.
+
 ## Costs, Credits, And Allowance
 
 Cost estimates are calculated only from aggregate token fields and your local pricing config. They are omitted when no matching model price is configured. Pricing refreshes pull only OpenAI's public pricing markdown and do not send local usage data anywhere.
@@ -86,7 +100,8 @@ The optional allowance config is local and stores only the remaining percentages
 Before sharing a dashboard, CSV, JSON query result, or support bundle:
 
 1. Use `--privacy-mode redacted` or `--privacy-mode strict` if project names, directories, branches, or tags are sensitive.
-2. Do not share local raw JSONL logs.
-3. Do not enable or export on-demand context unless you have reviewed the content.
-4. Prefer synthetic screenshots for public docs and issues.
-5. Treat source paths and thread names as potentially sensitive even when raw messages are absent.
+2. Use `--privacy-mode strict support-bundle` for public issues unless a maintainer specifically asks for normal-mode local path diagnostics.
+3. Do not share local raw JSONL logs.
+4. Do not enable or export on-demand context unless you have reviewed the content.
+5. Prefer synthetic screenshots for public docs and issues.
+6. Treat source paths and thread names as potentially sensitive even when raw messages are absent.
