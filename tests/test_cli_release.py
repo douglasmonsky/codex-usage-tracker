@@ -20,7 +20,7 @@ def test_module_cli_version() -> None:
         env=_subprocess_env(),
     )
 
-    assert "codex-usage-tracker 0.3.2" in result.stdout
+    assert "codex-usage-tracker 0.4.0" in result.stdout
 
 
 def test_release_check_script_passes() -> None:

@@ -147,8 +147,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.3.2
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.3.2
+python scripts/smoke_installed_package.py --from-pypi --version 0.4.0
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.4.0
 ```
 
 Docker avoids local toolchain side effects during install testing. Keep one local `pipx` smoke for platform-specific PATH and plugin-discovery behavior, but use Docker for repeatable Linux package verification.
@@ -274,11 +274,12 @@ Do not create or push release tags without maintainer approval.
 
 Publishing uses GitHub Actions Trusted Publishing through `.github/workflows/publish.yml`; do not upload from a local machine and do not add PyPI or TestPyPI API tokens.
 
-The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading:
+The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading. Minor release `0.4.0` added Python 3.14 support, release recovery docs, stricter privacy/support-bundle regression coverage, and large-history benchmark thresholds:
 
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.0`
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.1`
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.2`
+- GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.4.0`
 - PyPI: `https://pypi.org/project/codex-usage-tracking/`
 - TestPyPI: `https://test.pypi.org/project/codex-usage-tracking/`
 
