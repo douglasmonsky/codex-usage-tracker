@@ -89,6 +89,64 @@ def test_release_check_script_passes() -> None:
     assert "Release readiness checks passed." in result.stdout
 
 
+def test_release_check_rejects_stale_public_package_version_claims(tmp_path: Path) -> None:
+    module = _load_release_check_module()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "one-dot-oh-readiness.md").write_text(
+        "Verify public install: codex-usage-tracking==0.4.0\n"
+        "Smoke Docker: --from-pypi --version 0.4.0\n"
+        "Verify visible as `0.4.0`.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "development.md").write_text(
+        "python scripts/smoke_installed_package.py --from-pypi --version 0.4.0\n",
+        encoding="utf-8",
+    )
+
+    original_root = module.REPO_ROOT
+    module.REPO_ROOT = tmp_path
+    try:
+        failures = module._check_public_release_doc_versions("0.4.1")
+    finally:
+        module.REPO_ROOT = original_root
+
+    assert len(failures) == 4
+    assert all("does not match pyproject.toml 0.4.1" in failure for failure in failures)
+
+
+def test_release_check_rejects_old_pypi_package_install_docs(tmp_path: Path) -> None:
+    module = _load_release_check_module()
+    readme = tmp_path / "README.md"
+    install_doc = tmp_path / "docs" / "install.md"
+    development_doc = tmp_path / "docs" / "development.md"
+    install_doc.parent.mkdir()
+    readme.write_text(
+        "Package naming: the PyPI distribution is `codex-usage-tracking`. "
+        "The `codex-usage-tracker` PyPI name is not this project.\n"
+        "pipx install codex-usage-tracker\n",
+        encoding="utf-8",
+    )
+    install_doc.write_text(
+        "Package naming: the public PyPI distribution is `codex-usage-tracking`. "
+        "The `codex-usage-tracker` PyPI name is not this project.\n"
+        "python -m pip install codex-usage-tracker\n",
+        encoding="utf-8",
+    )
+    development_doc.write_text("Distribution: codex-usage-tracking\n", encoding="utf-8")
+
+    original_root = module.REPO_ROOT
+    module.REPO_ROOT = tmp_path
+    try:
+        failures = module._check_package_naming_docs()
+    finally:
+        module.REPO_ROOT = original_root
+
+    assert {
+        "README.md:2 installs codex-usage-tracker; use codex-usage-tracking",
+        "docs/install.md:2 installs codex-usage-tracker; use codex-usage-tracking",
+    } <= set(failures)
+
+
 def test_readme_codex_usage_tracker_commands_reference_known_subcommands() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     readme = repo_root / "README.md"
@@ -340,6 +398,17 @@ def _subprocess_env() -> dict[str, str]:
         else src_path
     )
     return env
+
+
+def _load_release_check_module():
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "scripts" / "check_release.py"
+    spec = importlib.util.spec_from_file_location("check_release", script_path)
+    if spec is None or spec.loader is None:
+        raise AssertionError("could not load check_release.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _documented_cli_commands(path: Path) -> tuple[set[str], list[str]]:

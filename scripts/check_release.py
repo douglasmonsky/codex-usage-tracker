@@ -23,6 +23,21 @@ DIST_FILE_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
 SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+OLD_PYPI_DISTRIBUTION_NAME = "codex-usage-tracker"
+PUBLIC_RELEASE_DOCS = [
+    "docs/one-dot-oh-readiness.md",
+    "docs/development.md",
+]
+PACKAGE_NAMING_DOCS = [
+    "README.md",
+    "docs/install.md",
+    "docs/development.md",
+]
+PUBLIC_VERSION_PATTERNS = [
+    re.compile(r"codex-usage-tracking==([0-9]+(?:\.[0-9]+){2})"),
+    re.compile(r"--from-pypi --version ([0-9]+(?:\.[0-9]+){2})"),
+    re.compile(r"visible as `([0-9]+(?:\.[0-9]+){2})`"),
+]
 SECRET_PATTERNS = {
     "OpenAI API key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
     "GitHub token": re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}"),
@@ -156,6 +171,7 @@ def _check_versions() -> list[str]:
         failures.append(".codex-plugin/plugin.json version does not match pyproject.toml")
     if f"## {package_version}" not in changelog:
         failures.append("CHANGELOG.md does not contain an entry for the package version")
+    failures.extend(_check_public_release_doc_versions(package_version))
     return failures
 
 
@@ -164,6 +180,7 @@ def _check_docs() -> list[str]:
     failures: list[str] = []
     for required in [
         "pipx install",
+        "codex-usage-tracking",
         "codex-usage-tracker install-plugin",
         "codex-usage-tracker doctor",
         "Data Privacy",
@@ -171,6 +188,57 @@ def _check_docs() -> list[str]:
     ]:
         if required not in readme:
             failures.append(f"README.md is missing required install/privacy text: {required}")
+    failures.extend(_check_package_naming_docs())
+    return failures
+
+
+def _check_public_release_doc_versions(package_version: str) -> list[str]:
+    failures: list[str] = []
+    for relative_path in PUBLIC_RELEASE_DOCS:
+        path = REPO_ROOT / relative_path
+        text = path.read_text(encoding="utf-8")
+        for pattern in PUBLIC_VERSION_PATTERNS:
+            for match in pattern.finditer(text):
+                if match.group(1) != package_version:
+                    failures.append(
+                        f"{relative_path} public release version {match.group(1)} "
+                        f"does not match pyproject.toml {package_version}"
+                    )
+    return failures
+
+
+def _check_package_naming_docs() -> list[str]:
+    failures: list[str] = []
+    old_name_warning = f"The `{OLD_PYPI_DISTRIBUTION_NAME}` PyPI name is not this project"
+    for relative_path in PACKAGE_NAMING_DOCS:
+        text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        if DISTRIBUTION_NAME not in text:
+            failures.append(f"{relative_path} must name the public PyPI package {DISTRIBUTION_NAME}")
+        if relative_path in {"README.md", "docs/install.md"} and old_name_warning not in text:
+            failures.append(
+                f"{relative_path} must warn that {OLD_PYPI_DISTRIBUTION_NAME} "
+                "is a different PyPI package"
+            )
+        failures.extend(_check_doc_install_lines(relative_path, text))
+    return failures
+
+
+def _check_doc_install_lines(relative_path: str, text: str) -> list[str]:
+    failures: list[str] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        normalized = line.strip().strip("`")
+        if not normalized:
+            continue
+        if not re.search(r"\b(?:pipx|pip|python(?:3)? -m pip)\s+install\b", normalized):
+            continue
+        if OLD_PYPI_DISTRIBUTION_NAME not in normalized:
+            continue
+        if DISTRIBUTION_NAME in normalized or "git+" in normalized or "github.com" in normalized:
+            continue
+        failures.append(
+            f"{relative_path}:{line_number} installs {OLD_PYPI_DISTRIBUTION_NAME}; "
+            f"use {DISTRIBUTION_NAME}"
+        )
     return failures
 
 
@@ -364,23 +432,6 @@ def _workflow_job_block(workflow: str, job_name: str) -> str | None:
     if not match:
         return None
     return match.group("body")
-
-
-def _check_ci_workflow() -> list[str]:
-    workflow_path = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-    if not workflow_path.exists():
-        return ["missing CI workflow: .github/workflows/ci.yml"]
-    workflow = workflow_path.read_text(encoding="utf-8")
-    failures: list[str] = []
-    for required in [
-        "name: Build package",
-        "python -m build",
-        "python -m twine check dist/*",
-        "python scripts/check_release.py --dist",
-    ]:
-        if required not in workflow:
-            failures.append(f"CI package job is missing required build check: {required}")
-    return failures
 
 
 def _check_ci_workflow() -> list[str]:
