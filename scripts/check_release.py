@@ -213,11 +213,19 @@ def _check_packaging_metadata() -> list[str]:
     )
     if "codex-usage-tracker.git@main" in launcher:
         failures.append("MCP runtime launcher must pin the package spec instead of tracking main")
-    package_spec = re.search(r"codex-usage-tracker\.git@([0-9a-f]{40})", launcher)
-    if not package_spec:
-        failures.append("MCP runtime launcher must pin a 40-character GitHub commit SHA")
-    elif not _is_ancestor_when_available(package_spec.group(1), "HEAD"):
-        failures.append("MCP runtime launcher package pin is not reachable from HEAD")
+    git_package_spec = re.search(r"codex-usage-tracker\.git@([0-9a-f]{40})", launcher)
+    pypi_package_spec = re.search(r"codex-usage-tracking==([0-9]+(?:\.[0-9]+){2})", launcher)
+    if pypi_package_spec:
+        if pypi_package_spec.group(1) != str(project.get("version")):
+            failures.append("MCP runtime launcher PyPI pin does not match project.version")
+    elif git_package_spec:
+        if not _is_ancestor_when_available(git_package_spec.group(1), "HEAD"):
+            failures.append("MCP runtime launcher package pin is not reachable from HEAD")
+    else:
+        failures.append(
+            "MCP runtime launcher must pin an exact codex-usage-tracking version or a "
+            "40-character GitHub commit SHA"
+        )
     if "importlib.metadata.version('codex-usage-tracking')" not in launcher:
         failures.append("MCP runtime launcher must check the codex-usage-tracking distribution")
     if "PACKAGE_SPEC_MARKER" not in launcher:

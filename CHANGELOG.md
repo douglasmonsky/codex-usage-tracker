@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.4.0 - 2026-06-09
+
+- Add official Python 3.14 support across CI, package classifiers, README/install docs, and installed-package Docker smoke coverage.
+- Add a release recovery runbook for failed publish workflows, stale PyPI/TestPyPI pages, Trusted Publishing issues, bad artifacts, and patch-forward recovery.
+- Add synthetic large-history benchmark thresholds for active/all-history dashboard queries, date filtering, model/effort filtering, recommendations, pricing coverage, and project summaries.
+- Add stricter privacy regression coverage for generated dashboards, CSV exports, API payloads, and support bundles.
+- Redact sensitive strings and local diagnostic paths in support bundles, including nested doctor output in redacted and strict privacy modes.
+- Add aggregate schema migration, JSON contract parity, installed-package smoke, and protected-main workflow readiness coverage.
+- Pin the marketplace MCP runtime launcher to the exact `codex-usage-tracking==0.4.0` package.
+
 ## 0.3.2 - 2026-06-08
 
 - Make `open-dashboard` and `serve-dashboard` refresh active-session logs by default, with `--no-refresh` as the explicit cached-index mode.

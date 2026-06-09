@@ -18,11 +18,11 @@ codex-usage-tracker install-plugin --python .venv/bin/python
 
 Restart Codex after registration so it can discover the plugin.
 
-Marketplace installs use the bundled MCP launcher at `skills/codex-usage-tracker/scripts/run_mcp.py`. On first MCP startup it creates a cached runtime under `~/.cache/codex-usage-tracker/mcp-runtime/` and installs the Python package from a pinned GitHub source commit, so it does not require a `.venv` inside the plugin directory.
+Marketplace installs use the bundled MCP launcher at `skills/codex-usage-tracker/scripts/run_mcp.py`. On first MCP startup it creates a cached runtime under `~/.cache/codex-usage-tracker/mcp-runtime/` and installs the exact pinned Python package, so it does not require a `.venv` inside the plugin directory.
 
-This is intentional: normal user installs come from the PyPI distribution `codex-usage-tracking`, while the plugin bootstrapper pins a reviewed repository commit so MCP startup does not accidentally track `main`.
+This is intentional: normal user installs come from the PyPI distribution `codex-usage-tracking`, and the plugin bootstrapper pins an exact reviewed package version so MCP startup does not accidentally track `main`.
 
-The launcher stores the GitHub package spec used for that runtime and reinstalls when the bundled package pin changes. Set `CODEX_USAGE_TRACKER_PACKAGE_SPEC` to test a different Git ref or `CODEX_USAGE_TRACKER_RUNTIME_DIR` to use a separate cache while debugging plugin startup.
+The launcher stores the package spec used for that runtime and reinstalls when the bundled package pin changes. Set `CODEX_USAGE_TRACKER_PACKAGE_SPEC` to test a different package version or Git ref, or set `CODEX_USAGE_TRACKER_RUNTIME_DIR` to use a separate cache while debugging plugin startup.
 
 ## Companion Skills
 
