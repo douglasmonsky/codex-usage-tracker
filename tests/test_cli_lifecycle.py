@@ -84,11 +84,13 @@ def test_setup_support_bundle_and_reset_db_cli(tmp_path: Path) -> None:
         "reset-db",
         "--yes",
     )
+    raw_log_path = next((codex_home / "sessions").glob("**/*.jsonl"))
 
     assert reset_without_confirm.returncode == 1
     assert "Re-run with --yes" in reset_without_confirm.stderr
     assert reset.returncode == 0
     assert "Raw Codex logs were not touched" in reset.stdout
+    assert "SECRET RAW PROMPT" in raw_log_path.read_text(encoding="utf-8")
 
 
 def test_rate_card_allowance_and_pricing_snapshot_cli(tmp_path: Path) -> None:

@@ -42,6 +42,10 @@ _ARCHIVED_SOURCE_PATTERNS = (
 )
 
 
+class SchemaMigrationError(RuntimeError):
+    """Raised when a persisted aggregate schema cannot be repaired safely."""
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
@@ -137,6 +141,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v2(conn)
         _record_migration_if_missing(conn, 2)
+    _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
@@ -305,6 +310,22 @@ def _ensure_columns(conn: sqlite3.Connection, columns: dict[str, str]) -> None:
             except sqlite3.OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
+
+
+def _validate_usage_events_schema(conn: sqlite3.Connection) -> None:
+    existing = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+    }
+    missing = [column for column in EVENT_COLUMNS if column not in existing]
+    if missing:
+        missing_text = ", ".join(missing)
+        raise SchemaMigrationError(
+            "usage_events schema is missing required columns: "
+            f"{missing_text}. Run codex-usage-tracker rebuild-index after confirming your "
+            "local aggregate index can be regenerated; raw Codex logs are not touched by "
+            "rebuild-index."
+        )
 
 
 def upsert_usage_events(

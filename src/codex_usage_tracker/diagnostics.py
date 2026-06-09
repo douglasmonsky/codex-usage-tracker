@@ -20,7 +20,7 @@ from codex_usage_tracker.paths import (
     DEFAULT_PRICING_PATH,
 )
 from codex_usage_tracker.pricing import load_pricing_config
-from codex_usage_tracker.store import refresh_metadata, schema_state
+from codex_usage_tracker.store import SchemaMigrationError, refresh_metadata, schema_state
 
 PLUGIN_NAME = "codex-usage-tracker"
 
@@ -165,7 +165,15 @@ def _check_database(db_path: Path) -> DoctorCheck:
 
 
 def _check_database_schema(db_path: Path) -> DoctorCheck:
-    state = schema_state(db_path)
+    try:
+        state = schema_state(db_path)
+    except SchemaMigrationError as exc:
+        return DoctorCheck(
+            "Database schema",
+            "fail",
+            str(exc),
+            "Run: codex-usage-tracker rebuild-index after confirming your local aggregate index can be regenerated.",
+        )
     if not state["exists"]:
         return DoctorCheck(
             "Database schema",
@@ -197,7 +205,15 @@ def _check_database_schema(db_path: Path) -> DoctorCheck:
 
 
 def _check_parser_diagnostics(db_path: Path) -> DoctorCheck:
-    metadata = refresh_metadata(db_path)
+    try:
+        metadata = refresh_metadata(db_path)
+    except SchemaMigrationError as exc:
+        return DoctorCheck(
+            "Parser diagnostics",
+            "fail",
+            f"Parser diagnostics are unavailable because database migration failed: {exc}",
+            "Run: codex-usage-tracker rebuild-index after resolving the database schema warning.",
+        )
     if not metadata:
         return DoctorCheck(
             "Parser diagnostics",

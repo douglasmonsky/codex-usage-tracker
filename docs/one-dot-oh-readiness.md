@@ -29,16 +29,17 @@ Not guaranteed:
 - [x] Verify installed package resources in Linux Docker: `python scripts/smoke_installed_package.py --docker`.
 - [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version <version>`.
 - [ ] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
+- [ ] Add Python 3.14 as an official support target only after CI, package classifiers, docs, and installed-package smoke coverage pass. Track this in issue #12.
 
 ## 2. Upgrade And Migration
 
-- [ ] Add synthetic v0.2-style SQLite fixture test proving `init_db` upgrades without data loss: `python -m pytest tests/test_store_migrations.py`.
+- [x] Add synthetic legacy SQLite fixture test proving `init_db` upgrades without data loss: `python -m pytest tests/test_store_migrations.py`.
 - [ ] Add synthetic v0.3-style SQLite fixture if schema drift requires it: `python -m pytest tests/test_store_migrations.py`.
-- [ ] Verify `schema_state` reports expected version and checksum after migration: `python -m pytest tests/test_store_migrations.py`.
-- [ ] Verify `rebuild-index` clears only tracker-owned aggregate tables: `python -m pytest tests/test_cli_lifecycle.py`.
-- [ ] Verify `reset-db` does not touch raw Codex logs: `python -m pytest tests/test_cli_lifecycle.py`.
-- [ ] Verify refresh metadata and parser diagnostics survive migration: `python -m pytest tests/test_store_migrations.py tests/test_parser.py`.
-- [ ] Verify CSV export columns after migration: `python -m pytest tests/test_cli_lifecycle.py`.
+- [x] Verify `schema_state` reports expected version and checksum after migration: `python -m pytest tests/test_store_migrations.py`.
+- [x] Verify `rebuild-index` clears only tracker-owned aggregate tables: `python -m pytest tests/test_store_dashboard_mcp.py`.
+- [x] Verify `reset-db` does not touch raw Codex logs: `python -m pytest tests/test_cli_lifecycle.py`.
+- [x] Verify refresh metadata and parser diagnostics survive migration: `python -m pytest tests/test_store_migrations.py tests/test_parser.py`.
+- [x] Verify CSV export columns after migration: `python -m pytest tests/test_store_migrations.py`.
 
 ## 3. CLI Compatibility
 
@@ -127,3 +128,4 @@ Not guaranteed:
 - [ ] Document that live account allowance cannot be read automatically by this local tracker.
 - [ ] Document that cost and credit estimates are not guaranteed to match exact billing.
 - [ ] Document platform/plugin discovery limitations separately from the core Python CLI/dashboard support.
+- [ ] Document that Python 3.14 may install because package metadata allows `>=3.10`, but it is not officially supported until issue #12 is complete.
