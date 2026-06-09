@@ -255,6 +255,8 @@ python scripts/smoke_installed_package.py
 python scripts/smoke_installed_package.py --docker
 ```
 
+The Docker smoke uses `python:3.14-slim` by default so release prep verifies installed-package behavior on the newest supported runtime.
+
 The release checker verifies version alignment, required public docs, packaged plugin assets, wheel contents, and obvious tracked secret patterns. It does not publish anything.
 
 After the release branch merges, tag from updated `main`, not from an unreviewed branch:

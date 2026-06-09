@@ -29,7 +29,7 @@ Not guaranteed:
 - [x] Verify installed package resources in Linux Docker: `python scripts/smoke_installed_package.py --docker`.
 - [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version <version>`.
 - [ ] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
-- [ ] Add Python 3.14 as a near-term official support target only after CI, package classifiers, docs, and installed-package smoke coverage pass. Include Docker smoke coverage for the packaged app before updating support badges or classifiers. Track this in issue #12.
+- [x] Add Python 3.14 as an official support target after CI, package classifiers, docs, and installed-package smoke coverage were added. Docker smoke coverage uses `python:3.14-slim` by default. Track this in issue #12.
 
 ## 2. Upgrade And Migration
 
@@ -128,4 +128,3 @@ Not guaranteed:
 - [ ] Document that live account allowance cannot be read automatically by this local tracker.
 - [ ] Document that cost and credit estimates are not guaranteed to match exact billing.
 - [ ] Document platform/plugin discovery limitations separately from the core Python CLI/dashboard support.
-- [ ] Document that Python 3.14 may install because package metadata allows `>=3.10`, but it is not officially supported until issue #12 is complete.
