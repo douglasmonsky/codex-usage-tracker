@@ -32,7 +32,7 @@ DISTRIBUTION_NAME = "codex-usage-tracking"
 WHEEL_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
-DEFAULT_DOCKER_IMAGE = "python:3.13-slim"
+DEFAULT_DOCKER_IMAGE = "python:3.14-slim"
 
 RESOURCE_PATHS = [
     "assets/icon.svg",

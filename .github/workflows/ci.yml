@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,24 +22,24 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
       - uses: actions/setup-node@v4
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.14'
         with:
           node-version: "22"
       - name: Ruff
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.14'
         run: python -m ruff check .
       - name: Type check
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.14'
         run: python -m mypy
       - name: Test
         run: python -m pytest
       - name: Coverage
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.14'
         run: python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
       - name: Compile
         run: python -m compileall src
       - name: Dashboard JavaScript syntax
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.14'
         run: |
           node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
           node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip

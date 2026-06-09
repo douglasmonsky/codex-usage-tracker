@@ -22,6 +22,7 @@ DISTRIBUTION_NAME = "codex-usage-tracking"
 DIST_FILE_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
+SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 SECRET_PATTERNS = {
     "OpenAI API key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
     "GitHub token": re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}"),
@@ -221,7 +222,39 @@ def _check_packaging_metadata() -> list[str]:
         failures.append("MCP runtime launcher must check the codex-usage-tracking distribution")
     if "PACKAGE_SPEC_MARKER" not in launcher:
         failures.append("MCP runtime launcher should invalidate cached runtimes when package spec changes")
+    failures.extend(_check_python_support_metadata(project))
     failures.extend(_check_publish_workflow())
+    return failures
+
+
+def _check_python_support_metadata(project: dict[str, object]) -> list[str]:
+    failures: list[str] = []
+    classifiers = set(project.get("classifiers", []))
+    for version in SUPPORTED_PYTHON_VERSIONS:
+        classifier = f"Programming Language :: Python :: {version}"
+        if classifier not in classifiers:
+            failures.append(f"pyproject.toml is missing Python classifier: {classifier}")
+
+    ci_workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    for version in SUPPORTED_PYTHON_VERSIONS:
+        if f'"{version}"' not in ci_workflow:
+            failures.append(f"CI workflow test matrix is missing Python {version}")
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    if "python-3.10--3.14" not in readme:
+        failures.append("README.md Python badge should advertise Python 3.10-3.14")
+    if "Python 3.10-3.14" not in readme:
+        failures.append("README.md platform support should document Python 3.10-3.14")
+
+    install_doc = (REPO_ROOT / "docs" / "install.md").read_text(encoding="utf-8")
+    if "Python 3.10, 3.11, 3.12, 3.13, and 3.14" not in install_doc:
+        failures.append("docs/install.md should document CI support through Python 3.14")
+
+    smoke_script = (REPO_ROOT / "scripts" / "smoke_installed_package.py").read_text(
+        encoding="utf-8"
+    )
+    if 'DEFAULT_DOCKER_IMAGE = "python:3.14-slim"' not in smoke_script:
+        failures.append("installed-package Docker smoke default should use python:3.14-slim")
     return failures
 
 

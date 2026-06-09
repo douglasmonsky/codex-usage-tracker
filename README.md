@@ -9,7 +9,7 @@ Local-first dashboard, Codex plugin, and companion skill for understanding where
 
 [![CI](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/douglasmonsky/codex-usage-tracker/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/codex-usage-tracking.svg)](https://pypi.org/project/codex-usage-tracking/)
-![Python 3.10-3.13](https://img.shields.io/badge/python-3.10--3.13-blue)
+![Python 3.10-3.14](https://img.shields.io/badge/python-3.10--3.14-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 > **Unofficial project:** Codex Usage Tracker is an independent open-source project. It is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI; this project only reads local log files from your machine.
@@ -63,7 +63,7 @@ More install paths: [Install Guide](docs/install.md).
 
 ## Platform Support
 
-The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and localhost server are Python-based and CI-tested on Ubuntu for Python 3.10-3.13. Python 3.14 support is a near-term roadmap item, but it is not an official target until CI, package classifiers, docs, and installed-package smoke coverage pass. It defaults to `~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data; pass `--codex-home` or `--db` when your local layout differs. Codex plugin discovery depends on Codex's local plugin directories on your machine, so run `codex-usage-tracker doctor` after setup if plugin registration does not appear in Codex.
+The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and localhost server are Python-based and CI-tested on Ubuntu for Python 3.10-3.14. The installed-package Docker smoke path uses `python:3.14-slim` by default so packaged resources and CLI entry points are exercised on the newest supported runtime. It defaults to `~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data; pass `--codex-home` or `--db` when your local layout differs. Codex plugin discovery depends on Codex's local plugin directories on your machine, so run `codex-usage-tracker doctor` after setup if plugin registration does not appear in Codex.
 
 ## Dashboard Preview
 
@@ -224,7 +224,7 @@ This is optional. The normal shell install above is the fastest trusted path for
 
 ## Roadmap
 
-- Add official Python 3.14 support soon once CI, package metadata, docs, and installed-package smoke tests are green, including Docker smoke coverage for the packaged app ([tracking issue #12](https://github.com/douglasmonsky/codex-usage-tracker/issues/12)).
+- Keep Python runtime support validated with CI matrix coverage, package classifiers, release docs, and installed-package smoke tests.
 - Improve the `Set limits` flow with a paste/import experience for 5-hour and weekly allowance snapshots.
 - Track allowance snapshot history so local Codex credits can be compared against visible remaining-usage changes over time.
 - Clarify top-card token accounting by showing output tokens and reasoning output as a subset instead of implying all token cards add together.
