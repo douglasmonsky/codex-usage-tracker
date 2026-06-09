@@ -57,12 +57,12 @@ Not guaranteed:
 
 ## 5. JSON Contract Stability
 
-- [ ] Verify every documented `--json` command has a tracked schema: `python -m pytest tests/test_json_contracts.py`.
-- [ ] Verify every schema in `docs/cli-json-schemas.md` exists in `src/codex_usage_tracker/json_contracts.py`: `python -m pytest tests/test_cli_release.py`.
-- [ ] Verify every schema in `json_contracts.py` is documented: `python -m pytest tests/test_json_contracts.py`.
-- [ ] Verify known payload examples pass `validate_json_payload_contract`: `python -m pytest tests/test_json_contracts.py`.
-- [ ] Verify invalid or missing required fields fail contract validation: `python -m pytest tests/test_json_contracts.py`.
-- [ ] Cover query, recommendations, summary, session, doctor, pricing-coverage, dashboard, export, support-bundle, and plugin lifecycle JSON payloads: `python -m pytest tests/test_json_contracts.py`.
+- [x] Verify every documented `--json` command has a tracked schema: `python -m pytest tests/test_json_contracts.py`.
+- [x] Verify every schema in `docs/cli-json-schemas.md` exists in `src/codex_usage_tracker/json_contracts.py`: `python -m pytest tests/test_json_contracts.py`.
+- [x] Verify every schema in `json_contracts.py` is documented: `python -m pytest tests/test_json_contracts.py`.
+- [x] Verify known payload examples pass `validate_json_payload_contract`: `python -m pytest tests/test_json_contracts.py`.
+- [x] Verify invalid or missing required fields fail contract validation: `python -m pytest tests/test_json_contracts.py`.
+- [x] Cover query, recommendations, summary, session, doctor, pricing-coverage, dashboard, export, support-bundle, and plugin lifecycle JSON payload contracts: `python -m pytest tests/test_json_contracts.py`.
 
 ## 6. CSV Export Stability
 

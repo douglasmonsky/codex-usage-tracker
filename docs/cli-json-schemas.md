@@ -1,6 +1,6 @@
-# CLI and MCP JSON Schemas
+# CLI, MCP, and Dashboard JSON Schemas
 
-Codex Usage Tracker exposes aggregate-only JSON for automation through CLI `--json` flags and MCP tools. These payloads do not include prompts, assistant messages, tool output, or raw transcript snippets.
+Codex Usage Tracker exposes aggregate-only JSON for automation through CLI `--json` flags, MCP tools, and the local dashboard server API. These payloads do not include prompts, assistant messages, tool output, or raw transcript snippets.
 
 ## Companion Skill Usage
 
@@ -24,6 +24,13 @@ Use the global `--privacy-mode redacted` or `--privacy-mode strict` option, or t
 
 Stable payload contracts are tracked in `codex_usage_tracker.json_contracts` and covered by tests. Every stable payload includes a top-level `schema` string so agents can distinguish compatible responses from markdown, disabled-context responses, or future versions.
 
+Compatibility rules before 1.0:
+
+- Additive fields are allowed when they do not change documented field types or privacy semantics.
+- Removing a documented schema, removing a required field, changing a required field type, or changing privacy behavior requires either a new schema id or an explicit pre-1.0 migration note.
+- After 1.0, breaking payload changes require a new schema id.
+- Config-file schemas such as pricing, allowance, and rate-card JSON are tracked separately from runtime CLI/MCP/dashboard payload schemas.
+
 Tracked schema ids:
 
 | Schema | Surface |
@@ -42,6 +49,7 @@ Tracked schema ids:
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
+| `codex-usage-tracker-context-settings-v1` | Dashboard server `/api/context-settings` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload |
