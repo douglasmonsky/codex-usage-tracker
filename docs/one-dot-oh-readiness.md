@@ -2,6 +2,8 @@
 
 This checklist tracks the work needed to move from the first public PyPI releases toward a stable 1.0 contract. Keep all verification data synthetic or aggregate-only.
 
+Each completed checkbox names the primary verification command inline. The evidence reference section at the end maps those commands to the concrete tests, scripts, workflow checks, or public-install smokes that prove the completed items.
+
 ## Compatibility Promise
 
 - CLI command names documented in `docs/cli-reference.md` are stable after 1.0.
@@ -22,12 +24,12 @@ Not guaranteed:
 
 ## 1. Public Install And Package Metadata
 
-- [x] Verify the current public PyPI version is visible: `python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/codex-usage-tracking/json'))['info']['version'])"`.
-- [x] Verify public venv install: `python -m venv /tmp/codex-usage-pypi-smoke && . /tmp/codex-usage-pypi-smoke/bin/activate && python -m pip install codex-usage-tracking && codex-usage-tracker --version`.
-- [x] Verify public pipx install path: `pipx install codex-usage-tracking && codex-usage-tracker --version`, with `pipx ensurepath` or the printed pipx app directory when needed.
+- [x] Verify the current public PyPI version is visible as `0.4.0`: `python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/codex-usage-tracking/json'))['info']['version'])"`.
+- [x] Verify public venv install for `0.4.0`: `python -m venv /tmp/codex-usage-pypi-smoke && . /tmp/codex-usage-pypi-smoke/bin/activate && python -m pip install codex-usage-tracking==0.4.0 && codex-usage-tracker --version`.
+- [x] Verify public pipx install path for `0.4.0`: `PIPX_HOME=/tmp/codex-usage-pipx-home PIPX_BIN_DIR=/tmp/codex-usage-pipx-bin pipx install codex-usage-tracking==0.4.0 && /tmp/codex-usage-pipx-bin/codex-usage-tracker --version`.
 - [x] Verify installed package resources from a built wheel: `python scripts/smoke_installed_package.py`.
 - [x] Verify installed package resources in Linux Docker: `python scripts/smoke_installed_package.py --docker`.
-- [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version <version>`.
+- [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version 0.4.0`.
 - [x] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
 - [x] Add Python 3.14 as an official support target after CI, package classifiers, docs, and installed-package smoke coverage were added. Docker smoke coverage uses `python:3.14-slim` by default. Track this in issue #12.
 
@@ -100,7 +102,7 @@ Not guaranteed:
 
 - [x] Verify support bundles include package version, Python version, OS/platform, doctor status, schema state, parser diagnostics, pricing status, allowance status, threshold status, project config status, and privacy metadata: `python -m pytest tests/test_support.py`.
 - [x] Verify support bundles exclude raw logs, prompt text, assistant text, tool output, context text, and raw source paths in strict mode: `python -m pytest tests/test_support.py`.
-- [x] Update issue templates to request only strict-mode support bundles: manual review of `.github/ISSUE_TEMPLATE/`.
+- [x] Update issue templates to request only strict-mode support bundles: `python scripts/check_release.py`.
 
 ## 11. Large-History Performance
 
@@ -115,6 +117,7 @@ Not guaranteed:
 - [x] Verify publish workflow publishes `codex-usage-tracking`, not `codex-usage-tracker`: `python scripts/check_release.py`.
 - [x] Verify publish workflow uses Trusted Publishing, not API tokens: `python scripts/check_release.py`.
 - [x] Verify TestPyPI and PyPI jobs exist and publish only on workflow dispatch or release events: `python scripts/check_release.py`.
+- [x] Verify manual PyPI workflow dispatch is restricted to `main` or tag refs: `python scripts/check_release.py`.
 - [ ] Verify PyPI job is gated by environment `pypi`: manual GitHub environment check.
 - [x] Verify dist filenames match `codex_usage_tracking`: `python -m build && python scripts/check_release.py --dist`.
 - [ ] Verify TestPyPI process: run `Publish Python package` with `target=testpypi` only when intentionally testing release publication.
@@ -128,3 +131,93 @@ Not guaranteed:
 - [x] Document that live account allowance cannot be read automatically by this local tracker.
 - [x] Document that cost and credit estimates are not guaranteed to match exact billing.
 - [x] Document platform/plugin discovery limitations separately from the core Python CLI/dashboard support.
+
+## Evidence References
+
+These references are the concrete proof behind completed checklist items. Public package smoke commands are version-specific to `0.4.0`; all repo tests use synthetic or aggregate-only data.
+
+### Public Install And Package Metadata
+
+- Public PyPI version, public venv install, and public pipx install are proven by the exact public-install commands in section 1.
+- Built-wheel and installed-resource coverage is proven by `scripts/smoke_installed_package.py` and `tests/test_cli_release.py::test_installed_package_smoke_checks_help_for_stable_commands`.
+- Linux package-resource coverage is proven by `scripts/smoke_installed_package.py --docker`.
+- Public PyPI Docker coverage is proven by `scripts/smoke_installed_package.py --docker --from-pypi --version 0.4.0`.
+- PyPI metadata, package/distribution names, package resources, source/wheel member names, Python 3.10-3.14 support metadata, CI workflow requirements, publish workflow safety text, and tracked secret patterns are proven by `scripts/check_release.py`, `scripts/check_release.py --dist`, and `tests/test_cli_release.py::test_release_check_script_passes`.
+
+### Upgrade And Migration
+
+- Legacy SQLite migration, schema state, migration idempotence, malformed legacy schema handling, and migration CSV shape are proven by `tests/test_store_migrations.py`.
+- `rebuild-index` clearing only tracker-owned aggregate rows is proven by `tests/test_store_dashboard_mcp.py::test_rebuild_index_clears_aggregate_rows_before_rescan`.
+- `reset-db` preserving raw Codex logs is proven by `tests/test_cli_lifecycle.py::test_setup_support_bundle_and_reset_db_cli`.
+- Refresh metadata and parser diagnostics are proven by `tests/test_store_migrations.py`, `tests/test_parser.py`, and `tests/test_store_dashboard_mcp.py::test_refresh_reports_skipped_corrupt_token_events`.
+
+### CLI Compatibility
+
+- Documented CLI command existence and stable command coverage are proven by `tests/test_cli_release.py::test_cli_reference_documents_only_existing_stable_commands` and `tests/test_cli_release.py::test_stable_cli_commands_are_not_removed_without_a_deprecation_plan`.
+- Installed-wheel subcommand help coverage is proven by `scripts/smoke_installed_package.py` and guarded by `tests/test_cli_release.py::test_installed_package_smoke_checks_help_for_stable_commands`.
+- Lifecycle actionable errors without real logs are proven by `tests/test_cli_lifecycle.py::test_lifecycle_commands_return_actionable_errors_without_real_logs`.
+
+### MCP Compatibility
+
+- MCP tool documentation parity is proven by `tests/test_cli_release.py::test_mcp_tool_names_remain_documented`.
+- MCP JSON response schema IDs and wrapper payload contracts are proven by `tests/test_store_dashboard_mcp.py::test_mcp_wrappers_smoke`.
+- Companion skill source/package parity is proven by `scripts/check_release.py`.
+- Installed-wheel plugin MCP config is proven by `scripts/smoke_installed_package.py`.
+
+### JSON Contract Stability
+
+- Documented schema table parity, runtime schema ID tracking, example validation, invalid-payload rejection, and minimal payload validation are proven by `tests/test_json_contracts.py`.
+- README and CLI schema doc references are additionally guarded by `tests/test_cli_release.py::test_cli_json_schema_doc_lists_tracked_contracts`.
+
+### CSV Export Stability
+
+- Aggregate CSV columns are proven by `tests/test_cli_lifecycle.py::test_report_json_and_query_cli`.
+- Redacted and strict privacy CSV behavior is proven by `tests/test_privacy.py::test_privacy_modes_cover_dashboard_query_session_and_csv` and `tests/test_privacy.py::test_aggregate_outputs_exclude_raw_transcript_content`.
+- Migration CSV shape is proven by `tests/test_store_migrations.py::test_csv_export_keeps_current_columns_after_legacy_migration`.
+
+### Config File Stability
+
+- Pricing config initialization and parsing are proven by `tests/test_pricing.py` and `tests/test_cli_lifecycle.py::test_rate_card_allowance_and_pricing_snapshot_cli`.
+- Allowance and Codex rate-card config initialization/parsing are proven by `tests/test_allowance.py` and `tests/test_cli_lifecycle.py::test_rate_card_allowance_and_pricing_snapshot_cli`.
+- Threshold config initialization/parsing is proven by `tests/test_recommendations.py::test_threshold_template_and_overrides`.
+- Project alias, ignored-path, tag, and privacy behavior is proven by `tests/test_projects.py`.
+- Config schema documentation coverage is proven by `tests/test_cli_release.py::test_local_config_schema_docs_reference_stable_fields`.
+
+### Dashboard Behavior
+
+- Aggregate-only dashboard payloads and CSV are proven by `tests/test_store_dashboard_mcp.py::test_dashboard_and_csv_are_aggregate_only` and `tests/test_privacy.py::test_aggregate_outputs_exclude_raw_transcript_content`.
+- URL-state round trips are proven by `tests/test_dashboard_state.py::test_dashboard_url_state_round_trips`.
+- Dashboard helper syntax is proven by the `node --check` commands in section 8 and the CI dashboard JavaScript syntax job.
+- Active/all-history payload behavior is proven by `tests/test_store_dashboard_mcp.py::test_dashboard_history_scope_excludes_archived_rows_by_default` and `tests/test_store_dashboard_mcp.py::test_dashboard_server_usage_api_switches_history_scope`.
+- Active/all-history user-facing labels are proven by `tests/test_cli_release.py::test_dashboard_history_scope_labels_remain_user_facing`.
+- No-context startup and runtime context enablement are proven by `tests/test_store_dashboard_mcp.py::test_dashboard_server_can_enable_context_api_at_runtime` and `tests/test_privacy.py::test_context_server_requires_loopback_origin_token_and_enablement`.
+
+### Privacy And Sharing Safety
+
+- Dashboard, query, session, CSV, support-bundle, and generated-static-HTML privacy behavior is proven by `tests/test_privacy.py`.
+- Strict project metadata redaction is proven by `tests/test_privacy.py::test_privacy_modes_cover_dashboard_query_session_and_csv` and `tests/test_projects.py::test_project_privacy_modes_redact_sensitive_metadata`.
+- Raw context exclusion and explicit context loading are proven by `tests/test_privacy.py::test_context_loading_is_explicit_redacted_and_not_static_html`, `tests/test_privacy.py::test_context_server_requires_loopback_origin_token_and_enablement`, and `tests/test_store_dashboard_mcp.py::test_context_loads_raw_log_only_on_demand`.
+- Tracked-file secret scanning is proven by `scripts/check_release.py`.
+
+### Support-Bundle Safety
+
+- Support-bundle payload shape and secret safety are proven by `tests/test_support.py::test_support_bundle_default_mode_contract_and_secret_safety`.
+- Strict support-bundle path and doctor-text redaction is proven by `tests/test_support.py::test_support_bundle_strict_mode_redacts_local_paths_and_doctor_text`.
+- Safe issue-template requests are proven by `scripts/check_release.py`.
+
+### Large-History Performance
+
+- Benchmark command behavior and threshold contract are smoke-tested by `tests/test_cli_release.py::test_synthetic_history_benchmark_script_smoke`.
+- Release-size 10k, 100k, and 500k benchmark claims are proven by running `python scripts/benchmark_synthetic_history.py --rows 10000 100000 500000 --json --enforce-thresholds` before release work when practical.
+- CI-safe benchmark coverage is proven by the CI `Release readiness` job through `tests/test_cli_release.py::test_synthetic_history_benchmark_script_smoke`.
+
+### Release Process
+
+- Normal CI package build plus `twine check` and dist verification are proven by `.github/workflows/ci.yml` and enforced by `scripts/check_release.py::_check_ci_workflow`.
+- Publish workflow package name, Trusted Publishing, TestPyPI/PyPI job presence, event guards, no push/PR publishing, no token/password publishing, and manual PyPI main/tag preflight are proven by `scripts/check_release.py::_check_publish_workflow`.
+- Dist filename and wheel/sdist member checks are proven by `python -m build`, `python -m twine check dist/*`, and `python scripts/check_release.py --dist`.
+- Release recovery documentation is proven by `scripts/check_release.py` required-file and docs checks.
+
+### Known Limitations
+
+- Parser-format drift, pricing/rate-card drift, live allowance, non-billing-equivalence, and plugin-discovery boundary documentation are proven by `tests/test_cli_release.py::test_known_limitations_are_documented`.

@@ -86,6 +86,21 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Verify PyPI publish ref
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "ref=$GITHUB_REF"
+          echo "sha=$GITHUB_SHA"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            case "$GITHUB_REF" in
+              refs/heads/main|refs/tags/*)
+                ;;
+              *)
+                echo "Manual PyPI publishing must run from main or a tag ref." >&2
+                exit 1
+                ;;
+            esac
+          fi
       - name: Download dist artifacts
         uses: actions/download-artifact@v4
         with:

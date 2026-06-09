@@ -110,6 +110,7 @@ def main() -> int:
     failures.extend(_check_required_files())
     failures.extend(_check_versions())
     failures.extend(_check_docs())
+    failures.extend(_check_issue_templates())
     failures.extend(_check_packaging_metadata())
     failures.extend(_check_tracked_files_for_secrets())
     if args.dist:
@@ -170,6 +171,37 @@ def _check_docs() -> list[str]:
     ]:
         if required not in readme:
             failures.append(f"README.md is missing required install/privacy text: {required}")
+    return failures
+
+
+def _check_issue_templates() -> list[str]:
+    failures: list[str] = []
+    templates = {
+        "bug_report.yml": [
+            "Do not paste real Codex logs",
+            "strict support bundle",
+            "--privacy-mode strict support-bundle",
+        ],
+        "parser_log_compatibility.yml": [
+            "Do not attach or paste raw Codex JSONL logs",
+            "Synthetic log shape",
+        ],
+        "pricing_or_allowance.yml": [
+            "Do not paste account screenshots with private details",
+            "--privacy-mode strict pricing-coverage --json",
+        ],
+    }
+    for filename, required_texts in templates.items():
+        path = REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / filename
+        if not path.exists():
+            failures.append(f"missing issue template: {path.relative_to(REPO_ROOT)}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        for required in required_texts:
+            if required not in text:
+                failures.append(
+                    f"{path.relative_to(REPO_ROOT)} is missing safe-reporting text: {required}"
+                )
     return failures
 
 
@@ -282,6 +314,10 @@ def _check_publish_workflow() -> list[str]:
         "python -m twine check dist/*",
         "if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'",
         "if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')",
+        "echo \"ref=$GITHUB_REF\"",
+        "echo \"sha=$GITHUB_SHA\"",
+        "refs/heads/main|refs/tags/*",
+        "Manual PyPI publishing must run from main or a tag ref.",
         "name: testpypi",
         "name: pypi",
         "https://test.pypi.org/project/codex-usage-tracking/",
