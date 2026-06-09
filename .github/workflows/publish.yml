@@ -106,7 +106,53 @@ jobs:
         with:
           name: python-dist
           path: dist
+      - name: Check target package version
+        id: package-version
+        env:
+          PACKAGE_INDEX_JSON_URL: https://test.pypi.org/pypi/codex-usage-tracking/json
+          PACKAGE_INDEX_NAME: TestPyPI
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          versions = set()
+          for path in Path("dist").iterdir():
+              name = path.name
+              if name.endswith(".tar.gz") and name.startswith("codex_usage_tracking-"):
+                  versions.add(name.removeprefix("codex_usage_tracking-").removesuffix(".tar.gz"))
+              elif name.endswith(".whl") and name.startswith("codex_usage_tracking-"):
+                  versions.add(name.split("-")[1])
+          if len(versions) != 1:
+              raise SystemExit(f"expected one distribution version, found {sorted(versions)}")
+          version = versions.pop()
+
+          url = os.environ["PACKAGE_INDEX_JSON_URL"]
+          index_name = os.environ["PACKAGE_INDEX_NAME"]
+          try:
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  payload = json.load(response)
+          except urllib.error.HTTPError as exc:
+              if exc.code == 404:
+                  exists = False
+              else:
+                  raise
+          else:
+              exists = version in payload.get("releases", {})
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+              output.write(f"exists={str(exists).lower()}\n")
+          if exists:
+              print(f"codex-usage-tracking {version} already exists on {index_name}; skipping upload.")
+          else:
+              print(f"codex-usage-tracking {version} is not present on {index_name}; upload will run.")
+          PY
       - name: Publish package distributions to TestPyPI
+        if: steps.package-version.outputs.exists != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
@@ -143,7 +189,53 @@ jobs:
         with:
           name: python-dist
           path: dist
+      - name: Check target package version
+        id: package-version
+        env:
+          PACKAGE_INDEX_JSON_URL: https://pypi.org/pypi/codex-usage-tracking/json
+          PACKAGE_INDEX_NAME: PyPI
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          versions = set()
+          for path in Path("dist").iterdir():
+              name = path.name
+              if name.endswith(".tar.gz") and name.startswith("codex_usage_tracking-"):
+                  versions.add(name.removeprefix("codex_usage_tracking-").removesuffix(".tar.gz"))
+              elif name.endswith(".whl") and name.startswith("codex_usage_tracking-"):
+                  versions.add(name.split("-")[1])
+          if len(versions) != 1:
+              raise SystemExit(f"expected one distribution version, found {sorted(versions)}")
+          version = versions.pop()
+
+          url = os.environ["PACKAGE_INDEX_JSON_URL"]
+          index_name = os.environ["PACKAGE_INDEX_NAME"]
+          try:
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  payload = json.load(response)
+          except urllib.error.HTTPError as exc:
+              if exc.code == 404:
+                  exists = False
+              else:
+                  raise
+          else:
+              exists = version in payload.get("releases", {})
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+              output.write(f"exists={str(exists).lower()}\n")
+          if exists:
+              print(f"codex-usage-tracking {version} already exists on {index_name}; skipping upload.")
+          else:
+              print(f"codex-usage-tracking {version} is not present on {index_name}; upload will run.")
+          PY
       - name: Publish package distributions to PyPI
+        if: steps.package-version.outputs.exists != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           print-hash: true

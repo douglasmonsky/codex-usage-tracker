@@ -322,6 +322,8 @@ def _check_publish_workflow() -> list[str]:
         "name: pypi",
         "https://test.pypi.org/project/codex-usage-tracking/",
         "https://pypi.org/project/codex-usage-tracking/",
+        "steps.package-version.outputs.exists != 'true'",
+        "codex-usage-tracking {version} already exists on {index_name}; skipping upload.",
     ]:
         if required not in workflow:
             failures.append(f"publish workflow is missing required Trusted Publishing text: {required}")
@@ -343,6 +345,11 @@ def _check_publish_workflow() -> list[str]:
             "echo \"sha=$GITHUB_SHA\"",
             "refs/heads/main|refs/tags/*",
             "Manual PyPI publishing must run from main or a tag ref.",
+            "Check target package version",
+            "id: package-version",
+            "PACKAGE_INDEX_JSON_URL",
+            "PACKAGE_INDEX_NAME",
+            "steps.package-version.outputs.exists != 'true'",
         ]:
             if required not in job_block:
                 failures.append(f"publish workflow {job_name} job is missing preflight: {required}")
