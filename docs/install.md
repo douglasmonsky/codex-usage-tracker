@@ -32,7 +32,7 @@ Restart Codex after plugin registration if you want Codex to discover the MCP to
 
 The CLI, SQLite index, dashboard generator, and localhost server are Python-based and are not macOS-only. CI runs the package on Ubuntu with Python 3.10, 3.11, 3.12, and 3.13.
 
-Python 3.14 is planned soon, but it is not an official support target yet. The package may install on 3.14 because metadata allows Python 3.10+, but the project will only document 3.14 as supported after CI, package classifiers, docs, and installed-package smoke coverage pass.
+Python 3.14 is planned soon, but it is not an official support target yet. The package may install on 3.14 because metadata allows Python 3.10+, but the project will only document 3.14 as supported after CI, package classifiers, docs, and installed-package smoke coverage pass, including Docker smoke coverage for the packaged app.
 
 By default the tracker looks for Codex JSONL logs under `~/.codex`, stores its own database/config under `~/.codex-usage-tracker`, and writes the local plugin wrapper under `~/plugins/codex-usage-tracker`. Override paths with `--codex-home`, `--db`, `--plugin-dir`, or `--marketplace` if your platform or Codex installation uses a different layout.
 
