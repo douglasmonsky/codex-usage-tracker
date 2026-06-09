@@ -136,6 +136,7 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
             "--db-dir",
             str(tmp_path),
             "--json",
+            "--enforce-thresholds",
         ],
         check=True,
         capture_output=True,
@@ -148,6 +149,21 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
     assert payload["benchmarks"][0]["rows"] == 100
     assert payload["benchmarks"][0]["filtered_rows"] <= 50
     assert "idx_usage_model_effort" in payload["benchmarks"][0]["query_plan"]
+    assert payload["benchmarks"][0]["threshold_status"] == "pass"
+    assert payload["benchmarks"][0]["threshold_failures"] == []
+    assert {
+        "populate_seconds",
+        "active_dashboard_query_seconds",
+        "all_history_dashboard_query_seconds",
+        "since_until_query_seconds",
+        "filtered_query_seconds",
+        "filtered_count_seconds",
+        "dashboard_payload_active_seconds",
+        "thread_summary_seconds",
+        "recommendations_report_seconds",
+        "pricing_coverage_seconds",
+        "project_summary_seconds",
+    } <= set(payload["benchmarks"][0]["timings"])
 
 
 def _subprocess_env() -> dict[str, str]:

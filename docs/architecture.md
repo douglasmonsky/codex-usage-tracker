@@ -15,7 +15,7 @@ Codex Usage Tracker is a local sidecar app. It reads aggregate token counters fr
 - `plugin_data/dashboard/dashboard_format.js` owns dashboard formatting primitives. `dashboard_data.js` owns row payload and thread relationship helpers. `dashboard_state.js` owns URL, CSV, and download state utilities. `dashboard.js` owns DOM rendering, event handling, API refresh, and detail-panel behavior.
 - `context.py` is the only normal path that reads raw log context, and it does so only for one selected record on demand with redaction and size limits.
 - `plugin_installer.py`, `.mcp.json`, `skills/`, and `scripts/check_release.py` own install and packaging behavior.
-- `scripts/benchmark_synthetic_history.py` owns generated large-history query timing for 10k, 100k, and 500k aggregate-row fixtures. It must stay synthetic-only and must not read real Codex logs.
+- `scripts/benchmark_synthetic_history.py` owns generated large-history query timing and threshold enforcement for 10k, 100k, and 500k aggregate-row fixtures. It must stay synthetic-only and must not read real Codex logs.
 - `skills/codex-usage-tracker/` is the source copy for the operational Codex skill. It should stay focused on setup, dashboard, export, doctor, and direct MCP workflows.
 - `skills/codex-usage-api/` is the source copy for the conversational analyst skill. It should stay focused on aggregate-only API routing, interpretation, and limitations.
 - `src/codex_usage_tracker/plugin_data/skills/` contains the wheel-bundled copies installed by `codex-usage-tracker install-plugin`.
@@ -50,4 +50,4 @@ git diff --check
 
 Dashboard UI changes should also be opened in a browser and checked on desktop and mobile widths for overlap, stale state, and aggregate-only output.
 
-Run `python scripts/benchmark_synthetic_history.py --rows 10000 100000 500000` after changing SQLite filters, dashboard payload loading, or indexes.
+Run `python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds` after changing SQLite filters, dashboard payload loading, or indexes. Run the 500k benchmark before release work when practical.

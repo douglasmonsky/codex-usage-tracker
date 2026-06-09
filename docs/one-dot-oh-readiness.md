@@ -104,11 +104,11 @@ Not guaranteed:
 
 ## 11. Large-History Performance
 
-- [ ] Run synthetic 10k benchmark: `python scripts/benchmark_synthetic_history.py --rows 10000 --json`.
-- [ ] Run synthetic 100k benchmark: `python scripts/benchmark_synthetic_history.py --rows 100000 --json`.
-- [ ] Run synthetic 500k benchmark as a release gate when practical: `python scripts/benchmark_synthetic_history.py --rows 500000 --json`.
-- [ ] Define thresholds for active-only dashboard query, all-history dashboard query, since/until, model/effort, min_tokens, recommendations, pricing coverage, and project summary.
-- [ ] Add a smaller CI-safe benchmark if it can stay fast and deterministic.
+- [x] Run synthetic 10k benchmark: `python scripts/benchmark_synthetic_history.py --rows 10000 --json --enforce-thresholds`.
+- [x] Run synthetic 100k benchmark: `python scripts/benchmark_synthetic_history.py --rows 100000 --json --enforce-thresholds`.
+- [x] Run synthetic 500k benchmark as a release gate when practical: `python scripts/benchmark_synthetic_history.py --rows 500000 --json --enforce-thresholds`.
+- [x] Define thresholds for active-only dashboard query, all-history dashboard query, since/until, model/effort, min_tokens, recommendations, pricing coverage, and project summary.
+- [x] Add a smaller CI-safe benchmark if it can stay fast and deterministic.
 
 ## 12. Release Process
 

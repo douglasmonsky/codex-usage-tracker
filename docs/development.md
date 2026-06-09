@@ -192,10 +192,37 @@ Do not use real session logs, real prompts, assistant text, tool output, secrets
 Use the synthetic benchmark script when changing SQLite filters, dashboard payload loading, or indexes:
 
 ```bash
-python scripts/benchmark_synthetic_history.py --rows 10000 100000 500000
+python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds
+python scripts/benchmark_synthetic_history.py --rows 500000 --json --enforce-thresholds
 ```
 
-The script creates synthetic aggregate-only SQLite databases and times common filtered dashboard query paths. It does not read real Codex logs.
+The script creates synthetic aggregate-only SQLite databases and times common release-sensitive paths. It does not read real Codex logs.
+
+Thresholds are regression sentinels, not universal performance guarantees. Each timed path uses:
+
+```text
+limit_seconds = base_seconds + per_10k_seconds * (rows / 10000)
+```
+
+Use `--threshold-scale <number>` when intentionally running on a slower local machine. Keep the default scale for release checks unless there is a documented reason to relax it.
+
+Tracked timings:
+
+| Timing key | Path covered |
+| --- | --- |
+| `populate_seconds` | Synthetic aggregate indexing/upsert path |
+| `active_dashboard_query_seconds` | Dashboard row query with archived sessions excluded |
+| `all_history_dashboard_query_seconds` | Dashboard row query with archived sessions included |
+| `since_until_query_seconds` | Date-window dashboard filtering |
+| `filtered_query_seconds` | Model + effort + min-token dashboard filtering |
+| `filtered_count_seconds` | Filtered dashboard count query |
+| `dashboard_payload_active_seconds` | Active-session dashboard payload assembly |
+| `thread_summary_seconds` | Thread summary report |
+| `recommendations_report_seconds` | Recommendation report and thread rollup |
+| `pricing_coverage_seconds` | Pricing coverage report |
+| `project_summary_seconds` | Project summary report |
+
+The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` so regressions in the benchmark contract are visible on pull requests. The 10k/100k runs are a practical local gate for performance-sensitive changes; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
 
 ## Release Checklist
 
