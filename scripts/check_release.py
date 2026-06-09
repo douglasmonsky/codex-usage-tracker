@@ -376,6 +376,23 @@ def _check_ci_workflow() -> list[str]:
     return failures
 
 
+def _check_ci_workflow() -> list[str]:
+    workflow_path = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    if not workflow_path.exists():
+        return ["missing CI workflow: .github/workflows/ci.yml"]
+    workflow = workflow_path.read_text(encoding="utf-8")
+    failures: list[str] = []
+    for required in [
+        "name: Build package",
+        "python -m build",
+        "python -m twine check dist/*",
+        "python scripts/check_release.py --dist",
+    ]:
+        if required not in workflow:
+            failures.append(f"CI package job is missing required build check: {required}")
+    return failures
+
+
 def _check_skill_packaging() -> list[str]:
     failures: list[str] = []
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
