@@ -30,7 +30,7 @@ body:
     id: diagnostics
     attributes:
       label: Safe diagnostics
-      description: Paste relevant output from `codex-usage-tracker doctor --json` or `codex-usage-tracker --privacy-mode strict support-bundle --json`. Review it first.
+      description: Prefer a reviewed strict support bundle from `codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json`. If pasting JSON, paste only reviewed strict-mode bundle content or `doctor --json` output.
       render: json
   - type: input
     id: version

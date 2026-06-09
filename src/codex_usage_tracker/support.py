@@ -6,6 +6,7 @@ import json
 import platform
 import sys
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,10 @@ from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
+    DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
+    DEFAULT_MARKETPLACE_PATH,
+    DEFAULT_PLUGIN_LINK,
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
     DEFAULT_RATE_CARD_PATH,
@@ -28,6 +32,7 @@ from codex_usage_tracker.projects import (
     validate_privacy_mode,
 )
 from codex_usage_tracker.recommendations import load_threshold_config
+from codex_usage_tracker.redaction import redact_secrets
 from codex_usage_tracker.store import refresh_metadata, schema_state
 
 
@@ -75,11 +80,21 @@ def support_bundle_payload(
     """Return support diagnostics safe to attach to a GitHub issue."""
 
     privacy_mode = validate_privacy_mode(privacy_mode)
+    redact_paths = privacy_mode in {"redacted", "strict"}
+    path_replacements = _support_path_replacements(
+        codex_home=codex_home,
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
+        projects_path=projects_path,
+    )
     pricing = load_pricing_config(pricing_path)
     allowance = load_allowance_config(allowance_path, rate_card_path=rate_card_path)
     thresholds = load_threshold_config(thresholds_path)
     projects = load_project_config(projects_path)
-    return {
+    payload = {
         "bundle_version": 1,
         "generated_at": datetime.now(timezone.utc)
         .replace(microsecond=0)
@@ -90,6 +105,7 @@ def support_bundle_payload(
             "contains_prompts": False,
             "contains_assistant_messages": False,
             "contains_tool_output": False,
+            "diagnostic_paths_redacted": redact_paths,
             "project_metadata": project_privacy_metadata(privacy_mode),
         },
         "package": {
@@ -99,14 +115,15 @@ def support_bundle_payload(
             "platform": platform.platform(),
         },
         "paths": {
+            "codex_home": _support_path_value("codex_home", codex_home, privacy_mode),
             "codex_home_exists": codex_home.expanduser().exists(),
             "sessions_dir_exists": (codex_home.expanduser() / "sessions").exists(),
-            "db_path": str(db_path.expanduser()),
-            "pricing_path": str(pricing_path.expanduser()),
-            "allowance_path": str(allowance_path.expanduser()),
-            "rate_card_path": str(rate_card_path.expanduser()),
-            "thresholds_path": str(thresholds_path.expanduser()),
-            "projects_path": str(projects_path.expanduser()),
+            "db_path": _support_path_value("db_path", db_path, privacy_mode),
+            "pricing_path": _support_path_value("pricing_path", pricing_path, privacy_mode),
+            "allowance_path": _support_path_value("allowance_path", allowance_path, privacy_mode),
+            "rate_card_path": _support_path_value("rate_card_path", rate_card_path, privacy_mode),
+            "thresholds_path": _support_path_value("thresholds_path", thresholds_path, privacy_mode),
+            "projects_path": _support_path_value("projects_path", projects_path, privacy_mode),
         },
         "database": schema_state(db_path),
         "refresh": refresh_metadata(db_path),
@@ -145,3 +162,122 @@ def support_bundle_payload(
             suggest_repair=True,
         ),
     }
+    return _sanitize_support_payload(
+        payload,
+        redact_paths=redact_paths,
+        path_replacements=path_replacements,
+    )
+
+
+def _support_path_value(label: str, path: Path, privacy_mode: str) -> str:
+    expanded = _safe_path(path.expanduser())
+    if privacy_mode == "normal":
+        return str(expanded)
+    return _redacted_path_label(label, expanded)
+
+
+def _support_path_replacements(
+    *,
+    codex_home: Path,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    rate_card_path: Path,
+    thresholds_path: Path,
+    projects_path: Path,
+) -> tuple[tuple[str, str], ...]:
+    raw_paths: list[tuple[str, Path]] = [
+        ("codex_sessions", codex_home.expanduser() / "sessions"),
+        ("codex_home", codex_home),
+        ("db_path", db_path),
+        ("pricing_path", pricing_path),
+        ("allowance_path", allowance_path),
+        ("rate_card_path", rate_card_path),
+        ("thresholds_path", thresholds_path),
+        ("projects_path", projects_path),
+        ("dashboard_path", DEFAULT_DASHBOARD_PATH),
+        ("plugin_path", DEFAULT_PLUGIN_LINK),
+        ("marketplace_path", DEFAULT_MARKETPLACE_PATH),
+        ("cwd", Path.cwd()),
+        ("home", Path.home()),
+    ]
+    replacements: dict[str, str] = {}
+    for label, path in raw_paths:
+        expanded = _safe_path(path.expanduser())
+        _add_path_replacement(replacements, label, expanded)
+        if label not in {"home", "cwd"}:
+            _add_path_replacement(replacements, f"{label}_dir", expanded.parent)
+    return tuple(sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True))
+
+
+def _add_path_replacement(replacements: dict[str, str], label: str, path: Path) -> None:
+    value = str(path)
+    if not value or value in {".", "/"} or value in replacements:
+        return
+    replacements[value] = _redacted_path_label(label, path)
+
+
+def _redacted_path_label(label: str, path: Path) -> str:
+    digest = sha256(str(path).encode("utf-8")).hexdigest()[:8]
+    safe_label = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in label)
+    return f"[redacted path:{safe_label}:{digest}]"
+
+
+def _sanitize_support_payload(
+    value: Any,
+    *,
+    redact_paths: bool,
+    path_replacements: tuple[tuple[str, str], ...],
+) -> Any:
+    if isinstance(value, str):
+        return _sanitize_support_text(
+            value,
+            redact_paths=redact_paths,
+            path_replacements=path_replacements,
+        )
+    if isinstance(value, list):
+        return [
+            _sanitize_support_payload(
+                item,
+                redact_paths=redact_paths,
+                path_replacements=path_replacements,
+            )
+            for item in value
+        ]
+    if isinstance(value, dict):
+        return {
+            _sanitize_support_payload(
+                key,
+                redact_paths=redact_paths,
+                path_replacements=path_replacements,
+            )
+            if isinstance(key, str)
+            else key: _sanitize_support_payload(
+                item,
+                redact_paths=redact_paths,
+                path_replacements=path_replacements,
+            )
+            for key, item in value.items()
+        }
+    return value
+
+
+def _sanitize_support_text(
+    text: str,
+    *,
+    redact_paths: bool,
+    path_replacements: tuple[tuple[str, str], ...],
+) -> str:
+    sanitized = redact_secrets(text)
+    if not redact_paths:
+        return sanitized
+    for raw_path, replacement in path_replacements:
+        sanitized = sanitized.replace(raw_path, replacement)
+    return sanitized
+
+
+def _safe_path(path: Path) -> Path:
+    try:
+        return path.resolve()
+    except OSError:
+        return path.absolute()
