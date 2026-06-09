@@ -154,6 +154,12 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "record_id": str,
         }
     },
+    "codex-usage-tracker-context-settings-v1": {
+        "required": {
+            "context_api_enabled": bool,
+            "raw_context_persisted": bool,
+        }
+    },
     "codex-usage-tracker-dashboard-v1": {
         "required": {
             "dashboard_path": str,
