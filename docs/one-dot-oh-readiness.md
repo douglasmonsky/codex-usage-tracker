@@ -120,8 +120,8 @@ Not guaranteed:
 - [x] Verify manual PyPI workflow dispatch is restricted to `main` or tag refs: `python scripts/check_release.py`.
 - [x] Verify PyPI job is gated by environment `pypi`: `gh api repos/douglasmonsky/codex-usage-tracker/environments/pypi`.
 - [x] Verify dist filenames match `codex_usage_tracking`: `python -m build && python scripts/check_release.py --dist`.
-- [ ] Verify TestPyPI process: run `Publish Python package` with `target=testpypi` only when intentionally testing release publication.
-- [ ] Verify PyPI process: publish a GitHub Release or run workflow dispatch with `target=pypi` only when intentionally publishing a reviewed release.
+- [x] Verify TestPyPI process: run `Publish Python package` with `target=testpypi` only when intentionally testing release publication.
+- [x] Verify PyPI process: publish a GitHub Release or run workflow dispatch with `target=pypi` only when intentionally publishing a reviewed release.
 - [x] Document release recovery by cutting a new patch version when an uploaded artifact is wrong: see `docs/development.md`.
 
 ## 13. Known Limitations
@@ -219,6 +219,8 @@ These references are the concrete proof behind completed checklist items. Public
 - Publish workflow package name, Trusted Publishing, TestPyPI/PyPI job presence, event guards, no push/PR publishing, no token/password publishing, and manual PyPI main/tag preflight are proven by `scripts/check_release.py::_check_publish_workflow`.
 - The GitHub `pypi` environment gate is proven by `gh api repos/douglasmonsky/codex-usage-tracker/environments/pypi`, which reports a `required_reviewers` protection rule and `can_admins_bypass=false`.
 - Dist filename and wheel/sdist member checks are proven by `python -m build`, `python -m twine check dist/*`, and `python scripts/check_release.py --dist`.
+- TestPyPI publish process is proven by workflow-dispatch run `27210601817` on `main`, followed by TestPyPI metadata and clean virtualenv install checks for `codex-usage-tracking==0.4.1`.
+- PyPI publish process is proven by workflow-dispatch run `27210741720` on `main`, protected `pypi` environment approval, PyPI metadata visibility, clean virtualenv install, temporary pipx install, and Docker public-package smoke for `codex-usage-tracking==0.4.1`.
 - Release recovery documentation is proven by `scripts/check_release.py` required-file and docs checks.
 
 ### Known Limitations
