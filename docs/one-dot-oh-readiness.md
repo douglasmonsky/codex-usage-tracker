@@ -119,7 +119,7 @@ Not guaranteed:
 - [ ] Verify dist filenames match `codex_usage_tracking`: `python -m build && python scripts/check_release.py --dist`.
 - [ ] Verify TestPyPI process: run `Publish Python package` with `target=testpypi` only when intentionally testing release publication.
 - [ ] Verify PyPI process: publish a GitHub Release or run workflow dispatch with `target=pypi` only when intentionally publishing a reviewed release.
-- [ ] Document release recovery by cutting a new patch version when an uploaded artifact is wrong.
+- [x] Document release recovery by cutting a new patch version when an uploaded artifact is wrong: see `docs/development.md`.
 
 ## 13. Known Limitations
 

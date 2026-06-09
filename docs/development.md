@@ -292,3 +292,63 @@ To publish to TestPyPI, run the `Publish Python package` workflow manually with 
 To publish to PyPI, either publish a GitHub Release for the tag or manually run the workflow with `target` set to `pypi`. The final project URL is `https://pypi.org/project/codex-usage-tracking/`.
 
 PyPI and TestPyPI filenames and versions cannot be reused after upload. If a bad artifact is uploaded, cut the next patch version instead of trying to replace it.
+
+## Release Recovery
+
+Default to patch-forward recovery. PyPI and TestPyPI artifacts are immutable: an uploaded filename/version cannot be replaced, even if the project page lags or a release was a mistake. Do not add API tokens, publish locally, force-push tags, delete releases, or try to reuse a version. If the uploaded artifact is wrong, open a hotfix branch, bump to the next patch version, update `CHANGELOG.md` and release notes, rerun the release gate, and publish the corrected version through GitHub Actions Trusted Publishing.
+
+If the release workflow fails before upload:
+
+```bash
+gh run list --workflow publish.yml --limit 10
+gh run view <run-id> --json status,conclusion,headBranch,headSha,event,createdAt,url
+gh run view <run-id> --log-failed
+```
+
+Fix the branch or workflow, rerun the workflow, and keep the same version only if the failed run did not upload artifacts to TestPyPI or PyPI. If upload succeeded anywhere, cut the next patch version for follow-up validation.
+
+If Trusted Publishing or environment approval breaks, inspect `.github/workflows/publish.yml` first. The publish jobs should use `permissions: id-token: write`, `pypa/gh-action-pypi-publish@release/v1`, environment `testpypi` for TestPyPI, and environment `pypi` for PyPI. Confirm the Trusted Publisher entries in TestPyPI and PyPI still point to owner `douglasmonsky`, repository `codex-usage-tracker`, workflow `publish.yml`, and the matching environment. Do not work around a Trusted Publishing failure by adding API tokens.
+
+If PyPI or TestPyPI appears stale, verify with the JSON API and simple index before assuming the upload failed:
+
+```bash
+python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/codex-usage-tracking/json'))['info']['version'])"
+python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://test.pypi.org/pypi/codex-usage-tracking/json'))['info']['version'])"
+python -c "import urllib.request; print(urllib.request.urlopen('https://pypi.org/simple/codex-usage-tracking/').read().decode()[:2000])"
+python -c "import urllib.request; print(urllib.request.urlopen('https://test.pypi.org/simple/codex-usage-tracking/').read().decode()[:2000])"
+```
+
+If a runtime pin, wheel contents, plugin asset, or installed CLI is wrong after publication, create `hotfix/<next-version>` and run the full release gate before publishing the replacement patch:
+
+```bash
+python -m ruff check .
+python -m mypy
+python -m pytest
+python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
+python -m compileall src
+python scripts/check_release.py
+git diff --check
+rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
+python -m build
+python -m twine check dist/*
+python scripts/check_release.py --dist
+python scripts/smoke_installed_package.py
+python scripts/smoke_installed_package.py --docker
+```
+
+After a public PyPI upload completes, verify fresh production install paths and Docker smoke coverage:
+
+```bash
+python -m venv /tmp/codex-usage-pypi-smoke
+. /tmp/codex-usage-pypi-smoke/bin/activate
+python -m pip install --upgrade pip
+python -m pip install "codex-usage-tracking==<version>"
+codex-usage-tracker --version
+codex-usage-tracker setup --help
+deactivate
+python scripts/smoke_installed_package.py --docker --from-pypi --version <version>
+pipx install --force "codex-usage-tracking==<version>"
+codex-usage-tracker --version
+```
+
+If the GitHub Release notes or tag description are wrong but the artifact is correct, edit the GitHub Release text. If the artifact is wrong, leave the old version as historical record and patch forward. Yank only when maintainers explicitly decide that the existing artifact should be hidden from ordinary installers; yanking does not make the filename/version reusable.
