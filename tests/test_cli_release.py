@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from codex_usage_tracker import __version__
 from codex_usage_tracker.cli import _COMMAND_HANDLERS
 from codex_usage_tracker.json_contracts import known_json_schemas
 
@@ -72,7 +73,7 @@ def test_module_cli_version() -> None:
         env=_subprocess_env(),
     )
 
-    assert "codex-usage-tracker 0.4.0" in result.stdout
+    assert f"codex-usage-tracker {__version__}" in result.stdout
 
 
 def test_release_check_script_passes() -> None:

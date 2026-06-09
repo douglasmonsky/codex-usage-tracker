@@ -38,7 +38,7 @@ fix/<issue-number>-short-description
 docs/<issue-number>-short-description
 chore/<issue-number>-short-description
 test/<issue-number>-short-description
-release/0.4.0
+release/0.4.1
 hotfix/0.3.3
 ```
 
@@ -91,7 +91,7 @@ blocked
 Recommended milestones:
 
 ```text
-0.4.0
+0.4.1
 1.0-readiness
 1.0.0
 ```
@@ -147,8 +147,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.4.0
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.4.0
+python scripts/smoke_installed_package.py --from-pypi --version 0.4.1
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.4.1
 ```
 
 Docker avoids local toolchain side effects during install testing. Keep one local `pipx` smoke for platform-specific PATH and plugin-discovery behavior, but use Docker for repeatable Linux package verification.
@@ -264,8 +264,8 @@ After the release branch merges, tag from updated `main`, not from an unreviewed
 ```bash
 git switch main
 git pull --ff-only
-git tag -a v0.4.0 -m "codex-usage-tracker 0.4.0"
-git push origin v0.4.0
+git tag -a v0.4.1 -m "codex-usage-tracker 0.4.1"
+git push origin v0.4.1
 ```
 
 Do not create or push release tags without maintainer approval.
@@ -274,12 +274,13 @@ Do not create or push release tags without maintainer approval.
 
 Publishing uses GitHub Actions Trusted Publishing through `.github/workflows/publish.yml`; do not upload from a local machine and do not add PyPI or TestPyPI API tokens.
 
-The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading. Minor release `0.4.0` added Python 3.14 support, release recovery docs, stricter privacy/support-bundle regression coverage, and large-history benchmark thresholds:
+The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading. Minor release `0.4.0` added Python 3.14 support, release recovery docs, stricter privacy/support-bundle regression coverage, and large-history benchmark thresholds. Patch release `0.4.1` hardened the PyPI publish workflow and checked off completed 1.0 readiness gates:
 
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.0`
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.1`
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.2`
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.4.0`
+- GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.4.1`
 - PyPI: `https://pypi.org/project/codex-usage-tracking/`
 - TestPyPI: `https://test.pypi.org/project/codex-usage-tracking/`
 

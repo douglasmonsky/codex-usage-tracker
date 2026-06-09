@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.1 - 2026-06-09
+
+- Harden the production PyPI workflow so manual publishing must run from `main` or a tag ref before artifacts are downloaded and uploaded.
+- Strengthen `scripts/check_release.py` so it validates the publish-ref preflight inside both the TestPyPI and PyPI jobs.
+- Check off completed 1.0 readiness items with evidence for migration coverage, localhost dashboard smoke testing, and the protected GitHub `pypi` environment.
+- Pin the marketplace MCP runtime launcher to the exact `codex-usage-tracking==0.4.1` package.
+
 ## 0.4.0 - 2026-06-09
 
 - Add official Python 3.14 support across CI, package classifiers, README/install docs, and installed-package Docker smoke coverage.

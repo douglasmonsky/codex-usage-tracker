@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from codex_usage_tracker import __version__
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.plugin_installer import install_plugin, uninstall_plugin
 
@@ -34,7 +35,7 @@ def test_install_plugin_writes_generated_wrapper_and_marketplace(tmp_path: Path)
     assert result.replaced_existing is False
     assert second.replaced_existing is False
     assert manifest["name"] == "codex-usage-tracker"
-    assert manifest["version"] == "0.4.0"
+    assert manifest["version"] == __version__
     assert manifest["interface"]["defaultPrompt"][:3] == [
         "Open dashboard",
         "Heaviest thread?",

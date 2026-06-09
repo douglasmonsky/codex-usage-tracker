@@ -331,7 +331,32 @@ def _check_publish_workflow() -> list[str]:
         failures.append("publish workflow must not publish on pull requests")
     if "secrets." in workflow or "api-token" in workflow or "password:" in workflow:
         failures.append("publish workflow must not use token secrets or password-based publishing")
+    for job_name in ["publish-testpypi", "publish-pypi"]:
+        job_block = _workflow_job_block(workflow, job_name)
+        if job_block is None:
+            failures.append(f"publish workflow is missing job: {job_name}")
+            continue
+        for required in [
+            "Verify PyPI publish ref",
+            "echo \"event=$GITHUB_EVENT_NAME\"",
+            "echo \"ref=$GITHUB_REF\"",
+            "echo \"sha=$GITHUB_SHA\"",
+            "refs/heads/main|refs/tags/*",
+            "Manual PyPI publishing must run from main or a tag ref.",
+        ]:
+            if required not in job_block:
+                failures.append(f"publish workflow {job_name} job is missing preflight: {required}")
     return failures
+
+
+def _workflow_job_block(workflow: str, job_name: str) -> str | None:
+    match = re.search(
+        rf"(?ms)^  {re.escape(job_name)}:\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)",
+        workflow,
+    )
+    if not match:
+        return None
+    return match.group("body")
 
 
 def _check_ci_workflow() -> list[str]:
