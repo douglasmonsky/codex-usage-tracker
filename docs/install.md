@@ -38,6 +38,8 @@ By default the tracker looks for Codex JSONL logs under `~/.codex`, stores its o
 
 Windows support should work for the core dashboard/CLI when Codex writes readable JSONL logs, but plugin discovery is tied to Codex's local plugin directory behavior. Run `codex-usage-tracker doctor --suggest-repair` after setup if Codex does not show the plugin.
 
+Plugin discovery limitations are separate from core Python CLI/dashboard support. If Codex cannot discover the local plugin wrapper, the installed command, SQLite index, generated dashboard, localhost server, and CLI JSON reports can still work.
+
 ## Upgrade
 
 ```bash

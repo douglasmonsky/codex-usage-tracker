@@ -28,7 +28,7 @@ Not guaranteed:
 - [x] Verify installed package resources from a built wheel: `python scripts/smoke_installed_package.py`.
 - [x] Verify installed package resources in Linux Docker: `python scripts/smoke_installed_package.py --docker`.
 - [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version <version>`.
-- [ ] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
+- [x] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
 - [x] Add Python 3.14 as an official support target after CI, package classifiers, docs, and installed-package smoke coverage were added. Docker smoke coverage uses `python:3.14-slim` by default. Track this in issue #12.
 
 ## 2. Upgrade And Migration
@@ -43,17 +43,17 @@ Not guaranteed:
 
 ## 3. CLI Compatibility
 
-- [ ] Confirm every documented command in `docs/cli-reference.md` exists: `python -m pytest tests/test_cli_release.py`.
-- [ ] Confirm no documented command is removed without a deprecation plan: manual diff review plus `python -m pytest tests/test_cli_release.py`.
-- [ ] Verify command help works from an installed wheel: `python scripts/smoke_installed_package.py`.
-- [ ] Verify lifecycle commands still return actionable errors without real logs: `python -m pytest tests/test_cli_lifecycle.py`.
+- [x] Confirm every documented command in `docs/cli-reference.md` exists: `python -m pytest tests/test_cli_release.py`.
+- [x] Confirm no documented command is removed without a deprecation plan: manual diff review plus `python -m pytest tests/test_cli_release.py`.
+- [x] Verify command help works from an installed wheel: `python scripts/smoke_installed_package.py`.
+- [x] Verify lifecycle commands still return actionable errors without real logs: `python -m pytest tests/test_cli_lifecycle.py`.
 
 ## 4. MCP Compatibility
 
-- [ ] Verify MCP tool names remain documented in `docs/mcp.md`: `python scripts/check_release.py`.
-- [ ] Verify MCP JSON responses use tracked schema IDs where applicable: `python -m pytest tests/test_store_dashboard_mcp.py`.
-- [ ] Verify companion skill packaged copy matches source skill: `python scripts/check_release.py`.
-- [ ] Verify plugin installer writes MCP config from an installed wheel: `python scripts/smoke_installed_package.py`.
+- [x] Verify MCP tool names remain documented in `docs/mcp.md`: `python -m pytest tests/test_cli_release.py`.
+- [x] Verify MCP JSON responses use tracked schema IDs where applicable: `python -m pytest tests/test_store_dashboard_mcp.py`.
+- [x] Verify companion skill packaged copy matches source skill: `python scripts/check_release.py`.
+- [x] Verify plugin installer writes MCP config from an installed wheel: `python scripts/smoke_installed_package.py`.
 
 ## 5. JSON Contract Stability
 
@@ -66,25 +66,25 @@ Not guaranteed:
 
 ## 6. CSV Export Stability
 
-- [ ] Verify expected CSV columns for aggregate exports: `python -m pytest tests/test_cli_lifecycle.py`.
-- [ ] Verify redacted and strict privacy CSV exports omit private metadata: `python -m pytest tests/test_privacy.py`.
-- [ ] Verify migration fixtures still export the expected CSV shape: `python -m pytest tests/test_store_migrations.py`.
+- [x] Verify expected CSV columns for aggregate exports: `python -m pytest tests/test_cli_lifecycle.py`.
+- [x] Verify redacted and strict privacy CSV exports omit private metadata: `python -m pytest tests/test_privacy.py`.
+- [x] Verify migration fixtures still export the expected CSV shape: `python -m pytest tests/test_store_migrations.py`.
 
 ## 7. Config File Stability
 
-- [ ] Verify pricing config initialization and parsing: `python -m pytest tests/test_pricing.py`.
-- [ ] Verify allowance and rate-card config initialization and parsing: `python -m pytest tests/test_allowance.py`.
-- [ ] Verify threshold config initialization and parsing: `python -m pytest tests/test_recommendations.py`.
-- [ ] Verify project alias/tag config initialization and parsing: `python -m pytest tests/test_projects.py`.
-- [ ] Document config schema changes before release: manual review of `docs/pricing-and-credits.md`, `docs/dashboard-guide.md`, and `docs/cli-reference.md`.
+- [x] Verify pricing config initialization and parsing: `python -m pytest tests/test_pricing.py`.
+- [x] Verify allowance and rate-card config initialization and parsing: `python -m pytest tests/test_allowance.py`.
+- [x] Verify threshold config initialization and parsing: `python -m pytest tests/test_recommendations.py`.
+- [x] Verify project alias/tag config initialization and parsing: `python -m pytest tests/test_projects.py`.
+- [x] Document config schema changes before release: manual review of `docs/pricing-and-credits.md`, `docs/dashboard-guide.md`, and `docs/cli-reference.md`; enforced by `python -m pytest tests/test_cli_release.py`.
 
 ## 8. Dashboard Behavior
 
-- [ ] Verify dashboard aggregate payload remains raw-context-free: `python -m pytest tests/test_store_dashboard_mcp.py`.
-- [ ] Verify dashboard URL state round trips: `python -m pytest tests/test_dashboard_state.py`.
-- [ ] Verify dashboard formatting helpers: `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js`.
-- [ ] Verify dashboard data helpers: `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js`.
-- [ ] Verify active-history and all-history state labels: `python -m pytest tests/test_store_dashboard_mcp.py`.
+- [x] Verify dashboard aggregate payload remains raw-context-free: `python -m pytest tests/test_store_dashboard_mcp.py`.
+- [x] Verify dashboard URL state round trips: `python -m pytest tests/test_dashboard_state.py`.
+- [x] Verify dashboard formatting helpers: `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js`.
+- [x] Verify dashboard data helpers: `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js`.
+- [x] Verify active-history and all-history state labels: `python -m pytest tests/test_cli_release.py tests/test_store_dashboard_mcp.py`.
 - [ ] Run a manual localhost dashboard smoke before release: `codex-usage-tracker serve-dashboard --open`.
 
 ## 9. Privacy And Sharing Safety
@@ -112,19 +112,19 @@ Not guaranteed:
 
 ## 12. Release Process
 
-- [ ] Verify publish workflow publishes `codex-usage-tracking`, not `codex-usage-tracker`: `python scripts/check_release.py`.
-- [ ] Verify publish workflow uses Trusted Publishing, not API tokens: `python scripts/check_release.py`.
-- [ ] Verify TestPyPI and PyPI jobs exist and publish only on workflow dispatch or release events: `python scripts/check_release.py`.
+- [x] Verify publish workflow publishes `codex-usage-tracking`, not `codex-usage-tracker`: `python scripts/check_release.py`.
+- [x] Verify publish workflow uses Trusted Publishing, not API tokens: `python scripts/check_release.py`.
+- [x] Verify TestPyPI and PyPI jobs exist and publish only on workflow dispatch or release events: `python scripts/check_release.py`.
 - [ ] Verify PyPI job is gated by environment `pypi`: manual GitHub environment check.
-- [ ] Verify dist filenames match `codex_usage_tracking`: `python -m build && python scripts/check_release.py --dist`.
+- [x] Verify dist filenames match `codex_usage_tracking`: `python -m build && python scripts/check_release.py --dist`.
 - [ ] Verify TestPyPI process: run `Publish Python package` with `target=testpypi` only when intentionally testing release publication.
 - [ ] Verify PyPI process: publish a GitHub Release or run workflow dispatch with `target=pypi` only when intentionally publishing a reviewed release.
 - [x] Document release recovery by cutting a new patch version when an uploaded artifact is wrong: see `docs/development.md`.
 
 ## 13. Known Limitations
 
-- [ ] Document that Codex upstream log formats can change and parser compatibility may require updates.
-- [ ] Document that pricing and rate-card sources can change outside this project.
-- [ ] Document that live account allowance cannot be read automatically by this local tracker.
-- [ ] Document that cost and credit estimates are not guaranteed to match exact billing.
-- [ ] Document platform/plugin discovery limitations separately from the core Python CLI/dashboard support.
+- [x] Document that Codex upstream log formats can change and parser compatibility may require updates.
+- [x] Document that pricing and rate-card sources can change outside this project.
+- [x] Document that live account allowance cannot be read automatically by this local tracker.
+- [x] Document that cost and credit estimates are not guaranteed to match exact billing.
+- [x] Document platform/plugin discovery limitations separately from the core Python CLI/dashboard support.

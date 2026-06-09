@@ -997,6 +997,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     context_json = json.loads(context)
     dashboard = mcp_server.generate_usage_dashboard()
     csv_export = mcp_server.export_usage_csv(str(tmp_path / "usage.csv"), privacy_mode="redacted")
+    pricing_init = mcp_server.init_usage_pricing_config(force=True)
     pricing_update = mcp_server.update_usage_pricing_config()
     allowance = mcp_server.init_usage_allowance_config()
     doctor = mcp_server.usage_doctor()
@@ -1014,6 +1015,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         context_json,
         dashboard,
         csv_export,
+        pricing_init,
         pricing_update,
         allowance,
         doctor_json,
@@ -1053,6 +1055,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert "[REDACTED_OPENAI_KEY]" in context
     assert dashboard["dashboard_path"] == str(dashboard_path)
     assert csv_export["privacy_mode"] == "redacted"
+    assert pricing_init["pricing_path"] == str(pricing_path)
     assert pricing_update["model_count"] == 1
     assert pricing_update["source_url"] == "https://example.test/pricing.md"
     assert allowance["allowance_path"] == str(allowance_path)

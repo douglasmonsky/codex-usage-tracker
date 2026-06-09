@@ -4,6 +4,14 @@ This page lists the common command-line workflows. For tested JSON contract ids,
 
 ## Index And Setup
 
+Run first-time setup:
+
+```bash
+codex-usage-tracker setup
+```
+
+`setup` installs or refreshes the local plugin wrapper, initializes local config templates when needed, refreshes the aggregate index, runs `doctor`, and prints whether Codex needs a restart for plugin discovery.
+
 Refresh the local aggregate index:
 
 ```bash
@@ -26,6 +34,36 @@ codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl --
 ```
 
 `inspect-log` reports parser adapter, aggregate token-count events, session ids, models, and parser diagnostics. It does not store raw prompts, assistant messages, tool output, or transcript snippets.
+
+Check setup without writing files:
+
+```bash
+codex-usage-tracker doctor
+codex-usage-tracker doctor --suggest-repair
+```
+
+`doctor` validates local paths, database state, parser diagnostics, pricing and allowance config, dashboard output, plugin files, and MCP importability. `--suggest-repair` adds likely next commands without making changes.
+
+Reset only the local aggregate database:
+
+```bash
+codex-usage-tracker reset-db --yes
+```
+
+`reset-db` deletes tracker-owned aggregate SQLite rows. It does not delete raw Codex logs and requires `--yes`.
+
+## Plugin Lifecycle
+
+```bash
+codex-usage-tracker install-plugin
+codex-usage-tracker install-plugin --python .venv/bin/python
+codex-usage-tracker upgrade-plugin
+codex-usage-tracker uninstall-plugin
+```
+
+`install-plugin` writes the package-owned local Codex plugin wrapper, companion skills, and MCP config. Use the `--python` form for source checkouts that should use a repo-local virtual environment.
+
+`upgrade-plugin` refreshes an existing wrapper in place. `uninstall-plugin` removes only the tracker-owned plugin wrapper and marketplace entry.
 
 ## Dashboard
 
@@ -110,6 +148,14 @@ codex-usage-tracker export --output usage.csv --limit 0
 
 Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing CSV output.
 
+## Support Bundle
+
+```bash
+codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json
+```
+
+Support bundles are diagnostic summaries for issues. They include package, platform, doctor, schema, parser, pricing, allowance, threshold, project-config, and privacy metadata. They exclude raw logs, aggregate rows, prompts, assistant messages, tool output, and context text.
+
 ## Local Config
 
 ```bash
@@ -124,6 +170,16 @@ codex-usage-tracker init-projects
 ```
 
 Local config files live under `~/.codex-usage-tracker/` and are never committed by this project.
+
+Stable local config files:
+
+- `pricing.json`: schema `_schema: codex-usage-tracker-pricing-v1`, optional `_source`, `models`, `aliases`, and `_estimated_models`. `models` maps model labels to USD-per-million-token rates such as `input`, `cached_input`, and `output`.
+- `rate-card.json`: schema `codex-usage-tracker-codex-rate-card-v1`, optional `_source`, `credit_rates`, and `aliases`. `credit_rates` maps Codex model labels to credit rates for aggregate token counters.
+- `allowance.json`: schema `codex-usage-tracker-allowance-v1`, `windows`, optional `credit_rates`, and `aliases`. `windows` stores copied 5-hour, weekly, or other allowance snapshots such as `remaining_percent`, `reset_at`, `remaining_credits`, and `total_credits`.
+- `thresholds.json`: JSON object keyed by recommendation threshold names such as `low_cache_ratio`, `high_context_percent`, and `high_cost_usd`. Unknown keys are ignored.
+- `projects.json`: JSON object with `aliases`, `ignored_paths`, and `tags` for local project attribution.
+
+These config schemas are part of the 1.0 compatibility surface. New optional fields may be added, but existing meanings should not change without documentation and a compatibility plan.
 
 ## Privacy Mode
 

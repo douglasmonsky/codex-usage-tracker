@@ -83,8 +83,11 @@ Configure the usage component:
 
 ## Accuracy Notes
 
+- Codex upstream log formats can change, and parser compatibility may require tracker updates before new event shapes are fully understood.
+- Pricing and rate-card sources can change outside this project. Refresh or pin local files when reports need a known source snapshot.
 - Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
-- The dashboard does not infer live remaining allowance from the logged-in account plan.
+- Live account allowance cannot be read automatically by this local tracker, and the dashboard does not infer live remaining allowance from the logged-in account plan.
 - Pricing can change after a report is generated. Use `pin-pricing` when you need reproducible historical cost estimates.
 - Rows with direct model/rate-card matches are more trustworthy than inferred aliases or local overrides.
 - Cost and credit calculations use aggregate counters; the tracker does not re-tokenize prompts or reconstruct usage from raw text.
+- Cost and credit estimates are not guaranteed to match exact billing.

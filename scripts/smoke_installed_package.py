@@ -33,6 +33,37 @@ WHEEL_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
 DEFAULT_DOCKER_IMAGE = "python:3.14-slim"
+CLI_HELP_SUBCOMMANDS = [
+    "setup",
+    "doctor",
+    "install-plugin",
+    "upgrade-plugin",
+    "uninstall-plugin",
+    "refresh",
+    "inspect-log",
+    "rebuild-index",
+    "reset-db",
+    "summary",
+    "query",
+    "recommendations",
+    "session",
+    "context",
+    "dashboard",
+    "open-dashboard",
+    "serve-dashboard",
+    "expensive",
+    "pricing-coverage",
+    "export",
+    "init-pricing",
+    "update-pricing",
+    "pin-pricing",
+    "init-allowance",
+    "parse-allowance",
+    "update-rate-card",
+    "init-thresholds",
+    "init-projects",
+    "support-bundle",
+]
 
 RESOURCE_PATHS = [
     "assets/icon.svg",
@@ -102,8 +133,8 @@ def main(argv: list[str] | None = None) -> int:
 
         _run([str(command), "--version"])
         _run([str(command), "--help"], capture_output=True)
-        _run([str(command), "setup", "--help"], capture_output=True)
-        _run([str(command), "serve-dashboard", "--help"], capture_output=True)
+        for subcommand in CLI_HELP_SUBCOMMANDS:
+            _run([str(command), subcommand, "--help"], capture_output=True)
         _run([str(python), "-c", _import_check_code()])
         _run([str(python), "-c", _resource_check_code()])
         _smoke_plugin_install(command, temp_dir)
@@ -255,6 +286,19 @@ def _smoke_plugin_install(command: Path, temp_dir: Path) -> None:
         raise SystemExit("plugin manifest name mismatch")
     if manifest.get("version") != _installed_version(command):
         raise SystemExit("plugin manifest version does not match installed CLI")
+    mcp_config = json.loads((plugin_dir / ".mcp.json").read_text())
+    server = mcp_config.get("mcpServers", {}).get("codex-usage-tracker", {})
+    actual_python = Path(str(server.get("command", ""))).resolve()
+    expected_python = _venv_python(command.parents[1]).resolve()
+    reported_python = Path(str(payload.get("python_executable", ""))).resolve()
+    if actual_python != expected_python:
+        raise SystemExit("plugin MCP config command does not point at installed wheel Python")
+    if reported_python != actual_python:
+        raise SystemExit("install-plugin JSON and MCP config report different Python executables")
+    if server.get("args") != ["-m", "codex_usage_tracker.mcp_server"]:
+        raise SystemExit("plugin MCP config args do not launch the installed MCP server")
+    if server.get("env", {}).get("PYTHONPATH"):
+        raise SystemExit("installed-wheel plugin MCP config should not require PYTHONPATH")
 
 
 def _installed_version(command: Path) -> str:

@@ -216,10 +216,13 @@ This is optional. The normal shell install above is the fastest trusted path for
 ## Current Limitations
 
 - This is a sidecar dashboard and plugin, not a native Codex chat overlay.
+- Codex upstream log formats can change, and parser compatibility may require tracker updates.
 - Token counts come from Codex's logged counters; the tracker does not re-tokenize prompts.
-- Pricing and Codex credit estimates depend on local rate data and confidence labels.
-- Remaining 5-hour and weekly allowance is not read automatically from the logged-in account.
+- Pricing and rate-card sources can change outside this project.
+- Pricing and Codex credit estimates depend on local rate data and confidence labels and are not guaranteed to match exact billing.
+- Live account allowance cannot be read automatically by this local tracker; remaining 5-hour and weekly allowance is only available when you configure copied values.
 - Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
+- Plugin discovery limitations are separate from core Python CLI/dashboard support.
 - Parent-child thread relationships are only as good as the metadata Codex logs; inferred auto-review attachments are labeled as inferred.
 
 ## Roadmap
