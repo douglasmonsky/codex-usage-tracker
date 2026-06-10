@@ -870,7 +870,7 @@
     }
     function recommendationSummary(row) {
       const recommendation = topRecommendation(row);
-      return recommendation ? `${recommendation.title}: ${recommendation.why}` : t('detail.no_aggregate_action');
+      return recommendation ? `${t(recommendation.title)}: ${t(recommendation.why)}` : t('detail.no_aggregate_action');
     }
     function signalCount(row) {
       return Array.isArray(row.efficiency_flags) ? row.efficiency_flags.length : 0;
@@ -1403,7 +1403,7 @@
           <td class="num">${number.format(row.total_tokens || 0)}</td>
           <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
           <td class="num">${pct(row.cache_ratio)}</td>
-          <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(flag)}</span>`).join('')}</div></td>
+          <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(t(flag))}</span>`).join('')}</div></td>
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
         tr.addEventListener('click', () => selectRow(row));
@@ -1660,7 +1660,7 @@
       return row.pricing_estimated ? t('state.best_guess_estimate') : t('state.configured_price');
     }
     function nextActionForRow(row) {
-      if (row.recommended_action) return row.recommended_action;
+      if (row.recommended_action) return t(row.recommended_action);
       if (!row.pricing_model) return t('action.configure_pricing');
       if (Number(row.cache_ratio || 0) < 0.3 && Number(row.input_tokens || 0) > 0) return t('action.compare_fresh_input');
       if (Number(row.context_window_percent || 0) >= 0.6) return t('action.inspect_thread_timeline');
@@ -1744,8 +1744,8 @@
     }
     function showDetail(row) {
       const attachment = rowAttachment(row);
-      const flags = Array.isArray(row.efficiency_flags) && row.efficiency_flags.length ? row.efficiency_flags.join(', ') : t('state.none');
-      const whyFlagged = Array.isArray(row.flag_explanations) && row.flag_explanations.length ? row.flag_explanations.join(' ') : recommendationSummary(row);
+      const flags = Array.isArray(row.efficiency_flags) && row.efficiency_flags.length ? row.efficiency_flags.map(f => t(f)).join(', ') : t('state.none');
+      const whyFlagged = Array.isArray(row.flag_explanations) && row.flag_explanations.length ? row.flag_explanations.map(exp => t(exp)).join(' ') : recommendationSummary(row);
       detailEl.innerHTML = `
         <div class="detail-stack">
           <div class="detail-card primary">
@@ -1786,9 +1786,9 @@
               [t('detail.pricing_model'), row.pricing_model || t('state.no_configured_price')],
               [t('detail.credit_model'), row.usage_credit_model || t('credit.no_mapped_rate')],
               [t('detail.credit_confidence'), usageCreditStatusLabel(row)],
-              [t('detail.credit_source'), row.usage_credit_source || t('state.none')],
+              [t('detail.credit_source'), t(row.usage_credit_source) || t('state.none')],
               [t('detail.credit_source_fetched'), row.usage_credit_fetched_at || t('state.unknown')],
-              [t('detail.credit_tier'), row.usage_credit_tier || t('state.unknown')],
+              [t('detail.credit_tier'), t(row.usage_credit_tier) || t('state.unknown')],
               [t('detail.cache_savings'), moneyText(row.estimated_cache_savings_usd)],
               [t('detail.efficiency_signals'), flags],
             ])}

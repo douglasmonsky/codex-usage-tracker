@@ -482,7 +482,7 @@
     }
     .table-tools {
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      grid-template-columns: auto 1fr auto;
       align-items: center;
       gap: 12px;
       padding: 12px 16px;
@@ -490,6 +490,8 @@
       background: #fbfcfe;
     }
     .segmented {
+      grid-row: 1;
+      grid-column: 1;
       display: inline-flex;
       gap: 2px;
       padding: 3px;
@@ -514,12 +516,18 @@
       box-shadow: 0 1px 4px rgba(23, 32, 51, 0.12);
     }
     .table-caption {
+      grid-row: 2;
+      grid-column: 1 / span 3;
       min-width: 0;
       color: var(--muted);
       font-size: 12px;
       font-weight: 680;
+      line-height: 1.4;
+      margin-top: 4px;
     }
     .table-actions {
+      grid-row: 1;
+      grid-column: 2;
       display: inline-flex;
       align-items: center;
       justify-content: flex-end;
@@ -548,6 +556,8 @@
       font-weight: 720;
     }
     .pager {
+      grid-row: 1;
+      grid-column: 3;
       display: inline-flex;
       align-items: center;
       justify-content: flex-end;
@@ -957,6 +967,7 @@
       .detail-section { position: static; max-height: none; }
       .detail { max-height: none; }
       .table-tools { align-items: stretch; grid-template-columns: 1fr; }
+      .segmented, .table-actions, .pager, .table-caption { grid-row: auto; grid-column: auto; }
       .segmented, .segmented button { width: 100%; }
       .pager, .load-control, .language-control, .table-actions { justify-content: space-between; width: 100%; }
       .action-status { min-width: 0; }
