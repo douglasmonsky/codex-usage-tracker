@@ -286,8 +286,13 @@ def test_dashboard_history_scope_labels_remain_user_facing() -> None:
 
     assert "Active sessions only" in template
     assert "All history" in template
-    assert "Active sessions only" in script
-    assert "All history" in script
+    assert "history.active_only" in script
+    assert "history.all_includes" in script
+
+    from codex_usage_tracker.i18n import translations_for
+    en_trans = translations_for("en")
+    assert en_trans["history.active_only"] == "Active sessions only"
+    assert "All history" in en_trans["history.all_includes"]
 
 
 def test_usage_skills_prefer_live_dashboard_for_open_requests() -> None:

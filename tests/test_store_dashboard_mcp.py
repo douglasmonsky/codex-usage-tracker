@@ -352,7 +352,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "copyCurrentViewLink" in dashboard_js
     assert "exportCurrentRows" in dashboard_js
     assert "last call" in dashboard_js.lower()
-    assert "session cumulative" in dashboard_js.lower()
+    assert "metric.session_cumulative" in dashboard_js.lower()
+
+    from codex_usage_tracker.i18n import translations_for
+    en_trans = translations_for("en")
+    assert "session cumulative" in en_trans["metric.session_cumulative"].lower()
     assert "Estimated Cost" in dashboard
     assert "estimated_cost_usd" in dashboard
     assert "pricing_snapshot" in dashboard
@@ -393,15 +397,15 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "flag_explanations" in dashboard
     assert "action_recommendations" in dashboard
     assert "action_thresholds" in dashboard
-    assert "Why flagged" in dashboard_js
-    assert "Thread lifecycle" in dashboard_js
-    assert "Largest cumulative jump" in dashboard_js
+    assert "detail.why_flagged" in dashboard_js
+    assert "detail.thread_lifecycle" in dashboard_js
+    assert "detail.largest_cumulative_jump" in dashboard_js
     assert "project_name" in dashboard
-    assert "Project tags" in dashboard_js
-    assert "Git branch" in dashboard_js
+    assert "detail.project_tags" in dashboard_js
+    assert "detail.git_branch" in dashboard_js
     assert "usage_credit_confidence" in dashboard
-    assert "Credit rates:" in dashboard_js
-    assert "Codex allowance usage" in dashboard_js
+    assert "allowance.credit_rates" in dashboard_js
+    assert "insight.codex_allowance_usage" in dashboard_js
     assert "Highest Codex credits" in dashboard
     assert "Estimated Tokens" not in dashboard
     assert "Unpriced Tokens" not in dashboard
@@ -415,16 +419,39 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "attentionScore" in dashboard_js
     assert "thread-row" in dashboard_surface
     assert "thread-call-table" in dashboard_surface
-    assert "Thread attachment" in dashboard_js
-    assert "Subagent type" in dashboard_js
-    assert "Auto-review" in dashboard_js
-    assert "Load context" in dashboard_js
+    assert "detail.thread_attachment" in dashboard_js
+    assert "detail.subagent_type" in dashboard_js
+    assert "source.auto_review" in dashboard_js
+    assert "button.load_context" in dashboard_js
     assert "parent_thread_name" in dashboard
     assert "thread_attachment_label" in dashboard
     assert "thread_attachment_relation" in dashboard
     assert "explicit parent thread" in dashboard_surface
-    assert "spawned from" in dashboard_js
-    assert "spawned threads" in dashboard_js
+    assert "thread.spawned_from" in dashboard_js
+    assert "thread.spawned_threads" in dashboard_js
+
+    from codex_usage_tracker.i18n import translations_for
+    en_trans = translations_for("en")
+    assert en_trans["detail.why_flagged"] == "Why flagged"
+    assert en_trans["detail.thread_lifecycle"] == "Thread lifecycle"
+    assert en_trans["detail.largest_cumulative_jump"] == "Largest cumulative jump"
+    assert en_trans["detail.project_tags"] == "Project tags"
+    assert en_trans["detail.git_branch"] == "Git branch"
+    assert "Credit rates:" in en_trans["allowance.credit_rates"]
+    assert en_trans["insight.codex_allowance_usage"] == "Codex allowance usage"
+    assert en_trans["detail.thread_attachment"] == "Thread attachment"
+    assert en_trans["detail.subagent_type"] == "Subagent type"
+    assert en_trans["source.auto_review"] == "Auto-review"
+    assert en_trans["button.load_context"] == "Load context"
+    assert "spawned from" in en_trans["thread.spawned_from"]
+    assert "spawned threads" in en_trans["thread.spawned_threads"]
+    assert en_trans["detail.thread_timeline"] == "Thread timeline"
+    assert en_trans["detail.raw_identifiers"] == "Raw aggregate identifiers"
+    assert en_trans["metric.codex_credits"] == "Codex credits"
+    assert en_trans["detail.allowance_impact"] == "Allowance impact"
+    assert en_trans["detail.credit_model"] == "Credit model"
+    assert "Live refresh every" in en_trans["live.every"]
+    assert "Refreshing local usage index" in en_trans["live.refreshing_index"]
     assert "Aggregate only" not in dashboard
     assert "Call Details" in dashboard
     assert "Dashboard guide" in dashboard
@@ -449,24 +476,24 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "model-pill" in dashboard_surface
     assert "Back to top" in dashboard
     assert "updateToTopVisibility" in dashboard_js
-    assert "Live refresh every" in dashboard_js
-    assert "Refreshing local usage index" in dashboard_js
+    assert "live.every" in dashboard_js
+    assert "live.refreshing_index" in dashboard_js
     assert "loadLimit" in dashboard
     assert "pager" in dashboard
     assert "pagerEl.hidden = !shouldShowPager" in dashboard_js
-    assert "updatePager(page, 'threads')" in dashboard_js
+    assert "updatePager(page, 'table.threads')" in dashboard_js
     assert "All calls" in dashboard
     assert "/api/usage" in dashboard_js
     assert "detail-card primary" in dashboard_js
-    assert "Thread timeline" in dashboard_js
-    assert "Raw aggregate identifiers" in dashboard_js
-    assert "Codex credits" in dashboard_js
-    assert "Allowance impact" in dashboard_js
-    assert "Credit model" in dashboard_js
+    assert "detail.thread_timeline" in dashboard_js
+    assert "detail.raw_identifiers" in dashboard_js
+    assert "metric.codex_credits" in dashboard_js
+    assert "detail.allowance_impact" in dashboard_js
+    assert "detail.credit_model" in dashboard_js
     assert 'data-sort-key="time"' in dashboard
     assert 'data-sort-key="thread"' in dashboard
-    assert '<option value="attention" selected>Needs attention</option>' in dashboard
-    assert '<option value="usage">Highest Codex credits</option>' in dashboard
+    assert '<option value="attention" selected data-i18n="option.needs_attention">Needs attention</option>' in dashboard
+    assert '<option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option>' in dashboard
 
     pricing_path.write_text(
         json.dumps(
