@@ -51,7 +51,16 @@ def test_recommendations_explain_aggregate_usage_flags() -> None:
     ]
     assert annotated["recommendation_score"] > 0
     assert annotated["recommended_action"] == recommendations[0]["action"]
+    assert annotated["recommended_action_key"] == recommendations[0]["action_key"]
     assert len(annotated["flag_explanations"]) == len(recommendations)
+    assert annotated["flag_explanation_keys"] == [
+        recommendation["why_key"] for recommendation in recommendations
+    ]
+    for recommendation in recommendations:
+        prefix = recommendation["key"].replace("-", "_")
+        assert recommendation["title_key"] == f"recommendation.{prefix}.title"
+        assert recommendation["why_key"] == f"recommendation.{prefix}.why"
+        assert recommendation["action_key"] == f"recommendation.{prefix}.action"
 
 
 def test_threshold_template_and_overrides(tmp_path: Path) -> None:

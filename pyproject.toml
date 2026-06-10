@@ -62,6 +62,7 @@ where = ["src"]
 "codex_usage_tracker.plugin_data" = [
   "assets/*",
   "dashboard/*",
+  "dashboard/locales/*",
   "docs/*",
   "docs/assets/*",
   "rate_cards/*",

@@ -35,15 +35,33 @@ If `codex-usage-tracker` is not found after installing with pipx, open a new ter
 
 `serve-dashboard` refreshes active-session usage before opening by default. Use `--no-refresh` only when you intentionally want to inspect the cached local index.
 
-## Language / Ngôn Ngữ
+## Dashboard Language
 
-The dashboard supports English and Tiếng Việt. Pass `--lang` before the command, or set `CODEX_USAGE_TRACKER_LANG` when you want a default language:
+The dashboard supports localized UI text. English is the canonical catalog, and the project includes starter locale catalogs for common dashboard languages.
+
+Set the initial dashboard language with `--lang`:
 
 ```bash
 codex-usage-tracker --lang vi serve-dashboard --open
 ```
 
-The dashboard header also includes a language selector and remembers your choice in the browser.
+Or set a default with:
+
+```bash
+CODEX_USAGE_TRACKER_LANG=vi codex-usage-tracker serve-dashboard --open
+```
+
+The dashboard also includes a language selector. Browser selections are stored locally and can override the generated default for that browser.
+
+Supported starter locales include English, Vietnamese, Spanish, French, German, Portuguese, Japanese, Simplified Chinese, Korean, Russian, Italian, and Arabic. This localizes dashboard UI text, not the full CLI output or data exports.
+
+### Adding A Dashboard Language
+
+1. Add a locale JSON file named by language code under `src/codex_usage_tracker/plugin_data/dashboard/locales/`.
+2. Include every key from the English catalog.
+3. Preserve every placeholder from the English string.
+4. Add the language code, native name, English name, and text direction to the supported language metadata.
+5. Run the i18n validation tests.
 
 Package naming: the PyPI distribution is `codex-usage-tracking`; the installed command is `codex-usage-tracker`; the GitHub repository remains `douglasmonsky/codex-usage-tracker`. The `codex-usage-tracker` PyPI name is not this project, so avoid similarly named packages when following these docs.
 

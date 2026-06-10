@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="__HTML_LANG__">
+<html lang="__HTML_LANG__" dir="__HTML_DIR__">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,6 @@
         <label class="language-control"><span data-i18n="language.label">Language</span>
           <select id="languageSelect" aria-label="Language" data-i18n-aria-label="language.label">
             <option value="en">English</option>
-            <option value="vi">Tiếng Việt</option>
           </select>
         </label>
         <button id="refreshDashboard" class="refresh-button" type="button" data-i18n="button.refresh">Refresh</button>
@@ -42,7 +41,7 @@
     <div class="header-meta">
       <div class="meta-chips" aria-label="Dashboard status" data-i18n-aria-label="aria.dashboard_status">
         <span class="disclaimer-chip" title="Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI." data-i18n="badge.unofficial_project" data-i18n-title="badge.unofficial_project_title">Unofficial project</span>
-        <span id="liveStatus" class="live-status" data-i18n="badge.static">Static</span>
+        <span id="liveStatus" class="live-status">Static</span>
         <span id="pricingSource" class="source-line"></span>
         <span id="allowanceSource" class="source-line"></span>
         <span id="privacyMode" class="source-line"></span>

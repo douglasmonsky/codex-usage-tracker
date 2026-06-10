@@ -52,7 +52,7 @@
       'button.include_tool_output': 'Include tool output',
       'button.copy_link': 'Copy link',
       'button.clear': 'Clear',
-      'button.run': 'Run',
+      'action.run': 'Run',
       'nav.live': 'Live',
       'nav.load': 'Load',
       'nav.history': 'History',
@@ -85,9 +85,12 @@
       'table.last_call': 'Last Call',
       'language.label': 'Language',
     };
-    const supportedLanguages = new Set((initialPayload.available_languages || [{ code: 'en' }]).map(language => language.code));
-    const translationCatalog = initialPayload.translation_catalog || { [initialPayload.language || 'en']: initialPayload.translations || {} };
-    const fallbackTranslations = { ...builtInFallbackTranslations, ...(translationCatalog.en || initialPayload.translations || {}) };
+    let availableLanguages = Array.isArray(initialPayload.available_languages) && initialPayload.available_languages.length
+      ? initialPayload.available_languages
+      : [{ code: 'en', english_name: 'English', native_name: 'English', dir: 'ltr' }];
+    let supportedLanguages = new Set(availableLanguages.map(language => language.code));
+    let translationCatalog = initialPayload.translation_catalog || { [initialPayload.language || 'en']: initialPayload.translations || {} };
+    let fallbackTranslations = { ...builtInFallbackTranslations, ...(translationCatalog.en || initialPayload.translations || {}) };
     function storedLanguage() {
       try {
         return window.localStorage ? window.localStorage.getItem('codex-usage-dashboard-language') : '';
@@ -96,12 +99,54 @@
       }
     }
     function normalizeLanguage(value) {
-      const normalized = String(value || '').toLowerCase().split(/[-_]/)[0];
-      if (normalized === 'vn') return 'vi';
-      return supportedLanguages.has(normalized) ? normalized : 'en';
+      const aliases = {
+        eng: 'en',
+        english: 'en',
+        'en-us': 'en',
+        vn: 'vi',
+        vie: 'vi',
+        vietnamese: 'vi',
+        'tieng viet': 'vi',
+        'tiếng việt': 'vi',
+        'vi-vn': 'vi',
+        spa: 'es',
+        spanish: 'es',
+        'es-es': 'es',
+        'es-mx': 'es',
+        fre: 'fr',
+        fra: 'fr',
+        french: 'fr',
+        ger: 'de',
+        deu: 'de',
+        german: 'de',
+        por: 'pt',
+        portuguese: 'pt',
+        'pt-br': 'pt',
+        jpn: 'ja',
+        japanese: 'ja',
+        zh: 'zh-Hans',
+        'zh-cn': 'zh-Hans',
+        'zh-hans': 'zh-Hans',
+        chinese: 'zh-Hans',
+        'simplified chinese': 'zh-Hans',
+        kor: 'ko',
+        korean: 'ko',
+        rus: 'ru',
+        russian: 'ru',
+        ita: 'it',
+        italian: 'it',
+        ara: 'ar',
+        arabic: 'ar',
+      };
+      const raw = String(value || '').trim();
+      const normalized = raw.toLowerCase().replace(/_/g, '-');
+      const candidate = aliases[normalized] || raw;
+      return supportedLanguages.has(candidate) ? candidate : 'en';
     }
     let currentLanguage = normalizeLanguage(storedLanguage() || initialPayload.language || 'en');
     let translations = translationCatalog[currentLanguage] || fallbackTranslations;
+    let liveStatusKey = window.location.protocol !== 'file:' ? 'badge.live' : 'status.static';
+    let liveStatusDetail = '';
     function t(key) {
       return translations[key] || fallbackTranslations[key] || key;
     }
@@ -109,6 +154,25 @@
       return t(key).replace(/\{(\w+)\}/g, (match, name) => (
         Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
       ));
+    }
+    function translatedField(keyValue, fallbackText = '') {
+      if (keyValue) {
+        const translated = t(keyValue);
+        if (translated !== keyValue) return translated;
+      }
+      return fallbackText || '';
+    }
+    function languageDirection(language) {
+      const entry = availableLanguages.find(candidate => candidate.code === language);
+      return entry && entry.dir === 'rtl' ? 'rtl' : 'ltr';
+    }
+    function populateLanguageOptions() {
+      if (!languageSelectEl) return;
+      languageSelectEl.innerHTML = availableLanguages.map(language => {
+        const label = language.native_name || language.english_name || language.code;
+        return `<option value="${escapeHtml(language.code)}" dir="${escapeHtml(language.dir || 'ltr')}">${escapeHtml(label)}</option>`;
+      }).join('');
+      languageSelectEl.value = currentLanguage;
     }
     function translateEffort(value) {
       if (!value) return value;
@@ -270,9 +334,11 @@
     function applyTranslations() {
       translations = translationCatalog[currentLanguage] || fallbackTranslations;
       document.documentElement.lang = currentLanguage;
+      document.documentElement.dir = languageDirection(currentLanguage);
       document.title = t('dashboard.title');
       if (languageSelectEl) languageSelectEl.value = currentLanguage;
       document.querySelectorAll('[data-i18n]').forEach(element => {
+        if (element === detailEl) return;
         element.textContent = t(element.dataset.i18n);
       });
       document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
@@ -284,13 +350,10 @@
       document.querySelectorAll('[data-i18n-aria-label]').forEach(element => {
         element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
       });
-      document.querySelectorAll('#languageSelect option').forEach(option => {
-        const key = option.value === 'vi' ? 'language.vietnamese' : option.value === 'en' ? 'language.english' : '';
-        if (key) option.textContent = t(key);
-      });
       if (detailEl && detailEl.dataset.i18n && !detailEl.querySelector('.detail-stack')) {
         detailEl.textContent = t(detailEl.dataset.i18n);
       }
+      renderLiveStatus();
     }
     function setLanguage(language) {
       currentLanguage = normalizeLanguage(language);
@@ -301,6 +364,18 @@
       }
       applyTranslations();
       render();
+      rerenderSelectedDetail();
+    }
+    function rerenderSelectedDetail() {
+      if (selectedRecordId) {
+        const row = rowByRecordId.get(selectedRecordId);
+        if (row) showDetail(row);
+        return;
+      }
+      if (selectedThreadKey) {
+        const group = groups.find(candidate => candidate.key === selectedThreadKey);
+        if (group) showThreadDetail(group);
+      }
     }
     function directional(compareResult) {
       return sortDirection === 'asc' ? compareResult : -compareResult;
@@ -870,7 +945,14 @@
     }
     function recommendationSummary(row) {
       const recommendation = topRecommendation(row);
-      return recommendation ? `${t(recommendation.title)}: ${t(recommendation.why)}` : t('detail.no_aggregate_action');
+      if (!recommendation) return t('detail.no_aggregate_action');
+      const title = translatedField(recommendation.title_key, recommendation.title);
+      const why = translatedField(recommendation.why_key, recommendation.why);
+      return `${title}: ${why}`;
+    }
+    function translateEfficiencyFlag(row, flag, index) {
+      const keys = Array.isArray(row.efficiency_flag_keys) ? row.efficiency_flag_keys : [];
+      return translatedField(keys[index], flag);
     }
     function signalCount(row) {
       return Array.isArray(row.efficiency_flags) ? row.efficiency_flags.length : 0;
@@ -1403,7 +1485,7 @@
           <td class="num">${number.format(row.total_tokens || 0)}</td>
           <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
           <td class="num">${pct(row.cache_ratio)}</td>
-          <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(t(flag))}</span>`).join('')}</div></td>
+          <td><div class="flags">${flags.slice(0, 2).map((flag, index) => `<span class="flag">${escapeHtml(translateEfficiencyFlag(row, flag, index))}</span>`).join('')}</div></td>
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
         tr.addEventListener('click', () => selectRow(row));
@@ -1531,6 +1613,9 @@
             <td>${escapeHtml(sourceLabelText(row))}</td>
             <td class="num">${number.format(row.total_tokens || 0)}</td>
             <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
+            <td class="num">${pct(row.cache_ratio)}</td>
+            <td>${flags.slice(0, 3).map((flag, index) => `<span class="flag">${escapeHtml(translateEfficiencyFlag(row, flag, index))}</span>`).join('') || `<span class="muted">${escapeHtml(t('state.none'))}</span>`}</td>
+          </tr>
         `;
       }).join('');
       tr.innerHTML = `
@@ -1660,34 +1745,14 @@
       return row.pricing_estimated ? t('state.best_guess_estimate') : t('state.configured_price');
     }
     function nextActionForRow(row) {
-      if (row.recommended_action) return t(row.recommended_action);
+      if (row.recommended_action || row.recommended_action_key) {
+        return translatedField(row.recommended_action_key, row.recommended_action);
+      }
       if (!row.pricing_model) return t('action.configure_pricing');
       if (Number(row.cache_ratio || 0) < 0.3 && Number(row.input_tokens || 0) > 0) return t('action.compare_fresh_input');
       if (Number(row.context_window_percent || 0) >= 0.6) return t('action.inspect_thread_timeline');
       if (Number(row.reasoning_output_tokens || 0) > Number(row.output_tokens || 0)) return t('action.review_reasoning_effort');
       return t('action.use_aggregate_first');
-    }
-    function fieldsList(fields, className = 'detail-kv') {
-      return `<dl class="${className}">${fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(short(value))}</dd>`).join('')}</dl>`;
-    }
-    function detailCollapse(title, fields) {
-      return `
-        <details class="detail-collapse">
-          <summary>${escapeHtml(title)}</summary>
-          <div class="detail-collapse-body">${fieldsList(fields)}</div>
-        </details>
-      `;
-    }
-    function timelineSeverity(value) {
-      if (value >= 0.65) return 'high';
-      if (value >= 0.35) return 'medium';
-      return 'low';
-    }
-    function timelineWidth(value) {
-      return `${Math.round(clamp(Number(value || 0), 0, 1) * 100)}%`;
-    }
-    function renderThreadTimeline(group) {
-      const calls = group.calls.slice(-5);
     }
     function fieldsList(fields, className = 'detail-kv') {
       return `<dl class="${className}">${fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(short(value))}</dd>`).join('')}</dl>`;
@@ -1744,8 +1809,12 @@
     }
     function showDetail(row) {
       const attachment = rowAttachment(row);
-      const flags = Array.isArray(row.efficiency_flags) && row.efficiency_flags.length ? row.efficiency_flags.map(f => t(f)).join(', ') : t('state.none');
-      const whyFlagged = Array.isArray(row.flag_explanations) && row.flag_explanations.length ? row.flag_explanations.map(exp => t(exp)).join(' ') : recommendationSummary(row);
+      const flagValues = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
+      const explanationKeys = Array.isArray(row.flag_explanation_keys) ? row.flag_explanation_keys : [];
+      const flags = flagValues.length ? flagValues.map((flag, index) => translateEfficiencyFlag(row, flag, index)).join(', ') : t('state.none');
+      const whyFlagged = Array.isArray(row.flag_explanations) && row.flag_explanations.length
+        ? row.flag_explanations.map((explanation, index) => translatedField(explanationKeys[index], explanation)).join(' ')
+        : recommendationSummary(row);
       detailEl.innerHTML = `
         <div class="detail-stack">
           <div class="detail-card primary">
@@ -1877,15 +1946,33 @@
       currentPage = 1;
       render();
     }
-    function updateLiveStatus(label, detail = '') {
+    function renderLiveStatus() {
+      const label = t(liveStatusKey);
+      const detail = liveStatusDetail || label;
       liveStatusEl.textContent = label;
-      liveStatusEl.title = detail || label;
-      liveStatusEl.dataset.state = label === t('status.refresh_error') || label.toLowerCase().includes('error') ? 'error' : 'ready';
+      liveStatusEl.title = detail;
+      liveStatusEl.dataset.state = liveStatusKey === 'status.refresh_error' ? 'error' : 'ready';
+    }
+    function updateLiveStatus(statusKey, detail = '') {
+      liveStatusKey = statusKey;
+      liveStatusDetail = detail;
+      renderLiveStatus();
     }
     function updateToTopVisibility() {
       toTopEl.dataset.visible = window.scrollY > 320 ? 'true' : 'false';
     }
     function applyDashboardPayload(nextPayload) {
+      if (nextPayload.translation_catalog) {
+        translationCatalog = nextPayload.translation_catalog;
+        fallbackTranslations = { ...builtInFallbackTranslations, ...(translationCatalog.en || fallbackTranslations) };
+      }
+      if (Array.isArray(nextPayload.available_languages) && nextPayload.available_languages.length) {
+        availableLanguages = nextPayload.available_languages;
+        supportedLanguages = new Set(availableLanguages.map(language => language.code));
+        populateLanguageOptions();
+      }
+      currentLanguage = normalizeLanguage(nextPayload.language || currentLanguage);
+      applyTranslations();
       data = payloadRows(nextPayload);
       pricingConfigured = Boolean(nextPayload.pricing_configured);
       pricingSource = nextPayload.pricing_source || {};
@@ -1918,14 +2005,14 @@
     }
     async function refreshDashboardData(manual = false) {
       if (!liveRefreshSupported) {
-        updateLiveStatus(t('status.reloading'), t('live.reloading_static'));
+        updateLiveStatus('status.reloading', t('live.reloading_static'));
         window.location.reload();
         return;
       }
       if (refreshInFlight) return;
       refreshInFlight = true;
       refreshDashboardEl.disabled = true;
-      updateLiveStatus(manual ? t('status.refreshing') : t('status.checking'), manual ? t('live.refreshing_index') : t('live.checking_usage'));
+      updateLiveStatus(manual ? 'status.refreshing' : 'status.checking', manual ? t('live.refreshing_index') : t('live.checking_usage'));
       try {
         const params = new URLSearchParams({
           refresh: '1',
@@ -1954,10 +2041,10 @@
         const skipped = result.skipped_events
           ? tf('live.skipped', { count: number.format(result.skipped_events) })
           : '';
-        updateLiveStatus(autoRefreshEl.checked ? t('badge.live') : t('status.updated'), tf('live.updated_detail', { time: formatTimestamp(nextPayload.refreshed_at), loaded: loadedRowsDescription(), history: historyRowsDescription(), indexed, skipped }));
+        updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', tf('live.updated_detail', { time: formatTimestamp(nextPayload.refreshed_at), loaded: loadedRowsDescription(), history: historyRowsDescription(), indexed, skipped }));
       } catch (error) {
         const message = error.message || String(error);
-        updateLiveStatus(t('status.refresh_error'), tf('live.refresh_unavailable', { message, suffix: manual ? t('live.refresh_suffix') : '' }));
+        updateLiveStatus('status.refresh_error', tf('live.refresh_unavailable', { message, suffix: manual ? t('live.refresh_suffix') : '' }));
         if (manual && message === 'HTTP 404') window.location.reload();
       } finally {
         refreshInFlight = false;
@@ -1987,7 +2074,7 @@
       if (liveRefreshSupported) {
         refreshDashboardData(true);
       } else {
-        updateLiveStatus(t('status.static'), t('live.load_static_hint'));
+        updateLiveStatus('status.static', t('live.load_static_hint'));
       }
     });
     historyScopeEl.addEventListener('change', () => {
@@ -1998,12 +2085,12 @@
       if (liveRefreshSupported) {
         refreshDashboardData(true);
       } else {
-        updateLiveStatus(t('status.static'), t('live.history_static_hint'));
+        updateLiveStatus('status.static', t('live.history_static_hint'));
       }
     });
     autoRefreshEl.addEventListener('change', () => {
       scheduleAutoRefresh();
-      updateLiveStatus(autoRefreshEl.checked ? t('badge.live') : t('status.paused'), `${autoRefreshEl.checked ? tf('live.every', { seconds: liveRefreshIntervalMs / 1000 }) : t('live.paused')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.paused', `${autoRefreshEl.checked ? tf('live.every', { seconds: liveRefreshIntervalMs / 1000 }) : t('live.paused')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       if (autoRefreshEl.checked) refreshDashboardData(false);
     });
     document.addEventListener('visibilitychange', () => {
@@ -2072,6 +2159,7 @@
     }));
     sortEl.addEventListener('input', () => setSort(sortEl.value, defaultSortDirection(sortEl.value)));
     rebuildDashboardIndexes();
+    populateLanguageOptions();
     applyTranslations();
     rebuildFilterOptions();
     applyInitialState();
@@ -2086,9 +2174,9 @@
       autoRefreshEl.disabled = true;
       loadLimitEl.disabled = true;
       historyScopeEl.disabled = true;
-      updateLiveStatus(t('status.static'), `${t('status.static')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      updateLiveStatus('status.static', `${t('status.static')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
     } else {
-      updateLiveStatus(t('badge.live'), `${tf('live.every', { seconds: liveRefreshIntervalMs / 1000 })}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      updateLiveStatus('badge.live', `${tf('live.every', { seconds: liveRefreshIntervalMs / 1000 })}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       scheduleAutoRefresh();
       if (needsInitialHistoryRefresh) refreshDashboardData(false);
     }

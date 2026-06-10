@@ -37,6 +37,15 @@ Redacted mode hides raw cwd/source paths, hides Git remote labels, and hashes un
 
 `serve-dashboard` refreshes active-session logs before opening by default. Use `--no-refresh` only when you intentionally want a cached view of the existing local index.
 
+Set the initial dashboard language with the global `--lang` option before the command, or use `CODEX_USAGE_TRACKER_LANG`:
+
+```bash
+codex-usage-tracker --lang vi serve-dashboard --open
+CODEX_USAGE_TRACKER_LANG=vi codex-usage-tracker serve-dashboard --open
+```
+
+The dashboard language selector stores your browser preference locally. It localizes dashboard UI labels, captions, badges, empty states, detail-panel labels, context controls, and recommendation text; it does not translate raw data values, JSON fields, CSV columns, model names, thread names, project names, paths, or full CLI output.
+
 The server keeps the HTML aggregate-only and enables two live features:
 
 - `Refresh` rescans local Codex logs and updates the dashboard rows.

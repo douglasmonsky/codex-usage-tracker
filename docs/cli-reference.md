@@ -83,6 +83,8 @@ codex-usage-tracker serve-dashboard --no-context-api --open
 
 Dashboards default to active sessions only. Use `--include-archived` for an all-history static/opened dashboard, or switch the served dashboard's `History` control from `Active sessions only` to `All history` when you intentionally want archived logs scanned and included.
 
+Use global `--lang <code>` before the dashboard command, or set `CODEX_USAGE_TRACKER_LANG`, to choose the dashboard's initial UI language. The dashboard language selector can then override that default in the browser. Localization applies to dashboard UI text, not JSON fields, CSV columns, model names, thread names, paths, or full CLI output.
+
 The localhost `/api/usage` endpoint accepts `limit` and `offset` query parameters, so automation can page aggregate rows without asking the server to load an entire large history at once.
 
 ## Summaries
