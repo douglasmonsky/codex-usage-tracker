@@ -224,7 +224,7 @@ Tracked timings:
 | `pricing_coverage_seconds` | Pricing coverage report |
 | `project_summary_seconds` | Project summary report |
 
-The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` so regressions in the benchmark contract are visible on pull requests. The 10k/100k runs are a practical local gate for performance-sensitive changes; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
+The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
 
 ## Release Checklist
 

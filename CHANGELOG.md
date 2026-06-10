@@ -7,6 +7,7 @@
 - Add the dashboard localization foundation, including starter locale catalogs, language metadata, local browser language selection, `--lang`, and `CODEX_USAGE_TRACKER_LANG`.
 - Add Vietnamese dashboard localization and focused validation coverage for translated dashboard labels.
 - Keep the README landing page focused on dashboard screenshots and companion usage workflows before detailed localization guidance.
+- Stabilize the CI synthetic benchmark smoke so coverage instrumentation does not create false release failures.
 - Pin the marketplace MCP runtime launcher to the exact `codex-usage-tracking==0.5.0` package.
 
 ## 0.4.1 - 2026-06-09

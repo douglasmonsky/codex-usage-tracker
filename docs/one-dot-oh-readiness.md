@@ -211,7 +211,7 @@ These references are the concrete proof behind completed checklist items. Public
 
 - Benchmark command behavior and threshold contract are smoke-tested by `tests/test_cli_release.py::test_synthetic_history_benchmark_script_smoke`.
 - Release-size 10k, 100k, and 500k benchmark claims are proven by running `python scripts/benchmark_synthetic_history.py --rows 10000 100000 500000 --json --enforce-thresholds` before release work when practical.
-- CI-safe benchmark coverage is proven by the CI `Release readiness` job through `tests/test_cli_release.py::test_synthetic_history_benchmark_script_smoke`.
+- CI-safe benchmark coverage is proven by the CI `Release readiness` job through `tests/test_cli_release.py::test_synthetic_history_benchmark_script_smoke`, using a small `--threshold-scale` allowance for coverage instrumentation and shared runner noise.
 
 ### Release Process
 
