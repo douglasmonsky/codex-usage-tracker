@@ -17,6 +17,7 @@ from codex_usage_tracker.allowance import (
     load_allowance_config,
     summarize_allowance_usage,
 )
+from codex_usage_tracker.i18n import dashboard_i18n_payload, translations_for
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_DASHBOARD_PATH,
@@ -59,6 +60,7 @@ def dashboard_payload(
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
     include_archived: bool = False,
+    language: str | None = None,
 ) -> dict[str, object]:
     """Return aggregate-only dashboard data without rendering HTML."""
 
@@ -108,6 +110,7 @@ def dashboard_payload(
         if key.startswith("parser_") and _safe_int(value)
     }
     return {
+        **dashboard_i18n_payload(language),
         "rows": annotated_rows,
         "pricing_configured": pricing.loaded and not pricing.error,
         "pricing_source": pricing.source,
@@ -166,6 +169,7 @@ def generate_dashboard(
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
     include_archived: bool = False,
+    language: str | None = None,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     guide_href = _dashboard_guide_href(output_path)
@@ -189,6 +193,7 @@ def generate_dashboard(
         projects_path=projects_path,
         privacy_mode=privacy_mode,
         include_archived=include_archived,
+        language=language,
     )
     payload_dict["pricing_snapshot_warning"] = _pricing_snapshot_warning(
         previous_payload, payload_dict
@@ -198,6 +203,7 @@ def generate_dashboard(
         _html(
             payload,
             guide_href=guide_href,
+            language=str(payload_dict["language"]),
             stylesheet_href=stylesheet_href,
             format_script_src=format_script_src,
             data_script_src=data_script_src,
@@ -347,6 +353,7 @@ def _html(
     payload: str,
     guide_href: str | None = None,
     *,
+    language: str = "en",
     stylesheet_href: str = "codex-usage-tracker-assets/dashboard.css",
     format_script_src: str = "codex-usage-tracker-assets/dashboard_format.js",
     data_script_src: str = "codex-usage-tracker-assets/dashboard_data.js",
@@ -354,13 +361,16 @@ def _html(
     script_src: str = "codex-usage-tracker-assets/dashboard.js",
 ) -> str:
     template = _read_dashboard_asset("dashboard_template.html")
+    translations = translations_for(language)
     guide_link = (
-        f'<a class="guide-link" href="{html.escape(guide_href, quote=True)}">Dashboard guide</a>'
+        f'<a class="guide-link" href="{html.escape(guide_href, quote=True)}" '
+        f'data-i18n="docs.dashboard_guide">{html.escape(translations["docs.dashboard_guide"])}</a>'
         if guide_href
         else ""
     )
     return (
-        template.replace("__TITLE__", html.escape("Codex Usage Dashboard"))
+        template.replace("__HTML_LANG__", html.escape(language, quote=True))
+        .replace("__TITLE__", html.escape(translations["dashboard.title"]))
         .replace("__STYLESHEET_HREF__", html.escape(stylesheet_href, quote=True))
         .replace("__GUIDE_LINK__", guide_link)
         .replace("__PAYLOAD__", payload)

@@ -30,6 +30,7 @@ from codex_usage_tracker.formatting import (
     format_doctor,
     format_session,
 )
+from codex_usage_tracker.i18n import SUPPORTED_LANGUAGES, normalize_language
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -110,6 +111,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rate-card", type=Path, default=DEFAULT_RATE_CARD_PATH)
     parser.add_argument("--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH)
     parser.add_argument("--projects", type=Path, default=DEFAULT_PROJECTS_PATH)
+    parser.add_argument(
+        "--lang",
+        choices=SUPPORTED_LANGUAGES,
+        default=None,
+        help="Dashboard/CLI language. Defaults to CODEX_USAGE_TRACKER_LANG or en.",
+    )
     parser.add_argument(
         "--privacy-mode",
         choices=PRIVACY_MODE_CHOICES,
@@ -942,6 +949,7 @@ def _run_dashboard(args: argparse.Namespace) -> int:
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
         include_archived=args.include_archived,
+        language=normalize_language(args.lang),
     )
     if args.as_json:
         _print_json(
@@ -954,6 +962,7 @@ def _run_dashboard(args: argparse.Namespace) -> int:
                 "since": args.since,
                 "privacy_mode": args.privacy_mode,
                 "include_archived": args.include_archived,
+                "language": normalize_language(args.lang),
             }
         )
     else:
@@ -986,6 +995,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
         include_archived=args.include_archived,
+        language=normalize_language(args.lang),
     )
     if args.as_json:
         _print_json(
@@ -999,6 +1009,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
                 "refresh": refresh_payload,
                 "privacy_mode": args.privacy_mode,
                 "include_archived": args.include_archived,
+                "language": normalize_language(args.lang),
             }
         )
     else:
@@ -1021,6 +1032,7 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
                 "refresh_before_start": args.refresh,
                 "privacy_mode": args.privacy_mode,
                 "include_archived": args.include_archived,
+                "language": normalize_language(args.lang),
             }
         )
     if args.refresh:
@@ -1047,6 +1059,7 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
         thresholds_path=args.thresholds,
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
+        language=normalize_language(args.lang),
     )
     return 0
 

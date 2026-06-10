@@ -24,3 +24,5 @@ dist/
 .DS_Store
 tmp/
 .cache/
+
+.codex/

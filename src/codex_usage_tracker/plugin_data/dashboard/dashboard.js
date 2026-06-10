@@ -33,10 +33,83 @@
       resolvedParentSessionUpdatedAt,
       resolveThreadAttachment,
       chronological,
-      compactListSummary,
-      threadModelSummary,
     } = dashboardData;
     const initialPayload = JSON.parse(document.getElementById('usage-data').textContent);
+    const builtInFallbackTranslations = {
+      'dashboard.title': 'Usage Dashboard',
+      'dashboard.eyebrow': 'Local Codex analytics',
+      'docs.dashboard_guide': 'Dashboard guide',
+      'dashboard.view.insights': 'Insights',
+      'dashboard.view.calls': 'Calls',
+      'dashboard.view.threads': 'Threads',
+      'dashboard.model_calls': 'Model Calls',
+      'dashboard.call_details': 'Call Details',
+      'dashboard.detail.empty': 'Hover or click a row to inspect aggregate usage fields.',
+      'button.refresh': 'Refresh',
+      'button.export_csv': 'Export CSV',
+      'button.load_more': 'Load more',
+      'button.load_context': 'Load context',
+      'button.include_tool_output': 'Include tool output',
+      'button.copy_link': 'Copy link',
+      'button.clear': 'Clear',
+      'button.run': 'Run',
+      'nav.live': 'Live',
+      'nav.load': 'Load',
+      'nav.history': 'History',
+      'filter.search': 'Search',
+      'filter.search_placeholder': 'Thread, cwd, model',
+      'filter.model': 'Model',
+      'filter.effort': 'Reasoning',
+      'filter.confidence': 'Confidence',
+      'filter.sort': 'Sort',
+      'filter.start': 'Start',
+      'filter.end': 'End',
+      'option.all_models': 'All models',
+      'option.all_efforts': 'All efforts',
+      'option.all_confidence': 'All confidence',
+      'section.needs_attention': 'Needs Attention',
+      'section.investigation_presets': 'Investigation Presets',
+      'state.no_data': 'No data',
+      'state.no_rows': 'No rows',
+      'state.no_calls': 'No calls match the current filters.',
+      'state.no_threads': 'No threads match the current filters.',
+      'table.time': 'Time',
+      'table.thread': 'Thread',
+      'table.model': 'Model',
+      'table.effort': 'Effort',
+      'table.tokens': 'Tokens',
+      'table.cost': 'Cost',
+      'table.cache': 'Cache',
+      'table.signals': 'Signals',
+      'table.source': 'Source',
+      'table.last_call': 'Last Call',
+      'language.label': 'Language',
+    };
+    const supportedLanguages = new Set((initialPayload.available_languages || [{ code: 'en' }]).map(language => language.code));
+    const translationCatalog = initialPayload.translation_catalog || { [initialPayload.language || 'en']: initialPayload.translations || {} };
+    const fallbackTranslations = { ...builtInFallbackTranslations, ...(translationCatalog.en || initialPayload.translations || {}) };
+    function storedLanguage() {
+      try {
+        return window.localStorage ? window.localStorage.getItem('codex-usage-dashboard-language') : '';
+      } catch (error) {
+        return '';
+      }
+    }
+    function normalizeLanguage(value) {
+      const normalized = String(value || '').toLowerCase().split(/[-_]/)[0];
+      if (normalized === 'vn') return 'vi';
+      return supportedLanguages.has(normalized) ? normalized : 'en';
+    }
+    let currentLanguage = normalizeLanguage(storedLanguage() || initialPayload.language || 'en');
+    let translations = translationCatalog[currentLanguage] || fallbackTranslations;
+    function t(key) {
+      return translations[key] || fallbackTranslations[key] || key;
+    }
+    function tf(key, values = {}) {
+      return t(key).replace(/\{(\w+)\}/g, (match, name) => (
+        Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
+      ));
+    }
     const stateManager = window.CodexUsageDashboardState;
     const urlParams = new URLSearchParams(window.location.search);
     const initialState = stateManager ? stateManager.read(urlParams) : {};
@@ -84,6 +157,7 @@
     const autoRefreshEl = document.getElementById('autoRefresh');
     const loadLimitEl = document.getElementById('loadLimit');
     const historyScopeEl = document.getElementById('historyScope');
+    const languageSelectEl = document.getElementById('languageSelect');
     const liveStatusEl = document.getElementById('liveStatus');
     const copyViewLinkEl = document.getElementById('copyViewLink');
     const exportVisibleEl = document.getElementById('exportVisible');
@@ -104,12 +178,12 @@
     const liveRefreshIntervalMs = 10000;
     const pageSize = 500;
     const datePresetLabels = {
-      all: 'All time',
-      today: 'Today',
-      'this-week': 'This week',
-      'last-7-days': 'Last 7 days',
-      'this-month': 'This month',
-      custom: 'Custom range',
+      all: 'option.all_time',
+      today: 'option.today',
+      'this-week': 'option.this_week',
+      'last-7-days': 'option.last_7_days',
+      'this-month': 'option.this_month',
+      custom: 'option.custom_range',
     };
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
     let activeView = ['calls', 'threads', 'insights'].includes(initialState.view) ? initialState.view : 'insights';
@@ -126,67 +200,102 @@
     const presetDefinitions = [
       {
         key: 'highest-cost',
-        label: 'Highest-cost threads',
-        description: 'Threads sorted by estimated spend, with subagents attached.',
+        labelKey: 'preset.highest_cost_threads',
+        descriptionKey: 'preset.highest_cost_threads_desc',
         view: 'threads',
         sort: 'cost',
         direction: 'desc',
-        caption: 'Highest-cost threads preset',
+        captionKey: 'preset.highest_cost_threads_caption',
         matches: () => true,
       },
       {
         key: 'context-bloat',
-        label: 'Context bloat',
-        description: 'Calls over 60% context use or with very high cumulative tokens.',
+        labelKey: 'preset.context_bloat',
+        descriptionKey: 'preset.context_bloat_desc',
         view: 'calls',
         sort: 'context',
         direction: 'desc',
-        caption: 'Context bloat preset',
+        captionKey: 'preset.context_bloat_caption',
         matches: row => Number(row.context_window_percent || 0) >= threshold('high_context_percent', 0.6) || Number(row.cumulative_total_tokens || 0) >= threshold('large_cumulative_tokens', 200000),
       },
       {
         key: 'cache-misses',
-        label: 'Cache misses',
-        description: 'Low cache-ratio calls grouped by cwd, model, and thread.',
+        labelKey: 'preset.cache_misses',
+        descriptionKey: 'preset.cache_misses_desc',
         view: 'calls',
         sort: 'cache',
         direction: 'asc',
-        caption: 'Cache misses preset',
+        captionKey: 'preset.cache_misses_caption',
         matches: row => Number(row.input_tokens || 0) > 0 && Number(row.cache_ratio || 0) < threshold('low_cache_ratio', 0.3),
       },
       {
         key: 'pricing-gaps',
-        label: 'Pricing gaps',
-        description: 'Unpriced usage that makes estimated cost totals incomplete.',
+        labelKey: 'preset.pricing_gaps',
+        descriptionKey: 'preset.pricing_gaps_desc',
         view: 'calls',
         sort: 'total',
         direction: 'desc',
         pricingStatus: 'unpriced',
-        caption: 'Pricing gaps preset',
+        captionKey: 'preset.pricing_gaps_caption',
         matches: row => !row.pricing_model,
       },
       {
         key: 'estimated-review',
-        label: 'Estimated-price review',
-        description: 'Usage priced with marked best-guess estimates.',
+        labelKey: 'preset.estimated_price_review',
+        descriptionKey: 'preset.estimated_price_review_desc',
         view: 'calls',
         sort: 'cost',
         direction: 'desc',
         pricingStatus: 'estimated',
-        caption: 'Estimated-price review preset',
+        captionKey: 'preset.estimated_price_review_caption',
         matches: row => Boolean(row.pricing_estimated),
       },
       {
         key: 'usage-credits',
-        label: 'Highest Codex credits',
-        description: 'Calls sorted by estimated impact on Codex usage allowance.',
+        labelKey: 'preset.highest_codex_credits',
+        descriptionKey: 'preset.highest_codex_credits_desc',
         view: 'calls',
         sort: 'usage',
         direction: 'desc',
-        caption: 'Highest Codex credits preset',
+        captionKey: 'preset.highest_codex_credits_caption',
         matches: row => Number(row.usage_credits || 0) > 0,
       },
     ];
+    function applyTranslations() {
+      translations = translationCatalog[currentLanguage] || fallbackTranslations;
+      document.documentElement.lang = currentLanguage;
+      document.title = t('dashboard.title');
+      if (languageSelectEl) languageSelectEl.value = currentLanguage;
+      document.querySelectorAll('[data-i18n]').forEach(element => {
+        element.textContent = t(element.dataset.i18n);
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+        element.setAttribute('placeholder', t(element.dataset.i18nPlaceholder));
+      });
+      document.querySelectorAll('[data-i18n-title]').forEach(element => {
+        element.setAttribute('title', t(element.dataset.i18nTitle));
+      });
+      document.querySelectorAll('[data-i18n-aria-label]').forEach(element => {
+        element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
+      });
+      document.querySelectorAll('#languageSelect option').forEach(option => {
+        const key = option.value === 'vi' ? 'language.vietnamese' : option.value === 'en' ? 'language.english' : '';
+        if (key) option.textContent = t(key);
+      });
+      if (detailEl && detailEl.dataset.i18n && !detailEl.querySelector('.detail-stack')) {
+        detailEl.textContent = t(detailEl.dataset.i18n);
+      }
+    }
+    function setLanguage(language) {
+      currentLanguage = normalizeLanguage(language);
+      try {
+        if (window.localStorage) window.localStorage.setItem('codex-usage-dashboard-language', currentLanguage);
+      } catch (error) {
+        // Local storage can be unavailable for file URLs or privacy settings.
+      }
+      applyTranslations();
+      render();
+    }
     function directional(compareResult) {
       return sortDirection === 'asc' ? compareResult : -compareResult;
     }
@@ -218,30 +327,56 @@
       document.querySelectorAll('[data-sort-indicator]').forEach(indicator => {
         indicator.textContent = indicator.dataset.sortIndicator === sortKey ? (sortDirection === 'asc' ? '▲' : '▼') : '';
       });
-      tableCaptionEl.dataset.sortDescription = `${sortLabel(sortKey)} ${sortDirection === 'asc' ? 'ascending' : 'descending'}`;
+      tableCaptionEl.dataset.sortDescription = tf('caption.sort_direction', {
+        label: sortLabelText(sortKey),
+        direction: sortDirection === 'asc' ? t('caption.ascending') : t('caption.descending'),
+      });
+    }
+    function sortLabelText(key) {
+      return {
+        attention: t('option.needs_attention'),
+        cache: t('table.cache'),
+        context: t('metric.context_use'),
+        cost: t('table.cost'),
+        effort: t('table.effort'),
+        model: t('table.model'),
+        signals: t('table.signals'),
+        thread: t('table.thread'),
+        time: t('table.time'),
+        total: t('table.tokens'),
+        usage: t('metric.codex_credits'),
+      }[key] || t('filter.sort');
+    }
+    function moneyText(value) {
+      return money(value, t('state.no_price'));
+    }
+    function creditsText(value) {
+      return credits(value, t('state.no_rate'));
     }
     function loadedRowsDescription() {
       const loaded = number.format(data.length);
       const available = number.format(totalAvailableRows || data.length);
       const capped = loadedLimit !== null && totalAvailableRows > data.length;
-      return capped ? `${loaded} of ${available} calls loaded` : `${loaded} calls loaded`;
+      return capped
+        ? tf('caption.loaded_capped', { loaded, available })
+        : tf('caption.loaded', { loaded });
     }
     function historyRowsDescription() {
       const archived = Number(archivedAvailableRows || 0);
       if (includeArchived) {
         return archived
-          ? `All history includes ${number.format(archived)} archived calls`
-          : 'All history selected; no archived calls are indexed yet';
+          ? tf('history.all_includes', { count: number.format(archived) })
+          : t('history.all_empty');
       }
       return archived
-        ? `Active sessions only; ${number.format(archived)} archived calls hidden`
-        : 'Active sessions only';
+        ? tf('history.active_hidden', { count: number.format(archived) })
+        : t('history.active_only');
     }
     function updateHistoryScopeControl() {
       historyScopeEl.value = includeArchived ? 'all' : 'active';
       const detail = historyRowsDescription();
       historyScopeEl.title = detail;
-      historyScopeEl.parentElement.title = `${detail}. Archived sessions are scanned only when All history is selected during live refresh.`;
+      historyScopeEl.parentElement.title = tf('history.archived_scan_hint', { detail });
     }
     function updateLoadLimitControl() {
       const value = limitValue(loadedLimit);
@@ -249,7 +384,7 @@
       if (!existing.has(value)) {
         const option = document.createElement('option');
         option.value = value;
-        option.textContent = `${number.format(loadedLimit)} calls`;
+        option.textContent = tf('caption.loaded', { loaded: number.format(loadedLimit) });
         loadLimitEl.insertBefore(option, loadLimitEl.lastElementChild);
       }
       loadLimitEl.value = value;
@@ -258,12 +393,38 @@
       rowByRecordId = new Map(data.map(row => [row.record_id, row]));
       threadAttachmentByRecordId = new Map(data.map(row => [row.record_id, resolveThreadAttachment(row)]));
     }
+    function usageCreditStatusLabel(row) {
+      if (usageCreditValue(row) === null) return t('allowance.row_no_rate');
+      if (row.usage_credit_confidence === 'exact') return t('credit.official_match');
+      if (row.usage_credit_confidence === 'estimated') return t('credit.inferred_mapping');
+      if (row.usage_credit_confidence === 'user_override') return t('credit.user_rate');
+      return short(row.usage_credit_confidence, t('credit.configured_rate'));
+    }
+    function sourceLabelText(row) {
+      if (isAutoReview(row)) return t('source.auto_review');
+      if (row.subagent_type === 'thread_spawn') {
+        return row.agent_role ? tf('source.subagent_role', { role: row.agent_role }) : t('source.subagent');
+      }
+      if (isSubagent(row)) return t('source.subagent');
+      return t('source.user');
+    }
+    function attachmentRelationText(relation) {
+      return {
+        direct: t('thread.direct'),
+        session: t('thread.session'),
+        'explicit parent thread': t('thread.explicit_parent_thread'),
+        'explicit parent': t('thread.explicit_parent'),
+        'unmatched subagent': t('thread.unmatched_subagent'),
+      }[relation] || relation || t('state.unknown');
+    }
     function usageCreditsWithStatus(row) {
       const value = usageCreditValue(row);
-      return value === null ? 'No mapped rate' : `${credits(value)} credits · ${usageCreditStatusText(row)}`;
+      return value === null
+        ? t('credit.no_mapped_rate')
+        : tf('credit.with_status', { value: credits(value), status: usageCreditStatusLabel(row) });
     }
     function costUsageCell(costText, creditValue) {
-      const usage = creditValue === null || creditValue === undefined ? 'No credit rate' : `${credits(creditValue)} cr`;
+      const usage = creditValue === null || creditValue === undefined ? t('credit.no_rate') : `${credits(creditValue)} cr`;
       return `<span class="metric-stack"><span>${escapeHtml(costText)}</span><span class="metric-sub">${escapeHtml(usage)}</span></span>`;
     }
     function allowanceWindowText(totalCredits, mode = 'impact') {
@@ -277,54 +438,54 @@
           return `${label} ${pct(remainingPercent)}`;
         }
         if (mode === 'remaining-card' && remainingCredits !== null && Number.isFinite(remainingCredits)) {
-          return `${label} ${credits(remainingCredits)} cr left`;
+          return `${label} ${tf('allowance.cr_left', { value: credits(remainingCredits) })}`;
         }
         if (mode === 'impact' && total > 0) {
-          return `${label} ${pct(totalCredits / total)} of allowance`;
+          return `${label} ${tf('allowance.of_allowance', { ratio: pct(totalCredits / total) })}`;
         }
         if (mode === 'impact' && remainingCredits !== null && Number.isFinite(remainingCredits)) {
-          return `${label} ${credits(totalCredits)} used vs ${credits(remainingCredits)} remaining`;
+          return `${label} ${tf('allowance.used_vs_remaining', { used: credits(totalCredits), remaining: credits(remainingCredits) })}`;
         }
         if (remainingPercent !== null && Number.isFinite(remainingPercent)) {
-          return `${label} ${pct(remainingPercent)} remaining`;
+          return `${label} ${tf('allowance.remaining', { value: pct(remainingPercent) })}`;
         }
         if (remainingCredits !== null && Number.isFinite(remainingCredits)) {
-          return `${label} ${credits(remainingCredits)} credits remaining`;
+          return `${label} ${tf('allowance.credits_remaining', { value: credits(remainingCredits) })}`;
         }
         if (total > 0) {
-          return `${label} ${credits(totalCredits)} of ${credits(total)} credits`;
+          return `${label} ${tf('allowance.of_total', { used: credits(totalCredits), total: credits(total) })}`;
         }
-        return `${label} configured`;
+        return tf('allowance.window_configured', { label });
       });
       return labels.join(mode === 'remaining-card' ? '\n' : ' · ');
     }
     function allowanceImpactText(totalCredits) {
       const windowImpact = allowanceWindowText(totalCredits, 'remaining-card') || allowanceWindowText(totalCredits, 'impact');
       if (windowImpact) return windowImpact;
-      if (allowanceError) return 'Allowance config error';
-      return allowanceConfigured ? 'Allowance configured' : 'Set limits';
+      if (allowanceError) return t('state.allowance_config_error');
+      return allowanceConfigured ? t('state.allowance_configured') : t('action.set_limits');
     }
     function rowAllowanceImpact(row) {
       const value = usageCreditValue(row);
-      if (value === null) return 'No mapped Codex credit rate';
+      if (value === null) return t('allowance.row_no_rate');
       const impact = allowanceWindowText(value, 'impact');
-      return impact || `${credits(value)} credits counted toward Codex usage limits`;
+      return impact || tf('allowance.counted', { value: credits(value) });
     }
     function updateAllowanceSourceLine() {
       const sourceEl = document.getElementById('allowanceSource');
       const sourceName = allowanceSource.name || 'Codex credit rates';
       const coverage = creditCoverageRatio(data);
-      sourceEl.textContent = 'Credits';
+      sourceEl.textContent = t('badge.credits');
       sourceEl.dataset.state = coverage > 0 ? 'ready' : 'missing';
       sourceEl.title = [
         allowanceSource.url ? `Source: ${allowanceSource.url}` : '',
         allowanceSource.fetched_at ? `rate card snapshot ${allowanceSource.fetched_at}` : '',
-        `Credit rates: ${sourceName}.`,
-        `Credit coverage ${pct(coverage)} of loaded tokens.`,
-        allowanceWindows.length ? `Allowance windows: ${allowanceWindows.map(window => short(window.label || window.key)).join(', ')}` : 'Run codex-usage-tracker init-allowance to add remaining usage windows.',
-        allowanceWindows.some(window => window.reset_at) ? `Resets: ${allowanceWindows.map(window => window.reset_at ? `${short(window.label || window.key)} ${formatTimestamp(window.reset_at, window.reset_at)}` : '').filter(Boolean).join('; ')}` : '',
-        allowanceError ? `Allowance config error: ${allowanceError}` : '',
-        rateCardError ? `Rate-card error: ${rateCardError}` : '',
+        tf('allowance.credit_rates', { source: sourceName }),
+        tf('allowance.credit_coverage', { ratio: pct(coverage) }),
+        allowanceWindows.length ? tf('allowance.windows', { windows: allowanceWindows.map(window => short(window.label || window.key)).join(', ') }) : t('allowance.init_hint'),
+        allowanceWindows.some(window => window.reset_at) ? tf('allowance.resets', { resets: allowanceWindows.map(window => window.reset_at ? `${short(window.label || window.key)} ${formatTimestamp(window.reset_at, window.reset_at)}` : '').filter(Boolean).join('; ') }) : '',
+        allowanceError ? `${t('state.allowance_config_error')}: ${allowanceError}` : '',
+        rateCardError ? tf('allowance.rate_card_error', { error: rateCardError }) : '',
       ].filter(Boolean).join(' ');
     }
     function rebuildSelectOptions(select, values, label) {
@@ -344,8 +505,8 @@
       select.value = valuesSet.has(previous) ? previous : '';
     }
     function rebuildFilterOptions() {
-      rebuildSelectOptions(modelEl, data.map(row => row.model), 'All models');
-      rebuildSelectOptions(effortEl, data.map(row => row.effort), 'All efforts');
+      rebuildSelectOptions(modelEl, data.map(row => row.model), t('option.all_models'));
+      rebuildSelectOptions(effortEl, data.map(row => row.effort), t('option.all_efforts'));
     }
     function applyInitialState() {
       if (!initialState) return;
@@ -384,20 +545,20 @@
       const sourceEl = document.getElementById('pricingSource');
       if (pricingConfigured && pricingSource.url) {
         const sourceParts = [
-          pricingSource.name || 'Pricing source',
-          pricingSource.tier ? `${pricingSource.tier} tier` : '',
-          pricingSource.fetched_at ? `fetched ${formatTimestamp(pricingSource.fetched_at)}` : '',
-          pricingSource.pinned ? 'pinned snapshot' : '',
+          pricingSource.name || t('pricing.source'),
+          pricingSource.tier ? tf('pricing.tier', { tier: pricingSource.tier }) : '',
+          pricingSource.fetched_at ? tf('pricing.fetched', { time: formatTimestamp(pricingSource.fetched_at) }) : '',
+          pricingSource.pinned ? t('pricing.pinned') : '',
         ].filter(Boolean);
-        sourceEl.textContent = 'Costs';
+        sourceEl.textContent = t('badge.costs');
         sourceEl.dataset.state = 'ready';
         sourceEl.title = pricingSource.fetched_at
-          ? `${sourceParts.join(' · ')}. Fetched from ${pricingSource.url} at ${formatTimestampTitle(pricingSource.fetched_at)}. Internal Codex labels may use marked best-guess estimates.${pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : ''}`
-          : `${sourceParts.join(' · ')}. Internal Codex labels may use marked best-guess estimates.${pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : ''}`;
+          ? tf('pricing.title_fetched', { parts: sourceParts.join(' · '), url: pricingSource.url, time: formatTimestampTitle(pricingSource.fetched_at), warning: pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : '' })
+          : tf('pricing.title', { parts: sourceParts.join(' · '), warning: pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : '' });
       } else {
-        sourceEl.textContent = pricingConfigured ? 'Costs' : 'No costs';
+        sourceEl.textContent = pricingConfigured ? t('badge.costs') : t('badge.no_costs');
         sourceEl.dataset.state = pricingConfigured ? 'ready' : 'missing';
-        sourceEl.title = pricingConfigured ? (pricingSnapshotWarning || '') : 'Run codex-usage-tracker update-pricing to configure estimated costs.';
+        sourceEl.title = pricingConfigured ? (pricingSnapshotWarning || '') : t('pricing.configure_hint');
       }
     }
     function updateParserDiagnosticsLine() {
@@ -411,26 +572,26 @@
       }
       const total = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
       sourceEl.hidden = false;
-      sourceEl.textContent = 'Parser warnings';
+      sourceEl.textContent = t('badge.parser_warnings');
       sourceEl.dataset.state = 'missing';
-      sourceEl.title = `Latest refresh reported ${number.format(total)} parser diagnostics: ${entries.map(([key, value]) => `${key}=${value}`).join(', ')}. Run codex-usage-tracker inspect-log <path> to investigate schema drift.`;
+      sourceEl.title = tf('parser.warnings_title', { count: number.format(total), entries: entries.map(([key, value]) => `${key}=${value}`).join(', ') });
     }
     function updatePrivacyModeLine() {
       const sourceEl = document.getElementById('privacyMode');
       const mode = projectMetadataPrivacy.mode || 'normal';
-      sourceEl.textContent = mode === 'normal' ? 'Metadata normal' : `Metadata ${mode}`;
+      sourceEl.textContent = mode === 'normal' ? t('badge.metadata_normal') : tf('badge.metadata_mode', { mode });
       sourceEl.dataset.state = mode === 'normal' ? 'ready' : 'missing';
       sourceEl.title = mode === 'normal'
-        ? 'Project metadata is shown with local cwd, project, branch, and configured labels.'
+        ? t('privacy.normal_title')
         : [
-            `Project metadata privacy mode: ${mode}.`,
-            projectMetadataPrivacy.cwd_redacted ? 'Raw cwd paths are redacted.' : '',
-            projectMetadataPrivacy.project_names_redacted ? 'Unnamed projects use stable hashed labels.' : '',
-            projectMetadataPrivacy.git_remote_label_hidden ? 'Git remote labels are hidden.' : '',
-            projectMetadataPrivacy.relative_cwd_hidden ? 'Relative cwd is hidden.' : '',
-            projectMetadataPrivacy.git_branch_hidden ? 'Git branch is hidden.' : '',
-            projectMetadataPrivacy.tags_hidden ? 'Project tags are hidden.' : '',
-            projectMetadataPrivacy.aliases_preserved ? 'Configured project aliases are treated as explicit display opt-ins.' : '',
+            tf('privacy.mode', { mode }),
+            projectMetadataPrivacy.cwd_redacted ? t('privacy.cwd_redacted') : '',
+            projectMetadataPrivacy.project_names_redacted ? t('privacy.project_names_redacted') : '',
+            projectMetadataPrivacy.git_remote_label_hidden ? t('privacy.git_remote_label_hidden') : '',
+            projectMetadataPrivacy.relative_cwd_hidden ? t('privacy.relative_cwd_hidden') : '',
+            projectMetadataPrivacy.git_branch_hidden ? t('privacy.git_branch_hidden') : '',
+            projectMetadataPrivacy.tags_hidden ? t('privacy.tags_hidden') : '',
+            projectMetadataPrivacy.aliases_preserved ? t('privacy.aliases_preserved') : '',
           ].filter(Boolean).join(' ');
     }
     function padDatePart(value) {
@@ -495,10 +656,10 @@
     function formatDateRangeLabel(prefix, start, end) {
       const startLabel = start ? localDateKey(start) : '';
       const endLabel = end ? localDateKey(end) : '';
-      if (startLabel && endLabel && startLabel === endLabel) return `${prefix} ${startLabel}`;
-      if (startLabel && endLabel) return `${prefix} ${startLabel} to ${endLabel}`;
-      if (startLabel) return `${prefix} from ${startLabel}`;
-      if (endLabel) return `${prefix} through ${endLabel}`;
+      if (startLabel && endLabel && startLabel === endLabel) return tf('date.range_exact', { prefix, date: startLabel });
+      if (startLabel && endLabel) return tf('date.range_between', { prefix, start: startLabel, end: endLabel });
+      if (startLabel) return tf('date.range_from', { prefix, start: startLabel });
+      if (endLabel) return tf('date.range_through', { prefix, end: endLabel });
       return prefix;
     }
     function currentDateRange() {
@@ -510,7 +671,7 @@
           invalid: false,
           start: range.start,
           endExclusive: range.endExclusive,
-          label: formatDateRangeLabel(datePresetLabels[preset], range.start, addDays(range.endExclusive, -1)),
+          label: formatDateRangeLabel(t(datePresetLabels[preset]), range.start, addDays(range.endExclusive, -1)),
         };
       }
       const start = parseDateInput(dateStartEl.value);
@@ -521,7 +682,7 @@
           invalid: true,
           start,
           endExclusive: addDays(end, 1),
-          label: 'Invalid date range',
+          label: t('date.invalid_range'),
         };
       }
       if (start || end) {
@@ -530,10 +691,10 @@
           invalid: false,
           start,
           endExclusive: end ? addDays(end, 1) : null,
-          label: formatDateRangeLabel('Custom', start, end),
+          label: formatDateRangeLabel(t('date.custom'), start, end),
         };
       }
-      return { active: false, invalid: false, start: null, endExclusive: null, label: 'All time' };
+      return { active: false, invalid: false, start: null, endExclusive: null, label: t('option.all_time') };
     }
     function rowMatchesDateRange(row, range) {
       if (range.invalid) return false;
@@ -630,9 +791,9 @@
       const url = stateManager.urlFor(currentDashboardState());
       try {
         await stateManager.copyText(url);
-        showActionStatus('Copied');
+        showActionStatus(t('action.copied'));
       } catch (error) {
-        showActionStatus('Copy failed');
+        showActionStatus(t('action.copy_failed'));
       }
     }
     function exportCurrentRows() {
@@ -662,7 +823,7 @@
       const csv = stateManager.toCsv(rows, columns);
       const suffix = activeView === 'threads' ? 'thread-filtered-calls' : `${activeView}-calls`;
       stateManager.downloadText(`codex-usage-${suffix}.csv`, csv, 'text/csv;charset=utf-8');
-      showActionStatus(`Exported ${number.format(rows.length)}`);
+      showActionStatus(tf('action.exported', { count: number.format(rows.length) }));
     }
     function activePresetDefinition() {
       return presetDefinitions.find(preset => preset.key === activePreset) || null;
@@ -703,7 +864,7 @@
     }
     function recommendationSummary(row) {
       const recommendation = topRecommendation(row);
-      return recommendation ? `${recommendation.title}: ${recommendation.why}` : 'No aggregate action is flagged.';
+      return recommendation ? `${recommendation.title}: ${recommendation.why}` : t('detail.no_aggregate_action');
     }
     function signalCount(row) {
       return Array.isArray(row.efficiency_flags) ? row.efficiency_flags.length : 0;
@@ -722,7 +883,7 @@
       const tokenScore = clamp(Number(group.totalTokens || 0) / 3500, 0, 42);
       const lowCacheScore = clamp((0.55 - Number(group.cacheRatio || 0)) * 70, 0, 38);
       const contextScore = clamp(Number(group.maxContextUse || 0) * 45, 0, 45);
-      const pricingScore = group.pricingStatus === 'No price' ? 36 : group.pricingStatus === 'Estimated' || group.pricingStatus === 'Mixed' ? 18 : 0;
+      const pricingScore = group.pricingStatusCode === 'no_price' ? 36 : group.pricingStatusCode === 'estimated' || group.pricingStatusCode === 'mixed' ? 18 : 0;
       const usageScore = clamp(Number(group.usageCredits || 0) * 2.4, 0, 72);
       const relationScore = (group.subagentCount || 0) * 4 + (group.autoReviewCount || 0) * 6 + (group.attachedCount || 0) * 3;
       return costScore + usageScore + tokenScore + lowCacheScore + contextScore + pricingScore + relationScore + Number(group.signalCount || 0) * 10;
@@ -805,6 +966,20 @@
         pill.title = pill.dataset.fullLabel || pill.textContent || '';
       });
     }
+    function compactSummaryText(values, fallbackKey) {
+      const unique = [...new Set(values.filter(Boolean))].sort();
+      if (!unique.length) return t('state.unknown');
+      if (unique.length === 1) return unique[0];
+      return tf(fallbackKey, { model: unique[0], effort: unique[0], count: unique.length - 1 });
+    }
+    function threadModelSummaryText(calls) {
+      const models = [...new Set(calls.map(row => row.model).filter(Boolean))].sort();
+      if (!models.length) return t('state.unknown');
+      if (models.length === 1) return models[0];
+      const nonReviewModels = models.filter(model => model !== 'codex-auto-review');
+      const primary = nonReviewModels.length ? nonReviewModels[0] : models[0];
+      return tf('table.more_models', { model: primary, count: models.length - 1 });
+    }
     function dominantParentThread(calls, ownLabel) {
       const counts = new Map();
       for (const row of calls) {
@@ -858,21 +1033,29 @@
       }
       return display;
     }
-    function pricingStatusFor(rows) {
+    function pricingStatusCodeFor(rows) {
       const priced = rows.filter(row => row.pricing_model);
       const estimated = rows.filter(row => row.pricing_estimated);
-      if (priced.length === 0) return 'No price';
-      if (estimated.length === rows.length) return 'Estimated';
-      if (estimated.length > 0 || priced.length < rows.length) return 'Mixed';
-      return 'Configured';
+      if (priced.length === 0) return 'no_price';
+      if (estimated.length === rows.length) return 'estimated';
+      if (estimated.length > 0 || priced.length < rows.length) return 'mixed';
+      return 'configured';
+    }
+    function pricingStatusFor(rows) {
+      return {
+        no_price: t('state.no_price'),
+        estimated: t('state.estimated'),
+        mixed: t('state.mixed'),
+        configured: t('state.configured'),
+      }[pricingStatusCodeFor(rows)];
     }
     function creditStatusFor(rows) {
       const rated = rows.filter(row => usageCreditValue(row) !== null);
       const estimated = rows.filter(row => row.usage_credit_confidence === 'estimated');
-      if (rated.length === 0) return 'No mapped rate';
-      if (estimated.length === rows.length) return 'Estimated mapping';
-      if (estimated.length > 0 || rated.length < rows.length) return 'Mixed';
-      return 'Official rate-card match';
+      if (rated.length === 0) return t('credit.no_mapped_rate');
+      if (estimated.length === rows.length) return t('credit.estimated_mapping');
+      if (estimated.length > 0 || rated.length < rows.length) return t('state.mixed');
+      return t('credit.official_match');
     }
     function threadLifecycle(calls) {
       const highCost = threshold('high_cost_usd', 1);
@@ -899,13 +1082,13 @@
       const topAction = calls.map(topRecommendation).filter(Boolean)[0];
       let action = topAction
         ? topAction.action
-        : 'Expand calls or select a row for call-level recommendations.';
+        : t('action.expand_or_select_recommendations');
       if (contextTrend >= 0.15 || Number(last.context_window_percent || 0) >= highContext) {
-        action = 'Review where context growth begins and consider starting a fresh thread.';
+        action = t('action.review_context_growth');
       } else if (cacheTrend <= -0.25) {
-        action = 'Check for reintroduced files or tool output after cache reuse dropped.';
+        action = t('action.check_cache_drop');
       } else if (subagentBeforeSpike) {
-        action = 'Compare attached subagent or review calls before changing the parent workflow.';
+        action = t('action.compare_subagent_calls');
       }
       return {
         firstExpensiveRow,
@@ -941,8 +1124,8 @@
         const subagentCount = calls.filter(isSubagent).length;
         const autoReviewCount = calls.filter(isAutoReview).length;
         const attachedCount = calls.filter(row => rowAttachment(row).relation !== 'direct' && rowAttachment(row).relation !== 'session').length;
-        const modelSummary = threadModelSummary(calls);
-        const effortSummary = compactListSummary(calls.map(row => row.effort), 'efforts');
+        const modelSummary = threadModelSummaryText(calls);
+        const effortSummary = compactSummaryText(calls.map(row => row.effort), 'table.more_efforts');
         const parentThreadLabel = dominantParentThread(calls, group.label);
         const lifecycle = threadLifecycle(calls);
         return {
@@ -959,6 +1142,7 @@
           usageCredits,
           cacheRatio: inputTokens ? cachedTokens / inputTokens : 0,
           maxContextUse,
+          pricingStatusCode: pricingStatusCodeFor(calls),
           pricingStatus: pricingStatusFor(calls),
           creditStatus: creditStatusFor(calls),
           signalCount,
@@ -987,16 +1171,23 @@
         pageCount,
       };
     }
-    function updatePager(page, itemLabel = 'rows') {
+    function updatePager(page, itemLabel = 'table.rows') {
       const shouldShowPager = page.pageCount > 1;
       pagerEl.hidden = !shouldShowPager;
       prevPageEl.disabled = currentPage <= 1;
       nextPageEl.disabled = currentPage >= page.pageCount;
       if (!page.total) {
-        pageStatusEl.textContent = 'No rows';
+        pageStatusEl.textContent = t('state.no_rows');
         return;
       }
-      pageStatusEl.textContent = `${number.format(page.start + 1)}-${number.format(page.end)} of ${number.format(page.total)} ${itemLabel} · page ${number.format(currentPage)}/${number.format(page.pageCount)}`;
+      pageStatusEl.textContent = tf('table.page_status', {
+        start: number.format(page.start + 1),
+        end: number.format(page.end),
+        total: number.format(page.total),
+        items: t(itemLabel),
+        page: number.format(currentPage),
+        pages: number.format(page.pageCount),
+      });
     }
     function buildInsights(rows) {
       const groups = groupThreads(rows);
@@ -1004,11 +1195,11 @@
       const topCostGroup = groups.filter(group => group.estimatedCost > 0).sort((a, b) => b.estimatedCost - a.estimatedCost || b.attentionScore - a.attentionScore)[0];
       if (topCostGroup) {
         insights.push({
-          title: 'Costliest thread',
-          value: pricingConfigured ? money(topCostGroup.estimatedCost) : 'Not configured',
-          body: `${topCostGroup.label} has ${number.format(topCostGroup.callCount)} calls and ${number.format(topCostGroup.totalTokens)} tokens.`,
+          title: t('insight.costliest_thread'),
+          value: pricingConfigured ? moneyText(topCostGroup.estimatedCost) : t('state.not_configured'),
+          body: tf('insight.costliest_thread_body', { thread: topCostGroup.label, calls: number.format(topCostGroup.callCount), tokens: number.format(topCostGroup.totalTokens) }),
           severity: severityForScore(topCostGroup.attentionScore),
-          action: 'Open thread timeline',
+          action: t('insight.open_thread_timeline'),
           preset: 'highest-cost',
         });
       }
@@ -1017,11 +1208,11 @@
       if (lowCacheRows.length) {
         const lowest = lowCacheRows.slice().sort((a, b) => Number(a.cache_ratio || 0) - Number(b.cache_ratio || 0))[0];
         insights.push({
-          title: 'Low cache reuse',
+          title: t('insight.low_cache_reuse'),
           value: pct(lowest.cache_ratio),
-          body: `${number.format(lowCacheRows.length)} calls are under ${pct(lowCacheLimit)} cache reuse. Start with ${rowThreadLabel(lowest)}.`,
+          body: tf('insight.low_cache_reuse_body', { calls: number.format(lowCacheRows.length), ratio: pct(lowCacheLimit), thread: rowThreadLabel(lowest) }),
           severity: 'medium',
-          action: 'Apply cache-misses preset',
+          action: t('insight.apply_cache_misses'),
           preset: 'cache-misses',
         });
       }
@@ -1030,11 +1221,11 @@
       if (highContextRows.length) {
         const highest = highContextRows.slice().sort((a, b) => Number(b.context_window_percent || 0) - Number(a.context_window_percent || 0))[0];
         insights.push({
-          title: 'Context bloat',
+          title: t('insight.context_bloat'),
           value: pct(highest.context_window_percent),
-          body: `${number.format(highContextRows.length)} calls are at or above ${pct(highContextLimit)} context use.`,
+          body: tf('insight.context_bloat_body', { calls: number.format(highContextRows.length), ratio: pct(highContextLimit) }),
           severity: severityForScore(rowAttentionScore(highest)),
-          action: 'Apply context-bloat preset',
+          action: t('insight.apply_context_bloat'),
           preset: 'context-bloat',
         });
       }
@@ -1042,44 +1233,44 @@
       if (usageCredits > 0) {
         const creditCoverage = creditCoverageRatio(rows);
         insights.push({
-          title: 'Codex allowance usage',
-          value: `${credits(usageCredits)} credits`,
-          body: allowanceWindowText(usageCredits, 'impact') || allowanceWindowText(usageCredits, 'remaining') || `${pct(creditCoverage)} of visible tokens map to Codex credit rates.`,
+          title: t('insight.codex_allowance_usage'),
+          value: `${credits(usageCredits)} ${t('badge.credits')}`,
+          body: allowanceWindowText(usageCredits, 'impact') || allowanceWindowText(usageCredits, 'remaining') || tf('insight.credit_coverage_body', { ratio: pct(creditCoverage) }),
           severity: severityForScore(clamp(usageCredits * 2.4, 0, 140)),
-          action: 'Review highest-credit calls',
+          action: t('insight.review_highest_credit'),
           preset: 'usage-credits',
         });
       }
       const unpricedTokens = rows.reduce((sum, row) => sum + (!row.pricing_model ? Number(row.total_tokens || 0) : 0), 0);
       if (unpricedTokens) {
         insights.push({
-          title: 'Unpriced usage',
+          title: t('insight.unpriced_usage'),
           value: number.format(unpricedTokens),
-          body: 'These tokens are omitted from estimated cost totals until pricing is configured.',
+          body: t('insight.unpriced_usage_body'),
           severity: 'review',
-          action: 'Review pricing gaps',
+          action: t('insight.review_pricing_gaps'),
           preset: 'pricing-gaps',
         });
       }
       const estimatedTokens = rows.reduce((sum, row) => sum + (row.pricing_estimated ? Number(row.total_tokens || 0) : 0), 0);
       if (estimatedTokens) {
         insights.push({
-          title: 'Estimated pricing',
+          title: t('insight.estimated_pricing'),
           value: number.format(estimatedTokens),
-          body: 'Marked best-guess prices are included, but should be reviewed separately.',
+          body: t('insight.estimated_pricing_body'),
           severity: 'review',
-          action: 'Review estimates',
+          action: t('insight.review_estimates'),
           preset: 'estimated-review',
         });
       }
       const reasoningRows = rows.filter(row => Number(row.reasoning_output_tokens || 0) > 0).sort((a, b) => Number(b.reasoning_output_tokens || 0) - Number(a.reasoning_output_tokens || 0));
       if (reasoningRows[0]) {
         insights.push({
-          title: 'Reasoning output spike',
+          title: t('insight.reasoning_output_spike'),
           value: number.format(reasoningRows[0].reasoning_output_tokens || 0),
-          body: `${rowThreadLabel(reasoningRows[0])} has the largest reasoning-output call in the current filter.`,
+          body: tf('insight.reasoning_spike_body', { thread: rowThreadLabel(reasoningRows[0]) }),
           severity: severityForScore(rowAttentionScore(reasoningRows[0])),
-          action: 'Inspect selected call',
+          action: t('insight.inspect_selected_call'),
           view: 'calls',
           sort: 'signals',
         });
@@ -1095,7 +1286,7 @@
       renderPresetControls();
       const insights = buildInsights(rows);
       if (!insights.length) {
-        insightCardsEl.innerHTML = '<div class="empty-state">No attention signals match the current filters.</div>';
+        insightCardsEl.innerHTML = `<div class="empty-state">${escapeHtml(t('state.no_data'))}</div>`;
         return;
       }
       insightCardsEl.innerHTML = insights.map((insight, index) => {
@@ -1104,7 +1295,7 @@
           <article class="insight-card" data-severity="${escapeHtml(severity)}">
             <div class="insight-card-header">
               <h3>${escapeHtml(insight.title)}</h3>
-              <span class="severity-chip ${escapeHtml(severity)}">${escapeHtml(severity === 'high' ? 'High' : severity === 'medium' ? 'Medium' : 'Review')}</span>
+              <span class="severity-chip ${escapeHtml(severity)}">${escapeHtml(severity === 'high' ? t('severity.high') : severity === 'medium' ? t('severity.medium') : t('severity.review'))}</span>
             </div>
             <strong>${escapeHtml(insight.value)}</strong>
             <p>${escapeHtml(insight.body)}</p>
@@ -1133,11 +1324,13 @@
     function renderPresetControls() {
       const preset = activePresetDefinition();
       clearPresetEl.hidden = !preset;
-      presetStatusEl.textContent = preset ? `${preset.caption}: ${preset.description}` : 'No preset applied.';
+      presetStatusEl.textContent = preset
+        ? tf('preset.caption', { caption: t(preset.captionKey), description: t(preset.descriptionKey) })
+        : t('preset.no_preset');
       presetListEl.innerHTML = presetDefinitions.map(candidate => `
         <button class="preset-card" type="button" data-preset="${escapeHtml(candidate.key)}" aria-pressed="${candidate.key === activePreset ? 'true' : 'false'}">
-          <span class="preset-copy"><b>${escapeHtml(candidate.label)}</b><span>${escapeHtml(candidate.description)}</span></span>
-          <span class="preset-chip">Run</span>
+          <span class="preset-copy"><b>${escapeHtml(t(candidate.labelKey))}</b><span>${escapeHtml(t(candidate.descriptionKey))}</span></span>
+          <span class="preset-chip">${escapeHtml(t('action.run'))}</span>
         </button>
       `).join('');
       presetListEl.querySelectorAll('[data-preset]').forEach(button => {
@@ -1160,10 +1353,10 @@
       document.getElementById('reasoningTokens').textContent = number.format(reasoningOutputTokens);
       const estimatedCost = rows.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
       const usageCredits = sumUsageCredits(rows);
-      document.getElementById('estimatedCost').textContent = pricingConfigured ? money(estimatedCost) : 'Not configured';
+      document.getElementById('estimatedCost').textContent = pricingConfigured ? moneyText(estimatedCost) : t('state.not_configured');
       document.getElementById('usageCredits').textContent = credits(usageCredits);
       document.getElementById('allowanceImpact').textContent = allowanceImpactText(usageCredits);
-      document.getElementById('allowanceImpact').title = allowanceWindowText(usageCredits, 'remaining') || 'Add ~/.codex-usage-tracker/allowance.json to show 5h and weekly remaining usage.';
+      document.getElementById('allowanceImpact').title = allowanceWindowText(usageCredits, 'remaining') || t('allowance.title_hint');
       insightsViewEl.setAttribute('aria-pressed', activeView === 'insights' ? 'true' : 'false');
       callsViewEl.setAttribute('aria-pressed', activeView === 'calls' ? 'true' : 'false');
       threadsViewEl.setAttribute('aria-pressed', activeView === 'threads' ? 'true' : 'false');
@@ -1180,11 +1373,11 @@
     }
     function renderCalls(rows) {
       const page = paginate(rows);
-      updatePager(page, 'calls');
-      tableTitleEl.textContent = 'Model Calls';
+      updatePager(page, 'table.calls');
+      tableTitleEl.textContent = t('dashboard.model_calls');
       const preset = activePresetDefinition();
-      const prefix = preset ? `${preset.caption}. ` : '';
-      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}Showing individual model calls sorted by ${tableCaptionEl.dataset.sortDescription}. ${loadedRowsDescription()}.`;
+      const prefix = preset ? `${t(preset.captionKey)}. ` : '';
+      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.calls', { sort: tableCaptionEl.dataset.sortDescription, loaded: loadedRowsDescription() })}`;
       for (const row of page.items) {
         const tr = document.createElement('tr');
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
@@ -1198,7 +1391,7 @@
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
           <td>${escapeHtml(short(row.effort))}</td>
           <td class="num">${number.format(row.total_tokens || 0)}</td>
-          <td class="num">${costUsageCell(row.pricing_estimated ? `${money(row.estimated_cost_usd)}*` : money(row.estimated_cost_usd), usageCreditValue(row))}</td>
+          <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
           <td class="num">${pct(row.cache_ratio)}</td>
           <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(flag)}</span>`).join('')}</div></td>
         `;
@@ -1224,7 +1417,7 @@
         showDetail(page.items[0]);
       }
       if (!rows.length) {
-        rowsEl.innerHTML = '<tr><td class="empty-state" colspan="8">No calls match the current filters.</td></tr>';
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="8">${escapeHtml(t('state.no_calls'))}</td></tr>`;
       }
     }
     function renderThreads(rows, mode = 'threads') {
@@ -1239,43 +1432,43 @@
         initialThreadExpansionApplied = true;
       }
       const page = paginate(groups);
-      updatePager(page, 'threads');
-      tableTitleEl.textContent = mode === 'insights' ? 'Top Threads by Attention Score' : 'Threads';
+      updatePager(page, 'table.threads');
+      tableTitleEl.textContent = mode === 'insights' ? t('dashboard.top_threads_by_attention') : t('dashboard.view.threads');
       const preset = activePresetDefinition();
-      const prefix = preset ? `${preset.caption}. ` : '';
-      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}Showing ${number.format(groups.length)} threads from ${number.format(rows.length)} filtered calls, sorted by ${tableCaptionEl.dataset.sortDescription}. ${loadedRowsDescription()}. Click a thread to expand its calls.`;
+      const prefix = preset ? `${t(preset.captionKey)}. ` : '';
+      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.threads', { threads: number.format(groups.length), calls: number.format(rows.length), sort: tableCaptionEl.dataset.sortDescription, loaded: loadedRowsDescription() })}`;
       for (const group of page.items) {
         const tr = document.createElement('tr');
         const expanded = expandedThreads.has(group.key);
         const threadNotes = [
-          `${number.format(group.callCount)} calls`,
+          `${number.format(group.callCount)} ${t('table.calls')}`,
           group.pricingStatus,
-          group.parentThreadLabel ? `spawned from ${group.parentThreadLabel}` : '',
-          group.childThreadCount ? `${number.format(group.childThreadCount)} spawned threads` : '',
-          group.subagentCount ? `${number.format(group.subagentCount)} subagent` : '',
-          group.autoReviewCount ? `${number.format(group.autoReviewCount)} auto-review` : '',
-          group.attachedCount ? 'attached' : '',
+          group.parentThreadLabel ? tf('thread.spawned_from', { thread: group.parentThreadLabel }) : '',
+          group.childThreadCount ? tf('thread.spawned_threads', { count: number.format(group.childThreadCount) }) : '',
+          group.subagentCount ? tf('thread.subagent', { count: number.format(group.subagentCount) }) : '',
+          group.autoReviewCount ? tf('thread.auto_review', { count: number.format(group.autoReviewCount) }) : '',
+          group.attachedCount ? t('thread.attached') : '',
         ].filter(Boolean).join(' - ');
         tr.className = `thread-row${group.parentThreadLabel ? ' spawned-thread' : ''}`;
         tr.tabIndex = 0;
         tr.setAttribute('role', 'button');
         tr.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        tr.setAttribute('aria-label', `${expanded ? 'Collapse' : 'Expand'} ${group.label} calls. Attention score ${Math.round(group.attentionScore)}.`);
+        tr.setAttribute('aria-label', tf('thread.expand_label', { action: expanded ? t('thread.collapse') : t('thread.expand'), thread: group.label, score: Math.round(group.attentionScore) }));
         tr.innerHTML = `
           <td>${renderTimeCell(group.latestActivity)}</td>
           <td>
             <div class="thread-title">
                 <span class="thread-toggle" aria-hidden="true">${expanded ? '-' : '+'}</span>
               <span class="thread-meta">
-                <span class="thread-name">${group.renderAsChild ? '<span class="thread-relation">spawned</span> ' : ''}${escapeHtml(truncate(group.label, 72))}</span>
-                <span class="thread-subtle">${escapeHtml(threadNotes)} · attention ${number.format(Math.round(group.attentionScore))}</span>
+                <span class="thread-name">${group.renderAsChild ? `<span class="thread-relation">${escapeHtml(t('thread.spawned'))}</span> ` : ''}${escapeHtml(truncate(group.label, 72))}</span>
+                <span class="thread-subtle">${escapeHtml(threadNotes)} · ${escapeHtml(tf('thread.attention', { score: number.format(Math.round(group.attentionScore)) }))}</span>
               </span>
             </div>
           </td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(group.modelSummary))}">${escapeHtml(short(group.modelSummary))}</span></td>
           <td>${escapeHtml(truncate(group.effortSummary, 28))}</td>
           <td class="num">${number.format(group.totalTokens)}</td>
-          <td class="num">${costUsageCell(pricingConfigured ? money(group.estimatedCost) : 'Not configured', group.usageCredits)}</td>
+          <td class="num">${costUsageCell(pricingConfigured ? moneyText(group.estimatedCost) : t('state.not_configured'), group.usageCredits)}</td>
           <td class="num">${pct(group.cacheRatio)}</td>
           <td class="num">${number.format(group.signalCount)}</td>
         `;
@@ -1301,7 +1494,7 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = '<tr><td class="empty-state" colspan="8">No threads match the current filters.</td></tr>';
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="8">${escapeHtml(t('state.no_threads'))}</td></tr>`;
       }
       if (!initialDetailApplied && selectedThreadKey) {
         const selected = groups.find(group => group.key === selectedThreadKey);
@@ -1325,9 +1518,9 @@
             <td>${renderTimeCell(row.event_timestamp)}</td>
             <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
             <td>${escapeHtml(short(row.effort))}</td>
-            <td>${escapeHtml(sourceLabel(row))}</td>
+            <td>${escapeHtml(sourceLabelText(row))}</td>
             <td class="num">${number.format(row.total_tokens || 0)}</td>
-            <td class="num">${costUsageCell(row.pricing_estimated ? `${money(row.estimated_cost_usd)}*` : money(row.estimated_cost_usd), usageCreditValue(row))}</td>
+            <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
             <td class="num">${pct(row.cache_ratio)}</td>
             <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(flag)}</span>`).join('')}</div></td>
           </tr>
@@ -1335,8 +1528,8 @@
       }).join('');
       tr.innerHTML = `
         <td class="child-cell" colspan="8">
-          <table class="thread-call-table" aria-label="${escapeHtml(group.label)} calls">
-            <thead><tr><th>Time</th><th>Model</th><th>Effort</th><th>Source</th><th class="num">Last Call</th><th class="num">Cost</th><th class="num">Cache</th><th>Signals</th></tr></thead>
+          <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
+            <thead><tr><th>${escapeHtml(t('table.time'))}</th><th>${escapeHtml(t('table.model'))}</th><th>${escapeHtml(t('table.effort'))}</th><th>${escapeHtml(t('table.source'))}</th><th class="num">${escapeHtml(t('table.last_call'))}</th><th class="num">${escapeHtml(t('table.cost'))}</th><th class="num">${escapeHtml(t('table.cache'))}</th><th>${escapeHtml(t('table.signals'))}</th></tr></thead>
             <tbody>${calls}</tbody>
           </table>
         </td>
@@ -1349,19 +1542,19 @@
       const apiDisabled = !contextApiEnabled;
       const disabled = fileMode || apiMissing || apiDisabled ? ' disabled' : '';
       const hint = fileMode
-        ? 'Open this dashboard with codex-usage-tracker serve-dashboard to load raw context on demand.'
+        ? t('context.file_hint')
         : apiMissing
-          ? 'Context loading requires a localhost dashboard API token.'
+          ? t('context.token_required')
           : apiDisabled
-            ? 'Context loading is off for this dashboard server. Enable it here to load local JSONL context on demand.'
-          : 'Context is not embedded in this dashboard. Press a button to read this call from the local JSONL source.';
+            ? t('context.disabled_hint')
+          : t('context.ready_hint');
       const enableButton = !fileMode && !apiMissing && apiDisabled
-        ? '<button class="context-button" type="button" data-context-enable>Enable context loading</button>'
+        ? `<button class="context-button" type="button" data-context-enable>${escapeHtml(t('button.enable_context_loading'))}</button>`
         : '';
       return `
         <div class="context-actions">
-          <button class="context-button" type="button" data-context-load${disabled}>Load context</button>
-          <button class="context-button secondary" type="button" data-context-load-output${disabled}>Include tool output</button>
+          <button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.load_context'))}</button>
+          <button class="context-button secondary" type="button" data-context-load-output${disabled}>${escapeHtml(t('button.include_tool_output'))}</button>
           ${enableButton}
         </div>
         <div id="contextResult" class="context-result"><p class="context-note">${escapeHtml(hint)}</p></div>
@@ -1378,7 +1571,7 @@
     async function enableContextApi(row) {
       const target = document.getElementById('contextResult');
       if (!target) return;
-      target.innerHTML = '<p class="context-note">Enabling context loading for this dashboard server...</p>';
+      target.innerHTML = `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`;
       try {
         const params = new URLSearchParams({ enabled: '1', _: String(Date.now()) });
         const response = await fetch(`/api/context-settings?${params.toString()}`, {
@@ -1389,7 +1582,7 @@
           cache: 'no-store',
         });
         if (!response.ok) {
-          throw new Error(`Context settings returned HTTP ${response.status}.`);
+          throw new Error(tf('context.settings_http', { status: response.status }));
         }
         const payload = await response.json();
         if (payload.error) throw new Error(payload.error);
@@ -1397,7 +1590,7 @@
         showDetail(row);
         const nextTarget = document.getElementById('contextResult');
         if (nextTarget && contextApiEnabled) {
-          nextTarget.innerHTML = '<p class="context-note">Context loading is enabled. Press Load context to read this call from the local JSONL source.</p>';
+          nextTarget.innerHTML = `<p class="context-note">${escapeHtml(t('context.enabled_note'))}</p>`;
         }
       } catch (error) {
         target.innerHTML = `<p class="context-note">${escapeHtml(error.message || String(error))}</p>`;
@@ -1407,10 +1600,10 @@
       const target = document.getElementById('contextResult');
       if (!target) return;
       if (!row.record_id) {
-        target.innerHTML = '<p class="context-note">This row has no record id for context lookup.</p>';
+        target.innerHTML = `<p class="context-note">${escapeHtml(t('context.no_record_id'))}</p>`;
         return;
       }
-      target.innerHTML = '<p class="context-note">Loading local context...</p>';
+      target.innerHTML = `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`;
       const params = new URLSearchParams({ record_id: row.record_id });
       if (includeToolOutput) params.set('include_tool_output', '1');
       try {
@@ -1423,8 +1616,8 @@
         });
         if (!response.ok) {
           const errorText = response.status === 404
-            ? 'Context API is unavailable here. Run codex-usage-tracker serve-dashboard --open for on-demand context loading.'
-            : `Context API returned HTTP ${response.status}.`;
+            ? t('context.api_unavailable')
+            : tf('context.api_http', { status: response.status });
           throw new Error(errorText);
         }
         const payload = await response.json();
@@ -1438,35 +1631,34 @@
       const source = payload.source || {};
       const omitted = payload.omitted || {};
       const note = [
-        'Loaded on demand from local JSONL.',
-        payload.raw_context_persisted === false ? 'Not persisted to SQLite or dashboard HTML.' : '',
-        payload.include_tool_output ? 'Tool output included with redaction and size limits.' : 'Tool output omitted by default.',
-        source.file ? `Source: ${source.file}:${source.line_number || ''}` : '',
-        omitted.older_entries ? `${number.format(omitted.older_entries)} older entries omitted.` : '',
-        omitted.over_budget_chars ? `${number.format(omitted.over_budget_chars)} chars over budget omitted.` : '',
+        t('context.local_redacted'),
+        payload.include_tool_output ? t('context.tool_included') : t('context.tool_omitted'),
+        source.file ? tf('context.source', { file: source.file, line: source.line_number || '' }) : '',
+        omitted.older_entries ? tf('context.older_omitted', { count: number.format(omitted.older_entries) }) : '',
+        omitted.over_budget_chars ? tf('context.chars_omitted', { count: number.format(omitted.over_budget_chars) }) : '',
       ].filter(Boolean).join(' ');
       const body = entries.map(entry => `
         <div class="context-entry">
           <div class="context-entry-header">
             <span>${escapeHtml(entry.label || entry.type || 'entry')}</span>
-            <span>${escapeHtml([formatTimestamp(entry.timestamp, ''), entry.line_number ? `line ${entry.line_number}` : ''].filter(Boolean).join(' - '))}</span>
+            <span>${escapeHtml([formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - '))}</span>
           </div>
           <pre>${escapeHtml(entry.text || '')}</pre>
         </div>
       `).join('');
-      return `<p class="context-note">${escapeHtml(note)}</p>${body || '<p class="context-note">No context entries found for this call.</p>'}`;
+      return `<p class="context-note">${escapeHtml(note)}</p>${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
     }
     function pricingStatusText(row) {
-      if (!row.pricing_model) return 'No configured price';
-      return row.pricing_estimated ? 'Best-guess estimate' : 'Configured price';
+      if (!row.pricing_model) return t('state.no_configured_price');
+      return row.pricing_estimated ? t('state.best_guess_estimate') : t('state.configured_price');
     }
     function nextActionForRow(row) {
       if (row.recommended_action) return row.recommended_action;
-      if (!row.pricing_model) return 'Configure pricing before trusting cost totals.';
-      if (Number(row.cache_ratio || 0) < 0.3 && Number(row.input_tokens || 0) > 0) return 'Compare fresh input with the previous turn before continuing.';
-      if (Number(row.context_window_percent || 0) >= 0.6) return 'Inspect the thread timeline and consider starting a fresh thread.';
-      if (Number(row.reasoning_output_tokens || 0) > Number(row.output_tokens || 0)) return 'Review whether reasoning effort is appropriate for this task.';
-      return 'Use the aggregate fields first; load context only if the signal is still unclear.';
+      if (!row.pricing_model) return t('action.configure_pricing');
+      if (Number(row.cache_ratio || 0) < 0.3 && Number(row.input_tokens || 0) > 0) return t('action.compare_fresh_input');
+      if (Number(row.context_window_percent || 0) >= 0.6) return t('action.inspect_thread_timeline');
+      if (Number(row.reasoning_output_tokens || 0) > Number(row.output_tokens || 0)) return t('action.review_reasoning_effort');
+      return t('action.use_aggregate_first');
     }
     function fieldsList(fields, className = 'detail-kv') {
       return `<dl class="${className}">${fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(short(value))}</dd>`).join('')}</dl>`;
@@ -1489,21 +1681,21 @@
     }
     function renderThreadTimeline(group) {
       const calls = group.calls.slice(-5);
-      if (!calls.length) return '<p>No calls in this thread.</p>';
+      if (!calls.length) return `<p>${escapeHtml(t('detail.timeline_empty'))}</p>`;
       return `<div class="timeline-list">${calls.map(row => {
         const contextUse = Number(row.context_window_percent || 0);
         return `
           <div class="timeline-item">
             <div class="timeline-time">${escapeHtml(formatTimestamp(row.event_timestamp, 'Unknown'))}</div>
             <div>
-              <div class="timeline-title">${escapeHtml(sourceLabel(row))} · ${escapeHtml(short(row.model))}</div>
-              <div class="timeline-meta">${escapeHtml(number.format(row.total_tokens || 0))} tokens · ${escapeHtml(money(row.estimated_cost_usd))} · ${escapeHtml(usageCreditValue(row) === null ? 'no credit rate' : `${credits(usageCreditValue(row))} credits`)} · cache ${escapeHtml(pct(row.cache_ratio))}</div>
+              <div class="timeline-title">${escapeHtml(sourceLabelText(row))} · ${escapeHtml(short(row.model))}</div>
+              <div class="timeline-meta">${escapeHtml(tf('detail.timeline_meta', { tokens: number.format(row.total_tokens || 0), cost: moneyText(row.estimated_cost_usd), credits: usageCreditValue(row) === null ? t('credit.no_rate') : `${credits(usageCreditValue(row))} ${t('badge.credits')}`, cache: pct(row.cache_ratio) }))}</div>
               <div class="timeline-meta">${escapeHtml(recommendationSummary(row))}</div>
               <div class="signal-strip">
-                <span class="flag">context ${escapeHtml(pct(contextUse))}</span>
+                <span class="flag">${escapeHtml(tf('detail.timeline_context', { value: pct(contextUse) }))}</span>
                 <span class="flag">${escapeHtml(pricingStatusText(row))}</span>
               </div>
-              <div class="mini-bar" title="Context use ${escapeHtml(pct(contextUse))}"><span class="${timelineSeverity(contextUse)}" style="width: ${timelineWidth(contextUse)}"></span></div>
+              <div class="mini-bar" title="${escapeHtml(t('metric.context_use'))} ${escapeHtml(pct(contextUse))}"><span class="${timelineSeverity(contextUse)}" style="width: ${timelineWidth(contextUse)}"></span></div>
             </div>
           </div>
         `;
@@ -1523,74 +1715,74 @@
     }
     function showDetail(row) {
       const attachment = rowAttachment(row);
-      const flags = Array.isArray(row.efficiency_flags) && row.efficiency_flags.length ? row.efficiency_flags.join(', ') : 'None';
+      const flags = Array.isArray(row.efficiency_flags) && row.efficiency_flags.length ? row.efficiency_flags.join(', ') : t('state.none');
       const whyFlagged = Array.isArray(row.flag_explanations) && row.flag_explanations.length ? row.flag_explanations.join(' ') : recommendationSummary(row);
       detailEl.innerHTML = `
         <div class="detail-stack">
           <div class="detail-card primary">
-            <h3>Cost, usage, and context</h3>
+            <h3>${escapeHtml(t('detail.cost_usage_context'))}</h3>
             ${fieldsList([
-              ['Estimated cost', money(row.estimated_cost_usd)],
-              ['Codex credits', usageCreditsWithStatus(row)],
-              ['Allowance impact', rowAllowanceImpact(row)],
-              ['Cache ratio', pct(row.cache_ratio)],
-              ['Uncached input', number.format(row.uncached_input_tokens || 0)],
-              ['Context use', pct(row.context_window_percent)],
-              ['Pricing status', pricingStatusText(row)],
-              ['Next action', nextActionForRow(row)],
-              ['Why flagged', whyFlagged],
+              [t('metric.estimated_cost'), moneyText(row.estimated_cost_usd)],
+              [t('metric.codex_credits'), usageCreditsWithStatus(row)],
+              [t('detail.allowance_impact'), rowAllowanceImpact(row)],
+              [t('metric.cache_ratio'), pct(row.cache_ratio)],
+              [t('metric.uncached_input'), number.format(row.uncached_input_tokens || 0)],
+              [t('metric.context_use'), pct(row.context_window_percent)],
+              [t('detail.pricing_status'), pricingStatusText(row)],
+              [t('detail.next_action'), nextActionForRow(row)],
+              [t('detail.why_flagged'), whyFlagged],
             ])}
           </div>
           <div class="detail-card">
-            <h3>Thread narrative</h3>
+            <h3>${escapeHtml(t('detail.thread_narrative'))}</h3>
             ${fieldsList([
-              ['Thread', attachment.label],
-              ['Project', row.project_name || 'Unknown project'],
-              ['Project tags', Array.isArray(row.project_tags) && row.project_tags.length ? row.project_tags.join(', ') : 'None'],
-              ['Thread attachment', attachment.relation],
-              ['Source', sourceLabel(row)],
-              ['Parent thread', resolvedParentThreadName(row) || 'None'],
-              ['Timestamp', formatTimestamp(row.event_timestamp)],
+              [t('table.thread'), attachment.label],
+              [t('filter.project'), row.project_name || t('state.unknown')],
+              [t('detail.project_tags'), Array.isArray(row.project_tags) && row.project_tags.length ? row.project_tags.join(', ') : t('state.none')],
+              [t('detail.thread_attachment'), attachmentRelationText(attachment.relation)],
+              [t('table.source'), sourceLabelText(row)],
+              [t('detail.parent_thread'), resolvedParentThreadName(row) || t('state.none')],
+              [t('detail.timestamp'), formatTimestamp(row.event_timestamp)],
             ])}
           </div>
           <div class="detail-card">
-            <h3>Token and pricing breakdown</h3>
+            <h3>${escapeHtml(t('detail.token_pricing_breakdown'))}</h3>
             ${fieldsList([
-              ['Last call total', number.format(row.total_tokens || 0)],
-              ['Last call input', number.format(row.input_tokens || 0)],
-              ['Cached input', number.format(row.cached_input_tokens || 0)],
-              ['Output', number.format(row.output_tokens || 0)],
-              ['Reasoning output', number.format(row.reasoning_output_tokens || 0)],
-              ['Session cumulative', number.format(row.cumulative_total_tokens || 0)],
-              ['Pricing model', row.pricing_model || 'No configured price'],
-              ['Credit model', row.usage_credit_model || 'No mapped rate'],
-              ['Credit confidence', usageCreditStatusText(row)],
-              ['Credit source', row.usage_credit_source || 'None'],
-              ['Credit source fetched', row.usage_credit_fetched_at || 'Unknown'],
-              ['Credit tier', row.usage_credit_tier || 'Unknown'],
-              ['Cache savings', money(row.estimated_cache_savings_usd)],
-              ['Efficiency signals', flags],
+              [t('metric.last_call_total'), number.format(row.total_tokens || 0)],
+              [t('metric.last_call_input'), number.format(row.input_tokens || 0)],
+              [t('metric.cached_input'), number.format(row.cached_input_tokens || 0)],
+              [t('metric.output'), number.format(row.output_tokens || 0)],
+              [t('metric.reasoning_output'), number.format(row.reasoning_output_tokens || 0)],
+              [t('metric.session_cumulative'), number.format(row.cumulative_total_tokens || 0)],
+              [t('detail.pricing_model'), row.pricing_model || t('state.no_configured_price')],
+              [t('detail.credit_model'), row.usage_credit_model || t('credit.no_mapped_rate')],
+              [t('detail.credit_confidence'), usageCreditStatusLabel(row)],
+              [t('detail.credit_source'), row.usage_credit_source || t('state.none')],
+              [t('detail.credit_source_fetched'), row.usage_credit_fetched_at || t('state.unknown')],
+              [t('detail.credit_tier'), row.usage_credit_tier || t('state.unknown')],
+              [t('detail.cache_savings'), moneyText(row.estimated_cache_savings_usd)],
+              [t('detail.efficiency_signals'), flags],
             ])}
           </div>
-          ${detailCollapse('Raw aggregate identifiers', [
-            ['Session', row.session_id],
-            ['Turn', row.turn_id],
-              ['Thread source', row.thread_source || 'user'],
-              ['Subagent type', row.subagent_type || 'None'],
-              ['Agent role', row.agent_role || 'None'],
-              ['Agent nickname', row.agent_nickname || 'None'],
-              ['Credit note', row.usage_credit_note || 'None'],
-              ['Parent session', row.parent_session_id || 'None'],
-            ['Parent updated', resolvedParentSessionUpdatedAt(row) ? formatTimestamp(resolvedParentSessionUpdatedAt(row)) : 'None'],
-            ['Cwd', row.cwd],
-            ['Project cwd', row.project_relative_cwd || '.'],
-            ['Git branch', row.git_branch || 'Unknown'],
-            ['Remote label', row.git_remote_label || 'None'],
-            ['Remote hash', row.git_remote_hash || 'None'],
+          ${detailCollapse(t('detail.raw_identifiers'), [
+            [t('filter.session'), row.session_id],
+            [t('detail.turn'), row.turn_id],
+              [t('detail.thread_source'), row.thread_source || t('source.user')],
+              [t('detail.subagent_type'), row.subagent_type || t('state.none')],
+              [t('detail.agent_role'), row.agent_role || t('state.none')],
+              [t('detail.agent_nickname'), row.agent_nickname || t('state.none')],
+              [t('detail.credit_note'), row.usage_credit_note || t('state.none')],
+              [t('detail.parent_session'), row.parent_session_id || t('state.none')],
+            [t('detail.parent_updated'), resolvedParentSessionUpdatedAt(row) ? formatTimestamp(resolvedParentSessionUpdatedAt(row)) : t('state.none')],
+            [t('detail.cwd'), row.cwd],
+            [t('detail.project_cwd'), row.project_relative_cwd || '.'],
+            [t('detail.git_branch'), row.git_branch || t('state.unknown')],
+            [t('detail.remote_label'), row.git_remote_label || t('state.none')],
+            [t('detail.remote_hash'), row.git_remote_hash || t('state.none')],
           ])}
-          ${detailCollapse('Source file and line', [
-            ['Source line', `${row.source_file}:${row.line_number}`],
-            ['Context window', number.format(row.model_context_window || 0)],
+          ${detailCollapse(t('detail.source_file_line'), [
+            [t('detail.source_line'), `${row.source_file}:${row.line_number}`],
+            [t('detail.context_window'), number.format(row.model_context_window || 0)],
           ])}
           ${contextControls(row)}
         </div>
@@ -1602,51 +1794,51 @@
       detailEl.innerHTML = `
         <div class="detail-stack">
           <div class="detail-card primary">
-            <h3>Thread attention summary</h3>
+            <h3>${escapeHtml(t('detail.thread_attention_summary'))}</h3>
             ${fieldsList([
-              ['Estimated cost', pricingConfigured ? money(group.estimatedCost) : 'Not configured'],
-              ['Codex credits', `${credits(group.usageCredits)} credits · ${group.creditStatus}`],
-              ['Allowance impact', allowanceWindowText(group.usageCredits, 'impact') || allowanceWindowText(group.usageCredits, 'remaining') || `${credits(group.usageCredits)} credits counted toward Codex usage limits`],
-              ['Attention score', number.format(Math.round(group.attentionScore))],
-              ['Cache ratio', pct(group.cacheRatio)],
-              ['Max context use', pct(group.maxContextUse)],
-              ['Pricing status', group.pricingStatus],
-              ['Next action', lifecycle.action || (group.maxContextUse >= threshold('high_context_percent', 0.6) || group.cacheRatio < threshold('low_cache_ratio', 0.3) ? 'Inspect the timeline before continuing this thread.' : 'Expand calls or select a row for call-level details.')],
+              [t('metric.estimated_cost'), pricingConfigured ? moneyText(group.estimatedCost) : t('state.not_configured')],
+              [t('metric.codex_credits'), tf('credit.with_status', { value: credits(group.usageCredits), status: group.creditStatus })],
+              [t('detail.allowance_impact'), allowanceWindowText(group.usageCredits, 'impact') || allowanceWindowText(group.usageCredits, 'remaining') || tf('allowance.counted', { value: credits(group.usageCredits) })],
+              [t('metric.attention_score'), number.format(Math.round(group.attentionScore))],
+              [t('metric.cache_ratio'), pct(group.cacheRatio)],
+              [t('metric.max_context_use'), pct(group.maxContextUse)],
+              [t('detail.pricing_status'), group.pricingStatus],
+              [t('detail.next_action'), lifecycle.action || (group.maxContextUse >= threshold('high_context_percent', 0.6) || group.cacheRatio < threshold('low_cache_ratio', 0.3) ? t('action.inspect_thread_timeline') : t('action.expand_or_select_recommendations'))],
             ])}
           </div>
           <div class="detail-card">
-            <h3>Thread lifecycle</h3>
+            <h3>${escapeHtml(t('detail.thread_lifecycle'))}</h3>
             ${fieldsList([
-              ['First expensive turn', lifecycle.firstExpensiveRow ? `${formatTimestamp(lifecycle.firstExpensiveRow.event_timestamp)} · call ${number.format((lifecycle.firstExpensiveIndex || 0) + 1)}` : 'None above thresholds'],
-              ['Largest cumulative jump', lifecycle.largestJumpRow ? `${number.format(lifecycle.largestJump)} tokens at ${formatTimestamp(lifecycle.largestJumpRow.event_timestamp)}` : 'None'],
-              ['Cache trend', `${lifecycle.cacheTrend >= 0 ? '+' : ''}${pct(lifecycle.cacheTrend || 0)}`],
-              ['Context trend', `${lifecycle.contextTrend >= 0 ? '+' : ''}${pct(lifecycle.contextTrend || 0)}`],
-              ['Subagent before spike', lifecycle.subagentBeforeSpike ? 'Yes' : 'No'],
+              [t('detail.first_expensive_turn'), lifecycle.firstExpensiveRow ? `${formatTimestamp(lifecycle.firstExpensiveRow.event_timestamp)} · ${tf('detail.call_number', { number: number.format((lifecycle.firstExpensiveIndex || 0) + 1) })}` : t('detail.no_above_thresholds')],
+              [t('detail.largest_cumulative_jump'), lifecycle.largestJumpRow ? tf('detail.tokens_at', { tokens: number.format(lifecycle.largestJump), time: formatTimestamp(lifecycle.largestJumpRow.event_timestamp) }) : t('state.none')],
+              [t('metric.cache_trend'), `${lifecycle.cacheTrend >= 0 ? '+' : ''}${pct(lifecycle.cacheTrend || 0)}`],
+              [t('metric.context_trend'), `${lifecycle.contextTrend >= 0 ? '+' : ''}${pct(lifecycle.contextTrend || 0)}`],
+              [t('detail.subagent_before_spike'), lifecycle.subagentBeforeSpike ? t('state.yes') : t('state.no')],
             ])}
           </div>
           <div class="detail-card">
-            <h3>Thread timeline</h3>
+            <h3>${escapeHtml(t('detail.thread_timeline'))}</h3>
             ${renderThreadTimeline(group)}
           </div>
           <div class="detail-card">
-            <h3>Relationships</h3>
+            <h3>${escapeHtml(t('detail.relationships'))}</h3>
             ${fieldsList([
-              ['Thread', group.label],
-              ['Calls', number.format(group.callCount)],
-              ['Subagent calls', number.format(group.subagentCount)],
-              ['Auto-review calls', number.format(group.autoReviewCount)],
-              ['Attached calls', number.format(group.attachedCount)],
-              ['Spawned from', group.parentThreadLabel || 'None'],
-              ['Spawned threads', number.format(group.childThreadCount || 0)],
-              ['Spawned child calls', number.format(group.childCallCount || 0)],
+              [t('table.thread'), group.label],
+              [t('detail.calls'), number.format(group.callCount)],
+              [t('detail.subagent_calls'), number.format(group.subagentCount)],
+              [t('detail.auto_review_calls'), number.format(group.autoReviewCount)],
+              [t('detail.attached_calls'), number.format(group.attachedCount)],
+              [t('detail.spawned_from'), group.parentThreadLabel || t('state.none')],
+              [t('detail.spawned_threads'), number.format(group.childThreadCount || 0)],
+              [t('detail.spawned_child_calls'), number.format(group.childCallCount || 0)],
             ])}
           </div>
-          ${detailCollapse('Secondary thread fields', [
-            ['Latest activity', formatTimestamp(group.latestActivity)],
-            ['Total tokens', number.format(group.totalTokens)],
-            ['Efficiency signals', number.format(group.signalCount)],
-            ['Model mix', group.modelSummary],
-            ['Reasoning mix', group.effortSummary],
+          ${detailCollapse(t('detail.secondary_thread_fields'), [
+            [t('detail.latest_activity'), formatTimestamp(group.latestActivity)],
+            [t('metric.total_tokens'), number.format(group.totalTokens)],
+            [t('detail.efficiency_signals'), number.format(group.signalCount)],
+            [t('detail.model_mix'), group.modelSummary],
+            [t('detail.reasoning_mix'), group.effortSummary],
           ])}
         </div>
       `;
@@ -1659,7 +1851,7 @@
     function updateLiveStatus(label, detail = '') {
       liveStatusEl.textContent = label;
       liveStatusEl.title = detail || label;
-      liveStatusEl.dataset.state = label.toLowerCase().includes('error') ? 'error' : 'ready';
+      liveStatusEl.dataset.state = label === t('status.refresh_error') || label.toLowerCase().includes('error') ? 'error' : 'ready';
     }
     function updateToTopVisibility() {
       toTopEl.dataset.visible = window.scrollY > 320 ? 'true' : 'false';
@@ -1697,19 +1889,20 @@
     }
     async function refreshDashboardData(manual = false) {
       if (!liveRefreshSupported) {
-        updateLiveStatus('Reloading', 'Reloading static dashboard snapshot...');
+        updateLiveStatus(t('status.reloading'), t('live.reloading_static'));
         window.location.reload();
         return;
       }
       if (refreshInFlight) return;
       refreshInFlight = true;
       refreshDashboardEl.disabled = true;
-      updateLiveStatus(manual ? 'Refreshing' : 'Checking', manual ? 'Refreshing local usage index...' : 'Checking for new usage...');
+      updateLiveStatus(manual ? t('status.refreshing') : t('status.checking'), manual ? t('live.refreshing_index') : t('live.checking_usage'));
       try {
         const params = new URLSearchParams({
           refresh: '1',
           limit: loadLimitEl.value,
           include_archived: includeArchived ? '1' : '0',
+          lang: currentLanguage,
           _: String(Date.now()),
         });
         const response = await fetch(`/api/usage?${params.toString()}`, {
@@ -1728,14 +1921,14 @@
         const result = nextPayload.refresh_result || {};
         const indexed = result.inserted_or_updated_events === undefined
           ? ''
-          : ` Indexed ${number.format(result.inserted_or_updated_events)} aggregate rows from ${number.format(result.scanned_files || 0)} logs.`;
+          : tf('live.indexed', { rows: number.format(result.inserted_or_updated_events), files: number.format(result.scanned_files || 0) });
         const skipped = result.skipped_events
-          ? ` Skipped ${number.format(result.skipped_events)} malformed token-count events.`
+          ? tf('live.skipped', { count: number.format(result.skipped_events) })
           : '';
-        updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Updated', `Updated ${formatTimestamp(nextPayload.refreshed_at)}. ${loadedRowsDescription()}. ${historyRowsDescription()}.${indexed}${skipped}`);
+        updateLiveStatus(autoRefreshEl.checked ? t('badge.live') : t('status.updated'), tf('live.updated_detail', { time: formatTimestamp(nextPayload.refreshed_at), loaded: loadedRowsDescription(), history: historyRowsDescription(), indexed, skipped }));
       } catch (error) {
         const message = error.message || String(error);
-        updateLiveStatus('Refresh error', `Live refresh unavailable: ${message}${manual ? '. Reload this page after regenerating a static dashboard, or run codex-usage-tracker serve-dashboard.' : ''}`);
+        updateLiveStatus(t('status.refresh_error'), tf('live.refresh_unavailable', { message, suffix: manual ? t('live.refresh_suffix') : '' }));
         if (manual && message === 'HTTP 404') window.location.reload();
       } finally {
         refreshInFlight = false;
@@ -1757,12 +1950,15 @@
     copyViewLinkEl.addEventListener('click', copyCurrentViewLink);
     exportVisibleEl.addEventListener('click', exportCurrentRows);
     refreshDashboardEl.addEventListener('click', () => refreshDashboardData(true));
+    if (languageSelectEl) {
+      languageSelectEl.addEventListener('change', () => setLanguage(languageSelectEl.value));
+    }
     loadLimitEl.addEventListener('change', () => {
       currentPage = 1;
       if (liveRefreshSupported) {
         refreshDashboardData(true);
       } else {
-        updateLiveStatus('Static', 'Run codex-usage-tracker serve-dashboard to load a different history size from the dashboard.');
+        updateLiveStatus(t('status.static'), t('live.load_static_hint'));
       }
     });
     historyScopeEl.addEventListener('change', () => {
@@ -1773,12 +1969,12 @@
       if (liveRefreshSupported) {
         refreshDashboardData(true);
       } else {
-        updateLiveStatus('Static', 'Run codex-usage-tracker serve-dashboard to switch between active sessions and all history from the dashboard.');
+        updateLiveStatus(t('status.static'), t('live.history_static_hint'));
       }
     });
     autoRefreshEl.addEventListener('change', () => {
       scheduleAutoRefresh();
-      updateLiveStatus(autoRefreshEl.checked ? 'Live' : 'Paused', `${autoRefreshEl.checked ? `Live refresh every ${liveRefreshIntervalMs / 1000}s` : 'Live refresh paused'}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      updateLiveStatus(autoRefreshEl.checked ? t('badge.live') : t('status.paused'), `${autoRefreshEl.checked ? tf('live.every', { seconds: liveRefreshIntervalMs / 1000 }) : t('live.paused')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       if (autoRefreshEl.checked) refreshDashboardData(false);
     });
     document.addEventListener('visibilitychange', () => {
@@ -1847,6 +2043,7 @@
     }));
     sortEl.addEventListener('input', () => setSort(sortEl.value, defaultSortDirection(sortEl.value)));
     rebuildDashboardIndexes();
+    applyTranslations();
     rebuildFilterOptions();
     applyInitialState();
     updatePricingSourceLine();
@@ -1860,9 +2057,9 @@
       autoRefreshEl.disabled = true;
       loadLimitEl.disabled = true;
       historyScopeEl.disabled = true;
-      updateLiveStatus('Static', `Static snapshot. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      updateLiveStatus(t('status.static'), `${t('status.static')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
     } else {
-      updateLiveStatus('Live', `Live refresh every ${liveRefreshIntervalMs / 1000}s. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      updateLiveStatus(t('badge.live'), `${tf('live.every', { seconds: liveRefreshIntervalMs / 1000 })}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       scheduleAutoRefresh();
       if (needsInitialHistoryRefresh) refreshDashboardData(false);
     }

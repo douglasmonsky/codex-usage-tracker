@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
+from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
@@ -63,6 +64,7 @@ def serve_dashboard(
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
+    language: str | None = None,
 ) -> None:
     """Generate and serve the dashboard plus a localhost-only context endpoint."""
 
@@ -70,6 +72,7 @@ def serve_dashboard(
     _validate_context_api_mode(context_api)
     api_token = secrets.token_urlsafe(32)
     context_api_enabled = context_api != "disabled"
+    selected_language = normalize_language(language)
     context_api_state = _ContextApiState(context_api_enabled)
     output = generate_dashboard(
         db_path=db_path,
@@ -85,6 +88,7 @@ def serve_dashboard(
         projects_path=projects_path,
         privacy_mode=privacy_mode,
         include_archived=include_archived,
+        language=selected_language,
     )
     handler = partial(
         _UsageDashboardHandler,
@@ -104,6 +108,7 @@ def serve_dashboard(
         context_chars=context_chars,
         api_token=api_token,
         context_api_state=context_api_state,
+        language=selected_language,
         refresh_lock=threading.Lock(),
     )
     server = ThreadingHTTPServer((host, port), handler)
@@ -147,6 +152,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         context_api_state: _ContextApiState | None = None,
         privacy_mode: str = "normal",
         rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+        language: str = "en",
         **kwargs: object,
     ) -> None:
         self._db_path = db_path
@@ -156,6 +162,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._thresholds_path = thresholds_path
         self._projects_path = projects_path
         self._privacy_mode = privacy_mode
+        self._language = normalize_language(language)
         self._limit = limit
         self._since = since
         self._codex_home = codex_home
@@ -272,6 +279,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         limit = _parse_limit(_first(params.get("limit")), self._limit)
         offset = _parse_offset(_first(params.get("offset")))
         include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
+        language = normalize_language(_first(params.get("lang")) or self._language)
         refresh_result = None
         try:
             if _truthy(_first(params.get("refresh"))):
@@ -310,6 +318,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 api_token=self._api_token,
                 context_api_enabled=self._context_api_state.enabled,
                 include_archived=include_archived,
+                language=language,
             )
         except sqlite3.Error as exc:
             self._send_json(

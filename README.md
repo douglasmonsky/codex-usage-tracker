@@ -35,6 +35,16 @@ If `codex-usage-tracker` is not found after installing with pipx, open a new ter
 
 `serve-dashboard` refreshes active-session usage before opening by default. Use `--no-refresh` only when you intentionally want to inspect the cached local index.
 
+## Language / Ngôn Ngữ
+
+The dashboard supports English and Tiếng Việt. Pass `--lang` before the command, or set `CODEX_USAGE_TRACKER_LANG` when you want a default language:
+
+```bash
+codex-usage-tracker --lang vi serve-dashboard --open
+```
+
+The dashboard header also includes a language selector and remembers your choice in the browser.
+
 Package naming: the PyPI distribution is `codex-usage-tracking`; the installed command is `codex-usage-tracker`; the GitHub repository remains `douglasmonsky/codex-usage-tracker`. The `codex-usage-tracker` PyPI name is not this project, so avoid similarly named packages when following these docs.
 
 Source install for development or branch testing:

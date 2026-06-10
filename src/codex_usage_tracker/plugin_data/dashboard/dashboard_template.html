@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="__HTML_LANG__">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,32 +11,38 @@
   <header>
     <div class="header-main">
       <div>
-        <p class="eyebrow">Local Codex analytics</p>
-        <h1>Usage Dashboard</h1>
+        <p class="eyebrow" data-i18n="dashboard.eyebrow">Local Codex analytics</p>
+        <h1 data-i18n="dashboard.title">Usage Dashboard</h1>
       </div>
-      <div class="live-bar" aria-label="Dashboard refresh controls">
-        <button id="refreshDashboard" class="refresh-button" type="button">Refresh</button>
-        <label class="live-toggle"><input id="autoRefresh" type="checkbox" checked> Live</label>
-        <label class="load-control">Load
-          <select id="loadLimit">
-            <option value="5000">5,000 calls</option>
-            <option value="10000">10,000 calls</option>
-            <option value="20000">20,000 calls</option>
-            <option value="all">All calls</option>
+      <div class="live-bar" aria-label="Dashboard refresh controls" data-i18n-aria-label="aria.refresh_controls">
+        <label class="language-control"><span data-i18n="language.label">Language</span>
+          <select id="languageSelect" aria-label="Language" data-i18n-aria-label="language.label">
+            <option value="en">English</option>
+            <option value="vi">Tiếng Việt</option>
           </select>
         </label>
-        <label class="history-control" title="Active sessions only is the default. All history scans archived session logs during live refresh.">History
+        <button id="refreshDashboard" class="refresh-button" type="button" data-i18n="button.refresh">Refresh</button>
+        <label class="live-toggle"><input id="autoRefresh" type="checkbox" checked> <span data-i18n="nav.live">Live</span></label>
+        <label class="load-control"><span data-i18n="nav.load">Load</span>
+          <select id="loadLimit">
+            <option value="5000" data-i18n="option.load_5000">5,000 calls</option>
+            <option value="10000" data-i18n="option.load_10000">10,000 calls</option>
+            <option value="20000" data-i18n="option.load_20000">20,000 calls</option>
+            <option value="all" data-i18n="option.load_all">All calls</option>
+          </select>
+        </label>
+        <label class="history-control" title="Active sessions only is the default. All history scans archived session logs during live refresh." data-i18n-title="aria.history_title"><span data-i18n="nav.history">History</span>
           <select id="historyScope">
-            <option value="active" selected>Active sessions only</option>
-            <option value="all">All history</option>
+            <option value="active" selected data-i18n="option.active_sessions_only">Active sessions only</option>
+            <option value="all" data-i18n="option.all_history">All history</option>
           </select>
         </label>
       </div>
     </div>
     <div class="header-meta">
-      <div class="meta-chips" aria-label="Dashboard status">
-        <span class="disclaimer-chip" title="Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI.">Unofficial project</span>
-        <span id="liveStatus" class="live-status">Static</span>
+      <div class="meta-chips" aria-label="Dashboard status" data-i18n-aria-label="aria.dashboard_status">
+        <span class="disclaimer-chip" title="Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI." data-i18n="badge.unofficial_project" data-i18n-title="badge.unofficial_project_title">Unofficial project</span>
+        <span id="liveStatus" class="live-status" data-i18n="badge.static">Static</span>
         <span id="pricingSource" class="source-line"></span>
         <span id="allowanceSource" class="source-line"></span>
         <span id="privacyMode" class="source-line"></span>
@@ -47,91 +53,91 @@
   </header>
   <main>
     <div class="filters">
-      <label>Search<input id="search" type="search" placeholder="Thread, cwd, model"></label>
-      <label>Model<select id="model"><option value="">All models</option></select></label>
-      <label>Reasoning<select id="effort"><option value="">All efforts</option></select></label>
-      <label>Confidence<select id="pricingStatus"><option value="">All confidence</option><option value="official">Exact cost</option><option value="estimated">Estimated cost</option><option value="unpriced">Unpriced cost</option><option value="credit-exact">Exact credit rate</option><option value="credit-estimated">Estimated credit mapping</option><option value="credit-override">User credit override</option><option value="credit-missing">Missing credit rate</option></select></label>
-      <label>Time<select id="datePreset"><option value="all" selected>All time</option><option value="today">Today</option><option value="this-week">This week</option><option value="last-7-days">Last 7 days</option><option value="this-month">This month</option><option value="custom">Custom range</option></select><span id="dateRangeStatus" class="filter-status" aria-live="polite" hidden></span></label>
-      <label>Start<input id="dateStart" type="date"></label>
-      <label>End<input id="dateEnd" type="date"></label>
-      <label>Sort<select id="sort"><option value="attention" selected>Needs attention</option><option value="time">Newest calls</option><option value="thread">Thread name</option><option value="model">Model</option><option value="effort">Reasoning</option><option value="total">Most tokens</option><option value="cost">Highest estimated cost</option><option value="usage">Highest Codex credits</option><option value="cache">Lowest cache ratio</option><option value="signals">Most signals</option><option value="context">Highest context use</option></select></label>
+      <label><span data-i18n="filter.search">Search</span><input id="search" type="search" placeholder="Thread, cwd, model" data-i18n-placeholder="filter.search_placeholder"></label>
+      <label><span data-i18n="filter.model">Model</span><select id="model"><option value="" data-i18n="option.all_models">All models</option></select></label>
+      <label><span data-i18n="filter.reasoning">Reasoning</span><select id="effort"><option value="" data-i18n="option.all_efforts">All efforts</option></select></label>
+      <label><span data-i18n="filter.confidence">Confidence</span><select id="pricingStatus"><option value="" data-i18n="option.all_confidence">All confidence</option><option value="official" data-i18n="option.exact_cost">Exact cost</option><option value="estimated" data-i18n="option.estimated_cost">Estimated cost</option><option value="unpriced" data-i18n="option.unpriced_cost">Unpriced cost</option><option value="credit-exact" data-i18n="option.exact_credit_rate">Exact credit rate</option><option value="credit-estimated" data-i18n="option.estimated_credit_mapping">Estimated credit mapping</option><option value="credit-override" data-i18n="option.user_credit_override">User credit override</option><option value="credit-missing" data-i18n="option.missing_credit_rate">Missing credit rate</option></select></label>
+      <label><span data-i18n="filter.time">Time</span><select id="datePreset"><option value="all" selected data-i18n="option.all_time">All time</option><option value="today" data-i18n="option.today">Today</option><option value="this-week" data-i18n="option.this_week">This week</option><option value="last-7-days" data-i18n="option.last_7_days">Last 7 days</option><option value="this-month" data-i18n="option.this_month">This month</option><option value="custom" data-i18n="option.custom_range">Custom range</option></select><span id="dateRangeStatus" class="filter-status" aria-live="polite" hidden></span></label>
+      <label><span data-i18n="filter.start">Start</span><input id="dateStart" type="date"></label>
+      <label><span data-i18n="filter.end">End</span><input id="dateEnd" type="date"></label>
+      <label><span data-i18n="filter.sort">Sort</span><select id="sort"><option value="attention" selected data-i18n="option.needs_attention">Needs attention</option><option value="time" data-i18n="option.newest_calls">Newest calls</option><option value="thread" data-i18n="option.thread_name">Thread name</option><option value="model" data-i18n="filter.model">Model</option><option value="effort" data-i18n="filter.reasoning">Reasoning</option><option value="total" data-i18n="option.most_tokens">Most tokens</option><option value="cost" data-i18n="option.highest_estimated_cost">Highest estimated cost</option><option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option><option value="cache" data-i18n="option.lowest_cache_ratio">Lowest cache ratio</option><option value="signals" data-i18n="option.most_signals">Most signals</option><option value="context" data-i18n="option.highest_context_use">Highest context use</option></select></label>
     </div>
     <div class="cards">
-      <div class="card"><span>Visible Calls</span><strong id="visibleCalls">0</strong></div>
-      <div class="card"><span>Total Tokens</span><strong id="totalTokens">0</strong></div>
-      <div class="card"><span>Cached Input</span><strong id="cachedTokens">0</strong></div>
-      <div class="card"><span>Uncached Input</span><strong id="uncachedTokens">0</strong></div>
-      <div class="card"><span>Reasoning Output</span><strong id="reasoningTokens">0</strong></div>
-      <div class="card"><span>Estimated Cost</span><strong id="estimatedCost">$0.00</strong></div>
-      <div class="card"><span>Codex Credits</span><strong id="usageCredits">0</strong></div>
-      <div class="card"><span>Usage Remaining</span><strong id="allowanceImpact">Set limits</strong></div>
+      <div class="card"><span data-i18n="metric.visible_calls">Visible Calls</span><strong id="visibleCalls">0</strong></div>
+      <div class="card"><span data-i18n="metric.total_tokens">Total Tokens</span><strong id="totalTokens">0</strong></div>
+      <div class="card"><span data-i18n="metric.cached_input">Cached Input</span><strong id="cachedTokens">0</strong></div>
+      <div class="card"><span data-i18n="metric.uncached_input">Uncached Input</span><strong id="uncachedTokens">0</strong></div>
+      <div class="card"><span data-i18n="metric.reasoning_output">Reasoning Output</span><strong id="reasoningTokens">0</strong></div>
+      <div class="card"><span data-i18n="metric.estimated_cost">Estimated Cost</span><strong id="estimatedCost">$0.00</strong></div>
+      <div class="card"><span data-i18n="metric.codex_credits">Codex Credits</span><strong id="usageCredits">0</strong></div>
+      <div class="card"><span data-i18n="metric.remaining_usage">Usage Remaining</span><strong id="allowanceImpact" data-i18n="action.set_limits">Set limits</strong></div>
     </div>
     <section id="insightsPanel" class="insights-panel" aria-labelledby="insightsTitle">
       <div class="insights-layout">
         <div>
           <div class="section-heading">
-            <h2 id="insightsTitle">Needs Attention</h2>
-            <p id="insightsCaption">Ranked by cost, usage credits, cache reuse, context pressure, and pricing confidence.</p>
+            <h2 id="insightsTitle" data-i18n="section.needs_attention">Needs Attention</h2>
+            <p id="insightsCaption" data-i18n="caption.insights">Ranked by cost, usage credits, cache reuse, context pressure, and pricing confidence.</p>
           </div>
           <div id="insightCards" class="insight-cards" aria-live="polite"></div>
         </div>
         <aside class="preset-panel" aria-labelledby="presetsTitle">
           <div class="preset-heading">
             <div>
-              <h2 id="presetsTitle">Investigation Presets</h2>
-              <p>One-click starting points for common usage questions.</p>
+              <h2 id="presetsTitle" data-i18n="preset.investigation_presets">Investigation Presets</h2>
+              <p data-i18n="preset.description">One-click starting points for common usage questions.</p>
             </div>
-            <button id="clearPreset" class="preset-clear" type="button" hidden>Clear</button>
+            <button id="clearPreset" class="preset-clear" type="button" hidden data-i18n="button.clear">Clear</button>
           </div>
-          <div id="presetStatus" class="preset-status">No preset applied.</div>
+          <div id="presetStatus" class="preset-status" data-i18n="preset.no_preset">No preset applied.</div>
           <div id="presetList" class="preset-list"></div>
         </aside>
       </div>
     </section>
     <div class="grid">
       <section>
-        <h2 id="tableTitle">Model Calls</h2>
+        <h2 id="tableTitle" data-i18n="dashboard.model_calls">Model Calls</h2>
         <div class="table-tools">
-          <div class="segmented" role="group" aria-label="Dashboard view">
-            <button id="insightsView" type="button" aria-pressed="true">Insights</button>
-            <button id="callsView" type="button" aria-pressed="false">Calls</button>
-            <button id="threadsView" type="button" aria-pressed="false">Threads</button>
+          <div class="segmented" role="group" aria-label="Dashboard view" data-i18n-aria-label="aria.dashboard_view">
+            <button id="insightsView" type="button" aria-pressed="true" data-i18n="dashboard.view.insights">Insights</button>
+            <button id="callsView" type="button" aria-pressed="false" data-i18n="dashboard.view.calls">Calls</button>
+            <button id="threadsView" type="button" aria-pressed="false" data-i18n="dashboard.view.threads">Threads</button>
           </div>
-          <div id="tableCaption" class="table-caption">Showing individual model calls.</div>
-          <div class="table-actions" aria-label="Current view actions">
-            <button id="copyViewLink" class="toolbar-button" type="button">Copy link</button>
-            <button id="exportVisible" class="toolbar-button" type="button">Export CSV</button>
+          <div id="tableCaption" class="table-caption" data-i18n="caption.initial_calls">Showing individual model calls.</div>
+          <div class="table-actions" aria-label="Current view actions" data-i18n-aria-label="aria.current_view_actions">
+            <button id="copyViewLink" class="toolbar-button" type="button" data-i18n="button.copy_link">Copy link</button>
+            <button id="exportVisible" class="toolbar-button" type="button" data-i18n="button.export_csv">Export CSV</button>
             <span id="actionStatus" class="action-status" aria-live="polite"></span>
           </div>
-          <div id="pager" class="pager" aria-label="Table pages">
-            <button id="prevPage" class="pager-button" type="button">Previous</button>
+          <div id="pager" class="pager" aria-label="Table pages" data-i18n-aria-label="aria.table_pages">
+            <button id="prevPage" class="pager-button" type="button" data-i18n="button.previous">Previous</button>
             <span id="pageStatus">Page 1</span>
-            <button id="nextPage" class="pager-button" type="button">Next</button>
+            <button id="nextPage" class="pager-button" type="button" data-i18n="button.next">Next</button>
           </div>
         </div>
         <table>
           <thead>
             <tr>
-              <th data-sort-header="time"><button class="sort-header" type="button" data-sort-key="time">Time <span class="sort-indicator" data-sort-indicator="time"></span></button></th>
-              <th data-sort-header="thread"><button class="sort-header" type="button" data-sort-key="thread">Thread <span class="sort-indicator" data-sort-indicator="thread"></span></button></th>
-              <th data-sort-header="model"><button class="sort-header" type="button" data-sort-key="model">Model <span class="sort-indicator" data-sort-indicator="model"></span></button></th>
-              <th data-sort-header="effort"><button class="sort-header" type="button" data-sort-key="effort">Effort <span class="sort-indicator" data-sort-indicator="effort"></span></button></th>
-              <th class="num" data-sort-header="total"><button class="sort-header" type="button" data-sort-key="total">Tokens <span class="sort-indicator" data-sort-indicator="total"></span></button></th>
-              <th class="num" data-sort-header="cost"><button class="sort-header" type="button" data-sort-key="cost">Cost <span class="sort-indicator" data-sort-indicator="cost"></span></button></th>
-              <th class="num" data-sort-header="cache"><button class="sort-header" type="button" data-sort-key="cache">Cache <span class="sort-indicator" data-sort-indicator="cache"></span></button></th>
-              <th class="num" data-sort-header="signals"><button class="sort-header" type="button" data-sort-key="signals">Signals <span class="sort-indicator" data-sort-indicator="signals"></span></button></th>
+              <th data-sort-header="time"><button class="sort-header" type="button" data-sort-key="time"><span data-i18n="table.time">Time</span> <span class="sort-indicator" data-sort-indicator="time"></span></button></th>
+              <th data-sort-header="thread"><button class="sort-header" type="button" data-sort-key="thread"><span data-i18n="table.thread">Thread</span> <span class="sort-indicator" data-sort-indicator="thread"></span></button></th>
+              <th data-sort-header="model"><button class="sort-header" type="button" data-sort-key="model"><span data-i18n="table.model">Model</span> <span class="sort-indicator" data-sort-indicator="model"></span></button></th>
+              <th data-sort-header="effort"><button class="sort-header" type="button" data-sort-key="effort"><span data-i18n="table.effort">Effort</span> <span class="sort-indicator" data-sort-indicator="effort"></span></button></th>
+              <th class="num" data-sort-header="total"><button class="sort-header" type="button" data-sort-key="total"><span data-i18n="table.tokens">Tokens</span> <span class="sort-indicator" data-sort-indicator="total"></span></button></th>
+              <th class="num" data-sort-header="cost"><button class="sort-header" type="button" data-sort-key="cost"><span data-i18n="table.cost">Cost</span> <span class="sort-indicator" data-sort-indicator="cost"></span></button></th>
+              <th class="num" data-sort-header="cache"><button class="sort-header" type="button" data-sort-key="cache"><span data-i18n="table.cache">Cache</span> <span class="sort-indicator" data-sort-indicator="cache"></span></button></th>
+              <th class="num" data-sort-header="signals"><button class="sort-header" type="button" data-sort-key="signals"><span data-i18n="table.signals">Signals</span> <span class="sort-indicator" data-sort-indicator="signals"></span></button></th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
       </section>
       <section class="detail-section">
-        <h2>Call Details</h2>
-        <div id="detail" class="detail">Hover or click a row to inspect aggregate usage fields.</div>
+        <h2 data-i18n="dashboard.call_details">Call Details</h2>
+        <div id="detail" class="detail" data-i18n="dashboard.detail.empty">Hover or click a row to inspect aggregate usage fields.</div>
       </section>
     </div>
   </main>
-  <button id="toTop" class="to-top" type="button" aria-label="Back to top">Top</button>
+  <button id="toTop" class="to-top" type="button" aria-label="Back to top" data-i18n="button.top" data-i18n-aria-label="button.top">Top</button>
   <script id="usage-data" type="application/json">__PAYLOAD__</script>
   <script src="__FORMAT_SCRIPT_SRC__"></script>
   <script src="__DATA_SCRIPT_SRC__"></script>

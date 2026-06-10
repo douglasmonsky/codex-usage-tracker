@@ -144,7 +144,8 @@
       font-weight: 680;
     }
     .load-control,
-    .history-control {
+    .history-control,
+    .language-control {
       display: inline-flex;
       grid-template-columns: none;
       align-items: center;
@@ -155,7 +156,8 @@
       font-weight: 760;
     }
     .load-control select,
-    .history-control select {
+    .history-control select,
+    .language-control select {
       width: auto;
       min-width: 104px;
       min-height: 34px;
@@ -164,6 +166,9 @@
     }
     .history-control select {
       min-width: 156px;
+    }
+    .language-control select {
+      min-width: 118px;
     }
     main { padding: 22px 28px 36px; }
     .filters {
@@ -953,7 +958,7 @@
       .detail { max-height: none; }
       .table-tools { align-items: stretch; grid-template-columns: 1fr; }
       .segmented, .segmented button { width: 100%; }
-      .pager, .load-control, .table-actions { justify-content: space-between; width: 100%; }
+      .pager, .load-control, .language-control, .table-actions { justify-content: space-between; width: 100%; }
       .action-status { min-width: 0; }
       .preset-card { grid-template-columns: 1fr; }
     }
