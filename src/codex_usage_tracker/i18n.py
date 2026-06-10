@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from functools import lru_cache
+from functools import cache
 from importlib import resources
 
 DEFAULT_LANGUAGE = "en"
@@ -156,7 +156,7 @@ def dashboard_i18n_payload(language: str | None = None) -> dict[str, object]:
     }
 
 
-@lru_cache(maxsize=None)
+@cache
 def _cached_raw_catalog(language: str) -> dict[str, str]:
     if language not in SUPPORTED_LANGUAGES:
         language = DEFAULT_LANGUAGE
