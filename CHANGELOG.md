@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-06-10
+
+- Add the dashboard localization foundation, including starter locale catalogs, language metadata, local browser language selection, `--lang`, and `CODEX_USAGE_TRACKER_LANG`.
+- Add Vietnamese dashboard localization and focused validation coverage for translated dashboard labels.
+- Keep the README landing page focused on dashboard screenshots and companion usage workflows before detailed localization guidance.
+- Pin the marketplace MCP runtime launcher to the exact `codex-usage-tracking==0.5.0` package.
+
 ## 0.4.1 - 2026-06-09
 
 - Harden the production PyPI workflow so manual publishing must run from `main` or a tag ref before artifacts are downloaded and uploaded.
