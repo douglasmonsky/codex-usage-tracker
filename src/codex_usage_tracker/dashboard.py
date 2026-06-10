@@ -17,7 +17,7 @@ from codex_usage_tracker.allowance import (
     load_allowance_config,
     summarize_allowance_usage,
 )
-from codex_usage_tracker.i18n import dashboard_i18n_payload, translations_for
+from codex_usage_tracker.i18n import dashboard_i18n_payload, language_direction, translations_for
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_DASHBOARD_PATH,
@@ -204,6 +204,7 @@ def generate_dashboard(
             payload,
             guide_href=guide_href,
             language=str(payload_dict["language"]),
+            direction=str(payload_dict["language_direction"]),
             stylesheet_href=stylesheet_href,
             format_script_src=format_script_src,
             data_script_src=data_script_src,
@@ -354,6 +355,7 @@ def _html(
     guide_href: str | None = None,
     *,
     language: str = "en",
+    direction: str | None = None,
     stylesheet_href: str = "codex-usage-tracker-assets/dashboard.css",
     format_script_src: str = "codex-usage-tracker-assets/dashboard_format.js",
     data_script_src: str = "codex-usage-tracker-assets/dashboard_data.js",
@@ -362,6 +364,7 @@ def _html(
 ) -> str:
     template = _read_dashboard_asset("dashboard_template.html")
     translations = translations_for(language)
+    html_direction = direction or language_direction(language)
     guide_link = (
         f'<a class="guide-link" href="{html.escape(guide_href, quote=True)}" '
         f'data-i18n="docs.dashboard_guide">{html.escape(translations["docs.dashboard_guide"])}</a>'
@@ -370,6 +373,7 @@ def _html(
     )
     return (
         template.replace("__HTML_LANG__", html.escape(language, quote=True))
+        .replace("__HTML_DIR__", html.escape(html_direction, quote=True))
         .replace("__TITLE__", html.escape(translations["dashboard.title"]))
         .replace("__STYLESHEET_HREF__", html.escape(stylesheet_href, quote=True))
         .replace("__GUIDE_LINK__", guide_link)

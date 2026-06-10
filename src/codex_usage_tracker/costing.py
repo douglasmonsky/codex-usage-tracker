@@ -8,6 +8,15 @@ from typing import Any
 from codex_usage_tracker.paths import DEFAULT_PRICING_PATH
 from codex_usage_tracker.pricing_config import PricingConfig, load_pricing_config
 
+EFFICIENCY_FLAG_KEYS = {
+    "high context use": "flag.high_context_use",
+    "elevated context use": "flag.elevated_context_use",
+    "high reasoning share": "flag.high_reasoning_share",
+    "low cache reuse": "flag.low_cache_reuse",
+    "expensive low-output call": "flag.expensive_low_output_call",
+    "high estimated cost": "flag.high_estimated_cost",
+}
+
 
 def summarize_pricing_coverage(
     rows: list[dict[str, Any]],
@@ -92,6 +101,11 @@ def annotate_rows_with_efficiency(
         copy["pricing_model"] = config.priced_as(model)
         copy["pricing_estimated"] = config.is_estimated_model(model)
         copy["efficiency_flags"] = efficiency_flags(copy)
+        copy["efficiency_flag_keys"] = [
+            EFFICIENCY_FLAG_KEYS[flag]
+            for flag in copy["efficiency_flags"]
+            if flag in EFFICIENCY_FLAG_KEYS
+        ]
         annotated.append(copy)
     return annotated
 

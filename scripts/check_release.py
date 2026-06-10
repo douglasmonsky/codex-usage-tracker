@@ -24,6 +24,28 @@ IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
 SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 OLD_PYPI_DISTRIBUTION_NAME = "codex-usage-tracker"
+DASHBOARD_LOCALE_CODES = [
+    "en",
+    "vi",
+    "es",
+    "fr",
+    "de",
+    "pt",
+    "ja",
+    "zh-Hans",
+    "ko",
+    "ru",
+    "it",
+    "ar",
+]
+DASHBOARD_LOCALE_SOURCE_FILES = [
+    f"src/codex_usage_tracker/plugin_data/dashboard/locales/{code}.json"
+    for code in DASHBOARD_LOCALE_CODES
+]
+DASHBOARD_LOCALE_WHEEL_MEMBERS = {
+    f"codex_usage_tracker/plugin_data/dashboard/locales/{code}.json"
+    for code in DASHBOARD_LOCALE_CODES
+}
 PUBLIC_RELEASE_DOCS = [
     "docs/one-dot-oh-readiness.md",
     "docs/development.md",
@@ -77,6 +99,7 @@ REQUIRED_FILES = [
     "src/codex_usage_tracker/plugin_data/dashboard/dashboard.js",
     "src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js",
     "src/codex_usage_tracker/plugin_data/dashboard/dashboard_template.html",
+    *DASHBOARD_LOCALE_SOURCE_FILES,
     "src/codex_usage_tracker/plugin_data/docs/dashboard-guide.html",
     "src/codex_usage_tracker/plugin_data/rate_cards/codex-credit-rates.json",
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-insights.png",
@@ -94,6 +117,7 @@ WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/dashboard/dashboard.js",
     "codex_usage_tracker/plugin_data/dashboard/dashboard_state.js",
     "codex_usage_tracker/plugin_data/dashboard/dashboard_template.html",
+    *DASHBOARD_LOCALE_WHEEL_MEMBERS,
     "codex_usage_tracker/plugin_data/docs/dashboard-guide.html",
     "codex_usage_tracker/plugin_data/rate_cards/codex-credit-rates.json",
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-insights.png",
@@ -455,6 +479,8 @@ def _check_skill_packaging() -> list[str]:
     failures: list[str] = []
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     package_data = set(pyproject["tool"]["setuptools"]["package-data"]["codex_usage_tracker.plugin_data"])
+    if "dashboard/locales/*" not in package_data:
+        failures.append("pyproject.toml package data is missing dashboard locale catalogs")
     for source_skill in sorted((REPO_ROOT / "skills").glob("*/SKILL.md")):
         skill_name = source_skill.parent.name
         package_skill = (

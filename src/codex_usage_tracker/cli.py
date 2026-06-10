@@ -30,7 +30,7 @@ from codex_usage_tracker.formatting import (
     format_doctor,
     format_session,
 )
-from codex_usage_tracker.i18n import SUPPORTED_LANGUAGES, normalize_language
+from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -113,9 +113,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--projects", type=Path, default=DEFAULT_PROJECTS_PATH)
     parser.add_argument(
         "--lang",
-        choices=SUPPORTED_LANGUAGES,
         default=None,
-        help="Dashboard/CLI language. Defaults to CODEX_USAGE_TRACKER_LANG or en.",
+        help=(
+            "Initial dashboard language. Accepts supported language codes and common aliases; "
+            "defaults to CODEX_USAGE_TRACKER_LANG or en."
+        ),
     )
     parser.add_argument(
         "--privacy-mode",

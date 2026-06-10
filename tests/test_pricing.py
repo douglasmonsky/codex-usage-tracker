@@ -8,6 +8,7 @@ from codex_usage_tracker.pricing import (
     OPENAI_PRICING_MD_URL,
     PRICING_SCHEMA,
     PricingParseError,
+    annotate_rows_with_efficiency,
     load_pricing_config,
     parse_openai_pricing_markdown,
     summarize_pricing_coverage,
@@ -160,3 +161,47 @@ def test_pricing_coverage_marks_internal_estimates(tmp_path: Path) -> None:
         "codex-auto-review",
         "gpt-5.3-codex-spark",
     }
+
+
+def test_efficiency_annotation_includes_stable_flag_keys(tmp_path: Path) -> None:
+    pricing_path = tmp_path / "pricing.json"
+    pricing_path.write_text(
+        json.dumps(
+            {
+                "models": {
+                    "gpt-test": {
+                        "input_per_million": 1.0,
+                        "cached_input_per_million": 0.1,
+                        "output_per_million": 5.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rows = annotate_rows_with_efficiency(
+        [
+            {
+                "model": "gpt-test",
+                "input_tokens": 30_000,
+                "cached_input_tokens": 0,
+                "uncached_input_tokens": 30_000,
+                "output_tokens": 80,
+                "total_tokens": 30_080,
+                "context_window_percent": 0.82,
+            }
+        ],
+        pricing=load_pricing_config(pricing_path),
+    )
+
+    assert rows[0]["efficiency_flags"] == [
+        "high context use",
+        "low cache reuse",
+        "expensive low-output call",
+    ]
+    assert rows[0]["efficiency_flag_keys"] == [
+        "flag.high_context_use",
+        "flag.low_cache_reuse",
+        "flag.expensive_low_output_call",
+    ]

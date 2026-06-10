@@ -96,7 +96,13 @@ def annotate_rows_with_recommendations(
             if recommendations
             else "No aggregate action is flagged; continue monitoring usage patterns."
         )
+        copy["recommended_action_key"] = (
+            recommendations[0]["action_key"]
+            if recommendations
+            else "recommendation.none.action"
+        )
         copy["flag_explanations"] = [recommendation["why"] for recommendation in recommendations]
+        copy["flag_explanation_keys"] = [recommendation["why_key"] for recommendation in recommendations]
         annotated.append(copy)
     return annotated
 
@@ -108,7 +114,7 @@ def action_recommendations(
     """Return ranked recommendations for one aggregate usage row."""
 
     limits = thresholds or DEFAULT_THRESHOLDS
-    recommendations: list[dict[str, str]] = []
+    recommendations: list[dict[str, Any]] = []
     total_tokens = _number(row.get("total_tokens"))
     output_tokens = _number(row.get("output_tokens"))
     uncached_input = _number(row.get("uncached_input_tokens"))
@@ -247,13 +253,17 @@ def _recommendation(
     why: str,
     action: str,
 ) -> dict[str, Any]:
+    key_prefix = f"recommendation.{key.replace('-', '_')}"
     return {
         "key": key,
         "severity": severity,
         "score": SEVERITY_POINTS.get(severity, 0),
         "title": title,
+        "title_key": f"{key_prefix}.title",
         "why": why,
+        "why_key": f"{key_prefix}.why",
         "action": action,
+        "action_key": f"{key_prefix}.action",
     }
 
 
