@@ -110,6 +110,12 @@
         Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
       ));
     }
+    function translateEffort(value) {
+      if (!value) return value;
+      const key = `effort.${String(value).toLowerCase()}`;
+      const translated = t(key);
+      return translated === key ? value : translated;
+    }
     const stateManager = window.CodexUsageDashboardState;
     const urlParams = new URLSearchParams(window.location.search);
     const initialState = stateManager ? stateManager.read(urlParams) : {};
@@ -498,7 +504,7 @@
       [...new Set(values.filter(Boolean))].sort().forEach(value => {
         const option = document.createElement('option');
         option.value = value;
-        option.textContent = value;
+        option.textContent = select.id === 'effort' ? translateEffort(value) : value;
         select.appendChild(option);
       });
       const valuesSet = new Set(Array.from(select.options).map(option => option.value));
@@ -969,8 +975,12 @@
     function compactSummaryText(values, fallbackKey) {
       const unique = [...new Set(values.filter(Boolean))].sort();
       if (!unique.length) return t('state.unknown');
-      if (unique.length === 1) return unique[0];
-      return tf(fallbackKey, { model: unique[0], effort: unique[0], count: unique.length - 1 });
+      if (unique.length === 1) return fallbackKey === 'table.more_efforts' ? translateEffort(unique[0]) : unique[0];
+      return tf(fallbackKey, {
+        model: unique[0],
+        effort: fallbackKey === 'table.more_efforts' ? translateEffort(unique[0]) : unique[0],
+        count: unique.length - 1
+      });
     }
     function threadModelSummaryText(calls) {
       const models = [...new Set(calls.map(row => row.model).filter(Boolean))].sort();
@@ -1384,12 +1394,12 @@
         tr.className = 'call-row';
         tr.tabIndex = 0;
         tr.setAttribute('role', 'button');
-        tr.setAttribute('aria-label', `Inspect ${rowThreadLabel(row)} usage`);
+        tr.setAttribute('aria-label', tf('aria.inspect_thread', { thread: rowThreadLabel(row) }));
         tr.innerHTML = `
           <td>${renderTimeCell(row.event_timestamp)}</td>
           <td title="${escapeHtml(short(row.session_id))}">${escapeHtml(truncate(rowThreadLabel(row)))}</td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
-          <td>${escapeHtml(short(row.effort))}</td>
+          <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
           <td class="num">${number.format(row.total_tokens || 0)}</td>
           <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
           <td class="num">${pct(row.cache_ratio)}</td>
@@ -1517,13 +1527,10 @@
           <tr class="thread-call-row" tabindex="0" role="button" data-record-id="${escapeHtml(row.record_id || '')}">
             <td>${renderTimeCell(row.event_timestamp)}</td>
             <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
-            <td>${escapeHtml(short(row.effort))}</td>
+            <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
             <td>${escapeHtml(sourceLabelText(row))}</td>
             <td class="num">${number.format(row.total_tokens || 0)}</td>
             <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
-            <td class="num">${pct(row.cache_ratio)}</td>
-            <td><div class="flags">${flags.slice(0, 2).map(flag => `<span class="flag">${escapeHtml(flag)}</span>`).join('')}</div></td>
-          </tr>
         `;
       }).join('');
       tr.innerHTML = `
@@ -1681,12 +1688,34 @@
     }
     function renderThreadTimeline(group) {
       const calls = group.calls.slice(-5);
+    }
+    function fieldsList(fields, className = 'detail-kv') {
+      return `<dl class="${className}">${fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(short(value))}</dd>`).join('')}</dl>`;
+    }
+    function detailCollapse(title, fields) {
+      return `
+        <details class="detail-collapse">
+          <summary>${escapeHtml(title)}</summary>
+          <div class="detail-collapse-body">${fieldsList(fields)}</div>
+        </details>
+      `;
+    }
+    function timelineSeverity(value) {
+      if (value >= 0.65) return 'high';
+      if (value >= 0.35) return 'medium';
+      return 'low';
+    }
+    function timelineWidth(value) {
+      return `${Math.round(clamp(Number(value || 0), 0, 1) * 100)}%`;
+    }
+    function renderThreadTimeline(group) {
+      const calls = group.calls.slice(-5);
       if (!calls.length) return `<p>${escapeHtml(t('detail.timeline_empty'))}</p>`;
       return `<div class="timeline-list">${calls.map(row => {
         const contextUse = Number(row.context_window_percent || 0);
         return `
           <div class="timeline-item">
-            <div class="timeline-time">${escapeHtml(formatTimestamp(row.event_timestamp, 'Unknown'))}</div>
+            <div class="timeline-time">${escapeHtml(formatTimestamp(row.event_timestamp, t('state.unknown')))}</div>
             <div>
               <div class="timeline-title">${escapeHtml(sourceLabelText(row))} · ${escapeHtml(short(row.model))}</div>
               <div class="timeline-meta">${escapeHtml(tf('detail.timeline_meta', { tokens: number.format(row.total_tokens || 0), cost: moneyText(row.estimated_cost_usd), credits: usageCreditValue(row) === null ? t('credit.no_rate') : `${credits(usageCreditValue(row))} ${t('badge.credits')}`, cache: pct(row.cache_ratio) }))}</div>
