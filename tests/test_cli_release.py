@@ -364,6 +364,8 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
             str(tmp_path),
             "--json",
             "--enforce-thresholds",
+            "--threshold-scale",
+            "5",
         ],
         check=True,
         capture_output=True,
@@ -373,6 +375,7 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
     )
     payload = json.loads(result.stdout)
 
+    assert payload["threshold_scale"] == 5.0
     assert payload["benchmarks"][0]["rows"] == 100
     assert payload["benchmarks"][0]["filtered_rows"] <= 50
     assert "idx_usage_model_effort" in payload["benchmarks"][0]["query_plan"]
