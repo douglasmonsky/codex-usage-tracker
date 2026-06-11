@@ -412,6 +412,7 @@
   "table.more_efforts": "{effort} +{count} mức suy luận",
   "table.more_models": "{model} +{count} mô hình",
   "table.page_status": "{start}-{end} trên {total} {items} · trang {page}/{pages}",
+  "table.visible_status": "Showing {end} of {total} {items}",
   "table.rows": "dòng",
   "table.signals": "Tín hiệu",
   "table.source": "Nguồn",

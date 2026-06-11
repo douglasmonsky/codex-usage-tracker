@@ -412,6 +412,7 @@
   "table.more_efforts": "{effort} +{count} efforts",
   "table.more_models": "{model} +{count} models",
   "table.page_status": "{start}-{end} of {total} {items} · page {page}/{pages}",
+  "table.visible_status": "Showing {end} of {total} {items}",
   "table.rows": "rows",
   "table.signals": "Signals",
   "table.source": "Source",

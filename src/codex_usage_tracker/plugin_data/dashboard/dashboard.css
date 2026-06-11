@@ -423,6 +423,9 @@
       overflow: hidden;
       box-shadow: var(--shadow);
     }
+    .grid > section:not(.detail-section) {
+      overflow-x: auto;
+    }
     .detail-section {
       position: sticky;
       top: 14px;
@@ -436,7 +439,7 @@
       border-bottom: 1px solid var(--line);
       font-size: 15px;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; min-width: 1160px; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
     th { color: var(--muted); font-size: 12px; background: #fbfcfe; position: sticky; top: 0; }
     tr:hover { background: #eff6ff; }
@@ -603,40 +606,12 @@
       font-weight: 720;
     }
     .token-cell {
-      min-width: 128px;
+      min-width: 78px;
     }
-    .token-mix {
-      display: inline-grid;
-      justify-items: end;
-      gap: 3px;
-      max-width: 100%;
-    }
-    .token-total {
+    .token-number {
+      display: inline-block;
       font-variant-numeric: tabular-nums;
-    }
-    .token-parts {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 3px;
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 720;
-      line-height: 1.2;
-    }
-    .token-part {
-      display: inline-flex;
-      gap: 3px;
-      align-items: center;
-      padding: 1px 4px;
-      border-radius: 5px;
-      background: #eef3fb;
       white-space: nowrap;
-      font-variant-numeric: tabular-nums;
-    }
-    .token-part span {
-      color: var(--blue);
-      font-weight: 820;
     }
     .time-cell {
       display: grid;
@@ -700,6 +675,19 @@
       font-size: 10px;
       line-height: 1.1;
     }
+    .signal-puck {
+      justify-content: center;
+      min-width: 24px;
+      max-width: 48px;
+      padding: 1px 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0;
+    }
+    .signal-puck.more {
+      background: #e0ecff;
+      color: var(--blue);
+    }
     .compact-flags {
       justify-content: flex-start;
     }
@@ -758,6 +746,7 @@
     }
     .thread-call-table {
       width: 100%;
+      min-width: 980px;
       border-collapse: collapse;
       font-size: 12px;
     }
@@ -769,13 +758,21 @@
       padding: 8px 10px;
     }
     .thread-call-table .token-cell {
-      min-width: 116px;
-    }
-    .thread-call-table .token-parts {
-      max-width: 128px;
+      min-width: 72px;
     }
     .thread-call-table tr:last-child td {
       border-bottom: 0;
+    }
+    .child-load-more {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
     }
     .empty-state {
       padding: 18px 16px;

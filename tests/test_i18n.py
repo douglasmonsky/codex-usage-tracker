@@ -360,14 +360,19 @@ def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> No
         "table.effort",
         "table.source",
         "table.tokens",
+        "metric.cached_input",
+        "metric.uncached_input",
+        "metric.output_tokens",
         "table.cost",
         "table.cache",
         "table.signals",
     ]:
         assert label in render_thread_calls
     assert "row.cache_ratio" in render_thread_calls
-    assert "flags.slice(0, 3)" in render_thread_calls
-    assert "translateEfficiencyFlag(row, flag, index)" in render_thread_calls
+    assert "cachedTokenCell(row)" in render_thread_calls
+    assert "uncachedTokenCell(row)" in render_thread_calls
+    assert "outputTokenCell(row)" in render_thread_calls
+    assert "renderSignalPucks(row, flags, 3" in render_thread_calls
     assert "</tr>" in render_thread_calls
 
 

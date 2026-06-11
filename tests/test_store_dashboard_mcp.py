@@ -419,9 +419,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "attentionScore" in dashboard_js
     assert "thread-row" in dashboard_surface
     assert "thread-call-table" in dashboard_surface
-    assert "tokenMixCell" in dashboard_js
-    assert "token-mix" in dashboard_js
-    assert "token-part" in dashboard_css
+    assert "cachedTokenCell" in dashboard_js
+    assert "uncachedTokenCell" in dashboard_js
+    assert "outputTokenCell" in dashboard_js
+    assert "signalPuckAbbreviation" in dashboard_js
+    assert "signal-puck" in dashboard_css
     assert "data-thread-call-sort-key" in dashboard_js
     assert "threadCallSortKey = 'time'" in dashboard_js
     assert "threadCallSortDirection = 'desc'" in dashboard_js
@@ -490,8 +492,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "live.refreshing_index" in dashboard_js
     assert "loadLimit" in dashboard
     assert "pager" in dashboard
-    assert "pagerEl.hidden = !shouldShowPager" in dashboard_js
-    assert "updatePager(page, 'table.threads')" in dashboard_js
+    assert "loadMoreRows" in dashboard
+    assert "visibleSlice(rows)" in dashboard_js
+    assert "updateLoadMoreControl(page, 'table.threads')" in dashboard_js
+    assert "data-thread-load-more" in dashboard_js
     assert "All calls" in dashboard
     assert "/api/usage" in dashboard_js
     assert "detail-card primary" in dashboard_js

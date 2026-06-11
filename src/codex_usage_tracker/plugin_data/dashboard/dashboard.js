@@ -84,6 +84,7 @@
       'table.signals': 'Signals',
       'table.source': 'Source',
       'table.last_call': 'Last Call',
+      'table.visible_status': 'Showing {end} of {total} {items}',
       'language.label': 'Language',
     };
     let availableLanguages = Array.isArray(initialPayload.available_languages) && initialPayload.available_languages.length
@@ -233,8 +234,7 @@
     const copyViewLinkEl = document.getElementById('copyViewLink');
     const exportVisibleEl = document.getElementById('exportVisible');
     const actionStatusEl = document.getElementById('actionStatus');
-    const prevPageEl = document.getElementById('prevPage');
-    const nextPageEl = document.getElementById('nextPage');
+    const loadMoreRowsEl = document.getElementById('loadMoreRows');
     const pageStatusEl = document.getElementById('pageStatus');
     const pagerEl = document.getElementById('pager');
     const toTopEl = document.getElementById('toTop');
@@ -248,6 +248,7 @@
     const needsInitialHistoryRefresh = liveRefreshSupported && includeArchived !== initialPayloadIncludeArchived;
     const liveRefreshIntervalMs = 10000;
     const pageSize = 500;
+    const threadCallPageSize = 100;
     const datePresetLabels = {
       all: 'option.all_time',
       today: 'option.today',
@@ -268,6 +269,7 @@
     let refreshInFlight = false;
     let autoRefreshTimer = null;
     let currentPage = 1;
+    const threadCallVisiblePages = new Map();
     let initialThreadExpansionApplied = false;
     let initialDetailApplied = false;
     const presetDefinitions = [
@@ -380,6 +382,10 @@
         if (group) showThreadDetail(group);
       }
     }
+    function resetVisibleRows() {
+      currentPage = 1;
+      threadCallVisiblePages.clear();
+    }
     function directional(compareResult) {
       return sortDirection === 'asc' ? compareResult : -compareResult;
     }
@@ -387,7 +393,7 @@
       sortKey = key;
       sortDirection = direction || defaultSortDirection(key);
       sortEl.value = key;
-      currentPage = 1;
+      resetVisibleRows();
       render();
     }
     function handleHeaderSort(key) {
@@ -398,7 +404,7 @@
         sortDirection = defaultSortDirection(key);
       }
       sortEl.value = key;
-      currentPage = 1;
+      resetVisibleRows();
       render();
     }
     function updateSortControls() {
@@ -424,6 +430,9 @@
         cost: t('table.cost'),
         effort: t('table.effort'),
         model: t('table.model'),
+        cached: t('metric.cached_input'),
+        uncached: t('metric.uncached_input'),
+        output: t('metric.output_tokens'),
         signals: t('table.signals'),
         thread: t('table.thread'),
         time: t('table.time'),
@@ -511,32 +520,82 @@
       const usage = creditValue === null || creditValue === undefined ? t('credit.no_rate') : `${credits(creditValue)} cr`;
       return `<span class="metric-stack"><span>${escapeHtml(costText)}</span><span class="metric-sub">${escapeHtml(usage)}</span></span>`;
     }
-    function tokenMixCell(row) {
-      const cached = Number(row.cached_input_tokens || 0);
-      const uncached = Number(row.uncached_input_tokens || Math.max(Number(row.input_tokens || 0) - cached, 0));
-      const output = Number(row.output_tokens || 0);
-      const reasoning = Number(row.reasoning_output_tokens || 0);
+    function cachedInputTokens(row) {
+      return Number(row.cached_input_tokens || 0);
+    }
+    function uncachedInputTokens(row) {
+      return Number(row.uncached_input_tokens || Math.max(Number(row.input_tokens || 0) - cachedInputTokens(row), 0));
+    }
+    function outputTokens(row) {
+      return Number(row.output_tokens || 0);
+    }
+    function tokenNumberCell(value, label) {
+      return `<span class="token-number" title="${escapeHtml(`${label}: ${number.format(value)}`)}">${escapeHtml(number.format(value))}</span>`;
+    }
+    function totalTokenCell(row) {
       const total = Number(row.total_tokens || 0);
       const title = [
-        `${t('metric.total_tokens')} ${number.format(total)}`,
-        `${t('metric.cached_input')} ${number.format(cached)}`,
-        `${t('metric.uncached_input')} ${number.format(uncached)}`,
-        `${t('metric.output_tokens')} ${number.format(output)}`,
-        reasoning ? `${t('metric.reasoning_output')} ${number.format(reasoning)}` : '',
+        `${t('metric.total_tokens')}: ${number.format(total)}`,
+        `${t('metric.cached_input')}: ${number.format(cachedInputTokens(row))}`,
+        `${t('metric.uncached_input')}: ${number.format(uncachedInputTokens(row))}`,
+        `${t('metric.output_tokens')}: ${number.format(outputTokens(row))}`,
+        Number(row.reasoning_output_tokens || 0) ? `${t('metric.reasoning_output')}: ${number.format(row.reasoning_output_tokens || 0)}` : '',
       ].filter(Boolean).join(' - ');
-      const parts = [
-        ['C', cached, t('metric.cached_input')],
-        ['U', uncached, t('metric.uncached_input')],
-        ['O', output, t('metric.output_tokens')],
-      ];
-      return `
-        <span class="token-mix" title="${escapeHtml(title)}">
-          <span class="token-total">${escapeHtml(number.format(total))}</span>
-          <span class="token-parts">
-            ${parts.map(([label, value, fullLabel]) => `<span class="token-part" title="${escapeHtml(fullLabel)}"><span>${escapeHtml(label)}</span>${escapeHtml(number.format(value))}</span>`).join('')}
-          </span>
-        </span>
-      `;
+      return `<span class="token-number token-total" title="${escapeHtml(title)}">${escapeHtml(number.format(total))}</span>`;
+    }
+    function cachedTokenCell(row) {
+      return tokenNumberCell(cachedInputTokens(row), t('metric.cached_input'));
+    }
+    function uncachedTokenCell(row) {
+      return tokenNumberCell(uncachedInputTokens(row), t('metric.uncached_input'));
+    }
+    function outputTokenCell(row) {
+      return tokenNumberCell(outputTokens(row), t('metric.output_tokens'));
+    }
+    function signalPuckLabel(row, flag, index) {
+      return translateEfficiencyFlag(row, flag, index);
+    }
+    function signalPuckAbbreviation(flag, label) {
+      const byFlag = {
+        'context-bloat': 'CTX',
+        'elevated-context-use': 'CTX',
+        'elevated-context': 'CTX',
+        'expensive-low-output-call': 'LO',
+        'estimated-pricing': 'EST',
+        'high-context-use': 'CTX',
+        'high-estimated-cost': '$',
+        'high-cost': '$',
+        'high-reasoning-share': 'RSN',
+        'large-thread': 'BIG',
+        'low-cache-reuse': 'CACHE',
+        'low-cache': 'CACHE',
+        'low-output': 'LO',
+        'pricing-gap': 'PRICE',
+        'reasoning-spike': 'RSN',
+        'subagent-attribution': 'SUB',
+      };
+      const normalized = String(flag || '').toLowerCase().replace(/[_\s]+/g, '-');
+      if (byFlag[normalized]) return byFlag[normalized];
+      const words = String(label || flag || '')
+        .replace(/[^a-zA-Z0-9 ]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean);
+      if (!words.length) return '?';
+      if (words.length === 1) return words[0].slice(0, 4).toUpperCase();
+      return words.slice(0, 3).map(word => word[0]).join('').toUpperCase();
+    }
+    function renderSignalPucks(row, flags, max = 3, emptyLabel = '') {
+      if (!flags.length) return emptyLabel ? `<span class="muted">${escapeHtml(emptyLabel)}</span>` : '';
+      const visible = flags.slice(0, max);
+      const pucks = visible.map((flag, index) => {
+        const label = signalPuckLabel(row, flag, index);
+        return `<span class="flag signal-puck" title="${escapeHtml(label)}">${escapeHtml(signalPuckAbbreviation(flag, label))}</span>`;
+      });
+      if (flags.length > max) {
+        const remaining = flags.slice(max).map((flag, offset) => signalPuckLabel(row, flag, max + offset)).join(' - ');
+        pucks.push(`<span class="flag signal-puck more" title="${escapeHtml(remaining)}">+${escapeHtml(flags.length - max)}</span>`);
+      }
+      return pucks.join('');
     }
     function allowanceWindowText(totalCredits, mode = 'impact') {
       if (!allowanceWindows.length) return '';
@@ -952,7 +1011,7 @@
       sortKey = preset.sort;
       sortDirection = preset.direction || defaultSortDirection(preset.sort);
       sortEl.value = preset.sort;
-      currentPage = 1;
+      resetVisibleRows();
       render();
     }
     function clearPreset() {
@@ -961,7 +1020,7 @@
       sortKey = 'attention';
       sortDirection = defaultSortDirection(sortKey);
       sortEl.value = sortKey;
-      currentPage = 1;
+      resetVisibleRows();
       render();
     }
     function threshold(key, fallback) {
@@ -1018,6 +1077,9 @@
       if (key === 'cost') return Number(row.estimated_cost_usd || 0);
       if (key === 'effort') return textValue(row.effort);
       if (key === 'model') return textValue(row.model);
+      if (key === 'cached') return cachedInputTokens(row);
+      if (key === 'uncached') return uncachedInputTokens(row);
+      if (key === 'output') return outputTokens(row);
       if (key === 'signals') return Array.isArray(row.efficiency_flags) ? row.efficiency_flags.length : 0;
       if (key === 'thread') return textValue(rowThreadLabel(row));
       if (key === 'time') return String(row.event_timestamp || '');
@@ -1036,6 +1098,9 @@
       if (key === 'cost') return Number(row.estimated_cost_usd || 0);
       if (key === 'effort') return textValue(row.effort);
       if (key === 'model') return textValue(row.model);
+      if (key === 'cached') return cachedInputTokens(row);
+      if (key === 'uncached') return uncachedInputTokens(row);
+      if (key === 'output') return outputTokens(row);
       if (key === 'signals') return signalCount(row);
       if (key === 'source') return textValue(sourceLabelText(row));
       if (key === 'time') return String(row.event_timestamp || '');
@@ -1060,7 +1125,7 @@
         threadCallSortDirection = threadCallSortDirection === 'asc' ? 'desc' : 'asc';
       } else {
         threadCallSortKey = key;
-        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cost' || key === 'cache' || key === 'signals' ? 'desc' : 'asc';
+        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'cost' || key === 'cache' || key === 'signals' ? 'desc' : 'asc';
       }
       render();
     }
@@ -1094,6 +1159,9 @@
       if (key === 'cost') return group.estimatedCost;
       if (key === 'effort') return textValue(group.effortSummary);
       if (key === 'model') return textValue(group.modelSummary);
+      if (key === 'cached') return group.cachedTokens;
+      if (key === 'uncached') return group.uncachedTokens;
+      if (key === 'output') return group.outputTokens;
       if (key === 'signals') return group.signalCount;
       if (key === 'thread') return textValue(group.label);
       if (key === 'time') return String(group.latestActivity || '');
@@ -1284,6 +1352,8 @@
         const totalTokens = calls.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
         const inputTokens = calls.reduce((sum, row) => sum + Number(row.input_tokens || 0), 0);
         const cachedTokens = calls.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0);
+        const uncachedTokens = calls.reduce((sum, row) => sum + uncachedInputTokens(row), 0);
+        const outputTokensTotal = calls.reduce((sum, row) => sum + outputTokens(row), 0);
         const estimatedCost = calls.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
         const usageCredits = sumUsageCredits(calls);
         const signalCount = calls.reduce((sum, row) => sum + (Array.isArray(row.efficiency_flags) ? row.efficiency_flags.length : 0), 0);
@@ -1306,6 +1376,9 @@
           modelSummary,
           effortSummary,
           totalTokens,
+          cachedTokens,
+          uncachedTokens,
+          outputTokens: outputTokensTotal,
           estimatedCost,
           usageCredits,
           cacheRatio: inputTokens ? cachedTokens / inputTokens : 0,
@@ -1326,35 +1399,29 @@
       }
       return arrangeThreadGroups(groups);
     }
-    function paginate(items) {
+    function visibleSlice(items) {
       const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
       currentPage = Math.min(Math.max(currentPage, 1), pageCount);
-      const start = (currentPage - 1) * pageSize;
-      const end = Math.min(start + pageSize, items.length);
+      const end = Math.min(currentPage * pageSize, items.length);
       return {
-        items: items.slice(start, end),
-        start,
+        items: items.slice(0, end),
+        start: 0,
         end,
         total: items.length,
         pageCount,
       };
     }
-    function updatePager(page, itemLabel = 'table.rows') {
-      const shouldShowPager = page.pageCount > 1;
-      pagerEl.hidden = !shouldShowPager;
-      prevPageEl.disabled = currentPage <= 1;
-      nextPageEl.disabled = currentPage >= page.pageCount;
+    function updateLoadMoreControl(page, itemLabel = 'table.rows') {
+      pagerEl.hidden = !page.total;
+      loadMoreRowsEl.hidden = page.end >= page.total;
       if (!page.total) {
         pageStatusEl.textContent = t('state.no_rows');
         return;
       }
-      pageStatusEl.textContent = tf('table.page_status', {
-        start: number.format(page.start + 1),
+      pageStatusEl.textContent = tf('table.visible_status', {
         end: number.format(page.end),
         total: number.format(page.total),
         items: t(itemLabel),
-        page: number.format(currentPage),
-        pages: number.format(page.pageCount),
       });
     }
     function buildInsights(rows) {
@@ -1484,7 +1551,7 @@
             sortDirection = defaultSortDirection(insight.sort);
             sortEl.value = sortKey;
           }
-          currentPage = 1;
+          resetVisibleRows();
           render();
         });
       });
@@ -1540,8 +1607,8 @@
       syncUrlState();
     }
     function renderCalls(rows) {
-      const page = paginate(rows);
-      updatePager(page, 'table.calls');
+      const page = visibleSlice(rows);
+      updateLoadMoreControl(page, 'table.calls');
       tableTitleEl.textContent = t('dashboard.model_calls');
       const preset = activePresetDefinition();
       const prefix = preset ? `${t(preset.captionKey)}. ` : '';
@@ -1558,10 +1625,13 @@
           <td title="${escapeHtml(short(row.session_id))}">${escapeHtml(truncate(rowThreadLabel(row)))}</td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
           <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
-          <td class="num token-cell">${tokenMixCell(row)}</td>
+          <td class="num token-cell">${totalTokenCell(row)}</td>
+          <td class="num token-cell">${cachedTokenCell(row)}</td>
+          <td class="num token-cell">${uncachedTokenCell(row)}</td>
+          <td class="num token-cell">${outputTokenCell(row)}</td>
           <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
           <td class="num">${pct(row.cache_ratio)}</td>
-          <td><div class="flags">${flags.slice(0, 2).map((flag, index) => `<span class="flag">${escapeHtml(translateEfficiencyFlag(row, flag, index))}</span>`).join('')}</div></td>
+          <td><div class="flags">${renderSignalPucks(row, flags, 3)}</div></td>
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
         tr.addEventListener('click', () => selectRow(row));
@@ -1585,7 +1655,7 @@
         showDetail(page.items[0]);
       }
       if (!rows.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="8">${escapeHtml(t('state.no_calls'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="11">${escapeHtml(t('state.no_calls'))}</td></tr>`;
       }
     }
     function renderThreads(rows, mode = 'threads') {
@@ -1599,8 +1669,8 @@
         }
         initialThreadExpansionApplied = true;
       }
-      const page = paginate(groups);
-      updatePager(page, 'table.threads');
+      const page = visibleSlice(groups);
+      updateLoadMoreControl(page, 'table.threads');
       tableTitleEl.textContent = mode === 'insights' ? t('dashboard.top_threads_by_attention') : t('dashboard.view.threads');
       const preset = activePresetDefinition();
       const prefix = preset ? `${t(preset.captionKey)}. ` : '';
@@ -1635,7 +1705,10 @@
           </td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(group.modelSummary))}">${escapeHtml(short(group.modelSummary))}</span></td>
           <td>${escapeHtml(truncate(group.effortSummary, 28))}</td>
-          <td class="num">${number.format(group.totalTokens)}</td>
+          <td class="num token-cell">${tokenNumberCell(group.totalTokens, t('metric.total_tokens'))}</td>
+          <td class="num token-cell">${tokenNumberCell(group.cachedTokens, t('metric.cached_input'))}</td>
+          <td class="num token-cell">${tokenNumberCell(group.uncachedTokens, t('metric.uncached_input'))}</td>
+          <td class="num token-cell">${tokenNumberCell(group.outputTokens, t('metric.output_tokens'))}</td>
           <td class="num">${costUsageCell(pricingConfigured ? moneyText(group.estimatedCost) : t('state.not_configured'), group.usageCredits)}</td>
           <td class="num">${pct(group.cacheRatio)}</td>
           <td class="num">${number.format(group.signalCount)}</td>
@@ -1662,7 +1735,7 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="8">${escapeHtml(t('state.no_threads'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="11">${escapeHtml(t('state.no_threads'))}</td></tr>`;
       }
       if (!initialDetailApplied && selectedThreadKey) {
         const selected = groups.find(group => group.key === selectedThreadKey);
@@ -1679,7 +1752,10 @@
     function renderThreadCalls(group) {
       const tr = document.createElement('tr');
       tr.className = 'thread-child-row';
-      const calls = sortedThreadCalls(group.calls).map(row => {
+      const sortedCalls = sortedThreadCalls(group.calls);
+      const visiblePages = Math.max(1, threadCallVisiblePages.get(group.key) || 1);
+      const visibleCount = Math.min(sortedCalls.length, visiblePages * threadCallPageSize);
+      const calls = sortedCalls.slice(0, visibleCount).map(row => {
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         return `
           <tr class="thread-call-row" tabindex="0" role="button" data-record-id="${escapeHtml(row.record_id || '')}">
@@ -1687,15 +1763,29 @@
             <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
             <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
             <td>${escapeHtml(sourceLabelText(row))}</td>
-            <td class="num token-cell">${tokenMixCell(row)}</td>
+            <td class="num token-cell">${totalTokenCell(row)}</td>
+            <td class="num token-cell">${cachedTokenCell(row)}</td>
+            <td class="num token-cell">${uncachedTokenCell(row)}</td>
+            <td class="num token-cell">${outputTokenCell(row)}</td>
             <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
             <td class="num">${pct(row.cache_ratio)}</td>
-            <td><div class="flags compact-flags">${flags.slice(0, 3).map((flag, index) => `<span class="flag">${escapeHtml(translateEfficiencyFlag(row, flag, index))}</span>`).join('') || `<span class="muted">${escapeHtml(t('state.none'))}</span>`}</div></td>
+            <td><div class="flags compact-flags">${renderSignalPucks(row, flags, 3, t('state.none'))}</div></td>
           </tr>
         `;
       }).join('');
+      const canLoadMore = visibleCount < sortedCalls.length;
+      const childLoadMore = canLoadMore
+        ? `
+          <div class="child-load-more">
+            <span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span>
+            <button class="pager-button" type="button" data-thread-load-more="${escapeHtml(group.key)}">${escapeHtml(t('button.load_more'))}</button>
+          </div>
+        `
+        : sortedCalls.length
+          ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span></div>`
+          : '';
       tr.innerHTML = `
-        <td class="child-cell" colspan="8">
+        <td class="child-cell" colspan="11">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
             <thead><tr>
               ${threadCallHeader('time', t('table.time'))}
@@ -1703,12 +1793,16 @@
               ${threadCallHeader('effort', t('table.effort'))}
               ${threadCallHeader('source', t('table.source'))}
               ${threadCallHeader('total', t('table.tokens'), true)}
+              ${threadCallHeader('cached', t('metric.cached_input'), true)}
+              ${threadCallHeader('uncached', t('metric.uncached_input'), true)}
+              ${threadCallHeader('output', t('metric.output_tokens'), true)}
               ${threadCallHeader('cost', t('table.cost'), true)}
               ${threadCallHeader('cache', t('table.cache'), true)}
               ${threadCallHeader('signals', t('table.signals'))}
             </tr></thead>
             <tbody>${calls}</tbody>
           </table>
+          ${childLoadMore}
         </td>
       `;
       return tr;
@@ -2046,7 +2140,7 @@
     }
     function setView(view) {
       activeView = view;
-      currentPage = 1;
+      resetVisibleRows();
       render();
     }
     function renderLiveStatus() {
@@ -2173,7 +2267,7 @@
       languageSelectEl.addEventListener('change', () => setLanguage(languageSelectEl.value));
     }
     loadLimitEl.addEventListener('change', () => {
-      currentPage = 1;
+      resetVisibleRows();
       if (liveRefreshSupported) {
         refreshDashboardData(true);
       } else {
@@ -2182,7 +2276,7 @@
     });
     historyScopeEl.addEventListener('change', () => {
       includeArchived = historyScopeEl.value === 'all';
-      currentPage = 1;
+      resetVisibleRows();
       updateHistoryScopeControl();
       syncUrlState();
       if (liveRefreshSupported) {
@@ -2214,11 +2308,7 @@
     });
     window.addEventListener('scroll', updateToTopVisibility, { passive: true });
     toTopEl.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-    prevPageEl.addEventListener('click', () => {
-      currentPage = Math.max(1, currentPage - 1);
-      render();
-    });
-    nextPageEl.addEventListener('click', () => {
+    loadMoreRowsEl.addEventListener('click', () => {
       currentPage += 1;
       render();
     });
@@ -2239,6 +2329,15 @@
         handleThreadCallHeaderSort(sortButton.dataset.threadCallSortKey);
         return;
       }
+      const loadMoreButton = event.target.closest('[data-thread-load-more]');
+      if (loadMoreButton && rowsEl.contains(loadMoreButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const key = loadMoreButton.dataset.threadLoadMore;
+        threadCallVisiblePages.set(key, Math.max(1, threadCallVisiblePages.get(key) || 1) + 1);
+        render();
+        return;
+      }
       const callRow = event.target.closest('.thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
       const row = rowByRecordId.get(callRow.dataset.recordId);
@@ -2254,17 +2353,17 @@
     });
     datePresetEl.addEventListener('input', () => {
       syncDatePresetInputs();
-      currentPage = 1;
+      resetVisibleRows();
       render();
     });
     [dateStartEl, dateEndEl].forEach(el => el.addEventListener('input', () => {
       if (datePresetEl.value !== 'custom') datePresetEl.value = 'custom';
       el.value = cleanDateInput(el.value) || el.value;
-      currentPage = 1;
+      resetVisibleRows();
       render();
     }));
     [searchEl, modelEl, effortEl, pricingStatusEl].forEach(el => el.addEventListener('input', () => {
-      currentPage = 1;
+      resetVisibleRows();
       render();
     }));
     sortEl.addEventListener('input', () => setSort(sortEl.value, defaultSortDirection(sortEl.value)));
