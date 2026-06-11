@@ -562,12 +562,13 @@
       font-weight: 720;
     }
     .pager {
-      grid-row: 1;
-      grid-column: 3;
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: center;
       gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      background: #fbfcfe;
       color: var(--muted);
       font-size: 12px;
       font-weight: 680;
@@ -604,6 +605,12 @@
       color: var(--muted);
       font-size: 11px;
       font-weight: 720;
+    }
+    .cost-cell,
+    .effort-cell {
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
     }
     .token-cell {
       min-width: 78px;
@@ -691,6 +698,22 @@
     .compact-flags {
       justify-content: flex-start;
     }
+    .focus-target {
+      position: relative;
+      outline: 2px solid var(--blue);
+      outline-offset: -2px;
+      background: #dbeafe !important;
+      transition: background 0.18s ease;
+    }
+    .selected-row {
+      background: #eff6ff;
+      box-shadow: inset 3px 0 0 var(--blue);
+    }
+    .thread-call-row.selected-row td,
+    .call-row.selected-row td,
+    .thread-row.selected-row td {
+      background: #eff6ff;
+    }
     .thread-row {
       cursor: pointer;
     }
@@ -773,6 +796,22 @@
       color: var(--muted);
       font-size: 12px;
       font-weight: 720;
+    }
+    .fast-tooltip {
+      position: fixed;
+      z-index: 9999;
+      max-width: min(360px, calc(100vw - 24px));
+      padding: 6px 8px;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #f8fafc;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.22);
+      font-size: 11px;
+      font-weight: 680;
+      line-height: 1.35;
+      pointer-events: none;
+      white-space: pre-line;
     }
     .empty-state {
       padding: 18px 16px;
@@ -1046,9 +1085,10 @@
       .detail-section { position: static; max-height: none; }
       .detail { max-height: none; }
       .table-tools { align-items: stretch; grid-template-columns: 1fr; }
-      .segmented, .table-actions, .pager, .table-caption { grid-row: auto; grid-column: auto; }
+      .segmented, .table-actions, .table-caption { grid-row: auto; grid-column: auto; }
       .segmented, .segmented button { width: 100%; }
-      .pager, .load-control, .language-control, .table-actions { justify-content: space-between; width: 100%; }
+      .load-control, .language-control, .table-actions { justify-content: space-between; width: 100%; }
+      .pager { width: auto; }
       .action-status { min-width: 0; }
       .preset-card { grid-template-columns: 1fr; }
     }

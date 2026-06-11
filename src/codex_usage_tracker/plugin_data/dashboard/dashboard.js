@@ -79,6 +79,9 @@
       'table.model': 'Model',
       'table.effort': 'Effort',
       'table.tokens': 'Tokens',
+      'table.cached': 'Cached',
+      'table.uncached': 'Uncached',
+      'table.output': 'Output',
       'table.cost': 'Cost',
       'table.cache': 'Cache',
       'table.signals': 'Signals',
@@ -270,6 +273,10 @@
     let autoRefreshTimer = null;
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
+    let pendingFocusTarget = null;
+    let fastTooltipEl = null;
+    let fastTooltipTarget = null;
+    let fastTooltipTimer = null;
     let initialThreadExpansionApplied = false;
     let initialDetailApplied = false;
     const presetDefinitions = [
@@ -350,7 +357,7 @@
         element.setAttribute('placeholder', t(element.dataset.i18nPlaceholder));
       });
       document.querySelectorAll('[data-i18n-title]').forEach(element => {
-        element.setAttribute('title', t(element.dataset.i18nTitle));
+        setFastTooltip(element, t(element.dataset.i18nTitle));
       });
       document.querySelectorAll('[data-i18n-aria-label]').forEach(element => {
         element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
@@ -385,6 +392,49 @@
     function resetVisibleRows() {
       currentPage = 1;
       threadCallVisiblePages.clear();
+    }
+    function queueFocusTarget(target) {
+      if (!target) return;
+      pendingFocusTarget = target;
+      if (target.threadKey) {
+        selectedThreadKey = target.threadKey;
+        selectedRecordId = '';
+        if (target.expandThread) expandedThreads.add(target.threadKey);
+      }
+      if (target.recordId) {
+        selectedRecordId = target.recordId;
+        selectedThreadKey = '';
+      }
+    }
+    function ensurePendingFocusVisibleInRows(rows) {
+      if (!pendingFocusTarget || !pendingFocusTarget.recordId) return;
+      const index = rows.findIndex(row => row.record_id === pendingFocusTarget.recordId);
+      if (index >= 0) currentPage = Math.max(currentPage, Math.ceil((index + 1) / pageSize));
+    }
+    function ensurePendingFocusVisibleInGroups(groups) {
+      if (!pendingFocusTarget || !pendingFocusTarget.threadKey) return;
+      const index = groups.findIndex(group => group.key === pendingFocusTarget.threadKey);
+      if (index >= 0) currentPage = Math.max(currentPage, Math.ceil((index + 1) / pageSize));
+    }
+    function focusPendingTarget() {
+      if (!pendingFocusTarget) return;
+      const target = pendingFocusTarget;
+      const selector = target.threadKey ? '.thread-row' : '.call-row, .thread-call-row';
+      const element = [...rowsEl.querySelectorAll(selector)].find(row => (
+        target.threadKey
+          ? row.dataset.threadKey === target.threadKey
+          : row.dataset.recordId === target.recordId
+      ));
+      if (!element) return;
+      pendingFocusTarget = null;
+      element.scrollIntoView({ block: 'center', behavior: 'auto' });
+      element.focus({ preventScroll: true });
+      element.classList.add('focus-target');
+      window.setTimeout(() => element.classList.remove('focus-target'), 2600);
+    }
+    function scheduleFocusPendingTarget() {
+      if (!pendingFocusTarget) return;
+      window.requestAnimationFrame(focusPendingTarget);
     }
     function directional(compareResult) {
       return sortDirection === 'asc' ? compareResult : -compareResult;
@@ -430,9 +480,9 @@
         cost: t('table.cost'),
         effort: t('table.effort'),
         model: t('table.model'),
-        cached: t('metric.cached_input'),
-        uncached: t('metric.uncached_input'),
-        output: t('metric.output_tokens'),
+        cached: t('table.cached'),
+        uncached: t('table.uncached'),
+        output: t('table.output'),
         signals: t('table.signals'),
         thread: t('table.thread'),
         time: t('table.time'),
@@ -468,8 +518,8 @@
     function updateHistoryScopeControl() {
       historyScopeEl.value = includeArchived ? 'all' : 'active';
       const detail = historyRowsDescription();
-      historyScopeEl.title = detail;
-      historyScopeEl.parentElement.title = tf('history.archived_scan_hint', { detail });
+      setFastTooltip(historyScopeEl, detail);
+      setFastTooltip(historyScopeEl.parentElement, tf('history.archived_scan_hint', { detail }));
     }
     function updateLoadLimitControl() {
       const value = limitValue(loadedLimit);
@@ -516,9 +566,90 @@
         ? t('credit.no_mapped_rate')
         : tf('credit.with_status', { value: credits(value), status: usageCreditStatusLabel(row) });
     }
+    function tooltipAttributes(text) {
+      const safe = escapeHtml(text || '');
+      return `title="${safe}" data-fast-tooltip data-tooltip="${safe}"`;
+    }
+    function setFastTooltip(element, text) {
+      if (!element) return;
+      const value = text || '';
+      if (!value) {
+        element.removeAttribute('title');
+        element.removeAttribute('data-tooltip');
+        element.removeAttribute('data-fast-tooltip');
+        return;
+      }
+      element.setAttribute('title', value);
+      element.dataset.tooltip = value;
+      element.dataset.fastTooltip = '';
+    }
+    function ensureFastTooltipElement() {
+      if (fastTooltipEl) return fastTooltipEl;
+      fastTooltipEl = document.createElement('div');
+      fastTooltipEl.className = 'fast-tooltip';
+      fastTooltipEl.hidden = true;
+      document.body.appendChild(fastTooltipEl);
+      return fastTooltipEl;
+    }
+    function restoreNativeTooltip(target = fastTooltipTarget) {
+      if (!target || !target.dataset) return;
+      if (target.dataset.nativeTitle !== undefined) {
+        target.setAttribute('title', target.dataset.nativeTitle);
+        delete target.dataset.nativeTitle;
+      }
+    }
+    function hideFastTooltip() {
+      if (fastTooltipTimer) window.clearTimeout(fastTooltipTimer);
+      fastTooltipTimer = null;
+      restoreNativeTooltip();
+      if (fastTooltipEl) fastTooltipEl.hidden = true;
+      fastTooltipTarget = null;
+    }
+    function positionFastTooltip(target) {
+      if (!fastTooltipEl || fastTooltipEl.hidden) return;
+      const rect = target.getBoundingClientRect();
+      const gap = 8;
+      const width = fastTooltipEl.offsetWidth;
+      const height = fastTooltipEl.offsetHeight;
+      const left = clamp(rect.left + rect.width / 2 - width / 2, 8, window.innerWidth - width - 8);
+      const above = rect.top - height - gap;
+      const top = above >= 8 ? above : Math.min(rect.bottom + gap, window.innerHeight - height - 8);
+      fastTooltipEl.style.left = `${left}px`;
+      fastTooltipEl.style.top = `${Math.max(8, top)}px`;
+    }
+    function showFastTooltip(target) {
+      const text = target.dataset.tooltip || target.getAttribute('title') || '';
+      if (!text.trim()) {
+        hideFastTooltip();
+        return;
+      }
+      if (target.hasAttribute('title') && target.dataset.nativeTitle === undefined) {
+        target.dataset.nativeTitle = target.getAttribute('title') || '';
+        target.removeAttribute('title');
+      }
+      fastTooltipTarget = target;
+      const tooltip = ensureFastTooltipElement();
+      tooltip.textContent = text;
+      tooltip.hidden = false;
+      positionFastTooltip(target);
+    }
+    function scheduleFastTooltip(target) {
+      if (!target) return;
+      if (fastTooltipTimer) window.clearTimeout(fastTooltipTimer);
+      restoreNativeTooltip();
+      if (fastTooltipEl) fastTooltipEl.hidden = true;
+      fastTooltipTarget = target;
+      fastTooltipTimer = window.setTimeout(() => {
+        fastTooltipTimer = null;
+        showFastTooltip(target);
+      }, 70);
+    }
+    function closestFastTooltipTarget(eventTarget) {
+      return eventTarget && eventTarget.closest ? eventTarget.closest('[data-fast-tooltip]') : null;
+    }
     function costUsageCell(costText, creditValue) {
-      const usage = creditValue === null || creditValue === undefined ? t('credit.no_rate') : `${credits(creditValue)} cr`;
-      return `<span class="metric-stack"><span>${escapeHtml(costText)}</span><span class="metric-sub">${escapeHtml(usage)}</span></span>`;
+      const usage = creditValue === null || creditValue === undefined ? t('credit.no_rate') : credits(creditValue);
+      return `<span class="cost-cell" ${tooltipAttributes(`${t('metric.codex_credits')}: ${usage}`)}>${escapeHtml(costText)}</span>`;
     }
     function cachedInputTokens(row) {
       return Number(row.cached_input_tokens || 0);
@@ -530,7 +661,7 @@
       return Number(row.output_tokens || 0);
     }
     function tokenNumberCell(value, label) {
-      return `<span class="token-number" title="${escapeHtml(`${label}: ${number.format(value)}`)}">${escapeHtml(number.format(value))}</span>`;
+      return `<span class="token-number" ${tooltipAttributes(`${label}: ${number.format(value)}`)}>${escapeHtml(number.format(value))}</span>`;
     }
     function totalTokenCell(row) {
       const total = Number(row.total_tokens || 0);
@@ -541,7 +672,7 @@
         `${t('metric.output_tokens')}: ${number.format(outputTokens(row))}`,
         Number(row.reasoning_output_tokens || 0) ? `${t('metric.reasoning_output')}: ${number.format(row.reasoning_output_tokens || 0)}` : '',
       ].filter(Boolean).join(' - ');
-      return `<span class="token-number token-total" title="${escapeHtml(title)}">${escapeHtml(number.format(total))}</span>`;
+      return `<span class="token-number token-total" ${tooltipAttributes(title)}>${escapeHtml(number.format(total))}</span>`;
     }
     function cachedTokenCell(row) {
       return tokenNumberCell(cachedInputTokens(row), t('metric.cached_input'));
@@ -551,6 +682,13 @@
     }
     function outputTokenCell(row) {
       return tokenNumberCell(outputTokens(row), t('metric.output_tokens'));
+    }
+    function effortTooltipText(values) {
+      const unique = [...new Set(values.filter(Boolean).map(value => translateEffort(short(value))))].sort();
+      return unique.length ? unique.join(' - ') : t('state.unknown');
+    }
+    function effortCell(label, tooltip) {
+      return `<span class="effort-cell" ${tooltipAttributes(tooltip || label)}>${escapeHtml(label)}</span>`;
     }
     function signalPuckLabel(row, flag, index) {
       return translateEfficiencyFlag(row, flag, index);
@@ -589,11 +727,11 @@
       const visible = flags.slice(0, max);
       const pucks = visible.map((flag, index) => {
         const label = signalPuckLabel(row, flag, index);
-        return `<span class="flag signal-puck" title="${escapeHtml(label)}">${escapeHtml(signalPuckAbbreviation(flag, label))}</span>`;
+        return `<span class="flag signal-puck" ${tooltipAttributes(label)}>${escapeHtml(signalPuckAbbreviation(flag, label))}</span>`;
       });
       if (flags.length > max) {
         const remaining = flags.slice(max).map((flag, offset) => signalPuckLabel(row, flag, max + offset)).join(' - ');
-        pucks.push(`<span class="flag signal-puck more" title="${escapeHtml(remaining)}">+${escapeHtml(flags.length - max)}</span>`);
+        pucks.push(`<span class="flag signal-puck more" ${tooltipAttributes(remaining)}>+${escapeHtml(flags.length - max)}</span>`);
       }
       return pucks.join('');
     }
@@ -647,7 +785,7 @@
       const coverage = creditCoverageRatio(data);
       sourceEl.textContent = t('badge.credits');
       sourceEl.dataset.state = coverage > 0 ? 'ready' : 'missing';
-      sourceEl.title = [
+      setFastTooltip(sourceEl, [
         allowanceSource.url ? `Source: ${allowanceSource.url}` : '',
         allowanceSource.fetched_at ? `rate card snapshot ${allowanceSource.fetched_at}` : '',
         tf('allowance.credit_rates', { source: sourceName }),
@@ -656,7 +794,7 @@
         allowanceWindows.some(window => window.reset_at) ? tf('allowance.resets', { resets: allowanceWindows.map(window => window.reset_at ? `${short(window.label || window.key)} ${formatTimestamp(window.reset_at, window.reset_at)}` : '').filter(Boolean).join('; ') }) : '',
         allowanceError ? `${t('state.allowance_config_error')}: ${allowanceError}` : '',
         rateCardError ? tf('allowance.rate_card_error', { error: rateCardError }) : '',
-      ].filter(Boolean).join(' ');
+      ].filter(Boolean).join(' '));
     }
     function rebuildSelectOptions(select, values, label) {
       const previous = select.value;
@@ -722,13 +860,13 @@
         ].filter(Boolean);
         sourceEl.textContent = t('badge.costs');
         sourceEl.dataset.state = 'ready';
-        sourceEl.title = pricingSource.fetched_at
+        setFastTooltip(sourceEl, pricingSource.fetched_at
           ? tf('pricing.title_fetched', { parts: sourceParts.join(' · '), url: pricingSource.url, time: formatTimestampTitle(pricingSource.fetched_at), warning: pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : '' })
-          : tf('pricing.title', { parts: sourceParts.join(' · '), warning: pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : '' });
+          : tf('pricing.title', { parts: sourceParts.join(' · '), warning: pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : '' }));
       } else {
         sourceEl.textContent = pricingConfigured ? t('badge.costs') : t('badge.no_costs');
         sourceEl.dataset.state = pricingConfigured ? 'ready' : 'missing';
-        sourceEl.title = pricingConfigured ? (pricingSnapshotWarning || '') : t('pricing.configure_hint');
+        setFastTooltip(sourceEl, pricingConfigured ? (pricingSnapshotWarning || '') : t('pricing.configure_hint'));
       }
     }
     function updateParserDiagnosticsLine() {
@@ -737,21 +875,21 @@
       if (!entries.length) {
         sourceEl.hidden = true;
         sourceEl.textContent = '';
-        sourceEl.title = '';
+        setFastTooltip(sourceEl, '');
         return;
       }
       const total = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
       sourceEl.hidden = false;
       sourceEl.textContent = t('badge.parser_warnings');
       sourceEl.dataset.state = 'missing';
-      sourceEl.title = tf('parser.warnings_title', { count: number.format(total), entries: entries.map(([key, value]) => `${key}=${value}`).join(', ') });
+      setFastTooltip(sourceEl, tf('parser.warnings_title', { count: number.format(total), entries: entries.map(([key, value]) => `${key}=${value}`).join(', ') }));
     }
     function updatePrivacyModeLine() {
       const sourceEl = document.getElementById('privacyMode');
       const mode = projectMetadataPrivacy.mode || 'normal';
       sourceEl.textContent = mode === 'normal' ? t('badge.metadata_normal') : tf('badge.metadata_mode', { mode });
       sourceEl.dataset.state = mode === 'normal' ? 'ready' : 'missing';
-      sourceEl.title = mode === 'normal'
+      setFastTooltip(sourceEl, mode === 'normal'
         ? t('privacy.normal_title')
         : [
             tf('privacy.mode', { mode }),
@@ -762,7 +900,7 @@
             projectMetadataPrivacy.git_branch_hidden ? t('privacy.git_branch_hidden') : '',
             projectMetadataPrivacy.tags_hidden ? t('privacy.tags_hidden') : '',
             projectMetadataPrivacy.aliases_preserved ? t('privacy.aliases_preserved') : '',
-          ].filter(Boolean).join(' ');
+          ].filter(Boolean).join(' '));
     }
     function padDatePart(value) {
       return String(value).padStart(2, '0');
@@ -1002,7 +1140,7 @@
       const preset = activePresetDefinition();
       return preset ? preset.matches(row) : true;
     }
-    function applyPreset(key) {
+    function applyPreset(key, focusTarget = null) {
       const preset = presetDefinitions.find(candidate => candidate.key === key);
       if (!preset) return;
       activePreset = preset.key;
@@ -1012,6 +1150,7 @@
       sortDirection = preset.direction || defaultSortDirection(preset.sort);
       sortEl.value = preset.sort;
       resetVisibleRows();
+      queueFocusTarget(focusTarget);
       render();
     }
     function clearPreset() {
@@ -1195,7 +1334,7 @@
           size -= 0.5;
           pill.style.fontSize = `${size}px`;
         }
-        pill.title = pill.dataset.fullLabel || pill.textContent || '';
+        setFastTooltip(pill, pill.dataset.fullLabel || pill.textContent || '');
       });
     }
     function compactSummaryText(values, fallbackKey) {
@@ -1364,6 +1503,7 @@
         const attachedCount = calls.filter(row => rowAttachment(row).relation !== 'direct' && rowAttachment(row).relation !== 'session').length;
         const modelSummary = threadModelSummaryText(calls);
         const effortSummary = compactSummaryText(calls.map(row => row.effort), 'table.more_efforts');
+        const effortTooltip = effortTooltipText(calls.map(row => row.effort));
         const parentThreadLabel = dominantParentThread(calls, group.label);
         const lifecycle = threadLifecycle(calls);
         return {
@@ -1375,6 +1515,7 @@
           parentThreadLabel,
           modelSummary,
           effortSummary,
+          effortTooltip,
           totalTokens,
           cachedTokens,
           uncachedTokens,
@@ -1436,6 +1577,7 @@
           severity: severityForScore(topCostGroup.attentionScore),
           action: t('insight.open_thread_timeline'),
           preset: 'highest-cost',
+          target: { threadKey: topCostGroup.key, expandThread: true },
         });
       }
       const lowCacheLimit = threshold('low_cache_ratio', 0.3);
@@ -1449,6 +1591,7 @@
           severity: 'medium',
           action: t('insight.apply_cache_misses'),
           preset: 'cache-misses',
+          target: { recordId: lowest.record_id },
         });
       }
       const highContextLimit = threshold('high_context_percent', 0.6);
@@ -1462,11 +1605,13 @@
           severity: severityForScore(rowAttentionScore(highest)),
           action: t('insight.apply_context_bloat'),
           preset: 'context-bloat',
+          target: { recordId: highest.record_id },
         });
       }
       const usageCredits = sumUsageCredits(rows);
       if (usageCredits > 0) {
         const creditCoverage = creditCoverageRatio(rows);
+        const highestUsageRow = rows.filter(row => usageCreditValue(row) !== null).sort((a, b) => Number(usageCreditValue(b) || 0) - Number(usageCreditValue(a) || 0))[0];
         insights.push({
           title: t('insight.codex_allowance_usage'),
           value: `${credits(usageCredits)} ${t('badge.credits')}`,
@@ -1474,10 +1619,12 @@
           severity: severityForScore(clamp(usageCredits * 2.4, 0, 140)),
           action: t('insight.review_highest_credit'),
           preset: 'usage-credits',
+          target: highestUsageRow ? { recordId: highestUsageRow.record_id } : null,
         });
       }
       const unpricedTokens = rows.reduce((sum, row) => sum + (!row.pricing_model ? Number(row.total_tokens || 0) : 0), 0);
       if (unpricedTokens) {
+        const topUnpricedRow = rows.filter(row => !row.pricing_model).sort((a, b) => Number(b.total_tokens || 0) - Number(a.total_tokens || 0))[0];
         insights.push({
           title: t('insight.unpriced_usage'),
           value: number.format(unpricedTokens),
@@ -1485,10 +1632,12 @@
           severity: 'review',
           action: t('insight.review_pricing_gaps'),
           preset: 'pricing-gaps',
+          target: topUnpricedRow ? { recordId: topUnpricedRow.record_id } : null,
         });
       }
       const estimatedTokens = rows.reduce((sum, row) => sum + (row.pricing_estimated ? Number(row.total_tokens || 0) : 0), 0);
       if (estimatedTokens) {
+        const topEstimatedRow = rows.filter(row => row.pricing_estimated).sort((a, b) => Number(b.total_tokens || 0) - Number(a.total_tokens || 0))[0];
         insights.push({
           title: t('insight.estimated_pricing'),
           value: number.format(estimatedTokens),
@@ -1496,6 +1645,7 @@
           severity: 'review',
           action: t('insight.review_estimates'),
           preset: 'estimated-review',
+          target: topEstimatedRow ? { recordId: topEstimatedRow.record_id } : null,
         });
       }
       const reasoningRows = rows.filter(row => Number(row.reasoning_output_tokens || 0) > 0).sort((a, b) => Number(b.reasoning_output_tokens || 0) - Number(a.reasoning_output_tokens || 0));
@@ -1508,6 +1658,7 @@
           action: t('insight.inspect_selected_call'),
           view: 'calls',
           sort: 'signals',
+          target: { recordId: reasoningRows[0].record_id },
         });
       }
       return insights.slice(0, 6);
@@ -1542,7 +1693,7 @@
         const insight = insights[Number(button.dataset.insightIndex)];
         button.addEventListener('click', () => {
           if (insight.preset) {
-            applyPreset(insight.preset);
+            applyPreset(insight.preset, insight.target);
             return;
           }
           activeView = insight.view || 'calls';
@@ -1552,6 +1703,7 @@
             sortEl.value = sortKey;
           }
           resetVisibleRows();
+          queueFocusTarget(insight.target);
           render();
         });
       });
@@ -1591,7 +1743,7 @@
       document.getElementById('estimatedCost').textContent = pricingConfigured ? moneyText(estimatedCost) : t('state.not_configured');
       document.getElementById('usageCredits').textContent = credits(usageCredits);
       document.getElementById('allowanceImpact').textContent = allowanceImpactText(usageCredits);
-      document.getElementById('allowanceImpact').title = allowanceWindowText(usageCredits, 'remaining') || t('allowance.title_hint');
+      setFastTooltip(document.getElementById('allowanceImpact'), allowanceWindowText(usageCredits, 'remaining') || t('allowance.title_hint'));
       insightsViewEl.setAttribute('aria-pressed', activeView === 'insights' ? 'true' : 'false');
       callsViewEl.setAttribute('aria-pressed', activeView === 'calls' ? 'true' : 'false');
       threadsViewEl.setAttribute('aria-pressed', activeView === 'threads' ? 'true' : 'false');
@@ -1605,8 +1757,10 @@
       }
       fitModelPills();
       syncUrlState();
+      scheduleFocusPendingTarget();
     }
     function renderCalls(rows) {
+      ensurePendingFocusVisibleInRows(rows);
       const page = visibleSlice(rows);
       updateLoadMoreControl(page, 'table.calls');
       tableTitleEl.textContent = t('dashboard.model_calls');
@@ -1616,7 +1770,8 @@
       for (const row of page.items) {
         const tr = document.createElement('tr');
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
-        tr.className = 'call-row';
+        tr.className = `call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}`;
+        tr.dataset.recordId = row.record_id || '';
         tr.tabIndex = 0;
         tr.setAttribute('role', 'button');
         tr.setAttribute('aria-label', tf('aria.inspect_thread', { thread: rowThreadLabel(row) }));
@@ -1624,7 +1779,7 @@
           <td>${renderTimeCell(row.event_timestamp)}</td>
           <td title="${escapeHtml(short(row.session_id))}">${escapeHtml(truncate(rowThreadLabel(row)))}</td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
-          <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
+          <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
           <td class="num token-cell">${totalTokenCell(row)}</td>
           <td class="num token-cell">${cachedTokenCell(row)}</td>
           <td class="num token-cell">${uncachedTokenCell(row)}</td>
@@ -1660,6 +1815,7 @@
     }
     function renderThreads(rows, mode = 'threads') {
       const groups = groupThreads(rows);
+      ensurePendingFocusVisibleInGroups(groups);
       if (!initialThreadExpansionApplied && (activeView === 'threads' || activeView === 'insights')) {
         const expansion = urlParams.get('expand');
         if (expansion === 'all') {
@@ -1687,7 +1843,8 @@
           group.autoReviewCount ? tf('thread.auto_review', { count: number.format(group.autoReviewCount) }) : '',
           group.attachedCount ? t('thread.attached') : '',
         ].filter(Boolean).join(' - ');
-        tr.className = `thread-row${group.parentThreadLabel ? ' spawned-thread' : ''}`;
+        tr.className = `thread-row${group.parentThreadLabel ? ' spawned-thread' : ''}${selectedThreadKey === group.key ? ' selected-row' : ''}`;
+        tr.dataset.threadKey = group.key;
         tr.tabIndex = 0;
         tr.setAttribute('role', 'button');
         tr.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -1704,7 +1861,7 @@
             </div>
           </td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(group.modelSummary))}">${escapeHtml(short(group.modelSummary))}</span></td>
-          <td>${escapeHtml(truncate(group.effortSummary, 28))}</td>
+          <td>${effortCell(truncate(group.effortSummary, 28), group.effortTooltip)}</td>
           <td class="num token-cell">${tokenNumberCell(group.totalTokens, t('metric.total_tokens'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.cachedTokens, t('metric.cached_input'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.uncachedTokens, t('metric.uncached_input'))}</td>
@@ -1758,10 +1915,10 @@
       const calls = sortedCalls.slice(0, visibleCount).map(row => {
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         return `
-          <tr class="thread-call-row" tabindex="0" role="button" data-record-id="${escapeHtml(row.record_id || '')}">
+          <tr class="thread-call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}" tabindex="0" role="button" data-record-id="${escapeHtml(row.record_id || '')}">
             <td>${renderTimeCell(row.event_timestamp)}</td>
             <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
-            <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
+            <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
             <td>${escapeHtml(sourceLabelText(row))}</td>
             <td class="num token-cell">${totalTokenCell(row)}</td>
             <td class="num token-cell">${cachedTokenCell(row)}</td>
@@ -1793,9 +1950,9 @@
               ${threadCallHeader('effort', t('table.effort'))}
               ${threadCallHeader('source', t('table.source'))}
               ${threadCallHeader('total', t('table.tokens'), true)}
-              ${threadCallHeader('cached', t('metric.cached_input'), true)}
-              ${threadCallHeader('uncached', t('metric.uncached_input'), true)}
-              ${threadCallHeader('output', t('metric.output_tokens'), true)}
+              ${threadCallHeader('cached', t('table.cached'), true)}
+              ${threadCallHeader('uncached', t('table.uncached'), true)}
+              ${threadCallHeader('output', t('table.output'), true)}
               ${threadCallHeader('cost', t('table.cost'), true)}
               ${threadCallHeader('cache', t('table.cache'), true)}
               ${threadCallHeader('signals', t('table.signals'))}
@@ -2147,7 +2304,7 @@
       const label = t(liveStatusKey);
       const detail = liveStatusDetail || label;
       liveStatusEl.textContent = label;
-      liveStatusEl.title = detail;
+      setFastTooltip(liveStatusEl, detail);
       liveStatusEl.dataset.state = liveStatusKey === 'status.refresh_error' ? 'error' : 'ready';
     }
     function updateLiveStatus(statusKey, detail = '') {
@@ -2351,6 +2508,28 @@
       const row = rowByRecordId.get(callRow.dataset.recordId);
       if (row) selectRow(row);
     });
+    document.addEventListener('mouseover', event => {
+      const target = closestFastTooltipTarget(event.target);
+      if (!target || !document.body.contains(target)) return;
+      if (target.contains(event.relatedTarget)) return;
+      scheduleFastTooltip(target);
+    });
+    document.addEventListener('mouseout', event => {
+      const target = closestFastTooltipTarget(event.target);
+      if (!target) return;
+      if (target.contains(event.relatedTarget)) return;
+      hideFastTooltip();
+    });
+    document.addEventListener('focusin', event => {
+      const target = closestFastTooltipTarget(event.target);
+      if (target) scheduleFastTooltip(target);
+    });
+    document.addEventListener('focusout', event => {
+      const target = closestFastTooltipTarget(event.target);
+      if (target) hideFastTooltip();
+    });
+    window.addEventListener('scroll', hideFastTooltip, { passive: true });
+    window.addEventListener('resize', hideFastTooltip);
     datePresetEl.addEventListener('input', () => {
       syncDatePresetInputs();
       resetVisibleRows();

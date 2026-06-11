@@ -496,6 +496,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "visibleSlice(rows)" in dashboard_js
     assert "updateLoadMoreControl(page, 'table.threads')" in dashboard_js
     assert "data-thread-load-more" in dashboard_js
+    assert "data-fast-tooltip" in dashboard_js
+    assert "scheduleFastTooltip(target)" in dashboard_js
+    assert "focusPendingTarget" in dashboard_js
+    assert "queueFocusTarget(insight.target)" in dashboard_js
+    assert "selected-row" in dashboard_js
+    assert "selected-row" in dashboard_css
+    assert "costUsageCell" in dashboard_js
+    assert "Codex credits" in dashboard
     assert "All calls" in dashboard
     assert "/api/usage" in dashboard_js
     assert "detail-card primary" in dashboard_js
