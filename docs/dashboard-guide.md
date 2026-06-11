@@ -92,6 +92,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.
 - The cards summarize only the currently visible filtered rows.
 - Time values are shown in your browser's local date/time format while sorting and time filtering still use the logged timestamp.
+- Calls view token cells show total tokens plus compact `C`, `U`, and `O` chips for cached input, uncached input, and output tokens.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
 - Hover or click a row to pin its aggregate fields in `Call Details`; on desktop, the details panel stays visible as you scroll.
 - The `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.
@@ -113,7 +114,7 @@ Useful interpretation notes:
 
 ## Threads View
 
-![Threads view with one expanded thread and its calls in chronological order.](assets/dashboard-threads.png)
+![Threads view with one expanded thread and sortable newest-first calls.](assets/dashboard-threads.png)
 
 Use `Threads` view when you want to understand a work session as a group instead of one call at a time.
 
@@ -121,7 +122,7 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Thread rows show latest activity, call count, model mix, effort mix, total tokens, estimated cost, Codex credits, cache ratio, and signal count.
 - Mixed model summaries prefer the primary non-review model; `codex-auto-review` appears as the thread model only for review-only threads.
 - Click a thread row to expand or collapse its calls. Multiple thread rows can stay open.
-- Expanded calls are ordered oldest to newest by event timestamp, then cumulative token count.
+- Expanded calls default to newest first. Click an expanded-call header such as `Time`, `Tokens`, `Cost`, or `Cache` to sort that thread's visible calls without changing the top-level Threads ranking.
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
 
 The same search, time range, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, and `Threads` views.
@@ -151,6 +152,7 @@ When served from localhost, the details panel includes `Load context` and `Inclu
 
 - `Load context` fetches a size-limited, redacted context excerpt for only that call.
 - `Include tool output` repeats the request with tool output included, still redacted and capped.
+- Omitted tool-output entries also show a `Show tool output` button so you can reload from the specific context card that needs inspection.
 - Raw context is not written to SQLite, CSV, or the generated dashboard HTML.
 - If the server was started with `--no-context-api`, context loading starts off. Use `Enable context loading` in the details panel when you want to allow explicit row actions without restarting the dashboard server.
 

@@ -359,7 +359,7 @@ def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> No
         "table.model",
         "table.effort",
         "table.source",
-        "table.last_call",
+        "table.tokens",
         "table.cost",
         "table.cache",
         "table.signals",

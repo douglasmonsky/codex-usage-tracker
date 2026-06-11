@@ -56,6 +56,7 @@
   "button.next": "Next",
   "button.previous": "Previous",
   "button.refresh": "Refresh",
+  "button.show_tool_output": "Show tool output",
   "button.top": "Top",
   "caption.ascending": "ascending",
   "caption.calls": "Showing individual model calls sorted by {sort}. {loaded}.",

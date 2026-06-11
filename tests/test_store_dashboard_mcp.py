@@ -419,10 +419,19 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "attentionScore" in dashboard_js
     assert "thread-row" in dashboard_surface
     assert "thread-call-table" in dashboard_surface
+    assert "tokenMixCell" in dashboard_js
+    assert "token-mix" in dashboard_js
+    assert "token-part" in dashboard_css
+    assert "data-thread-call-sort-key" in dashboard_js
+    assert "threadCallSortKey = 'time'" in dashboard_js
+    assert "threadCallSortDirection = 'desc'" in dashboard_js
     assert "detail.thread_attachment" in dashboard_js
     assert "detail.subagent_type" in dashboard_js
     assert "source.auto_review" in dashboard_js
     assert "button.load_context" in dashboard_js
+    assert "button.show_tool_output" in dashboard_js
+    assert "data-context-entry-load-output" in dashboard_js
+    assert "tool_output_omitted" in dashboard_js
     assert "parent_thread_name" in dashboard
     assert "thread_attachment_label" in dashboard
     assert "thread_attachment_relation" in dashboard
@@ -443,6 +452,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["detail.subagent_type"] == "Subagent type"
     assert en_trans["source.auto_review"] == "Auto-review"
     assert en_trans["button.load_context"] == "Load context"
+    assert en_trans["button.show_tool_output"] == "Show tool output"
     assert "spawned from" in en_trans["thread.spawned_from"]
     assert "spawned threads" in en_trans["thread.spawned_threads"]
     assert en_trans["detail.thread_timeline"] == "Thread timeline"

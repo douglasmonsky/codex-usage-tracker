@@ -474,6 +474,9 @@
     th[data-sort-active="true"] .sort-header {
       color: var(--ink);
     }
+    th[data-thread-call-sort-active="true"] .sort-header {
+      color: var(--ink);
+    }
     .sort-indicator {
       display: inline-block;
       min-width: 12px;
@@ -599,6 +602,42 @@
       font-size: 11px;
       font-weight: 720;
     }
+    .token-cell {
+      min-width: 128px;
+    }
+    .token-mix {
+      display: inline-grid;
+      justify-items: end;
+      gap: 3px;
+      max-width: 100%;
+    }
+    .token-total {
+      font-variant-numeric: tabular-nums;
+    }
+    .token-parts {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 720;
+      line-height: 1.2;
+    }
+    .token-part {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+      padding: 1px 4px;
+      border-radius: 5px;
+      background: #eef3fb;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .token-part span {
+      color: var(--blue);
+      font-weight: 820;
+    }
     .time-cell {
       display: grid;
       gap: 2px;
@@ -653,6 +692,16 @@
       font-size: 11px;
       font-weight: 680;
       white-space: nowrap;
+    }
+    .call-row .flag,
+    .thread-call-row .flag {
+      min-height: 18px;
+      padding: 1px 5px;
+      font-size: 10px;
+      line-height: 1.1;
+    }
+    .compact-flags {
+      justify-content: flex-start;
     }
     .thread-row {
       cursor: pointer;
@@ -718,6 +767,12 @@
     }
     .thread-call-table td, .thread-call-table th {
       padding: 8px 10px;
+    }
+    .thread-call-table .token-cell {
+      min-width: 116px;
+    }
+    .thread-call-table .token-parts {
+      max-width: 128px;
     }
     .thread-call-table tr:last-child td {
       border-bottom: 0;
@@ -912,6 +967,8 @@
     .context-entry-header {
       display: flex;
       justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
       gap: 10px;
       padding: 8px 10px;
       border-bottom: 1px solid var(--line);
@@ -919,6 +976,31 @@
       font-size: 12px;
       font-weight: 720;
     }
+    .context-entry-title {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .context-entry-meta {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-left: auto;
+      text-align: right;
+    }
+    .context-entry-action {
+      min-height: 26px;
+      padding: 4px 8px;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 760;
+      cursor: pointer;
+    }
+    .context-entry-action:hover { background: #dbeafe; }
     .context-entry pre {
       margin: 0;
       padding: 10px;

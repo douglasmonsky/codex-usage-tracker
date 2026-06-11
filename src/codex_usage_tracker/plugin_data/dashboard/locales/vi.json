@@ -56,6 +56,7 @@
   "button.next": "Tiếp",
   "button.previous": "Trước",
   "button.refresh": "Làm mới",
+  "button.show_tool_output": "Hiển thị output công cụ",
   "button.top": "Lên đầu",
   "caption.ascending": "tăng dần",
   "caption.calls": "Đang hiển thị từng lượt gọi mô hình, sắp xếp theo {sort}. {loaded}.",

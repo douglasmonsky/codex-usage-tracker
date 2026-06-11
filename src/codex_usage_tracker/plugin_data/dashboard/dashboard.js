@@ -50,6 +50,7 @@
       'button.load_more': 'Load more',
       'button.load_context': 'Load context',
       'button.include_tool_output': 'Include tool output',
+      'button.show_tool_output': 'Show tool output',
       'button.copy_link': 'Copy link',
       'button.clear': 'Clear',
       'action.run': 'Run',
@@ -259,6 +260,8 @@
     let activeView = ['calls', 'threads', 'insights'].includes(initialState.view) ? initialState.view : 'insights';
     let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'attention';
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
+    let threadCallSortKey = 'time';
+    let threadCallSortDirection = 'desc';
     let activePreset = '';
     let selectedRecordId = initialState.record || '';
     let selectedThreadKey = initialState.thread || '';
@@ -507,6 +510,33 @@
     function costUsageCell(costText, creditValue) {
       const usage = creditValue === null || creditValue === undefined ? t('credit.no_rate') : `${credits(creditValue)} cr`;
       return `<span class="metric-stack"><span>${escapeHtml(costText)}</span><span class="metric-sub">${escapeHtml(usage)}</span></span>`;
+    }
+    function tokenMixCell(row) {
+      const cached = Number(row.cached_input_tokens || 0);
+      const uncached = Number(row.uncached_input_tokens || Math.max(Number(row.input_tokens || 0) - cached, 0));
+      const output = Number(row.output_tokens || 0);
+      const reasoning = Number(row.reasoning_output_tokens || 0);
+      const total = Number(row.total_tokens || 0);
+      const title = [
+        `${t('metric.total_tokens')} ${number.format(total)}`,
+        `${t('metric.cached_input')} ${number.format(cached)}`,
+        `${t('metric.uncached_input')} ${number.format(uncached)}`,
+        `${t('metric.output_tokens')} ${number.format(output)}`,
+        reasoning ? `${t('metric.reasoning_output')} ${number.format(reasoning)}` : '',
+      ].filter(Boolean).join(' - ');
+      const parts = [
+        ['C', cached, t('metric.cached_input')],
+        ['U', uncached, t('metric.uncached_input')],
+        ['O', output, t('metric.output_tokens')],
+      ];
+      return `
+        <span class="token-mix" title="${escapeHtml(title)}">
+          <span class="token-total">${escapeHtml(number.format(total))}</span>
+          <span class="token-parts">
+            ${parts.map(([label, value, fullLabel]) => `<span class="token-part" title="${escapeHtml(fullLabel)}"><span>${escapeHtml(label)}</span>${escapeHtml(number.format(value))}</span>`).join('')}
+          </span>
+        </span>
+      `;
     }
     function allowanceWindowText(totalCredits, mode = 'impact') {
       if (!allowanceWindows.length) return '';
@@ -1001,6 +1031,52 @@
       if (timeFallback !== 0) return timeFallback;
       return String(a.record_id || '').localeCompare(String(b.record_id || ''));
     }
+    function threadCallSortValue(row, key) {
+      if (key === 'cache') return Number(row.cache_ratio || 0);
+      if (key === 'cost') return Number(row.estimated_cost_usd || 0);
+      if (key === 'effort') return textValue(row.effort);
+      if (key === 'model') return textValue(row.model);
+      if (key === 'signals') return signalCount(row);
+      if (key === 'source') return textValue(sourceLabelText(row));
+      if (key === 'time') return String(row.event_timestamp || '');
+      return Number(row.total_tokens || 0);
+    }
+    function compareThreadCalls(a, b) {
+      const comparison = compareValues(
+        threadCallSortValue(a, threadCallSortKey),
+        threadCallSortValue(b, threadCallSortKey),
+      );
+      const primary = threadCallSortDirection === 'asc' ? comparison : -comparison;
+      if (primary !== 0) return primary;
+      const timeFallback = String(b.event_timestamp || '').localeCompare(String(a.event_timestamp || ''));
+      if (timeFallback !== 0) return timeFallback;
+      return String(a.record_id || '').localeCompare(String(b.record_id || ''));
+    }
+    function sortedThreadCalls(calls) {
+      return calls.slice().sort(compareThreadCalls);
+    }
+    function handleThreadCallHeaderSort(key) {
+      if (threadCallSortKey === key) {
+        threadCallSortDirection = threadCallSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        threadCallSortKey = key;
+        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cost' || key === 'cache' || key === 'signals' ? 'desc' : 'asc';
+      }
+      render();
+    }
+    function threadCallHeader(key, label, numeric = false) {
+      const active = threadCallSortKey === key;
+      const indicator = active ? (threadCallSortDirection === 'asc' ? '▲' : '▼') : '';
+      const ariaSort = active ? (threadCallSortDirection === 'asc' ? 'ascending' : 'descending') : 'none';
+      return `
+        <th${numeric ? ' class="num"' : ''} data-thread-call-sort-active="${active ? 'true' : 'false'}" aria-sort="${ariaSort}">
+          <button class="sort-header child-sort-header" type="button" data-thread-call-sort-key="${escapeHtml(key)}">
+            <span>${escapeHtml(label)}</span>
+            <span class="sort-indicator">${escapeHtml(indicator)}</span>
+          </button>
+        </th>
+      `;
+    }
     function rowAttachment(row) {
       return threadAttachmentByRecordId.get(row.record_id) || resolveThreadAttachment(row);
     }
@@ -1482,7 +1558,7 @@
           <td title="${escapeHtml(short(row.session_id))}">${escapeHtml(truncate(rowThreadLabel(row)))}</td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
           <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
-          <td class="num">${number.format(row.total_tokens || 0)}</td>
+          <td class="num token-cell">${tokenMixCell(row)}</td>
           <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
           <td class="num">${pct(row.cache_ratio)}</td>
           <td><div class="flags">${flags.slice(0, 2).map((flag, index) => `<span class="flag">${escapeHtml(translateEfficiencyFlag(row, flag, index))}</span>`).join('')}</div></td>
@@ -1603,7 +1679,7 @@
     function renderThreadCalls(group) {
       const tr = document.createElement('tr');
       tr.className = 'thread-child-row';
-      const calls = group.calls.map(row => {
+      const calls = sortedThreadCalls(group.calls).map(row => {
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         return `
           <tr class="thread-call-row" tabindex="0" role="button" data-record-id="${escapeHtml(row.record_id || '')}">
@@ -1611,17 +1687,26 @@
             <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
             <td>${escapeHtml(translateEffort(short(row.effort)))}</td>
             <td>${escapeHtml(sourceLabelText(row))}</td>
-            <td class="num">${number.format(row.total_tokens || 0)}</td>
+            <td class="num token-cell">${tokenMixCell(row)}</td>
             <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
             <td class="num">${pct(row.cache_ratio)}</td>
-            <td>${flags.slice(0, 3).map((flag, index) => `<span class="flag">${escapeHtml(translateEfficiencyFlag(row, flag, index))}</span>`).join('') || `<span class="muted">${escapeHtml(t('state.none'))}</span>`}</td>
+            <td><div class="flags compact-flags">${flags.slice(0, 3).map((flag, index) => `<span class="flag">${escapeHtml(translateEfficiencyFlag(row, flag, index))}</span>`).join('') || `<span class="muted">${escapeHtml(t('state.none'))}</span>`}</div></td>
           </tr>
         `;
       }).join('');
       tr.innerHTML = `
         <td class="child-cell" colspan="8">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
-            <thead><tr><th>${escapeHtml(t('table.time'))}</th><th>${escapeHtml(t('table.model'))}</th><th>${escapeHtml(t('table.effort'))}</th><th>${escapeHtml(t('table.source'))}</th><th class="num">${escapeHtml(t('table.last_call'))}</th><th class="num">${escapeHtml(t('table.cost'))}</th><th class="num">${escapeHtml(t('table.cache'))}</th><th>${escapeHtml(t('table.signals'))}</th></tr></thead>
+            <thead><tr>
+              ${threadCallHeader('time', t('table.time'))}
+              ${threadCallHeader('model', t('table.model'))}
+              ${threadCallHeader('effort', t('table.effort'))}
+              ${threadCallHeader('source', t('table.source'))}
+              ${threadCallHeader('total', t('table.tokens'), true)}
+              ${threadCallHeader('cost', t('table.cost'), true)}
+              ${threadCallHeader('cache', t('table.cache'), true)}
+              ${threadCallHeader('signals', t('table.signals'))}
+            </tr></thead>
             <tbody>${calls}</tbody>
           </table>
         </td>
@@ -1656,9 +1741,18 @@
       const loadButton = detailEl.querySelector('[data-context-load]');
       const outputButton = detailEl.querySelector('[data-context-load-output]');
       const enableButton = detailEl.querySelector('[data-context-enable]');
+      const contextResult = detailEl.querySelector('#contextResult');
       if (loadButton) loadButton.addEventListener('click', () => loadContext(row, false));
       if (outputButton) outputButton.addEventListener('click', () => loadContext(row, true));
       if (enableButton) enableButton.addEventListener('click', () => enableContextApi(row));
+      if (contextResult) {
+        contextResult.addEventListener('click', event => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest('[data-context-entry-load-output]');
+          if (!button) return;
+          loadContext(row, true);
+        });
+      }
     }
     async function enableContextApi(row) {
       const target = document.getElementById('contextResult');
@@ -1729,15 +1823,24 @@
         omitted.older_entries ? tf('context.older_omitted', { count: number.format(omitted.older_entries) }) : '',
         omitted.over_budget_chars ? tf('context.chars_omitted', { count: number.format(omitted.over_budget_chars) }) : '',
       ].filter(Boolean).join(' ');
-      const body = entries.map(entry => `
-        <div class="context-entry">
-          <div class="context-entry-header">
-            <span>${escapeHtml(entry.label || entry.type || 'entry')}</span>
-            <span>${escapeHtml([formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - '))}</span>
+      const body = entries.map(entry => {
+        const meta = [formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - ');
+        const outputAction = entry.tool_output_omitted && !payload.include_tool_output
+          ? `<button class="context-entry-action" type="button" data-context-entry-load-output>${escapeHtml(t('button.show_tool_output'))}</button>`
+          : '';
+        return `
+          <div class="context-entry">
+            <div class="context-entry-header">
+              <span class="context-entry-title">${escapeHtml(entry.label || entry.type || 'entry')}</span>
+              <span class="context-entry-meta">
+                ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
+                ${outputAction}
+              </span>
+            </div>
+            <pre>${escapeHtml(entry.text || '')}</pre>
           </div>
-          <pre>${escapeHtml(entry.text || '')}</pre>
-        </div>
-      `).join('');
+        `;
+      }).join('');
       return `<p class="context-note">${escapeHtml(note)}</p>${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
     }
     function pricingStatusText(row) {
@@ -2129,6 +2232,13 @@
       if (row) selectRow(row);
     });
     rowsEl.addEventListener('click', event => {
+      const sortButton = event.target.closest('[data-thread-call-sort-key]');
+      if (sortButton && rowsEl.contains(sortButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleThreadCallHeaderSort(sortButton.dataset.threadCallSortKey);
+        return;
+      }
       const callRow = event.target.closest('.thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
       const row = rowByRecordId.get(callRow.dataset.recordId);

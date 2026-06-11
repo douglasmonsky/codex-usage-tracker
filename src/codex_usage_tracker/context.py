@@ -140,6 +140,7 @@ def _read_context_entries(
                         entry_type,
                         summarized["label"],
                         summarized["text"],
+                        tool_output_omitted=bool(summarized.get("tool_output_omitted")),
                     )
                 )
 
@@ -160,7 +161,7 @@ def _summarize_payload(
     entry_type: str,
     payload: dict[str, Any],
     include_tool_output: bool,
-) -> dict[str, str] | None:
+) -> dict[str, Any] | None:
     if entry_type == "response_item":
         return _summarize_response_item(payload, include_tool_output=include_tool_output)
     if entry_type == "event_msg":
@@ -190,7 +191,7 @@ def _summarize_turn_context(payload: dict[str, Any]) -> str:
 def _summarize_response_item(
     payload: dict[str, Any],
     include_tool_output: bool,
-) -> dict[str, str] | None:
+) -> dict[str, Any] | None:
     item_type = _optional_str(payload.get("type")) or "response_item"
     role = _optional_str(payload.get("role"))
     name = _optional_str(payload.get("name"))
@@ -219,10 +220,9 @@ def _summarize_response_item(
 
     if "output" in payload:
         output = _optional_str(payload.get("output")) or _jsonish(payload.get("output"))
-        return {
-            "label": label,
-            "text": output if include_tool_output else _OUTPUT_OMITTED,
-        }
+        if include_tool_output:
+            return {"label": label, "text": output}
+        return {"label": label, "text": _OUTPUT_OMITTED, "tool_output_omitted": True}
 
     summary = _content_text(payload.get("summary"))
     if summary:
@@ -238,7 +238,7 @@ def _summarize_response_item(
 def _summarize_event_msg(
     payload: dict[str, Any],
     include_tool_output: bool,
-) -> dict[str, str] | None:
+) -> dict[str, Any] | None:
     event_type = _optional_str(payload.get("type")) or "event_msg"
     if event_type == "token_count":
         info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
@@ -250,7 +250,7 @@ def _summarize_event_msg(
     output_fields = [field for field in ("stdout", "stderr", "result") if field in payload]
     if output_fields:
         if not include_tool_output:
-            return {"label": event_type, "text": _OUTPUT_OMITTED}
+            return {"label": event_type, "text": _OUTPUT_OMITTED, "tool_output_omitted": True}
         text = "\n".join(f"{field}:\n{_jsonish(payload.get(field))}" for field in output_fields)
         return {"label": event_type, "text": text}
 
@@ -276,8 +276,10 @@ def _context_entry(
     entry_type: str,
     label: str,
     text: str,
+    *,
+    tool_output_omitted: bool = False,
 ) -> dict[str, Any]:
-    return {
+    entry = {
         "line_number": line_number,
         "timestamp": timestamp,
         "type": entry_type,
@@ -285,6 +287,9 @@ def _context_entry(
         "text": _redact(text),
         "truncated": False,
     }
+    if tool_output_omitted:
+        entry["tool_output_omitted"] = True
+    return entry
 
 
 def _limit_entries(
