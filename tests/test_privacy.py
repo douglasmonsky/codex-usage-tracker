@@ -97,6 +97,17 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
     assert strict_row["git_branch"] is None
     assert strict_row["git_remote_label"] is None
     assert strict_row["project_tags"] == []
+    assert strict_row["call_initiator"] in {"user", "codex", "unknown"}
+    assert strict_row["call_initiator_reason"] in {
+        "user_message",
+        "post_compaction",
+        "tool_result",
+        "agent_continuation",
+        "no_signal",
+        "thread_source",
+        "missing_origin",
+    }
+    assert strict_row["call_initiator_confidence"] in {"high", "medium", "low"}
     assert csv_rows[0]["cwd"].startswith("[redacted cwd:")
     assert PRIVATE_BRANCH not in json.dumps(strict_payload)
     assert PRIVATE_TAG not in json.dumps(strict_payload)

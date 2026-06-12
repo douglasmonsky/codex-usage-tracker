@@ -38,9 +38,9 @@ Milestone 0 inspection ran on `perf/call-drilldown-performance-hardening` after 
 
 Suspected hot paths confirmed by source inspection:
 
-- `src/codex_usage_tracker/dashboard.py` calls `annotate_rows_with_call_origin(...)` inside `dashboard_payload`.
-- `src/codex_usage_tracker/call_origin.py` groups rows by `source_file` and opens each JSONL file to infer call origin.
-- `src/codex_usage_tracker/server.py` serves `/api/usage` by calling `dashboard_payload`, so live refresh inherits the source-log scan.
+- M3 removed the `dashboard_payload` source-log call-origin scan. Call origin is now persisted as aggregate categorical metadata during parser refresh, with a cheap fallback for migrated rows.
+- M3 converted `src/codex_usage_tracker/call_origin.py` to pure classifiers that do not open source JSONL files.
+- `src/codex_usage_tracker/server.py` serves `/api/usage` by calling `dashboard_payload`; after M3, this no longer inherits call-origin source-log reads.
 - M2 removed `_read_call_anchors(...)` from `load_call_context`, so explicit context loading no longer performs the extra anchor scan.
 - M2 removed all dashboard reads of `payload.call_anchors` and `payload.thread_anchors`.
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js` builds helper indexes, but adjacent-call lookup and render paths still need a focused large-history review.
@@ -59,7 +59,7 @@ Already implemented before this branch:
 - [x] M0.1 contain calls-table horizontal overflow inside the table card.
 - [x] M1 validate and package the call investigator dashboard asset in CI, docs, and release checks.
 - [x] M2 remove low-value call/thread anchor diagnostics and their extra context source scan.
-- [ ] M3 persist aggregate call-origin metadata during indexing so dashboard payloads do not scan source logs.
+- [x] M3 persist aggregate call-origin metadata during indexing so dashboard payloads do not scan source logs.
 - [ ] M4 persist cheap performance-critical dashboard query helper fields where feasible.
 - [ ] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
 - [ ] M6 make explicit context loading single-pass where practical.
@@ -102,10 +102,21 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - `docs/development.md`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.css`
 - `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/call_origin.py`
+- `src/codex_usage_tracker/dashboard.py`
+- `src/codex_usage_tracker/models.py`
+- `src/codex_usage_tracker/parser.py`
+- `src/codex_usage_tracker/schema.py`
+- `src/codex_usage_tracker/store.py`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
+- `docs/privacy.md`
 - `tests/test_privacy.py`
+- `tests/test_call_origin.py`
+- `tests/test_parser.py`
+- `tests/test_schema.py`
 - `tests/test_store_dashboard_mcp.py`
+- `tests/test_store_migrations.py`
 
 ## Tests Run
 
@@ -126,15 +137,20 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `python -m pytest tests/test_privacy.py -q`
   - `python -m pytest tests/test_store_dashboard_mcp.py -q`
   - `python scripts/check_release.py`
+- M3 persisted call-origin metadata:
+  - `python -m pytest tests/test_call_origin.py tests/test_parser.py::test_parser_ignores_known_non_token_context_compaction_event tests/test_parser.py::test_parser_persists_call_origin_from_metadata_segments tests/test_store_dashboard_mcp.py::test_dashboard_payload_uses_persisted_call_origin_without_source_scan -q` failed before implementation because the pure classifier API was missing.
+  - `python -m pytest tests/test_call_origin.py tests/test_parser.py::test_parser_ignores_known_non_token_context_compaction_event tests/test_parser.py::test_parser_persists_call_origin_from_metadata_segments tests/test_schema.py tests/test_store_migrations.py::test_init_db_migrates_legacy_aggregate_table_without_data_loss tests/test_store_migrations.py::test_csv_export_keeps_current_columns_after_legacy_migration tests/test_store_dashboard_mcp.py::test_dashboard_payload_uses_persisted_call_origin_without_source_scan -q`
+  - `python -m pytest tests/test_parser.py tests/test_call_origin.py tests/test_store_migrations.py tests/test_privacy.py tests/test_store_dashboard_mcp.py -q`
+  - `python scripts/check_release.py`
 
 ## Benchmarks Run
 
-- None yet. Benchmarks start after implementation milestones change measurable behavior.
+- None yet. M3 removed a source-log scan path and added regression tests; benchmark coverage starts in M8.
 
 ## Known Remaining Slow Paths
 
-- Normal `dashboard_payload` currently runs source-file call-origin annotation.
-- Live `/api/usage` currently calls `dashboard_payload` and inherits that work.
+- Normal `dashboard_payload` no longer runs source-file call-origin annotation.
+- Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata.
 - Context loading still does selected-turn evidence and serialized-evidence work; Milestone 6 must verify whether that can be reduced to one source-file pass.
 - Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
 
@@ -142,11 +158,11 @@ Full branch closeout should also run the release validation listed in `docs/deve
 
 - Milestone 0 made no product behavior changes.
 - The branch must keep all test data synthetic and must not persist raw transcript content.
-- Persisted call-origin work must store only categorical labels, reasons, and confidence values.
+- Persisted call-origin stores only categorical labels, reasons, and confidence values. Parser tests and privacy tests cover this with synthetic secret-bearing message/tool/compaction payloads.
 
 ## Merge Blockers
 
-- `dashboard_payload` and `/api/usage` must stop opening source JSONL files.
+- `dashboard_payload` and `/api/usage` must stop opening source JSONL files. M3 covers the call-origin path; future milestones must preserve that invariant as APIs are split.
 - The call investigator asset must be syntax-checked in CI and release validation.
 - Raw call/thread anchors are removed; keep regression tests proving `call_anchors` and `thread_anchors` stay out of context payloads.
 - Focused privacy tests must prove no raw prompts, assistant messages, tool output, replacement history, or raw JSONL fragments are persisted by default.

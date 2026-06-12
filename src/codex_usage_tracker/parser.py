@@ -10,6 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.call_origin import (
+    CallOriginFlags,
+    classify_call_origin,
+    event_flags_from_envelope,
+)
 from codex_usage_tracker.models import SessionInfo, UsageEvent
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME
 
@@ -192,6 +197,7 @@ def _parse_codex_jsonl_v1(
     session_meta: dict[str, str | None] = {}
     last_cumulative_total = -1
     events: list[UsageEvent] = []
+    call_origin_segment: list[CallOriginFlags] = []
 
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
@@ -230,10 +236,15 @@ def _parse_codex_jsonl_v1(
 
             payload_type = payload.get("type")
             if entry_type != "event_msg" or payload_type != "token_count":
+                flags = event_flags_from_envelope(envelope)
+                if flags.has_signal:
+                    call_origin_segment.append(flags)
                 if entry_type == "event_msg" and payload_type not in KNOWN_NON_TOKEN_EVENT_MSG_TYPES:
                     _increment_stat(stats, "unknown_event_shape")
                 continue
 
+            call_origin = classify_call_origin(call_origin_segment)
+            call_origin_segment = []
             info = payload.get("info")
             if not isinstance(info, dict):
                 _increment_stat(stats, "missing_info")
@@ -275,6 +286,7 @@ def _parse_codex_jsonl_v1(
                     session_info=session_info,
                     session_meta=session_meta,
                     current_turn=current_turn,
+                    call_origin=call_origin,
                     model_context_window=_nullable_int(
                         info.get("model_context_window"),
                         stats=stats,
@@ -301,6 +313,7 @@ def _build_event(
     session_info: SessionInfo | None,
     session_meta: dict[str, str | None],
     current_turn: dict[str, Any],
+    call_origin: dict[str, str],
     model_context_window: int | None,
     last_usage: dict[str, Any],
     total_usage: dict[str, Any],
@@ -341,6 +354,9 @@ def _build_event(
         effort=_optional_str(current_turn.get("effort")),
         current_date=_optional_str(current_turn.get("current_date")),
         timezone=_optional_str(current_turn.get("timezone")),
+        call_initiator=call_origin.get("call_initiator"),
+        call_initiator_reason=call_origin.get("call_initiator_reason"),
+        call_initiator_confidence=call_origin.get("call_initiator_confidence"),
         thread_source=session_meta.get("thread_source"),
         subagent_type=session_meta.get("subagent_type"),
         agent_role=session_meta.get("agent_role"),

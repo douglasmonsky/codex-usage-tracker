@@ -32,6 +32,9 @@ class UsageEvent:
     effort: str | None
     current_date: str | None
     timezone: str | None
+    call_initiator: str | None
+    call_initiator_reason: str | None
+    call_initiator_confidence: str | None
     thread_source: str | None
     subagent_type: str | None
     agent_role: str | None

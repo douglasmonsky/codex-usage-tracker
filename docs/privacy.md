@@ -10,6 +10,7 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - model, reasoning effort, context window
 - token counts and derived efficiency ratios
 - subagent source, role, nickname, parent session id, and parent thread name when present
+- call-origin category, reason, and confidence labels derived from event metadata during indexing
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
 
 ## Not Stored
@@ -24,6 +25,8 @@ The parser intentionally does not store:
 - raw logged context
 
 Those fields are not written to SQLite, CSV exports, generated dashboard HTML, or synthetic screenshots.
+
+Call-origin metadata is heuristic and confidence-labeled. It stores categories such as `user`, `codex`, or `unknown` plus a reason such as `user_message`, `tool_result`, `post_compaction`, or `agent_continuation`. It does not store the message text, tool output, compaction replacement text, or raw JSONL fragment that produced the category.
 
 ## On-Demand Context
 

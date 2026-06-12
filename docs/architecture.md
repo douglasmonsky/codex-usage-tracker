@@ -4,7 +4,8 @@ Codex Usage Tracker is a local sidecar app. It reads aggregate token counters fr
 
 ## Boundaries
 
-- `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It must not persist prompts, assistant text, tool output, or transcript snippets.
+- `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories such as user message, tool result, post-compaction, and agent continuation. It must not persist prompts, assistant text, tool output, or transcript snippets.
+- `call_origin.py` owns the pure call-origin classifier and migrated-row fallback. It must not open source JSONL files; source-log reads belong in parser refresh or explicit context loading only.
 - `schema.py` owns persisted `usage_events` columns. Add columns there before changing SQLite migrations or export behavior.
 - `store.py` owns SQLite setup, refresh, rebuild, and query access. Keep filesystem scanning, database writes, SQL prefilters, counts, limits, and offsets here.
 - `reports.py` is the application-service layer for summaries, expensive-call reports, recommendations, pricing coverage, and filtered query payloads. CLI and MCP should call this layer instead of duplicating report assembly.
@@ -28,7 +29,7 @@ Codex Usage Tracker is a local sidecar app. It reads aggregate token counters fr
 4. Add dashboard-only interactions in `plugin_data/dashboard/dashboard.js` and keep URL state in `dashboard_state.js`.
 5. Keep all examples, screenshots, mocks, and tests synthetic. Never derive fixtures from real logs.
 6. When editing skill instructions, update both the source `skills/...` file and the bundled `src/codex_usage_tracker/plugin_data/skills/...` copy. `scripts/check_release.py` verifies that installable plugin assets stay complete and synced.
-7. When adding fields derived from `cwd`, Git metadata, or source paths, decide how they behave in `normal`, `redacted`, and `strict` privacy modes before exposing them in dashboard, JSON, CSV, MCP, or support-bundle output.
+7. When adding fields derived from `cwd`, Git metadata, source paths, or log-event metadata, decide how they behave in `normal`, `redacted`, and `strict` privacy modes before exposing them in dashboard, JSON, CSV, MCP, or support-bundle output.
 
 ## Validation
 

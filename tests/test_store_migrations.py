@@ -39,14 +39,17 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(rows) == 1
     assert rows[0]["record_id"] == "legacy-record"
     assert rows[0]["source_file"] == "/tmp/synthetic-session.jsonl"
+    assert rows[0]["call_initiator"] is None
+    assert rows[0]["call_initiator_reason"] is None
+    assert rows[0]["call_initiator_confidence"] is None
     assert rows[0]["thread_source"] is None
     assert rows[0]["parent_thread_name"] is None
     assert rows[0]["model_context_window"] is None
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 2
+    assert state["schema_version"] == 3
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3]
 
 
 def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
@@ -68,7 +71,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "2"
+    assert metadata["schema_version"] == "3"
     assert metadata["parsed_events"] == "1"
     assert metadata["inserted_or_updated_events"] == "1"
 
@@ -85,6 +88,9 @@ def test_csv_export_keeps_current_columns_after_legacy_migration(tmp_path: Path)
 
     assert exported == 1
     assert rows[0]["record_id"] == "legacy-record"
+    assert rows[0]["call_initiator"] == ""
+    assert rows[0]["call_initiator_reason"] == ""
+    assert rows[0]["call_initiator_confidence"] == ""
     assert list(rows[0]) == EVENT_COLUMNS
 
 

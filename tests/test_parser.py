@@ -161,7 +161,59 @@ def test_parser_ignores_known_non_token_context_compaction_event(tmp_path: Path)
 
     assert len(events) == 1
     assert stats.get("unknown_event_shape", 0) == 0
+    assert events[0].call_initiator == "codex"
+    assert events[0].call_initiator_reason == "post_compaction"
+    assert events[0].call_initiator_confidence == "high"
     assert "SECRET COMPACTION TEXT" not in json.dumps([event.to_row() for event in events])
+
+
+def test_parser_persists_call_origin_from_metadata_segments(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "SECRET USER TEXT"}],
+                },
+            ),
+            _token_event(100, 100),
+            _entry("response_item", {"type": "function_call_output", "output": "SECRET TOOL"}),
+            _token_event(150, 50),
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "SECRET ASSISTANT TEXT"}],
+                },
+            ),
+            _token_event(210, 60),
+            _token_event(280, 70),
+        ],
+    )
+
+    events = parse_usage_events_from_file(log_path)
+
+    assert [
+        (
+            event.call_initiator,
+            event.call_initiator_reason,
+            event.call_initiator_confidence,
+        )
+        for event in events
+    ] == [
+        ("user", "user_message", "high"),
+        ("codex", "tool_result", "high"),
+        ("codex", "agent_continuation", "medium"),
+        ("unknown", "no_signal", "low"),
+    ]
+    assert "SECRET" not in json.dumps([event.to_row() for event in events])
 
 
 def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: Path) -> None:

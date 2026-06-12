@@ -29,10 +29,16 @@ from codex_usage_tracker.schema import (
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
+    3: "persist aggregate call-origin metadata",
+}
+CALL_ORIGIN_REPAIR_COLUMNS = {
+    "call_initiator": "TEXT",
+    "call_initiator_reason": "TEXT",
+    "call_initiator_confidence": "TEXT",
 }
 _ARCHIVED_SOURCE_PATTERNS = (
     "%/archived_sessions/%",
@@ -141,6 +147,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v2(conn)
         _record_migration_if_missing(conn, 2)
+    if user_version < 3:
+        _migrate_v3(conn)
+        _record_migration(conn, 3)
+    else:
+        _migrate_v3(conn)
+        _record_migration_if_missing(conn, 3)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -187,6 +199,10 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
 
 def _migrate_v2(conn: sqlite3.Connection) -> None:
     _ensure_migrations_table(conn)
+
+
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    _ensure_columns(conn, CALL_ORIGIN_REPAIR_COLUMNS)
 
 
 def _record_migration(conn: sqlite3.Connection, version: int) -> None:

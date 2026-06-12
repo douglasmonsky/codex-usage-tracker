@@ -1,91 +1,86 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
+from codex_usage_tracker.call_origin import (
+    CallOriginFlags,
+    classify_call_origin,
+    event_flags_from_envelope,
+    fallback_call_origin,
+)
 
-from codex_usage_tracker.call_origin import annotate_rows_with_call_origin
 
-
-def test_call_origin_uses_event_metadata_between_token_counts(tmp_path: Path) -> None:
-    log_path = tmp_path / "session.jsonl"
-    rows = [
-        _entry("session_meta", {"id": "session-a"}),
-        _entry("turn_context", {"turn_id": "turn-a"}),
-        _entry("response_item", {"type": "message", "role": "user", "content": []}),
-        _entry("event_msg", {"type": "user_message", "message": "raw prompt is ignored"}),
-        _entry("response_item", {"type": "message", "role": "assistant", "content": []}),
-        _token_event(),
-        _entry("response_item", {"type": "function_call_output", "output": "raw output is ignored"}),
-        _entry("response_item", {"type": "message", "role": "assistant", "content": []}),
-        _token_event(),
-        _entry("compacted", {"message": "", "replacement_history": []}),
-        _entry("turn_context", {"turn_id": "turn-b"}),
-        _token_event(),
-        _token_event(),
-    ]
-    _write_jsonl(log_path, rows)
-
-    annotated = annotate_rows_with_call_origin(
+def test_call_origin_classifies_metadata_segments_without_raw_text() -> None:
+    user_fields = classify_call_origin(
         [
-            _row("user", log_path, 6),
-            _row("tool", log_path, 9),
-            _row("compaction", log_path, 12),
-            _row("unknown", log_path, 13),
+            CallOriginFlags(user_message=True),
+            CallOriginFlags(tool_result=True),
         ]
     )
-    by_id = {row["record_id"]: row for row in annotated}
+    compaction_fields = classify_call_origin([CallOriginFlags(compaction=True)])
+    tool_fields = classify_call_origin([CallOriginFlags(tool_result=True)])
+    continuation_fields = classify_call_origin([CallOriginFlags(codex_activity=True)])
+    unknown_fields = classify_call_origin([])
 
-    assert by_id["user"]["call_initiator"] == "user"
-    assert by_id["user"]["call_initiator_reason"] == "user_message"
-    assert by_id["tool"]["call_initiator"] == "codex"
-    assert by_id["tool"]["call_initiator_reason"] == "tool_result"
-    assert by_id["compaction"]["call_initiator"] == "codex"
-    assert by_id["compaction"]["call_initiator_reason"] == "post_compaction"
-    assert by_id["unknown"]["call_initiator"] == "unknown"
-    assert by_id["unknown"]["call_initiator_reason"] == "no_signal"
+    assert user_fields == _origin("user", "user_message", "high")
+    assert compaction_fields == _origin("codex", "post_compaction", "high")
+    assert tool_fields == _origin("codex", "tool_result", "high")
+    assert continuation_fields == _origin("codex", "agent_continuation", "medium")
+    assert unknown_fields == _origin("unknown", "no_signal", "low")
 
 
-def test_call_origin_falls_back_to_subagent_metadata_when_source_missing(tmp_path: Path) -> None:
-    annotated = annotate_rows_with_call_origin(
-        [
+def test_call_origin_reads_only_event_shape_metadata() -> None:
+    assert event_flags_from_envelope(
+        _entry(
+            "response_item",
             {
-                "record_id": "subagent",
-                "source_file": str(tmp_path / "missing.jsonl"),
-                "line_number": 1,
-                "thread_source": "subagent",
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "SECRET RAW PROMPT"}],
             },
+        )
+    ).user_message is True
+    assert event_flags_from_envelope(
+        _entry("response_item", {"type": "function_call_output", "output": "SECRET"})
+    ).tool_result is True
+    assert event_flags_from_envelope(
+        _entry("event_msg", {"type": "context_compacted", "replacement_history": ["SECRET"]})
+    ).compaction is True
+    assert event_flags_from_envelope(
+        _entry(
+            "response_item",
             {
-                "record_id": "normal",
-                "source_file": str(tmp_path / "missing.jsonl"),
-                "line_number": 2,
-                "thread_source": "user",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "SECRET RAW ANSWER"}],
             },
-        ]
+        )
+    ).codex_activity is True
+
+
+def test_call_origin_falls_back_to_subagent_metadata_for_migrated_rows() -> None:
+    subagent_fields = fallback_call_origin(
+        {
+            "record_id": "subagent",
+            "thread_source": "subagent",
+        }
     )
-    by_id = {row["record_id"]: row for row in annotated}
+    normal_fields = fallback_call_origin(
+        {
+            "record_id": "normal",
+            "thread_source": "user",
+        }
+    )
 
-    assert by_id["subagent"]["call_initiator"] == "codex"
-    assert by_id["subagent"]["call_initiator_reason"] == "thread_source"
-    assert by_id["normal"]["call_initiator"] == "unknown"
-    assert by_id["normal"]["call_initiator_reason"] == "source_unavailable"
+    assert subagent_fields == _origin("codex", "thread_source", "medium")
+    assert normal_fields == _origin("unknown", "missing_origin", "low")
 
 
-def _row(record_id: str, source_file: Path, line_number: int) -> dict[str, object]:
+def _origin(initiator: str, reason: str, confidence: str) -> dict[str, str]:
     return {
-        "record_id": record_id,
-        "source_file": str(source_file),
-        "line_number": line_number,
-        "thread_source": "user",
+        "call_initiator": initiator,
+        "call_initiator_reason": reason,
+        "call_initiator_confidence": confidence,
     }
-
-
-def _token_event() -> dict[str, object]:
-    return _entry("event_msg", {"type": "token_count"})
 
 
 def _entry(entry_type: str, payload: dict[str, object]) -> dict[str, object]:
     return {"type": entry_type, "payload": payload}
-
-
-def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
-    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")

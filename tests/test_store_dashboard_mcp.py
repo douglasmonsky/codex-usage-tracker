@@ -11,6 +11,8 @@ from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.context import load_call_context
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
@@ -97,12 +99,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["skipped_events"] == "0"
     assert meta["inserted_or_updated_events"] == "4"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "2"
+    assert meta["schema_version"] == "3"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 2
+    assert state["schema_version"] == 3
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3]
 
 
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
@@ -136,7 +138,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 2
+    assert user_version == 3
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -190,12 +192,19 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
             ).fetchall()
         ]
 
-    assert {"thread_source", "parent_thread_name", "parent_session_updated_at"} <= columns
+    assert {
+        "thread_source",
+        "parent_thread_name",
+        "parent_session_updated_at",
+        "call_initiator",
+        "call_initiator_reason",
+        "call_initiator_confidence",
+    } <= columns
     assert "idx_usage_timestamp" in indexes
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
-    assert user_version == 2
-    assert [row["version"] for row in migrations] == [1, 2]
+    assert user_version == 3
+    assert [row["version"] for row in migrations] == [1, 2, 3]
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:
@@ -264,6 +273,9 @@ def test_large_history_query_prefilter_uses_sql_indexes(tmp_path: Path) -> None:
             effort="high" if index % 3 == 0 else "low",
             current_date="2026-05-17",
             timezone="UTC",
+            call_initiator="user",
+            call_initiator_reason="user_message",
+            call_initiator_confidence="high",
             thread_source="user",
             subagent_type=None,
             agent_role=None,
@@ -698,6 +710,42 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "project_key",
         "thread_attachment_label",
     } <= set(row)
+
+
+def test_dashboard_payload_uses_persisted_call_origin_without_source_scan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    poison_source = tmp_path / "poison-source.jsonl"
+    poison_source.write_text("{this is not valid json}\n" * 1000, encoding="utf-8")
+    with connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE usage_events
+            SET source_file = ?
+            WHERE call_initiator = 'user'
+            """,
+            (str(poison_source),),
+        )
+
+    original_open = Path.open
+
+    def fail_source_open(self: Path, *args: object, **kwargs: object) -> object:
+        if self == poison_source:
+            raise AssertionError("dashboard_payload must not read source JSONL")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fail_source_open)
+
+    payload = dashboard_payload(db_path=db_path)
+    rows = payload["rows"]
+    by_initiator = {row["call_initiator"]: row for row in rows}
+
+    assert by_initiator["user"]["call_initiator_reason"] == "user_message"
+    assert by_initiator["user"]["call_initiator_confidence"] == "high"
 
 
 def test_dashboard_payload_and_csv_privacy_mode_redact_project_metadata(tmp_path: Path) -> None:
