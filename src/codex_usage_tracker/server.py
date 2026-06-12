@@ -14,6 +14,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from ipaddress import ip_address
 from pathlib import Path
+from time import perf_counter
 from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker.context import (
@@ -245,6 +246,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         include_tool_output = _truthy(_first(params.get("include_tool_output")))
         include_compaction_history = _truthy(_first(params.get("include_compaction_history")))
+        diagnostics = _parse_bool(_first(params.get("diagnostics")), False)
         max_chars = _parse_context_limit(_first(params.get("max_chars")), self._context_chars)
         max_entries = _parse_context_limit(
             _first(params.get("max_entries")), DEFAULT_CONTEXT_ENTRIES
@@ -257,6 +259,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 max_entries=max_entries,
                 include_tool_output=include_tool_output,
                 include_compaction_history=include_compaction_history,
+                diagnostics=diagnostics,
             )
         except sqlite3.Error as exc:
             self._send_json(
@@ -343,7 +346,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         offset = _parse_offset(_first(params.get("offset")))
         include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
         language = normalize_language(_first(params.get("lang")) or self._language)
+        diagnostics_enabled = _parse_bool(_first(params.get("diagnostics")), False)
         refresh_result = None
+        refresh_ms: float | None = None
         try:
             if _truthy(_first(params.get("refresh"))):
                 if not self._has_valid_api_token(params):
@@ -352,12 +357,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                         {"error": "Valid API token is required for refresh"},
                     )
                     return
+                refresh_started = perf_counter()
                 with self._refresh_lock:
                     result = refresh_usage_index(
                         codex_home=self._codex_home,
                         db_path=self._db_path,
                         include_archived=include_archived,
                     )
+                refresh_ms = _elapsed_ms(refresh_started)
                 refresh_result = {
                     "scanned_files": result.scanned_files,
                     "parsed_events": result.parsed_events,
@@ -367,6 +374,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                     "parser_diagnostics": result.parser_diagnostics,
                     "include_archived": include_archived,
                 }
+            payload_started = perf_counter()
             payload = dashboard_payload(
                 db_path=self._db_path,
                 limit=limit,
@@ -383,6 +391,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 include_archived=include_archived,
                 language=language,
             )
+            dashboard_payload_ms = _elapsed_ms(payload_started)
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -397,6 +406,17 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         payload["refreshed_at"] = _utc_now()
         payload["refresh_result"] = refresh_result
+        if diagnostics_enabled:
+            diagnostic_payload: dict[str, object] = {
+                "dashboard_payload_ms": dashboard_payload_ms,
+                "rows_returned": len(payload.get("rows") or []),
+                "include_archived": include_archived,
+                "limit": limit,
+                "offset": offset,
+            }
+            if refresh_ms is not None:
+                diagnostic_payload["refresh_ms"] = refresh_ms
+            payload["diagnostics"] = diagnostic_payload
         self._send_json(HTTPStatus.OK, payload)
 
     def _request_origin_allowed(self) -> bool:
@@ -417,7 +437,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         return hmac.compare_digest(str(provided), self._api_token)
 
     def _send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
-        body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+        body = _json_response_body(payload)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
@@ -479,6 +499,25 @@ def _parse_context_limit(value: str | None, default: int) -> int:
     except ValueError:
         return default
     return max(limit, 0)
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round((perf_counter() - started_at) * 1000, 3)
+
+
+def _json_response_body(payload: dict[str, object]) -> bytes:
+    diagnostics = payload.get("diagnostics")
+    if not isinstance(diagnostics, dict):
+        return json.dumps(payload, ensure_ascii=True).encode("utf-8")
+
+    previous_size: int | None = None
+    while True:
+        body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+        current_size = len(body)
+        if current_size == previous_size:
+            return body
+        diagnostics["json_bytes"] = current_size
+        previous_size = current_size
 
 
 def _utc_now() -> str:

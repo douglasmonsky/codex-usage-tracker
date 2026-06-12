@@ -1086,6 +1086,116 @@ def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> No
     )
 
 
+def test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical(
+    tmp_path: Path,
+) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=codex_home,
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"{base_url}/api/usage?refresh=1&limit=2&diagnostics=true",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            usage_diagnostics_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"{base_url}/api/usage?limit=2",
+            timeout=5,
+        ) as response:
+            usage_default_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"{base_url}/api/usage?limit=2&diagnostics=false",
+            timeout=5,
+        ) as response:
+            usage_false_payload = json.loads(response.read().decode("utf-8"))
+
+        record_id = usage_diagnostics_payload["rows"][0]["record_id"]
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"{base_url}/api/context?record_id={record_id}&diagnostics=true",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            context_diagnostics_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"{base_url}/api/context?record_id={record_id}",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            context_default_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"{base_url}/api/context?record_id={record_id}&diagnostics=false",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            context_false_payload = json.loads(response.read().decode("utf-8"))
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert "diagnostics" not in usage_default_payload
+    assert "diagnostics" not in usage_false_payload
+    usage_diagnostics = usage_diagnostics_payload["diagnostics"]
+    assert usage_diagnostics["refresh_ms"] >= 0
+    assert usage_diagnostics["dashboard_payload_ms"] >= 0
+    assert usage_diagnostics["json_bytes"] > 0
+    assert usage_diagnostics["rows_returned"] == 2
+    assert usage_diagnostics["include_archived"] is False
+    assert usage_diagnostics["limit"] == 2
+    assert usage_diagnostics["offset"] == 0
+    usage_diagnostics_text = json.dumps(usage_diagnostics)
+    assert "SECRET RAW PROMPT" not in usage_diagnostics_text
+    assert "source_file" not in usage_diagnostics_text
+
+    assert "diagnostics" not in context_default_payload
+    assert "diagnostics" not in context_false_payload
+    context_diagnostics = context_diagnostics_payload["diagnostics"]
+    assert context_diagnostics["db_lookup_ms"] >= 0
+    assert context_diagnostics["source_scan_ms"] >= 0
+    assert context_diagnostics["serialized_estimate_ms"] >= 0
+    assert context_diagnostics["source_file_bytes"] > 0
+    assert context_diagnostics["source_line_number"] > 0
+    assert context_diagnostics["entries_before_limit"] >= context_diagnostics["entries_returned"]
+    assert context_diagnostics["json_bytes"] > 0
+    context_diagnostics_text = json.dumps(context_diagnostics)
+    assert "SECRET RAW PROMPT" not in context_diagnostics_text
+    assert str(codex_home) not in context_diagnostics_text
+    assert ".jsonl" not in context_diagnostics_text
+
+
 def test_dashboard_server_opens_only_token_protected_investigator_urls(
     tmp_path: Path, monkeypatch
 ) -> None:

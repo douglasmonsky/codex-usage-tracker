@@ -63,7 +63,7 @@ Already implemented before this branch:
 - [x] M2 remove low-value call/thread anchor diagnostics and their extra context source scan.
 - [x] M3 persist aggregate call-origin metadata during indexing so dashboard payloads do not scan source logs.
 - [x] M4 persist cheap performance-critical dashboard query helper fields where feasible.
-- [ ] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
+- [x] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
 - [ ] M6 make explicit context loading single-pass where practical.
 - [ ] M7 precompute client-side call adjacency for investigator rendering.
 - [ ] M8 add source-log-aware synthetic benchmark coverage.
@@ -111,6 +111,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - `src/codex_usage_tracker/parser.py`
 - `src/codex_usage_tracker/schema.py`
 - `src/codex_usage_tracker/store.py`
+- `src/codex_usage_tracker/server.py`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
 - `docs/privacy.md`
@@ -151,6 +152,12 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `python -m pytest tests/test_store_migrations.py tests/test_store_dashboard_mcp.py tests/test_privacy.py -q`
   - `python scripts/check_release.py`
   - `git diff --check`
+- M5 optional API timing diagnostics:
+  - `python -m pytest tests/test_store_dashboard_mcp.py::test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical -q` failed before implementation because `diagnostics=true` did not return a diagnostics object.
+  - `python -m pytest tests/test_store_dashboard_mcp.py::test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical -q`
+  - `python -m pytest tests/test_store_dashboard_mcp.py -q`
+  - `python -m pytest tests/test_privacy.py -q`
+  - `python scripts/check_release.py`
 
 ## Benchmarks Run
 
@@ -166,6 +173,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Per-thread adjacency is persisted after upsert; M7 still needs to make the browser prefer `previous_record_id` and `next_record_id` instead of filtering loaded rows.
 - Context loading still does selected-turn evidence and serialized-evidence work; Milestone 6 must verify whether that can be reduced to one source-file pass.
 - Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
+- M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
 
 ## Privacy Notes
 
@@ -173,6 +181,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - The branch must keep all test data synthetic and must not persist raw transcript content.
 - Persisted call-origin stores only categorical labels, reasons, and confidence values. Parser tests and privacy tests cover this with synthetic secret-bearing message/tool/compaction payloads.
 - M4 persisted only aggregate navigation/scope fields: archived flag, conservative thread key, call index, and adjacent aggregate record ids.
+- M5 diagnostics do not include raw text, prompts, tool output, source paths, or JSONL filenames. Context diagnostics include source file byte count and source line number only because the context payload itself already requires explicit token-protected on-demand loading.
 
 ## Merge Blockers
 
