@@ -5,6 +5,13 @@
 - Remove low-value call/thread anchor diagnostics from the experimental call investigator to avoid an extra source-log scan per context load.
 - Persist call-origin metadata as categorical aggregate fields during indexing so normal dashboard payloads do not reopen source JSONL logs to infer user-vs-Codex initiation.
 - Persist archived-session scope, conservative thread keys, and per-thread previous/next call links as aggregate helper fields for faster dashboard filtering and investigator navigation.
+- Add opt-in localhost API timing diagnostics for `/api/usage` and `/api/context` without exposing raw transcript content.
+- Reduce explicit context loading to a single source-file scan where practical, while keeping raw evidence on demand for one selected call.
+- Add source-log-aware synthetic benchmark coverage that verifies normal dashboard payload assembly does not open generated source JSONL files.
+- Add SQL-backed live dashboard API slices for status, calls, one call, threads, thread calls, summary, and recommendations while preserving the compatibility `/api/usage` endpoint.
+- Materialize active and all-history thread summaries in SQLite so live thread APIs can read pre-aggregated totals.
+- Add source-file refresh metadata so live refresh skips unchanged logs, indexes appended token events, and safely replaces aggregate rows for changed or truncated source logs.
+- Hydrate direct call-investigator links from the aggregate `/api/call` endpoint when the selected record is outside the currently loaded table slice or filter state.
 
 ## 0.5.0 - 2026-06-10
 

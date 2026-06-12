@@ -70,7 +70,7 @@ Already implemented before this branch:
 - [x] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
 - [x] M10 optionally materialize thread summaries after APIs are stable.
 - [x] M11 optionally add incremental source-file refresh metadata after parser-time call origin is stable.
-- [ ] M12 finalize docs, validation, benchmark results, and merge-readiness notes.
+- [x] M12 finalize docs, validation, benchmark results, and merge-readiness notes.
 
 ## Validation Commands
 
@@ -194,6 +194,25 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py tests/test_store_dashboard_mcp.py tests/test_store_migrations.py`
   - `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py tests/test_store_migrations.py tests/test_privacy.py -q`
   - `.venv/bin/python -m mypy`
+- M12 final validation:
+  - `.venv/bin/python -m ruff check .`
+  - `.venv/bin/python -m mypy`
+  - `.venv/bin/python -m pytest -q`
+  - `.venv/bin/python -m pytest --cov=codex_usage_tracker --cov-report=term-missing`
+  - `.venv/bin/python -m compileall src`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js`
+  - `.venv/bin/python scripts/check_release.py`
+  - `git diff --check`
+  - `rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info`
+  - `.venv/bin/python -m build`
+  - `.venv/bin/python -m twine check dist/*`
+  - `.venv/bin/python scripts/check_release.py --dist`
+  - `.venv/bin/python scripts/smoke_installed_package.py`
+  - `.venv/bin/python scripts/smoke_installed_package.py --docker`
 
 ## Benchmarks Run
 
@@ -203,6 +222,9 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - M8:
   - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 100 --batch-size 25 --with-source-logs --json --enforce-thresholds` passed. Latest recorded source-log timings included `dashboard_payload_with_source_logs_seconds: 0.039320`, `context_load_early_line_seconds: 0.211319`, `context_load_middle_line_seconds: 0.003791`, and `context_load_late_line_seconds: 0.003682`, with `2` synthetic source logs and no threshold failures.
   - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 2000 --with-source-logs --json --enforce-thresholds` passed. Latest recorded source-log timings included `dashboard_payload_with_source_logs_seconds: 0.047490`, `context_load_early_line_seconds: 0.209456`, `context_load_middle_line_seconds: 0.002840`, and `context_load_late_line_seconds: 0.012454`, with `8` synthetic source logs and no threshold failures.
+- M12:
+  - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds` initially failed only the `populate_seconds` threshold after M10/M11 made populate maintain materialized thread summaries and source-file metadata. The populate sentinel was recalibrated from `0.60` to `0.90` seconds per 10k rows while leaving read-path thresholds unchanged. Final 100k run passed with `populate_seconds: 6.887096`, `dashboard_payload_active_seconds: 0.163591`, `thread_summary_seconds: 0.144897`, and no threshold failures.
+  - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --json --enforce-thresholds` passed with `dashboard_payload_with_source_logs_seconds: 0.040977`, `context_load_early_line_seconds: 0.188511`, `context_load_middle_line_seconds: 0.002758`, `context_load_late_line_seconds: 0.011821`, `4` synthetic source logs, and no threshold failures.
 
 ## Known Remaining Slow Paths
 
@@ -213,6 +235,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Context loading now performs selected-turn evidence and serialized-evidence collection in one source-file scan for a selected call. Serialized evidence is still built in memory and timed separately as `serialized_estimate_ms`.
 - M8 source-log benchmark mode now generates synthetic JSONL files, points synthetic aggregate rows at matching `token_count` lines, measures early/middle/late explicit context loads, and wraps source-log dashboard payload assembly with a guard that fails if a synthetic source file is opened.
 - M9 adds additive SQL-backed live endpoints: `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, and `/api/recommendations`. The frontend still uses `/api/usage` until a later split.
+- Direct `view=call&record=...` investigator links can hydrate the selected aggregate row through `/api/call` when the current dashboard payload is filtered, stale, or does not include that record.
 - M10 materializes per-thread active and all-history summary rows in SQLite so `/api/threads` can read pre-aggregated thread totals without grouping every usage row on each request.
 - M11 adds a `source_files` metadata table. Refresh skips unchanged logs, parses appended token events after the last indexed source line when safe, and fully replaces aggregate rows for changed/truncated source files.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.

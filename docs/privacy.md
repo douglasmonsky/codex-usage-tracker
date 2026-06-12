@@ -12,6 +12,8 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - subagent source, role, nickname, parent session id, and parent thread name when present
 - call-origin category, reason, and confidence labels derived from event metadata during indexing
 - archived-session flag, conservative thread key, and adjacent aggregate record ids for dashboard navigation
+- materialized thread-level aggregate summaries for active and all-history scopes
+- source-file refresh metadata such as path, path hash, size, mtime, indexed line/byte offsets, latest aggregate record id, parser diagnostics, and last indexed time
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
 
 ## Not Stored
@@ -60,6 +62,9 @@ The localhost server:
 - protects refresh/context API calls with a random per-server token
 - can disable the context API entirely
 - refreshes aggregate rows without embedding raw transcript content into the dashboard
+- serves `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, `/api/recommendations`, and the compatibility `/api/usage` endpoint from aggregate SQLite data without loading raw source JSONL context
+
+Source JSONL reads happen during refresh/indexing, explicit on-demand context loading for one selected call, and explicit synthetic benchmark/diagnostic runs. Live refresh records metadata about source files so unchanged logs can be skipped later; that metadata does not store prompts, assistant messages, tool output, compaction replacement text, raw JSONL fragments, raw context, or reconstructed transcript evidence. The live aggregate APIs do not return that raw content either.
 
 ## Privacy Modes
 

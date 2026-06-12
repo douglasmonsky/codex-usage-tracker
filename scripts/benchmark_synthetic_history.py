@@ -9,19 +9,19 @@ import shutil
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, TypeVar
+from typing import Any, TypeVar
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = REPO_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from codex_usage_tracker.dashboard import dashboard_payload  # noqa: E402
 from codex_usage_tracker.context import load_call_context  # noqa: E402
+from codex_usage_tracker.dashboard import dashboard_payload  # noqa: E402
 from codex_usage_tracker.models import UsageEvent  # noqa: E402
 from codex_usage_tracker.reports import (  # noqa: E402
     build_pricing_coverage_report,
@@ -39,7 +39,7 @@ from codex_usage_tracker.store import (  # noqa: E402
 
 DEFAULT_ROW_COUNTS = (10_000, 100_000, 500_000)
 BENCHMARK_THRESHOLDS: dict[str, dict[str, float]] = {
-    "populate_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.60},
+    "populate_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.90},
     "active_dashboard_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
     "all_history_dashboard_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
     "since_until_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},

@@ -196,10 +196,11 @@ Use the synthetic benchmark script when changing SQLite filters, dashboard paylo
 
 ```bash
 python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds
+python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --json --enforce-thresholds
 python scripts/benchmark_synthetic_history.py --rows 500000 --json --enforce-thresholds
 ```
 
-The script creates synthetic aggregate-only SQLite databases and times common release-sensitive paths. It does not read real Codex logs.
+The default mode creates synthetic aggregate-only SQLite databases and times common release-sensitive paths. The optional `--with-source-logs` mode writes synthetic JSONL source files, points aggregate rows at matching synthetic `token_count` lines, times explicit one-call context loading, and fails if normal dashboard payload assembly opens those generated source files. Neither mode reads real Codex logs.
 
 Thresholds are regression sentinels, not universal performance guarantees. Each timed path uses:
 
@@ -224,8 +225,14 @@ Tracked timings:
 | `recommendations_report_seconds` | Recommendation report and thread rollup |
 | `pricing_coverage_seconds` | Pricing coverage report |
 | `project_summary_seconds` | Project summary report |
+| `dashboard_payload_with_source_logs_seconds` | Dashboard payload assembly while synthetic source logs exist; this path must not open those source logs |
+| `context_load_early_line_seconds` | Explicit context load for an early synthetic source-log line |
+| `context_load_middle_line_seconds` | Explicit context load for a middle synthetic source-log line |
+| `context_load_late_line_seconds` | Explicit context load for a late synthetic source-log line |
 
-The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
+Source-log benchmark JSON also reports `source_logs_generated`, `source_log_bytes`, `context_loads`, `context_payload_json_bytes`, `source_scan_ms`, and `serialized_estimate_ms` for explicit context loading.
+
+The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the source-log run is the local gate for context/evidence work; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
 
 ## Release Checklist
 

@@ -666,6 +666,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "selectRow(row);" not in render_calls_js
     assert "dashboard.view.call" in dashboard_js
     assert "renderCallInvestigator" in dashboard_js
+    assert "fetchCallRecord" in dashboard_js
+    assert "fetchCallRecord" in dashboard_call_js
+    assert "supplementalRowsByRecordId" in dashboard_js
     assert 'body[data-active-view="call"] .detail-section' in dashboard_css
     assert 'body[data-active-view="call"] .table-tools' in dashboard_css
     assert ".call-diagnostic-section.exact" in dashboard_css
@@ -722,6 +725,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "renderContextTokenUsage" in dashboard_call_js
     assert "renderContextCompaction" in dashboard_call_js
     assert "renderThreadAnchors" not in dashboard_call_js
+    assert "payload.call_anchors" not in dashboard_call_js
+    assert "payload.thread_anchors" not in dashboard_call_js
     assert "context-entry-collapsed" in dashboard_call_js
     assert "Evidence analyzed:" in dashboard_call_js
     assert "total_entries" in dashboard_call_js
@@ -777,6 +782,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "github.com/douglasmonsky/codex-usage-tracker/blob/main/docs/dashboard-guide.md" not in dashboard
     assert "codex-usage-tracker-guide/dashboard-guide.html" in dashboard
     assert (tmp_path / "codex-usage-tracker-guide" / "dashboard-guide.html").exists()
+    dashboard_guide = (tmp_path / "codex-usage-tracker-guide" / "dashboard-guide.html").read_text(
+        encoding="utf-8"
+    )
+    assert "call anchors" not in dashboard_guide.lower()
+    assert "nearest visible message" not in dashboard_guide
     assert (tmp_path / "codex-usage-tracker-guide" / "assets" / "dashboard-calls.png").exists()
     assert (asset_dir / "dashboard.js").exists()
     assert (asset_dir / "dashboard_call_investigator.js").exists()

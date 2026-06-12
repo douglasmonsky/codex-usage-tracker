@@ -323,6 +323,8 @@
     let rowByRecordId = new Map();
     let threadAttachmentByRecordId = new Map();
     let callAdjacencyByRecordId = new Map();
+    let supplementalRowsByRecordId = new Map();
+    const callFetchInFlightByRecordId = new Set();
     const expandedThreads = new Set();
     const liveRefreshSupported = window.location.protocol !== 'file:';
     const initialPayloadIncludeArchived = Boolean(initialPayload.include_archived);
@@ -644,9 +646,14 @@
       loadLimitEl.value = value;
     }
     function rebuildDashboardIndexes() {
-      rowByRecordId = new Map(data.map(row => [row.record_id, row]));
-      threadAttachmentByRecordId = new Map(data.map(row => [row.record_id, resolveThreadAttachment(row)]));
-      callAdjacencyByRecordId = buildCallAdjacencyIndex(data);
+      const indexedRows = [...data];
+      for (const row of supplementalRowsByRecordId.values()) {
+        if (!row?.record_id || indexedRows.some(candidate => candidate.record_id === row.record_id)) continue;
+        indexedRows.push(row);
+      }
+      rowByRecordId = new Map(indexedRows.map(row => [row.record_id, row]));
+      threadAttachmentByRecordId = new Map(indexedRows.map(row => [row.record_id, resolveThreadAttachment(row)]));
+      callAdjacencyByRecordId = buildCallAdjacencyIndex(indexedRows);
     }
     function usageCreditStatusLabel(row) {
       if (usageCreditValue(row) === null) return t('allowance.row_no_rate');
@@ -2561,6 +2568,7 @@
       archivedAvailableRows = Number(nextPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
       includeArchived = Boolean(nextPayload.include_archived);
       loadedLimit = payloadLimit(nextPayload);
+      supplementalRowsByRecordId = new Map();
       rebuildDashboardIndexes();
       rebuildFilterOptions();
       updatePricingSourceLine();
@@ -2606,6 +2614,7 @@
       getSelectedRecordId: () => selectedRecordId,
       setSelectedRecordId: value => { selectedRecordId = value || ''; },
       getRowByRecordId: () => rowByRecordId,
+      fetchCallRecord,
       getContextRuntime: () => ({ apiToken, contextApiEnabled, activeView }),
       setContextApiEnabled: value => { contextApiEnabled = Boolean(value); },
       renderDashboard: render,
@@ -2618,6 +2627,37 @@
       tableCaptionEl,
       defaultContextEntries,
     });
+    async function fetchCallRecord(recordId) {
+      const normalizedRecordId = recordId || '';
+      if (!liveRefreshSupported || !normalizedRecordId || !apiToken) return null;
+      const existing = rowByRecordId.get(normalizedRecordId);
+      if (existing) return existing;
+      if (callFetchInFlightByRecordId.has(normalizedRecordId)) return null;
+      callFetchInFlightByRecordId.add(normalizedRecordId);
+      try {
+        const params = new URLSearchParams({ record_id: normalizedRecordId, _: String(Date.now()) });
+        const response = await fetch(`/api/call?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken,
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        if (!payload?.record?.record_id) return null;
+        supplementalRowsByRecordId.set(payload.record.record_id, payload.record);
+        rebuildDashboardIndexes();
+        if (activeView === 'call' && selectedRecordId === normalizedRecordId) {
+          render();
+        }
+        return payload.record;
+      } catch (_error) {
+        return null;
+      } finally {
+        callFetchInFlightByRecordId.delete(normalizedRecordId);
+      }
+    }
     async function refreshDashboardData(manual = false) {
       if (!liveRefreshSupported) {
         updateLiveStatus('status.reloading', t('live.reloading_static'));

@@ -35,6 +35,7 @@
       getSelectedRecordId,
       setSelectedRecordId,
       getRowByRecordId,
+      fetchCallRecord,
       getContextRuntime,
       setContextApiEnabled,
       renderDashboard,
@@ -348,6 +349,17 @@
         ? tf('caption.call_investigator', { record: short(getSelectedRecordId(), '').slice(0, 12) })
         : t('call.open_hint');
       if (!row) {
+        const selectedRecordId = getSelectedRecordId();
+        if (selectedRecordId && fetchCallRecord) {
+          rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('context.loading'))}</td></tr>`;
+          detailEl.textContent = t('dashboard.detail.empty');
+          fetchCallRecord(selectedRecordId).then(fetchedRow => {
+            if (!fetchedRow && getSelectedRecordId() === selectedRecordId) {
+              rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('call.not_found'))}</td></tr>`;
+            }
+          });
+          return;
+        }
         rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('call.not_found'))}</td></tr>`;
         detailEl.textContent = t('dashboard.detail.empty');
         return;
