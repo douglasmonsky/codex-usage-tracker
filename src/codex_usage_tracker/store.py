@@ -29,12 +29,13 @@ from codex_usage_tracker.schema import (
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
     3: "persist aggregate call-origin metadata",
     4: "persist dashboard query helper fields",
+    5: "materialize thread summaries",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -116,6 +117,7 @@ def rebuild_usage_index(
     with connect(db_path) as conn:
         init_db(conn)
         conn.execute("DELETE FROM usage_events")
+        conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM refresh_meta")
     return refresh_usage_index(
         codex_home=codex_home,
@@ -132,6 +134,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
         deleted_rows = int(row["count"] if row is not None else 0)
         conn.execute("DELETE FROM usage_events")
+        conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM refresh_meta")
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
@@ -181,6 +184,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v4(conn)
         _record_migration_if_missing(conn, 4)
+    if user_version < 5:
+        _migrate_v5(conn)
+        _record_migration(conn, 5)
+    else:
+        _migrate_v5(conn)
+        _record_migration_if_missing(conn, 5)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -243,6 +252,43 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
             ON usage_events(is_archived, model, effort);
         CREATE INDEX IF NOT EXISTS idx_usage_thread_key_timestamp
             ON usage_events(thread_key, event_timestamp, cumulative_total_tokens);
+        """
+    )
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS thread_summaries (
+            thread_key TEXT NOT NULL,
+            is_archived_scope TEXT NOT NULL,
+            thread_label TEXT,
+            first_event_timestamp TEXT,
+            latest_event_timestamp TEXT,
+            call_count INTEGER NOT NULL DEFAULT 0,
+            session_count INTEGER NOT NULL DEFAULT 0,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            uncached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_output_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            estimated_cost_usd REAL,
+            usage_credits REAL,
+            avg_cache_ratio REAL NOT NULL DEFAULT 0,
+            max_context_window_percent REAL NOT NULL DEFAULT 0,
+            max_recommendation_score REAL,
+            primary_recommendation TEXT,
+            call_initiator_summary TEXT,
+            archived_call_count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (thread_key, is_archived_scope)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_thread_summaries_scope_tokens
+            ON thread_summaries(is_archived_scope, total_tokens);
+        CREATE INDEX IF NOT EXISTS idx_thread_summaries_scope_latest
+            ON thread_summaries(is_archived_scope, latest_event_timestamp);
         """
     )
 
@@ -411,6 +457,7 @@ def upsert_usage_events(
         conn.executemany(sql, [[row[column] for column in EVENT_COLUMNS] for row in rows])
         if refresh_links:
             _refresh_usage_event_links(conn)
+            _refresh_thread_summaries(conn)
         return len(rows)
 
 
@@ -419,7 +466,9 @@ def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
 
     with connect(db_path) as conn:
         init_db(conn)
-        return _refresh_usage_event_links(conn)
+        changed = _refresh_usage_event_links(conn)
+        _refresh_thread_summaries(conn)
+        return changed
 
 
 def _refresh_usage_event_links(conn: sqlite3.Connection) -> int:
@@ -475,6 +524,136 @@ def _refresh_usage_event_links(conn: sqlite3.Connection) -> int:
     )
     conn.execute("DROP TABLE IF EXISTS temp_usage_event_links")
     return conn.total_changes - before
+
+
+def refresh_thread_summaries(db_path: Path = DEFAULT_DB_PATH) -> int:
+    """Rebuild materialized per-thread aggregate summaries."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        return _refresh_thread_summaries(conn)
+
+
+def _refresh_thread_summaries(conn: sqlite3.Connection) -> int:
+    before = conn.total_changes
+    conn.execute("DELETE FROM thread_summaries")
+    updated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    _insert_thread_summary_scope(
+        conn,
+        scope="active",
+        include_archived=False,
+        updated_at=updated_at,
+    )
+    _insert_thread_summary_scope(
+        conn,
+        scope="all-history",
+        include_archived=True,
+        updated_at=updated_at,
+    )
+    return conn.total_changes - before
+
+
+def _insert_thread_summary_scope(
+    conn: sqlite3.Connection,
+    *,
+    scope: str,
+    include_archived: bool,
+    updated_at: str,
+) -> None:
+    where_clause, params = _usage_where_clause(include_archived=include_archived)
+    thread_key_expr = _thread_key_expression()
+    conn.execute(
+        f"""
+        INSERT INTO thread_summaries (
+            thread_key,
+            is_archived_scope,
+            thread_label,
+            first_event_timestamp,
+            latest_event_timestamp,
+            call_count,
+            session_count,
+            input_tokens,
+            cached_input_tokens,
+            uncached_input_tokens,
+            output_tokens,
+            reasoning_output_tokens,
+            total_tokens,
+            estimated_cost_usd,
+            usage_credits,
+            avg_cache_ratio,
+            max_context_window_percent,
+            max_recommendation_score,
+            primary_recommendation,
+            call_initiator_summary,
+            archived_call_count,
+            updated_at
+        )
+        SELECT
+            {thread_key_expr} AS thread_key,
+            ? AS is_archived_scope,
+            coalesce(max(thread_name), max(parent_thread_name), max(session_id)) AS thread_label,
+            MIN(event_timestamp) AS first_event_timestamp,
+            MAX(event_timestamp) AS latest_event_timestamp,
+            COUNT(*) AS call_count,
+            COUNT(DISTINCT session_id) AS session_count,
+            coalesce(SUM(input_tokens), 0) AS input_tokens,
+            coalesce(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+            coalesce(SUM(uncached_input_tokens), 0) AS uncached_input_tokens,
+            coalesce(SUM(output_tokens), 0) AS output_tokens,
+            coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
+            coalesce(SUM(total_tokens), 0) AS total_tokens,
+            NULL AS estimated_cost_usd,
+            NULL AS usage_credits,
+            coalesce(AVG(cache_ratio), 0) AS avg_cache_ratio,
+            coalesce(MAX(context_window_percent), 0) AS max_context_window_percent,
+            coalesce(MAX(
+                CASE
+                    WHEN context_window_percent >= 0.90 THEN 100
+                    WHEN cache_ratio < 0.20 AND input_tokens >= 50000 THEN 80
+                    WHEN total_tokens >= 100000 THEN 70
+                    ELSE 0
+                END
+            ), 0) AS max_recommendation_score,
+            CASE
+                WHEN MAX(context_window_percent) >= 0.90 THEN 'high_context_use'
+                WHEN MIN(cache_ratio) < 0.20 AND MAX(input_tokens) >= 50000
+                    THEN 'low_cache_reuse'
+                WHEN MAX(total_tokens) >= 100000 THEN 'large_calls'
+                ELSE NULL
+            END AS primary_recommendation,
+            CASE
+                WHEN SUM(
+                    CASE WHEN coalesce(call_initiator, 'unknown') = 'codex'
+                    THEN 1 ELSE 0 END
+                ) > SUM(
+                    CASE WHEN coalesce(call_initiator, 'unknown') = 'user'
+                    THEN 1 ELSE 0 END
+                )
+                    THEN 'mostly_codex'
+                WHEN SUM(
+                    CASE WHEN coalesce(call_initiator, 'unknown') = 'user'
+                    THEN 1 ELSE 0 END
+                ) > SUM(
+                    CASE WHEN coalesce(call_initiator, 'unknown') = 'codex'
+                    THEN 1 ELSE 0 END
+                )
+                    THEN 'mostly_user'
+                WHEN SUM(
+                    CASE WHEN coalesce(call_initiator, 'unknown') = 'unknown'
+                    THEN 1 ELSE 0 END
+                ) = COUNT(*)
+                    THEN 'unknown'
+                ELSE 'mixed'
+            END AS call_initiator_summary,
+            SUM(CASE WHEN coalesce(is_archived, 0) != 0 THEN 1 ELSE 0 END)
+                AS archived_call_count,
+            ? AS updated_at
+        FROM usage_events
+        {where_clause}
+        GROUP BY {thread_key_expr}
+        """,
+        [scope, updated_at, *params],
+    )
 
 
 def query_summary(
@@ -841,12 +1020,15 @@ def query_thread_summaries(
     sort: str = "tokens",
     direction: str = "desc",
 ) -> list[dict[str, Any]]:
-    """Return SQL-computed thread summaries for live dashboard APIs."""
+    """Return materialized thread summaries for live dashboard APIs."""
 
-    where_clause, params = _usage_api_where_clause(
-        search=search,
-        include_archived=include_archived,
-    )
+    clauses = ["is_archived_scope = ?"]
+    params: list[Any] = ["all-history" if include_archived else "active"]
+    if search:
+        like = f"%{search}%"
+        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
+        params.extend([like, like])
+    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
     sort_map = {
         "tokens": "total_tokens",
         "time": "latest_event_timestamp",
@@ -875,25 +1057,9 @@ def query_thread_summaries(
         init_db(conn)
         rows = conn.execute(
             f"""
-            SELECT
-                coalesce(nullif(thread_key, ''), 'thread:' || thread_name, 'session:' || session_id) AS thread_key,
-                coalesce(max(thread_name), max(parent_thread_name), max(session_id)) AS thread_label,
-                MIN(event_timestamp) AS first_event_timestamp,
-                MAX(event_timestamp) AS latest_event_timestamp,
-                COUNT(*) AS call_count,
-                COUNT(DISTINCT session_id) AS session_count,
-                SUM(input_tokens) AS input_tokens,
-                SUM(cached_input_tokens) AS cached_input_tokens,
-                SUM(uncached_input_tokens) AS uncached_input_tokens,
-                SUM(output_tokens) AS output_tokens,
-                SUM(reasoning_output_tokens) AS reasoning_output_tokens,
-                SUM(total_tokens) AS total_tokens,
-                AVG(cache_ratio) AS avg_cache_ratio,
-                MAX(context_window_percent) AS max_context_window_percent,
-                SUM(CASE WHEN coalesce(is_archived, 0) != 0 THEN 1 ELSE 0 END) AS archived_call_count
-            FROM usage_events
+            SELECT *
+            FROM thread_summaries
             {where_clause}
-            GROUP BY coalesce(nullif(thread_key, ''), 'thread:' || thread_name, 'session:' || session_id)
             ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
             {limit_clause}
             """,
@@ -973,6 +1139,15 @@ def _group_expression(group_by: str) -> str:
 
 def _since_where_clause(since: str | None) -> tuple[str, list[Any]]:
     return _usage_where_clause(since=since)
+
+
+def _thread_key_expression(prefix: str = "") -> str:
+    return (
+        f"coalesce(nullif({prefix}thread_key, ''), "
+        f"CASE WHEN {prefix}thread_name IS NOT NULL "
+        f"THEN 'thread:' || {prefix}thread_name "
+        f"ELSE 'session:' || {prefix}session_id END)"
+    )
 
 
 def _usage_where_clause(

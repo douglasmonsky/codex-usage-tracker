@@ -68,7 +68,7 @@ Already implemented before this branch:
 - [x] M7 precompute client-side call adjacency for investigator rendering.
 - [x] M8 add source-log-aware synthetic benchmark coverage.
 - [x] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
-- [ ] M10 optionally materialize thread summaries after APIs are stable.
+- [x] M10 optionally materialize thread summaries after APIs are stable.
 - [ ] M11 optionally add incremental source-file refresh metadata after parser-time call origin is stable.
 - [ ] M12 finalize docs, validation, benchmark results, and merge-readiness notes.
 
@@ -186,6 +186,9 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `.venv/bin/python -m pytest tests/test_json_contracts.py -q` initially failed because the new live API schema ids were not tracked; after adding contracts and docs, it passed.
   - `.venv/bin/python -m pytest tests/test_privacy.py -q`
   - `.venv/bin/python scripts/check_release.py`
+- M10 materialized thread summaries:
+  - `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py::test_upsert_materializes_thread_summaries tests/test_store_dashboard_mcp.py::test_thread_summaries_keep_active_and_all_history_scopes_separate tests/test_store_dashboard_mcp.py::test_dashboard_server_live_sql_api_slices_are_aggregate_only tests/test_store_migrations.py::test_init_db_migrates_legacy_aggregate_table_without_data_loss -q`
+  - `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py tests/test_store_dashboard_mcp.py tests/test_store_migrations.py`
 
 ## Benchmarks Run
 
@@ -205,7 +208,11 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Context loading now performs selected-turn evidence and serialized-evidence collection in one source-file scan for a selected call. Serialized evidence is still built in memory and timed separately as `serialized_estimate_ms`.
 - M8 source-log benchmark mode now generates synthetic JSONL files, points synthetic aggregate rows at matching `token_count` lines, measures early/middle/late explicit context loads, and wraps source-log dashboard payload assembly with a guard that fails if a synthetic source file is opened.
 - M9 adds additive SQL-backed live endpoints: `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, and `/api/recommendations`. The frontend still uses `/api/usage` until a later split.
+- M10 materializes per-thread active and all-history summary rows in SQLite so `/api/threads` can read pre-aggregated thread totals without grouping every usage row on each request.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
+- Static dashboard generation remains supported as the export/compatibility path; M9 added live API slices without removing generated dashboard HTML.
+- Source-log reads are limited to refresh/indexing, explicit `/api/context` loading for one selected call, and explicit benchmark/diagnostic tooling. Normal `dashboard_payload` and `/api/usage` must remain aggregate-only.
+- No evidence cache was implemented in this branch.
 
 ## Privacy Notes
 
@@ -214,6 +221,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Persisted call-origin stores only categorical labels, reasons, and confidence values. Parser tests and privacy tests cover this with synthetic secret-bearing message/tool/compaction payloads.
 - M4 persisted only aggregate navigation/scope fields: archived flag, conservative thread key, call index, and adjacent aggregate record ids.
 - M5 diagnostics do not include raw text, prompts, tool output, source paths, or JSONL filenames. Context diagnostics include source file byte count and source line number only because the context payload itself already requires explicit token-protected on-demand loading.
+- M9 live dashboard APIs return aggregate SQLite data and explicitly keep raw context out of status, calls, call, threads, thread-calls, summary, recommendations, and compatibility usage payloads.
 
 ## Merge Blockers
 
@@ -226,7 +234,6 @@ Full branch closeout should also run the release validation listed in `docs/deve
 ## Deferred Work
 
 - Evidence cache is explicitly deferred.
-- Materialized thread summaries are deferred until the SQLite-backed API path is stable.
 - Incremental source-file refresh metadata is deferred until parser-time call origin is stable.
 - Any frontend rewrite from `/api/usage` to the new SQLite-backed endpoints should be split if it becomes broad.
 

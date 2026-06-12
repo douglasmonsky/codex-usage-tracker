@@ -33,6 +33,7 @@ from codex_usage_tracker.store import (
     query_most_expensive_calls,
     query_session_usage,
     query_summary,
+    query_thread_summaries,
     rebuild_usage_index,
     refresh_metadata,
     refresh_usage_index,
@@ -99,12 +100,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["skipped_events"] == "0"
     assert meta["inserted_or_updated_events"] == "4"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "4"
+    assert meta["schema_version"] == "5"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 4
+    assert state["schema_version"] == 5
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5]
 
 
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
@@ -387,6 +388,76 @@ def test_upsert_refreshes_thread_adjacency_fields(tmp_path: Path) -> None:
     assert by_id["b1"]["thread_call_index"] == 1
     assert by_id["b1"]["previous_record_id"] is None
     assert by_id["b1"]["next_record_id"] is None
+
+
+def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="a1",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:00Z",
+            cumulative_total_tokens=100,
+        ),
+        _usage_event(
+            record_id="a2",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:02Z",
+            cumulative_total_tokens=220,
+        ),
+        _usage_event(
+            record_id="b1",
+            session_id="session-b",
+            thread_key="thread:Beta",
+            event_timestamp="2026-05-17T12:00:01Z",
+            cumulative_total_tokens=90,
+        ),
+    ]
+
+    upsert_usage_events(events, db_path=db_path)
+    summaries = query_thread_summaries(db_path=db_path, limit=0, include_archived=False)
+    by_key = {row["thread_key"]: row for row in summaries}
+
+    assert set(by_key) == {"thread:Alpha", "thread:Beta"}
+    assert by_key["thread:Alpha"]["call_count"] == 2
+    assert by_key["thread:Alpha"]["session_count"] == 1
+    assert by_key["thread:Alpha"]["total_tokens"] == 220
+    assert by_key["thread:Alpha"]["cached_input_tokens"] == 40
+    assert by_key["thread:Alpha"]["call_initiator_summary"] == "mostly_user"
+    assert by_key["thread:Alpha"]["is_archived_scope"] == "active"
+    assert by_key["thread:Alpha"]["estimated_cost_usd"] is None
+    assert by_key["thread:Alpha"]["usage_credits"] is None
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        persisted = conn.execute("SELECT COUNT(*) AS count FROM thread_summaries").fetchone()
+    assert persisted is not None
+    assert persisted["count"] == 4
+
+
+def test_thread_summaries_keep_active_and_all_history_scopes_separate(
+    tmp_path: Path,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    _write_archived_log(codex_home)
+    db_path = tmp_path / "usage.sqlite3"
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path, include_archived=True)
+    active_summaries = query_thread_summaries(db_path=db_path, limit=0)
+    all_summaries = query_thread_summaries(
+        db_path=db_path,
+        limit=0,
+        include_archived=True,
+    )
+
+    assert {row["is_archived_scope"] for row in active_summaries} == {"active"}
+    assert {row["is_archived_scope"] for row in all_summaries} == {"all-history"}
+    assert sum(row["call_count"] for row in active_summaries) == 4
+    assert sum(row["call_count"] for row in all_summaries) == 5
+    assert sum(row["archived_call_count"] for row in active_summaries) == 0
+    assert sum(row["archived_call_count"] for row in all_summaries) == 1
 
 
 def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
