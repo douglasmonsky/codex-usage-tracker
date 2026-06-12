@@ -35,6 +35,18 @@
     return number.format(Math.round(amount));
   };
 
+  const compactNumber = (value, threshold = 1_000_000_000) => {
+    const amount = Number(value) || 0;
+    if (Math.abs(amount) < threshold) return number.format(Math.round(amount));
+    const scaled = amount / threshold;
+    const maximumFractionDigits = Math.abs(scaled) >= 10 ? 0 : 1;
+    const compacted = new Intl.NumberFormat([], {
+      maximumFractionDigits,
+      minimumFractionDigits: 0,
+    }).format(scaled);
+    return `${compacted}B`;
+  };
+
   const pct = value => `${((Number(value) || 0) * 100).toFixed(1)}%`;
   const short = (value, fallback = 'Unknown') => value || fallback;
   const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
@@ -120,6 +132,7 @@
     number,
     money,
     credits,
+    compactNumber,
     pct,
     short,
     escapeHtml,

@@ -33,6 +33,51 @@ const helpers = context.window.CodexUsageDashboardData;
     return json.loads(result.stdout)
 
 
+def _run_dashboard_format_script(script: str) -> dict[str, object]:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for dashboard format helper tests")
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "dashboard_format.js"
+    wrapped = f"""
+const fs = require('fs');
+const vm = require('vm');
+const code = fs.readFileSync({json.dumps(str(script_path))}, 'utf8');
+const context = {{ window: {{}}, Intl }};
+vm.createContext(context);
+vm.runInContext(code, context);
+const helpers = context.window.CodexUsageDashboardFormat;
+{script}
+"""
+    result = subprocess.run(
+        [node, "-e", wrapped],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
+def test_compact_number_collapses_billion_scale_values() -> None:
+    payload = _run_dashboard_format_script(
+        """
+console.log(JSON.stringify({
+  below: helpers.compactNumber(999999999),
+  one: helpers.compactNumber(1000000000),
+  decimal: helpers.compactNumber(1234567890),
+  large: helpers.compactNumber(2280875918),
+}));
+"""
+    )
+
+    assert payload == {
+        "below": "999,999,999",
+        "one": "1B",
+        "decimal": "1.2B",
+        "large": "2.3B",
+    }
+
+
 def test_cache_diagnostic_classification_handles_expected_patterns() -> None:
     payload = _run_dashboard_data_script(
         """

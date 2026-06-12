@@ -4,6 +4,7 @@
       number,
       money,
       credits,
+      compactNumber,
       pct,
       short,
       escapeHtml,
@@ -853,6 +854,14 @@
     }
     function tokenNumberCell(value, label) {
       return `<span class="token-number" ${tooltipAttributes(`${label}: ${number.format(value)}`)}>${escapeHtml(number.format(value))}</span>`;
+    }
+    function setSummaryNumber(id, value, labelKey) {
+      const element = document.getElementById(id);
+      if (!element) return;
+      const exact = number.format(Math.round(Number(value) || 0));
+      const compacted = compactNumber(value);
+      element.textContent = compacted;
+      setFastTooltip(element, compacted === exact ? '' : `${t(labelKey)}: ${exact}`);
     }
     function totalTokenCell(row) {
       const total = Number(row.total_tokens || 0);
@@ -2030,11 +2039,11 @@
       const cachedInputTokens = rows.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0);
       const uncachedInputTokens = rows.reduce((sum, row) => sum + Number(row.uncached_input_tokens || 0), 0);
       const reasoningOutputTokens = rows.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0);
-      document.getElementById('visibleCalls').textContent = number.format(rows.length);
-      document.getElementById('totalTokens').textContent = number.format(totalTokens);
-      document.getElementById('cachedTokens').textContent = number.format(cachedInputTokens);
-      document.getElementById('uncachedTokens').textContent = number.format(uncachedInputTokens);
-      document.getElementById('reasoningTokens').textContent = number.format(reasoningOutputTokens);
+      setSummaryNumber('visibleCalls', rows.length, 'metric.visible_calls');
+      setSummaryNumber('totalTokens', totalTokens, 'metric.total_tokens');
+      setSummaryNumber('cachedTokens', cachedInputTokens, 'metric.cached_input');
+      setSummaryNumber('uncachedTokens', uncachedInputTokens, 'metric.uncached_input');
+      setSummaryNumber('reasoningTokens', reasoningOutputTokens, 'metric.reasoning_output');
       const estimatedCost = rows.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
       const usageCredits = sumUsageCredits(rows);
       document.getElementById('estimatedCost').textContent = pricingConfigured ? moneyText(estimatedCost) : t('state.not_configured');
