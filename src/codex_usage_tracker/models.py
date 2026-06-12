@@ -35,6 +35,11 @@ class UsageEvent:
     call_initiator: str | None
     call_initiator_reason: str | None
     call_initiator_confidence: str | None
+    is_archived: int
+    thread_key: str | None
+    thread_call_index: int | None
+    previous_record_id: str | None
+    next_record_id: str | None
     thread_source: str | None
     subagent_type: str | None
     agent_role: str | None

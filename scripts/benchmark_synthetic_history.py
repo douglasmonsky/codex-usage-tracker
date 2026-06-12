@@ -30,6 +30,7 @@ from codex_usage_tracker.store import (  # noqa: E402
     init_db,
     query_dashboard_event_count,
     query_dashboard_events,
+    refresh_usage_event_links,
     upsert_usage_events,
 )
 
@@ -146,7 +147,12 @@ def benchmark_size(
     populate_start = time.perf_counter()
     for start in range(0, row_count, batch_size):
         end = min(start + batch_size, row_count)
-        upsert_usage_events(_synthetic_events(start, end), db_path=db_path)
+        upsert_usage_events(
+            _synthetic_events(start, end),
+            db_path=db_path,
+            refresh_links=False,
+        )
+    refresh_usage_event_links(db_path=db_path)
     populate_seconds = time.perf_counter() - populate_start
 
     active_rows, active_dashboard_query_seconds = _time_call(
@@ -391,10 +397,13 @@ def _synthetic_events(start: int, end: int) -> Iterable[UsageEvent]:
             if index % 11 == 0
             else f"/tmp/synthetic/{index % 2500}.jsonl"
         )
+        thread_name = f"Thread {index % 500}"
+        call_initiator = "codex" if is_subagent or is_review else "user"
+        call_reason = "thread_source" if is_subagent or is_review else "user_message"
         yield UsageEvent(
             record_id=f"record-{index:08d}",
             session_id=session_id,
-            thread_name=f"Thread {index % 500}",
+            thread_name=thread_name,
             session_updated_at=f"2026-05-{day:02d}T23:00:00Z",
             event_timestamp=f"2026-05-{day:02d}T12:{index % 60:02d}:00Z",
             source_file=source_file,
@@ -406,6 +415,14 @@ def _synthetic_events(start: int, end: int) -> Iterable[UsageEvent]:
             effort=effort,
             current_date=f"2026-05-{day:02d}",
             timezone="UTC",
+            call_initiator=call_initiator,
+            call_initiator_reason=call_reason,
+            call_initiator_confidence="medium" if call_initiator == "codex" else "high",
+            is_archived=1 if "/archived_sessions/" in source_file else 0,
+            thread_key=f"thread:{thread_name}",
+            thread_call_index=None,
+            previous_record_id=None,
+            next_record_id=None,
             thread_source="subagent" if is_subagent or is_review else "user",
             subagent_type="guardian" if is_review else "thread_spawn" if is_subagent else None,
             agent_role="reviewer" if is_review else "worker" if is_subagent else None,

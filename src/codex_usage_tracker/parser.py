@@ -162,6 +162,8 @@ def inspect_log(
                 "reasoning_output_tokens": event.reasoning_output_tokens,
                 "total_tokens": event.total_tokens,
                 "cumulative_total_tokens": event.cumulative_total_tokens,
+                "is_archived": event.is_archived,
+                "thread_key": event.thread_key,
             }
             for event in events
         ],
@@ -357,6 +359,15 @@ def _build_event(
         call_initiator=call_origin.get("call_initiator"),
         call_initiator_reason=call_origin.get("call_initiator_reason"),
         call_initiator_confidence=call_origin.get("call_initiator_confidence"),
+        is_archived=_is_archived_source(path),
+        thread_key=_thread_key(
+            session_id=session_id,
+            session_info=session_info,
+            session_meta=session_meta,
+        ),
+        thread_call_index=None,
+        previous_record_id=None,
+        next_record_id=None,
         thread_source=session_meta.get("thread_source"),
         subagent_type=session_meta.get("subagent_type"),
         agent_role=session_meta.get("agent_role"),
@@ -440,6 +451,28 @@ def _record_id(
         ]
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _is_archived_source(path: Path) -> int:
+    return 1 if "archived_sessions" in path.parts else 0
+
+
+def _thread_key(
+    *,
+    session_id: str,
+    session_info: SessionInfo | None,
+    session_meta: dict[str, str | None],
+) -> str:
+    thread_name = session_info.thread_name if session_info else None
+    if thread_name:
+        return f"thread:{thread_name}"
+    parent_thread_name = session_meta.get("parent_thread_name")
+    if parent_thread_name:
+        return f"thread:{parent_thread_name}"
+    parent_session_id = session_meta.get("parent_session_id")
+    if parent_session_id:
+        return f"session:{parent_session_id}"
+    return f"session:{session_id}"
 
 
 def _session_id_from_path(path: Path) -> str | None:

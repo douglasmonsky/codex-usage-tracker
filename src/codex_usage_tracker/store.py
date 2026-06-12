@@ -29,16 +29,24 @@ from codex_usage_tracker.schema import (
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
     3: "persist aggregate call-origin metadata",
+    4: "persist dashboard query helper fields",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
     "call_initiator_reason": "TEXT",
     "call_initiator_confidence": "TEXT",
+}
+DASHBOARD_HELPER_REPAIR_COLUMNS = {
+    "is_archived": "INTEGER NOT NULL DEFAULT 0",
+    "thread_key": "TEXT",
+    "thread_call_index": "INTEGER",
+    "previous_record_id": "TEXT",
+    "next_record_id": "TEXT",
 }
 _ARCHIVED_SOURCE_PATTERNS = (
     "%/archived_sessions/%",
@@ -153,6 +161,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v3(conn)
         _record_migration_if_missing(conn, 3)
+    if user_version < 4:
+        _migrate_v4(conn)
+        _record_migration(conn, 4)
+    else:
+        _migrate_v4(conn)
+        _record_migration_if_missing(conn, 4)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -203,6 +217,20 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
 
 def _migrate_v3(conn: sqlite3.Connection) -> None:
     _ensure_columns(conn, CALL_ORIGIN_REPAIR_COLUMNS)
+
+
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    _ensure_columns(conn, DASHBOARD_HELPER_REPAIR_COLUMNS)
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_usage_archived_timestamp
+            ON usage_events(is_archived, event_timestamp);
+        CREATE INDEX IF NOT EXISTS idx_usage_archived_model_effort
+            ON usage_events(is_archived, model, effort);
+        CREATE INDEX IF NOT EXISTS idx_usage_thread_key_timestamp
+            ON usage_events(thread_key, event_timestamp, cumulative_total_tokens);
+        """
+    )
 
 
 def _record_migration(conn: sqlite3.Connection, version: int) -> None:
@@ -345,7 +373,10 @@ def _validate_usage_events_schema(conn: sqlite3.Connection) -> None:
 
 
 def upsert_usage_events(
-    events: Iterable[UsageEvent], db_path: Path = DEFAULT_DB_PATH
+    events: Iterable[UsageEvent],
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    refresh_links: bool = True,
 ) -> int:
     rows = [event.to_row() for event in events]
     with connect(db_path) as conn:
@@ -364,7 +395,72 @@ def upsert_usage_events(
             f"ON CONFLICT(record_id) DO UPDATE SET {update_clause}"
         )
         conn.executemany(sql, [[row[column] for column in EVENT_COLUMNS] for row in rows])
+        if refresh_links:
+            _refresh_usage_event_links(conn)
         return len(rows)
+
+
+def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
+    """Recompute per-thread chronological adjacency for aggregate usage rows."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        return _refresh_usage_event_links(conn)
+
+
+def _refresh_usage_event_links(conn: sqlite3.Connection) -> int:
+    before = conn.total_changes
+    conn.execute("DROP TABLE IF EXISTS temp_usage_event_links")
+    conn.execute(
+        """
+        CREATE TEMP TABLE temp_usage_event_links AS
+        SELECT
+            record_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
+            ) AS next_thread_call_index,
+            LAG(record_id) OVER (
+                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
+            ) AS previous_id,
+            LEAD(record_id) OVER (
+                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
+            ) AS next_id
+        FROM usage_events
+        """
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX temp_usage_event_links_record_id ON temp_usage_event_links(record_id)"
+    )
+    conn.execute(
+        """
+        UPDATE usage_events
+        SET
+            thread_call_index = (
+                SELECT next_thread_call_index
+                FROM temp_usage_event_links
+                WHERE temp_usage_event_links.record_id = usage_events.record_id
+            ),
+            previous_record_id = (
+                SELECT previous_id
+                FROM temp_usage_event_links
+                WHERE temp_usage_event_links.record_id = usage_events.record_id
+            ),
+            next_record_id = (
+                SELECT next_id
+                FROM temp_usage_event_links
+                WHERE temp_usage_event_links.record_id = usage_events.record_id
+            )
+        WHERE record_id IN (
+            SELECT record_id
+            FROM temp_usage_event_links
+        )
+        """
+    )
+    conn.execute("DROP TABLE IF EXISTS temp_usage_event_links")
+    return conn.total_changes - before
 
 
 def query_summary(
@@ -680,7 +776,12 @@ def _usage_where_clause(
         clauses.append(f"{prefix}total_tokens >= ?")
         params.append(min_tokens)
     if not include_archived:
-        clauses.extend([f"{prefix}source_file NOT LIKE ?"] * len(_ARCHIVED_SOURCE_PATTERNS))
+        archived_path_clause = " OR ".join(
+            f"{prefix}source_file LIKE ?" for _pattern in _ARCHIVED_SOURCE_PATTERNS
+        )
+        clauses.append(
+            f"(coalesce({prefix}is_archived, 0) = 0 AND NOT ({archived_path_clause}))"
+        )
         params.extend(_ARCHIVED_SOURCE_PATTERNS)
     if not clauses:
         return "", []

@@ -41,6 +41,8 @@ Suspected hot paths confirmed by source inspection:
 - M3 removed the `dashboard_payload` source-log call-origin scan. Call origin is now persisted as aggregate categorical metadata during parser refresh, with a cheap fallback for migrated rows.
 - M3 converted `src/codex_usage_tracker/call_origin.py` to pure classifiers that do not open source JSONL files.
 - `src/codex_usage_tracker/server.py` serves `/api/usage` by calling `dashboard_payload`; after M3, this no longer inherits call-origin source-log reads.
+- M4 persists `is_archived`, `thread_key`, `thread_call_index`, `previous_record_id`, and `next_record_id` in `usage_events`.
+- M4 updates active-history SQL filtering to use `is_archived` while still excluding migrated archived source paths when the new flag has only its default value.
 - M2 removed `_read_call_anchors(...)` from `load_call_context`, so explicit context loading no longer performs the extra anchor scan.
 - M2 removed all dashboard reads of `payload.call_anchors` and `payload.thread_anchors`.
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js` builds helper indexes, but adjacent-call lookup and render paths still need a focused large-history review.
@@ -60,7 +62,7 @@ Already implemented before this branch:
 - [x] M1 validate and package the call investigator dashboard asset in CI, docs, and release checks.
 - [x] M2 remove low-value call/thread anchor diagnostics and their extra context source scan.
 - [x] M3 persist aggregate call-origin metadata during indexing so dashboard payloads do not scan source logs.
-- [ ] M4 persist cheap performance-critical dashboard query helper fields where feasible.
+- [x] M4 persist cheap performance-critical dashboard query helper fields where feasible.
 - [ ] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
 - [ ] M6 make explicit context loading single-pass where practical.
 - [ ] M7 precompute client-side call adjacency for investigator rendering.
@@ -100,6 +102,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - `CHANGELOG.md`
 - `docs/architecture.md`
 - `docs/development.md`
+- `scripts/benchmark_synthetic_history.py`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.css`
 - `src/codex_usage_tracker/context.py`
 - `src/codex_usage_tracker/call_origin.py`
@@ -142,15 +145,25 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `python -m pytest tests/test_call_origin.py tests/test_parser.py::test_parser_ignores_known_non_token_context_compaction_event tests/test_parser.py::test_parser_persists_call_origin_from_metadata_segments tests/test_schema.py tests/test_store_migrations.py::test_init_db_migrates_legacy_aggregate_table_without_data_loss tests/test_store_migrations.py::test_csv_export_keeps_current_columns_after_legacy_migration tests/test_store_dashboard_mcp.py::test_dashboard_payload_uses_persisted_call_origin_without_source_scan -q`
   - `python -m pytest tests/test_parser.py tests/test_call_origin.py tests/test_store_migrations.py tests/test_privacy.py tests/test_store_dashboard_mcp.py -q`
   - `python scripts/check_release.py`
+- M4 dashboard query helper fields:
+  - `python -m pytest tests/test_parser.py::test_parser_persists_dashboard_helper_metadata tests/test_store_dashboard_mcp.py::test_upsert_refreshes_thread_adjacency_fields tests/test_store_dashboard_mcp.py::test_dashboard_history_scope_excludes_archived_rows_by_default -q` failed before implementation because the helper fields were missing.
+  - `python -m pytest tests/test_parser.py::test_parser_persists_dashboard_helper_metadata tests/test_store_dashboard_mcp.py::test_upsert_refreshes_thread_adjacency_fields tests/test_store_dashboard_mcp.py::test_dashboard_history_scope_excludes_archived_rows_by_default tests/test_store_migrations.py::test_init_db_migrates_legacy_aggregate_table_without_data_loss tests/test_schema.py -q`
+  - `python -m pytest tests/test_store_migrations.py tests/test_store_dashboard_mcp.py tests/test_privacy.py -q`
+  - `python scripts/check_release.py`
+  - `git diff --check`
 
 ## Benchmarks Run
 
-- None yet. M3 removed a source-log scan path and added regression tests; benchmark coverage starts in M8.
+- M4:
+  - `python scripts/benchmark_synthetic_history.py --rows 10000 --json --enforce-thresholds` initially failed after adjacency updates because population took `9.479820s` against a `1.600000s` threshold.
+  - After deferring bulk link recomputation and materializing the link window update, the same command passed. Latest recorded 10k timings included `populate_seconds: 0.357407`, `active_dashboard_query_seconds: 0.017709`, `dashboard_payload_active_seconds: 0.072064`, and no threshold failures.
 
 ## Known Remaining Slow Paths
 
 - Normal `dashboard_payload` no longer runs source-file call-origin annotation.
 - Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata.
+- Active/all-history filtering now has a persisted `is_archived` flag and path fallback; future SQLite-backed API slices should reuse that helper instead of reintroducing path-only filtering.
+- Per-thread adjacency is persisted after upsert; M7 still needs to make the browser prefer `previous_record_id` and `next_record_id` instead of filtering loaded rows.
 - Context loading still does selected-turn evidence and serialized-evidence work; Milestone 6 must verify whether that can be reduced to one source-file pass.
 - Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
 
@@ -159,6 +172,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Milestone 0 made no product behavior changes.
 - The branch must keep all test data synthetic and must not persist raw transcript content.
 - Persisted call-origin stores only categorical labels, reasons, and confidence values. Parser tests and privacy tests cover this with synthetic secret-bearing message/tool/compaction payloads.
+- M4 persisted only aggregate navigation/scope fields: archived flag, conservative thread key, call index, and adjacent aggregate record ids.
 
 ## Merge Blockers
 

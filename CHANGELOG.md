@@ -4,6 +4,7 @@
 
 - Remove low-value call/thread anchor diagnostics from the experimental call investigator to avoid an extra source-log scan per context load.
 - Persist call-origin metadata as categorical aggregate fields during indexing so normal dashboard payloads do not reopen source JSONL logs to infer user-vs-Codex initiation.
+- Persist archived-session scope, conservative thread keys, and per-thread previous/next call links as aggregate helper fields for faster dashboard filtering and investigator navigation.
 
 ## 0.5.0 - 2026-06-10
 

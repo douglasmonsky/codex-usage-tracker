@@ -99,12 +99,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["skipped_events"] == "0"
     assert meta["inserted_or_updated_events"] == "4"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "3"
+    assert meta["schema_version"] == "4"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 3
+    assert state["schema_version"] == 4
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4]
 
 
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
@@ -138,7 +138,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 3
+    assert user_version == 4
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -199,12 +199,17 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
         "call_initiator",
         "call_initiator_reason",
         "call_initiator_confidence",
+        "is_archived",
+        "thread_key",
+        "thread_call_index",
+        "previous_record_id",
+        "next_record_id",
     } <= columns
     assert "idx_usage_timestamp" in indexes
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
-    assert user_version == 3
-    assert [row["version"] for row in migrations] == [1, 2, 3]
+    assert user_version == 4
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4]
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:
@@ -276,6 +281,11 @@ def test_large_history_query_prefilter_uses_sql_indexes(tmp_path: Path) -> None:
             call_initiator="user",
             call_initiator_reason="user_message",
             call_initiator_confidence="high",
+            is_archived=0,
+            thread_key=f"thread:Thread {index % 25}",
+            thread_call_index=None,
+            previous_record_id=None,
+            next_record_id=None,
             thread_source="user",
             subagent_type=None,
             agent_role=None,
@@ -326,6 +336,57 @@ def test_large_history_query_prefilter_uses_sql_indexes(tmp_path: Path) -> None:
     assert all(row["effort"] == "high" for row in rows)
     assert all(row["total_tokens"] >= 9000 for row in rows)
     assert "idx_usage_model_effort" in plan
+
+
+def test_upsert_refreshes_thread_adjacency_fields(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="a1",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:00Z",
+            cumulative_total_tokens=100,
+        ),
+        _usage_event(
+            record_id="b1",
+            session_id="session-b",
+            thread_key="thread:Beta",
+            event_timestamp="2026-05-17T12:00:01Z",
+            cumulative_total_tokens=50,
+        ),
+        _usage_event(
+            record_id="a2",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:02Z",
+            cumulative_total_tokens=200,
+        ),
+        _usage_event(
+            record_id="a3",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:03Z",
+            cumulative_total_tokens=300,
+        ),
+    ]
+
+    upsert_usage_events(events, db_path=db_path)
+    rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=True)
+    by_id = {row["record_id"]: row for row in rows}
+
+    assert by_id["a1"]["thread_call_index"] == 1
+    assert by_id["a1"]["previous_record_id"] is None
+    assert by_id["a1"]["next_record_id"] == "a2"
+    assert by_id["a2"]["thread_call_index"] == 2
+    assert by_id["a2"]["previous_record_id"] == "a1"
+    assert by_id["a2"]["next_record_id"] == "a3"
+    assert by_id["a3"]["thread_call_index"] == 3
+    assert by_id["a3"]["previous_record_id"] == "a2"
+    assert by_id["a3"]["next_record_id"] is None
+    assert by_id["b1"]["thread_call_index"] == 1
+    assert by_id["b1"]["previous_record_id"] is None
+    assert by_id["b1"]["next_record_id"] is None
 
 
 def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
@@ -918,6 +979,7 @@ def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Pat
     all_history_payload = dashboard_payload(db_path=db_path, limit=0, include_archived=True)
     active_rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=False)
     all_rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=True)
+    archived_rows = [row for row in all_rows if "/archived_sessions/" in row["source_file"]]
 
     assert refresh_result.parsed_events == 5
     assert active_payload["include_archived"] is False
@@ -934,7 +996,22 @@ def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Pat
     assert len(active_rows) == 4
     assert len(all_rows) == 5
     assert not any("/archived_sessions/" in row["source_file"] for row in active_rows)
-    assert any("/archived_sessions/" in row["source_file"] for row in all_rows)
+    assert len(archived_rows) == 1
+    assert archived_rows[0]["is_archived"] == 1
+    assert all(row["is_archived"] == 0 for row in active_rows)
+
+    with connect(db_path) as conn:
+        conn.execute("UPDATE usage_events SET is_archived = 0")
+    active_rows_after_migrated_flag_reset = query_dashboard_events(
+        db_path=db_path,
+        limit=0,
+        include_archived=False,
+    )
+    assert len(active_rows_after_migrated_flag_reset) == 4
+    assert not any(
+        "/archived_sessions/" in row["source_file"]
+        for row in active_rows_after_migrated_flag_reset
+    )
 
 
 def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> None:
@@ -1871,6 +1948,58 @@ def _write_archived_log(codex_home: Path) -> Path:
         ],
     )
     return archived_log_path
+
+
+def _usage_event(
+    *,
+    record_id: str,
+    session_id: str,
+    thread_key: str,
+    event_timestamp: str,
+    cumulative_total_tokens: int,
+) -> UsageEvent:
+    return UsageEvent(
+        record_id=record_id,
+        session_id=session_id,
+        thread_name=thread_key.removeprefix("thread:"),
+        session_updated_at="2026-05-17T18:58:27Z",
+        event_timestamp=event_timestamp,
+        source_file=f"/tmp/synthetic/{record_id}.jsonl",
+        line_number=1,
+        turn_id=f"turn-{record_id}",
+        turn_timestamp=event_timestamp,
+        cwd="/tmp/project",
+        model="gpt-5.5",
+        effort="high",
+        current_date="2026-05-17",
+        timezone="UTC",
+        call_initiator="user",
+        call_initiator_reason="user_message",
+        call_initiator_confidence="high",
+        is_archived=0,
+        thread_key=thread_key,
+        thread_call_index=None,
+        previous_record_id=None,
+        next_record_id=None,
+        thread_source="user",
+        subagent_type=None,
+        agent_role=None,
+        agent_nickname=None,
+        parent_session_id=None,
+        parent_thread_name=None,
+        parent_session_updated_at=None,
+        model_context_window=200000,
+        input_tokens=100,
+        cached_input_tokens=20,
+        output_tokens=10,
+        reasoning_output_tokens=5,
+        total_tokens=110,
+        cumulative_input_tokens=cumulative_total_tokens - 10,
+        cumulative_cached_input_tokens=20,
+        cumulative_output_tokens=10,
+        cumulative_reasoning_output_tokens=5,
+        cumulative_total_tokens=cumulative_total_tokens,
+    )
 
 
 def _write_pricing(path: Path) -> Path:

@@ -11,6 +11,7 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - token counts and derived efficiency ratios
 - subagent source, role, nickname, parent session id, and parent thread name when present
 - call-origin category, reason, and confidence labels derived from event metadata during indexing
+- archived-session flag, conservative thread key, and adjacent aggregate record ids for dashboard navigation
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
 
 ## Not Stored

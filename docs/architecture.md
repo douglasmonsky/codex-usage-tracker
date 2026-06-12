@@ -4,10 +4,10 @@ Codex Usage Tracker is a local sidecar app. It reads aggregate token counters fr
 
 ## Boundaries
 
-- `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories such as user message, tool result, post-compaction, and agent continuation. It must not persist prompts, assistant text, tool output, or transcript snippets.
+- `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories, archived-session flags, and conservative thread keys. It must not persist prompts, assistant text, tool output, or transcript snippets.
 - `call_origin.py` owns the pure call-origin classifier and migrated-row fallback. It must not open source JSONL files; source-log reads belong in parser refresh or explicit context loading only.
 - `schema.py` owns persisted `usage_events` columns. Add columns there before changing SQLite migrations or export behavior.
-- `store.py` owns SQLite setup, refresh, rebuild, and query access. Keep filesystem scanning, database writes, SQL prefilters, counts, limits, and offsets here.
+- `store.py` owns SQLite setup, refresh, rebuild, query access, and persisted per-thread previous/next call links. Keep filesystem scanning, database writes, SQL prefilters, counts, limits, and offsets here.
 - `reports.py` is the application-service layer for summaries, expensive-call reports, recommendations, pricing coverage, and filtered query payloads. CLI and MCP should call this layer instead of duplicating report assembly.
 - `api_payloads.py` owns stable JSON payload helpers shared by CLI and MCP. `json_contracts.py` owns the lightweight contract checks for schema-versioned CLI/MCP payloads. Add payload builders and contract entries together when both surfaces need the same shape.
 - `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows.

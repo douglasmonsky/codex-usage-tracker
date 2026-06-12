@@ -216,6 +216,41 @@ def test_parser_persists_call_origin_from_metadata_segments(tmp_path: Path) -> N
     assert "SECRET" not in json.dumps([event.to_row() for event in events])
 
 
+def test_parser_persists_dashboard_helper_metadata(tmp_path: Path) -> None:
+    log_path = (
+        tmp_path
+        / ".codex"
+        / "archived_sessions"
+        / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+        ],
+    )
+
+    events = parse_usage_events_from_file(
+        log_path,
+        {
+            SESSION_ID: SessionInfo(
+                session_id=SESSION_ID,
+                thread_name="Archived tracker thread",
+                updated_at="2026-05-17T18:00:00Z",
+            )
+        },
+    )
+
+    assert len(events) == 1
+    assert events[0].is_archived == 1
+    assert events[0].thread_key == "thread:Archived tracker thread"
+    assert events[0].thread_call_index is None
+    assert events[0].previous_record_id is None
+    assert events[0].next_record_id is None
+
+
 def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: Path) -> None:
     log_path = tmp_path / "unknown-name.jsonl"
     missing_counter = _token_event(100, 100)
