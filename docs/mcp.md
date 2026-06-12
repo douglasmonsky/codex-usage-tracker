@@ -81,3 +81,5 @@ CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1
 ```
 
 Normal aggregate tools do not need this variable. Keep raw context disabled unless the user specifically asks to inspect local log context.
+
+When raw context is enabled, `usage_call_context` accepts `max_entries` and `max_chars`. Use `0` for either value only when the user explicitly asks for all matching entries or no character cap for that local context request.

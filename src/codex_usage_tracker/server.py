@@ -16,7 +16,11 @@ from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
+from codex_usage_tracker.context import (
+    DEFAULT_CONTEXT_CHARS,
+    DEFAULT_CONTEXT_ENTRIES,
+    load_call_context,
+)
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
@@ -231,11 +235,16 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             )
             return
         include_tool_output = _truthy(_first(params.get("include_tool_output")))
+        max_chars = _parse_context_limit(_first(params.get("max_chars")), self._context_chars)
+        max_entries = _parse_context_limit(
+            _first(params.get("max_entries")), DEFAULT_CONTEXT_ENTRIES
+        )
         try:
             payload = load_call_context(
                 record_id=record_id,
                 db_path=self._db_path,
-                max_chars=self._context_chars,
+                max_chars=max_chars,
+                max_entries=max_entries,
                 include_tool_output=include_tool_output,
             )
         except sqlite3.Error as exc:
@@ -404,6 +413,18 @@ def _parse_offset(value: str | None) -> int:
     except ValueError:
         return 0
     return max(offset, 0)
+
+
+def _parse_context_limit(value: str | None, default: int) -> int:
+    if value is None or value == "":
+        return default
+    if value.lower() == "all":
+        return 0
+    try:
+        limit = int(value)
+    except ValueError:
+        return default
+    return max(limit, 0)
 
 
 def _utc_now() -> str:

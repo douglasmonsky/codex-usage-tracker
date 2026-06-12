@@ -433,6 +433,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "button.load_context" in dashboard_js
     assert "button.show_tool_output" in dashboard_js
     assert "data-context-entry-load-output" in dashboard_js
+    assert "data-context-load-older" in dashboard_js
+    assert "data-context-no-budget" in dashboard_js
+    assert "renderContextTokenUsage" in dashboard_js
+    assert "context-token-breakdown" in dashboard_css
     assert "tool_output_omitted" in dashboard_js
     assert "parent_thread_name" in dashboard
     assert "thread_attachment_label" in dashboard
@@ -944,6 +948,14 @@ def test_dashboard_server_can_enable_context_api_at_runtime(tmp_path: Path) -> N
             timeout=5,
         ) as response:
             context_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/api/context?record_id={record_id}&max_chars=0&max_entries=0",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            unlimited_context_payload = json.loads(response.read().decode("utf-8"))
     finally:
         server.shutdown()
         server.server_close()
@@ -959,6 +971,9 @@ def test_dashboard_server_can_enable_context_api_at_runtime(tmp_path: Path) -> N
     assert usage_payload["context_api_enabled"] is True
     assert context_payload["loaded_on_demand"] is True
     assert context_payload["raw_context_persisted"] is False
+    assert unlimited_context_payload["omitted"]["max_chars"] == 0
+    assert unlimited_context_payload["omitted"]["max_entries"] == 0
+    assert unlimited_context_payload["omitted"]["older_entries"] == 0
 
 
 def test_dashboard_query_limit_zero_loads_all_rows(tmp_path: Path) -> None:
@@ -997,6 +1012,28 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     assert "[REDACTED_JWT]" in context_text
     assert "[REDACTED_PRIVATE_KEY]" in context_text
     assert any(entry["label"] == "message / user" for entry in context["entries"])
+    token_entry = next(entry for entry in context["entries"] if entry["label"] == "Token count")
+    assert token_entry["token_usage"]["last_token_usage"]["uncached_input_tokens"] >= 0
+
+    limited_context = load_call_context(
+        rows[0]["record_id"],
+        db_path=db_path,
+        max_chars=40,
+        max_entries=1,
+    )
+    unlimited_context = load_call_context(
+        rows[0]["record_id"],
+        db_path=db_path,
+        max_chars=0,
+        max_entries=0,
+    )
+    assert limited_context["omitted"]["returned_entries"] == 1
+    assert limited_context["omitted"]["older_entries"] > 0
+    assert unlimited_context["omitted"]["max_chars"] == 0
+    assert unlimited_context["omitted"]["max_entries"] == 0
+    assert unlimited_context["omitted"]["older_entries"] == 0
+    assert unlimited_context["omitted"]["over_budget_chars"] == 0
+    assert len(unlimited_context["entries"]) > len(limited_context["entries"])
 
 
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:

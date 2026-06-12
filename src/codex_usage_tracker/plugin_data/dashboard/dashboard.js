@@ -51,6 +51,8 @@
       'button.load_context': 'Load context',
       'button.include_tool_output': 'Include tool output',
       'button.show_tool_output': 'Show tool output',
+      'button.load_older_context': 'Load older entries',
+      'button.no_char_limit': 'No char limit',
       'button.copy_link': 'Copy link',
       'button.clear': 'Clear',
       'action.run': 'Run',
@@ -89,6 +91,17 @@
       'table.last_call': 'Last Call',
       'table.visible_status': 'Showing {end} of {total} {items}',
       'language.label': 'Language',
+      'context.token_breakdown': 'Token breakdown',
+      'context.token_scope_call': 'This call',
+      'context.token_scope_session': 'Session cumulative',
+      'context.token_type': 'Type',
+      'context.token_input': 'Input',
+      'context.token_cached': 'Cached',
+      'context.token_uncached': 'Uncached',
+      'context.token_output': 'Output',
+      'context.token_reasoning': 'Reasoning',
+      'context.token_total': 'Total',
+      'context.no_char_limit_active': 'No character limit applied.',
     };
     let availableLanguages = Array.isArray(initialPayload.available_languages) && initialPayload.available_languages.length
       ? initialPayload.available_languages
@@ -252,6 +265,7 @@
     const liveRefreshIntervalMs = 10000;
     const pageSize = 500;
     const threadCallPageSize = 100;
+    const defaultContextEntries = 80;
     const datePresetLabels = {
       all: 'option.all_time',
       today: 'option.today',
@@ -273,6 +287,7 @@
     let autoRefreshTimer = null;
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
+    const contextRequestState = new Map();
     let pendingFocusTarget = null;
     let fastTooltipEl = null;
     let fastTooltipTarget = null;
@@ -1993,15 +2008,25 @@
       const outputButton = detailEl.querySelector('[data-context-load-output]');
       const enableButton = detailEl.querySelector('[data-context-enable]');
       const contextResult = detailEl.querySelector('#contextResult');
-      if (loadButton) loadButton.addEventListener('click', () => loadContext(row, false));
-      if (outputButton) outputButton.addEventListener('click', () => loadContext(row, true));
+      if (loadButton) loadButton.addEventListener('click', () => loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }));
+      if (outputButton) outputButton.addEventListener('click', () => loadContext(row, { includeToolOutput: true, maxChars: null, maxEntries: defaultContextEntries }));
       if (enableButton) enableButton.addEventListener('click', () => enableContextApi(row));
       if (contextResult) {
         contextResult.addEventListener('click', event => {
           if (!(event.target instanceof Element)) return;
-          const button = event.target.closest('[data-context-entry-load-output]');
+          const button = event.target.closest('[data-context-entry-load-output], [data-context-load-older], [data-context-no-budget]');
           if (!button) return;
-          loadContext(row, true);
+          if (button.matches('[data-context-entry-load-output]')) {
+            loadContext(row, { includeToolOutput: true });
+            return;
+          }
+          if (button.matches('[data-context-load-older]')) {
+            loadContext(row, { maxEntries: Number(button.dataset.contextMaxEntries || 0) });
+            return;
+          }
+          if (button.matches('[data-context-no-budget]')) {
+            loadContext(row, { maxChars: 0 });
+          }
         });
       }
     }
@@ -2033,7 +2058,23 @@
         target.innerHTML = `<p class="context-note">${escapeHtml(error.message || String(error))}</p>`;
       }
     }
-    async function loadContext(row, includeToolOutput) {
+    function contextStateForRow(row) {
+      const key = row.record_id || '';
+      return key && contextRequestState.has(key)
+        ? contextRequestState.get(key)
+        : { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries };
+    }
+    function nextContextState(row, options) {
+      const base = contextStateForRow(row);
+      const updates = typeof options === 'boolean' ? { includeToolOutput: options } : (options || {});
+      const next = { ...base, ...updates };
+      next.includeToolOutput = Boolean(next.includeToolOutput);
+      if (next.maxEntries === undefined) next.maxEntries = defaultContextEntries;
+      if (next.maxChars === undefined) next.maxChars = null;
+      if (row.record_id) contextRequestState.set(row.record_id, next);
+      return next;
+    }
+    async function loadContext(row, options = {}) {
       const target = document.getElementById('contextResult');
       if (!target) return;
       if (!row.record_id) {
@@ -2041,8 +2082,15 @@
         return;
       }
       target.innerHTML = `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`;
+      const requestState = nextContextState(row, options);
       const params = new URLSearchParams({ record_id: row.record_id });
-      if (includeToolOutput) params.set('include_tool_output', '1');
+      if (requestState.includeToolOutput) params.set('include_tool_output', '1');
+      if (requestState.maxChars !== null && requestState.maxChars !== undefined) {
+        params.set('max_chars', String(requestState.maxChars));
+      }
+      if (requestState.maxEntries !== null && requestState.maxEntries !== undefined) {
+        params.set('max_entries', String(requestState.maxEntries));
+      }
       try {
         const response = await fetch(`/api/context?${params.toString()}`, {
           headers: {
@@ -2063,6 +2111,65 @@
         target.innerHTML = `<p class="context-note">${escapeHtml(error.message || String(error))}</p>`;
       }
     }
+    function contextLimitActions(payload) {
+      const omitted = payload.omitted || {};
+      const buttons = [];
+      const maxEntries = Number(omitted.max_entries || defaultContextEntries);
+      if (Number(omitted.older_entries || 0) > 0) {
+        const nextEntries = maxEntries > 0 ? Math.max(maxEntries + defaultContextEntries, maxEntries * 2) : 0;
+        buttons.push(`<button class="context-entry-action" type="button" data-context-load-older data-context-max-entries="${escapeHtml(String(nextEntries))}">${escapeHtml(t('button.load_older_context'))}</button>`);
+      }
+      if (Number(omitted.over_budget_chars || 0) > 0 && Number(omitted.max_chars || 0) !== 0) {
+        buttons.push(`<button class="context-entry-action" type="button" data-context-no-budget>${escapeHtml(t('button.no_char_limit'))}</button>`);
+      }
+      return buttons.length ? `<div class="context-followup-actions">${buttons.join('')}</div>` : '';
+    }
+    function tokenUsageNumber(value) {
+      const numeric = Number(value || 0);
+      return Number.isFinite(numeric) ? number.format(numeric) : '0';
+    }
+    function tokenUsageRows(usage) {
+      if (!usage || typeof usage !== 'object') return '';
+      const input = Number(usage.input_tokens || 0);
+      const cached = Number(usage.cached_input_tokens || 0);
+      const uncached = Number(usage.uncached_input_tokens ?? Math.max(input - cached, 0));
+      return `
+        <td>${escapeHtml(tokenUsageNumber(input))}</td>
+        <td>${escapeHtml(tokenUsageNumber(cached))}</td>
+        <td>${escapeHtml(tokenUsageNumber(uncached))}</td>
+        <td>${escapeHtml(tokenUsageNumber(usage.output_tokens))}</td>
+        <td>${escapeHtml(tokenUsageNumber(usage.reasoning_output_tokens))}</td>
+        <td>${escapeHtml(tokenUsageNumber(usage.total_tokens))}</td>
+      `;
+    }
+    function renderContextTokenUsage(entry) {
+      const usage = entry.token_usage || {};
+      const rows = [
+        [t('context.token_scope_call'), usage.last_token_usage],
+        [t('context.token_scope_session'), usage.total_token_usage],
+      ].filter(([, value]) => value && typeof value === 'object');
+      if (!rows.length) return '';
+      return `
+        <div class="context-token-breakdown" aria-label="${escapeHtml(t('context.token_breakdown'))}">
+          <table>
+            <thead>
+              <tr>
+                <th>${escapeHtml(t('context.token_type'))}</th>
+                <th>${escapeHtml(t('context.token_input'))}</th>
+                <th>${escapeHtml(t('context.token_cached'))}</th>
+                <th>${escapeHtml(t('context.token_uncached'))}</th>
+                <th>${escapeHtml(t('context.token_output'))}</th>
+                <th>${escapeHtml(t('context.token_reasoning'))}</th>
+                <th>${escapeHtml(t('context.token_total'))}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(([label, usageValue]) => `<tr><th>${escapeHtml(label)}</th>${tokenUsageRows(usageValue)}</tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
     function renderContext(payload) {
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
       const source = payload.source || {};
@@ -2073,12 +2180,14 @@
         source.file ? tf('context.source', { file: source.file, line: source.line_number || '' }) : '',
         omitted.older_entries ? tf('context.older_omitted', { count: number.format(omitted.older_entries) }) : '',
         omitted.over_budget_chars ? tf('context.chars_omitted', { count: number.format(omitted.over_budget_chars) }) : '',
+        Number(omitted.max_chars || 0) === 0 ? t('context.no_char_limit_active') : '',
       ].filter(Boolean).join(' ');
       const body = entries.map(entry => {
         const meta = [formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - ');
         const outputAction = entry.tool_output_omitted && !payload.include_tool_output
           ? `<button class="context-entry-action" type="button" data-context-entry-load-output>${escapeHtml(t('button.show_tool_output'))}</button>`
           : '';
+        const tokenUsage = renderContextTokenUsage(entry);
         return `
           <div class="context-entry">
             <div class="context-entry-header">
@@ -2088,11 +2197,12 @@
                 ${outputAction}
               </span>
             </div>
+            ${tokenUsage}
             <pre>${escapeHtml(entry.text || '')}</pre>
           </div>
         `;
       }).join('');
-      return `<p class="context-note">${escapeHtml(note)}</p>${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
+      return `<p class="context-note">${escapeHtml(note)}</p>${contextLimitActions(payload)}${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
     }
     function pricingStatusText(row) {
       if (!row.pricing_model) return t('state.no_configured_price');

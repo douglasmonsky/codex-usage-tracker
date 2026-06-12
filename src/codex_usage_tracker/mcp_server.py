@@ -11,7 +11,11 @@ from mcp.server.fastmcp import FastMCP
 
 from codex_usage_tracker.allowance import write_allowance_template
 from codex_usage_tracker.api_payloads import refresh_result_payload, session_payload
-from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
+from codex_usage_tracker.context import (
+    DEFAULT_CONTEXT_CHARS,
+    DEFAULT_CONTEXT_ENTRIES,
+    load_call_context,
+)
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
@@ -125,6 +129,7 @@ def session_usage(
 def usage_call_context(
     record_id: str,
     max_chars: int = DEFAULT_CONTEXT_CHARS,
+    max_entries: int = DEFAULT_CONTEXT_ENTRIES,
     include_tool_output: bool = False,
 ) -> str:
     """Load one model call's logged local context on demand from its source JSONL file."""
@@ -146,6 +151,7 @@ def usage_call_context(
         record_id=record_id,
         db_path=DEFAULT_DB_PATH,
         max_chars=max_chars,
+        max_entries=max_entries,
         include_tool_output=include_tool_output,
     )
     return json.dumps(payload, indent=2)

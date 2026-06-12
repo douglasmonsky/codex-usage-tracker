@@ -23,7 +23,11 @@ from codex_usage_tracker.api_payloads import (
     refresh_result_payload,
     session_payload,
 )
-from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, load_call_context
+from codex_usage_tracker.context import (
+    DEFAULT_CONTEXT_CHARS,
+    DEFAULT_CONTEXT_ENTRIES,
+    load_call_context,
+)
 from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
@@ -365,8 +369,18 @@ def _add_context_parser(subparsers: argparse._SubParsersAction[argparse.Argument
         help="Load raw logged context for one usage record on demand",
     )
     context.add_argument("record_id")
-    context.add_argument("--max-chars", type=int, default=DEFAULT_CONTEXT_CHARS)
-    context.add_argument("--max-entries", type=int, default=80)
+    context.add_argument(
+        "--max-chars",
+        type=int,
+        default=DEFAULT_CONTEXT_CHARS,
+        help="Maximum redacted context characters to return; use 0 for no character limit.",
+    )
+    context.add_argument(
+        "--max-entries",
+        type=int,
+        default=DEFAULT_CONTEXT_ENTRIES,
+        help="Maximum context entries to return; use 0 for all matching entries.",
+    )
     context.add_argument(
         "--include-tool-output",
         action="store_true",

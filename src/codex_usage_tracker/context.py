@@ -49,8 +49,8 @@ def load_call_context(
         path=source_file,
         token_line=line_number,
         target_turn_id=target_turn_id,
-        max_chars=max(1_000, max_chars),
-        max_entries=max(1, max_entries),
+        max_chars=max_chars if max_chars <= 0 else max(1_000, max_chars),
+        max_entries=max_entries if max_entries <= 0 else max(1, max_entries),
         include_tool_output=include_tool_output,
     )
     return {
@@ -141,6 +141,9 @@ def _read_context_entries(
                         summarized["label"],
                         summarized["text"],
                         tool_output_omitted=bool(summarized.get("tool_output_omitted")),
+                        token_usage=summarized.get("token_usage")
+                        if isinstance(summarized.get("token_usage"), dict)
+                        else None,
                     )
                 )
 
@@ -242,7 +245,12 @@ def _summarize_event_msg(
     event_type = _optional_str(payload.get("type")) or "event_msg"
     if event_type == "token_count":
         info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
-        return {"label": "Token count", "text": _jsonish(_token_count_summary(info))}
+        token_usage = _token_count_summary(info)
+        return {
+            "label": "Token count",
+            "text": _jsonish(token_usage),
+            "token_usage": token_usage,
+        }
 
     if "message" in payload:
         return {"label": event_type, "text": _optional_str(payload.get("message")) or ""}
@@ -264,10 +272,21 @@ def _summarize_event_msg(
 
 def _token_count_summary(info: dict[str, Any]) -> dict[str, Any]:
     return {
-        "last_token_usage": info.get("last_token_usage"),
-        "total_token_usage": info.get("total_token_usage"),
+        "last_token_usage": _token_usage_summary(info.get("last_token_usage")),
+        "total_token_usage": _token_usage_summary(info.get("total_token_usage")),
         "model_context_window": info.get("model_context_window"),
     }
+
+
+def _token_usage_summary(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    usage = dict(value)
+    input_tokens = _nonnegative_int(usage.get("input_tokens"))
+    cached_input_tokens = _nonnegative_int(usage.get("cached_input_tokens"))
+    if input_tokens is not None and cached_input_tokens is not None:
+        usage.setdefault("uncached_input_tokens", max(input_tokens - cached_input_tokens, 0))
+    return usage
 
 
 def _context_entry(
@@ -278,6 +297,7 @@ def _context_entry(
     text: str,
     *,
     tool_output_omitted: bool = False,
+    token_usage: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     entry = {
         "line_number": line_number,
@@ -289,6 +309,8 @@ def _context_entry(
     }
     if tool_output_omitted:
         entry["tool_output_omitted"] = True
+    if token_usage:
+        entry["token_usage"] = token_usage
     return entry
 
 
@@ -298,13 +320,16 @@ def _limit_entries(
     max_entries: int,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     limited_reversed: list[dict[str, Any]] = []
-    remaining = max_chars
+    remaining = None if max_chars <= 0 else max_chars
     omitted_entries = 0
     omitted_chars = 0
-    selected = entries[-max_entries:]
+    selected = entries if max_entries <= 0 else entries[-max_entries:]
 
     for entry in reversed(selected):
         text = str(entry.get("text") or "")
+        if remaining is None:
+            limited_reversed.append(entry)
+            continue
         if remaining <= 0:
             omitted_entries += 1
             omitted_chars += len(text)
@@ -321,7 +346,7 @@ def _limit_entries(
 
     limited = list(reversed(limited_reversed))
     return limited, {
-        "older_entries": max(0, len(entries) - max_entries),
+        "older_entries": 0 if max_entries <= 0 else max(0, len(entries) - max_entries),
         "over_budget_entries": omitted_entries,
         "over_budget_chars": omitted_chars,
         "max_chars": max_chars,
@@ -367,6 +392,14 @@ def _positive_int(value: object) -> int | None:
     except (TypeError, ValueError):
         return None
     return number if number > 0 else None
+
+
+def _nonnegative_int(value: object) -> int | None:
+    try:
+        number = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
 
 
 def _optional_str(value: object) -> str | None:

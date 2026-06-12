@@ -133,6 +133,8 @@ The same search, time range, confidence status, load limit, cards, and sort cont
 
 The details panel is structured for progressive disclosure. On desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
+Loaded context uses a bounded, redacted default. When the selected call has more local history or text than the default window, the context panel can request older entries or remove the character cap for that explicit row action. Token-count context entries show a labeled breakdown for the call and session cumulative totals: input, cached input, uncached input, output, reasoning output, and total tokens.
+
 For selected calls, the panel shows:
 
 - primary cost, Codex credits, allowance impact, cache, uncached input, context use, pricing status, and next action
