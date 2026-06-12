@@ -35,6 +35,7 @@
       resolveThreadAttachment,
       chronological,
       adjacentThreadCalls,
+      buildCallAdjacencyIndex,
       classifyCacheDiagnostic,
       callAccountingDelta,
       rowInputTokens: dataRowInputTokens,
@@ -321,6 +322,7 @@
     const toTopEl = document.getElementById('toTop');
     let rowByRecordId = new Map();
     let threadAttachmentByRecordId = new Map();
+    let callAdjacencyByRecordId = new Map();
     const expandedThreads = new Set();
     const liveRefreshSupported = window.location.protocol !== 'file:';
     const initialPayloadIncludeArchived = Boolean(initialPayload.include_archived);
@@ -644,6 +646,7 @@
     function rebuildDashboardIndexes() {
       rowByRecordId = new Map(data.map(row => [row.record_id, row]));
       threadAttachmentByRecordId = new Map(data.map(row => [row.record_id, resolveThreadAttachment(row)]));
+      callAdjacencyByRecordId = buildCallAdjacencyIndex(data);
     }
     function usageCreditStatusLabel(row) {
       if (usageCreditValue(row) === null) return t('allowance.row_no_rate');
@@ -892,7 +895,7 @@
       return dataRowReasoningTokens(row);
     }
     function adjacentCalls(row) {
-      return adjacentThreadCalls(data, row);
+      return adjacentThreadCalls(data, row, callAdjacencyByRecordId);
     }
     function cacheDiagnostic(row, previous = null) {
       const diagnostic = classifyCacheDiagnostic(row, previous);

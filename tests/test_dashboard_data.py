@@ -112,7 +112,8 @@ const rows = [
   { record_id: 'last', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:02:00Z', cumulative_total_tokens: 50 },
 ];
 const selected = rows.find(row => row.record_id === 'middle');
-const adjacent = helpers.adjacentThreadCalls(rows, selected);
+const index = helpers.buildCallAdjacencyIndex(rows);
+const adjacent = helpers.adjacentThreadCalls(rows, selected, index);
 console.log(JSON.stringify({
   order: adjacent.calls.map(row => row.record_id),
   index: adjacent.index,
@@ -127,6 +128,54 @@ console.log(JSON.stringify({
         "index": 1,
         "previous": "first",
         "next": "last",
+    }
+
+
+def test_call_adjacency_index_prefers_persisted_neighbors_when_loaded() -> None:
+    payload = _run_dashboard_data_script(
+        """
+const rows = [
+  { record_id: 'old-loaded', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:00:00Z', cumulative_total_tokens: 1 },
+  { record_id: 'middle', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:02:00Z', cumulative_total_tokens: 30, previous_record_id: 'persisted-prev', next_record_id: 'persisted-next' },
+  { record_id: 'persisted-next', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:03:00Z', cumulative_total_tokens: 40 },
+  { record_id: 'persisted-prev', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:04:00Z', cumulative_total_tokens: 50 },
+];
+const index = helpers.buildCallAdjacencyIndex(rows);
+const adjacent = index.get('middle');
+console.log(JSON.stringify({
+  order: adjacent.calls.map(row => row.record_id),
+  previous: adjacent.previous.record_id,
+  next: adjacent.next.record_id,
+}));
+"""
+    )
+
+    assert payload == {
+        "order": ["old-loaded", "middle", "persisted-next", "persisted-prev"],
+        "previous": "persisted-prev",
+        "next": "persisted-next",
+    }
+
+
+def test_call_adjacency_index_does_not_guess_when_persisted_neighbor_is_unloaded() -> None:
+    payload = _run_dashboard_data_script(
+        """
+const rows = [
+  { record_id: 'old-loaded', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:00:00Z', cumulative_total_tokens: 1 },
+  { record_id: 'middle', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:02:00Z', cumulative_total_tokens: 30, previous_record_id: 'not-loaded' },
+  { record_id: 'next-loaded', thread_name: 'Thread A', event_timestamp: '2026-06-01T00:03:00Z', cumulative_total_tokens: 40 },
+];
+const adjacent = helpers.buildCallAdjacencyIndex(rows).get('middle');
+console.log(JSON.stringify({
+  previous: adjacent.previous,
+  next: adjacent.next.record_id,
+}));
+"""
+    )
+
+    assert payload == {
+        "previous": None,
+        "next": "next-loaded",
     }
 
 

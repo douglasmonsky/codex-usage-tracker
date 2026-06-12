@@ -143,7 +143,43 @@
       .sort(chronological);
   }
 
-  function adjacentThreadCalls(rows, row) {
+  function persistedAdjacentRow(recordById, row, key) {
+    const recordId = row ? row[key] : null;
+    if (!recordId) return undefined;
+    return recordById.get(recordId) || null;
+  }
+
+  function buildCallAdjacencyIndex(rows) {
+    const recordById = new Map(rows.filter(row => row.record_id).map(row => [row.record_id, row]));
+    const threadRows = new Map();
+    rows.forEach(row => {
+      const key = resolveThreadAttachment(row).key;
+      if (!threadRows.has(key)) threadRows.set(key, []);
+      threadRows.get(key).push(row);
+    });
+    const adjacencyByRecordId = new Map();
+    threadRows.forEach(calls => {
+      calls.sort(chronological);
+      calls.forEach((row, index) => {
+        if (!row.record_id) return;
+        const persistedPrevious = persistedAdjacentRow(recordById, row, 'previous_record_id');
+        const persistedNext = persistedAdjacentRow(recordById, row, 'next_record_id');
+        adjacencyByRecordId.set(row.record_id, {
+          calls,
+          index,
+          previous: persistedPrevious !== undefined ? persistedPrevious : index > 0 ? calls[index - 1] : null,
+          next: persistedNext !== undefined ? persistedNext : index < calls.length - 1 ? calls[index + 1] : null,
+        });
+      });
+    });
+    return adjacencyByRecordId;
+  }
+
+  function adjacentThreadCalls(rows, row, adjacencyByRecordId = null) {
+    if (adjacencyByRecordId && row && row.record_id) {
+      const adjacent = adjacencyByRecordId.get(row.record_id);
+      if (adjacent) return adjacent;
+    }
     const calls = resolvedThreadRows(rows, row);
     const index = calls.findIndex(candidate => candidate.record_id === row.record_id);
     return {
@@ -235,6 +271,7 @@
     resolveThreadAttachment,
     chronological,
     resolvedThreadRows,
+    buildCallAdjacencyIndex,
     adjacentThreadCalls,
     classifyCacheDiagnostic,
     callAccountingDelta,

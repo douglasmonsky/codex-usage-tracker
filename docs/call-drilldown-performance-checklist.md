@@ -65,7 +65,7 @@ Already implemented before this branch:
 - [x] M4 persist cheap performance-critical dashboard query helper fields where feasible.
 - [x] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
 - [x] M6 make explicit context loading single-pass where practical.
-- [ ] M7 precompute client-side call adjacency for investigator rendering.
+- [x] M7 precompute client-side call adjacency for investigator rendering.
 - [ ] M8 add source-log-aware synthetic benchmark coverage.
 - [ ] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
 - [ ] M10 optionally materialize thread summaries after APIs are stable.
@@ -114,7 +114,9 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - `src/codex_usage_tracker/server.py`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
+- `src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js`
 - `docs/privacy.md`
+- `tests/test_dashboard_data.py`
 - `tests/test_privacy.py`
 - `tests/test_call_origin.py`
 - `tests/test_parser.py`
@@ -164,6 +166,12 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `python -m pytest tests/test_store_dashboard_mcp.py -q`
   - `python -m pytest tests/test_privacy.py -q`
   - `python -m pytest tests/test_json_contracts.py -q`
+- M7 client-side call adjacency index:
+  - `python -m pytest tests/test_dashboard_data.py -q`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
+  - `python scripts/check_release.py`
 
 ## Benchmarks Run
 
@@ -176,7 +184,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Normal `dashboard_payload` no longer runs source-file call-origin annotation.
 - Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata.
 - Active/all-history filtering now has a persisted `is_archived` flag and path fallback; future SQLite-backed API slices should reuse that helper instead of reintroducing path-only filtering.
-- Per-thread adjacency is persisted after upsert; M7 still needs to make the browser prefer `previous_record_id` and `next_record_id` instead of filtering loaded rows.
+- Per-thread adjacency is persisted after upsert and M7 makes the browser build a `record_id` adjacency index once per payload. Investigator lookup now uses that index and prefers loaded `previous_record_id`/`next_record_id` neighbors when available.
 - Context loading now performs selected-turn evidence and serialized-evidence collection in one source-file scan for a selected call. Serialized evidence is still built in memory and timed separately as `serialized_estimate_ms`.
 - Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
