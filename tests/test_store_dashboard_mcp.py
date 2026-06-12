@@ -1216,11 +1216,12 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     assert "local_goal_metadata" in serialized_bucket_keys
     anchors = context["call_anchors"]
     assert anchors["available"] is True
-    assert anchors["scope"] == "selected_call_latest"
+    assert anchors["scope"] == "selected_call_reasoning_output"
     assert anchors["before_message"]["role"] == "user"
-    assert anchors["latest_message"]["role"] == "assistant"
+    assert anchors["reasoning_output"]["role"] == "reasoning"
     assert "SECRET RAW PROMPT" in anchors["before_message"]["text"]
-    assert "AFTER SELECTED CALL" in anchors["latest_message"]["text"]
+    assert "Reasoning summary" in anchors["reasoning_output"]["text"]
+    assert "AFTER SELECTED CALL" not in json.dumps(anchors)
     assert "AGENTS.md instructions" not in anchors["before_message"]["text"]
     assert "sk" + "-proj-" not in anchors["before_message"]["text"]
     assert context["omitted"]["total_entries"] >= context["omitted"]["returned_entries"]

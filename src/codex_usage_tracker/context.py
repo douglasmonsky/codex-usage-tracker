@@ -253,6 +253,7 @@ def _is_structured_chat_message(entry: dict[str, Any]) -> bool:
 
 def _read_call_anchors(path: Path, token_line: int) -> dict[str, Any]:
     before: dict[str, Any] | None = None
+    reasoning_output: dict[str, Any] | None = None
     parse_errors = 0
     try:
         with path.open(encoding="utf-8") as handle:
@@ -274,7 +275,7 @@ def _read_call_anchors(path: Path, token_line: int) -> dict[str, Any]:
                     include_tool_output=False,
                     include_compaction_history=False,
                 )
-                if summarized is None or not _is_anchor_message(summarized):
+                if summarized is None:
                     continue
                 entry = _summarized_context_entry(
                     line_number,
@@ -282,23 +283,30 @@ def _read_call_anchors(path: Path, token_line: int) -> dict[str, Any]:
                     entry_type,
                     summarized,
                 )
-                if _is_runtime_instruction_anchor(entry):
+                if _is_token_count_summary(summarized):
+                    if line_number < token_line:
+                        reasoning_output = None
                     continue
-                before = _prefer_structured_anchor(before, entry)
+                if _is_reasoning_output_anchor(summarized):
+                    reasoning_output = entry
+                    continue
+                if _is_anchor_message(summarized):
+                    if _is_runtime_instruction_anchor(entry):
+                        continue
+                    before = _prefer_structured_anchor(before, entry)
     except OSError:
         return {
-            "scope": "selected_call_latest",
+            "scope": "selected_call_reasoning_output",
             "available": False,
             "parse_errors": parse_errors,
         }
 
-    latest, latest_parse_errors = _read_latest_anchor(path)
     return {
-        "scope": "selected_call_latest",
-        "available": bool(before or latest),
-        "parse_errors": parse_errors + latest_parse_errors,
+        "scope": "selected_call_reasoning_output",
+        "available": bool(before or reasoning_output),
+        "parse_errors": parse_errors,
         "before_message": _anchor_from_entry(before),
-        "latest_message": _anchor_from_entry(latest),
+        "reasoning_output": _anchor_from_entry(reasoning_output),
     }
 
 
@@ -312,74 +320,6 @@ def _prefer_structured_anchor(current: dict[str, Any] | None, candidate: dict[st
     return candidate
 
 
-def _read_latest_anchor(path: Path) -> tuple[dict[str, Any] | None, int]:
-    parse_errors = 0
-    try:
-        for line_number, line in _iter_jsonl_lines_reverse(path):
-            try:
-                envelope = json.loads(line)
-            except json.JSONDecodeError:
-                parse_errors += 1
-                continue
-            if not isinstance(envelope, dict):
-                continue
-            payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
-            entry_type = _optional_str(envelope.get("type")) or "unknown"
-            summarized = _summarize_payload(
-                entry_type=entry_type,
-                payload=payload,
-                include_tool_output=False,
-                include_compaction_history=False,
-            )
-            if summarized is None or not _is_anchor_message(summarized):
-                continue
-            entry = _summarized_context_entry(
-                line_number,
-                _optional_str(envelope.get("timestamp")),
-                entry_type,
-                summarized,
-            )
-            if not _is_runtime_instruction_anchor(entry):
-                return entry, parse_errors
-    except OSError:
-        return None, parse_errors
-    return None, parse_errors
-
-
-def _iter_jsonl_lines_reverse(path: Path, chunk_size: int = 65_536):
-    total_lines = _count_jsonl_lines(path)
-    yielded = 0
-    buffer = b""
-    with path.open("rb") as handle:
-        handle.seek(0, 2)
-        position = handle.tell()
-        while position > 0:
-            read_size = min(chunk_size, position)
-            position -= read_size
-            handle.seek(position)
-            buffer = handle.read(read_size) + buffer
-            lines = buffer.split(b"\n")
-            buffer = lines[0]
-            for raw_line in reversed(lines[1:]):
-                if not raw_line:
-                    continue
-                yielded += 1
-                yield total_lines - yielded + 1, raw_line.decode("utf-8", errors="replace")
-        if buffer:
-            yielded += 1
-            yield total_lines - yielded + 1, buffer.decode("utf-8", errors="replace")
-
-
-def _count_jsonl_lines(path: Path, chunk_size: int = 1024 * 1024) -> int:
-    count = 0
-    last_byte = b"\n"
-    with path.open("rb") as handle:
-        while chunk := handle.read(chunk_size):
-            count += chunk.count(b"\n")
-            last_byte = chunk[-1:]
-    return count if last_byte == b"\n" else count + 1
-
-
 def _is_anchor_message(summarized: dict[str, Any]) -> bool:
     return (_optional_str(summarized.get("label")) or "") in {
         "agent_message",
@@ -387,6 +327,17 @@ def _is_anchor_message(summarized: dict[str, Any]) -> bool:
         "message / user",
         "user_message",
     } and bool(_optional_str(summarized.get("text")))
+
+
+def _is_reasoning_output_anchor(summarized: dict[str, Any]) -> bool:
+    label = _optional_str(summarized.get("label")) or ""
+    return label.split(" / ", 1)[0] == "reasoning" and bool(
+        _optional_str(summarized.get("text"))
+    )
+
+
+def _is_token_count_summary(summarized: dict[str, Any]) -> bool:
+    return "token_usage" in summarized
 
 
 def _anchor_from_entry(entry: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -414,6 +365,8 @@ def _anchor_role(entry: dict[str, Any]) -> str | None:
         return "user"
     if label in {"message / assistant", "agent_message"}:
         return "assistant"
+    if label.split(" / ", 1)[0] == "reasoning":
+        return "reasoning"
     return None
 
 

@@ -857,7 +857,11 @@
       const seen = new Set();
       const candidates = [
         ['before', t('context.anchor_before'), anchors.before_message || anchors.selected_lead_in],
-        ['latest', t('context.anchor_latest'), anchors.latest_message || anchors.after_message],
+        [
+          'reasoning',
+          t('context.anchor_reasoning_output'),
+          anchors.reasoning_output || anchors.latest_message || anchors.after_message,
+        ],
       ].filter(([, , anchor]) => anchor && anchor.text).filter(([, , anchor]) => {
         const identity = `${anchor.line_number || ''}:${anchor.role || ''}:${anchor.text || ''}`;
         if (seen.has(identity)) return false;
