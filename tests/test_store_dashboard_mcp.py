@@ -1196,6 +1196,112 @@ def test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical(
     assert ".jsonl" not in context_diagnostics_text
 
 
+def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=codex_home,
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+
+        status_payload = _read_json(f"{base_url}/api/status")
+        calls_payload = _read_json(
+            f"{base_url}/api/calls?limit=2&sort=tokens&direction=desc&q=Codex"
+        )
+        offset_payload = _read_json(
+            f"{base_url}/api/calls?limit=1&offset=1&sort=tokens&direction=desc&q=Codex"
+        )
+        record_id = calls_payload["rows"][0]["record_id"]
+        call_payload = _read_json(f"{base_url}/api/call?record_id={record_id}")
+        threads_payload = _read_json(f"{base_url}/api/threads?limit=2&sort=tokens")
+        thread_key = threads_payload["rows"][0]["thread_key"]
+        thread_calls_payload = _read_json(
+            f"{base_url}/api/thread-calls?thread_key={urllib.parse.quote(thread_key)}&limit=2"
+        )
+        summary_payload = _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
+        recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
+        invalid_sort = _http_error_json(f"{base_url}/api/calls?sort=not-a-sort")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_payload["schema"] == "codex-usage-tracker-status-v1"
+    _assert_contract(status_payload)
+    assert "rows" not in status_payload
+    assert status_payload["row_counts"]["scoped_rows"] == 4
+    assert status_payload["max_event_timestamp"]
+
+    assert calls_payload["schema"] == "codex-usage-tracker-calls-v1"
+    _assert_contract(calls_payload)
+    assert calls_payload["row_count"] == 2
+    assert calls_payload["total_matched_rows"] >= 2
+    assert calls_payload["has_more"] is True
+    assert calls_payload["next_offset"] == 2
+    assert calls_payload["rows"][0]["total_tokens"] >= calls_payload["rows"][1]["total_tokens"]
+    assert offset_payload["rows"][0]["record_id"] != calls_payload["rows"][0]["record_id"]
+
+    assert call_payload["schema"] == "codex-usage-tracker-call-v1"
+    _assert_contract(call_payload)
+    assert call_payload["record"]["record_id"] == record_id
+    assert call_payload["raw_context_included"] is False
+
+    assert threads_payload["schema"] == "codex-usage-tracker-threads-v1"
+    _assert_contract(threads_payload)
+    assert threads_payload["row_count"] >= 1
+    assert "total_tokens" in threads_payload["rows"][0]
+
+    assert thread_calls_payload["schema"] == "codex-usage-tracker-thread-calls-v1"
+    _assert_contract(thread_calls_payload)
+    assert thread_calls_payload["thread_key"] == thread_key
+    assert thread_calls_payload["row_count"] >= 1
+
+    assert summary_payload["schema"] == "codex-usage-tracker-summary-v1"
+    _assert_contract(summary_payload)
+    assert summary_payload["group_by"] == "model"
+    assert recommendations_payload["schema"] == "codex-usage-tracker-recommendations-v1"
+    _assert_contract(recommendations_payload)
+    assert invalid_sort["status"] == 400
+    assert "sort must be one of" in invalid_sort["payload"]["error"]
+
+    combined_payload = json.dumps(
+        [
+            status_payload,
+            calls_payload,
+            call_payload,
+            threads_payload,
+            thread_calls_payload,
+            summary_payload,
+            recommendations_payload,
+        ]
+    )
+    assert "SECRET RAW PROMPT" not in combined_payload
+    assert "raw_context_included\": true" not in combined_payload
+
+
 def test_dashboard_server_opens_only_token_protected_investigator_urls(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -2164,6 +2270,12 @@ def _write_pricing(path: Path) -> Path:
 
 def _assert_contract(payload: object) -> None:
     assert validate_json_payload_contract(payload) == []
+
+
+def _read_json(url: str, headers: dict[str, str] | None = None) -> dict[str, object]:
+    request = urllib.request.Request(url, headers=headers or {})
+    with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310 - local test server only
+        return json.loads(response.read().decode("utf-8"))
 
 
 def _http_error_json(url: str, headers: dict[str, str] | None = None) -> dict[str, object]:

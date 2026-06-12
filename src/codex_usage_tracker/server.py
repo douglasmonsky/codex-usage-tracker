@@ -15,8 +15,11 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from ipaddress import ip_address
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
+from codex_usage_tracker.call_origin import ensure_call_origin
 from codex_usage_tracker.context import (
     DEFAULT_CONTEXT_CHARS,
     DEFAULT_CONTEXT_ENTRIES,
@@ -33,7 +36,32 @@ from codex_usage_tracker.paths import (
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
-from codex_usage_tracker.store import refresh_usage_index
+from codex_usage_tracker.pricing import annotate_rows_with_efficiency, load_pricing_config
+from codex_usage_tracker.projects import (
+    annotate_rows_with_project_identity,
+    apply_project_privacy_to_rows,
+    load_project_config,
+)
+from codex_usage_tracker.recommendations import (
+    annotate_rows_with_recommendations,
+    load_threshold_config,
+)
+from codex_usage_tracker.reports import (
+    QUERY_CREDIT_CONFIDENCE_CHOICES,
+    QUERY_PRICING_STATUS_CHOICES,
+    build_recommendations_report,
+    build_summary_report,
+)
+from codex_usage_tracker.store import (
+    query_thread_summaries,
+    query_usage_api_event_count,
+    query_usage_api_events,
+    query_usage_record,
+    query_usage_status,
+    refresh_metadata,
+    refresh_usage_index,
+)
+from codex_usage_tracker.threads import annotate_thread_attachments
 
 
 class _ContextApiState:
@@ -193,6 +221,27 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/open-investigator":
             self._handle_open_investigator(parsed.query)
             return
+        if parsed.path == "/api/status":
+            self._handle_status(parsed.query)
+            return
+        if parsed.path == "/api/calls":
+            self._handle_calls(parsed.query)
+            return
+        if parsed.path == "/api/call":
+            self._handle_call(parsed.query)
+            return
+        if parsed.path == "/api/threads":
+            self._handle_threads(parsed.query)
+            return
+        if parsed.path == "/api/thread-calls":
+            self._handle_thread_calls(parsed.query)
+            return
+        if parsed.path == "/api/summary":
+            self._handle_summary(parsed.query)
+            return
+        if parsed.path == "/api/recommendations":
+            self._handle_recommendations(parsed.query)
+            return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
             return
@@ -339,6 +388,361 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 "url": safe_url,
             },
         )
+
+    def _handle_status(self, query: str) -> None:
+        params = parse_qs(query)
+        include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
+        try:
+            counts = query_usage_status(
+                db_path=self._db_path,
+                include_archived=include_archived,
+            )
+            metadata = refresh_metadata(self._db_path)
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading status: {exc}"},
+            )
+            return
+        parser_diagnostics = {
+            key.removeprefix("parser_"): _safe_int(value)
+            for key, value in metadata.items()
+            if key.startswith("parser_") and _safe_int(value)
+        }
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "schema": "codex-usage-tracker-status-v1",
+                "payload_schema": "codex-usage-tracker-live-api-v1",
+                "latest_refresh_at": metadata.get("latest_refresh_at"),
+                "include_archived": include_archived,
+                "row_counts": counts,
+                "max_event_timestamp": counts.get("max_event_timestamp"),
+                "parser_adapter": metadata.get("parser_adapter"),
+                "parser_diagnostics": parser_diagnostics,
+            },
+        )
+
+    def _handle_calls(self, query: str) -> None:
+        params = parse_qs(query)
+        try:
+            query_params = self._live_query_params(params)
+            pricing_status = _optional_filter(
+                _first(params.get("pricing_status")),
+                QUERY_PRICING_STATUS_CHOICES,
+                "pricing_status",
+            )
+            credit_confidence = _optional_filter(
+                _first(params.get("credit_confidence")),
+                QUERY_CREDIT_CONFIDENCE_CHOICES,
+                "credit_confidence",
+            )
+            rows, total_matched = self._live_call_rows(
+                query_params=query_params,
+                pricing_status=pricing_status,
+                credit_confidence=credit_confidence,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading calls: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "schema": "codex-usage-tracker-calls-v1",
+                "rows": rows,
+                "row_count": len(rows),
+                "total_matched_rows": total_matched,
+                "limit": query_params["limit"],
+                "offset": query_params["offset"],
+                "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
+                "next_offset": _next_offset(query_params["limit"], query_params["offset"], len(rows), total_matched),
+                "filters": {
+                    **query_params["filters"],
+                    "pricing_status": pricing_status,
+                    "credit_confidence": credit_confidence,
+                },
+                "raw_context_included": False,
+            },
+        )
+
+    def _handle_call(self, query: str) -> None:
+        params = parse_qs(query)
+        record_id = _first(params.get("record_id")) or _first(params.get("record"))
+        if not record_id:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "record_id is required"})
+            return
+        try:
+            row = query_usage_record(db_path=self._db_path, record_id=record_id)
+            if row is None:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": f"No usage record found: {record_id}"})
+                return
+            rows = self._annotate_live_rows([row])
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading call: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "schema": "codex-usage-tracker-call-v1",
+                "record": rows[0],
+                "previous_record_id": row.get("previous_record_id"),
+                "next_record_id": row.get("next_record_id"),
+                "raw_context_included": False,
+            },
+        )
+
+    def _handle_threads(self, query: str) -> None:
+        params = parse_qs(query)
+        try:
+            limit = _parse_api_limit(_first(params.get("limit")), 100)
+            offset = _parse_api_offset(_first(params.get("offset")))
+            include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
+            sort = _first(params.get("sort")) or "tokens"
+            direction = _first(params.get("direction")) or "desc"
+            rows = query_thread_summaries(
+                db_path=self._db_path,
+                limit=limit,
+                offset=offset,
+                search=_first(params.get("q")) or _first(params.get("search")),
+                include_archived=include_archived,
+                sort=sort,
+                direction=direction,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading threads: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "schema": "codex-usage-tracker-threads-v1",
+                "rows": rows,
+                "row_count": len(rows),
+                "limit": limit,
+                "offset": offset,
+                "include_archived": include_archived,
+                "raw_context_included": False,
+            },
+        )
+
+    def _handle_thread_calls(self, query: str) -> None:
+        params = parse_qs(query)
+        thread_key = _first(params.get("thread_key")) or _first(params.get("thread"))
+        if not thread_key:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "thread_key is required"})
+            return
+        try:
+            query_params = self._live_query_params(params, thread_key=thread_key)
+            rows, total_matched = self._live_call_rows(
+                query_params=query_params,
+                pricing_status=None,
+                credit_confidence=None,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading thread calls: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "schema": "codex-usage-tracker-thread-calls-v1",
+                "thread_key": thread_key,
+                "rows": rows,
+                "row_count": len(rows),
+                "total_matched_rows": total_matched,
+                "limit": query_params["limit"],
+                "offset": query_params["offset"],
+                "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
+                "next_offset": _next_offset(query_params["limit"], query_params["offset"], len(rows), total_matched),
+                "raw_context_included": False,
+            },
+        )
+
+    def _handle_summary(self, query: str) -> None:
+        params = parse_qs(query)
+        try:
+            report = build_summary_report(
+                db_path=self._db_path,
+                pricing_path=self._pricing_path,
+                group_by=_first(params.get("group_by")) or "thread",
+                limit=_parse_report_limit(_first(params.get("limit")), 20),
+                preset=_first(params.get("preset")),
+                since=_first(params.get("since")),
+                projects_path=self._projects_path,
+                privacy_mode=self._privacy_mode,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading summary: {exc}"},
+            )
+            return
+        payload = report.payload()
+        payload["raw_context_included"] = False
+        self._send_json(HTTPStatus.OK, payload)
+
+    def _handle_recommendations(self, query: str) -> None:
+        params = parse_qs(query)
+        try:
+            report = build_recommendations_report(
+                db_path=self._db_path,
+                pricing_path=self._pricing_path,
+                allowance_path=self._allowance_path,
+                projects_path=self._projects_path,
+                since=_first(params.get("since")),
+                until=_first(params.get("until")),
+                model=_first(params.get("model")),
+                effort=_first(params.get("effort")),
+                thread=_first(params.get("thread")),
+                project=_first(params.get("project")),
+                min_score=_parse_optional_float(_first(params.get("min_score")), "min_score"),
+                limit=_parse_report_limit(_first(params.get("limit")), 20),
+                privacy_mode=self._privacy_mode,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading recommendations: {exc}"},
+            )
+            return
+        payload = dict(report.payload)
+        payload["raw_context_included"] = False
+        self._send_json(HTTPStatus.OK, payload)
+
+    def _live_query_params(
+        self,
+        params: dict[str, list[str]],
+        *,
+        thread_key: str | None = None,
+    ) -> dict[str, Any]:
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        limit = _parse_api_limit(_first(params.get("limit")), 100)
+        offset = _parse_api_offset(_first(params.get("offset")))
+        return {
+            "limit": limit,
+            "offset": offset,
+            "search": _first(params.get("q")) or _first(params.get("search")),
+            "since": _first(params.get("since")),
+            "until": _first(params.get("until")),
+            "model": _first(params.get("model")),
+            "effort": _first(params.get("effort")),
+            "thread": _first(params.get("thread")) if thread_key is None else None,
+            "thread_key": thread_key,
+            "include_archived": include_archived,
+            "sort": _first(params.get("sort")) or "time",
+            "direction": _first(params.get("direction")) or "desc",
+            "filters": {
+                "q": _first(params.get("q")) or _first(params.get("search")),
+                "since": _first(params.get("since")),
+                "until": _first(params.get("until")),
+                "model": _first(params.get("model")),
+                "effort": _first(params.get("effort")),
+                "thread": _first(params.get("thread")) if thread_key is None else None,
+                "thread_key": thread_key,
+                "include_archived": include_archived,
+                "sort": _first(params.get("sort")) or "time",
+                "direction": _first(params.get("direction")) or "desc",
+            },
+        }
+
+    def _live_call_rows(
+        self,
+        *,
+        query_params: dict[str, Any],
+        pricing_status: str | None,
+        credit_confidence: str | None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        derived_filter = bool(pricing_status or credit_confidence)
+        rows = query_usage_api_events(
+            db_path=self._db_path,
+            limit=None if derived_filter else query_params["limit"],
+            offset=0 if derived_filter else query_params["offset"],
+            search=query_params["search"],
+            since=query_params["since"],
+            until=query_params["until"],
+            model=query_params["model"],
+            effort=query_params["effort"],
+            thread=query_params["thread"],
+            thread_key=query_params["thread_key"],
+            include_archived=query_params["include_archived"],
+            sort=query_params["sort"],
+            direction=query_params["direction"],
+        )
+        rows = self._annotate_live_rows(rows)
+        if derived_filter:
+            rows = [
+                row
+                for row in rows
+                if _matches_live_derived_filters(
+                    row,
+                    pricing_status=pricing_status,
+                    credit_confidence=credit_confidence,
+                )
+            ]
+            total_matched = len(rows)
+            limit = query_params["limit"]
+            offset = query_params["offset"]
+            rows = rows[offset:] if limit is None else rows[offset : offset + limit]
+            return rows, total_matched
+        total_matched = query_usage_api_event_count(
+            db_path=self._db_path,
+            search=query_params["search"],
+            since=query_params["since"],
+            until=query_params["until"],
+            model=query_params["model"],
+            effort=query_params["effort"],
+            thread=query_params["thread"],
+            thread_key=query_params["thread_key"],
+            include_archived=query_params["include_archived"],
+        )
+        return rows, total_matched
+
+    def _annotate_live_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not rows:
+            return []
+        rows = annotate_thread_attachments([ensure_call_origin(row) for row in rows])
+        pricing = load_pricing_config(self._pricing_path)
+        allowance = load_allowance_config(
+            self._allowance_path,
+            rate_card_path=self._rate_card_path,
+        )
+        thresholds = load_threshold_config(self._thresholds_path)
+        projects = load_project_config(self._projects_path)
+        rows = annotate_rows_with_allowance(
+            annotate_rows_with_efficiency(rows, pricing),
+            allowance,
+        )
+        rows = annotate_rows_with_recommendations(rows, thresholds)
+        rows = annotate_rows_with_project_identity(rows, projects)
+        return apply_project_privacy_to_rows(rows, privacy_mode=self._privacy_mode)
 
     def _handle_usage(self, query: str) -> None:
         params = parse_qs(query)
@@ -489,6 +893,86 @@ def _parse_offset(value: str | None) -> int:
     return max(offset, 0)
 
 
+def _parse_api_limit(value: str | None, default: int) -> int | None:
+    if value is None or value == "":
+        return default
+    if value.lower() == "all":
+        return None
+    try:
+        limit = int(value)
+    except ValueError as exc:
+        raise ValueError("limit must be a positive integer or all") from exc
+    if limit <= 0:
+        raise ValueError("limit must be a positive integer or all")
+    return min(limit, 10_000)
+
+
+def _parse_report_limit(value: str | None, default: int) -> int:
+    limit = _parse_api_limit(value, default)
+    return 10_000 if limit is None else limit
+
+
+def _parse_api_offset(value: str | None) -> int:
+    if value is None or value == "":
+        return 0
+    try:
+        offset = int(value)
+    except ValueError as exc:
+        raise ValueError("offset must be a non-negative integer") from exc
+    if offset < 0:
+        raise ValueError("offset must be a non-negative integer")
+    return offset
+
+
+def _parse_optional_float(value: str | None, name: str) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number") from exc
+
+
+def _optional_filter(
+    value: str | None,
+    allowed: tuple[str, ...],
+    name: str,
+) -> str | None:
+    if value is None or value == "":
+        return None
+    if value not in allowed:
+        raise ValueError(f"{name} must be one of: {', '.join(allowed)}")
+    return value
+
+
+def _matches_live_derived_filters(
+    row: dict[str, Any],
+    *,
+    pricing_status: str | None,
+    credit_confidence: str | None,
+) -> bool:
+    if pricing_status == "priced" and not row.get("pricing_model"):
+        return False
+    if pricing_status == "estimated" and not row.get("pricing_estimated"):
+        return False
+    if pricing_status == "unpriced" and row.get("pricing_model"):
+        return False
+    return not (credit_confidence and row.get("usage_credit_confidence") != credit_confidence)
+
+
+def _has_more(limit: int | None, offset: int, row_count: int, total_matched: int) -> bool:
+    return limit is not None and offset + row_count < total_matched
+
+
+def _next_offset(
+    limit: int | None,
+    offset: int,
+    row_count: int,
+    total_matched: int,
+) -> int | None:
+    return offset + row_count if _has_more(limit, offset, row_count, total_matched) else None
+
+
 def _parse_context_limit(value: str | None, default: int) -> int:
     if value is None or value == "":
         return default
@@ -503,6 +987,13 @@ def _parse_context_limit(value: str | None, default: int) -> int:
 
 def _elapsed_ms(started_at: float) -> float:
     return round((perf_counter() - started_at) * 1000, 3)
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _json_response_body(payload: dict[str, object]) -> bytes:

@@ -51,6 +51,12 @@ Tracked schema ids:
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
 | `codex-usage-tracker-context-settings-v1` | Dashboard server `/api/context-settings` response |
 | `codex-usage-tracker-open-investigator-v1` | Dashboard server `/api/open-investigator` response |
+| `codex-usage-tracker-live-api-v1` | Dashboard server live API payload family marker |
+| `codex-usage-tracker-status-v1` | Dashboard server `/api/status` response |
+| `codex-usage-tracker-calls-v1` | Dashboard server `/api/calls` response |
+| `codex-usage-tracker-call-v1` | Dashboard server `/api/call` response |
+| `codex-usage-tracker-threads-v1` | Dashboard server `/api/threads` response |
+| `codex-usage-tracker-thread-calls-v1` | Dashboard server `/api/thread-calls` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload |

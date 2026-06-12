@@ -54,6 +54,20 @@ _ARCHIVED_SOURCE_PATTERNS = (
     "%\\archived_sessions\\%",
     "archived_sessions\\%",
 )
+API_USAGE_SORTS = {
+    "time": "usage_events.event_timestamp",
+    "tokens": "usage_events.total_tokens",
+    "input": "usage_events.input_tokens",
+    "cached": "usage_events.cached_input_tokens",
+    "uncached": "usage_events.uncached_input_tokens",
+    "output": "usage_events.output_tokens",
+    "reasoning": "usage_events.reasoning_output_tokens",
+    "cache": "usage_events.cache_ratio",
+    "model": "usage_events.model",
+    "effort": "usage_events.effort",
+    "thread": "coalesce(usage_events.thread_name, usage_events.parent_thread_name, usage_events.session_id)",
+    "initiator": "coalesce(usage_events.call_initiator, 'unknown')",
+}
 
 
 class SchemaMigrationError(RuntimeError):
@@ -664,6 +678,230 @@ def query_dashboard_event_count(
         return int(row["row_count"] if row is not None else 0)
 
 
+def query_usage_status(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    include_archived: bool = False,
+) -> dict[str, Any]:
+    """Return cheap row-count metadata for live dashboard status checks."""
+
+    scoped_where, scoped_params = _usage_where_clause(include_archived=include_archived)
+    active_where, active_params = _usage_where_clause(include_archived=False)
+    with connect(db_path) as conn:
+        init_db(conn)
+        total_row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
+        active_row = conn.execute(
+            f"SELECT COUNT(*) AS count FROM usage_events {active_where}",
+            active_params,
+        ).fetchone()
+        scoped_row = conn.execute(
+            f"SELECT COUNT(*) AS count FROM usage_events {scoped_where}",
+            scoped_params,
+        ).fetchone()
+        max_row = conn.execute(
+            f"SELECT MAX(event_timestamp) AS max_event_timestamp FROM usage_events {scoped_where}",
+            scoped_params,
+        ).fetchone()
+    return {
+        "total_rows": int(total_row["count"] if total_row is not None else 0),
+        "active_rows": int(active_row["count"] if active_row is not None else 0),
+        "scoped_rows": int(scoped_row["count"] if scoped_row is not None else 0),
+        "max_event_timestamp": (
+            max_row["max_event_timestamp"] if max_row is not None else None
+        ),
+    }
+
+
+def query_usage_api_events(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    limit: int | None = 100,
+    offset: int = 0,
+    search: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    thread_key: str | None = None,
+    include_archived: bool = False,
+    sort: str = "time",
+    direction: str = "desc",
+) -> list[dict[str, Any]]:
+    """Return a SQL-backed slice for live dashboard call APIs."""
+
+    where_clause, params = _usage_api_where_clause(
+        search=search,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        thread_key=thread_key,
+        include_archived=include_archived,
+        table_alias="usage_events",
+    )
+    order_expr = _usage_api_sort_expression(sort)
+    direction_sql = _normalize_sort_direction(direction)
+    normalized_limit = _normalize_limit(limit)
+    normalized_offset = _normalize_offset(offset)
+    limit_clause = ""
+    query_params = list(params)
+    if normalized_limit is not None:
+        limit_clause = "LIMIT ?"
+        query_params.append(normalized_limit)
+        if normalized_offset:
+            limit_clause += " OFFSET ?"
+            query_params.append(normalized_offset)
+    elif normalized_offset:
+        limit_clause = "LIMIT -1 OFFSET ?"
+        query_params.append(normalized_offset)
+    parent_where_clause, parent_params = _usage_where_clause(include_archived=include_archived)
+    parent_thread_filter = (
+        f"{parent_where_clause} AND thread_name IS NOT NULL"
+        if parent_where_clause
+        else "WHERE thread_name IS NOT NULL"
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                usage_events.*,
+                coalesce(
+                    usage_events.parent_thread_name,
+                    parent_threads.thread_name
+                ) AS resolved_parent_thread_name,
+                coalesce(
+                    usage_events.parent_session_updated_at,
+                    parent_threads.session_updated_at
+                ) AS resolved_parent_session_updated_at
+            FROM usage_events
+            LEFT JOIN (
+                SELECT
+                    session_id,
+                    max(thread_name) AS thread_name,
+                    max(session_updated_at) AS session_updated_at
+                FROM usage_events
+                {parent_thread_filter}
+                GROUP BY session_id
+            ) AS parent_threads
+            ON usage_events.parent_session_id = parent_threads.session_id
+            {where_clause}
+            ORDER BY {order_expr} {direction_sql},
+                usage_events.event_timestamp DESC,
+                usage_events.cumulative_total_tokens DESC
+            {limit_clause}
+            """,
+            [*parent_params, *query_params],
+        )
+        return [_row_to_dict(row) for row in rows]
+
+
+def query_usage_api_event_count(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    search: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    thread_key: str | None = None,
+    include_archived: bool = False,
+) -> int:
+    """Return count for SQL-backed live dashboard call APIs."""
+
+    where_clause, params = _usage_api_where_clause(
+        search=search,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        thread_key=thread_key,
+        include_archived=include_archived,
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            f"SELECT COUNT(*) AS row_count FROM usage_events {where_clause}",
+            params,
+        ).fetchone()
+        return int(row["row_count"] if row is not None else 0)
+
+
+def query_thread_summaries(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    limit: int | None = 100,
+    offset: int = 0,
+    search: str | None = None,
+    include_archived: bool = False,
+    sort: str = "tokens",
+    direction: str = "desc",
+) -> list[dict[str, Any]]:
+    """Return SQL-computed thread summaries for live dashboard APIs."""
+
+    where_clause, params = _usage_api_where_clause(
+        search=search,
+        include_archived=include_archived,
+    )
+    sort_map = {
+        "tokens": "total_tokens",
+        "time": "latest_event_timestamp",
+        "calls": "call_count",
+        "cache": "avg_cache_ratio",
+        "thread": "thread_label",
+    }
+    if sort not in sort_map:
+        allowed = ", ".join(sorted(sort_map))
+        raise ValueError(f"sort must be one of: {allowed}")
+    direction_sql = _normalize_sort_direction(direction)
+    normalized_limit = _normalize_limit(limit)
+    normalized_offset = _normalize_offset(offset)
+    limit_clause = ""
+    query_params = list(params)
+    if normalized_limit is not None:
+        limit_clause = "LIMIT ?"
+        query_params.append(normalized_limit)
+        if normalized_offset:
+            limit_clause += " OFFSET ?"
+            query_params.append(normalized_offset)
+    elif normalized_offset:
+        limit_clause = "LIMIT -1 OFFSET ?"
+        query_params.append(normalized_offset)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                coalesce(nullif(thread_key, ''), 'thread:' || thread_name, 'session:' || session_id) AS thread_key,
+                coalesce(max(thread_name), max(parent_thread_name), max(session_id)) AS thread_label,
+                MIN(event_timestamp) AS first_event_timestamp,
+                MAX(event_timestamp) AS latest_event_timestamp,
+                COUNT(*) AS call_count,
+                COUNT(DISTINCT session_id) AS session_count,
+                SUM(input_tokens) AS input_tokens,
+                SUM(cached_input_tokens) AS cached_input_tokens,
+                SUM(uncached_input_tokens) AS uncached_input_tokens,
+                SUM(output_tokens) AS output_tokens,
+                SUM(reasoning_output_tokens) AS reasoning_output_tokens,
+                SUM(total_tokens) AS total_tokens,
+                AVG(cache_ratio) AS avg_cache_ratio,
+                MAX(context_window_percent) AS max_context_window_percent,
+                SUM(CASE WHEN coalesce(is_archived, 0) != 0 THEN 1 ELSE 0 END) AS archived_call_count
+            FROM usage_events
+            {where_clause}
+            GROUP BY coalesce(nullif(thread_key, ''), 'thread:' || thread_name, 'session:' || session_id)
+            ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
+            {limit_clause}
+            """,
+            query_params,
+        )
+        return [_row_to_dict(row) for row in rows]
+
+
 def query_most_expensive_calls(
     db_path: Path = DEFAULT_DB_PATH, limit: int = 20, since: str | None = None
 ) -> list[dict[str, Any]]:
@@ -786,6 +1024,75 @@ def _usage_where_clause(
     if not clauses:
         return "", []
     return "WHERE " + " AND ".join(clauses), params
+
+
+def _usage_api_where_clause(
+    *,
+    search: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    thread_key: str | None = None,
+    min_tokens: int | None = None,
+    include_archived: bool = True,
+    table_alias: str | None = None,
+) -> tuple[str, list[Any]]:
+    prefix = f"{table_alias}." if table_alias else ""
+    base_where, params = _usage_where_clause(
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        min_tokens=min_tokens,
+        include_archived=include_archived,
+        table_alias=table_alias,
+    )
+    clauses = [base_where.removeprefix("WHERE ")] if base_where else []
+    if search:
+        like = f"%{search}%"
+        clauses.append(
+            "("
+            f"{prefix}thread_name LIKE ? OR "
+            f"{prefix}parent_thread_name LIKE ? OR "
+            f"{prefix}cwd LIKE ? OR "
+            f"{prefix}model LIKE ? OR "
+            f"{prefix}session_id LIKE ?"
+            ")"
+        )
+        params.extend([like, like, like, like, like])
+    if thread_key:
+        clauses.append(
+            "("
+            f"{prefix}thread_key = ? OR "
+            f"'thread:' || {prefix}thread_name = ? OR "
+            f"'session:' || {prefix}session_id = ? OR "
+            f"{prefix}session_id = ?"
+            ")"
+        )
+        params.extend([thread_key, thread_key, thread_key, thread_key])
+    if not clauses:
+        return "", []
+    return "WHERE " + " AND ".join(f"({clause})" for clause in clauses), params
+
+
+def _usage_api_sort_expression(sort: str) -> str:
+    try:
+        return API_USAGE_SORTS[sort]
+    except KeyError as exc:
+        allowed = ", ".join(sorted(API_USAGE_SORTS))
+        raise ValueError(f"sort must be one of: {allowed}") from exc
+
+
+def _normalize_sort_direction(direction: str) -> str:
+    normalized = direction.lower()
+    if normalized == "asc":
+        return "ASC"
+    if normalized == "desc":
+        return "DESC"
+    raise ValueError("direction must be one of: asc, desc")
 
 
 def _normalize_limit(limit: int | None) -> int | None:

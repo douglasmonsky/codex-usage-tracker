@@ -67,7 +67,7 @@ Already implemented before this branch:
 - [x] M6 make explicit context loading single-pass where practical.
 - [x] M7 precompute client-side call adjacency for investigator rendering.
 - [x] M8 add source-log-aware synthetic benchmark coverage.
-- [ ] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
+- [x] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
 - [ ] M10 optionally materialize thread summaries after APIs are stable.
 - [ ] M11 optionally add incremental source-file refresh metadata after parser-time call origin is stable.
 - [ ] M12 finalize docs, validation, benchmark results, and merge-readiness notes.
@@ -113,10 +113,12 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - `src/codex_usage_tracker/schema.py`
 - `src/codex_usage_tracker/store.py`
 - `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/json_contracts.py`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js`
 - `docs/privacy.md`
+- `docs/cli-json-schemas.md`
 - `tests/test_dashboard_data.py`
 - `tests/test_privacy.py`
 - `tests/test_call_origin.py`
@@ -178,6 +180,12 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 100 --batch-size 25 --with-source-logs --json --enforce-thresholds`
   - `.venv/bin/python -m pytest tests/test_cli_release.py -q`
   - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 2000 --with-source-logs --json --enforce-thresholds`
+- M9 SQLite-backed live dashboard API slices:
+  - `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py::test_dashboard_server_live_sql_api_slices_are_aggregate_only -q`
+  - `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py -q`
+  - `.venv/bin/python -m pytest tests/test_json_contracts.py -q` initially failed because the new live API schema ids were not tracked; after adding contracts and docs, it passed.
+  - `.venv/bin/python -m pytest tests/test_privacy.py -q`
+  - `.venv/bin/python scripts/check_release.py`
 
 ## Benchmarks Run
 
@@ -191,12 +199,12 @@ Full branch closeout should also run the release validation listed in `docs/deve
 ## Known Remaining Slow Paths
 
 - Normal `dashboard_payload` no longer runs source-file call-origin annotation.
-- Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata.
+- Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata. M9 preserves this compatibility endpoint while adding SQL-backed live API slices.
 - Active/all-history filtering now has a persisted `is_archived` flag and path fallback; future SQLite-backed API slices should reuse that helper instead of reintroducing path-only filtering.
 - Per-thread adjacency is persisted after upsert and M7 makes the browser build a `record_id` adjacency index once per payload. Investigator lookup now uses that index and prefers loaded `previous_record_id`/`next_record_id` neighbors when available.
 - Context loading now performs selected-turn evidence and serialized-evidence collection in one source-file scan for a selected call. Serialized evidence is still built in memory and timed separately as `serialized_estimate_ms`.
 - M8 source-log benchmark mode now generates synthetic JSONL files, points synthetic aggregate rows at matching `token_count` lines, measures early/middle/late explicit context loads, and wraps source-log dashboard payload assembly with a guard that fails if a synthetic source file is opened.
-- Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
+- M9 adds additive SQL-backed live endpoints: `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, and `/api/recommendations`. The frontend still uses `/api/usage` until a later split.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
 
 ## Privacy Notes
