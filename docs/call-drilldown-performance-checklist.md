@@ -69,7 +69,7 @@ Already implemented before this branch:
 - [x] M8 add source-log-aware synthetic benchmark coverage.
 - [x] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
 - [x] M10 optionally materialize thread summaries after APIs are stable.
-- [ ] M11 optionally add incremental source-file refresh metadata after parser-time call origin is stable.
+- [x] M11 optionally add incremental source-file refresh metadata after parser-time call origin is stable.
 - [ ] M12 finalize docs, validation, benchmark results, and merge-readiness notes.
 
 ## Validation Commands
@@ -189,6 +189,11 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - M10 materialized thread summaries:
   - `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py::test_upsert_materializes_thread_summaries tests/test_store_dashboard_mcp.py::test_thread_summaries_keep_active_and_all_history_scopes_separate tests/test_store_dashboard_mcp.py::test_dashboard_server_live_sql_api_slices_are_aggregate_only tests/test_store_migrations.py::test_init_db_migrates_legacy_aggregate_table_without_data_loss -q`
   - `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py tests/test_store_dashboard_mcp.py tests/test_store_migrations.py`
+- M11 incremental source-file refresh metadata:
+  - `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py::test_refresh_is_idempotent_and_summary_works tests/test_store_dashboard_mcp.py::test_refresh_indexes_only_appended_token_events_when_source_grows tests/test_store_dashboard_mcp.py::test_refresh_reports_skipped_corrupt_token_events tests/test_store_migrations.py::test_refresh_is_idempotent_after_legacy_migration tests/test_store_migrations.py::test_init_db_migrates_legacy_aggregate_table_without_data_loss -q`
+  - `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py tests/test_store_dashboard_mcp.py tests/test_store_migrations.py`
+  - `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py tests/test_store_migrations.py tests/test_privacy.py -q`
+  - `.venv/bin/python -m mypy`
 
 ## Benchmarks Run
 
@@ -209,6 +214,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - M8 source-log benchmark mode now generates synthetic JSONL files, points synthetic aggregate rows at matching `token_count` lines, measures early/middle/late explicit context loads, and wraps source-log dashboard payload assembly with a guard that fails if a synthetic source file is opened.
 - M9 adds additive SQL-backed live endpoints: `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, and `/api/recommendations`. The frontend still uses `/api/usage` until a later split.
 - M10 materializes per-thread active and all-history summary rows in SQLite so `/api/threads` can read pre-aggregated thread totals without grouping every usage row on each request.
+- M11 adds a `source_files` metadata table. Refresh skips unchanged logs, parses appended token events after the last indexed source line when safe, and fully replaces aggregate rows for changed/truncated source files.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
 - Static dashboard generation remains supported as the export/compatibility path; M9 added live API slices without removing generated dashboard HTML.
 - Source-log reads are limited to refresh/indexing, explicit `/api/context` loading for one selected call, and explicit benchmark/diagnostic tooling. Normal `dashboard_payload` and `/api/usage` must remain aggregate-only.
@@ -234,7 +240,6 @@ Full branch closeout should also run the release validation listed in `docs/deve
 ## Deferred Work
 
 - Evidence cache is explicitly deferred.
-- Incremental source-file refresh metadata is deferred until parser-time call origin is stable.
 - Any frontend rewrite from `/api/usage` to the new SQLite-backed endpoints should be split if it becomes broad.
 
 ## Open Risks

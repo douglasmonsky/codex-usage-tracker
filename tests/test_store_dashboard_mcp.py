@@ -77,7 +77,8 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     subagent_rows = query_session_usage(db_path=db_path, session_id=SECOND_SESSION_ID)
 
     assert first.parsed_events == 4
-    assert second.parsed_events == 4
+    assert second.parsed_events == 0
+    assert second.inserted_or_updated_events == 0
     assert first.skipped_events == 0
     assert len(session_rows) == 2
     assert summary[0]["group_key"] == "gpt-5.5"
@@ -96,16 +97,36 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
             row["key"]: row["value"]
             for row in conn.execute("SELECT key, value FROM refresh_meta").fetchall()
         }
-    assert meta["parsed_events"] == "4"
+    assert meta["parsed_events"] == "0"
     assert meta["skipped_events"] == "0"
-    assert meta["inserted_or_updated_events"] == "4"
+    assert meta["inserted_or_updated_events"] == "0"
+    assert meta["parsed_source_files"] == "0"
+    assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "5"
+    assert meta["schema_version"] == "6"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 5
+    assert state["schema_version"] == 6
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6]
+    with connect(db_path) as conn:
+        init_db(conn)
+        source_rows = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT source_file, size_bytes, parsed_until_line, latest_record_id,
+                    parser_diagnostics_json
+                FROM source_files
+                ORDER BY source_file
+                """
+            ).fetchall()
+        ]
+    assert len(source_rows) == 3
+    assert all(row["size_bytes"] > 0 for row in source_rows)
+    assert all(row["parsed_until_line"] > 0 for row in source_rows)
+    assert any(row["latest_record_id"] for row in source_rows)
+    assert "SECRET RAW PROMPT" not in json.dumps(source_rows)
 
 
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
@@ -129,6 +150,32 @@ def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
 
 
+def test_refresh_indexes_only_appended_token_events_when_source_grows(
+    tmp_path: Path,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = next(
+        path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name
+    )
+
+    first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(_token_event(650, 350)) + "\n")
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    third = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    rows = query_session_usage(db_path=db_path, session_id=SESSION_ID)
+    metadata = refresh_metadata(db_path)
+
+    assert first.parsed_events == 4
+    assert second.parsed_events == 1
+    assert second.inserted_or_updated_events == 1
+    assert third.parsed_events == 0
+    assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
+    assert metadata["parsed_source_files"] == "0"
+    assert metadata["skipped_source_files"] == "3"
+
+
 def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     with connect(db_path) as conn:
@@ -139,7 +186,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 4
+    assert user_version == 6
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -209,8 +256,8 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_timestamp" in indexes
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
-    assert user_version == 4
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4]
+    assert user_version == 6
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6]
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:
