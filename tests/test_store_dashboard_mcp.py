@@ -1184,6 +1184,63 @@ def test_context_carries_incoming_compaction_history_into_selected_turn(tmp_path
     assert "[REDACTED_OPENAI_KEY]" in context_text
 
 
+def test_context_dedupes_adjacent_chat_message_echoes(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-508941432222"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "06"
+        / "11"
+        / f"rollout-2026-06-11T22-40-00-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [{"id": session_id, "thread_name": "Echo dedupe", "updated_at": "2026-06-11T22:45:00Z"}],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "echo-turn", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "same user text"}],
+                },
+            ),
+            _entry("event_msg", {"type": "user_message", "message": "same user text"}),
+            _entry("event_msg", {"type": "agent_message", "message": "same assistant text"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "same assistant text"}],
+                },
+            ),
+            _token_event(300, 200),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    target = query_session_usage(db_path=db_path, session_id=session_id)[0]
+
+    context = load_call_context(target["record_id"], db_path=db_path)
+    labels = [entry["label"] for entry in context["entries"]]
+    texts = [entry["text"] for entry in context["entries"]]
+
+    assert "message / user" in labels
+    assert "message / assistant" in labels
+    assert "user_message" not in labels
+    assert "agent_message" not in labels
+    assert texts.count("same user text") == 1
+    assert texts.count("same assistant text") == 1
+
+
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker import mcp_server
 

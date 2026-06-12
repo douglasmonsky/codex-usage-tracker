@@ -169,6 +169,7 @@ def _read_context_entries(
             ):
                 break
 
+    candidates = _dedupe_chat_message_echoes(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
     omitted["parse_errors"] = omitted_parse_errors
     omitted["target_turn_id"] = target_turn_id
@@ -195,6 +196,41 @@ def _summarized_context_entry(
         if isinstance(summarized.get("compaction"), dict)
         else None,
     )
+
+
+def _dedupe_chat_message_echoes(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Hide adjacent progress-message echoes when a structured chat message exists."""
+
+    deduped: list[dict[str, Any]] = []
+    for entry in entries:
+        key = _chat_message_echo_key(entry)
+        if key and deduped and _chat_message_echo_key(deduped[-1]) == key:
+            if _is_structured_chat_message(entry) and not _is_structured_chat_message(deduped[-1]):
+                deduped[-1] = entry
+            elif _is_structured_chat_message(deduped[-1]):
+                continue
+            else:
+                continue
+        else:
+            deduped.append(entry)
+    return deduped
+
+
+def _chat_message_echo_key(entry: dict[str, Any]) -> tuple[str, str] | None:
+    label = _optional_str(entry.get("label")) or ""
+    role = None
+    if label == "message / user" or label == "user_message":
+        role = "user"
+    elif label == "message / assistant" or label == "agent_message":
+        role = "assistant"
+    if role is None:
+        return None
+    text = " ".join(str(entry.get("text") or "").split())
+    return (role, text) if text else None
+
+
+def _is_structured_chat_message(entry: dict[str, Any]) -> bool:
+    return (_optional_str(entry.get("label")) or "") in {"message / user", "message / assistant"}
 
 
 def _summarize_payload(
