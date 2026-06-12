@@ -160,6 +160,12 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "raw_context_persisted": bool,
         }
     },
+    "codex-usage-tracker-open-investigator-v1": {
+        "required": {
+            "opened": bool,
+            "url": str,
+        }
+    },
     "codex-usage-tracker-dashboard-v1": {
         "required": {
             "dashboard_path": str,

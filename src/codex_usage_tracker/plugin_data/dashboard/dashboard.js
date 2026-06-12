@@ -963,10 +963,44 @@
         expandedThreads: Array.from(expandedThreads),
       });
     }
-    function openInvestigator(row) {
-      const url = investigatorUrl(row);
-      const opened = window.open(url, '_blank', 'noopener');
-      if (!opened) window.location.href = url;
+    async function openInvestigatorUrl(url) {
+      if (liveRefreshSupported) {
+        if (apiToken) {
+          try {
+            const params = new URLSearchParams({ url });
+            const response = await fetch(`/api/open-investigator?${params.toString()}`, {
+              headers: {
+                'Accept': 'application/json',
+                'X-Codex-Usage-Token': apiToken,
+              },
+              cache: 'no-store',
+            });
+            if (response.ok) return true;
+          } catch (_error) {
+            // Fall through to copying the link; never mutate this window on failure.
+          }
+        }
+      } else {
+        const opened = window.open(url, '_blank');
+        if (opened) {
+          opened.opener = null;
+          return true;
+        }
+      }
+      try {
+        await stateManager.copyText(url);
+        showActionStatus(t('action.copied'));
+      } catch (_error) {
+        showActionStatus(t('action.copy_failed'));
+      }
+      return false;
+    }
+    async function openInvestigator(row) {
+      await openInvestigatorUrl(investigatorUrl(row));
+    }
+    function rowInvestigatorLink(row, html, focusable = false) {
+      const tabIndex = focusable ? '' : ' tabindex="-1"';
+      return `<a class="row-investigator-link" href="${escapeHtml(investigatorUrl(row))}" target="_blank" rel="noopener"${tabIndex}>${html}</a>`;
     }
     async function copyCallLink(row) {
       if (!stateManager) return;
@@ -2079,34 +2113,21 @@
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         tr.className = `call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}`;
         tr.dataset.recordId = row.record_id || '';
-        tr.tabIndex = 0;
-        tr.setAttribute('role', 'button');
-        tr.setAttribute('aria-label', tf('caption.call_investigator', { record: short(row.record_id || rowThreadLabel(row), '').slice(0, 12) }));
         tr.innerHTML = `
-          <td>${renderTimeCell(row.event_timestamp)}</td>
-          <td title="${escapeHtml(short(row.session_id))}"><span class="thread-name">${escapeHtml(truncate(rowThreadLabel(row)))}</span></td>
-          <td>${callInitiatorCell(row)}</td>
-          <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
-          <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
-          <td class="num token-cell">${totalTokenCell(row)}</td>
-          <td class="num token-cell">${cachedTokenCell(row)}</td>
-          <td class="num token-cell">${uncachedTokenCell(row)}</td>
-          <td class="num token-cell">${outputTokenCell(row)}</td>
-          <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
-          <td class="num">${pct(row.cache_ratio)}</td>
-          <td><div class="flags">${renderSignalPucks(row, flags, 3)}</div></td>
+          <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
+          <td title="${escapeHtml(short(row.session_id))}">${rowInvestigatorLink(row, `<span class="thread-name">${escapeHtml(truncate(rowThreadLabel(row)))}</span>`)}</td>
+          <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
+          <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
+          <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
+          <td class="num token-cell">${rowInvestigatorLink(row, totalTokenCell(row))}</td>
+          <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
+          <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
+          <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
+          <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
+          <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
+          <td>${rowInvestigatorLink(row, `<div class="flags">${renderSignalPucks(row, flags, 3)}</div>`)}</td>
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
-        tr.addEventListener('click', event => {
-          event.preventDefault();
-          openInvestigator(row);
-        });
-        tr.addEventListener('keydown', event => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            openInvestigator(row);
-          }
-        });
         rowsEl.appendChild(tr);
       }
       if (!initialDetailApplied && selectedRecordId) {
@@ -2227,18 +2248,18 @@
       const calls = sortedCalls.slice(0, visibleCount).map(row => {
         const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         return `
-          <tr class="thread-call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}" tabindex="0" role="button" data-record-id="${escapeHtml(row.record_id || '')}">
-            <td>${renderTimeCell(row.event_timestamp)}</td>
-            <td>${callInitiatorCell(row)}</td>
-            <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
-            <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
-            <td class="num token-cell">${totalTokenCell(row)}</td>
-            <td class="num token-cell">${cachedTokenCell(row)}</td>
-            <td class="num token-cell">${uncachedTokenCell(row)}</td>
-            <td class="num token-cell">${outputTokenCell(row)}</td>
-            <td class="num">${costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row))}</td>
-            <td class="num">${pct(row.cache_ratio)}</td>
-            <td><div class="flags compact-flags">${renderSignalPucks(row, flags, 3, t('state.none'))}</div></td>
+          <tr class="thread-call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}" data-record-id="${escapeHtml(row.record_id || '')}">
+            <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
+            <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
+            <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
+            <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(row, totalTokenCell(row))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
+            <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
+            <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
+            <td>${rowInvestigatorLink(row, `<div class="flags compact-flags">${renderSignalPucks(row, flags, 3, t('state.none'))}</div>`)}</td>
           </tr>
         `;
       }).join('');
@@ -2721,6 +2742,14 @@
       if (row) selectRow(row);
     });
     rowsEl.addEventListener('click', event => {
+      const rowLink = event.target.closest('a.row-investigator-link');
+      if (rowLink && rowsEl.contains(rowLink)) {
+        if (!liveRefreshSupported) return;
+        event.preventDefault();
+        event.stopPropagation();
+        openInvestigatorUrl(rowLink.href);
+        return;
+      }
       const openButton = event.target.closest('[data-open-investigator-record]');
       if (openButton && rowsEl.contains(openButton)) {
         event.preventDefault();
@@ -2773,12 +2802,14 @@
       if (row) openInvestigator(row);
     });
     rowsEl.addEventListener('dblclick', event => {
+      if (event.target.closest('a.row-investigator-link')) return;
       const callRow = event.target.closest('.thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
       const row = rowByRecordId.get(callRow.dataset.recordId);
       if (row) openInvestigator(row);
     });
     rowsEl.addEventListener('keydown', event => {
+      if (event.target.closest('a.row-investigator-link')) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
       const callRow = event.target.closest('.thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;

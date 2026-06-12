@@ -50,6 +50,7 @@ Tracked schema ids:
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
 | `codex-usage-tracker-context-settings-v1` | Dashboard server `/api/context-settings` response |
+| `codex-usage-tracker-open-investigator-v1` | Dashboard server `/api/open-investigator` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload |

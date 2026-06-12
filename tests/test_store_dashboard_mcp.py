@@ -5,6 +5,7 @@ import sqlite3
 import sys
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
@@ -462,7 +463,15 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "button.open_investigator" in dashboard_js
     assert "Click a call row for deep diagnostics." in dashboard_js
     assert "data-open-investigator-record" not in render_calls_js
-    assert "openInvestigator(row);" in render_calls_js
+    assert "rowInvestigatorLink(row" in render_calls_js
+    assert "target=\"_blank\"" in dashboard_js
+    assert "rel=\"noopener\"" in dashboard_js
+    assert "a.row-investigator-link" in dashboard_js
+    assert "/api/open-investigator" in dashboard_js
+    assert "openInvestigatorUrl(rowLink.href)" in dashboard_js
+    assert "window.location.href = url" not in dashboard_js
+    assert "window.open(url, '_blank')" in dashboard_js
+    assert "opened.opener = null" in dashboard_js
     assert "selectRow(row);" not in render_calls_js
     assert "dashboard.view.call" in dashboard_js
     assert "renderCallInvestigator" in dashboard_js
@@ -949,6 +958,74 @@ def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> No
         "/archived_sessions/" in row["source_file"]
         for row in active_after_all_payload["rows"]
     )
+
+
+def test_dashboard_server_opens_only_token_protected_investigator_urls(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from codex_usage_tracker import server as server_module
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    opened_urls: list[str] = []
+    monkeypatch.setattr(server_module.webbrowser, "open_new_tab", lambda url: opened_urls.append(url) or True)
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=_make_codex_home(tmp_path),
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        target = f"{base_url}/dashboard.html?view=call&record=abc123&history=all"
+        encoded_target = urllib.parse.quote(target, safe="")
+        without_token = _http_error_json(
+            f"{base_url}/api/open-investigator?url={encoded_target}"
+        )
+        external_url = urllib.parse.quote("https://example.test/dashboard.html?view=call&record=abc123", safe="")
+        external_error = _http_error_json(
+            f"{base_url}/api/open-investigator?url={external_url}",
+            headers={"X-Codex-Usage-Token": "test-token"},
+        )
+        missing_record = urllib.parse.quote(f"{base_url}/dashboard.html?view=call", safe="")
+        missing_record_error = _http_error_json(
+            f"{base_url}/api/open-investigator?url={missing_record}",
+            headers={"X-Codex-Usage-Token": "test-token"},
+        )
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"{base_url}/api/open-investigator?url={encoded_target}",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert without_token["status"] == 403
+    assert external_error["status"] == 400
+    assert missing_record_error["status"] == 400
+    assert payload["schema"] == "codex-usage-tracker-open-investigator-v1"
+    assert payload["opened"] is True
+    assert opened_urls == [target]
 
 
 def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeypatch) -> None:
