@@ -701,7 +701,7 @@
       const replacementEntries = Array.isArray(compaction.replacement_history) ? compaction.replacement_history : [];
       const history = replacementEntries.length
         ? `
-          <div class="context-replacement-history">
+          <div class="context-replacement-history" tabindex="0" aria-label="${escapeHtml(t('context.compaction_replacement'))}">
             <h4>${escapeHtml(t('context.compaction_replacement'))}</h4>
             ${replacementEntries.map(item => `
               <div class="context-replacement-entry">

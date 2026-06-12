@@ -350,7 +350,7 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .call-diagnostic-section.delta .call-delta-grid {
-      grid-template-columns: repeat(6, minmax(150px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
     }
     .call-metric-card {
       min-width: 0;
@@ -1358,6 +1358,11 @@
       text-align: right;
     }
     .context-entry-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      max-width: 100%;
       min-height: 26px;
       padding: 4px 8px;
       border: 1px solid #bfdbfe;
@@ -1366,6 +1371,8 @@
       color: var(--blue);
       font-size: 11px;
       font-weight: 760;
+      line-height: 1.25;
+      white-space: normal;
       cursor: pointer;
     }
     .context-entry-action:hover { background: #dbeafe; }
@@ -1409,9 +1416,22 @@
       display: grid;
       gap: 8px;
       margin-top: 4px;
+      max-height: min(560px, 70vh);
+      padding: 8px;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      overflow: auto;
+      overscroll-behavior: contain;
+      background: #fffaf5;
     }
     .context-replacement-history h4 {
-      margin: 0;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      margin: -8px -8px 0;
+      padding: 8px;
+      border-bottom: 1px solid #fed7aa;
+      background: #fffaf5;
       font-size: 12px;
     }
     .context-replacement-entry {
@@ -1504,9 +1524,19 @@
     }
     @media (min-width: 700px) and (max-width: 980px) {
       body[data-active-view="call"] .call-metric-grid,
-      body[data-active-view="call"] .call-delta-grid,
       body[data-active-view="call"] .call-metric-grid.two,
       body[data-active-view="call"] .readout-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 700px) {
+      body[data-active-view="call"] .cache-verdict {
+        grid-template-columns: 1fr;
+      }
+      body[data-active-view="call"] .cache-verdict-meta {
+        padding-top: 8px;
+        padding-left: 0;
+        border-top: 1px solid var(--line);
+        border-left: 0;
       }
     }
