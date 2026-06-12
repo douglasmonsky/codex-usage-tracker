@@ -57,7 +57,7 @@ Already implemented before this branch:
 
 - [x] M0 inventory current state and create this checklist.
 - [x] M0.1 contain calls-table horizontal overflow inside the table card.
-- [ ] M1 validate and package the call investigator dashboard asset in CI, docs, and release checks.
+- [x] M1 validate and package the call investigator dashboard asset in CI, docs, and release checks.
 - [ ] M2 remove low-value call/thread anchor diagnostics and their extra context source scan.
 - [ ] M3 persist aggregate call-origin metadata during indexing so dashboard payloads do not scan source logs.
 - [ ] M4 persist cheap performance-critical dashboard query helper fields where feasible.
@@ -95,6 +95,10 @@ Full branch closeout should also run the release validation listed in `docs/deve
 ## Files Touched
 
 - `docs/call-drilldown-performance-checklist.md`
+- `.github/workflows/ci.yml`
+- `AGENTS.md`
+- `docs/architecture.md`
+- `docs/development.md`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.css`
 - `tests/test_store_dashboard_mcp.py`
 
@@ -106,6 +110,9 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `rg` source inspection for raw-log, context, dashboard payload, and JS validation hot paths
 - M0.1 table overflow containment:
   - `python -m pytest tests/test_store_dashboard_mcp.py -q`
+- M1 asset validation:
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
+  - `python scripts/check_release.py`
 
 ## Benchmarks Run
 

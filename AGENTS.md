@@ -144,6 +144,7 @@ python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
 python scripts/check_release.py
@@ -218,6 +219,7 @@ python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
+node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
 node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
 python scripts/check_release.py
