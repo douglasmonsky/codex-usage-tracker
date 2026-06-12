@@ -66,7 +66,7 @@ Already implemented before this branch:
 - [x] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
 - [x] M6 make explicit context loading single-pass where practical.
 - [x] M7 precompute client-side call adjacency for investigator rendering.
-- [ ] M8 add source-log-aware synthetic benchmark coverage.
+- [x] M8 add source-log-aware synthetic benchmark coverage.
 - [ ] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
 - [ ] M10 optionally materialize thread summaries after APIs are stable.
 - [ ] M11 optionally add incremental source-file refresh metadata after parser-time call origin is stable.
@@ -90,6 +90,7 @@ python -m pytest tests/test_call_origin.py
 python -m pytest tests/test_store_migrations.py
 python scripts/check_release.py
 python scripts/benchmark_synthetic_history.py --rows 10000 --json --enforce-thresholds
+python scripts/benchmark_synthetic_history.py --rows 100 --batch-size 25 --with-source-logs --json --enforce-thresholds
 ```
 
 Full branch closeout should also run the release validation listed in `docs/development.md`.
@@ -172,12 +173,20 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
   - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
   - `python scripts/check_release.py`
+- M8 source-log-aware synthetic benchmark coverage:
+  - `python scripts/benchmark_synthetic_history.py --rows 100 --batch-size 25 --with-source-logs --json --enforce-thresholds` could not run because bare `python` is not installed on this machine.
+  - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 100 --batch-size 25 --with-source-logs --json --enforce-thresholds`
+  - `.venv/bin/python -m pytest tests/test_cli_release.py -q`
+  - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 2000 --with-source-logs --json --enforce-thresholds`
 
 ## Benchmarks Run
 
 - M4:
   - `python scripts/benchmark_synthetic_history.py --rows 10000 --json --enforce-thresholds` initially failed after adjacency updates because population took `9.479820s` against a `1.600000s` threshold.
   - After deferring bulk link recomputation and materializing the link window update, the same command passed. Latest recorded 10k timings included `populate_seconds: 0.357407`, `active_dashboard_query_seconds: 0.017709`, `dashboard_payload_active_seconds: 0.072064`, and no threshold failures.
+- M8:
+  - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 100 --batch-size 25 --with-source-logs --json --enforce-thresholds` passed. Latest recorded source-log timings included `dashboard_payload_with_source_logs_seconds: 0.039320`, `context_load_early_line_seconds: 0.211319`, `context_load_middle_line_seconds: 0.003791`, and `context_load_late_line_seconds: 0.003682`, with `2` synthetic source logs and no threshold failures.
+  - `.venv/bin/python scripts/benchmark_synthetic_history.py --rows 2000 --with-source-logs --json --enforce-thresholds` passed. Latest recorded source-log timings included `dashboard_payload_with_source_logs_seconds: 0.047490`, `context_load_early_line_seconds: 0.209456`, `context_load_middle_line_seconds: 0.002840`, and `context_load_late_line_seconds: 0.012454`, with `8` synthetic source logs and no threshold failures.
 
 ## Known Remaining Slow Paths
 
@@ -186,6 +195,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Active/all-history filtering now has a persisted `is_archived` flag and path fallback; future SQLite-backed API slices should reuse that helper instead of reintroducing path-only filtering.
 - Per-thread adjacency is persisted after upsert and M7 makes the browser build a `record_id` adjacency index once per payload. Investigator lookup now uses that index and prefers loaded `previous_record_id`/`next_record_id` neighbors when available.
 - Context loading now performs selected-turn evidence and serialized-evidence collection in one source-file scan for a selected call. Serialized evidence is still built in memory and timed separately as `serialized_estimate_ms`.
+- M8 source-log benchmark mode now generates synthetic JSONL files, points synthetic aggregate rows at matching `token_count` lines, measures early/middle/late explicit context loads, and wraps source-log dashboard payload assembly with a guard that fails if a synthetic source file is opened.
 - Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
 

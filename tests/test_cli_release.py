@@ -396,6 +396,52 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
     } <= set(payload["benchmarks"][0]["timings"])
 
 
+def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/benchmark_synthetic_history.py",
+            "--rows",
+            "100",
+            "--batch-size",
+            "25",
+            "--db-dir",
+            str(tmp_path),
+            "--with-source-logs",
+            "--json",
+            "--enforce-thresholds",
+            "--threshold-scale",
+            "5",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        env=_subprocess_env(),
+    )
+    payload = json.loads(result.stdout)
+    benchmark = payload["benchmarks"][0]
+
+    assert benchmark["threshold_status"] == "pass"
+    assert benchmark["threshold_failures"] == []
+    assert benchmark["source_logs_generated"] > 0
+    assert benchmark["source_log_bytes"] > 0
+    assert benchmark["context_load_seconds"] is not None
+    assert benchmark["context_payload_json_bytes"] > 0
+    assert benchmark["source_scan_ms"] >= 0
+    assert benchmark["serialized_estimate_ms"] >= 0
+    assert {
+        "dashboard_payload_with_source_logs_seconds",
+        "context_load_early_line_seconds",
+        "context_load_middle_line_seconds",
+        "context_load_late_line_seconds",
+    } <= set(benchmark["timings"])
+    assert {"early", "middle", "late"} == set(benchmark["context_loads"])
+    assert benchmark["context_loads"]["middle"]["context_payload_json_bytes"] > 0
+    assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
+
+
 def _subprocess_env() -> dict[str, str]:
     env = dict(os.environ)
     repo_root = Path(__file__).resolve().parents[1]
