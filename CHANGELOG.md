@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove low-value call/thread anchor diagnostics from the experimental call investigator to avoid an extra source-log scan per context load.
+
 ## 0.5.0 - 2026-06-10
 
 - Add the dashboard localization foundation, including starter locale catalogs, language metadata, local browser language selection, `--lang`, and `CODEX_USAGE_TRACKER_LANG`.

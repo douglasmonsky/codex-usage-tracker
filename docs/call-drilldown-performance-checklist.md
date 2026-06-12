@@ -41,8 +41,8 @@ Suspected hot paths confirmed by source inspection:
 - `src/codex_usage_tracker/dashboard.py` calls `annotate_rows_with_call_origin(...)` inside `dashboard_payload`.
 - `src/codex_usage_tracker/call_origin.py` groups rows by `source_file` and opens each JSONL file to infer call origin.
 - `src/codex_usage_tracker/server.py` serves `/api/usage` by calling `dashboard_payload`, so live refresh inherits the source-log scan.
-- `src/codex_usage_tracker/context.py` calls `_read_call_anchors(...)` in `load_call_context`, adding a second source-file pass for anchor diagnostics.
-- `src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js` reads `payload.call_anchors || payload.thread_anchors`.
+- M2 removed `_read_call_anchors(...)` from `load_call_context`, so explicit context loading no longer performs the extra anchor scan.
+- M2 removed all dashboard reads of `payload.call_anchors` and `payload.thread_anchors`.
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js` builds helper indexes, but adjacent-call lookup and render paths still need a focused large-history review.
 - `scripts/benchmark_synthetic_history.py` benchmarks synthetic SQLite rows, but currently uses synthetic `source_file` paths that do not exercise source-log scanning.
 - `.github/workflows/ci.yml`, `docs/development.md`, `docs/architecture.md`, and `AGENTS.md` run Node syntax checks for dashboard JS assets, but not yet for `dashboard_call_investigator.js`.
@@ -58,7 +58,7 @@ Already implemented before this branch:
 - [x] M0 inventory current state and create this checklist.
 - [x] M0.1 contain calls-table horizontal overflow inside the table card.
 - [x] M1 validate and package the call investigator dashboard asset in CI, docs, and release checks.
-- [ ] M2 remove low-value call/thread anchor diagnostics and their extra context source scan.
+- [x] M2 remove low-value call/thread anchor diagnostics and their extra context source scan.
 - [ ] M3 persist aggregate call-origin metadata during indexing so dashboard payloads do not scan source logs.
 - [ ] M4 persist cheap performance-critical dashboard query helper fields where feasible.
 - [ ] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
@@ -97,9 +97,14 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - `docs/call-drilldown-performance-checklist.md`
 - `.github/workflows/ci.yml`
 - `AGENTS.md`
+- `CHANGELOG.md`
 - `docs/architecture.md`
 - `docs/development.md`
 - `src/codex_usage_tracker/plugin_data/dashboard/dashboard.css`
+- `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
+- `src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
+- `tests/test_privacy.py`
 - `tests/test_store_dashboard_mcp.py`
 
 ## Tests Run
@@ -113,6 +118,14 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - M1 asset validation:
   - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
   - `python scripts/check_release.py`
+- M2 anchor removal:
+  - `python -m pytest tests/test_store_dashboard_mcp.py::test_dashboard_and_csv_are_aggregate_only tests/test_store_dashboard_mcp.py::test_context_loads_raw_log_only_on_demand tests/test_privacy.py::test_context_loading_is_explicit_redacted_and_not_static_html -q`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js`
+  - `node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js`
+  - `python -m pytest tests/test_json_contracts.py -q`
+  - `python -m pytest tests/test_privacy.py -q`
+  - `python -m pytest tests/test_store_dashboard_mcp.py -q`
+  - `python scripts/check_release.py`
 
 ## Benchmarks Run
 
@@ -122,8 +135,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 
 - Normal `dashboard_payload` currently runs source-file call-origin annotation.
 - Live `/api/usage` currently calls `dashboard_payload` and inherits that work.
-- `load_call_context` currently reads anchors in addition to the selected turn/context evidence.
-- Context loading may still do more than one source-file pass after anchors are removed; Milestone 6 must verify this directly.
+- Context loading still does selected-turn evidence and serialized-evidence work; Milestone 6 must verify whether that can be reduced to one source-file pass.
 - Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
 
 ## Privacy Notes
@@ -136,7 +148,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 
 - `dashboard_payload` and `/api/usage` must stop opening source JSONL files.
 - The call investigator asset must be syntax-checked in CI and release validation.
-- Raw call/thread anchors must be removed or proven not to add source-log scans.
+- Raw call/thread anchors are removed; keep regression tests proving `call_anchors` and `thread_anchors` stay out of context payloads.
 - Focused privacy tests must prove no raw prompts, assistant messages, tool output, replacement history, or raw JSONL fragments are persisted by default.
 - Release checks and focused dashboard/context tests must pass before merge.
 

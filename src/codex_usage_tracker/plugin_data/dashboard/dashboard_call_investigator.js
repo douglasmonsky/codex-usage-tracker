@@ -851,58 +851,6 @@
       `;
     }
 
-    function renderThreadAnchors(payload) {
-      const anchors = payload.call_anchors || payload.thread_anchors || {};
-      if (!anchors.available) return '';
-      const seen = new Set();
-      const candidates = [
-        ['before', t('context.anchor_before'), anchors.before_message || anchors.selected_lead_in],
-        [
-          'reasoning',
-          t('context.anchor_reasoning_output'),
-          anchors.reasoning_output || anchors.latest_message || anchors.after_message,
-        ],
-      ].filter(([, , anchor]) => anchor && anchor.text).filter(([, , anchor]) => {
-        const identity = `${anchor.line_number || ''}:${anchor.role || ''}:${anchor.text || ''}`;
-        if (seen.has(identity)) return false;
-        seen.add(identity);
-        return true;
-      });
-      if (!candidates.length) return '';
-      return `
-        <div class="context-anchor-panel">
-          <div class="context-anchor-header">
-            <div>
-              <strong>${escapeHtml(t('context.thread_anchors'))}</strong>
-              <span>${escapeHtml(t('context.thread_anchors_hint'))}</span>
-            </div>
-            <span>${escapeHtml(tf('context.anchor_count', { count: number.format(anchors.message_count || candidates.length) }))}</span>
-          </div>
-          <div class="context-anchor-grid">
-            ${candidates.map(([key, label, anchor]) => renderThreadAnchorCard(key, label, anchor)).join('')}
-          </div>
-        </div>
-      `;
-    }
-
-    function renderThreadAnchorCard(key, label, anchor) {
-      const role = anchor.role || 'unknown';
-      const meta = [
-        formatTimestamp(anchor.timestamp, ''),
-        anchor.line_number ? tf('context.line', { line: anchor.line_number }) : '',
-      ].filter(Boolean).join(' - ');
-      return `
-        <div class="context-anchor-card context-anchor-${escapeHtml(key)}">
-          <div class="context-anchor-card-head">
-            <span>${escapeHtml(label)}</span>
-            <span class="context-anchor-role">${escapeHtml(role)}</span>
-          </div>
-          ${meta ? `<div class="context-anchor-meta">${escapeHtml(meta)}</div>` : ''}
-          <pre>${escapeHtml(anchor.text || '')}</pre>
-        </div>
-      `;
-    }
-
     function contextEntryWindow(entries, payload) {
       const sourceLine = Number(payload?.source?.line_number || 0);
       const selectedIndex = entries.findIndex(entry => sourceLine && Number(entry.line_number || 0) === sourceLine);
@@ -984,7 +932,7 @@
           </div>
         `;
       }).join('');
-      return `<p class="context-note">${escapeHtml(note)}</p>${renderThreadAnchors(payload)}${contextLimitActions(payload)}${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
+      return `<p class="context-note">${escapeHtml(note)}</p>${contextLimitActions(payload)}${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
     }
 
     function contextEntryKey(entry, index) {

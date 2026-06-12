@@ -14,7 +14,6 @@ from codex_usage_tracker.store import query_usage_record
 
 DEFAULT_CONTEXT_CHARS = 20_000
 DEFAULT_CONTEXT_ENTRIES = 80
-ANCHOR_TEXT_CHARS = 1_200
 
 _OUTPUT_OMITTED = (
     "Tool output hidden for this request. Reload with include_tool_output=true to inspect "
@@ -58,7 +57,6 @@ def load_call_context(
         include_tool_output=include_tool_output,
         include_compaction_history=include_compaction_history,
     )
-    call_anchors = _read_call_anchors(source_file, token_line=line_number)
     visible_estimate = _estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
     serialized_estimate = _estimate_serialized_context(
         path=source_file,
@@ -93,8 +91,6 @@ def load_call_context(
             "file": str(source_file),
             "line_number": line_number,
         },
-        "call_anchors": call_anchors,
-        "thread_anchors": call_anchors,
         "entries": entries,
         "omitted": omitted,
     }
@@ -249,134 +245,6 @@ def _chat_message_echo_key(entry: dict[str, Any]) -> tuple[str, str] | None:
 
 def _is_structured_chat_message(entry: dict[str, Any]) -> bool:
     return (_optional_str(entry.get("label")) or "") in {"message / user", "message / assistant"}
-
-
-def _read_call_anchors(path: Path, token_line: int) -> dict[str, Any]:
-    before: dict[str, Any] | None = None
-    reasoning_output: dict[str, Any] | None = None
-    parse_errors = 0
-    try:
-        with path.open(encoding="utf-8") as handle:
-            for line_number, line in enumerate(handle, 1):
-                if line_number > token_line:
-                    break
-                try:
-                    envelope = json.loads(line)
-                except json.JSONDecodeError:
-                    parse_errors += 1
-                    continue
-                if not isinstance(envelope, dict):
-                    continue
-                payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
-                entry_type = _optional_str(envelope.get("type")) or "unknown"
-                summarized = _summarize_payload(
-                    entry_type=entry_type,
-                    payload=payload,
-                    include_tool_output=False,
-                    include_compaction_history=False,
-                )
-                if summarized is None:
-                    continue
-                entry = _summarized_context_entry(
-                    line_number,
-                    _optional_str(envelope.get("timestamp")),
-                    entry_type,
-                    summarized,
-                )
-                if _is_token_count_summary(summarized):
-                    if line_number < token_line:
-                        reasoning_output = None
-                    continue
-                if _is_reasoning_output_anchor(summarized):
-                    reasoning_output = entry
-                    continue
-                if _is_anchor_message(summarized):
-                    if _is_runtime_instruction_anchor(entry):
-                        continue
-                    before = _prefer_structured_anchor(before, entry)
-    except OSError:
-        return {
-            "scope": "selected_call_reasoning_output",
-            "available": False,
-            "parse_errors": parse_errors,
-        }
-
-    return {
-        "scope": "selected_call_reasoning_output",
-        "available": bool(before or reasoning_output),
-        "parse_errors": parse_errors,
-        "before_message": _anchor_from_entry(before),
-        "reasoning_output": _anchor_from_entry(reasoning_output),
-    }
-
-
-def _prefer_structured_anchor(current: dict[str, Any] | None, candidate: dict[str, Any]) -> dict[str, Any]:
-    if current is None:
-        return candidate
-    if _chat_message_echo_key(current) == _chat_message_echo_key(candidate):
-        if _is_structured_chat_message(candidate) and not _is_structured_chat_message(current):
-            return candidate
-        return current
-    return candidate
-
-
-def _is_anchor_message(summarized: dict[str, Any]) -> bool:
-    return (_optional_str(summarized.get("label")) or "") in {
-        "agent_message",
-        "message / assistant",
-        "message / user",
-        "user_message",
-    } and bool(_optional_str(summarized.get("text")))
-
-
-def _is_reasoning_output_anchor(summarized: dict[str, Any]) -> bool:
-    label = _optional_str(summarized.get("label")) or ""
-    return label.split(" / ", 1)[0] == "reasoning" and bool(
-        _optional_str(summarized.get("text"))
-    )
-
-
-def _is_token_count_summary(summarized: dict[str, Any]) -> bool:
-    return "token_usage" in summarized
-
-
-def _anchor_from_entry(entry: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not entry:
-        return None
-    text = str(entry.get("text") or "")
-    truncated = bool(entry.get("truncated"))
-    if len(text) > ANCHOR_TEXT_CHARS:
-        text = text[:ANCHOR_TEXT_CHARS].rstrip() + "\n[TRUNCATED]"
-        truncated = True
-    return {
-        "line_number": entry.get("line_number"),
-        "timestamp": entry.get("timestamp"),
-        "type": entry.get("type"),
-        "label": entry.get("label"),
-        "role": _anchor_role(entry),
-        "text": text,
-        "truncated": truncated,
-    }
-
-
-def _anchor_role(entry: dict[str, Any]) -> str | None:
-    label = _optional_str(entry.get("label")) or ""
-    if label in {"message / user", "user_message"}:
-        return "user"
-    if label in {"message / assistant", "agent_message"}:
-        return "assistant"
-    if label.split(" / ", 1)[0] == "reasoning":
-        return "reasoning"
-    return None
-
-
-def _is_runtime_instruction_anchor(entry: dict[str, Any]) -> bool:
-    text = str(entry.get("text") or "").lstrip()
-    if not text:
-        return False
-    if text.startswith("# AGENTS.md instructions for "):
-        return True
-    return text.startswith("<environment_context>") or text.startswith("# Codex desktop context")
 
 
 def _summarize_payload(

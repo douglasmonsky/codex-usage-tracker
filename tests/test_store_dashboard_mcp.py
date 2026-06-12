@@ -530,11 +530,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-context-no-budget" not in dashboard_call_js
     assert "renderContextTokenUsage" in dashboard_call_js
     assert "renderContextCompaction" in dashboard_call_js
-    assert "renderThreadAnchors" in dashboard_call_js
+    assert "renderThreadAnchors" not in dashboard_call_js
     assert "context-entry-collapsed" in dashboard_call_js
     assert "Evidence analyzed:" in dashboard_call_js
     assert "total_entries" in dashboard_call_js
-    assert ".context-anchor-panel" in dashboard_css
+    assert ".context-anchor-panel" not in dashboard_css
     assert ".context-entry-summary" in dashboard_css
     assert "data-context-compaction-history" in dashboard_call_js
     assert "context-token-breakdown" in dashboard_css
@@ -1215,16 +1215,8 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     serialized_bucket_keys = {bucket["key"] for bucket in serialized["buckets"]}
     assert "encrypted_reasoning_state" in serialized_bucket_keys
     assert "local_goal_metadata" in serialized_bucket_keys
-    anchors = context["call_anchors"]
-    assert anchors["available"] is True
-    assert anchors["scope"] == "selected_call_reasoning_output"
-    assert anchors["before_message"]["role"] == "user"
-    assert anchors["reasoning_output"]["role"] == "reasoning"
-    assert "SECRET RAW PROMPT" in anchors["before_message"]["text"]
-    assert "Reasoning summary" in anchors["reasoning_output"]["text"]
-    assert "AFTER SELECTED CALL" not in json.dumps(anchors)
-    assert "AGENTS.md instructions" not in anchors["before_message"]["text"]
-    assert "sk" + "-proj-" not in anchors["before_message"]["text"]
+    assert "call_anchors" not in context
+    assert "thread_anchors" not in context
     assert context["omitted"]["total_entries"] >= context["omitted"]["returned_entries"]
     assert "SECRET RAW PROMPT" in context_text
     assert "sk" + "-proj-" not in context_text
