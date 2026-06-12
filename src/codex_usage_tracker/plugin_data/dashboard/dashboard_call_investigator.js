@@ -49,6 +49,7 @@
     } = deps;
     const contextRequestState = new Map();
     const contextPayloadState = new Map();
+    const contextUiState = new Map();
 
     function runtime() {
       return getContextRuntime ? getContextRuntime() : {};
@@ -284,6 +285,7 @@
     function renderCallInvestigator(rows) {
       const rowByRecordId = getRowByRecordId();
       const row = rowByRecordId.get(getSelectedRecordId()) || rows.find(candidate => candidate.record_id === getSelectedRecordId());
+      if (row?.record_id) captureContextUiState(row.record_id);
       updateLoadMoreControl({ total: 0, end: 0 }, 'table.calls');
       pagerEl.hidden = true;
       tableTitleEl.textContent = t('dashboard.view.call');
@@ -382,9 +384,95 @@
       const article = rowsEl.querySelector('.call-investigator');
       if (article) {
         bindContextButtons(row, article);
+        restoreContextUiState(row.record_id, article);
+        bindContextUiState(row.record_id, article);
         maybeAutoloadEvidence(row, article);
       }
       detailEl.textContent = t('dashboard.detail.empty');
+    }
+
+    function captureContextUiState(recordId) {
+      const article = rowsEl.querySelector(`.call-investigator[data-record-id="${cssEscape(recordId)}"]`);
+      if (!article) return;
+      const openEntries = new Set();
+      const scrollTops = new Map();
+      article.querySelectorAll('.context-entry[data-context-entry-key]').forEach(entry => {
+        const key = entry.getAttribute('data-context-entry-key') || '';
+        if (!key) return;
+        if (entry.tagName.toLowerCase() === 'details' && entry.open) openEntries.add(key);
+        const scroller = entry.querySelector('pre');
+        if (scroller && scroller.scrollTop > 0) scrollTops.set(key, scroller.scrollTop);
+      });
+      contextUiState.set(recordId, { openEntries, scrollTops });
+    }
+
+    function restoreContextUiState(recordId, root) {
+      const saved = contextUiState.get(recordId || '');
+      if (!saved) return;
+      root.querySelectorAll('.context-entry[data-context-entry-key]').forEach(entry => {
+        const key = entry.getAttribute('data-context-entry-key') || '';
+        if (!key) return;
+        if (entry.tagName.toLowerCase() === 'details' && saved.openEntries.has(key)) {
+          entry.open = true;
+        }
+        const scrollTop = saved.scrollTops.get(key);
+        const scroller = entry.querySelector('pre');
+        if (scroller && scrollTop) {
+          window.requestAnimationFrame(() => {
+            scroller.scrollTop = scrollTop;
+          });
+        }
+      });
+    }
+
+    function bindContextUiState(recordId, root) {
+      if (!recordId) return;
+      root.querySelectorAll('.context-entry[data-context-entry-key]').forEach(entry => {
+        const key = entry.getAttribute('data-context-entry-key') || '';
+        if (!key) return;
+        if (entry.tagName.toLowerCase() === 'details') {
+          entry.addEventListener('toggle', () => {
+            rememberContextEntryOpen(recordId, key, entry.open);
+          });
+        }
+        const scroller = entry.querySelector('pre');
+        if (scroller) {
+          scroller.addEventListener('scroll', () => {
+            rememberContextEntryScroll(recordId, key, scroller.scrollTop);
+          }, { passive: true });
+        }
+      });
+    }
+
+    function ensureContextUiState(recordId) {
+      const key = recordId || '';
+      if (!contextUiState.has(key)) {
+        contextUiState.set(key, { openEntries: new Set(), scrollTops: new Map() });
+      }
+      return contextUiState.get(key);
+    }
+
+    function rememberContextEntryOpen(recordId, entryKey, open) {
+      const saved = ensureContextUiState(recordId);
+      if (open) {
+        saved.openEntries.add(entryKey);
+      } else {
+        saved.openEntries.delete(entryKey);
+      }
+    }
+
+    function rememberContextEntryScroll(recordId, entryKey, scrollTop) {
+      const saved = ensureContextUiState(recordId);
+      if (scrollTop > 0) {
+        saved.scrollTops.set(entryKey, scrollTop);
+      } else {
+        saved.scrollTops.delete(entryKey);
+      }
+    }
+
+    function cssEscape(value) {
+      if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(value || '');
+      return String(value || '').replace(/["\\]/g, '\\$&');
     }
 
     function contextControls(row, options = {}) {
@@ -573,6 +661,7 @@
         target.innerHTML = `<p class="context-note">${escapeHtml(t('context.no_record_id'))}</p>`;
         return;
       }
+      captureContextUiState(row.record_id);
       contextPayloadState.set(row.record_id, { status: 'loading' });
       target.innerHTML = `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`;
       const requestState = nextContextState(row, options);
@@ -603,6 +692,8 @@
         const payload = await response.json();
         contextPayloadState.set(row.record_id, { status: 'loaded', payload });
         target.innerHTML = renderContext(payload);
+        restoreContextUiState(row.record_id, target);
+        bindContextUiState(row.record_id, target);
         if (runtime().activeView === 'call') renderDashboard();
       } catch (error) {
         const message = error.message || String(error);
@@ -793,6 +884,7 @@
       });
       const entryWindow = contextEntryWindow(entries, payload);
       const body = entries.map((entry, index) => {
+        const entryKey = contextEntryKey(entry, index);
         const meta = [formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - ');
         const outputAction = entry.tool_output_omitted && !payload.include_tool_output
           ? `<button class="context-entry-action" type="button" data-context-entry-load-output>${escapeHtml(t('button.show_tool_output'))}</button>`
@@ -816,7 +908,7 @@
         `;
         if (!currentCallEntry) {
           return `
-            <details class="context-entry context-entry-collapsed">
+            <details class="context-entry context-entry-collapsed" data-context-entry-key="${escapeHtml(entryKey)}">
               <summary class="context-entry-summary">
                 <span class="context-entry-title">${escapeHtml(entry.label || entry.type || 'entry')}</span>
                 <span class="context-entry-meta">${meta ? escapeHtml(meta) : ''}</span>
@@ -826,13 +918,20 @@
           `;
         }
         return `
-          <div class="context-entry context-entry-current">
+          <div class="context-entry context-entry-current" data-context-entry-key="${escapeHtml(entryKey)}">
             ${header}
             ${bodyHtml}
           </div>
         `;
       }).join('');
       return `<p class="context-note">${escapeHtml(note)}</p>${renderThreadAnchors(payload)}${contextLimitActions(payload)}${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
+    }
+
+    function contextEntryKey(entry, index) {
+      const line = entry.line_number || '';
+      const type = entry.type || '';
+      const label = entry.label || '';
+      return `${line || `index-${index}`}:${type}:${label}`;
     }
 
     return Object.freeze({

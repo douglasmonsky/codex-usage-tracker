@@ -498,6 +498,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "renderSerializedEvidenceBreakdown" in dashboard_call_js
     assert "serialized_evidence" in dashboard_call_js
     assert ".serialized-breakdown" in dashboard_css
+    assert "captureContextUiState" in dashboard_call_js
+    assert "restoreContextUiState" in dashboard_call_js
+    assert "bindContextUiState" in dashboard_call_js
+    assert "data-context-entry-key" in dashboard_call_js
     assert "button.show_tool_output" in dashboard_call_js
     assert "data-context-entry-load-output" in dashboard_call_js
     assert "data-context-load-older" in dashboard_call_js
