@@ -220,11 +220,39 @@
     .card span { display: block; color: var(--muted); font-size: 12px; font-weight: 680; }
     .card strong { display: block; margin-top: 7px; font-size: 22px; }
     #allowanceImpact { white-space: pre-line; line-height: 1.18; }
-    body[data-active-view="call"] table > thead {
+    body[data-active-view="call"] .filters,
+    body[data-active-view="call"] .cards,
+    body[data-active-view="call"] .detail-section,
+    body[data-active-view="call"] .grid > section:first-child > h2,
+    body[data-active-view="call"] .table-tools {
       display: none;
     }
+    body[data-active-view="call"] main {
+      padding-top: 14px;
+    }
     body[data-active-view="call"] .grid {
-      grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+      display: block;
+    }
+    body[data-active-view="call"] .grid > section:first-child {
+      overflow: visible;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    body[data-active-view="call"] .grid > section:first-child > table,
+    body[data-active-view="call"] .grid > section:first-child > table > tbody,
+    body[data-active-view="call"] .grid > section:first-child > table > tbody > tr,
+    body[data-active-view="call"] .grid > section:first-child > table > tbody > tr > td {
+      display: block;
+      width: 100%;
+      min-width: 0;
+    }
+    body[data-active-view="call"] .grid > section:first-child > table {
+      border-collapse: separate;
+      font-size: 13px;
+    }
+    body[data-active-view="call"] .grid > section:first-child > table > thead {
+      display: none;
     }
     .call-thread-cell {
       display: flex;
@@ -249,12 +277,14 @@
     .mini-open-button:hover { background: #eff6ff; }
     .call-investigator-row > td {
       padding: 0;
-      background: var(--bg);
+      border: 0;
+      background: transparent;
     }
     .call-investigator {
       display: grid;
-      gap: 14px;
-      padding: 14px;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
+      gap: 12px;
+      padding: 0;
     }
     .call-investigator-header,
     .call-nav,
@@ -265,60 +295,81 @@
       gap: 8px;
     }
     .call-investigator-header {
+      grid-column: 1 / -1;
       justify-content: space-between;
-      padding: 14px;
+      padding: 12px 14px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
-      box-shadow: var(--shadow);
+      box-shadow: none;
     }
     .call-investigator-header h3 {
       margin: 0 0 4px;
-      font-size: 18px;
+      font-size: 17px;
       letter-spacing: 0;
+    }
+    .call-investigator-header .muted {
+      margin: 0;
     }
     .call-nav {
       justify-content: flex-end;
     }
     .call-diagnostic-section {
-      padding: 14px;
+      min-width: 0;
+      padding: 12px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
-      box-shadow: var(--shadow);
+      box-shadow: none;
+    }
+    .call-diagnostic-section.exact,
+    .call-diagnostic-section.raw-evidence {
+      grid-column: 1 / -1;
+    }
+    .call-diagnostic-section.cache,
+    .call-diagnostic-section.delta,
+    .call-diagnostic-section.context,
+    .call-diagnostic-section.compaction {
+      align-self: start;
     }
     .section-heading.compact {
       margin-bottom: 10px;
       align-items: center;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
     }
     .call-metric-grid,
     .call-delta-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
     }
     .call-metric-grid.two {
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .call-metric-card {
       min-width: 0;
-      padding: 10px;
+      min-height: 68px;
+      padding: 8px 9px;
       border: 1px solid #dbe4f0;
       border-radius: 8px;
-      background: #f8fafc;
+      background: #fbfcfe;
     }
     .call-metric-card span,
     .call-metric-card small {
       display: block;
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 720;
-      overflow-wrap: anywhere;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .call-metric-card strong {
       display: block;
       margin: 4px 0 2px;
-      font-size: 18px;
+      font-size: 17px;
       line-height: 1.15;
       overflow-wrap: anywhere;
     }
@@ -331,9 +382,13 @@
       border-radius: 999px;
       color: var(--muted);
       background: #f8fafc;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 780;
       text-transform: uppercase;
+      max-width: min(100%, 240px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .evidence-chip.exact { color: #065f46; background: #ecfdf5; border-color: #bbf7d0; }
     .evidence-chip.derived { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
@@ -342,6 +397,17 @@
     .diagnostic-summary {
       display: grid;
       gap: 8px;
+    }
+    .diagnostic-summary .flags {
+      justify-content: flex-start;
+      gap: 6px;
+    }
+    .diagnostic-summary .signal-puck {
+      max-width: none;
+      min-width: 0;
+      padding: 3px 8px;
+      font-size: 11px;
+      line-height: 1.15;
     }
     .diagnostic-summary p {
       margin: 0;
@@ -1301,4 +1367,26 @@
       .pager { width: auto; }
       .action-status { min-width: 0; }
       .preset-card { grid-template-columns: 1fr; }
+      body[data-active-view="call"] .call-investigator {
+        grid-template-columns: 1fr;
+      }
+      body[data-active-view="call"] .call-diagnostic-section,
+      body[data-active-view="call"] .call-investigator-header {
+        grid-column: 1 / -1;
+      }
+      body[data-active-view="call"] .call-metric-grid,
+      body[data-active-view="call"] .call-delta-grid,
+      body[data-active-view="call"] .call-metric-grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      body[data-active-view="call"] .call-nav {
+        justify-content: flex-start;
+      }
+    }
+    @media (min-width: 700px) and (max-width: 980px) {
+      body[data-active-view="call"] .call-metric-grid,
+      body[data-active-view="call"] .call-delta-grid,
+      body[data-active-view="call"] .call-metric-grid.two {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }

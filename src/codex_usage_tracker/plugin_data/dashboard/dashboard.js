@@ -1935,9 +1935,9 @@
       syncUrlState();
       scheduleFocusPendingTarget();
     }
-    function callMetricCard(label, value, badge = '') {
+    function callMetricCard(label, value, badge = '', title = '') {
       return `
-        <div class="call-metric-card">
+        <div class="call-metric-card" ${title ? tooltipAttributes(title) : ''}>
           <span>${escapeHtml(label)}</span>
           <strong>${escapeHtml(value)}</strong>
           ${badge ? `<small>${escapeHtml(badge)}</small>` : ''}
@@ -2006,7 +2006,7 @@
                 </div>
                 ${renderCallNavigation(row, previous, next)}
               </header>
-              <section class="call-diagnostic-section">
+              <section class="call-diagnostic-section exact">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.exact_accounting'))}</h3>
                   <span class="evidence-chip exact">${escapeHtml(t('call.exact_label'))}</span>
@@ -2017,10 +2017,10 @@
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
                   ${callMetricCard(t('metric.output'), number.format(outputTokens(row)), t('metric.reasoning_output'))}
                   ${callMetricCard(t('metric.estimated_cost'), moneyText(row.estimated_cost_usd), pricingStatusText(row))}
-                  ${callMetricCard(t('metric.codex_credits'), usageCreditsWithStatus(row), rowAllowanceImpact(row))}
+                  ${callMetricCard(t('metric.codex_credits'), creditsText(usageCreditValue(row)), usageCreditStatusLabel(row), usageCreditsWithStatus(row))}
                 </div>
               </section>
-              <section class="call-diagnostic-section">
+              <section class="call-diagnostic-section cache">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.cache_diagnostics'))}</h3>
                   <span class="evidence-chip derived">${escapeHtml(t('call.derived_label'))}</span>
@@ -2031,14 +2031,14 @@
                   <p class="muted">${escapeHtml(tf('call.position', { position: callPosition }))}</p>
                 </div>
               </section>
-              <section class="call-diagnostic-section">
+              <section class="call-diagnostic-section delta">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.cache_accounting_delta'))}</h3>
                   <span class="evidence-chip derived">${escapeHtml(t('call.derived_label'))}</span>
                 </div>
                 ${renderDeltaCards(row, previous)}
               </section>
-              <section class="call-diagnostic-section">
+              <section class="call-diagnostic-section context">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.context_estimate'))}</h3>
                   <span class="evidence-chip estimated">${escapeHtml(t('call.estimated_label'))}</span>
@@ -2049,7 +2049,7 @@
                 </div>
                 <p class="muted">${escapeHtml(t('call.context_estimate_hint'))}</p>
               </section>
-              <section class="call-diagnostic-section">
+              <section class="call-diagnostic-section compaction">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.compaction_diagnostics'))}</h3>
                   <span class="evidence-chip evidence">${escapeHtml(t('call.evidence_label'))}</span>
@@ -2069,7 +2069,7 @@
       `;
       const article = rowsEl.querySelector('.call-investigator');
       if (article) bindContextButtons(row, article);
-      showDetail(row);
+      detailEl.textContent = t('dashboard.detail.empty');
     }
     function renderCalls(rows) {
       ensurePendingFocusVisibleInRows(rows);

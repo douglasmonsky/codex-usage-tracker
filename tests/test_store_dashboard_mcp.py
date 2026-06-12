@@ -438,6 +438,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "button.open_investigator" in dashboard_js
     assert "dashboard.view.call" in dashboard_js
     assert "renderCallInvestigator" in dashboard_js
+    assert 'body[data-active-view="call"] .detail-section' in dashboard_css
+    assert 'body[data-active-view="call"] .table-tools' in dashboard_css
+    assert ".call-diagnostic-section.exact" in dashboard_css
+    assert "creditsText(usageCreditValue(row))" in dashboard_js
     assert "data-open-investigator-record" in dashboard_js
     assert "data-call-nav-record" in dashboard_js
     assert "call.cache_accounting_delta" in dashboard_js
