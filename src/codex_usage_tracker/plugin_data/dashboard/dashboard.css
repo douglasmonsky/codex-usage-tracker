@@ -1452,6 +1452,36 @@
       font-size: 12px;
       font-weight: 720;
     }
+    .context-entry-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
+      cursor: pointer;
+    }
+    .context-entry-summary::-webkit-details-marker {
+      display: none;
+    }
+    .context-entry-summary::before {
+      content: "▶";
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .context-entry-collapsed[open] .context-entry-summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .context-entry-collapsed[open] .context-entry-summary::before {
+      content: "▼";
+    }
+    .context-entry-current {
+      background: #ffffff;
+    }
     .context-entry-title {
       min-width: 0;
       overflow-wrap: anywhere;

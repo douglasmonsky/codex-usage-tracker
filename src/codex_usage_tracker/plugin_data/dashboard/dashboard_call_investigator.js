@@ -159,12 +159,15 @@
       const payload = loadedContextPayload(row);
       if (!payload) return null;
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
+      const omitted = payload.omitted || {};
+      const totalEntries = Number(omitted.total_entries ?? entries.length);
       const visibleChars = Number(payload.visible_char_count ?? entries.reduce((sum, entry) => sum + String(entry.text || '').length, 0));
       const fallbackEstimate = Math.ceil(visibleChars / 4);
       const visibleTokenEstimate = Number(payload.visible_token_estimate ?? fallbackEstimate);
       const hiddenGap = Math.max(uncachedInputTokens(row) - visibleTokenEstimate, 0);
       return {
         entries: entries.length,
+        totalEntries: Number.isFinite(totalEntries) ? totalEntries : entries.length,
         visibleChars,
         visibleTokenEstimate,
         estimator: payload.visible_token_estimator || 'chars_per_4_fallback',
@@ -219,7 +222,7 @@
         : 'No previous call is loaded for this resolved thread, so call-to-call deltas are unavailable.';
       const stats = contextEvidenceStats(row);
       const evidence = stats
-        ? `Evidence loaded: ${number.format(stats.entries)} entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}.`
+        ? `Evidence analyzed: ${number.format(stats.totalEntries)} selected-turn entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}. ${number.format(stats.entries)} entries rendered initially.`
         : 'Evidence is loading from the local JSONL source. Aggregate token counts are exact, but visible-context attribution needs that runtime evidence.';
       return `
         <section class="call-diagnostic-section readout">
@@ -331,7 +334,7 @@
                 </div>
                 <div class="call-metric-grid two">
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
-                  ${callMetricCard(t('call.visible_estimate'), visibleEstimateValue, evidenceStats ? `${number.format(evidenceStats.visibleChars)} visible chars · ${evidenceStats.estimator}` : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.visible_estimate'), visibleEstimateValue, evidenceStats ? `${number.format(evidenceStats.visibleChars)} analyzed chars · ${evidenceStats.estimator}` : t('call.evidence_label'))}
                   ${callMetricCard(t('call.hidden_estimate'), hiddenEstimateValue, evidenceStats ? 'Uncached input minus visible estimate' : t('call.evidence_label'))}
                 </div>
                 <p class="muted">${escapeHtml(t('call.context_estimate_hint'))}</p>
@@ -494,7 +497,7 @@
         includeToolOutput: true,
         includeCompactionHistory: false,
         maxChars: 0,
-        maxEntries: 0,
+        maxEntries: defaultContextEntries,
       };
     }
 
@@ -649,13 +652,12 @@
     }
 
     function renderThreadAnchors(payload) {
-      const anchors = payload.thread_anchors || {};
+      const anchors = payload.call_anchors || payload.thread_anchors || {};
       if (!anchors.available) return '';
       const seen = new Set();
       const candidates = [
-        ['entry', t('context.anchor_entry'), anchors.first_message],
-        ['selected', t('context.anchor_selected'), anchors.selected_lead_in],
-        ['latest', t('context.anchor_latest'), anchors.latest_message],
+        ['before', t('context.anchor_before'), anchors.before_message || anchors.selected_lead_in],
+        ['latest', t('context.anchor_latest'), anchors.latest_message || anchors.after_message],
       ].filter(([, , anchor]) => anchor && anchor.text).filter(([, , anchor]) => {
         const identity = `${anchor.line_number || ''}:${anchor.role || ''}:${anchor.text || ''}`;
         if (seen.has(identity)) return false;
@@ -697,6 +699,29 @@
       `;
     }
 
+    function contextEntryWindow(entries, payload) {
+      const sourceLine = Number(payload?.source?.line_number || 0);
+      const selectedIndex = entries.findIndex(entry => sourceLine && Number(entry.line_number || 0) === sourceLine);
+      if (selectedIndex < 0) {
+        return {
+          start: Math.max(entries.length - 3, 0),
+          end: Math.max(entries.length - 1, 0),
+        };
+      }
+      let previousTokenIndex = -1;
+      entries.forEach((entry, index) => {
+        if (index < selectedIndex && entry && entry.token_usage) previousTokenIndex = index;
+      });
+      return {
+        start: Math.max(previousTokenIndex + 1, 0),
+        end: selectedIndex,
+      };
+    }
+
+    function contextEntryBelongsToSelectedCall(index, windowRange) {
+      return index >= windowRange.start && index <= windowRange.end;
+    }
+
     function renderContext(payload) {
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
       const source = payload.source || {};
@@ -713,25 +738,44 @@
       entries.filter(entry => entry && entry.token_usage).forEach((entry, index) => {
         tokenEntryIndexes.set(entry, index);
       });
-      const body = entries.map(entry => {
+      const entryWindow = contextEntryWindow(entries, payload);
+      const body = entries.map((entry, index) => {
         const meta = [formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - ');
         const outputAction = entry.tool_output_omitted && !payload.include_tool_output
           ? `<button class="context-entry-action" type="button" data-context-entry-load-output>${escapeHtml(t('button.show_tool_output'))}</button>`
           : '';
         const tokenUsage = renderContextTokenUsage(entry, payload, tokenEntryIndexes.get(entry) || 0);
         const compaction = renderContextCompaction(entry);
+        const currentCallEntry = contextEntryBelongsToSelectedCall(index, entryWindow);
+        const header = `
+          <div class="context-entry-header">
+            <span class="context-entry-title">${escapeHtml(entry.label || entry.type || 'entry')}</span>
+            <span class="context-entry-meta">
+              ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
+              ${outputAction}
+            </span>
+          </div>
+        `;
+        const bodyHtml = `
+          ${tokenUsage}
+          ${compaction}
+          <pre>${escapeHtml(entry.text || '')}</pre>
+        `;
+        if (!currentCallEntry) {
+          return `
+            <details class="context-entry context-entry-collapsed">
+              <summary class="context-entry-summary">
+                <span class="context-entry-title">${escapeHtml(entry.label || entry.type || 'entry')}</span>
+                <span class="context-entry-meta">${meta ? escapeHtml(meta) : ''}</span>
+              </summary>
+              ${bodyHtml}
+            </details>
+          `;
+        }
         return `
-          <div class="context-entry">
-            <div class="context-entry-header">
-              <span class="context-entry-title">${escapeHtml(entry.label || entry.type || 'entry')}</span>
-              <span class="context-entry-meta">
-                ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
-                ${outputAction}
-              </span>
-            </div>
-            ${tokenUsage}
-            ${compaction}
-            <pre>${escapeHtml(entry.text || '')}</pre>
+          <div class="context-entry context-entry-current">
+            ${header}
+            ${bodyHtml}
           </div>
         `;
       }).join('');

@@ -104,7 +104,7 @@
   "caption.threads": "Đang hiển thị {threads} cuộc trò chuyện từ {calls} lượt gọi đã lọc, sắp xếp theo {sort}. {loaded}. Bấm một cuộc trò chuyện để mở các lượt gọi.",
   "context.api_http": "Ngữ cảnh API trả HTTP {status}.",
   "context.api_unavailable": "Ngữ cảnh API không khả dụng ở đây. Chạy codex-usage-tracker serve-dashboard --open để tải ngữ cảnh theo yêu cầu.",
-  "context.auto_loading": "Loading full turn-log evidence with tool output included.",
+  "context.auto_loading": "Loading selected-turn evidence with tool output included.",
   "context.chars_omitted": "Đã bỏ qua {count} ký tự vượt ngân sách.",
   "context.compaction_detected": "Compaction detected",
   "context.compaction_replacement": "Compacted replacement context",

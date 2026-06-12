@@ -104,7 +104,7 @@
   "caption.threads": "Showing {threads} threads from {calls} filtered calls, sorted by {sort}. {loaded}. Click a thread to expand its calls.",
   "context.api_http": "Context API returned HTTP {status}.",
   "context.api_unavailable": "Context API is unavailable here. Run codex-usage-tracker serve-dashboard --open for on-demand context loading.",
-  "context.auto_loading": "Loading full turn-log evidence with tool output included.",
+  "context.auto_loading": "Loading selected-turn evidence with tool output included.",
   "context.chars_omitted": "{count} chars over budget omitted.",
   "context.compaction_detected": "Compaction detected",
   "context.compaction_replacement": "Compacted replacement context",

@@ -457,7 +457,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "defaultContextRequest" in dashboard_call_js
     assert "includeToolOutput: true" in dashboard_call_js
     assert "maxChars: 0" in dashboard_call_js
-    assert "maxEntries: 0" in dashboard_call_js
+    assert "maxEntries: defaultContextEntries" in dashboard_call_js
     assert "data-context-toggle-tool-output" in dashboard_call_js
     assert "button.hide_tool_output" in dashboard_call_js
     assert "data-context-autoload-toggle" not in dashboard_call_js
@@ -481,7 +481,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "renderContextTokenUsage" in dashboard_call_js
     assert "renderContextCompaction" in dashboard_call_js
     assert "renderThreadAnchors" in dashboard_call_js
+    assert "context-entry-collapsed" in dashboard_call_js
+    assert "Evidence analyzed:" in dashboard_call_js
+    assert "total_entries" in dashboard_call_js
     assert ".context-anchor-panel" in dashboard_css
+    assert ".context-entry-summary" in dashboard_css
     assert "data-context-compaction-history" in dashboard_call_js
     assert "context-token-breakdown" in dashboard_css
     assert "context-compaction" in dashboard_css
@@ -1061,16 +1065,16 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
         "tiktoken:o200k_base",
         "tiktoken:cl100k_base",
     }
-    anchors = context["thread_anchors"]
+    anchors = context["call_anchors"]
     assert anchors["available"] is True
-    assert anchors["scope"] == "source_session"
-    assert anchors["message_count"] >= 1
-    assert anchors["first_message"]["role"] == "user"
-    assert anchors["selected_lead_in"]["role"] == "user"
-    assert anchors["latest_message"]["role"] == "user"
-    assert "SECRET RAW PROMPT" in anchors["first_message"]["text"]
-    assert "AGENTS.md instructions" not in anchors["first_message"]["text"]
-    assert "sk" + "-proj-" not in anchors["first_message"]["text"]
+    assert anchors["scope"] == "selected_call_latest"
+    assert anchors["before_message"]["role"] == "user"
+    assert anchors["latest_message"]["role"] == "assistant"
+    assert "SECRET RAW PROMPT" in anchors["before_message"]["text"]
+    assert "AFTER SELECTED CALL" in anchors["latest_message"]["text"]
+    assert "AGENTS.md instructions" not in anchors["before_message"]["text"]
+    assert "sk" + "-proj-" not in anchors["before_message"]["text"]
+    assert context["omitted"]["total_entries"] >= context["omitted"]["returned_entries"]
     assert "SECRET RAW PROMPT" in context_text
     assert "sk" + "-proj-" not in context_text
     assert "AKIAIOSFODNN7EXAMPLE" not in context_text
@@ -1570,6 +1574,14 @@ def _make_codex_home(tmp_path: Path) -> Path:
                 },
             ),
             _token_event(100, 100),
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "AFTER SELECTED CALL"}],
+                },
+            ),
             _token_event(300, 200),
         ],
     )

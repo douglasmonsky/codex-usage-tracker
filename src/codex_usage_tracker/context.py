@@ -49,7 +49,7 @@ def load_call_context(
         raise ValueError(f"Usage record has no valid source line: {record_id}")
 
     target_turn_id = _optional_str(row.get("turn_id"))
-    entries, omitted = _read_context_entries(
+    entries, omitted, estimate_entries = _read_context_entries(
         path=source_file,
         token_line=line_number,
         target_turn_id=target_turn_id,
@@ -58,8 +58,8 @@ def load_call_context(
         include_tool_output=include_tool_output,
         include_compaction_history=include_compaction_history,
     )
-    thread_anchors = _read_thread_anchors(source_file, token_line=line_number)
-    visible_estimate = _estimate_visible_tokens(entries, _optional_str(row.get("model")))
+    call_anchors = _read_call_anchors(source_file, token_line=line_number)
+    visible_estimate = _estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
     return {
         "schema": "codex-usage-tracker-context-v1",
         "loaded_on_demand": True,
@@ -86,7 +86,8 @@ def load_call_context(
             "file": str(source_file),
             "line_number": line_number,
         },
-        "thread_anchors": thread_anchors,
+        "call_anchors": call_anchors,
+        "thread_anchors": call_anchors,
         "entries": entries,
         "omitted": omitted,
     }
@@ -100,7 +101,7 @@ def _read_context_entries(
     max_entries: int,
     include_tool_output: bool,
     include_compaction_history: bool,
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     candidates: list[dict[str, Any]] = []
     omitted_parse_errors = 0
     current_turn_id: str | None = None
@@ -182,7 +183,8 @@ def _read_context_entries(
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
     omitted["parse_errors"] = omitted_parse_errors
     omitted["target_turn_id"] = target_turn_id
-    return limited, omitted
+    omitted["total_entries"] = len(candidates)
+    return limited, omitted, candidates
 
 
 def _summarized_context_entry(
@@ -242,12 +244,14 @@ def _is_structured_chat_message(entry: dict[str, Any]) -> bool:
     return (_optional_str(entry.get("label")) or "") in {"message / user", "message / assistant"}
 
 
-def _read_thread_anchors(path: Path, token_line: int) -> dict[str, Any]:
-    messages: list[dict[str, Any]] = []
+def _read_call_anchors(path: Path, token_line: int) -> dict[str, Any]:
+    before: dict[str, Any] | None = None
     parse_errors = 0
     try:
         with path.open(encoding="utf-8") as handle:
             for line_number, line in enumerate(handle, 1):
+                if line_number > token_line:
+                    break
                 try:
                     envelope = json.loads(line)
                 except json.JSONDecodeError:
@@ -265,41 +269,108 @@ def _read_thread_anchors(path: Path, token_line: int) -> dict[str, Any]:
                 )
                 if summarized is None or not _is_anchor_message(summarized):
                     continue
-                messages.append(
-                    _summarized_context_entry(
-                        line_number,
-                        _optional_str(envelope.get("timestamp")),
-                        entry_type,
-                        summarized,
-                    )
+                entry = _summarized_context_entry(
+                    line_number,
+                    _optional_str(envelope.get("timestamp")),
+                    entry_type,
+                    summarized,
                 )
+                if _is_runtime_instruction_anchor(entry):
+                    continue
+                before = _prefer_structured_anchor(before, entry)
     except OSError:
         return {
-            "scope": "source_session",
+            "scope": "selected_call_latest",
             "available": False,
             "parse_errors": parse_errors,
         }
 
-    messages = [
-        entry
-        for entry in _dedupe_chat_message_echoes(messages)
-        if not _is_runtime_instruction_anchor(entry)
-    ]
-    first = messages[0] if messages else None
-    selected_lead_in = next(
-        (entry for entry in reversed(messages) if int(entry.get("line_number") or 0) <= token_line),
-        None,
-    )
-    latest = messages[-1] if messages else None
+    latest, latest_parse_errors = _read_latest_anchor(path)
     return {
-        "scope": "source_session",
-        "available": bool(messages),
-        "message_count": len(messages),
-        "parse_errors": parse_errors,
-        "first_message": _anchor_from_entry(first),
-        "selected_lead_in": _anchor_from_entry(selected_lead_in),
+        "scope": "selected_call_latest",
+        "available": bool(before or latest),
+        "parse_errors": parse_errors + latest_parse_errors,
+        "before_message": _anchor_from_entry(before),
         "latest_message": _anchor_from_entry(latest),
     }
+
+
+def _prefer_structured_anchor(current: dict[str, Any] | None, candidate: dict[str, Any]) -> dict[str, Any]:
+    if current is None:
+        return candidate
+    if _chat_message_echo_key(current) == _chat_message_echo_key(candidate):
+        if _is_structured_chat_message(candidate) and not _is_structured_chat_message(current):
+            return candidate
+        return current
+    return candidate
+
+
+def _read_latest_anchor(path: Path) -> tuple[dict[str, Any] | None, int]:
+    parse_errors = 0
+    try:
+        for line_number, line in _iter_jsonl_lines_reverse(path):
+            try:
+                envelope = json.loads(line)
+            except json.JSONDecodeError:
+                parse_errors += 1
+                continue
+            if not isinstance(envelope, dict):
+                continue
+            payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
+            entry_type = _optional_str(envelope.get("type")) or "unknown"
+            summarized = _summarize_payload(
+                entry_type=entry_type,
+                payload=payload,
+                include_tool_output=False,
+                include_compaction_history=False,
+            )
+            if summarized is None or not _is_anchor_message(summarized):
+                continue
+            entry = _summarized_context_entry(
+                line_number,
+                _optional_str(envelope.get("timestamp")),
+                entry_type,
+                summarized,
+            )
+            if not _is_runtime_instruction_anchor(entry):
+                return entry, parse_errors
+    except OSError:
+        return None, parse_errors
+    return None, parse_errors
+
+
+def _iter_jsonl_lines_reverse(path: Path, chunk_size: int = 65_536):
+    total_lines = _count_jsonl_lines(path)
+    yielded = 0
+    buffer = b""
+    with path.open("rb") as handle:
+        handle.seek(0, 2)
+        position = handle.tell()
+        while position > 0:
+            read_size = min(chunk_size, position)
+            position -= read_size
+            handle.seek(position)
+            buffer = handle.read(read_size) + buffer
+            lines = buffer.split(b"\n")
+            buffer = lines[0]
+            for raw_line in reversed(lines[1:]):
+                if not raw_line:
+                    continue
+                yielded += 1
+                yield total_lines - yielded + 1, raw_line.decode("utf-8", errors="replace")
+        if buffer:
+            yielded += 1
+            yield total_lines - yielded + 1, buffer.decode("utf-8", errors="replace")
+
+
+def _count_jsonl_lines(path: Path, chunk_size: int = 1024 * 1024) -> int:
+    count = 0
+    last_byte = b"\n"
+    with path.open("rb") as handle:
+        while chunk := handle.read(chunk_size):
+            count += chunk.count(b"\n")
+            last_byte = chunk[-1:]
+    return count if last_byte == b"\n" else count + 1
 
 
 def _is_anchor_message(summarized: dict[str, Any]) -> bool:
