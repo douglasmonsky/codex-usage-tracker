@@ -151,6 +151,12 @@
       'context.token_total': 'Total',
       'context.no_char_limit_active': 'No character limit applied.',
       'context.auto_loading': 'Loading full turn-log evidence with tool output included.',
+      'context.thread_anchors': 'Thread anchors',
+      'context.thread_anchors_hint': 'First, current lead-in, and latest visible messages from the source session.',
+      'context.anchor_entry': 'Entry',
+      'context.anchor_selected': 'Before this call',
+      'context.anchor_latest': 'Latest',
+      'context.anchor_count': '{count} visible messages in source session.',
       'source.user_initiated': 'User initiated',
       'source.codex_initiated': 'Codex initiated',
     };

@@ -480,6 +480,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-context-no-budget" not in dashboard_call_js
     assert "renderContextTokenUsage" in dashboard_call_js
     assert "renderContextCompaction" in dashboard_call_js
+    assert "renderThreadAnchors" in dashboard_call_js
+    assert ".context-anchor-panel" in dashboard_css
     assert "data-context-compaction-history" in dashboard_call_js
     assert "context-token-breakdown" in dashboard_css
     assert "context-compaction" in dashboard_css
@@ -1059,6 +1061,16 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
         "tiktoken:o200k_base",
         "tiktoken:cl100k_base",
     }
+    anchors = context["thread_anchors"]
+    assert anchors["available"] is True
+    assert anchors["scope"] == "source_session"
+    assert anchors["message_count"] >= 1
+    assert anchors["first_message"]["role"] == "user"
+    assert anchors["selected_lead_in"]["role"] == "user"
+    assert anchors["latest_message"]["role"] == "user"
+    assert "SECRET RAW PROMPT" in anchors["first_message"]["text"]
+    assert "AGENTS.md instructions" not in anchors["first_message"]["text"]
+    assert "sk" + "-proj-" not in anchors["first_message"]["text"]
     assert "SECRET RAW PROMPT" in context_text
     assert "sk" + "-proj-" not in context_text
     assert "AKIAIOSFODNN7EXAMPLE" not in context_text
@@ -1469,6 +1481,20 @@ def _make_codex_home(tmp_path: Path) -> Path:
                     "model": "gpt-5.5",
                     "effort": "xhigh",
                     "cwd": "/tmp/codex-usage-tracker",
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "# AGENTS.md instructions for /tmp/codex-usage-tracker\n\n"
+                            "<INSTRUCTIONS>\nKeep local logs private.\n</INSTRUCTIONS>",
+                        }
+                    ],
                 },
             ),
             _entry(

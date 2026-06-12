@@ -648,6 +648,55 @@
       `;
     }
 
+    function renderThreadAnchors(payload) {
+      const anchors = payload.thread_anchors || {};
+      if (!anchors.available) return '';
+      const seen = new Set();
+      const candidates = [
+        ['entry', t('context.anchor_entry'), anchors.first_message],
+        ['selected', t('context.anchor_selected'), anchors.selected_lead_in],
+        ['latest', t('context.anchor_latest'), anchors.latest_message],
+      ].filter(([, , anchor]) => anchor && anchor.text).filter(([, , anchor]) => {
+        const identity = `${anchor.line_number || ''}:${anchor.role || ''}:${anchor.text || ''}`;
+        if (seen.has(identity)) return false;
+        seen.add(identity);
+        return true;
+      });
+      if (!candidates.length) return '';
+      return `
+        <div class="context-anchor-panel">
+          <div class="context-anchor-header">
+            <div>
+              <strong>${escapeHtml(t('context.thread_anchors'))}</strong>
+              <span>${escapeHtml(t('context.thread_anchors_hint'))}</span>
+            </div>
+            <span>${escapeHtml(tf('context.anchor_count', { count: number.format(anchors.message_count || candidates.length) }))}</span>
+          </div>
+          <div class="context-anchor-grid">
+            ${candidates.map(([key, label, anchor]) => renderThreadAnchorCard(key, label, anchor)).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderThreadAnchorCard(key, label, anchor) {
+      const role = anchor.role || 'unknown';
+      const meta = [
+        formatTimestamp(anchor.timestamp, ''),
+        anchor.line_number ? tf('context.line', { line: anchor.line_number }) : '',
+      ].filter(Boolean).join(' - ');
+      return `
+        <div class="context-anchor-card context-anchor-${escapeHtml(key)}">
+          <div class="context-anchor-card-head">
+            <span>${escapeHtml(label)}</span>
+            <span class="context-anchor-role">${escapeHtml(role)}</span>
+          </div>
+          ${meta ? `<div class="context-anchor-meta">${escapeHtml(meta)}</div>` : ''}
+          <pre>${escapeHtml(anchor.text || '')}</pre>
+        </div>
+      `;
+    }
+
     function renderContext(payload) {
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
       const source = payload.source || {};
@@ -686,7 +735,7 @@
           </div>
         `;
       }).join('');
-      return `<p class="context-note">${escapeHtml(note)}</p>${contextLimitActions(payload)}${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
+      return `<p class="context-note">${escapeHtml(note)}</p>${renderThreadAnchors(payload)}${contextLimitActions(payload)}${body || `<p class="context-note">${escapeHtml(t('state.no_context_entries'))}</p>`}`;
     }
 
     return Object.freeze({

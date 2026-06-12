@@ -14,6 +14,7 @@ from codex_usage_tracker.store import query_usage_record
 
 DEFAULT_CONTEXT_CHARS = 20_000
 DEFAULT_CONTEXT_ENTRIES = 80
+ANCHOR_TEXT_CHARS = 1_200
 
 _OUTPUT_OMITTED = (
     "Tool output hidden for this request. Reload with include_tool_output=true to inspect "
@@ -57,6 +58,7 @@ def load_call_context(
         include_tool_output=include_tool_output,
         include_compaction_history=include_compaction_history,
     )
+    thread_anchors = _read_thread_anchors(source_file, token_line=line_number)
     visible_estimate = _estimate_visible_tokens(entries, _optional_str(row.get("model")))
     return {
         "schema": "codex-usage-tracker-context-v1",
@@ -84,6 +86,7 @@ def load_call_context(
             "file": str(source_file),
             "line_number": line_number,
         },
+        "thread_anchors": thread_anchors,
         "entries": entries,
         "omitted": omitted,
     }
@@ -237,6 +240,112 @@ def _chat_message_echo_key(entry: dict[str, Any]) -> tuple[str, str] | None:
 
 def _is_structured_chat_message(entry: dict[str, Any]) -> bool:
     return (_optional_str(entry.get("label")) or "") in {"message / user", "message / assistant"}
+
+
+def _read_thread_anchors(path: Path, token_line: int) -> dict[str, Any]:
+    messages: list[dict[str, Any]] = []
+    parse_errors = 0
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, 1):
+                try:
+                    envelope = json.loads(line)
+                except json.JSONDecodeError:
+                    parse_errors += 1
+                    continue
+                if not isinstance(envelope, dict):
+                    continue
+                payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
+                entry_type = _optional_str(envelope.get("type")) or "unknown"
+                summarized = _summarize_payload(
+                    entry_type=entry_type,
+                    payload=payload,
+                    include_tool_output=False,
+                    include_compaction_history=False,
+                )
+                if summarized is None or not _is_anchor_message(summarized):
+                    continue
+                messages.append(
+                    _summarized_context_entry(
+                        line_number,
+                        _optional_str(envelope.get("timestamp")),
+                        entry_type,
+                        summarized,
+                    )
+                )
+    except OSError:
+        return {
+            "scope": "source_session",
+            "available": False,
+            "parse_errors": parse_errors,
+        }
+
+    messages = [
+        entry
+        for entry in _dedupe_chat_message_echoes(messages)
+        if not _is_runtime_instruction_anchor(entry)
+    ]
+    first = messages[0] if messages else None
+    selected_lead_in = next(
+        (entry for entry in reversed(messages) if int(entry.get("line_number") or 0) <= token_line),
+        None,
+    )
+    latest = messages[-1] if messages else None
+    return {
+        "scope": "source_session",
+        "available": bool(messages),
+        "message_count": len(messages),
+        "parse_errors": parse_errors,
+        "first_message": _anchor_from_entry(first),
+        "selected_lead_in": _anchor_from_entry(selected_lead_in),
+        "latest_message": _anchor_from_entry(latest),
+    }
+
+
+def _is_anchor_message(summarized: dict[str, Any]) -> bool:
+    return (_optional_str(summarized.get("label")) or "") in {
+        "agent_message",
+        "message / assistant",
+        "message / user",
+        "user_message",
+    } and bool(_optional_str(summarized.get("text")))
+
+
+def _anchor_from_entry(entry: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not entry:
+        return None
+    text = str(entry.get("text") or "")
+    truncated = bool(entry.get("truncated"))
+    if len(text) > ANCHOR_TEXT_CHARS:
+        text = text[:ANCHOR_TEXT_CHARS].rstrip() + "\n[TRUNCATED]"
+        truncated = True
+    return {
+        "line_number": entry.get("line_number"),
+        "timestamp": entry.get("timestamp"),
+        "type": entry.get("type"),
+        "label": entry.get("label"),
+        "role": _anchor_role(entry),
+        "text": text,
+        "truncated": truncated,
+    }
+
+
+def _anchor_role(entry: dict[str, Any]) -> str | None:
+    label = _optional_str(entry.get("label")) or ""
+    if label in {"message / user", "user_message"}:
+        return "user"
+    if label in {"message / assistant", "agent_message"}:
+        return "assistant"
+    return None
+
+
+def _is_runtime_instruction_anchor(entry: dict[str, Any]) -> bool:
+    text = str(entry.get("text") or "").lstrip()
+    if not text:
+        return False
+    if text.startswith("# AGENTS.md instructions for "):
+        return True
+    return text.startswith("<environment_context>") or text.startswith("# Codex desktop context")
 
 
 def _summarize_payload(
