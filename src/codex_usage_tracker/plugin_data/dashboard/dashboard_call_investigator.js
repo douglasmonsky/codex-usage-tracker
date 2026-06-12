@@ -164,14 +164,30 @@
       const visibleChars = Number(payload.visible_char_count ?? entries.reduce((sum, entry) => sum + String(entry.text || '').length, 0));
       const fallbackEstimate = Math.ceil(visibleChars / 4);
       const visibleTokenEstimate = Number(payload.visible_token_estimate ?? fallbackEstimate);
-      const hiddenGap = Math.max(uncachedInputTokens(row) - visibleTokenEstimate, 0);
+      const uncached = uncachedInputTokens(row);
+      const serialized = payload.serialized_evidence || {};
+      const serializedTokens = Number(serialized.raw_json_token_estimate || 0);
+      const serializedChars = Number(serialized.raw_json_char_count || 0);
+      const serializedBound = serializedTokens > 0 ? Math.min(serializedTokens, uncached) : 0;
+      const visibleGap = Math.max(uncached - visibleTokenEstimate, 0);
+      const serializedCandidate = serializedBound > visibleTokenEstimate ? serializedBound - visibleTokenEstimate : 0;
+      const remainingAfterSerialized = serializedTokens > 0 ? Math.max(uncached - Math.max(visibleTokenEstimate, serializedBound), 0) : visibleGap;
       return {
         entries: entries.length,
         totalEntries: Number.isFinite(totalEntries) ? totalEntries : entries.length,
         visibleChars,
         visibleTokenEstimate,
         estimator: payload.visible_token_estimator || 'chars_per_4_fallback',
-        hiddenGap,
+        visibleGap,
+        hiddenGap: visibleGap,
+        serializedTokens,
+        serializedChars,
+        serializedLineCount: Number(serialized.raw_line_count || 0),
+        serializedEstimator: serialized.token_estimator || payload.visible_token_estimator || 'chars_per_4_fallback',
+        serializedCandidate,
+        remainingAfterSerialized,
+        serializedBuckets: Array.isArray(serialized.buckets) ? serialized.buckets : [],
+        serializedUpperBound: Boolean(serialized.upper_bound),
         source: payload.source || {},
       };
     }
@@ -222,7 +238,7 @@
         : 'No previous call is loaded for this resolved thread, so call-to-call deltas are unavailable.';
       const stats = contextEvidenceStats(row);
       const evidence = stats
-        ? `Evidence analyzed: ${number.format(stats.totalEntries)} selected-turn entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}. ${number.format(stats.entries)} entries rendered initially.`
+        ? `Evidence analyzed: ${number.format(stats.totalEntries)} selected-turn entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}. Serialized local upper bound: ${number.format(stats.serializedTokens)} tokens from ${number.format(stats.serializedChars)} raw JSON chars. ${number.format(stats.entries)} entries rendered initially.`
         : 'Evidence is loading from the local JSONL source. Aggregate token counts are exact, but visible-context attribution needs that runtime evidence.';
       return `
         <section class="call-diagnostic-section readout">
@@ -291,6 +307,15 @@
       const hiddenEstimateValue = evidenceStats
         ? `~${number.format(evidenceStats.hiddenGap)} tokens`
         : 'Not loaded yet';
+      const serializedUpperBoundValue = evidenceStats && evidenceStats.serializedTokens
+        ? `~${number.format(evidenceStats.serializedTokens)} tokens`
+        : 'Not loaded yet';
+      const serializedCandidateValue = evidenceStats
+        ? `~${number.format(evidenceStats.serializedCandidate)} tokens`
+        : 'Not loaded yet';
+      const remainingAfterSerializedValue = evidenceStats
+        ? `~${number.format(evidenceStats.remainingAfterSerialized)} tokens`
+        : 'Not loaded yet';
       rowsEl.innerHTML = `
         <tr class="call-investigator-row">
           <td colspan="11">
@@ -332,11 +357,15 @@
                   <h3>${escapeHtml(t('call.context_estimate'))}</h3>
                   <span class="evidence-chip estimated">${escapeHtml(t('call.estimated_label'))}</span>
                 </div>
-                <div class="call-metric-grid two">
+                <div class="call-metric-grid context-attribution">
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
                   ${callMetricCard(t('call.visible_estimate'), visibleEstimateValue, evidenceStats ? `${number.format(evidenceStats.visibleChars)} analyzed chars · ${evidenceStats.estimator}` : t('call.evidence_label'))}
-                  ${callMetricCard(t('call.hidden_estimate'), hiddenEstimateValue, evidenceStats ? 'Uncached input minus visible estimate' : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.serialized_upper_bound'), serializedUpperBoundValue, evidenceStats ? `${number.format(evidenceStats.serializedChars)} raw JSON chars · ${evidenceStats.serializedEstimator}` : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.hidden_estimate'), hiddenEstimateValue, evidenceStats ? t('call.visible_gap') : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.serialized_candidate'), serializedCandidateValue, evidenceStats ? t('call.serialized_candidate_hint') : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.remaining_after_serialized'), remainingAfterSerializedValue, evidenceStats ? t('call.remaining_after_serialized_hint') : t('call.evidence_label'))}
                 </div>
+                ${renderSerializedEvidenceBreakdown(evidenceStats)}
                 <p class="muted">${escapeHtml(t('call.context_estimate_hint'))}</p>
               </section>
               <section class="call-diagnostic-section raw-evidence">
@@ -394,6 +423,30 @@
       return `
         ${actionHtml ? `<div class="context-actions">${actionHtml}</div>` : ''}
         <div id="contextResult" class="context-result">${resultHtml}</div>
+      `;
+    }
+
+    function renderSerializedEvidenceBreakdown(stats) {
+      if (!stats || !stats.serializedTokens) return '';
+      const buckets = stats.serializedBuckets.slice(0, 6);
+      const bucketHtml = buckets.map(bucket => `
+        <div class="serialized-bucket">
+          <span>${escapeHtml(bucket.label || bucket.key || t('state.unknown'))}</span>
+          <strong>${number.format(Number(bucket.token_estimate || 0))}</strong>
+          <small>${escapeHtml(tf('call.serialized_bucket_detail', { count: number.format(Number(bucket.count || 0)), chars: number.format(Number(bucket.char_count || 0)) }))}</small>
+          ${bucket.note ? `<small>${escapeHtml(bucket.note)}</small>` : ''}
+        </div>
+      `).join('');
+      return `
+        <div class="serialized-breakdown">
+          <div class="serialized-breakdown-heading">
+            <strong>${escapeHtml(t('call.serialized_breakdown'))}</strong>
+            <span>${escapeHtml(t('call.serialized_bound_hint'))}</span>
+          </div>
+          <div class="serialized-bucket-grid">
+            ${bucketHtml || `<p class="muted">${escapeHtml(t('state.no_data'))}</p>`}
+          </div>
+        </div>
       `;
     }
 

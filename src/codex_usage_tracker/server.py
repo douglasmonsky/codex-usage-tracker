@@ -197,6 +197,8 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def end_headers(self) -> None:
+        if self._is_dashboard_html_request():
+            self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header(
@@ -206,6 +208,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             "img-src 'self' data:; object-src 'none'; base-uri 'none'",
         )
         super().end_headers()
+
+    def _is_dashboard_html_request(self) -> bool:
+        path = urlparse(self.path).path
+        return path in {"/", f"/{self._dashboard_name}"}
 
     def log_message(self, format: str, *args: object) -> None:
         if self.path.startswith("/api/usage"):

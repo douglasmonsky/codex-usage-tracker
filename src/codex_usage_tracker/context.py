@@ -60,6 +60,12 @@ def load_call_context(
     )
     call_anchors = _read_call_anchors(source_file, token_line=line_number)
     visible_estimate = _estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
+    serialized_estimate = _estimate_serialized_context(
+        path=source_file,
+        token_line=line_number,
+        target_turn_id=target_turn_id,
+        model=_optional_str(row.get("model")),
+    )
     return {
         "schema": "codex-usage-tracker-context-v1",
         "loaded_on_demand": True,
@@ -69,6 +75,7 @@ def load_call_context(
         "visible_char_count": visible_estimate["visible_char_count"],
         "visible_token_estimate": visible_estimate["visible_token_estimate"],
         "visible_token_estimator": visible_estimate["visible_token_estimator"],
+        "serialized_evidence": serialized_estimate,
         "record": {
             "record_id": row.get("record_id"),
             "session_id": row.get("session_id"),
@@ -693,17 +700,207 @@ def _estimate_visible_tokens(entries: list[dict[str, Any]], model: str | None) -
     text = "\n\n".join(str(entry.get("text") or "") for entry in entries if entry.get("text"))
     visible_chars = len(text)
     encoding, estimator = _context_encoding(model or "")
+    visible_tokens = _token_estimate(text, encoding)
     if encoding is None:
-        return {
-            "visible_char_count": visible_chars,
-            "visible_token_estimate": ceil(visible_chars / 4) if visible_chars else 0,
-            "visible_token_estimator": estimator,
-        }
+        visible_tokens = ceil(visible_chars / 4) if visible_chars else 0
     return {
         "visible_char_count": visible_chars,
-        "visible_token_estimate": len(encoding.encode(text)) if text else 0,
+        "visible_token_estimate": visible_tokens,
         "visible_token_estimator": estimator,
     }
+
+
+def _estimate_serialized_context(
+    *,
+    path: Path,
+    token_line: int,
+    target_turn_id: str | None,
+    model: str | None,
+) -> dict[str, Any]:
+    raw_entries: list[dict[str, Any]] = []
+    field_buckets: dict[str, dict[str, Any]] = {}
+    parse_errors = 0
+    current_turn_id: str | None = None
+    collecting = target_turn_id is None
+    encoding, estimator = _context_encoding(model or "")
+
+    with path.open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            if line_number > token_line:
+                break
+            try:
+                envelope = json.loads(line)
+            except json.JSONDecodeError:
+                parse_errors += 1
+                continue
+            if not isinstance(envelope, dict):
+                continue
+
+            entry_type = _optional_str(envelope.get("type")) or "unknown"
+            payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
+            if entry_type == "turn_context":
+                current_turn_id = _optional_str(payload.get("turn_id"))
+                collecting = target_turn_id is None or current_turn_id == target_turn_id
+                if collecting:
+                    raw_entries = []
+                    field_buckets = {}
+
+            if not collecting:
+                continue
+
+            raw_entries.append(envelope)
+            _collect_serialized_field_buckets(
+                buckets=field_buckets,
+                entry_type=entry_type,
+                payload=payload,
+                encoding=encoding,
+            )
+
+            if (
+                line_number >= token_line
+                and entry_type == "event_msg"
+                and payload.get("type") == "token_count"
+            ):
+                break
+
+    raw_json = "\n".join(_compact_json(_redact_json_value(entry)) for entry in raw_entries)
+    top_buckets = sorted(
+        field_buckets.values(),
+        key=lambda bucket: int(bucket.get("token_estimate") or 0),
+        reverse=True,
+    )[:8]
+    return {
+        "available": bool(raw_entries),
+        "scope": "selected_turn_raw_jsonl",
+        "raw_line_count": len(raw_entries),
+        "raw_json_char_count": len(raw_json),
+        "raw_json_token_estimate": _token_estimate(raw_json, encoding),
+        "token_estimator": estimator,
+        "parse_errors": parse_errors,
+        "upper_bound": True,
+        "raw_text_returned": False,
+        "buckets": top_buckets,
+    }
+
+
+def _collect_serialized_field_buckets(
+    *,
+    buckets: dict[str, dict[str, Any]],
+    entry_type: str,
+    payload: dict[str, Any],
+    encoding: Any | None,
+) -> None:
+    payload_type = _optional_str(payload.get("type")) or ""
+    for key, value in payload.items():
+        if key == "type":
+            continue
+        bucket_key, label, note = _serialized_bucket_label(entry_type, payload_type, key)
+        rendered = _compact_json({key: _redact_json_value(value)})
+        stats = buckets.setdefault(
+            bucket_key,
+            {
+                "key": bucket_key,
+                "label": label,
+                "note": note,
+                "count": 0,
+                "char_count": 0,
+                "token_estimate": 0,
+            },
+        )
+        stats["count"] = int(stats["count"]) + 1
+        stats["char_count"] = int(stats["char_count"]) + len(rendered)
+        stats["token_estimate"] = int(stats["token_estimate"]) + _token_estimate(rendered, encoding)
+
+
+def _serialized_bucket_label(
+    entry_type: str,
+    payload_type: str,
+    key: str,
+) -> tuple[str, str, str]:
+    if entry_type == "response_item" and key == "encrypted_content":
+        return (
+            "encrypted_reasoning_state",
+            "Encrypted reasoning/state payload",
+            "Opaque local payload; counted as serialized evidence, not readable text.",
+        )
+    if key in {"content", "message", "output", "arguments", "input"}:
+        return (
+            "visible_payload_fields",
+            "Visible message/tool payload fields",
+            "Raw JSON representation of content already summarized in evidence.",
+        )
+    if key == "goal":
+        return (
+            "local_goal_metadata",
+            "Local thread goal metadata",
+            "Client-side workflow metadata in the log; may not be model prompt input.",
+        )
+    if entry_type == "event_msg" and key == "rate_limits":
+        return (
+            "rate_limit_metadata",
+            "Rate-limit metadata",
+            "Client-side rate-limit state in the log; useful as an upper-bound bucket only.",
+        )
+    if entry_type == "event_msg" and payload_type == "token_count" and key == "info":
+        return (
+            "token_callback_metadata",
+            "Token callback metadata",
+            "Structured callback accounting already partly summarized in evidence.",
+        )
+    if key in {
+        "call_id",
+        "threadId",
+        "turnId",
+        "turn_id",
+        "phase",
+        "status",
+        "name",
+        "role",
+        "memory_citation",
+        "summary",
+        "duration_ms",
+    }:
+        return (
+            "protocol_metadata",
+            "Protocol and response metadata",
+            "IDs, roles, names, phases, or summaries in the local event stream.",
+        )
+    if entry_type == "turn_context":
+        return (
+            "turn_context_metadata",
+            "Turn context metadata",
+            "Local turn configuration such as cwd, model, effort, date, and timezone.",
+        )
+    return (
+        "other_serialized_metadata",
+        "Other serialized metadata",
+        "Additional local JSONL fields not separately categorized.",
+    )
+
+
+def _token_estimate(text: str, encoding: Any | None) -> int:
+    if not text:
+        return 0
+    if encoding is None:
+        return ceil(len(text) / 4)
+    return len(encoding.encode(text))
+
+
+def _redact_json_value(value: object) -> object:
+    if isinstance(value, str):
+        return _redact(value)
+    if isinstance(value, list):
+        return [_redact_json_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _redact_json_value(item) for key, item in value.items()}
+    return value
+
+
+def _compact_json(value: object) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    except TypeError:
+        return str(value)
 
 
 @lru_cache(maxsize=32)

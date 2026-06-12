@@ -95,7 +95,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - Calls view token cells show total tokens plus compact `C`, `U`, and `O` chips for cached input, uncached input, and output tokens.
 - Source pucks are call-level estimates derived from local event metadata. `User` means the token-count segment included a user message, `Codex` means it followed tool output, compaction, or agent-continuation metadata, and `Unknown` means the source event metadata was unavailable or ambiguous.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
-- Hover or click a row to pin a compact aggregate preview in `Call Details`; double-click a row or use `Open investigator` when you want the dedicated call drilldown.
+- Hover a row to scan a compact aggregate preview in `Call Details`; click a Calls row to open the dedicated call investigator.
 - The `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.
 - The first detail section includes a recommended action and a "why flagged" explanation derived only from aggregate counters and pricing/allowance metadata.
 - Raw aggregate identifiers and source file metadata are collapsed until you need them.
@@ -130,13 +130,13 @@ The same search, time range, confidence status, load limit, cards, and sort cont
 
 ## Call Investigator
 
-`Open investigator` opens `dashboard.html?view=call&record=<record_id>` for one model call. The normal table and hover behavior remains a fast scanning surface; the investigator is the deeper diagnostic page for a single selected call.
+Clicking a Calls row opens `dashboard.html?view=call&record=<record_id>` for one model call. Hover remains the fast scanning surface; the investigator is the deeper diagnostic page for a single selected call. Expanded Threads rows and the details panel can still expose explicit investigator actions where a row click already has another meaning.
 
 The investigator separates evidence by confidence:
 
 - `Exact`: logged token callback counts, cost, Codex credits, cache ratio, model, effort, source, and context-window pressure.
 - `Derived`: previous/next calls in the same resolved thread and cache/accounting deltas versus the previous chronological call.
-- `Estimated`: visible new-context estimates and the unexplained hidden or serialized input gap. These are attribution aids, not exact cached text spans.
+- `Estimated`: visible new-context estimates, serialized local JSONL upper bounds, candidate serialized-overhead buckets, and any remaining gap after that upper bound. These are attribution aids, not exact cached text spans.
 - `Evidence`: redacted local JSONL turn-log evidence loaded at runtime for the selected investigator call.
 
 Previous and next buttons move chronologically within the same resolved thread and keep the selected call in the URL. Cache diagnostics label common patterns such as warm cache reuse, cold resume or stale cache, partial cache miss, uncached spike, and post-compaction. Delta cards compare input, cached input, uncached input, output/reasoning output, and cache ratio to the previous call and use "cache/accounting delta" terminology because logs do not expose exact cached text spans.
@@ -147,7 +147,7 @@ Previous and next buttons move chronologically within the same resolved thread a
 
 The details panel is structured for progressive disclosure. On desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
-The call investigator loads a bounded redacted turn-log evidence window by default when served from localhost with the context API enabled. Tool output is included by default and can be hidden with `Hide tool output`. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens. The evidence view also shows call anchors: the nearest visible message before the selected call and the latest visible message in the source session. These anchors are redacted and loaded only at runtime through the context API.
+The call investigator loads a bounded redacted turn-log evidence window by default when served from localhost with the context API enabled. Tool output is included by default and can be hidden with `Hide tool output`. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable. The investigator also tokenizes a redacted raw-JSON representation of the same selected-turn log slice and reports it only as a serialized local upper bound. This upper bound can explain why visible text is much smaller than exact uncached input, but it can overcount because local JSONL includes client metadata that may not be prompt text. Bucket labels such as encrypted reasoning/state, local goal metadata, token callback metadata, and rate-limit metadata are counts only; raw text is not returned. `encrypted_content` is an opaque encrypted field found on some reasoning response items. The tracker cannot decrypt it and treats it as serialized state, not readable prompt, assistant, or tool text. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens. The evidence view also shows call anchors: the nearest visible message before the selected call and the latest visible message in the source session. These anchors are redacted and loaded only at runtime through the context API.
 
 For selected calls, the panel shows:
 

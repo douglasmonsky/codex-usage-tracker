@@ -493,6 +493,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-call-nav-record" in dashboard_js
     assert "call.cache_accounting_delta" in dashboard_call_js
     assert "call.hidden_estimate" in dashboard_call_js
+    assert "call.serialized_upper_bound" in dashboard_call_js
+    assert "call.remaining_after_serialized" in dashboard_call_js
+    assert "renderSerializedEvidenceBreakdown" in dashboard_call_js
+    assert "serialized_evidence" in dashboard_call_js
+    assert ".serialized-breakdown" in dashboard_css
     assert "button.show_tool_output" in dashboard_call_js
     assert "data-context-entry-load-output" in dashboard_call_js
     assert "data-context-load-older" in dashboard_call_js
@@ -531,6 +536,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["button.show_turn_evidence"] == "Show turn log evidence"
     assert en_trans["button.open_investigator"] == "Open investigator"
     assert en_trans["call.open_hint"] == "Click a call row for deep diagnostics."
+    assert en_trans["call.serialized_upper_bound"] == "Serialized local upper bound"
+    assert en_trans["call.serialized_bucket_detail"] == "{count} fields · {chars} chars"
     assert en_trans["dashboard.view.call"] == "Call Investigator"
     assert en_trans["button.show_tool_output"] == "Show tool output"
     assert en_trans["button.hide_tool_output"] == "Hide tool output"
@@ -712,6 +719,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
@@ -734,6 +742,11 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"http://127.0.0.1:{server.server_port}/dashboard.html",
+            timeout=5,
+        ) as response:
+            dashboard_cache_control = response.headers.get("Cache-Control")
         refresh_without_token = _http_error_json(
             f"http://127.0.0.1:{server.server_port}/api/usage?refresh=1&limit=2"
         )
@@ -767,6 +780,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         thread.join(timeout=5)
 
     assert refresh_without_token["status"] == 403
+    assert dashboard_cache_control == "no-store"
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}
@@ -1085,6 +1099,22 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
         "tiktoken:o200k_base",
         "tiktoken:cl100k_base",
     }
+    serialized = context["serialized_evidence"]
+    assert serialized["available"] is True
+    assert serialized["scope"] == "selected_turn_raw_jsonl"
+    assert serialized["upper_bound"] is True
+    assert serialized["raw_text_returned"] is False
+    assert serialized["raw_line_count"] >= len(context["entries"])
+    assert serialized["raw_json_char_count"] > context["visible_char_count"]
+    assert serialized["raw_json_token_estimate"] >= context["visible_token_estimate"]
+    assert serialized["token_estimator"] in {
+        "chars_per_4_fallback",
+        "tiktoken:o200k_base",
+        "tiktoken:cl100k_base",
+    }
+    serialized_bucket_keys = {bucket["key"] for bucket in serialized["buckets"]}
+    assert "encrypted_reasoning_state" in serialized_bucket_keys
+    assert "local_goal_metadata" in serialized_bucket_keys
     anchors = context["call_anchors"]
     assert anchors["available"] is True
     assert anchors["scope"] == "selected_call_latest"
@@ -1128,6 +1158,8 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     assert "replacement_history" not in compaction_entry["compaction"]
     assert "COMPACTED REPLACEMENT SUMMARY" not in context_text
     assert "EVENT MSG COMPACTION SUMMARY" not in context_text
+    assert "ENCRYPTED_STATE_SENTINEL_DO_NOT_RETURN" not in context_text
+    assert "LOCAL_GOAL_SENTINEL_DO_NOT_RETURN" not in context_text
 
     compaction_context = load_call_context(
         rows[0]["record_id"],
@@ -1579,6 +1611,9 @@ def _make_codex_home(tmp_path: Path) -> Path:
                 {
                     "type": "context_compacted",
                     "message": "Context compacted by Codex.",
+                    "goal": "LOCAL_GOAL_SENTINEL_DO_NOT_RETURN "
+                    + "sk"
+                    + "-proj-goalsecret1234567890",
                     "replacement_history": [
                         {
                             "type": "message",
@@ -1591,6 +1626,16 @@ def _make_codex_home(tmp_path: Path) -> Path:
                             ],
                         }
                     ],
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "reasoning",
+                    "summary": [{"type": "summary_text", "text": "Reasoning summary"}],
+                    "encrypted_content": "ENCRYPTED_STATE_SENTINEL_DO_NOT_RETURN "
+                    + "sk"
+                    + "-proj-encryptedsecret1234567890",
                 },
             ),
             _token_event(100, 100),

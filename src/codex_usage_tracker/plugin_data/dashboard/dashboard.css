@@ -349,6 +349,9 @@
     .call-metric-grid.two {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+    .call-metric-grid.context-attribution {
+      grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+    }
     .call-diagnostic-section.delta .call-delta-grid {
       grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
     }
@@ -495,6 +498,54 @@
     }
     .diagnostic-interpretation {
       margin-bottom: 10px;
+    }
+    .serialized-breakdown {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #dbe4f0;
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+    .serialized-breakdown-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .serialized-breakdown-heading strong {
+      color: var(--ink);
+      font-size: 12px;
+    }
+    .serialized-bucket-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+      gap: 8px;
+    }
+    .serialized-bucket {
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    .serialized-bucket span,
+    .serialized-bucket small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 720;
+      line-height: 1.3;
+    }
+    .serialized-bucket strong {
+      display: block;
+      margin: 4px 0 2px;
+      font-size: 15px;
+      line-height: 1.15;
     }
     .call-section-actions {
       display: flex;
