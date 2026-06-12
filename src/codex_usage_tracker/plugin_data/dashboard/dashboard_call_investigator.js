@@ -56,11 +56,12 @@
     }
 
     function callMetricCard(label, value, badge = '', title = '') {
+      const cardTooltip = title || `${label}: ${value}${badge ? ` - ${badge}` : ''}`;
       return `
-        <div class="call-metric-card" ${title ? tooltipAttributes(title) : ''}>
-          <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
-          ${badge ? `<small>${escapeHtml(badge)}</small>` : ''}
+        <div class="call-metric-card" ${tooltipAttributes(cardTooltip)}>
+          <span ${tooltipAttributes(label)}>${escapeHtml(label)}</span>
+          <strong ${tooltipAttributes(value)}>${escapeHtml(value)}</strong>
+          ${badge ? `<small ${tooltipAttributes(badge)}>${escapeHtml(badge)}</small>` : ''}
         </div>
       `;
     }

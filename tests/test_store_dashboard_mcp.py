@@ -508,6 +508,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-context-entry-key" in dashboard_call_js
     assert "button.show_tool_output" in dashboard_call_js
     assert "data-context-entry-load-output" in dashboard_call_js
+    assert ".grid > section:not(.detail-section)" in dashboard_css
+    assert "overflow: visible" in dashboard_css
+    assert "position: sticky" in dashboard_css
+    assert ".grid > section:first-child > table > thead" in dashboard_css
+    assert "${callInitiatorPuck(row)}" in dashboard_js
+    assert "<span>${escapeHtml(initiator.source)}</span>" not in dashboard_js
+    assert "tooltipAttributes(label)" in dashboard_call_js
+    assert "tooltipAttributes(badge)" in dashboard_call_js
     assert "data-context-load-older" in dashboard_call_js
     assert "data-context-no-budget" not in dashboard_call_js
     assert "renderContextTokenUsage" in dashboard_call_js

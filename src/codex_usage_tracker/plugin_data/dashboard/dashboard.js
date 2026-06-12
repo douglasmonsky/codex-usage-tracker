@@ -719,7 +719,6 @@
       return `
         <div class="initiator-cell" ${tooltipAttributes(`${initiator.label}: ${initiator.source}`)}>
           ${callInitiatorPuck(row)}
-          <span>${escapeHtml(initiator.source)}</span>
         </div>
       `;
     }

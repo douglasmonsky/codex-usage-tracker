@@ -237,6 +237,7 @@
     }
     body[data-active-view="call"] .grid > section:first-child {
       overflow: visible;
+      max-height: none;
       border: 0;
       background: transparent;
       box-shadow: none;
@@ -829,7 +830,7 @@
       box-shadow: var(--shadow);
     }
     .grid > section:not(.detail-section) {
-      overflow-x: auto;
+      overflow: visible;
     }
     .detail-section {
       position: sticky;
@@ -894,8 +895,14 @@
     .detail-section h2 {
       padding-right: 72px;
     }
-    table { width: 100%; min-width: 1320px; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; min-width: 1320px; border-collapse: separate; border-spacing: 0; font-size: 13px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .grid > section:first-child > table > thead,
+    .thread-call-table thead {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+    }
     th { color: var(--muted); font-size: 12px; background: #fbfcfe; position: sticky; top: 0; z-index: 4; }
     .grid > section:first-child > table > thead th:nth-child(1),
     .grid > section:first-child > table > tbody > tr:not(.call-investigator-row):not(.thread-child-row) > td:nth-child(1) {
@@ -1205,18 +1212,13 @@
     .initiator-cell {
       display: flex;
       align-items: center;
+      justify-content: flex-start;
       gap: 6px;
       min-width: 0;
       color: var(--muted);
       font-size: 11px;
       font-weight: 700;
       line-height: 1.25;
-    }
-    .initiator-cell > span:last-child {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .initiator-summary {
       display: flex;
