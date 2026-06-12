@@ -128,7 +128,7 @@
       'call.no_previous': 'No previous call in this resolved thread.',
       'call.visible_estimate': 'Visible new context estimate',
       'call.hidden_estimate': 'Unexplained hidden/serialized input estimate',
-      'call.open_hint': 'Double-click a row or use Open investigator for deep diagnostics.',
+      'call.open_hint': 'Click a call row for deep diagnostics.',
       'call.not_found': 'Selected call was not found in the loaded dashboard rows.',
       'call.position': 'Call {position} in this resolved thread.',
       'call.context_estimate_hint': 'Compare exact uncached input with tokenizer-counted visible log evidence. The gap should be treated as hidden scaffolding, serialization, or tokenizer estimate error.',
@@ -1997,14 +1997,13 @@
         tr.dataset.recordId = row.record_id || '';
         tr.tabIndex = 0;
         tr.setAttribute('role', 'button');
-        tr.setAttribute('aria-label', tf('aria.inspect_thread', { thread: rowThreadLabel(row) }));
+        tr.setAttribute('aria-label', tf('caption.call_investigator', { record: short(row.record_id || rowThreadLabel(row), '').slice(0, 12) }));
         tr.innerHTML = `
           <td>${renderTimeCell(row.event_timestamp)}</td>
           <td title="${escapeHtml(short(row.session_id))}">
             <div class="call-thread-cell">
               <span>${escapeHtml(truncate(rowThreadLabel(row)))}</span>
               ${callInitiatorPuck(row)}
-              <button class="mini-open-button" type="button" data-open-investigator-record="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.open_investigator'))}</button>
             </div>
           </td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
@@ -2019,14 +2018,13 @@
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
         tr.addEventListener('click', event => {
-          if (event.target.closest('[data-open-investigator-record]')) return;
-          selectRow(row);
+          event.preventDefault();
+          openInvestigator(row);
         });
-        tr.addEventListener('dblclick', () => openInvestigator(row));
         tr.addEventListener('keydown', event => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            selectRow(row);
+            openInvestigator(row);
           }
         });
         rowsEl.appendChild(tr);

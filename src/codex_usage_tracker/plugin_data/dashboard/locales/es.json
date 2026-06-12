@@ -86,7 +86,7 @@
   "call.hidden_estimate": "Unexplained hidden/serialized input estimate",
   "call.no_previous": "No previous call in this resolved thread.",
   "call.not_found": "Selected call was not found in the loaded dashboard rows.",
-  "call.open_hint": "Double-click a row or use Open investigator for deep diagnostics.",
+  "call.open_hint": "Click a call row for deep diagnostics.",
   "call.position": "Call {position} in this resolved thread.",
   "call.post_compaction": "Post-compaction possible",
   "call.raw_evidence": "Raw evidence",

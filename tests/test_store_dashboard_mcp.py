@@ -43,6 +43,20 @@ AUTO_REVIEW_SESSION_ID = "019e37d5-01fd-71df-87f4-ae3e8d60df7a"
 ARCHIVED_SESSION_ID = "019e37d5-bb36-76ba-aa33-ed0beaf4f9ce"
 
 
+def _extract_js_function(source: str, name: str) -> str:
+    start = source.index(f"function {name}(")
+    brace = source.index("{", start)
+    depth = 0
+    for offset, char in enumerate(source[brace:], start=brace):
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : offset + 1]
+    raise AssertionError(f"could not extract function {name}")
+
+
 def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -324,6 +338,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     )
     dashboard_state_js = (asset_dir / "dashboard_state.js").read_text(encoding="utf-8")
     dashboard_css = (asset_dir / "dashboard.css").read_text(encoding="utf-8")
+    render_calls_js = _extract_js_function(dashboard_js, "renderCalls")
     dashboard_surface = "\n".join([
         dashboard,
         dashboard_format_js,
@@ -445,6 +460,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "source.auto_review" in dashboard_js
     assert "button.load_context" in dashboard_js
     assert "button.open_investigator" in dashboard_js
+    assert "Click a call row for deep diagnostics." in dashboard_js
+    assert "data-open-investigator-record" not in render_calls_js
+    assert "openInvestigator(row);" in render_calls_js
+    assert "selectRow(row);" not in render_calls_js
     assert "dashboard.view.call" in dashboard_js
     assert "renderCallInvestigator" in dashboard_js
     assert 'body[data-active-view="call"] .detail-section' in dashboard_css
@@ -511,6 +530,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["source.auto_review"] == "Auto-review"
     assert en_trans["button.show_turn_evidence"] == "Show turn log evidence"
     assert en_trans["button.open_investigator"] == "Open investigator"
+    assert en_trans["call.open_hint"] == "Click a call row for deep diagnostics."
     assert en_trans["dashboard.view.call"] == "Call Investigator"
     assert en_trans["button.show_tool_output"] == "Show tool output"
     assert en_trans["button.hide_tool_output"] == "Hide tool output"
