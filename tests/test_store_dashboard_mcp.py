@@ -319,12 +319,16 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_js = (asset_dir / "dashboard.js").read_text(encoding="utf-8")
     dashboard_format_js = (asset_dir / "dashboard_format.js").read_text(encoding="utf-8")
     dashboard_data_js = (asset_dir / "dashboard_data.js").read_text(encoding="utf-8")
+    dashboard_call_js = (asset_dir / "dashboard_call_investigator.js").read_text(
+        encoding="utf-8"
+    )
     dashboard_state_js = (asset_dir / "dashboard_state.js").read_text(encoding="utf-8")
     dashboard_css = (asset_dir / "dashboard.css").read_text(encoding="utf-8")
     dashboard_surface = "\n".join([
         dashboard,
         dashboard_format_js,
         dashboard_data_js,
+        dashboard_call_js,
         dashboard_js,
         dashboard_state_js,
         dashboard_css,
@@ -334,20 +338,25 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert exported_with_zero_limit == 4
     assert "SECRET RAW PROMPT" not in dashboard
     assert "SECRET RAW PROMPT" not in dashboard_js
+    assert "SECRET RAW PROMPT" not in dashboard_call_js
     assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_js
     assert 'href="codex-usage-tracker-assets/dashboard.css?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_format.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_data.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_state.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_call_investigator.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard.js?v=' in dashboard
     assert "CodexUsageDashboardFormat" in dashboard_format_js
     assert "CodexUsageDashboardData" in dashboard_data_js
     assert "CodexUsageDashboardState" in dashboard_state_js
+    assert "CodexUsageCallInvestigator" in dashboard_call_js
     assert "copyViewLink" in dashboard
     assert "exportVisible" in dashboard
     assert "Copy link" in dashboard
@@ -441,27 +450,31 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'body[data-active-view="call"] .detail-section' in dashboard_css
     assert 'body[data-active-view="call"] .table-tools' in dashboard_css
     assert ".call-diagnostic-section.exact" in dashboard_css
-    assert "creditsText(usageCreditValue(row))" in dashboard_js
-    assert "const contextPayloadState = new Map()" in dashboard_js
-    assert "renderInvestigationReadout" in dashboard_js
-    assert "contextStateRecord(row)" in dashboard_js
-    assert "data-context-scroll" in dashboard_js
+    assert "creditsText(usageCreditValue(row))" in dashboard_call_js
+    assert "const contextPayloadState = new Map()" in dashboard_call_js
+    assert "renderInvestigationReadout" in dashboard_call_js
+    assert "contextStateRecord(row)" in dashboard_call_js
+    assert "sessionStorage.setItem(evidenceAutoloadKey, '1')" in dashboard_call_js
+    assert "data-context-autoload-toggle" in dashboard_call_js
+    assert "renderCacheVerdict" in dashboard_call_js
+    assert "data-context-scroll" in dashboard_call_js
     assert ".readout-grid" in dashboard_css
+    assert ".cache-verdict" in dashboard_css
     assert ".context-inline-action" in dashboard_css
     assert "data-open-investigator-record" in dashboard_js
     assert "data-call-nav-record" in dashboard_js
-    assert "call.cache_accounting_delta" in dashboard_js
-    assert "call.hidden_estimate" in dashboard_js
-    assert "button.show_tool_output" in dashboard_js
-    assert "data-context-entry-load-output" in dashboard_js
-    assert "data-context-load-older" in dashboard_js
-    assert "data-context-no-budget" in dashboard_js
-    assert "renderContextTokenUsage" in dashboard_js
-    assert "renderContextCompaction" in dashboard_js
-    assert "data-context-compaction-history" in dashboard_js
+    assert "call.cache_accounting_delta" in dashboard_call_js
+    assert "call.hidden_estimate" in dashboard_call_js
+    assert "button.show_tool_output" in dashboard_call_js
+    assert "data-context-entry-load-output" in dashboard_call_js
+    assert "data-context-load-older" in dashboard_call_js
+    assert "data-context-no-budget" in dashboard_call_js
+    assert "renderContextTokenUsage" in dashboard_call_js
+    assert "renderContextCompaction" in dashboard_call_js
+    assert "data-context-compaction-history" in dashboard_call_js
     assert "context-token-breakdown" in dashboard_css
     assert "context-compaction" in dashboard_css
-    assert "tool_output_omitted" in dashboard_js
+    assert "tool_output_omitted" in dashboard_call_js
     assert "parent_thread_name" in dashboard
     assert "thread_attachment_label" in dashboard
     assert "thread_attachment_relation" in dashboard
@@ -502,6 +515,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (tmp_path / "codex-usage-tracker-guide" / "dashboard-guide.html").exists()
     assert (tmp_path / "codex-usage-tracker-guide" / "assets" / "dashboard-calls.png").exists()
     assert (asset_dir / "dashboard.js").exists()
+    assert (asset_dir / "dashboard_call_investigator.js").exists()
     assert (asset_dir / "dashboard_format.js").exists()
     assert (asset_dir / "dashboard_data.js").exists()
     assert (asset_dir / "dashboard_state.js").exists()
