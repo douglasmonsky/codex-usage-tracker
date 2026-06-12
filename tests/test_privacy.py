@@ -195,7 +195,7 @@ def test_context_loading_is_explicit_redacted_and_not_static_html(tmp_path: Path
     assert PROMPT_SENTINEL in default_context_text
     assert ASSISTANT_SENTINEL in default_context_text
     assert TOOL_OUTPUT_SENTINEL not in default_context_text
-    assert "Tool output omitted by default" in default_context_text
+    assert "Tool output hidden for this request" in default_context_text
     assert any(entry.get("tool_output_omitted") is True for entry in default_context["entries"])
     assert TOOL_OUTPUT_SENTINEL in tool_context_text
     assert not any(entry.get("tool_output_omitted") is True for entry in tool_context["entries"])

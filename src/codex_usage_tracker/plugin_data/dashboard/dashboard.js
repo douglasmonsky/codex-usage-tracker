@@ -60,6 +60,7 @@
       'button.load_context': 'Load context',
       'button.show_turn_evidence': 'Show turn log evidence',
       'button.include_tool_output': 'Include tool output',
+      'button.hide_tool_output': 'Hide tool output',
       'button.show_tool_output': 'Show tool output',
       'button.load_older_context': 'Load older entries',
       'button.no_char_limit': 'No char limit',
@@ -117,7 +118,7 @@
       'call.exact_label': 'Exact from token callback',
       'call.derived_label': 'Derived from adjacent aggregate calls',
       'call.estimated_label': 'Estimated from visible log volume',
-      'call.evidence_label': 'Evidence loaded from local JSONL on demand',
+      'call.evidence_label': 'Runtime evidence',
       'call.cache_warm': 'Warm cache reuse',
       'call.cache_cold': 'Cold resume / stale cache',
       'call.cache_partial': 'Partial cache miss',
@@ -130,8 +131,8 @@
       'call.open_hint': 'Double-click a row or use Open investigator for deep diagnostics.',
       'call.not_found': 'Selected call was not found in the loaded dashboard rows.',
       'call.position': 'Call {position} in this resolved thread.',
-      'call.context_estimate_hint': 'Use the evidence actions below to compare exact uncached input with visible log entries. The gap should be treated as hidden scaffolding, serialization, or tokenizer estimate error.',
-      'call.compaction_hint': 'Use the evidence actions below to detect explicit compaction events and view redacted replacement history when available.',
+      'call.context_estimate_hint': 'Compare exact uncached input with tokenizer-counted visible log evidence. The gap should be treated as hidden scaffolding, serialization, or tokenizer estimate error.',
+      'call.compaction_hint': 'Loaded evidence can show explicit compaction events. Redacted replacement history is shown only after the compacted replacement action.',
       'context.token_breakdown': 'Token breakdown',
       'context.compaction_detected': 'Compaction detected',
       'context.compaction_replacement': 'Compacted replacement context',
@@ -149,6 +150,9 @@
       'context.token_reasoning': 'Reasoning',
       'context.token_total': 'Total',
       'context.no_char_limit_active': 'No character limit applied.',
+      'context.auto_loading': 'Loading full turn-log evidence with tool output included.',
+      'source.user_initiated': 'User initiated',
+      'source.codex_initiated': 'Codex initiated',
     };
     let availableLanguages = Array.isArray(initialPayload.available_languages) && initialPayload.available_languages.length
       ? initialPayload.available_languages
@@ -612,6 +616,26 @@
       if (isSubagent(row)) return t('source.subagent');
       return t('source.user');
     }
+    function callInitiator(row) {
+      const codexInitiated = isAutoReview(row)
+        || isSubagent(row)
+        || (row.thread_source && row.thread_source !== 'user');
+      return {
+        key: codexInitiated ? 'codex' : 'user',
+        label: codexInitiated ? t('source.codex_initiated') : t('source.user_initiated'),
+        shortLabel: codexInitiated ? 'Codex' : t('source.user'),
+        source: sourceLabelText(row),
+      };
+    }
+    function callInitiatorText(row) {
+      const initiator = callInitiator(row);
+      return `${initiator.label} - ${initiator.source}`;
+    }
+    function callInitiatorPuck(row) {
+      const initiator = callInitiator(row);
+      const title = `${initiator.label}: ${initiator.source}`;
+      return `<span class="initiator-puck initiator-${escapeHtml(initiator.key)}" ${tooltipAttributes(title)}>${escapeHtml(initiator.shortLabel)}</span>`;
+    }
     function attachmentRelationText(relation) {
       return {
         direct: t('thread.direct'),
@@ -767,7 +791,7 @@
         return {
           key: 'post-compaction',
           label: t('call.post_compaction'),
-          body: 'A compaction marker or reset-like profile is associated with this call. Use the evidence actions to confirm replacement context.',
+          body: 'A compaction marker or reset-like profile is associated with this call. Check loaded evidence to confirm replacement context.',
         };
       }
       if (diagnostic === 'cold') {
@@ -1943,6 +1967,7 @@
           <td title="${escapeHtml(short(row.session_id))}">
             <div class="call-thread-cell">
               <span>${escapeHtml(truncate(rowThreadLabel(row)))}</span>
+              ${callInitiatorPuck(row)}
               <button class="mini-open-button" type="button" data-open-investigator-record="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.open_investigator'))}</button>
             </div>
           </td>
@@ -2093,7 +2118,7 @@
             <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
             <td>
               <div class="call-thread-cell">
-                <span>${escapeHtml(sourceLabelText(row))}</span>
+                ${callInitiatorPuck(row)}
                 <button class="mini-open-button" type="button" data-open-investigator-record="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.open_investigator'))}</button>
               </div>
             </td>
@@ -2183,7 +2208,7 @@
           <div class="timeline-item">
             <div class="timeline-time">${escapeHtml(formatTimestamp(row.event_timestamp, t('state.unknown')))}</div>
             <div>
-              <div class="timeline-title">${escapeHtml(sourceLabelText(row))} · ${escapeHtml(short(row.model))}</div>
+              <div class="timeline-title">${callInitiatorPuck(row)} ${escapeHtml(short(row.model))}</div>
               <div class="timeline-meta">${escapeHtml(tf('detail.timeline_meta', { tokens: number.format(row.total_tokens || 0), cost: moneyText(row.estimated_cost_usd), credits: usageCreditValue(row) === null ? t('credit.no_rate') : `${credits(usageCreditValue(row))} ${t('badge.credits')}`, cache: pct(row.cache_ratio) }))}</div>
               <div class="timeline-meta">${escapeHtml(recommendationSummary(row))}</div>
               <div class="signal-strip">
@@ -2246,12 +2271,13 @@
           </div>
           <div class="detail-card">
             <h3>${escapeHtml(t('detail.thread_narrative'))}</h3>
+            <div class="detail-source-line">${callInitiatorPuck(row)}<span>${escapeHtml(sourceLabelText(row))}</span></div>
             ${fieldsList([
               [t('table.thread'), attachment.label],
               [t('filter.project'), row.project_name || t('state.unknown')],
               [t('detail.project_tags'), Array.isArray(row.project_tags) && row.project_tags.length ? row.project_tags.join(', ') : t('state.none')],
               [t('detail.thread_attachment'), attachmentRelationText(attachment.relation)],
-              [t('table.source'), sourceLabelText(row)],
+              [t('table.source'), callInitiatorText(row)],
               [t('detail.parent_thread'), resolvedParentThreadName(row) || t('state.none')],
               [t('detail.timestamp'), formatTimestamp(row.event_timestamp)],
             ])}
@@ -2442,6 +2468,8 @@
       pricingStatusText,
       usageCreditStatusLabel,
       usageCreditsWithStatus,
+      callInitiatorPuck,
+      callInitiatorText,
       tableUrlForRow,
       signedNumber,
       signedPct,

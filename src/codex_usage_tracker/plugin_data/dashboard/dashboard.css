@@ -528,11 +528,6 @@
       background: #f8fafc;
       color: var(--muted);
     }
-    .autoload-evidence-toggle[aria-pressed="true"] {
-      border-color: #bfdbfe;
-      background: #eff6ff;
-      color: var(--blue);
-    }
     .diagnostic-cold,
     .diagnostic-spike {
       color: #9a3412;
@@ -983,6 +978,36 @@
       min-width: 0;
       overflow: hidden;
     }
+    .initiator-puck {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: max-content;
+      max-width: 76px;
+      min-height: 20px;
+      padding: 1px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 780;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+    .initiator-user {
+      border-color: #bbf7d0;
+      background: #ecfdf5;
+      color: #047857;
+    }
+    .initiator-codex {
+      border-color: #c7d2fe;
+      background: #eef2ff;
+      color: #4338ca;
+    }
+    .timeline-title .initiator-puck,
+    .call-investigator-header .initiator-puck {
+      margin-right: 4px;
+      vertical-align: middle;
+    }
     .flags {
       display: flex;
       flex-wrap: wrap;
@@ -1215,6 +1240,15 @@
     .detail-kv dd {
       color: var(--ink);
       font-weight: 680;
+    }
+    .detail-source-line {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
     }
     .detail-collapse {
       border: 1px solid var(--line);

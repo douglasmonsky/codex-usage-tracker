@@ -30,7 +30,8 @@ classifiers = [
   "Topic :: System :: Monitoring",
 ]
 dependencies = [
-  "mcp>=1.2.0"
+  "mcp>=1.2.0",
+  "tiktoken>=0.13.0"
 ]
 
 [project.urls]

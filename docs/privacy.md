@@ -27,9 +27,9 @@ Those fields are not written to SQLite, CSV exports, generated dashboard HTML, o
 
 ## On-Demand Context
 
-`usage_call_context`, `codex-usage-tracker context`, and the `serve-dashboard` context endpoint read a single source JSONL file only when explicitly requested. Returned context is redacted for common secret patterns and capped in size by default. A user can explicitly request older entries or set a zero character cap for one local context request; that still does not persist raw context into SQLite, CSV, support bundles, or generated dashboard HTML.
+`usage_call_context`, `codex-usage-tracker context`, and the `serve-dashboard` context endpoint read a single source JSONL file only when explicitly requested. Returned context is redacted for common secret patterns and capped in size by default for CLI/MCP requests. The call investigator uses the same endpoint at runtime and requests full redacted evidence for the selected call when the local context API is enabled; that still does not persist raw context into SQLite, CSV, support bundles, or generated dashboard HTML.
 
-Tool output and compacted replacement history are omitted by default. Compaction metadata can show that replacement history exists, its entry count, and the source line, but the replacement text is returned only when explicitly requested for that selected call and is redacted before display.
+Tool output is omitted by default for CLI/MCP context requests. The call investigator includes tool output by default and offers `Hide tool output` for a quieter evidence stream. Compacted replacement history remains omitted by default everywhere. Compaction metadata can show that replacement history exists, its entry count, and the source line, but the replacement text is returned only when explicitly requested for that selected call and is redacted before display.
 
 Dashboard context loading can start off and then be enabled from the local details panel without restarting:
 

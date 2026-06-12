@@ -49,7 +49,7 @@ The dashboard language selector stores your browser preference locally. It local
 The server keeps the HTML aggregate-only and enables two live features:
 
 - `Refresh` rescans local Codex logs and updates the dashboard rows.
-- `Show turn log evidence` reads one selected model call from the original local JSONL file only when you ask for it.
+- The call investigator automatically reads the selected model call from the original local JSONL file when the localhost context API is enabled.
 
 For a static snapshot, use:
 
@@ -136,7 +136,7 @@ The investigator separates evidence by confidence:
 - `Exact`: logged token callback counts, cost, Codex credits, cache ratio, model, effort, source, and context-window pressure.
 - `Derived`: previous/next calls in the same resolved thread and cache/accounting deltas versus the previous chronological call.
 - `Estimated`: visible new-context estimates and the unexplained hidden or serialized input gap. These are attribution aids, not exact cached text spans.
-- `Evidence`: redacted local JSONL turn-log evidence loaded only on demand.
+- `Evidence`: redacted local JSONL turn-log evidence loaded at runtime for the selected investigator call.
 
 Previous and next buttons move chronologically within the same resolved thread and keep the selected call in the URL. Cache diagnostics label common patterns such as warm cache reuse, cold resume or stale cache, partial cache miss, uncached spike, and post-compaction. Delta cards compare input, cached input, uncached input, output/reasoning output, and cache ratio to the previous call and use "cache/accounting delta" terminology because logs do not expose exact cached text spans.
 
@@ -146,7 +146,7 @@ Previous and next buttons move chronologically within the same resolved thread a
 
 The details panel is structured for progressive disclosure. On desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
-Loaded turn-log evidence uses a bounded, redacted default. When the selected call has more local history or text than the default window, the context panel can request older entries or remove the character cap for that explicit row action. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens.
+The call investigator loads full redacted turn-log evidence by default when served from localhost with the context API enabled. Tool output is included by default and can be hidden with `Hide tool output`. Visible evidence token estimates use `tiktoken` when available, with a conservative character fallback only when the tokenizer is unavailable. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens.
 
 For selected calls, the panel shows:
 
@@ -163,13 +163,10 @@ For selected threads, the panel shows:
 - a compact thread timeline with recent calls, cost, credits, cache, context, and pricing cues
 - direct, subagent, auto-review, attached-call, and spawned-thread relationship counts
 
-When served from localhost, the details panel or investigator includes `Show turn log evidence` and `Include tool output`.
+When served from localhost, the call investigator automatically fetches a full, redacted source excerpt for only that call. The details panel still uses an explicit `Show turn log evidence` action so hovering rows does not pull raw context unexpectedly.
 
-- `Show turn log evidence` fetches a size-limited, redacted source excerpt for only that call.
-- `Include tool output` repeats the request with tool output included, still redacted and capped.
-- `Load older entries` requests earlier entries from the same selected turn.
-- `No char limit` removes the character cap for that explicit local request.
-- Omitted tool-output entries also show a `Show tool output` button so you can reload from the specific context card that needs inspection.
+- `Hide tool output` repeats the investigator request without tool output when you want a quieter evidence stream.
+- If tool output is hidden, omitted tool-output entries can show a `Show tool output` button so you can reload from the specific context card that needs inspection.
 - Compaction events are shown as metadata first. Replacement history is transcript-like content and is returned only after an explicit `Show compaction history` action, with redaction still applied.
 - Raw context is not written to SQLite, CSV, or the generated dashboard HTML.
 - If the server was started with `--no-context-api`, context loading starts off. Use `Enable context loading` in the details panel when you want to allow explicit row actions without restarting the dashboard server.
@@ -187,7 +184,7 @@ When served from localhost, the details panel or investigator includes `Show tur
 9. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
 10. Use `Copy link` when you want to return to the same filter/sort/selection state later.
 11. Use `Export CSV` when the current filtered aggregate calls need spreadsheet review.
-12. Click into a row and use `Show turn log evidence` only when aggregate fields are not enough to explain the call.
+12. Open the call investigator when aggregate fields are not enough; the investigator loads redacted evidence automatically when the context API is enabled.
 
 ## Investigating Long Chat Growth
 

@@ -454,13 +454,20 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "const contextPayloadState = new Map()" in dashboard_call_js
     assert "renderInvestigationReadout" in dashboard_call_js
     assert "contextStateRecord(row)" in dashboard_call_js
-    assert "sessionStorage.setItem(evidenceAutoloadKey, '1')" in dashboard_call_js
-    assert "data-context-autoload-toggle" in dashboard_call_js
+    assert "defaultContextRequest" in dashboard_call_js
+    assert "includeToolOutput: true" in dashboard_call_js
+    assert "maxChars: 0" in dashboard_call_js
+    assert "maxEntries: 0" in dashboard_call_js
+    assert "data-context-toggle-tool-output" in dashboard_call_js
+    assert "button.hide_tool_output" in dashboard_call_js
+    assert "data-context-autoload-toggle" not in dashboard_call_js
     assert "renderCacheVerdict" in dashboard_call_js
-    assert "data-context-scroll" in dashboard_call_js
+    assert "data-context-scroll" not in dashboard_call_js
     assert ".readout-grid" in dashboard_css
     assert ".cache-verdict" in dashboard_css
     assert ".context-inline-action" in dashboard_css
+    assert ".initiator-puck" in dashboard_css
+    assert "callInitiatorPuck" in dashboard_js
     assert "data-open-investigator-record" in dashboard_js
     assert "data-call-nav-record" in dashboard_js
     assert "call.cache_accounting_delta" in dashboard_call_js
@@ -468,7 +475,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "button.show_tool_output" in dashboard_call_js
     assert "data-context-entry-load-output" in dashboard_call_js
     assert "data-context-load-older" in dashboard_call_js
-    assert "data-context-no-budget" in dashboard_call_js
+    assert "data-context-no-budget" not in dashboard_call_js
     assert "renderContextTokenUsage" in dashboard_call_js
     assert "renderContextCompaction" in dashboard_call_js
     assert "data-context-compaction-history" in dashboard_call_js
@@ -498,6 +505,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["button.open_investigator"] == "Open investigator"
     assert en_trans["dashboard.view.call"] == "Call Investigator"
     assert en_trans["button.show_tool_output"] == "Show tool output"
+    assert en_trans["button.hide_tool_output"] == "Hide tool output"
+    assert en_trans["source.user_initiated"] == "User initiated"
+    assert en_trans["source.codex_initiated"] == "Codex initiated"
     assert "spawned from" in en_trans["thread.spawned_from"]
     assert "spawned threads" in en_trans["thread.spawned_threads"]
     assert en_trans["detail.thread_timeline"] == "Thread timeline"
@@ -1037,6 +1047,13 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
 
     assert context["loaded_on_demand"] is True
     assert context["raw_context_persisted"] is False
+    assert context["visible_char_count"] > 0
+    assert context["visible_token_estimate"] > 0
+    assert context["visible_token_estimator"] in {
+        "chars_per_4_fallback",
+        "tiktoken:o200k_base",
+        "tiktoken:cl100k_base",
+    }
     assert "SECRET RAW PROMPT" in context_text
     assert "sk" + "-proj-" not in context_text
     assert "AKIAIOSFODNN7EXAMPLE" not in context_text

@@ -26,6 +26,8 @@
       pricingStatusText,
       usageCreditStatusLabel,
       usageCreditsWithStatus,
+      callInitiatorPuck,
+      callInitiatorText,
       tableUrlForRow,
       signedNumber,
       signedPct,
@@ -47,31 +49,9 @@
     } = deps;
     const contextRequestState = new Map();
     const contextPayloadState = new Map();
-    const evidenceAutoloadKey = 'codex-usage-dashboard-autoload-evidence';
 
     function runtime() {
       return getContextRuntime ? getContextRuntime() : {};
-    }
-
-    function autoloadEvidenceEnabled() {
-      try {
-        return window.sessionStorage ? window.sessionStorage.getItem(evidenceAutoloadKey) === '1' : false;
-      } catch (error) {
-        return false;
-      }
-    }
-
-    function setAutoloadEvidenceEnabled(enabled) {
-      try {
-        if (!window.sessionStorage) return;
-        if (enabled) {
-          window.sessionStorage.setItem(evidenceAutoloadKey, '1');
-        } else {
-          window.sessionStorage.removeItem(evidenceAutoloadKey);
-        }
-      } catch (error) {
-        // Session persistence is an enhancement; evidence loading still works without it.
-      }
     }
 
     function callMetricCard(label, value, badge = '', title = '') {
@@ -179,35 +159,24 @@
       const payload = loadedContextPayload(row);
       if (!payload) return null;
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
-      const visibleChars = entries.reduce((sum, entry) => sum + String(entry.text || '').length, 0);
-      const visibleTokenEstimate = Math.ceil(visibleChars / 4);
+      const visibleChars = Number(payload.visible_char_count ?? entries.reduce((sum, entry) => sum + String(entry.text || '').length, 0));
+      const fallbackEstimate = Math.ceil(visibleChars / 4);
+      const visibleTokenEstimate = Number(payload.visible_token_estimate ?? fallbackEstimate);
       const hiddenGap = Math.max(uncachedInputTokens(row) - visibleTokenEstimate, 0);
       return {
         entries: entries.length,
         visibleChars,
         visibleTokenEstimate,
+        estimator: payload.visible_token_estimator || 'chars_per_4_fallback',
         hiddenGap,
         source: payload.source || {},
       };
-    }
-
-    function evidenceAction(label = t('button.show_turn_evidence'), extraAttrs = '') {
-      return `<button class="context-inline-action" type="button" data-context-load data-context-scroll ${extraAttrs}>${escapeHtml(label)}</button>`;
     }
 
     function contextDisabledAttr() {
       const fileMode = window.location.protocol === 'file:';
       const { apiToken, contextApiEnabled } = runtime();
       return fileMode || !apiToken || !contextApiEnabled ? ' disabled' : '';
-    }
-
-    function autoloadEvidenceButton(disabled = '') {
-      const enabled = autoloadEvidenceEnabled();
-      return `
-        <button class="context-button secondary autoload-evidence-toggle" type="button" data-context-autoload-toggle aria-pressed="${enabled ? 'true' : 'false'}"${disabled}>
-          ${enabled ? 'Auto-load evidence on' : 'Auto-load evidence'}
-        </button>
-      `;
     }
 
     function deltaInterpretation(row, previous) {
@@ -228,31 +197,30 @@
 
     function diagnosticNextStep(row, diagnostic, previous) {
       if (diagnostic.key === 'post-compaction') {
-        return 'Use Show turn log evidence and check for an explicit compaction marker or replacement history before interpreting the cache delta.';
+        return 'Check the loaded evidence for an explicit compaction marker or replacement history before interpreting the cache delta.';
       }
       if (diagnostic.key === 'cold') {
-        return 'Compare the previous call, then use Show turn log evidence for this call to see what fresh context was sent after the cache miss.';
+        return 'Compare the previous call, then inspect the loaded evidence to see what fresh context was sent after the cache miss.';
       }
       if (diagnostic.key === 'spike') {
-        return 'Use Show turn log evidence and inspect the most recent entries first; the spike is in fresh uncached input, not cached history.';
+        return 'Inspect the most recent evidence entries first; the spike is in fresh uncached input, not cached history.';
       }
       if (diagnostic.key === 'warm') {
         return `Cache reuse is healthy; focus on the ${number.format(uncachedInputTokens(row))} uncached tokens that were still billed as fresh input.`;
       }
       if (previous) return 'Use the delta cards to locate whether the change is cached input, uncached input, or output/reasoning.';
-      return 'Use Show turn log evidence if the aggregate totals are not enough to understand this isolated call.';
+      return 'Use the loaded evidence if the aggregate totals are not enough to understand this isolated call.';
     }
 
     function renderInvestigationReadout(row, previous, diagnostic, callPosition) {
-      const evidenceDisabled = contextDisabledAttr();
       const exact = `${number.format(rowInputTokens(row))} input tokens = ${number.format(cachedInputTokens(row))} cached + ${number.format(uncachedInputTokens(row))} uncached; ${number.format(outputTokens(row))} output tokens; ${pct(row.cache_ratio)} cache reuse.`;
       const derived = previous
         ? deltaInterpretation(row, previous)
         : 'No previous call is loaded for this resolved thread, so call-to-call deltas are unavailable.';
       const stats = contextEvidenceStats(row);
       const evidence = stats
-        ? `Evidence loaded: ${number.format(stats.entries)} entries, ${number.format(stats.visibleChars)} visible redacted chars, roughly ${number.format(stats.visibleTokenEstimate)} visible-token estimate.`
-        : 'Evidence is not loaded yet. Aggregate token counts are exact, but visible-context attribution needs the local JSONL evidence.';
+        ? `Evidence loaded: ${number.format(stats.entries)} entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}.`
+        : 'Evidence is loading from the local JSONL source. Aggregate token counts are exact, but visible-context attribution needs that runtime evidence.';
       return `
         <section class="call-diagnostic-section readout">
           <div class="section-heading compact">
@@ -271,10 +239,6 @@
             <div class="readout-card">
               <span>Evidence state</span>
               <p>${escapeHtml(evidence)}</p>
-              <div class="readout-actions">
-                ${stats ? '' : evidenceAction(t('button.show_turn_evidence'), evidenceDisabled)}
-                ${autoloadEvidenceButton(evidenceDisabled)}
-              </div>
             </div>
             <div class="readout-card">
               <span>Next diagnostic move</span>
@@ -318,7 +282,6 @@
       const threadLabel = rowThreadLabel(row);
       const callPosition = index >= 0 ? `${number.format(index + 1)} / ${number.format(calls.length)}` : t('state.unknown');
       const evidenceStats = contextEvidenceStats(row);
-      const evidenceDisabled = contextDisabledAttr();
       const visibleEstimateValue = evidenceStats
         ? `~${number.format(evidenceStats.visibleTokenEstimate)} tokens`
         : 'Not loaded yet';
@@ -333,7 +296,7 @@
                 <div>
                   <p class="eyebrow">${escapeHtml(t('dashboard.view.call'))}</p>
                   <h3>${escapeHtml(threadLabel)}</h3>
-                  <p class="muted">${escapeHtml(formatTimestamp(row.event_timestamp))} · ${escapeHtml(short(row.model))} · ${escapeHtml(translateEffort(short(row.effort)))}</p>
+                  <p class="muted">${escapeHtml(formatTimestamp(row.event_timestamp))} · ${escapeHtml(short(row.model))} · ${escapeHtml(translateEffort(short(row.effort)))} · ${callInitiatorPuck(row)}</p>
                 </div>
                 ${renderCallNavigation(row, previous, next)}
               </header>
@@ -348,6 +311,7 @@
                   ${callMetricCard(t('metric.cached_input'), number.format(cachedInputTokens(row)), pct(row.cache_ratio))}
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
                   ${callMetricCard(t('metric.output'), number.format(outputTokens(row)), t('metric.reasoning_output'))}
+                  ${callMetricCard(t('table.source'), callInitiatorText(row), t('call.exact_label'))}
                   ${callMetricCard(t('metric.estimated_cost'), moneyText(row.estimated_cost_usd), pricingStatusText(row))}
                   ${callMetricCard(t('metric.codex_credits'), creditsText(usageCreditValue(row)), usageCreditStatusLabel(row), usageCreditsWithStatus(row))}
                 </div>
@@ -367,32 +331,17 @@
                 </div>
                 <div class="call-metric-grid two">
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
-                  ${callMetricCard(t('call.visible_estimate'), visibleEstimateValue, evidenceStats ? `${number.format(evidenceStats.visibleChars)} visible chars` : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.visible_estimate'), visibleEstimateValue, evidenceStats ? `${number.format(evidenceStats.visibleChars)} visible chars · ${evidenceStats.estimator}` : t('call.evidence_label'))}
                   ${callMetricCard(t('call.hidden_estimate'), hiddenEstimateValue, evidenceStats ? 'Uncached input minus visible estimate' : t('call.evidence_label'))}
                 </div>
                 <p class="muted">${escapeHtml(t('call.context_estimate_hint'))}</p>
-                <div class="call-section-actions">
-                  ${evidenceAction(evidenceStats ? 'Refresh turn evidence' : t('button.show_turn_evidence'), evidenceDisabled)}
-                  <button class="context-inline-action secondary" type="button" data-context-no-budget data-context-scroll${evidenceDisabled}>${escapeHtml(t('button.no_char_limit'))}</button>
-                </div>
-              </section>
-              <section class="call-diagnostic-section compaction">
-                <div class="section-heading compact">
-                  <h3>${escapeHtml(t('call.compaction_diagnostics'))}</h3>
-                  <span class="evidence-chip evidence">${escapeHtml(t('call.evidence_label'))}</span>
-                </div>
-                <p class="muted">${escapeHtml(t('call.compaction_hint'))}</p>
-                <div class="call-section-actions">
-                  ${evidenceAction(t('button.show_turn_evidence'), evidenceDisabled)}
-                  <button class="context-inline-action secondary" type="button" data-context-compaction-history data-context-scroll${evidenceDisabled}>${escapeHtml(t('button.show_compaction_history'))}</button>
-                </div>
               </section>
               <section class="call-diagnostic-section raw-evidence">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.raw_evidence'))}</h3>
                   <span class="evidence-chip evidence">${escapeHtml(t('call.evidence_label'))}</span>
                 </div>
-                ${contextControls(row)}
+                ${contextControls(row, { automatic: true })}
               </section>
             </article>
           </td>
@@ -406,7 +355,8 @@
       detailEl.textContent = t('dashboard.detail.empty');
     }
 
-    function contextControls(row) {
+    function contextControls(row, options = {}) {
+      const automatic = Boolean(options.automatic);
       const { apiToken, contextApiEnabled } = runtime();
       const fileMode = window.location.protocol === 'file:';
       const apiMissing = !apiToken;
@@ -423,78 +373,53 @@
         ? `<button class="context-button" type="button" data-context-enable>${escapeHtml(t('button.enable_context_loading'))}</button>`
         : '';
       const stored = contextStateRecord(row);
+      const requestState = contextStateForRow(row);
+      const toolOutputToggle = stored?.status === 'loaded' && !disabled
+        ? `<button class="context-button secondary" type="button" data-context-toggle-tool-output>${escapeHtml(requestState.includeToolOutput ? t('button.hide_tool_output') : t('button.show_tool_output'))}</button>`
+        : '';
+      const manualLoadButton = !automatic && stored?.status !== 'loaded'
+        ? `<button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.show_turn_evidence'))}</button>`
+        : '';
+      const actionHtml = [manualLoadButton, toolOutputToggle, enableButton].filter(Boolean).join('');
       const resultHtml = stored?.status === 'loaded'
         ? renderContext(stored.payload)
         : stored?.status === 'loading'
           ? `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`
           : stored?.status === 'error'
             ? `<p class="context-note">${escapeHtml(stored.message)}</p>`
-            : `<p class="context-note">${escapeHtml(hint)}</p>`;
+            : `<p class="context-note">${escapeHtml(automatic && !disabled ? t('context.auto_loading') : hint)}</p>`;
       return `
-        <div class="context-actions">
-          <button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.show_turn_evidence'))}</button>
-          <button class="context-button secondary" type="button" data-context-load-output${disabled}>${escapeHtml(t('button.include_tool_output'))}</button>
-          ${autoloadEvidenceButton(disabled)}
-          ${enableButton}
-        </div>
+        ${actionHtml ? `<div class="context-actions">${actionHtml}</div>` : ''}
         <div id="contextResult" class="context-result">${resultHtml}</div>
       `;
     }
 
     function bindContextButtons(row, root = detailEl) {
       const contextResult = root.querySelector('#contextResult');
-      const scrollToEvidence = () => {
-        if (!contextResult) return;
-        const section = contextResult.closest('.raw-evidence') || contextResult;
-        section.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      };
       root.querySelectorAll('[data-context-load]').forEach(button => {
         button.addEventListener('click', () => {
-          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
-          loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }, contextResult);
+          loadContext(row, defaultContextRequest(), contextResult);
         });
       });
-      root.querySelectorAll('[data-context-load-output]').forEach(button => {
+      root.querySelectorAll('[data-context-toggle-tool-output]').forEach(button => {
         button.addEventListener('click', () => {
-          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
-          loadContext(row, { includeToolOutput: true, maxChars: null, maxEntries: defaultContextEntries }, contextResult);
+          const current = contextStateForRow(row);
+          loadContext(row, { includeToolOutput: !current.includeToolOutput }, contextResult);
         });
       });
       root.querySelectorAll('[data-context-enable]').forEach(button => {
         button.addEventListener('click', () => enableContextApi(row, contextResult));
       });
-      root.querySelectorAll('[data-context-autoload-toggle]').forEach(button => {
-        button.addEventListener('click', () => {
-          const next = !autoloadEvidenceEnabled();
-          setAutoloadEvidenceEnabled(next);
-          root.querySelectorAll('[data-context-autoload-toggle]').forEach(toggle => {
-            toggle.setAttribute('aria-pressed', next ? 'true' : 'false');
-            toggle.textContent = next ? 'Auto-load evidence on' : 'Auto-load evidence';
-          });
-          if (next) {
-            if (button.dataset.contextScroll !== undefined) scrollToEvidence();
-            loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }, contextResult);
-          }
-        });
-      });
-      root.querySelectorAll('[data-context-no-budget]').forEach(button => {
-        if (contextResult && contextResult.contains(button)) return;
-        button.addEventListener('click', () => {
-          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
-          loadContext(row, { maxChars: 0 }, contextResult);
-        });
-      });
       root.querySelectorAll('[data-context-compaction-history]').forEach(button => {
         if (contextResult && contextResult.contains(button)) return;
         button.addEventListener('click', () => {
-          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
           loadContext(row, { includeCompactionHistory: true }, contextResult);
         });
       });
       if (contextResult) {
         contextResult.addEventListener('click', event => {
           if (!(event.target instanceof Element)) return;
-          const button = event.target.closest('[data-context-entry-load-output], [data-context-load-older], [data-context-no-budget], [data-context-compaction-history]');
+          const button = event.target.closest('[data-context-entry-load-output], [data-context-load-older], [data-context-compaction-history]');
           if (!button) return;
           if (button.matches('[data-context-entry-load-output]')) {
             loadContext(row, { includeToolOutput: true }, contextResult);
@@ -502,10 +427,6 @@
           }
           if (button.matches('[data-context-load-older]')) {
             loadContext(row, { maxEntries: Number(button.dataset.contextMaxEntries || 0) }, contextResult);
-            return;
-          }
-          if (button.matches('[data-context-no-budget]')) {
-            loadContext(row, { maxChars: 0 }, contextResult);
             return;
           }
           if (button.matches('[data-context-compaction-history]')) {
@@ -516,13 +437,13 @@
     }
 
     function maybeAutoloadEvidence(row, root) {
-      if (!autoloadEvidenceEnabled() || !row.record_id || contextStateRecord(row)) return;
+      if (!row.record_id || contextStateRecord(row)) return;
       const { apiToken, contextApiEnabled } = runtime();
       if (!apiToken || !contextApiEnabled || window.location.protocol === 'file:') return;
       const target = root.querySelector('#contextResult');
       window.setTimeout(() => {
         if (!contextStateRecord(row)) {
-          loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }, target);
+          loadContext(row, defaultContextRequest(), target);
         }
       }, 0);
     }
@@ -551,10 +472,10 @@
           renderDashboard();
         } else {
           showDetail(row);
-        }
-        const nextTarget = document.getElementById('contextResult');
-        if (nextTarget && runtime().contextApiEnabled) {
-          nextTarget.innerHTML = `<p class="context-note">${escapeHtml(t('context.enabled_note'))}</p>`;
+          const nextTarget = document.getElementById('contextResult');
+          if (nextTarget && runtime().contextApiEnabled) {
+            nextTarget.innerHTML = `<p class="context-note">${escapeHtml(t('context.enabled_note'))}</p>`;
+          }
         }
       } catch (error) {
         target.innerHTML = `<p class="context-note">${escapeHtml(error.message || String(error))}</p>`;
@@ -565,7 +486,16 @@
       const key = row.record_id || '';
       return key && contextRequestState.has(key)
         ? contextRequestState.get(key)
-        : { includeToolOutput: false, includeCompactionHistory: false, maxChars: null, maxEntries: defaultContextEntries };
+        : defaultContextRequest();
+    }
+
+    function defaultContextRequest() {
+      return {
+        includeToolOutput: true,
+        includeCompactionHistory: false,
+        maxChars: 0,
+        maxEntries: 0,
+      };
     }
 
     function nextContextState(row, options) {
@@ -632,9 +562,6 @@
       if (Number(omitted.older_entries || 0) > 0) {
         const nextEntries = maxEntries > 0 ? Math.max(maxEntries + defaultContextEntries, maxEntries * 2) : 0;
         buttons.push(`<button class="context-entry-action" type="button" data-context-load-older data-context-max-entries="${escapeHtml(String(nextEntries))}">${escapeHtml(t('button.load_older_context'))}</button>`);
-      }
-      if (Number(omitted.over_budget_chars || 0) > 0 && Number(omitted.max_chars || 0) !== 0) {
-        buttons.push(`<button class="context-entry-action" type="button" data-context-no-budget>${escapeHtml(t('button.no_char_limit'))}</button>`);
       }
       return buttons.length ? `<div class="context-followup-actions">${buttons.join('')}</div>` : '';
     }

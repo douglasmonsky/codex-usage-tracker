@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
+from math import ceil
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +16,7 @@ DEFAULT_CONTEXT_CHARS = 20_000
 DEFAULT_CONTEXT_ENTRIES = 80
 
 _OUTPUT_OMITTED = (
-    "Tool output omitted by default. Reload with include_tool_output=true to inspect "
+    "Tool output hidden for this request. Reload with include_tool_output=true to inspect "
     "redacted, size-limited output."
 )
 
@@ -55,12 +57,16 @@ def load_call_context(
         include_tool_output=include_tool_output,
         include_compaction_history=include_compaction_history,
     )
+    visible_estimate = _estimate_visible_tokens(entries, _optional_str(row.get("model")))
     return {
         "schema": "codex-usage-tracker-context-v1",
         "loaded_on_demand": True,
         "raw_context_persisted": False,
         "include_tool_output": include_tool_output,
         "include_compaction_history": include_compaction_history,
+        "visible_char_count": visible_estimate["visible_char_count"],
+        "visible_token_estimate": visible_estimate["visible_token_estimate"],
+        "visible_token_estimator": visible_estimate["visible_token_estimator"],
         "record": {
             "record_id": row.get("record_id"),
             "session_id": row.get("session_id"),
@@ -501,6 +507,45 @@ def _limit_entries(
         "max_entries": max_entries,
         "returned_entries": len(limited),
     }
+
+
+def _estimate_visible_tokens(entries: list[dict[str, Any]], model: str | None) -> dict[str, Any]:
+    text = "\n\n".join(str(entry.get("text") or "") for entry in entries if entry.get("text"))
+    visible_chars = len(text)
+    encoding, estimator = _context_encoding(model or "")
+    if encoding is None:
+        return {
+            "visible_char_count": visible_chars,
+            "visible_token_estimate": ceil(visible_chars / 4) if visible_chars else 0,
+            "visible_token_estimator": estimator,
+        }
+    return {
+        "visible_char_count": visible_chars,
+        "visible_token_estimate": len(encoding.encode(text)) if text else 0,
+        "visible_token_estimator": estimator,
+    }
+
+
+@lru_cache(maxsize=32)
+def _context_encoding(model: str) -> tuple[Any | None, str]:
+    try:
+        import tiktoken  # type: ignore[import-not-found]
+    except Exception:
+        return None, "chars_per_4_fallback"
+
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        try:
+            encoding = tiktoken.get_encoding("o200k_base")
+        except Exception:
+            try:
+                encoding = tiktoken.get_encoding("cl100k_base")
+            except Exception:
+                return None, "chars_per_4_fallback"
+    except Exception:
+        return None, "chars_per_4_fallback"
+    return encoding, f"tiktoken:{getattr(encoding, 'name', 'unknown')}"
 
 
 def _content_text(value: object) -> str:
