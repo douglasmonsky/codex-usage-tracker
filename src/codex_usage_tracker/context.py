@@ -56,27 +56,24 @@ def load_call_context(
 
     target_turn_id = _optional_str(row.get("turn_id"))
     source_scan_started = perf_counter()
-    entries, omitted, estimate_entries = _read_context_entries(
-        path=source_file,
-        token_line=line_number,
-        target_turn_id=target_turn_id,
-        max_chars=max_chars if max_chars <= 0 else max(1_000, max_chars),
-        max_entries=max_entries if max_entries <= 0 else max(1, max_entries),
-        include_tool_output=include_tool_output,
-        include_compaction_history=include_compaction_history,
+    entries, omitted, estimate_entries, serialized_estimate, serialized_estimate_ms = (
+        _read_context_entries(
+            path=source_file,
+            token_line=line_number,
+            target_turn_id=target_turn_id,
+            max_chars=max_chars if max_chars <= 0 else max(1_000, max_chars),
+            max_entries=max_entries if max_entries <= 0 else max(1, max_entries),
+            include_tool_output=include_tool_output,
+            include_compaction_history=include_compaction_history,
+            model=_optional_str(row.get("model")),
+        )
     )
+    source_scan_ms = _elapsed_ms(source_scan_started)
     if diagnostic_payload is not None:
-        diagnostic_payload["source_scan_ms"] = _elapsed_ms(source_scan_started)
+        diagnostic_payload["source_scan_ms"] = source_scan_ms
     visible_estimate = _estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
-    serialized_estimate_started = perf_counter()
-    serialized_estimate = _estimate_serialized_context(
-        path=source_file,
-        token_line=line_number,
-        target_turn_id=target_turn_id,
-        model=_optional_str(row.get("model")),
-    )
     if diagnostic_payload is not None:
-        diagnostic_payload["serialized_estimate_ms"] = _elapsed_ms(serialized_estimate_started)
+        diagnostic_payload["serialized_estimate_ms"] = serialized_estimate_ms
         diagnostic_payload["source_file_bytes"] = source_file_bytes
         diagnostic_payload["source_line_number"] = line_number
         diagnostic_payload["entries_before_limit"] = int(omitted.get("total_entries") or 0)
@@ -140,12 +137,16 @@ def _read_context_entries(
     max_entries: int,
     include_tool_output: bool,
     include_compaction_history: bool,
-) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
+    model: str | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]], dict[str, Any], float]:
     candidates: list[dict[str, Any]] = []
+    raw_entries: list[dict[str, Any]] = []
+    field_buckets: dict[str, dict[str, Any]] = {}
     omitted_parse_errors = 0
     current_turn_id: str | None = None
     collecting = target_turn_id is None
     pending_compactions: list[dict[str, Any]] = []
+    encoding, estimator = _context_encoding(model or "")
 
     with path.open(encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
@@ -167,6 +168,16 @@ def _read_context_entries(
                 current_turn_id = _optional_str(payload.get("turn_id"))
                 collecting = target_turn_id is None or current_turn_id == target_turn_id
                 if collecting:
+                    raw_entries = []
+                    field_buckets = {}
+                    _collect_serialized_envelope(
+                        raw_entries=raw_entries,
+                        field_buckets=field_buckets,
+                        envelope=envelope,
+                        entry_type=entry_type,
+                        payload=payload,
+                        encoding=encoding,
+                    )
                     carried_compactions = (
                         [entry for entry in candidates if entry.get("type") == "compacted"]
                         if was_collecting and target_turn_id is not None
@@ -186,6 +197,16 @@ def _read_context_entries(
                     candidates.extend(carried_compactions)
                 pending_compactions = []
                 continue
+
+            if collecting:
+                _collect_serialized_envelope(
+                    raw_entries=raw_entries,
+                    field_buckets=field_buckets,
+                    envelope=envelope,
+                    entry_type=entry_type,
+                    payload=payload,
+                    encoding=encoding,
+                )
 
             summarized = _summarize_payload(
                 entry_type=entry_type,
@@ -218,12 +239,67 @@ def _read_context_entries(
             ):
                 break
 
+    serialized_started = perf_counter()
+    serialized_estimate = _serialized_context_estimate(
+        raw_entries=raw_entries,
+        field_buckets=field_buckets,
+        parse_errors=omitted_parse_errors,
+        encoding=encoding,
+        estimator=estimator,
+    )
+    serialized_estimate_ms = _elapsed_ms(serialized_started)
     candidates = _dedupe_chat_message_echoes(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
     omitted["parse_errors"] = omitted_parse_errors
     omitted["target_turn_id"] = target_turn_id
     omitted["total_entries"] = len(candidates)
-    return limited, omitted, candidates
+    return limited, omitted, candidates, serialized_estimate, serialized_estimate_ms
+
+
+def _collect_serialized_envelope(
+    *,
+    raw_entries: list[dict[str, Any]],
+    field_buckets: dict[str, dict[str, Any]],
+    envelope: dict[str, Any],
+    entry_type: str,
+    payload: dict[str, Any],
+    encoding: Any | None,
+) -> None:
+    raw_entries.append(envelope)
+    _collect_serialized_field_buckets(
+        buckets=field_buckets,
+        entry_type=entry_type,
+        payload=payload,
+        encoding=encoding,
+    )
+
+
+def _serialized_context_estimate(
+    *,
+    raw_entries: list[dict[str, Any]],
+    field_buckets: dict[str, dict[str, Any]],
+    parse_errors: int,
+    encoding: Any | None,
+    estimator: str,
+) -> dict[str, Any]:
+    raw_json = "\n".join(_compact_json(_redact_json_value(entry)) for entry in raw_entries)
+    top_buckets = sorted(
+        field_buckets.values(),
+        key=lambda bucket: int(bucket.get("token_estimate") or 0),
+        reverse=True,
+    )[:8]
+    return {
+        "available": bool(raw_entries),
+        "scope": "selected_turn_raw_jsonl",
+        "raw_line_count": len(raw_entries),
+        "raw_json_char_count": len(raw_json),
+        "raw_json_token_estimate": _token_estimate(raw_json, encoding),
+        "token_estimator": estimator,
+        "parse_errors": parse_errors,
+        "upper_bound": True,
+        "raw_text_returned": False,
+        "buckets": top_buckets,
+    }
 
 
 def _summarized_context_entry(
@@ -564,79 +640,6 @@ def _estimate_visible_tokens(entries: list[dict[str, Any]], model: str | None) -
         "visible_char_count": visible_chars,
         "visible_token_estimate": visible_tokens,
         "visible_token_estimator": estimator,
-    }
-
-
-def _estimate_serialized_context(
-    *,
-    path: Path,
-    token_line: int,
-    target_turn_id: str | None,
-    model: str | None,
-) -> dict[str, Any]:
-    raw_entries: list[dict[str, Any]] = []
-    field_buckets: dict[str, dict[str, Any]] = {}
-    parse_errors = 0
-    current_turn_id: str | None = None
-    collecting = target_turn_id is None
-    encoding, estimator = _context_encoding(model or "")
-
-    with path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
-            if line_number > token_line:
-                break
-            try:
-                envelope = json.loads(line)
-            except json.JSONDecodeError:
-                parse_errors += 1
-                continue
-            if not isinstance(envelope, dict):
-                continue
-
-            entry_type = _optional_str(envelope.get("type")) or "unknown"
-            payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
-            if entry_type == "turn_context":
-                current_turn_id = _optional_str(payload.get("turn_id"))
-                collecting = target_turn_id is None or current_turn_id == target_turn_id
-                if collecting:
-                    raw_entries = []
-                    field_buckets = {}
-
-            if not collecting:
-                continue
-
-            raw_entries.append(envelope)
-            _collect_serialized_field_buckets(
-                buckets=field_buckets,
-                entry_type=entry_type,
-                payload=payload,
-                encoding=encoding,
-            )
-
-            if (
-                line_number >= token_line
-                and entry_type == "event_msg"
-                and payload.get("type") == "token_count"
-            ):
-                break
-
-    raw_json = "\n".join(_compact_json(_redact_json_value(entry)) for entry in raw_entries)
-    top_buckets = sorted(
-        field_buckets.values(),
-        key=lambda bucket: int(bucket.get("token_estimate") or 0),
-        reverse=True,
-    )[:8]
-    return {
-        "available": bool(raw_entries),
-        "scope": "selected_turn_raw_jsonl",
-        "raw_line_count": len(raw_entries),
-        "raw_json_char_count": len(raw_json),
-        "raw_json_token_estimate": _token_estimate(raw_json, encoding),
-        "token_estimator": estimator,
-        "parse_errors": parse_errors,
-        "upper_bound": True,
-        "raw_text_returned": False,
-        "buckets": top_buckets,
     }
 
 

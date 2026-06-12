@@ -64,7 +64,7 @@ Already implemented before this branch:
 - [x] M3 persist aggregate call-origin metadata during indexing so dashboard payloads do not scan source logs.
 - [x] M4 persist cheap performance-critical dashboard query helper fields where feasible.
 - [x] M5 add optional timing diagnostics to `/api/usage` and `/api/context`.
-- [ ] M6 make explicit context loading single-pass where practical.
+- [x] M6 make explicit context loading single-pass where practical.
 - [ ] M7 precompute client-side call adjacency for investigator rendering.
 - [ ] M8 add source-log-aware synthetic benchmark coverage.
 - [ ] M9 add SQLite-backed live dashboard API slices while preserving `/api/usage`.
@@ -158,6 +158,12 @@ Full branch closeout should also run the release validation listed in `docs/deve
   - `python -m pytest tests/test_store_dashboard_mcp.py -q`
   - `python -m pytest tests/test_privacy.py -q`
   - `python scripts/check_release.py`
+- M6 single-pass context loading:
+  - `python -m pytest tests/test_store_dashboard_mcp.py::test_context_loading_uses_one_source_scan_for_evidence_and_serialized_estimate -q` failed before implementation because one context load opened the same source JSONL twice.
+  - `python -m pytest tests/test_store_dashboard_mcp.py::test_context_loading_uses_one_source_scan_for_evidence_and_serialized_estimate -q`
+  - `python -m pytest tests/test_store_dashboard_mcp.py -q`
+  - `python -m pytest tests/test_privacy.py -q`
+  - `python -m pytest tests/test_json_contracts.py -q`
 
 ## Benchmarks Run
 
@@ -171,7 +177,7 @@ Full branch closeout should also run the release validation listed in `docs/deve
 - Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata.
 - Active/all-history filtering now has a persisted `is_archived` flag and path fallback; future SQLite-backed API slices should reuse that helper instead of reintroducing path-only filtering.
 - Per-thread adjacency is persisted after upsert; M7 still needs to make the browser prefer `previous_record_id` and `next_record_id` instead of filtering loaded rows.
-- Context loading still does selected-turn evidence and serialized-evidence work; Milestone 6 must verify whether that can be reduced to one source-file pass.
+- Context loading now performs selected-turn evidence and serialized-evidence collection in one source-file scan for a selected call. Serialized evidence is still built in memory and timed separately as `serialized_estimate_ms`.
 - Large-history live dashboard still ships broad payloads before the SQLite-backed API slice work.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
 
