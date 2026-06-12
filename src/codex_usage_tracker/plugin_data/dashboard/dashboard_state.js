@@ -1,5 +1,5 @@
 (function () {
-  const ALLOWED_VIEWS = new Set(['insights', 'calls', 'threads']);
+  const ALLOWED_VIEWS = new Set(['insights', 'calls', 'threads', 'call']);
   const ALLOWED_DIRECTIONS = new Set(['asc', 'desc']);
   const STATE_KEYS = [
     'view',

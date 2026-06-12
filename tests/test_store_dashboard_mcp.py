@@ -336,6 +336,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_js
     assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_js
     assert 'href="codex-usage-tracker-assets/dashboard.css?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_format.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_data.js?v=' in dashboard
@@ -431,12 +435,22 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.subagent_type" in dashboard_js
     assert "source.auto_review" in dashboard_js
     assert "button.load_context" in dashboard_js
+    assert "button.open_investigator" in dashboard_js
+    assert "dashboard.view.call" in dashboard_js
+    assert "renderCallInvestigator" in dashboard_js
+    assert "data-open-investigator-record" in dashboard_js
+    assert "data-call-nav-record" in dashboard_js
+    assert "call.cache_accounting_delta" in dashboard_js
+    assert "call.hidden_estimate" in dashboard_js
     assert "button.show_tool_output" in dashboard_js
     assert "data-context-entry-load-output" in dashboard_js
     assert "data-context-load-older" in dashboard_js
     assert "data-context-no-budget" in dashboard_js
     assert "renderContextTokenUsage" in dashboard_js
+    assert "renderContextCompaction" in dashboard_js
+    assert "data-context-compaction-history" in dashboard_js
     assert "context-token-breakdown" in dashboard_css
+    assert "context-compaction" in dashboard_css
     assert "tool_output_omitted" in dashboard_js
     assert "parent_thread_name" in dashboard
     assert "thread_attachment_label" in dashboard
@@ -457,7 +471,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["detail.thread_attachment"] == "Thread attachment"
     assert en_trans["detail.subagent_type"] == "Subagent type"
     assert en_trans["source.auto_review"] == "Auto-review"
-    assert en_trans["button.load_context"] == "Load context"
+    assert en_trans["button.show_turn_evidence"] == "Show turn log evidence"
+    assert en_trans["button.open_investigator"] == "Open investigator"
+    assert en_trans["dashboard.view.call"] == "Call Investigator"
     assert en_trans["button.show_tool_output"] == "Show tool output"
     assert "spawned from" in en_trans["thread.spawned_from"]
     assert "spawned threads" in en_trans["thread.spawned_threads"]
@@ -1014,6 +1030,38 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     assert any(entry["label"] == "message / user" for entry in context["entries"])
     token_entry = next(entry for entry in context["entries"] if entry["label"] == "Token count")
     assert token_entry["token_usage"]["last_token_usage"]["uncached_input_tokens"] >= 0
+    compaction_entries = [entry for entry in context["entries"] if entry["label"] == "Compaction detected"]
+    assert len(compaction_entries) == 2
+    compaction_entry = next(
+        entry for entry in compaction_entries if entry["compaction"]["replacement_entry_count"] == 2
+    )
+    event_compaction_entry = next(
+        entry for entry in compaction_entries if entry["compaction"]["replacement_entry_count"] == 1
+    )
+    assert compaction_entry["compaction"]["replacement_history_available"] is True
+    assert compaction_entry["compaction"]["replacement_entry_count"] == 2
+    assert compaction_entry["compaction"]["replacement_history_included"] is False
+    assert event_compaction_entry["compaction"]["replacement_history_available"] is True
+    assert event_compaction_entry["compaction"]["replacement_history_included"] is False
+    assert "replacement_history" not in compaction_entry["compaction"]
+    assert "COMPACTED REPLACEMENT SUMMARY" not in context_text
+    assert "EVENT MSG COMPACTION SUMMARY" not in context_text
+
+    compaction_context = load_call_context(
+        rows[0]["record_id"],
+        db_path=db_path,
+        include_compaction_history=True,
+    )
+    compaction_context_text = json.dumps(compaction_context)
+    compaction_with_history = next(
+        entry for entry in compaction_context["entries"] if entry["label"] == "Compaction detected"
+    )
+    assert compaction_context["include_compaction_history"] is True
+    assert compaction_with_history["compaction"]["replacement_history_included"] is True
+    assert "COMPACTED REPLACEMENT SUMMARY" in compaction_context_text
+    assert "EVENT MSG COMPACTION SUMMARY" in compaction_context_text
+    assert "sk" + "-proj-compactedsecret" not in compaction_context_text
+    assert "[REDACTED_OPENAI_KEY]" in compaction_context_text
 
     limited_context = load_call_context(
         rows[0]["record_id"],
@@ -1263,6 +1311,55 @@ def _make_codex_home(tmp_path: Path) -> Path:
                             + "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c "
                             + "client_secret=super-secret-value "
                             + "-----BEGIN OPENSSH PRIVATE KEY-----abc123-----END OPENSSH PRIVATE KEY-----",
+                        }
+                    ],
+                },
+            ),
+            _entry(
+                "compacted",
+                {
+                    "message": "",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": "COMPACTED REPLACEMENT SUMMARY "
+                                    + "sk"
+                                    + "-proj-compactedsecret1234567890",
+                                }
+                            ],
+                        },
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "output_text",
+                                    "text": "Retained compacted work plan.",
+                                }
+                            ],
+                        },
+                    ],
+                },
+            ),
+            _entry(
+                "event_msg",
+                {
+                    "type": "context_compacted",
+                    "message": "Context compacted by Codex.",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "output_text",
+                                    "text": "EVENT MSG COMPACTION SUMMARY",
+                                }
+                            ],
                         }
                     ],
                 },

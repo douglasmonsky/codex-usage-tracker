@@ -42,6 +42,7 @@ EXPECTED_KEY_PREFIXES = (
     "status.",
     "table.",
     "caption.",
+    "call.",
     "date.",
     "history.",
     "pricing.",

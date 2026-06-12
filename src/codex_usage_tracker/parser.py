@@ -34,6 +34,10 @@ PARSER_DIAGNOSTIC_KEYS = (
     "skipped_events",
 )
 
+KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset({
+    "context_compacted",
+})
+
 
 @dataclass(frozen=True)
 class ParserAdapter:
@@ -224,8 +228,9 @@ def _parse_codex_jsonl_v1(
                 }
                 continue
 
-            if entry_type != "event_msg" or payload.get("type") != "token_count":
-                if entry_type == "event_msg":
+            payload_type = payload.get("type")
+            if entry_type != "event_msg" or payload_type != "token_count":
+                if entry_type == "event_msg" and payload_type not in KNOWN_NON_TOKEN_EVENT_MSG_TYPES:
                     _increment_stat(stats, "unknown_event_shape")
                 continue
 

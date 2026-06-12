@@ -138,9 +138,11 @@ Load one call's logged context on demand:
 ```bash
 codex-usage-tracker context <record-id>
 codex-usage-tracker context <record-id> --max-entries 0 --max-chars 0
+codex-usage-tracker context <record-id> --include-tool-output
+codex-usage-tracker context <record-id> --include-compaction-history
 ```
 
-Raw context is read from the original local JSONL source only when explicitly requested. It is not written to SQLite, CSV, or generated dashboard HTML. The default response is bounded; use `--max-entries 0` to request all matching context entries and `--max-chars 0` to remove the character cap for that explicit request.
+Raw context is read from the original local JSONL source only when explicitly requested. It is not written to SQLite, CSV, or generated dashboard HTML. The default response is bounded; use `--max-entries 0` to request all matching context entries and `--max-chars 0` to remove the character cap for that explicit request. Tool output and compacted replacement history are omitted unless explicitly requested with their flags, and returned text is still redacted.
 
 ## Export
 

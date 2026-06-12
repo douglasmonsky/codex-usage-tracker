@@ -133,6 +133,37 @@ def test_parser_skips_corrupt_token_count_and_continues(tmp_path: Path) -> None:
     assert events[0].model_context_window is None
 
 
+def test_parser_ignores_known_non_token_context_compaction_event(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry(
+                "event_msg",
+                {
+                    "type": "context_compacted",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "SECRET COMPACTION TEXT"}],
+                        }
+                    ],
+                },
+            ),
+            _token_event(100, 100),
+        ],
+    )
+
+    stats: dict[str, int] = {}
+    events = parse_usage_events_from_file(log_path, stats=stats)
+
+    assert len(events) == 1
+    assert stats.get("unknown_event_shape", 0) == 0
+    assert "SECRET COMPACTION TEXT" not in json.dumps([event.to_row() for event in events])
+
+
 def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: Path) -> None:
     log_path = tmp_path / "unknown-name.jsonl"
     missing_counter = _token_event(100, 100)

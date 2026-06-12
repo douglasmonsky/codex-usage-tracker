@@ -131,6 +131,7 @@ def usage_call_context(
     max_chars: int = DEFAULT_CONTEXT_CHARS,
     max_entries: int = DEFAULT_CONTEXT_ENTRIES,
     include_tool_output: bool = False,
+    include_compaction_history: bool = False,
 ) -> str:
     """Load one model call's logged local context on demand from its source JSONL file."""
 
@@ -153,6 +154,7 @@ def usage_call_context(
         max_chars=max_chars,
         max_entries=max_entries,
         include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
     )
     return json.dumps(payload, indent=2)
 

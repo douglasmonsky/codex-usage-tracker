@@ -132,7 +132,7 @@ Then:
 4. Use investigation presets for highest-cost threads, highest-credit calls, context bloat, cache misses, pricing gaps, or estimated-price review.
 5. Open `Threads` to see how a conversation grew and whether subagent or auto-review work attached to it.
 6. Hover or click rows to inspect aggregate fields in `Call Details`.
-7. Use `Load context` only when aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
+7. Use `Show turn log evidence` only when aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
 
 Optional allowance context:
 

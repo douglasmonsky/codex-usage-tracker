@@ -235,6 +235,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             )
             return
         include_tool_output = _truthy(_first(params.get("include_tool_output")))
+        include_compaction_history = _truthy(_first(params.get("include_compaction_history")))
         max_chars = _parse_context_limit(_first(params.get("max_chars")), self._context_chars)
         max_entries = _parse_context_limit(
             _first(params.get("max_entries")), DEFAULT_CONTEXT_ENTRIES
@@ -246,6 +247,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 max_chars=max_chars,
                 max_entries=max_entries,
                 include_tool_output=include_tool_output,
+                include_compaction_history=include_compaction_history,
             )
         except sqlite3.Error as exc:
             self._send_json(

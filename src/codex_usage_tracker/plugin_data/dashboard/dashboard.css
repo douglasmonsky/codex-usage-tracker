@@ -220,6 +220,148 @@
     .card span { display: block; color: var(--muted); font-size: 12px; font-weight: 680; }
     .card strong { display: block; margin-top: 7px; font-size: 22px; }
     #allowanceImpact { white-space: pre-line; line-height: 1.18; }
+    body[data-active-view="call"] table > thead {
+      display: none;
+    }
+    body[data-active-view="call"] .grid {
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+    }
+    .call-thread-cell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+    .mini-open-button {
+      flex: 0 0 auto;
+      min-height: 24px;
+      padding: 3px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      color: var(--blue);
+      font: inherit;
+      font-size: 10px;
+      font-weight: 780;
+      cursor: pointer;
+    }
+    .mini-open-button:hover { background: #eff6ff; }
+    .call-investigator-row > td {
+      padding: 0;
+      background: var(--bg);
+    }
+    .call-investigator {
+      display: grid;
+      gap: 14px;
+      padding: 14px;
+    }
+    .call-investigator-header,
+    .call-nav,
+    .detail-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .call-investigator-header {
+      justify-content: space-between;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .call-investigator-header h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    .call-nav {
+      justify-content: flex-end;
+    }
+    .call-diagnostic-section {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .section-heading.compact {
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .call-metric-grid,
+    .call-delta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .call-metric-grid.two {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .call-metric-card {
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid #dbe4f0;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .call-metric-card span,
+    .call-metric-card small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 720;
+      overflow-wrap: anywhere;
+    }
+    .call-metric-card strong {
+      display: block;
+      margin: 4px 0 2px;
+      font-size: 18px;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+    .evidence-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: #f8fafc;
+      font-size: 10px;
+      font-weight: 780;
+      text-transform: uppercase;
+    }
+    .evidence-chip.exact { color: #065f46; background: #ecfdf5; border-color: #bbf7d0; }
+    .evidence-chip.derived { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+    .evidence-chip.estimated { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+    .evidence-chip.evidence { color: #5b21b6; background: #f5f3ff; border-color: #ddd6fe; }
+    .diagnostic-summary {
+      display: grid;
+      gap: 8px;
+    }
+    .diagnostic-summary p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .diagnostic-cold,
+    .diagnostic-spike {
+      color: #9a3412;
+      background: #fff7ed;
+    }
+    .diagnostic-warm {
+      color: #065f46;
+      background: #ecfdf5;
+    }
+    .diagnostic-partial {
+      color: #3346a3;
+      background: #eef2ff;
+    }
     .insights-panel {
       margin-bottom: 18px;
     }
@@ -1069,6 +1211,41 @@
     .context-token-breakdown tbody tr:last-child th,
     .context-token-breakdown tbody tr:last-child td {
       border-bottom: 0;
+    }
+    .context-compaction {
+      display: grid;
+      gap: 6px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fff7ed;
+      color: #7c2d12;
+      font-size: 12px;
+    }
+    .context-replacement-history {
+      display: grid;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .context-replacement-history h4 {
+      margin: 0;
+      font-size: 12px;
+    }
+    .context-replacement-entry {
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      background: #fffaf5;
+      overflow: hidden;
+    }
+    .context-replacement-entry strong {
+      display: block;
+      padding: 6px 8px;
+      border-bottom: 1px solid #fed7aa;
+      font-size: 11px;
+    }
+    .context-replacement-entry pre {
+      margin: 0;
+      padding: 8px;
+      white-space: pre-wrap;
     }
     .context-entry pre {
       margin: 0;

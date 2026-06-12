@@ -386,6 +386,11 @@ def _add_context_parser(subparsers: argparse._SubParsersAction[argparse.Argument
         action="store_true",
         help="Include redacted, size-limited tool output in the on-demand context.",
     )
+    context.add_argument(
+        "--include-compaction-history",
+        action="store_true",
+        help="Include redacted compaction replacement history when a compaction event is present.",
+    )
     context.add_argument("--json", action="store_true", dest="as_json")
 
 
@@ -947,6 +952,7 @@ def _run_context(args: argparse.Namespace) -> int:
         max_chars=args.max_chars,
         max_entries=args.max_entries,
         include_tool_output=args.include_tool_output,
+        include_compaction_history=args.include_compaction_history,
     )
     print(json.dumps(payload, indent=2))
     return 0

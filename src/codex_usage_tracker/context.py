@@ -25,6 +25,7 @@ def load_call_context(
     max_chars: int = DEFAULT_CONTEXT_CHARS,
     max_entries: int = DEFAULT_CONTEXT_ENTRIES,
     include_tool_output: bool = False,
+    include_compaction_history: bool = False,
 ) -> dict[str, Any]:
     """Load logged turn context for one model call from the source JSONL file.
 
@@ -52,12 +53,14 @@ def load_call_context(
         max_chars=max_chars if max_chars <= 0 else max(1_000, max_chars),
         max_entries=max_entries if max_entries <= 0 else max(1, max_entries),
         include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
     )
     return {
         "schema": "codex-usage-tracker-context-v1",
         "loaded_on_demand": True,
         "raw_context_persisted": False,
         "include_tool_output": include_tool_output,
+        "include_compaction_history": include_compaction_history,
         "record": {
             "record_id": row.get("record_id"),
             "session_id": row.get("session_id"),
@@ -87,6 +90,7 @@ def _read_context_entries(
     max_chars: int,
     max_entries: int,
     include_tool_output: bool,
+    include_compaction_history: bool,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     omitted_parse_errors = 0
@@ -131,6 +135,7 @@ def _read_context_entries(
                 entry_type=entry_type,
                 payload=payload,
                 include_tool_output=include_tool_output,
+                include_compaction_history=include_compaction_history,
             )
             if summarized is not None:
                 candidates.append(
@@ -143,6 +148,9 @@ def _read_context_entries(
                         tool_output_omitted=bool(summarized.get("tool_output_omitted")),
                         token_usage=summarized.get("token_usage")
                         if isinstance(summarized.get("token_usage"), dict)
+                        else None,
+                        compaction=summarized.get("compaction")
+                        if isinstance(summarized.get("compaction"), dict)
                         else None,
                     )
                 )
@@ -164,15 +172,79 @@ def _summarize_payload(
     entry_type: str,
     payload: dict[str, Any],
     include_tool_output: bool,
+    include_compaction_history: bool,
 ) -> dict[str, Any] | None:
     if entry_type == "response_item":
         return _summarize_response_item(payload, include_tool_output=include_tool_output)
+    if _optional_str(payload.get("type")) == "context_compacted":
+        return _summarize_compaction(
+            payload,
+            include_compaction_history=include_compaction_history,
+        )
     if entry_type == "event_msg":
         return _summarize_event_msg(payload, include_tool_output=include_tool_output)
     if entry_type == "compacted":
-        message = _optional_str(payload.get("message")) or "Compaction event"
-        return {"label": "Compaction", "text": message}
+        return _summarize_compaction(
+            payload,
+            include_compaction_history=include_compaction_history,
+        )
     return None
+
+
+def _summarize_compaction(
+    payload: dict[str, Any],
+    *,
+    include_compaction_history: bool,
+) -> dict[str, Any]:
+    replacement_history = payload.get("replacement_history")
+    replacement_entries = replacement_history if isinstance(replacement_history, list) else []
+    message = _optional_str(payload.get("message")) or ""
+    compaction: dict[str, Any] = {
+        "replacement_history_available": bool(replacement_entries),
+        "replacement_entry_count": len(replacement_entries),
+        "replacement_history_included": include_compaction_history and bool(replacement_entries),
+        "classification": "confirmed_compaction",
+    }
+    text = _redact(message) if message else (
+        "Compaction detected. Older context was replaced with "
+        f"{len(replacement_entries)} compacted history entries."
+    )
+    if include_compaction_history and replacement_entries:
+        compaction["replacement_history"] = [
+            _summarize_replacement_history_item(item) for item in replacement_entries
+        ]
+    return {
+        "label": "Compaction detected",
+        "text": text,
+        "compaction": compaction,
+    }
+
+
+def _summarize_replacement_history_item(item: object) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        return {
+            "label": "replacement item",
+            "role": None,
+            "type": type(item).__name__,
+            "text": _redact(_jsonish(item)),
+        }
+    item_type = _optional_str(item.get("type")) or "replacement item"
+    role = _optional_str(item.get("role"))
+    name = _optional_str(item.get("name"))
+    label_bits = [item_type]
+    if role:
+        label_bits.append(role)
+    if name:
+        label_bits.append(name)
+    text = _content_text(item.get("content")) or _jsonish(
+        {key: value for key, value in item.items() if key not in {"content"}}
+    )
+    return {
+        "label": " / ".join(label_bits),
+        "role": role,
+        "type": item_type,
+        "text": _redact(text),
+    }
 
 
 def _summarize_turn_context(payload: dict[str, Any]) -> str:
@@ -298,6 +370,7 @@ def _context_entry(
     *,
     tool_output_omitted: bool = False,
     token_usage: dict[str, Any] | None = None,
+    compaction: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     entry = {
         "line_number": line_number,
@@ -311,6 +384,8 @@ def _context_entry(
         entry["tool_output_omitted"] = True
     if token_usage:
         entry["token_usage"] = token_usage
+    if compaction:
+        entry["compaction"] = compaction
     return entry
 
 

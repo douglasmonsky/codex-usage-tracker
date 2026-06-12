@@ -33,6 +33,14 @@
       resolvedParentSessionUpdatedAt,
       resolveThreadAttachment,
       chronological,
+      adjacentThreadCalls,
+      classifyCacheDiagnostic,
+      callAccountingDelta,
+      rowInputTokens: dataRowInputTokens,
+      cachedInputTokens: dataCachedInputTokens,
+      uncachedInputTokens: dataUncachedInputTokens,
+      outputTokens: dataOutputTokens,
+      rowReasoningTokens: dataRowReasoningTokens,
     } = dashboardData;
     const initialPayload = JSON.parse(document.getElementById('usage-data').textContent);
     const builtInFallbackTranslations = {
@@ -42,6 +50,7 @@
       'dashboard.view.insights': 'Insights',
       'dashboard.view.calls': 'Calls',
       'dashboard.view.threads': 'Threads',
+      'dashboard.view.call': 'Call Investigator',
       'dashboard.model_calls': 'Model Calls',
       'dashboard.call_details': 'Call Details',
       'dashboard.detail.empty': 'Hover or click a row to inspect aggregate usage fields.',
@@ -49,10 +58,16 @@
       'button.export_csv': 'Export CSV',
       'button.load_more': 'Load more',
       'button.load_context': 'Load context',
+      'button.show_turn_evidence': 'Show turn log evidence',
       'button.include_tool_output': 'Include tool output',
       'button.show_tool_output': 'Show tool output',
       'button.load_older_context': 'Load older entries',
       'button.no_char_limit': 'No char limit',
+      'button.open_investigator': 'Open investigator',
+      'button.previous_call': 'Previous call',
+      'button.next_call': 'Next call',
+      'button.back_to_dashboard': 'Back to dashboard',
+      'button.show_compaction_history': 'Show compacted replacement',
       'button.copy_link': 'Copy link',
       'button.clear': 'Clear',
       'action.run': 'Run',
@@ -76,6 +91,7 @@
       'state.no_rows': 'No rows',
       'state.no_calls': 'No calls match the current filters.',
       'state.no_threads': 'No threads match the current filters.',
+      'state.requires_evidence': 'Load evidence',
       'table.time': 'Time',
       'table.thread': 'Thread',
       'table.model': 'Model',
@@ -91,8 +107,39 @@
       'table.last_call': 'Last Call',
       'table.visible_status': 'Showing {end} of {total} {items}',
       'language.label': 'Language',
+      'caption.call_investigator': 'Investigating call {record}.',
+      'call.exact_accounting': 'Exact token accounting',
+      'call.cache_diagnostics': 'Cache diagnostics',
+      'call.cache_accounting_delta': 'Cache/accounting delta',
+      'call.context_estimate': 'Context change estimate',
+      'call.compaction_diagnostics': 'Compaction diagnostics',
+      'call.raw_evidence': 'Raw evidence',
+      'call.exact_label': 'Exact from token callback',
+      'call.derived_label': 'Derived from adjacent aggregate calls',
+      'call.estimated_label': 'Estimated from visible log volume',
+      'call.evidence_label': 'Evidence loaded from local JSONL on demand',
+      'call.cache_warm': 'Warm cache reuse',
+      'call.cache_cold': 'Cold resume / stale cache',
+      'call.cache_partial': 'Partial cache miss',
+      'call.cache_spike': 'Uncached spike',
+      'call.cache_steady': 'Steady cache profile',
+      'call.post_compaction': 'Post-compaction possible',
+      'call.no_previous': 'No previous call in this resolved thread.',
+      'call.visible_estimate': 'Visible new context estimate',
+      'call.hidden_estimate': 'Unexplained hidden/serialized input estimate',
+      'call.open_hint': 'Double-click a row or use Open investigator for deep diagnostics.',
+      'call.not_found': 'Selected call was not found in the loaded dashboard rows.',
+      'call.position': 'Call {position} in this resolved thread.',
+      'call.context_estimate_hint': 'Load raw evidence to compare exact uncached input with visible log entries. The gap should be treated as hidden scaffolding, serialization, or tokenizer estimate error.',
+      'call.compaction_hint': 'Load raw evidence to detect explicit compaction events and view redacted replacement history when available.',
       'context.token_breakdown': 'Token breakdown',
+      'context.compaction_detected': 'Compaction detected',
+      'context.compaction_replacement': 'Compacted replacement context',
+      'context.compaction_replacement_count': '{count} replacement history entries available.',
       'context.token_scope_call': 'This call',
+      'context.token_scope_selected': 'Selected call token count',
+      'context.token_scope_previous': 'Previous token count in same turn',
+      'context.token_scope_earlier': 'Earlier token count in same turn',
       'context.token_scope_session': 'Session cumulative',
       'context.token_type': 'Type',
       'context.token_input': 'Input',
@@ -275,7 +322,7 @@
       custom: 'option.custom_range',
     };
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
-    let activeView = ['calls', 'threads', 'insights'].includes(initialState.view) ? initialState.view : 'insights';
+    let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : 'insights';
     let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'attention';
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
     let threadCallSortKey = 'time';
@@ -667,13 +714,13 @@
       return `<span class="cost-cell" ${tooltipAttributes(`${t('metric.codex_credits')}: ${usage}`)}>${escapeHtml(costText)}</span>`;
     }
     function cachedInputTokens(row) {
-      return Number(row.cached_input_tokens || 0);
+      return dataCachedInputTokens(row);
     }
     function uncachedInputTokens(row) {
-      return Number(row.uncached_input_tokens || Math.max(Number(row.input_tokens || 0) - cachedInputTokens(row), 0));
+      return dataUncachedInputTokens(row);
     }
     function outputTokens(row) {
-      return Number(row.output_tokens || 0);
+      return dataOutputTokens(row);
     }
     function tokenNumberCell(value, label) {
       return `<span class="token-number" ${tooltipAttributes(`${label}: ${number.format(value)}`)}>${escapeHtml(number.format(value))}</span>`;
@@ -697,6 +744,113 @@
     }
     function outputTokenCell(row) {
       return tokenNumberCell(outputTokens(row), t('metric.output_tokens'));
+    }
+    function signedNumber(value) {
+      const numeric = Number(value || 0);
+      return `${numeric >= 0 ? '+' : ''}${number.format(numeric)}`;
+    }
+    function signedPct(value) {
+      const numeric = Number(value || 0);
+      return `${numeric >= 0 ? '+' : ''}${pct(numeric)}`;
+    }
+    function rowInputTokens(row) {
+      return dataRowInputTokens(row);
+    }
+    function rowReasoningTokens(row) {
+      return dataRowReasoningTokens(row);
+    }
+    function adjacentCalls(row) {
+      return adjacentThreadCalls(data, row);
+    }
+    function cacheDiagnostic(row, previous = null) {
+      const diagnostic = classifyCacheDiagnostic(row, previous);
+      if (diagnostic === 'post_compaction') {
+        return {
+          key: 'post-compaction',
+          label: t('call.post_compaction'),
+          body: 'A compaction marker or reset-like profile is associated with this call. Load evidence to confirm replacement context.',
+        };
+      }
+      if (diagnostic === 'cold') {
+        return {
+          key: 'cold',
+          label: t('call.cache_cold'),
+          body: 'Conversation-specific cache likely expired or missed; remaining cache is probably stable Codex scaffolding or tool schema prefix.',
+        };
+      }
+      if (diagnostic === 'spike') {
+        return {
+          key: 'spike',
+          label: t('call.cache_spike'),
+          body: 'Fresh input rose sharply compared with the previous call in this resolved thread.',
+        };
+      }
+      if (diagnostic === 'warm') {
+        return {
+          key: 'warm',
+          label: t('call.cache_warm'),
+          body: 'Most input tokens reused prompt cache. The uncached portion is the most likely investigation target.',
+        };
+      }
+      if (diagnostic === 'partial') {
+        return {
+          key: 'partial',
+          label: t('call.cache_partial'),
+          body: 'Some prefix reused cache, but a meaningful share of the input was fresh or reserialized.',
+        };
+      }
+      return {
+        key: 'cold',
+        label: t('call.cache_cold'),
+        body: 'This call has little or no cache reuse, so most input was charged as fresh.',
+      };
+    }
+    function callDeltaRows(row, previous) {
+      if (!previous) return [];
+      const delta = callAccountingDelta(row, previous);
+      return [
+        [t('metric.last_call_input'), signedNumber(delta.input)],
+        [t('metric.cached_input'), signedNumber(delta.cached)],
+        [t('metric.uncached_input'), signedNumber(delta.uncached)],
+        [t('metric.output'), signedNumber(delta.output)],
+        [t('metric.reasoning_output'), signedNumber(delta.reasoning)],
+        [t('metric.cache_ratio'), signedPct(delta.cacheRatio)],
+      ];
+    }
+    function investigatorUrl(row, overrides = {}) {
+      if (!stateManager) return '#';
+      return stateManager.urlFor({
+        ...currentDashboardState(),
+        ...overrides,
+        view: 'call',
+        record: row.record_id || '',
+        thread: rowAttachment(row).key,
+        expandedThreads: Array.from(expandedThreads),
+      });
+    }
+    function tableUrlForRow(row) {
+      if (!stateManager) return '#';
+      return stateManager.urlFor({
+        ...currentDashboardState(),
+        view: 'calls',
+        record: row.record_id || '',
+        thread: rowAttachment(row).key,
+        expandedThreads: Array.from(expandedThreads),
+      });
+    }
+    function openInvestigator(row) {
+      const url = investigatorUrl(row);
+      const opened = window.open(url, '_blank', 'noopener');
+      if (!opened) window.location.href = url;
+    }
+    async function copyCallLink(row) {
+      if (!stateManager) return;
+      try {
+        await stateManager.copyText(investigatorUrl(row));
+        showActionStatus(t('action.copied'));
+      } catch (error) {
+        showActionStatus(t('action.copy_failed'));
+      }
     }
     function effortTooltipText(values) {
       const unique = [...new Set(values.filter(Boolean).map(value => translateEffort(short(value))))].sort();
@@ -1679,6 +1833,10 @@
       return insights.slice(0, 6);
     }
     function renderInsightPanel(rows) {
+      if (activeView === 'call') {
+        insightsPanelEl.hidden = true;
+        return;
+      }
       if (activeView !== 'insights' && !activePreset) {
         insightsPanelEl.hidden = true;
         return;
@@ -1743,6 +1901,7 @@
       const dateRange = updateDateFilterControls();
       const rows = filtered(dateRange);
       rowsEl.textContent = '';
+      document.body.dataset.activeView = activeView;
       updateSortControls();
       const totalTokens = rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
       const cachedInputTokens = rows.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0);
@@ -1763,7 +1922,9 @@
       callsViewEl.setAttribute('aria-pressed', activeView === 'calls' ? 'true' : 'false');
       threadsViewEl.setAttribute('aria-pressed', activeView === 'threads' ? 'true' : 'false');
       renderInsightPanel(rows);
-      if (activeView === 'threads') {
+      if (activeView === 'call') {
+        renderCallInvestigator(rows);
+      } else if (activeView === 'threads') {
         renderThreads(rows);
       } else if (activeView === 'insights') {
         renderThreads(rows, 'insights');
@@ -1773,6 +1934,142 @@
       fitModelPills();
       syncUrlState();
       scheduleFocusPendingTarget();
+    }
+    function callMetricCard(label, value, badge = '') {
+      return `
+        <div class="call-metric-card">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          ${badge ? `<small>${escapeHtml(badge)}</small>` : ''}
+        </div>
+      `;
+    }
+    function callDiagnosticPucks(row, previous) {
+      const primary = cacheDiagnostic(row, previous);
+      const pucks = [`<span class="flag signal-puck diagnostic-${escapeHtml(primary.key)}">${escapeHtml(primary.label)}</span>`];
+      if (previous && uncachedInputTokens(row) > Math.max(uncachedInputTokens(previous) * 2, 1000) && primary.key !== 'spike') {
+        pucks.push(`<span class="flag signal-puck diagnostic-spike">${escapeHtml(t('call.cache_spike'))}</span>`);
+      }
+      if (Number(row.context_window_percent || 0) >= threshold('high_context_percent', 0.6)) {
+        pucks.push(`<span class="flag signal-puck">${escapeHtml(t('flag.high_context_use'))}</span>`);
+      }
+      return pucks.join('');
+    }
+    function renderDeltaCards(row, previous) {
+      if (!previous) {
+        return `<p class="muted">${escapeHtml(t('call.no_previous'))}</p>`;
+      }
+      return `
+        <div class="call-delta-grid">
+          ${callDeltaRows(row, previous).map(([label, value]) => callMetricCard(label, value, t('call.derived_label'))).join('')}
+        </div>
+      `;
+    }
+    function renderCallNavigation(row, previous, next) {
+      const backUrl = tableUrlForRow(row);
+      return `
+        <div class="call-nav">
+          <a class="toolbar-button" href="${escapeHtml(backUrl)}">${escapeHtml(t('button.back_to_dashboard'))}</a>
+          <button class="toolbar-button" type="button" data-call-nav-record="${escapeHtml(previous?.record_id || '')}" ${previous ? '' : 'disabled'}>${escapeHtml(t('button.previous_call'))}</button>
+          <button class="toolbar-button" type="button" data-call-nav-record="${escapeHtml(next?.record_id || '')}" ${next ? '' : 'disabled'}>${escapeHtml(t('button.next_call'))}</button>
+          <button class="toolbar-button" type="button" data-copy-call-link="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.copy_link'))}</button>
+        </div>
+      `;
+    }
+    function renderCallInvestigator(rows) {
+      const row = rowByRecordId.get(selectedRecordId) || rows.find(candidate => candidate.record_id === selectedRecordId);
+      updateLoadMoreControl({ total: 0, end: 0 }, 'table.calls');
+      pagerEl.hidden = true;
+      tableTitleEl.textContent = t('dashboard.view.call');
+      tableCaptionEl.textContent = selectedRecordId
+        ? tf('caption.call_investigator', { record: short(selectedRecordId, '').slice(0, 12) })
+        : t('call.open_hint');
+      if (!row) {
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="11">${escapeHtml(t('call.not_found'))}</td></tr>`;
+        detailEl.textContent = t('dashboard.detail.empty');
+        return;
+      }
+      selectedRecordId = row.record_id || selectedRecordId;
+      const { calls, index, previous, next } = adjacentCalls(row);
+      const diagnostic = cacheDiagnostic(row, previous);
+      const threadLabel = rowThreadLabel(row);
+      const callPosition = index >= 0 ? `${number.format(index + 1)} / ${number.format(calls.length)}` : t('state.unknown');
+      rowsEl.innerHTML = `
+        <tr class="call-investigator-row">
+          <td colspan="11">
+            <article class="call-investigator" data-record-id="${escapeHtml(row.record_id || '')}">
+              <header class="call-investigator-header">
+                <div>
+                  <p class="eyebrow">${escapeHtml(t('dashboard.view.call'))}</p>
+                  <h3>${escapeHtml(threadLabel)}</h3>
+                  <p class="muted">${escapeHtml(formatTimestamp(row.event_timestamp))} · ${escapeHtml(short(row.model))} · ${escapeHtml(translateEffort(short(row.effort)))}</p>
+                </div>
+                ${renderCallNavigation(row, previous, next)}
+              </header>
+              <section class="call-diagnostic-section">
+                <div class="section-heading compact">
+                  <h3>${escapeHtml(t('call.exact_accounting'))}</h3>
+                  <span class="evidence-chip exact">${escapeHtml(t('call.exact_label'))}</span>
+                </div>
+                <div class="call-metric-grid">
+                  ${callMetricCard(t('metric.last_call_input'), number.format(rowInputTokens(row)), t('metric.last_call_total'))}
+                  ${callMetricCard(t('metric.cached_input'), number.format(cachedInputTokens(row)), pct(row.cache_ratio))}
+                  ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
+                  ${callMetricCard(t('metric.output'), number.format(outputTokens(row)), t('metric.reasoning_output'))}
+                  ${callMetricCard(t('metric.estimated_cost'), moneyText(row.estimated_cost_usd), pricingStatusText(row))}
+                  ${callMetricCard(t('metric.codex_credits'), usageCreditsWithStatus(row), rowAllowanceImpact(row))}
+                </div>
+              </section>
+              <section class="call-diagnostic-section">
+                <div class="section-heading compact">
+                  <h3>${escapeHtml(t('call.cache_diagnostics'))}</h3>
+                  <span class="evidence-chip derived">${escapeHtml(t('call.derived_label'))}</span>
+                </div>
+                <div class="diagnostic-summary">
+                  <div class="flags">${callDiagnosticPucks(row, previous)}</div>
+                  <p>${escapeHtml(diagnostic.body)}</p>
+                  <p class="muted">${escapeHtml(tf('call.position', { position: callPosition }))}</p>
+                </div>
+              </section>
+              <section class="call-diagnostic-section">
+                <div class="section-heading compact">
+                  <h3>${escapeHtml(t('call.cache_accounting_delta'))}</h3>
+                  <span class="evidence-chip derived">${escapeHtml(t('call.derived_label'))}</span>
+                </div>
+                ${renderDeltaCards(row, previous)}
+              </section>
+              <section class="call-diagnostic-section">
+                <div class="section-heading compact">
+                  <h3>${escapeHtml(t('call.context_estimate'))}</h3>
+                  <span class="evidence-chip estimated">${escapeHtml(t('call.estimated_label'))}</span>
+                </div>
+                <div class="call-metric-grid two">
+                  ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
+                  ${callMetricCard(t('call.hidden_estimate'), t('state.requires_evidence'), t('call.evidence_label'))}
+                </div>
+                <p class="muted">${escapeHtml(t('call.context_estimate_hint'))}</p>
+              </section>
+              <section class="call-diagnostic-section">
+                <div class="section-heading compact">
+                  <h3>${escapeHtml(t('call.compaction_diagnostics'))}</h3>
+                  <span class="evidence-chip evidence">${escapeHtml(t('call.evidence_label'))}</span>
+                </div>
+                <p class="muted">${escapeHtml(t('call.compaction_hint'))}</p>
+              </section>
+              <section class="call-diagnostic-section raw-evidence">
+                <div class="section-heading compact">
+                  <h3>${escapeHtml(t('call.raw_evidence'))}</h3>
+                  <span class="evidence-chip evidence">${escapeHtml(t('call.evidence_label'))}</span>
+                </div>
+                ${contextControls(row)}
+              </section>
+            </article>
+          </td>
+        </tr>
+      `;
+      const article = rowsEl.querySelector('.call-investigator');
+      if (article) bindContextButtons(row, article);
+      showDetail(row);
     }
     function renderCalls(rows) {
       ensurePendingFocusVisibleInRows(rows);
@@ -1792,7 +2089,12 @@
         tr.setAttribute('aria-label', tf('aria.inspect_thread', { thread: rowThreadLabel(row) }));
         tr.innerHTML = `
           <td>${renderTimeCell(row.event_timestamp)}</td>
-          <td title="${escapeHtml(short(row.session_id))}">${escapeHtml(truncate(rowThreadLabel(row)))}</td>
+          <td title="${escapeHtml(short(row.session_id))}">
+            <div class="call-thread-cell">
+              <span>${escapeHtml(truncate(rowThreadLabel(row)))}</span>
+              <button class="mini-open-button" type="button" data-open-investigator-record="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.open_investigator'))}</button>
+            </div>
+          </td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
           <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
           <td class="num token-cell">${totalTokenCell(row)}</td>
@@ -1804,7 +2106,11 @@
           <td><div class="flags">${renderSignalPucks(row, flags, 3)}</div></td>
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
-        tr.addEventListener('click', () => selectRow(row));
+        tr.addEventListener('click', event => {
+          if (event.target.closest('[data-open-investigator-record]')) return;
+          selectRow(row);
+        });
+        tr.addEventListener('dblclick', () => openInvestigator(row));
         tr.addEventListener('keydown', event => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
@@ -1934,7 +2240,12 @@
             <td>${renderTimeCell(row.event_timestamp)}</td>
             <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
             <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
-            <td>${escapeHtml(sourceLabelText(row))}</td>
+            <td>
+              <div class="call-thread-cell">
+                <span>${escapeHtml(sourceLabelText(row))}</span>
+                <button class="mini-open-button" type="button" data-open-investigator-record="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.open_investigator'))}</button>
+              </div>
+            </td>
             <td class="num token-cell">${totalTokenCell(row)}</td>
             <td class="num token-cell">${cachedTokenCell(row)}</td>
             <td class="num token-cell">${uncachedTokenCell(row)}</td>
@@ -1996,36 +2307,40 @@
         : '';
       return `
         <div class="context-actions">
-          <button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.load_context'))}</button>
+          <button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.show_turn_evidence'))}</button>
           <button class="context-button secondary" type="button" data-context-load-output${disabled}>${escapeHtml(t('button.include_tool_output'))}</button>
           ${enableButton}
         </div>
         <div id="contextResult" class="context-result"><p class="context-note">${escapeHtml(hint)}</p></div>
       `;
     }
-    function bindContextButtons(row) {
-      const loadButton = detailEl.querySelector('[data-context-load]');
-      const outputButton = detailEl.querySelector('[data-context-load-output]');
-      const enableButton = detailEl.querySelector('[data-context-enable]');
-      const contextResult = detailEl.querySelector('#contextResult');
-      if (loadButton) loadButton.addEventListener('click', () => loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }));
-      if (outputButton) outputButton.addEventListener('click', () => loadContext(row, { includeToolOutput: true, maxChars: null, maxEntries: defaultContextEntries }));
+    function bindContextButtons(row, root = detailEl) {
+      const loadButton = root.querySelector('[data-context-load]');
+      const outputButton = root.querySelector('[data-context-load-output]');
+      const enableButton = root.querySelector('[data-context-enable]');
+      const contextResult = root.querySelector('#contextResult');
+      if (loadButton) loadButton.addEventListener('click', () => loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }, contextResult));
+      if (outputButton) outputButton.addEventListener('click', () => loadContext(row, { includeToolOutput: true, maxChars: null, maxEntries: defaultContextEntries }, contextResult));
       if (enableButton) enableButton.addEventListener('click', () => enableContextApi(row));
       if (contextResult) {
         contextResult.addEventListener('click', event => {
           if (!(event.target instanceof Element)) return;
-          const button = event.target.closest('[data-context-entry-load-output], [data-context-load-older], [data-context-no-budget]');
+          const button = event.target.closest('[data-context-entry-load-output], [data-context-load-older], [data-context-no-budget], [data-context-compaction-history]');
           if (!button) return;
           if (button.matches('[data-context-entry-load-output]')) {
-            loadContext(row, { includeToolOutput: true });
+            loadContext(row, { includeToolOutput: true }, contextResult);
             return;
           }
           if (button.matches('[data-context-load-older]')) {
-            loadContext(row, { maxEntries: Number(button.dataset.contextMaxEntries || 0) });
+            loadContext(row, { maxEntries: Number(button.dataset.contextMaxEntries || 0) }, contextResult);
             return;
           }
           if (button.matches('[data-context-no-budget]')) {
-            loadContext(row, { maxChars: 0 });
+            loadContext(row, { maxChars: 0 }, contextResult);
+            return;
+          }
+          if (button.matches('[data-context-compaction-history]')) {
+            loadContext(row, { includeCompactionHistory: true }, contextResult);
           }
         });
       }
@@ -2062,20 +2377,21 @@
       const key = row.record_id || '';
       return key && contextRequestState.has(key)
         ? contextRequestState.get(key)
-        : { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries };
+        : { includeToolOutput: false, includeCompactionHistory: false, maxChars: null, maxEntries: defaultContextEntries };
     }
     function nextContextState(row, options) {
       const base = contextStateForRow(row);
       const updates = typeof options === 'boolean' ? { includeToolOutput: options } : (options || {});
       const next = { ...base, ...updates };
       next.includeToolOutput = Boolean(next.includeToolOutput);
+      next.includeCompactionHistory = Boolean(next.includeCompactionHistory);
       if (next.maxEntries === undefined) next.maxEntries = defaultContextEntries;
       if (next.maxChars === undefined) next.maxChars = null;
       if (row.record_id) contextRequestState.set(row.record_id, next);
       return next;
     }
-    async function loadContext(row, options = {}) {
-      const target = document.getElementById('contextResult');
+    async function loadContext(row, options = {}, targetElement = null) {
+      const target = targetElement || document.getElementById('contextResult');
       if (!target) return;
       if (!row.record_id) {
         target.innerHTML = `<p class="context-note">${escapeHtml(t('context.no_record_id'))}</p>`;
@@ -2085,6 +2401,7 @@
       const requestState = nextContextState(row, options);
       const params = new URLSearchParams({ record_id: row.record_id });
       if (requestState.includeToolOutput) params.set('include_tool_output', '1');
+      if (requestState.includeCompactionHistory) params.set('include_compaction_history', '1');
       if (requestState.maxChars !== null && requestState.maxChars !== undefined) {
         params.set('max_chars', String(requestState.maxChars));
       }
@@ -2142,10 +2459,16 @@
         <td>${escapeHtml(tokenUsageNumber(usage.total_tokens))}</td>
       `;
     }
-    function renderContextTokenUsage(entry) {
+    function tokenUsageScopeLabel(entry, payload, index) {
+      const sourceLine = Number(payload?.source?.line_number || 0);
+      if (sourceLine && Number(entry.line_number || 0) === sourceLine) return t('context.token_scope_selected');
+      if (index === 0) return t('context.token_scope_previous');
+      return t('context.token_scope_earlier');
+    }
+    function renderContextTokenUsage(entry, payload, index) {
       const usage = entry.token_usage || {};
       const rows = [
-        [t('context.token_scope_call'), usage.last_token_usage],
+        [tokenUsageScopeLabel(entry, payload, index), usage.last_token_usage],
         [t('context.token_scope_session'), usage.total_token_usage],
       ].filter(([, value]) => value && typeof value === 'object');
       if (!rows.length) return '';
@@ -2170,6 +2493,31 @@
         </div>
       `;
     }
+    function renderContextCompaction(entry, payload) {
+      const compaction = entry.compaction || {};
+      if (!compaction.replacement_history_available) return '';
+      const replacementEntries = Array.isArray(compaction.replacement_history) ? compaction.replacement_history : [];
+      const history = replacementEntries.length
+        ? `
+          <div class="context-replacement-history">
+            <h4>${escapeHtml(t('context.compaction_replacement'))}</h4>
+            ${replacementEntries.map(item => `
+              <div class="context-replacement-entry">
+                <strong>${escapeHtml(item.label || 'replacement item')}</strong>
+                <pre>${escapeHtml(item.text || '')}</pre>
+              </div>
+            `).join('')}
+          </div>
+        `
+        : `<button class="context-entry-action" type="button" data-context-compaction-history>${escapeHtml(t('button.show_compaction_history'))}</button>`;
+      return `
+        <div class="context-compaction">
+          <strong>${escapeHtml(t('context.compaction_detected'))}</strong>
+          <span>${escapeHtml(tf('context.compaction_replacement_count', { count: number.format(compaction.replacement_entry_count || 0) }))}</span>
+          ${history}
+        </div>
+      `;
+    }
     function renderContext(payload) {
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
       const source = payload.source || {};
@@ -2182,12 +2530,17 @@
         omitted.over_budget_chars ? tf('context.chars_omitted', { count: number.format(omitted.over_budget_chars) }) : '',
         Number(omitted.max_chars || 0) === 0 ? t('context.no_char_limit_active') : '',
       ].filter(Boolean).join(' ');
+      const tokenEntryIndexes = new Map();
+      entries.filter(entry => entry && entry.token_usage).forEach((entry, index) => {
+        tokenEntryIndexes.set(entry, index);
+      });
       const body = entries.map(entry => {
         const meta = [formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - ');
         const outputAction = entry.tool_output_omitted && !payload.include_tool_output
           ? `<button class="context-entry-action" type="button" data-context-entry-load-output>${escapeHtml(t('button.show_tool_output'))}</button>`
           : '';
-        const tokenUsage = renderContextTokenUsage(entry);
+        const tokenUsage = renderContextTokenUsage(entry, payload, tokenEntryIndexes.get(entry) || 0);
+        const compaction = renderContextCompaction(entry, payload);
         return `
           <div class="context-entry">
             <div class="context-entry-header">
@@ -2198,6 +2551,7 @@
               </span>
             </div>
             ${tokenUsage}
+            ${compaction}
             <pre>${escapeHtml(entry.text || '')}</pre>
           </div>
         `;
@@ -2265,6 +2619,13 @@
       showDetail(row);
       syncUrlState();
     }
+    function bindDetailButtons(row, includeEvidence = true) {
+      const openButton = detailEl.querySelector('[data-open-investigator-record]');
+      const copyButton = detailEl.querySelector('[data-copy-call-link]');
+      if (openButton) openButton.addEventListener('click', () => openInvestigator(row));
+      if (copyButton) copyButton.addEventListener('click', () => copyCallLink(row));
+      if (includeEvidence) bindContextButtons(row);
+    }
     function selectThread(group) {
       selectedThreadKey = group.key || '';
       selectedRecordId = '';
@@ -2273,6 +2634,7 @@
     }
     function showDetail(row) {
       const attachment = rowAttachment(row);
+      const includeEvidence = activeView !== 'call';
       const flagValues = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
       const explanationKeys = Array.isArray(row.flag_explanation_keys) ? row.flag_explanation_keys : [];
       const flags = flagValues.length ? flagValues.map((flag, index) => translateEfficiencyFlag(row, flag, index)).join(', ') : t('state.none');
@@ -2283,6 +2645,10 @@
         <div class="detail-stack">
           <div class="detail-card primary">
             <h3>${escapeHtml(t('detail.cost_usage_context'))}</h3>
+            <div class="detail-action-row">
+              <button class="context-button" type="button" data-open-investigator-record="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.open_investigator'))}</button>
+              <button class="context-button secondary" type="button" data-copy-call-link="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.copy_link'))}</button>
+            </div>
             ${fieldsList([
               [t('metric.estimated_cost'), moneyText(row.estimated_cost_usd)],
               [t('metric.codex_credits'), usageCreditsWithStatus(row)],
@@ -2346,10 +2712,10 @@
             [t('detail.source_line'), `${row.source_file}:${row.line_number}`],
             [t('detail.context_window'), number.format(row.model_context_window || 0)],
           ])}
-          ${contextControls(row)}
+          ${includeEvidence ? contextControls(row) : ''}
         </div>
       `;
-      bindContextButtons(row);
+      bindDetailButtons(row, includeEvidence);
     }
     function showThreadDetail(group) {
       const lifecycle = group.lifecycle || {};
@@ -2589,6 +2955,36 @@
       if (row) selectRow(row);
     });
     rowsEl.addEventListener('click', event => {
+      const openButton = event.target.closest('[data-open-investigator-record]');
+      if (openButton && rowsEl.contains(openButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const row = rowByRecordId.get(openButton.dataset.openInvestigatorRecord);
+        if (row) openInvestigator(row);
+        return;
+      }
+      const copyButton = event.target.closest('[data-copy-call-link]');
+      if (copyButton && rowsEl.contains(copyButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const row = rowByRecordId.get(copyButton.dataset.copyCallLink);
+        if (row) copyCallLink(row);
+        return;
+      }
+      const navButton = event.target.closest('[data-call-nav-record]');
+      if (navButton && rowsEl.contains(navButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const recordId = navButton.dataset.callNavRecord;
+        const row = rowByRecordId.get(recordId);
+        if (row) {
+          selectedRecordId = row.record_id || '';
+          selectedThreadKey = rowAttachment(row).key;
+          activeView = 'call';
+          render();
+        }
+        return;
+      }
       const sortButton = event.target.closest('[data-thread-call-sort-key]');
       if (sortButton && rowsEl.contains(sortButton)) {
         event.preventDefault();
@@ -2609,6 +3005,12 @@
       if (!callRow || !rowsEl.contains(callRow)) return;
       const row = rowByRecordId.get(callRow.dataset.recordId);
       if (row) showDetail(row);
+    });
+    rowsEl.addEventListener('dblclick', event => {
+      const callRow = event.target.closest('.thread-call-row');
+      if (!callRow || !rowsEl.contains(callRow)) return;
+      const row = rowByRecordId.get(callRow.dataset.recordId);
+      if (row) openInvestigator(row);
     });
     rowsEl.addEventListener('keydown', event => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
