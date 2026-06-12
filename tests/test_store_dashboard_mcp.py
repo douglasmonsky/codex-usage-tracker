@@ -1108,6 +1108,82 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     assert len(unlimited_context["entries"]) > len(limited_context["entries"])
 
 
+def test_context_carries_incoming_compaction_history_into_selected_turn(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-508941431111"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "06"
+        / "11"
+        / f"rollout-2026-06-11T22-20-00-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Compaction boundary",
+                "updated_at": "2026-06-11T22:30:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "before-compact", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+            _entry(
+                "compacted",
+                {
+                    "message": "",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "output_text",
+                                    "text": "INCOMING REPLACEMENT HISTORY sk-proj-boundarysecret",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            ),
+            _entry("turn_context", {"turn_id": "after-compact", "model": "gpt-5.5"}),
+            _entry("event_msg", {"type": "context_compacted"}),
+            _token_event(300, 200),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    target = next(
+        row
+        for row in query_session_usage(db_path=db_path, session_id=session_id)
+        if row["turn_id"] == "after-compact"
+    )
+
+    context = load_call_context(
+        target["record_id"],
+        db_path=db_path,
+        include_compaction_history=True,
+    )
+    compaction_entries = [entry for entry in context["entries"] if entry["label"] == "Compaction detected"]
+
+    assert [entry["line_number"] for entry in compaction_entries] == [4, 6]
+    assert compaction_entries[0]["compaction"]["replacement_entry_count"] == 1
+    assert compaction_entries[0]["compaction"]["replacement_history_included"] is True
+    assert compaction_entries[1]["compaction"]["replacement_entry_count"] == 0
+    assert "Compaction marker found" in compaction_entries[1]["text"]
+    context_text = json.dumps(context)
+    assert "INCOMING REPLACEMENT HISTORY" in context_text
+    assert "sk-proj-boundarysecret" not in context_text
+    assert "[REDACTED_OPENAI_KEY]" in context_text
+
+
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker import mcp_server
 

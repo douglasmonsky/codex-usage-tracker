@@ -96,6 +96,7 @@ def _read_context_entries(
     omitted_parse_errors = 0
     current_turn_id: str | None = None
     collecting = target_turn_id is None
+    pending_compactions: list[dict[str, Any]] = []
 
     with path.open(encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
@@ -113,9 +114,15 @@ def _read_context_entries(
             timestamp = _optional_str(envelope.get("timestamp"))
 
             if entry_type == "turn_context":
+                was_collecting = collecting
                 current_turn_id = _optional_str(payload.get("turn_id"))
                 collecting = target_turn_id is None or current_turn_id == target_turn_id
                 if collecting:
+                    carried_compactions = (
+                        [entry for entry in candidates if entry.get("type") == "compacted"]
+                        if was_collecting and target_turn_id is not None
+                        else []
+                    )
                     candidates = []
                     candidates.append(
                         _context_entry(
@@ -126,9 +133,9 @@ def _read_context_entries(
                             _summarize_turn_context(payload),
                         )
                     )
-                continue
-
-            if not collecting:
+                    candidates.extend(pending_compactions)
+                    candidates.extend(carried_compactions)
+                pending_compactions = []
                 continue
 
             summarized = _summarize_payload(
@@ -137,23 +144,23 @@ def _read_context_entries(
                 include_tool_output=include_tool_output,
                 include_compaction_history=include_compaction_history,
             )
-            if summarized is not None:
-                candidates.append(
-                    _context_entry(
+
+            if not collecting and entry_type == "compacted" and summarized is not None:
+                pending_compactions = [
+                    _summarized_context_entry(
                         line_number,
                         timestamp,
                         entry_type,
-                        summarized["label"],
-                        summarized["text"],
-                        tool_output_omitted=bool(summarized.get("tool_output_omitted")),
-                        token_usage=summarized.get("token_usage")
-                        if isinstance(summarized.get("token_usage"), dict)
-                        else None,
-                        compaction=summarized.get("compaction")
-                        if isinstance(summarized.get("compaction"), dict)
-                        else None,
+                        summarized,
                     )
-                )
+                ]
+                continue
+
+            if not collecting:
+                continue
+
+            if summarized is not None:
+                candidates.append(_summarized_context_entry(line_number, timestamp, entry_type, summarized))
 
             if (
                 line_number >= token_line
@@ -166,6 +173,28 @@ def _read_context_entries(
     omitted["parse_errors"] = omitted_parse_errors
     omitted["target_turn_id"] = target_turn_id
     return limited, omitted
+
+
+def _summarized_context_entry(
+    line_number: int,
+    timestamp: str | None,
+    entry_type: str,
+    summarized: dict[str, Any],
+) -> dict[str, Any]:
+    return _context_entry(
+        line_number,
+        timestamp,
+        entry_type,
+        summarized["label"],
+        summarized["text"],
+        tool_output_omitted=bool(summarized.get("tool_output_omitted")),
+        token_usage=summarized.get("token_usage")
+        if isinstance(summarized.get("token_usage"), dict)
+        else None,
+        compaction=summarized.get("compaction")
+        if isinstance(summarized.get("compaction"), dict)
+        else None,
+    )
 
 
 def _summarize_payload(
@@ -205,10 +234,18 @@ def _summarize_compaction(
         "replacement_history_included": include_compaction_history and bool(replacement_entries),
         "classification": "confirmed_compaction",
     }
-    text = _redact(message) if message else (
-        "Compaction detected. Older context was replaced with "
-        f"{len(replacement_entries)} compacted history entries."
-    )
+    if message:
+        text = _redact(message)
+    elif replacement_entries:
+        text = (
+            "Compaction detected. Replacement history contains "
+            f"{len(replacement_entries)} compacted history entries."
+        )
+    else:
+        text = (
+            "Compaction marker found. This event did not include replacement history, "
+            "so there is no compacted summary to display."
+        )
     if include_compaction_history and replacement_entries:
         compaction["replacement_history"] = [
             _summarize_replacement_history_item(item) for item in replacement_entries
