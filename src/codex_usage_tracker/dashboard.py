@@ -17,6 +17,7 @@ from codex_usage_tracker.allowance import (
     load_allowance_config,
     summarize_allowance_usage,
 )
+from codex_usage_tracker.call_origin import annotate_rows_with_call_origin
 from codex_usage_tracker.i18n import dashboard_i18n_payload, language_direction, translations_for
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -67,12 +68,14 @@ def dashboard_payload(
     privacy_mode = validate_privacy_mode(privacy_mode)
     normalized_offset = _normalize_offset(offset)
     rows = annotate_thread_attachments(
-        query_dashboard_events(
-            db_path=db_path,
-            limit=limit,
-            offset=normalized_offset,
-            since=since,
-            include_archived=include_archived,
+        annotate_rows_with_call_origin(
+            query_dashboard_events(
+                db_path=db_path,
+                limit=limit,
+                offset=normalized_offset,
+                since=since,
+                include_archived=include_archived,
+            )
         )
     )
     pricing = load_pricing_config(pricing_path)

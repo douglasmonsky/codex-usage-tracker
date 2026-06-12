@@ -1003,6 +1003,11 @@
       background: #eef2ff;
       color: #4338ca;
     }
+    .initiator-unknown {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+      color: #64748b;
+    }
     .timeline-title .initiator-puck,
     .call-investigator-header .initiator-puck {
       margin-right: 4px;

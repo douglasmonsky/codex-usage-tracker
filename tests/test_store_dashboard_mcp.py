@@ -467,7 +467,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert ".cache-verdict" in dashboard_css
     assert ".context-inline-action" in dashboard_css
     assert ".initiator-puck" in dashboard_css
+    assert ".initiator-unknown" in dashboard_css
     assert "callInitiatorPuck" in dashboard_js
+    assert "row.call_initiator" in dashboard_js
     assert "data-open-investigator-record" in dashboard_js
     assert "data-call-nav-record" in dashboard_js
     assert "call.cache_accounting_delta" in dashboard_call_js
@@ -624,6 +626,9 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "pricing_model",
         "usage_credits",
         "recommended_action",
+        "call_initiator",
+        "call_initiator_reason",
+        "call_initiator_confidence",
         "project_name",
         "project_key",
         "thread_attachment_label",

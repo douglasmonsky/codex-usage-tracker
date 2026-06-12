@@ -93,6 +93,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - The cards summarize only the currently visible filtered rows.
 - Time values are shown in your browser's local date/time format while sorting and time filtering still use the logged timestamp.
 - Calls view token cells show total tokens plus compact `C`, `U`, and `O` chips for cached input, uncached input, and output tokens.
+- Source pucks are call-level estimates derived from local event metadata. `User` means the token-count segment included a user message, `Codex` means it followed tool output, compaction, or agent-continuation metadata, and `Unknown` means the source event metadata was unavailable or ambiguous.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
 - Hover or click a row to pin a compact aggregate preview in `Call Details`; double-click a row or use `Open investigator` when you want the dedicated call drilldown.
 - The `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.

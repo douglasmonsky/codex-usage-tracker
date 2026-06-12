@@ -616,7 +616,36 @@
       if (isSubagent(row)) return t('source.subagent');
       return t('source.user');
     }
+    function callInitiatorReasonText(row) {
+      return {
+        user_message: 'First model call after a user message',
+        tool_result: 'Continuation after tool output',
+        post_compaction: 'Post-compaction continuation',
+        agent_continuation: 'Codex continuation',
+        thread_source: sourceLabelText(row),
+        no_signal: 'No source event signal found',
+        source_unavailable: 'Source event metadata unavailable',
+        missing_source: 'Source event metadata unavailable',
+      }[row.call_initiator_reason] || sourceLabelText(row);
+    }
     function callInitiator(row) {
+      const derived = String(row.call_initiator || '').toLowerCase();
+      if (derived === 'user' || derived === 'codex') {
+        return {
+          key: derived,
+          label: derived === 'codex' ? t('source.codex_initiated') : t('source.user_initiated'),
+          shortLabel: derived === 'codex' ? 'Codex' : t('source.user'),
+          source: callInitiatorReasonText(row),
+        };
+      }
+      if (derived === 'unknown') {
+        return {
+          key: 'unknown',
+          label: t('state.unknown'),
+          shortLabel: t('state.unknown'),
+          source: callInitiatorReasonText(row),
+        };
+      }
       const codexInitiated = isAutoReview(row)
         || isSubagent(row)
         || (row.thread_source && row.thread_source !== 'user');
@@ -1222,6 +1251,8 @@
           row.effort,
           row.session_id,
           row.turn_id,
+          row.call_initiator,
+          row.call_initiator_reason,
           row.thread_source,
           row.subagent_type,
           row.agent_role,
@@ -1421,7 +1452,7 @@
       if (key === 'uncached') return uncachedInputTokens(row);
       if (key === 'output') return outputTokens(row);
       if (key === 'signals') return signalCount(row);
-      if (key === 'source') return textValue(sourceLabelText(row));
+      if (key === 'source') return textValue(callInitiatorText(row));
       if (key === 'time') return String(row.event_timestamp || '');
       return Number(row.total_tokens || 0);
     }
