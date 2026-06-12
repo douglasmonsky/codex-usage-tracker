@@ -830,7 +830,11 @@
       box-shadow: var(--shadow);
     }
     .grid > section:not(.detail-section) {
-      overflow: visible;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: visible;
+      scrollbar-gutter: stable;
+      overscroll-behavior-x: contain;
     }
     .detail-section {
       position: sticky;

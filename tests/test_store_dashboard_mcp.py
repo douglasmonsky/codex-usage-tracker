@@ -518,7 +518,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "button.show_tool_output" in dashboard_call_js
     assert "data-context-entry-load-output" in dashboard_call_js
     assert ".grid > section:not(.detail-section)" in dashboard_css
-    assert "overflow: visible" in dashboard_css
+    assert "overflow-x: auto" in dashboard_css
+    assert "overscroll-behavior-x: contain" in dashboard_css
     assert "position: sticky" in dashboard_css
     assert ".grid > section:first-child > table > thead" in dashboard_css
     assert "${callInitiatorPuck(row)}" in dashboard_js
