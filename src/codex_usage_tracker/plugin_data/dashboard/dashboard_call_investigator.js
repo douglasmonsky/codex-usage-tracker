@@ -270,6 +270,60 @@
       `;
     }
 
+    function metadataValue(value, fallback = t('state.none')) {
+      if (value === null || value === undefined || value === '') return fallback;
+      return String(value);
+    }
+
+    function parentUpdatedAt(row) {
+      return row.resolved_parent_session_updated_at || row.parent_session_updated_at || '';
+    }
+
+    function renderMetadataField(label, value) {
+      return `
+        <div class="metadata-field">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
+      `;
+    }
+
+    function renderAggregateMetadata(row) {
+      const sourceLine = row.source_file
+        ? `${row.source_file}:${row.line_number || ''}`
+        : t('state.unknown');
+      const fields = [
+        [t('filter.session'), metadataValue(row.session_id)],
+        [t('detail.turn'), metadataValue(row.turn_id)],
+        [t('table.initiated'), callInitiatorText(row)],
+        [t('detail.thread_source'), metadataValue(row.thread_source, t('source.user'))],
+        [t('detail.subagent_type'), metadataValue(row.subagent_type)],
+        [t('detail.agent_role'), metadataValue(row.agent_role)],
+        [t('detail.agent_nickname'), metadataValue(row.agent_nickname)],
+        [t('detail.parent_session'), metadataValue(row.parent_session_id)],
+        [t('detail.parent_updated'), parentUpdatedAt(row) ? formatTimestamp(parentUpdatedAt(row)) : t('state.none')],
+        [t('detail.cwd'), metadataValue(row.cwd, t('state.unknown'))],
+        [t('detail.project_cwd'), metadataValue(row.project_relative_cwd || '.', '.')],
+        [t('detail.git_branch'), metadataValue(row.git_branch, t('state.unknown'))],
+        [t('detail.remote_label'), metadataValue(row.git_remote_label)],
+        [t('detail.remote_hash'), metadataValue(row.git_remote_hash)],
+        [t('detail.credit_note'), metadataValue(row.usage_credit_note)],
+        [t('detail.source_line'), sourceLine],
+        [t('detail.context_window'), number.format(row.model_context_window || 0)],
+      ];
+      return `
+        <section class="call-diagnostic-section metadata">
+          <div class="section-heading compact">
+            <h3>${escapeHtml(`${t('detail.raw_identifiers')} + ${t('detail.source_file_line')}`)}</h3>
+            <span class="evidence-chip derived">${escapeHtml(t('detail.source_file_line'))}</span>
+          </div>
+          <div class="call-metadata-grid">
+            ${fields.map(([label, value]) => renderMetadataField(label, value)).join('')}
+          </div>
+        </section>
+      `;
+    }
+
     function renderCallNavigation(row, previous, next) {
       const backUrl = tableUrlForRow(row);
       return `
@@ -293,7 +347,7 @@
         ? tf('caption.call_investigator', { record: short(getSelectedRecordId(), '').slice(0, 12) })
         : t('call.open_hint');
       if (!row) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="11">${escapeHtml(t('call.not_found'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('call.not_found'))}</td></tr>`;
         detailEl.textContent = t('dashboard.detail.empty');
         return;
       }
@@ -320,7 +374,7 @@
         : 'Not loaded yet';
       rowsEl.innerHTML = `
         <tr class="call-investigator-row">
-          <td colspan="11">
+          <td colspan="12">
             <article class="call-investigator" data-record-id="${escapeHtml(row.record_id || '')}">
               <header class="call-investigator-header">
                 <div>
@@ -341,11 +395,12 @@
                   ${callMetricCard(t('metric.cached_input'), number.format(cachedInputTokens(row)), pct(row.cache_ratio))}
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
                   ${callMetricCard(t('metric.output'), number.format(outputTokens(row)), t('metric.reasoning_output'))}
-                  ${callMetricCard(t('table.source'), callInitiatorText(row), t('call.exact_label'))}
+                  ${callMetricCard(t('table.initiated'), callInitiatorText(row), t('call.exact_label'))}
                   ${callMetricCard(t('metric.estimated_cost'), moneyText(row.estimated_cost_usd), pricingStatusText(row))}
                   ${callMetricCard(t('metric.codex_credits'), creditsText(usageCreditValue(row)), usageCreditStatusLabel(row), usageCreditsWithStatus(row))}
                 </div>
               </section>
+              ${renderAggregateMetadata(row)}
               <section class="call-diagnostic-section delta">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.cache_accounting_delta'))}</h3>

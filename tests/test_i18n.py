@@ -357,9 +357,9 @@ def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> No
 
     for label in [
         "table.time",
+        "table.initiated",
         "table.model",
         "table.effort",
-        "table.source",
         "table.tokens",
         "table.cached",
         "table.uncached",

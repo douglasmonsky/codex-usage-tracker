@@ -71,6 +71,7 @@
       'button.show_compaction_history': 'Show compacted replacement',
       'button.copy_link': 'Copy link',
       'button.clear': 'Clear',
+      'button.hide_details': 'Hide details',
       'action.run': 'Run',
       'nav.live': 'Live',
       'nav.load': 'Load',
@@ -95,6 +96,7 @@
       'state.requires_evidence': 'Evidence needed',
       'table.time': 'Time',
       'table.thread': 'Thread',
+      'table.initiated': 'Initiated',
       'table.model': 'Model',
       'table.effort': 'Effort',
       'table.tokens': 'Tokens',
@@ -287,6 +289,8 @@
     let loadedLimit = payloadLimit(initialPayload);
     const rowsEl = document.getElementById('rows');
     const detailEl = document.getElementById('detail');
+    const detailToggleEl = document.getElementById('detailToggle');
+    const detailSectionEl = document.querySelector('.detail-section');
     const searchEl = document.getElementById('search');
     const modelEl = document.getElementById('model');
     const effortEl = document.getElementById('effort');
@@ -356,6 +360,7 @@
     let fastTooltipEl = null;
     let fastTooltipTarget = null;
     let fastTooltipTimer = null;
+    let detailPanelExpanded = readDetailPanelPreference();
     let initialThreadExpansionApplied = false;
     let initialDetailApplied = false;
     const presetDefinitions = [
@@ -445,6 +450,7 @@
         detailEl.textContent = t(detailEl.dataset.i18n);
       }
       renderLiveStatus();
+      applyDetailPanelState();
     }
     function setLanguage(language) {
       currentLanguage = normalizeLanguage(language);
@@ -515,6 +521,33 @@
       if (!pendingFocusTarget) return;
       window.requestAnimationFrame(focusPendingTarget);
     }
+    function readDetailPanelPreference() {
+      try {
+        return window.sessionStorage?.getItem('codexUsageDetailPanel') === 'expanded';
+      } catch (error) {
+        return false;
+      }
+    }
+    function rememberDetailPanelPreference(expanded) {
+      try {
+        window.sessionStorage?.setItem('codexUsageDetailPanel', expanded ? 'expanded' : 'collapsed');
+      } catch (error) {
+        // Session storage is optional; the drawer can still work without persistence.
+      }
+    }
+    function applyDetailPanelState() {
+      document.body.dataset.detailPanel = detailPanelExpanded ? 'expanded' : 'collapsed';
+      if (detailSectionEl) detailSectionEl.dataset.collapsed = detailPanelExpanded ? 'false' : 'true';
+      if (detailToggleEl) {
+        detailToggleEl.setAttribute('aria-expanded', detailPanelExpanded ? 'true' : 'false');
+        detailToggleEl.textContent = detailPanelExpanded ? t('button.hide_details') : t('dashboard.call_details');
+      }
+    }
+    function setDetailPanelExpanded(expanded) {
+      detailPanelExpanded = Boolean(expanded);
+      rememberDetailPanelPreference(detailPanelExpanded);
+      applyDetailPanelState();
+    }
     function directional(compareResult) {
       return sortDirection === 'asc' ? compareResult : -compareResult;
     }
@@ -558,6 +591,7 @@
         context: t('metric.context_use'),
         cost: t('table.cost'),
         effort: t('table.effort'),
+        initiator: t('table.initiated'),
         model: t('table.model'),
         cached: t('table.cached'),
         uncached: t('table.uncached'),
@@ -678,6 +712,35 @@
       const initiator = callInitiator(row);
       const title = `${initiator.label}: ${initiator.source}`;
       return `<span class="initiator-puck initiator-${escapeHtml(initiator.key)}" ${tooltipAttributes(title)}>${escapeHtml(initiator.shortLabel)}</span>`;
+    }
+    function callInitiatorCell(row) {
+      const initiator = callInitiator(row);
+      return `
+        <div class="initiator-cell" ${tooltipAttributes(`${initiator.label}: ${initiator.source}`)}>
+          ${callInitiatorPuck(row)}
+          <span>${escapeHtml(initiator.source)}</span>
+        </div>
+      `;
+    }
+    function threadInitiatorSummary(group) {
+      const counts = (group.calls || []).reduce((acc, row) => {
+        const key = callInitiator(row).key || 'unknown';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      const total = Math.max(Number(group.callCount || 0), 1);
+      const items = [
+        ['user', t('source.user'), counts.user || 0],
+        ['codex', 'Codex', counts.codex || 0],
+        ['unknown', t('state.unknown'), counts.unknown || 0],
+      ].filter(([, , count]) => count > 0);
+      return `
+        <div class="initiator-summary">
+          ${items.map(([key, label, count]) => `
+            <span class="initiator-puck initiator-${escapeHtml(key)}" ${tooltipAttributes(`${label}: ${number.format(count)} / ${number.format(total)} ${t('table.calls')}`)}>${escapeHtml(label)} ${escapeHtml(number.format(count))}</span>
+          `).join('')}
+        </div>
+      `;
     }
     function attachmentRelationText(relation) {
       return {
@@ -1335,6 +1398,8 @@
       const columns = [
         { label: 'timestamp', field: 'event_timestamp' },
         { label: 'thread', field: row => rowThreadLabel(row) },
+        { label: 'initiated', field: row => callInitiator(row).label },
+        { label: 'initiated_reason', field: row => callInitiator(row).source },
         { label: 'project', field: 'project_name' },
         { label: 'model', field: 'model' },
         { label: 'effort', field: 'effort' },
@@ -1440,6 +1505,7 @@
       if (key === 'context') return Number(row.context_window_percent || 0);
       if (key === 'cost') return Number(row.estimated_cost_usd || 0);
       if (key === 'effort') return textValue(row.effort);
+      if (key === 'initiator') return textValue(callInitiatorText(row));
       if (key === 'model') return textValue(row.model);
       if (key === 'cached') return cachedInputTokens(row);
       if (key === 'uncached') return uncachedInputTokens(row);
@@ -1461,6 +1527,7 @@
       if (key === 'cache') return Number(row.cache_ratio || 0);
       if (key === 'cost') return Number(row.estimated_cost_usd || 0);
       if (key === 'effort') return textValue(row.effort);
+      if (key === 'initiator') return textValue(callInitiatorText(row));
       if (key === 'model') return textValue(row.model);
       if (key === 'cached') return cachedInputTokens(row);
       if (key === 'uncached') return uncachedInputTokens(row);
@@ -2009,12 +2076,8 @@
         tr.setAttribute('aria-label', tf('caption.call_investigator', { record: short(row.record_id || rowThreadLabel(row), '').slice(0, 12) }));
         tr.innerHTML = `
           <td>${renderTimeCell(row.event_timestamp)}</td>
-          <td title="${escapeHtml(short(row.session_id))}">
-            <div class="call-thread-cell">
-              <span>${escapeHtml(truncate(rowThreadLabel(row)))}</span>
-              ${callInitiatorPuck(row)}
-            </div>
-          </td>
+          <td title="${escapeHtml(short(row.session_id))}"><span class="thread-name">${escapeHtml(truncate(rowThreadLabel(row)))}</span></td>
+          <td>${callInitiatorCell(row)}</td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
           <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
           <td class="num token-cell">${totalTokenCell(row)}</td>
@@ -2050,7 +2113,7 @@
         showDetail(page.items[0]);
       }
       if (!rows.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="11">${escapeHtml(t('state.no_calls'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('state.no_calls'))}</td></tr>`;
       }
     }
     function renderThreads(rows, mode = 'threads') {
@@ -2100,6 +2163,7 @@
               </span>
             </div>
           </td>
+          <td>${threadInitiatorSummary(group)}</td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(group.modelSummary))}">${escapeHtml(short(group.modelSummary))}</span></td>
           <td>${effortCell(truncate(group.effortSummary, 28), group.effortTooltip)}</td>
           <td class="num token-cell">${tokenNumberCell(group.totalTokens, t('metric.total_tokens'))}</td>
@@ -2132,7 +2196,7 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="11">${escapeHtml(t('state.no_threads'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('state.no_threads'))}</td></tr>`;
       }
       if (!initialDetailApplied && selectedThreadKey) {
         const selected = groups.find(group => group.key === selectedThreadKey);
@@ -2157,14 +2221,9 @@
         return `
           <tr class="thread-call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}" tabindex="0" role="button" data-record-id="${escapeHtml(row.record_id || '')}">
             <td>${renderTimeCell(row.event_timestamp)}</td>
+            <td>${callInitiatorCell(row)}</td>
             <td><span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span></td>
             <td>${effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort)))}</td>
-            <td>
-              <div class="call-thread-cell">
-                ${callInitiatorPuck(row)}
-                <button class="mini-open-button" type="button" data-open-investigator-record="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.open_investigator'))}</button>
-              </div>
-            </td>
             <td class="num token-cell">${totalTokenCell(row)}</td>
             <td class="num token-cell">${cachedTokenCell(row)}</td>
             <td class="num token-cell">${uncachedTokenCell(row)}</td>
@@ -2187,13 +2246,13 @@
           ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span></div>`
           : '';
       tr.innerHTML = `
-        <td class="child-cell" colspan="11">
+        <td class="child-cell" colspan="12">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
             <thead><tr>
               ${threadCallHeader('time', t('table.time'))}
+              ${threadCallHeader('initiator', t('table.initiated'))}
               ${threadCallHeader('model', t('table.model'))}
               ${threadCallHeader('effort', t('table.effort'))}
-              ${threadCallHeader('source', t('table.source'))}
               ${threadCallHeader('total', t('table.tokens'), true)}
               ${threadCallHeader('cached', t('table.cached'), true)}
               ${threadCallHeader('uncached', t('table.uncached'), true)}
@@ -2703,7 +2762,7 @@
       const callRow = event.target.closest('.thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
       const row = rowByRecordId.get(callRow.dataset.recordId);
-      if (row) showDetail(row);
+      if (row) openInvestigator(row);
     });
     rowsEl.addEventListener('dblclick', event => {
       const callRow = event.target.closest('.thread-call-row');
@@ -2717,8 +2776,9 @@
       if (!callRow || !rowsEl.contains(callRow)) return;
       event.preventDefault();
       const row = rowByRecordId.get(callRow.dataset.recordId);
-      if (row) selectRow(row);
+      if (row) openInvestigator(row);
     });
+    if (detailToggleEl) detailToggleEl.addEventListener('click', () => setDetailPanelExpanded(!detailPanelExpanded));
     document.addEventListener('mouseover', event => {
       const target = closestFastTooltipTarget(event.target);
       if (!target || !document.body.contains(target)) return;

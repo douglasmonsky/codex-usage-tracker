@@ -487,6 +487,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert ".context-inline-action" in dashboard_css
     assert ".initiator-puck" in dashboard_css
     assert ".initiator-unknown" in dashboard_css
+    assert ".initiator-cell" in dashboard_css
+    assert "table.initiated" in dashboard_js
+    assert "callInitiatorCell" in dashboard_js
+    assert "sortLabelText(sortKey)" in dashboard_js
     assert "callInitiatorPuck" in dashboard_js
     assert "row.call_initiator" in dashboard_js
     assert "data-open-investigator-record" in dashboard_js
@@ -545,6 +549,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["dashboard.view.call"] == "Call Investigator"
     assert en_trans["button.show_tool_output"] == "Show tool output"
     assert en_trans["button.hide_tool_output"] == "Hide tool output"
+    assert en_trans["button.hide_details"] == "Hide details"
+    assert en_trans["table.initiated"] == "Initiated"
     assert en_trans["source.user_initiated"] == "User initiated"
     assert en_trans["source.codex_initiated"] == "Codex initiated"
     assert "spawned from" in en_trans["thread.spawned_from"]
@@ -570,6 +576,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_state.js").exists()
     assert (asset_dir / "dashboard.css").exists()
     assert "detail-section" in dashboard
+    assert "detailToggle" in dashboard
+    assert "body[data-detail-panel=\"expanded\"] .grid" in dashboard_css
+    assert "applyDetailPanelState()" in dashboard_js
     assert "time-cell" in dashboard_surface
     assert "formatTimestamp" in dashboard_js
     assert "scrollbar-gutter: stable" in dashboard_css
@@ -608,6 +617,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'data-sort-key="time"' in dashboard
     assert 'data-sort-key="thread"' in dashboard
     assert '<option value="attention" selected data-i18n="option.needs_attention">Needs attention</option>' in dashboard
+    assert '<option value="initiator" data-i18n="table.initiated">Initiated</option>' in dashboard
     assert '<option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option>' in dashboard
 
     pricing_path.write_text(

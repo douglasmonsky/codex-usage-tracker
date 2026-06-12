@@ -80,6 +80,7 @@
     return {
       cache: 'asc',
       effort: 'asc',
+      initiator: 'asc',
       model: 'asc',
       thread: 'asc',
     }[key] || 'desc';
