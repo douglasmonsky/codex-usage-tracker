@@ -442,6 +442,12 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'body[data-active-view="call"] .table-tools' in dashboard_css
     assert ".call-diagnostic-section.exact" in dashboard_css
     assert "creditsText(usageCreditValue(row))" in dashboard_js
+    assert "const contextPayloadState = new Map()" in dashboard_js
+    assert "renderInvestigationReadout" in dashboard_js
+    assert "contextStateRecord(row)" in dashboard_js
+    assert "data-context-scroll" in dashboard_js
+    assert ".readout-grid" in dashboard_css
+    assert ".context-inline-action" in dashboard_css
     assert "data-open-investigator-record" in dashboard_js
     assert "data-call-nav-record" in dashboard_js
     assert "call.cache_accounting_delta" in dashboard_js

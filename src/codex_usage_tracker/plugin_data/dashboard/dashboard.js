@@ -91,7 +91,7 @@
       'state.no_rows': 'No rows',
       'state.no_calls': 'No calls match the current filters.',
       'state.no_threads': 'No threads match the current filters.',
-      'state.requires_evidence': 'Load evidence',
+      'state.requires_evidence': 'Evidence needed',
       'table.time': 'Time',
       'table.thread': 'Thread',
       'table.model': 'Model',
@@ -130,8 +130,8 @@
       'call.open_hint': 'Double-click a row or use Open investigator for deep diagnostics.',
       'call.not_found': 'Selected call was not found in the loaded dashboard rows.',
       'call.position': 'Call {position} in this resolved thread.',
-      'call.context_estimate_hint': 'Load raw evidence to compare exact uncached input with visible log entries. The gap should be treated as hidden scaffolding, serialization, or tokenizer estimate error.',
-      'call.compaction_hint': 'Load raw evidence to detect explicit compaction events and view redacted replacement history when available.',
+      'call.context_estimate_hint': 'Use the evidence actions below to compare exact uncached input with visible log entries. The gap should be treated as hidden scaffolding, serialization, or tokenizer estimate error.',
+      'call.compaction_hint': 'Use the evidence actions below to detect explicit compaction events and view redacted replacement history when available.',
       'context.token_breakdown': 'Token breakdown',
       'context.compaction_detected': 'Compaction detected',
       'context.compaction_replacement': 'Compacted replacement context',
@@ -335,6 +335,7 @@
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
     const contextRequestState = new Map();
+    const contextPayloadState = new Map();
     let pendingFocusTarget = null;
     let fastTooltipEl = null;
     let fastTooltipTarget = null;
@@ -768,7 +769,7 @@
         return {
           key: 'post-compaction',
           label: t('call.post_compaction'),
-          body: 'A compaction marker or reset-like profile is associated with this call. Load evidence to confirm replacement context.',
+          body: 'A compaction marker or reset-like profile is associated with this call. Use the evidence actions to confirm replacement context.',
         };
       }
       if (diagnostic === 'cold') {
@@ -1960,9 +1961,105 @@
         return `<p class="muted">${escapeHtml(t('call.no_previous'))}</p>`;
       }
       return `
+        <p class="diagnostic-interpretation">${escapeHtml(deltaInterpretation(row, previous))}</p>
         <div class="call-delta-grid">
           ${callDeltaRows(row, previous).map(([label, value]) => callMetricCard(label, value, t('call.derived_label'))).join('')}
         </div>
+      `;
+    }
+    function contextStateRecord(row) {
+      const key = row.record_id || '';
+      return key ? contextPayloadState.get(key) : null;
+    }
+    function loadedContextPayload(row) {
+      const record = contextStateRecord(row);
+      return record && record.status === 'loaded' ? record.payload : null;
+    }
+    function contextEvidenceStats(row) {
+      const payload = loadedContextPayload(row);
+      if (!payload) return null;
+      const entries = Array.isArray(payload.entries) ? payload.entries : [];
+      const visibleChars = entries.reduce((sum, entry) => sum + String(entry.text || '').length, 0);
+      const visibleTokenEstimate = Math.ceil(visibleChars / 4);
+      const hiddenGap = Math.max(uncachedInputTokens(row) - visibleTokenEstimate, 0);
+      return {
+        entries: entries.length,
+        visibleChars,
+        visibleTokenEstimate,
+        hiddenGap,
+        source: payload.source || {},
+      };
+    }
+    function evidenceAction(label = t('button.show_turn_evidence'), extraAttrs = '') {
+      return `<button class="context-inline-action" type="button" data-context-load data-context-scroll ${extraAttrs}>${escapeHtml(label)}</button>`;
+    }
+    function deltaInterpretation(row, previous) {
+      const delta = callAccountingDelta(row, previous);
+      const uncached = delta.uncached;
+      const cached = delta.cached;
+      if (uncached > 0 && cached < 0) {
+        return `Fresh input rose by ${number.format(uncached)} while cached input fell by ${number.format(Math.abs(cached))}; this is the classic cache-drop profile.`;
+      }
+      if (uncached > 0) {
+        return `Fresh input increased by ${number.format(uncached)} from the previous call; inspect evidence for new files, tool results, or rewritten context.`;
+      }
+      if (uncached < 0 && cached >= 0) {
+        return `Fresh input fell by ${number.format(Math.abs(uncached))} while cached input increased, so this call is reusing context more efficiently than the previous one.`;
+      }
+      return 'Token accounting is broadly stable compared with the previous call in this resolved thread.';
+    }
+    function diagnosticNextStep(row, diagnostic, previous) {
+      if (diagnostic.key === 'post-compaction') {
+        return 'Use Show turn log evidence and check for an explicit compaction marker or replacement history before interpreting the cache delta.';
+      }
+      if (diagnostic.key === 'cold') {
+        return 'Compare the previous call, then use Show turn log evidence for this call to see what fresh context was sent after the cache miss.';
+      }
+      if (diagnostic.key === 'spike') {
+        return 'Use Show turn log evidence and inspect the most recent entries first; the spike is in fresh uncached input, not cached history.';
+      }
+      if (diagnostic.key === 'warm') {
+        return `Cache reuse is healthy; focus on the ${number.format(uncachedInputTokens(row))} uncached tokens that were still billed as fresh input.`;
+      }
+      if (previous) return 'Use the delta cards to locate whether the change is cached input, uncached input, or output/reasoning.';
+      return 'Use Show turn log evidence if the aggregate totals are not enough to understand this isolated call.';
+    }
+    function renderInvestigationReadout(row, previous, diagnostic, callPosition) {
+      const exact = `${number.format(rowInputTokens(row))} input tokens = ${number.format(cachedInputTokens(row))} cached + ${number.format(uncachedInputTokens(row))} uncached; ${number.format(outputTokens(row))} output tokens; ${pct(row.cache_ratio)} cache reuse.`;
+      const derived = previous
+        ? deltaInterpretation(row, previous)
+        : 'No previous call is loaded for this resolved thread, so call-to-call deltas are unavailable.';
+      const stats = contextEvidenceStats(row);
+      const evidence = stats
+        ? `Evidence loaded: ${number.format(stats.entries)} entries, ${number.format(stats.visibleChars)} visible redacted chars, roughly ${number.format(stats.visibleTokenEstimate)} visible-token estimate.`
+        : 'Evidence is not loaded yet. Aggregate token counts are exact, but visible-context attribution needs the local JSONL evidence.';
+      return `
+        <section class="call-diagnostic-section readout">
+          <div class="section-heading compact">
+            <h3>Investigation readout</h3>
+            <span class="evidence-chip exact">Exact + derived + on-demand evidence</span>
+          </div>
+          <div class="readout-grid">
+            <div class="readout-card">
+              <span>Exact callback accounting</span>
+              <p>${escapeHtml(exact)}</p>
+            </div>
+            <div class="readout-card">
+              <span>Compared with previous call</span>
+              <p>${escapeHtml(derived)}</p>
+            </div>
+            <div class="readout-card">
+              <span>Evidence state</span>
+              <p>${escapeHtml(evidence)}</p>
+              ${stats ? '' : evidenceAction()}
+            </div>
+            <div class="readout-card">
+              <span>Next diagnostic move</span>
+              <p>${escapeHtml(diagnosticNextStep(row, diagnostic, previous))}</p>
+              <small>${escapeHtml(tf('call.position', { position: callPosition }))}</small>
+            </div>
+          </div>
+        </section>
       `;
     }
     function renderCallNavigation(row, previous, next) {
@@ -1994,6 +2091,13 @@
       const diagnostic = cacheDiagnostic(row, previous);
       const threadLabel = rowThreadLabel(row);
       const callPosition = index >= 0 ? `${number.format(index + 1)} / ${number.format(calls.length)}` : t('state.unknown');
+      const evidenceStats = contextEvidenceStats(row);
+      const visibleEstimateValue = evidenceStats
+        ? `~${number.format(evidenceStats.visibleTokenEstimate)} tokens`
+        : 'Not loaded yet';
+      const hiddenEstimateValue = evidenceStats
+        ? `~${number.format(evidenceStats.hiddenGap)} tokens`
+        : 'Not loaded yet';
       rowsEl.innerHTML = `
         <tr class="call-investigator-row">
           <td colspan="11">
@@ -2006,6 +2110,7 @@
                 </div>
                 ${renderCallNavigation(row, previous, next)}
               </header>
+              ${renderInvestigationReadout(row, previous, diagnostic, callPosition)}
               <section class="call-diagnostic-section exact">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.exact_accounting'))}</h3>
@@ -2045,9 +2150,14 @@
                 </div>
                 <div class="call-metric-grid two">
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
-                  ${callMetricCard(t('call.hidden_estimate'), t('state.requires_evidence'), t('call.evidence_label'))}
+                  ${callMetricCard(t('call.visible_estimate'), visibleEstimateValue, evidenceStats ? `${number.format(evidenceStats.visibleChars)} visible chars` : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.hidden_estimate'), hiddenEstimateValue, evidenceStats ? 'Uncached input minus visible estimate' : t('call.evidence_label'))}
                 </div>
                 <p class="muted">${escapeHtml(t('call.context_estimate_hint'))}</p>
+                <div class="call-section-actions">
+                  ${evidenceAction(evidenceStats ? 'Refresh turn evidence' : t('button.show_turn_evidence'))}
+                  <button class="context-inline-action secondary" type="button" data-context-no-budget data-context-scroll>${escapeHtml(t('button.no_char_limit'))}</button>
+                </div>
               </section>
               <section class="call-diagnostic-section compaction">
                 <div class="section-heading compact">
@@ -2055,6 +2165,10 @@
                   <span class="evidence-chip evidence">${escapeHtml(t('call.evidence_label'))}</span>
                 </div>
                 <p class="muted">${escapeHtml(t('call.compaction_hint'))}</p>
+                <div class="call-section-actions">
+                  ${evidenceAction(t('button.show_turn_evidence'))}
+                  <button class="context-inline-action secondary" type="button" data-context-compaction-history data-context-scroll>${escapeHtml(t('button.show_compaction_history'))}</button>
+                </div>
               </section>
               <section class="call-diagnostic-section raw-evidence">
                 <div class="section-heading compact">
@@ -2305,23 +2419,59 @@
       const enableButton = !fileMode && !apiMissing && apiDisabled
         ? `<button class="context-button" type="button" data-context-enable>${escapeHtml(t('button.enable_context_loading'))}</button>`
         : '';
+      const stored = contextStateRecord(row);
+      const resultHtml = stored?.status === 'loaded'
+        ? renderContext(stored.payload)
+        : stored?.status === 'loading'
+          ? `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`
+          : stored?.status === 'error'
+            ? `<p class="context-note">${escapeHtml(stored.message)}</p>`
+            : `<p class="context-note">${escapeHtml(hint)}</p>`;
       return `
         <div class="context-actions">
           <button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.show_turn_evidence'))}</button>
           <button class="context-button secondary" type="button" data-context-load-output${disabled}>${escapeHtml(t('button.include_tool_output'))}</button>
           ${enableButton}
         </div>
-        <div id="contextResult" class="context-result"><p class="context-note">${escapeHtml(hint)}</p></div>
+        <div id="contextResult" class="context-result">${resultHtml}</div>
       `;
     }
     function bindContextButtons(row, root = detailEl) {
-      const loadButton = root.querySelector('[data-context-load]');
-      const outputButton = root.querySelector('[data-context-load-output]');
-      const enableButton = root.querySelector('[data-context-enable]');
       const contextResult = root.querySelector('#contextResult');
-      if (loadButton) loadButton.addEventListener('click', () => loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }, contextResult));
-      if (outputButton) outputButton.addEventListener('click', () => loadContext(row, { includeToolOutput: true, maxChars: null, maxEntries: defaultContextEntries }, contextResult));
-      if (enableButton) enableButton.addEventListener('click', () => enableContextApi(row));
+      const scrollToEvidence = () => {
+        if (!contextResult) return;
+        const section = contextResult.closest('.raw-evidence') || contextResult;
+        section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      };
+      root.querySelectorAll('[data-context-load]').forEach(button => {
+        button.addEventListener('click', () => {
+          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
+          loadContext(row, { includeToolOutput: false, maxChars: null, maxEntries: defaultContextEntries }, contextResult);
+        });
+      });
+      root.querySelectorAll('[data-context-load-output]').forEach(button => {
+        button.addEventListener('click', () => {
+          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
+          loadContext(row, { includeToolOutput: true, maxChars: null, maxEntries: defaultContextEntries }, contextResult);
+        });
+      });
+      root.querySelectorAll('[data-context-enable]').forEach(button => {
+        button.addEventListener('click', () => enableContextApi(row));
+      });
+      root.querySelectorAll('[data-context-no-budget]').forEach(button => {
+        if (contextResult && contextResult.contains(button)) return;
+        button.addEventListener('click', () => {
+          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
+          loadContext(row, { maxChars: 0 }, contextResult);
+        });
+      });
+      root.querySelectorAll('[data-context-compaction-history]').forEach(button => {
+        if (contextResult && contextResult.contains(button)) return;
+        button.addEventListener('click', () => {
+          if (button.dataset.contextScroll !== undefined) scrollToEvidence();
+          loadContext(row, { includeCompactionHistory: true }, contextResult);
+        });
+      });
       if (contextResult) {
         contextResult.addEventListener('click', event => {
           if (!(event.target instanceof Element)) return;
@@ -2364,7 +2514,11 @@
         const payload = await response.json();
         if (payload.error) throw new Error(payload.error);
         contextApiEnabled = Boolean(payload.context_api_enabled);
-        showDetail(row);
+        if (activeView === 'call') {
+          render();
+        } else {
+          showDetail(row);
+        }
         const nextTarget = document.getElementById('contextResult');
         if (nextTarget && contextApiEnabled) {
           nextTarget.innerHTML = `<p class="context-note">${escapeHtml(t('context.enabled_note'))}</p>`;
@@ -2397,6 +2551,7 @@
         target.innerHTML = `<p class="context-note">${escapeHtml(t('context.no_record_id'))}</p>`;
         return;
       }
+      contextPayloadState.set(row.record_id, { status: 'loading' });
       target.innerHTML = `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`;
       const requestState = nextContextState(row, options);
       const params = new URLSearchParams({ record_id: row.record_id });
@@ -2423,9 +2578,13 @@
           throw new Error(errorText);
         }
         const payload = await response.json();
+        contextPayloadState.set(row.record_id, { status: 'loaded', payload });
         target.innerHTML = renderContext(payload);
+        if (activeView === 'call') render();
       } catch (error) {
-        target.innerHTML = `<p class="context-note">${escapeHtml(error.message || String(error))}</p>`;
+        const message = error.message || String(error);
+        contextPayloadState.set(row.record_id, { status: 'error', message });
+        target.innerHTML = `<p class="context-note">${escapeHtml(message)}</p>`;
       }
     }
     function contextLimitActions(payload) {
