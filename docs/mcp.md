@@ -81,3 +81,5 @@ CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1
 ```
 
 Normal aggregate tools do not need this variable. Keep raw context disabled unless the user specifically asks to inspect local log context.
+
+When raw context is enabled, `usage_call_context` accepts `max_entries`, `max_chars`, `include_tool_output`, and `include_compaction_history`. Use `0` for either limit only when the user explicitly asks for all matching entries or no character cap for that local context request. Compacted replacement history is transcript-like content; request it only for a specific call investigation, and keep the aggregate tools as the default path.

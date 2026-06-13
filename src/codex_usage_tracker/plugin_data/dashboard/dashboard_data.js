@@ -28,6 +28,26 @@
     return row.usage_credits === null || row.usage_credits === undefined ? null : Number(row.usage_credits || 0);
   }
 
+  function rowInputTokens(row) {
+    return Number(row.input_tokens || 0);
+  }
+
+  function cachedInputTokens(row) {
+    return Number(row.cached_input_tokens || 0);
+  }
+
+  function uncachedInputTokens(row) {
+    return Number(row.uncached_input_tokens || Math.max(rowInputTokens(row) - cachedInputTokens(row), 0));
+  }
+
+  function outputTokens(row) {
+    return Number(row.output_tokens || 0);
+  }
+
+  function rowReasoningTokens(row) {
+    return Number(row.reasoning_output_tokens || 0);
+  }
+
   function usageCreditStatusText(row) {
     if (usageCreditValue(row) === null) return 'No mapped Codex credit rate';
     if (row.usage_credit_confidence === 'exact') return 'Official rate-card match';
@@ -116,6 +136,102 @@
     return Number(a.cumulative_total_tokens || 0) - Number(b.cumulative_total_tokens || 0);
   }
 
+  function resolvedThreadRows(rows, row) {
+    const key = resolveThreadAttachment(row).key;
+    return rows
+      .filter(candidate => resolveThreadAttachment(candidate).key === key)
+      .sort(chronological);
+  }
+
+  function persistedAdjacentRow(recordById, row, key) {
+    const recordId = row ? row[key] : null;
+    if (!recordId) return undefined;
+    return recordById.get(recordId) || null;
+  }
+
+  function buildCallAdjacencyIndex(rows) {
+    const recordById = new Map(rows.filter(row => row.record_id).map(row => [row.record_id, row]));
+    const threadRows = new Map();
+    rows.forEach(row => {
+      const key = resolveThreadAttachment(row).key;
+      if (!threadRows.has(key)) threadRows.set(key, []);
+      threadRows.get(key).push(row);
+    });
+    const adjacencyByRecordId = new Map();
+    threadRows.forEach(calls => {
+      calls.sort(chronological);
+      calls.forEach((row, index) => {
+        if (!row.record_id) return;
+        const persistedPrevious = persistedAdjacentRow(recordById, row, 'previous_record_id');
+        const persistedNext = persistedAdjacentRow(recordById, row, 'next_record_id');
+        adjacencyByRecordId.set(row.record_id, {
+          calls,
+          index,
+          previous: persistedPrevious !== undefined ? persistedPrevious : index > 0 ? calls[index - 1] : null,
+          next: persistedNext !== undefined ? persistedNext : index < calls.length - 1 ? calls[index + 1] : null,
+        });
+      });
+    });
+    return adjacencyByRecordId;
+  }
+
+  function adjacentThreadCalls(rows, row, adjacencyByRecordId = null) {
+    if (adjacencyByRecordId && row && row.record_id) {
+      const adjacent = adjacencyByRecordId.get(row.record_id);
+      if (adjacent) return adjacent;
+    }
+    const calls = resolvedThreadRows(rows, row);
+    const index = calls.findIndex(candidate => candidate.record_id === row.record_id);
+    return {
+      calls,
+      index,
+      previous: index > 0 ? calls[index - 1] : null,
+      next: index >= 0 && index < calls.length - 1 ? calls[index + 1] : null,
+    };
+  }
+
+  function classifyCacheDiagnostic(row, previous = null, options = {}) {
+    const cache = Number(row.cache_ratio || 0);
+    const previousCache = previous ? Number(previous.cache_ratio || 0) : null;
+    const uncached = uncachedInputTokens(row);
+    const previousUncached = previous ? uncachedInputTokens(previous) : 0;
+    const coldRatio = Number(options.coldCacheRatio ?? 0.05);
+    const warmRatio = Number(options.warmCacheRatio ?? 0.85);
+    const previousWarmRatio = Number(options.coldResumePreviousRatio ?? 0.8);
+    const significantTokens = Number(options.significantTokens ?? 1000);
+    if (row.post_compaction || row.compaction_detected) return 'post_compaction';
+    if (previous && previousCache >= previousWarmRatio && cache <= coldRatio && rowInputTokens(row) >= significantTokens) {
+      return 'cold';
+    }
+    if (previous && uncached > Math.max(previousUncached * 2, significantTokens)) {
+      return 'spike';
+    }
+    if (cache >= warmRatio) return 'warm';
+    if (cache > coldRatio) return 'partial';
+    return 'cold';
+  }
+
+  function callAccountingDelta(row, previous) {
+    if (!previous) {
+      return {
+        input: 0,
+        cached: 0,
+        uncached: 0,
+        output: 0,
+        reasoning: 0,
+        cacheRatio: 0,
+      };
+    }
+    return {
+      input: rowInputTokens(row) - rowInputTokens(previous),
+      cached: cachedInputTokens(row) - cachedInputTokens(previous),
+      uncached: uncachedInputTokens(row) - uncachedInputTokens(previous),
+      output: outputTokens(row) - outputTokens(previous),
+      reasoning: rowReasoningTokens(row) - rowReasoningTokens(previous),
+      cacheRatio: Number(row.cache_ratio || 0) - Number(previous.cache_ratio || 0),
+    };
+  }
+
   function compactListSummary(values, fallback = 'Mixed') {
     const unique = [...new Set(values.filter(Boolean))].sort();
     if (!unique.length) return 'Unknown';
@@ -139,6 +255,11 @@
     optionValueExists,
     clamp,
     usageCreditValue,
+    rowInputTokens,
+    cachedInputTokens,
+    uncachedInputTokens,
+    outputTokens,
+    rowReasoningTokens,
     usageCreditStatusText,
     sumUsageCredits,
     creditCoverageRatio,
@@ -149,6 +270,11 @@
     resolvedParentSessionUpdatedAt,
     resolveThreadAttachment,
     chronological,
+    resolvedThreadRows,
+    buildCallAdjacencyIndex,
+    adjacentThreadCalls,
+    classifyCacheDiagnostic,
+    callAccountingDelta,
     compactListSummary,
     threadModelSummary,
   });

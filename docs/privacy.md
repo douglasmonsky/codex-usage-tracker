@@ -10,6 +10,10 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - model, reasoning effort, context window
 - token counts and derived efficiency ratios
 - subagent source, role, nickname, parent session id, and parent thread name when present
+- call-origin category, reason, and confidence labels derived from event metadata during indexing
+- archived-session flag, conservative thread key, and adjacent aggregate record ids for dashboard navigation
+- materialized thread-level aggregate summaries for active and all-history scopes
+- source-file refresh metadata such as path, path hash, size, mtime, indexed line/byte offsets, latest aggregate record id, parser diagnostics, and last indexed time
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
 
 ## Not Stored
@@ -25,9 +29,13 @@ The parser intentionally does not store:
 
 Those fields are not written to SQLite, CSV exports, generated dashboard HTML, or synthetic screenshots.
 
+Call-origin metadata is heuristic and confidence-labeled. It stores categories such as `user`, `codex`, or `unknown` plus a reason such as `user_message`, `tool_result`, `post_compaction`, or `agent_continuation`. It does not store the message text, tool output, compaction replacement text, or raw JSONL fragment that produced the category.
+
 ## On-Demand Context
 
-`usage_call_context`, `codex-usage-tracker context`, and the `serve-dashboard` context endpoint read a single source JSONL file only when explicitly requested. Returned context is redacted for common secret patterns and capped in size.
+`usage_call_context`, `codex-usage-tracker context`, and the `serve-dashboard` context endpoint read a single source JSONL file only when explicitly requested. Returned context is redacted for common secret patterns and capped in size by default for CLI/MCP requests. The call investigator uses the same endpoint at runtime and requests quick redacted evidence for the selected call when the local context API is enabled; that still does not persist raw context into SQLite, CSV, support bundles, or generated dashboard HTML.
+
+Tool output is omitted by default for CLI/MCP and dashboard investigator context requests. The call investigator offers `Show tool output` when redacted, size-limited tool output is needed. Full serialized JSONL group analysis is also opt-in through `mode=full` / `Run full serialized analysis`; default quick mode returns only a fast serialized upper-bound estimate. Compacted replacement history remains omitted by default everywhere. Compaction metadata can show that replacement history exists, its entry count, and the source line, but the replacement text is returned only when explicitly requested for that selected call and is redacted before display.
 
 Dashboard context loading can start off and then be enabled from the local details panel without restarting:
 
@@ -54,6 +62,9 @@ The localhost server:
 - protects refresh/context API calls with a random per-server token
 - can disable the context API entirely
 - refreshes aggregate rows without embedding raw transcript content into the dashboard
+- serves `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, `/api/recommendations`, and the compatibility `/api/usage` endpoint from aggregate SQLite data without loading raw source JSONL context
+
+Source JSONL reads happen during refresh/indexing, explicit on-demand context loading for one selected call, and explicit synthetic benchmark/diagnostic runs. Live refresh records metadata and aggregate-only parser cursors about source files so unchanged logs can be skipped and append-only growth can be parsed from the last indexed byte; that metadata does not store prompts, assistant messages, tool output, compaction replacement text, raw JSONL fragments, raw context, or reconstructed transcript evidence. The live aggregate APIs do not return that raw content either.
 
 ## Privacy Modes
 

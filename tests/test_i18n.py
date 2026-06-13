@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+from store_dashboard_helpers import _make_codex_home
 
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.i18n import (
@@ -19,7 +20,6 @@ from codex_usage_tracker.i18n import (
     translations_for,
 )
 from codex_usage_tracker.store import refresh_usage_index
-from tests.test_store_dashboard_mcp import _make_codex_home
 
 _PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 EXPECTED_KEY_PREFIXES = (
@@ -42,6 +42,7 @@ EXPECTED_KEY_PREFIXES = (
     "status.",
     "table.",
     "caption.",
+    "call.",
     "date.",
     "history.",
     "pricing.",
@@ -91,6 +92,54 @@ def dashboard_js_text() -> str:
         / "plugin_data"
         / "dashboard"
         / "dashboard.js"
+    ).read_text(encoding="utf-8")
+
+
+def dashboard_details_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_details.js"
+    ).read_text(encoding="utf-8")
+
+
+def dashboard_tables_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_tables.js"
+    ).read_text(encoding="utf-8")
+
+
+def dashboard_i18n_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_i18n.js"
+    ).read_text(encoding="utf-8")
+
+
+def dashboard_live_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_live.js"
     ).read_text(encoding="utf-8")
 
 
@@ -144,6 +193,47 @@ def test_catalog_placeholders_match_english(language: str) -> None:
 
     for key, english_value in english.items():
         assert placeholders(current[key]) == placeholders(english_value), key
+
+
+@pytest.mark.parametrize("language", [lang for lang in SUPPORTED_LANGUAGES if lang != "en"])
+def test_non_english_catalogs_translate_core_visible_labels(language: str) -> None:
+    english = raw_catalog("en")
+    current = raw_catalog(language)
+
+    core_labels = [
+        "dashboard.title",
+        "button.refresh",
+        "filter.search",
+        "dashboard.view.calls",
+        "dashboard.view.threads",
+        "call.readout.title",
+        "call.readout.badge",
+        "metric.total_tokens",
+        "table.cost",
+    ]
+
+    untranslated = [key for key in core_labels if current[key] == english[key]]
+    assert not untranslated, f"{language} leaves core dashboard labels untranslated: {untranslated}"
+
+
+@pytest.mark.parametrize("language", [lang for lang in SUPPORTED_LANGUAGES if lang != "en"])
+def test_non_english_catalogs_translate_call_investigator_readout(language: str) -> None:
+    english = raw_catalog("en")
+    current = raw_catalog(language)
+
+    readout_labels = [
+        "call.readout.title",
+        "call.readout.badge",
+        "call.readout.exact_label",
+        "call.readout.previous_label",
+        "call.readout.evidence_label",
+        "call.readout.next_label",
+        "call.delta.cache_drop",
+        "call.next_step.warm",
+    ]
+
+    untranslated = [key for key in readout_labels if current[key] == english[key]]
+    assert not untranslated, f"{language} leaves call investigator readout untranslated: {untranslated}"
 
 
 def test_catalog_keys_use_expected_namespaces() -> None:
@@ -250,7 +340,7 @@ def test_arabic_direction_is_rtl() -> None:
 
 
 @pytest.mark.parametrize("language", [lang for lang in SUPPORTED_LANGUAGES if lang != "ar"])
-def test_non_arabic_starter_languages_are_ltr(language: str) -> None:
+def test_non_arabic_supported_languages_are_ltr(language: str) -> None:
     assert language_direction(language) == "ltr"
 
 
@@ -338,47 +428,56 @@ def test_dashboard_template_has_dynamic_language_selector_and_runtime_status_own
 
 def test_dashboard_js_generates_language_options_and_preserves_runtime_state() -> None:
     js = dashboard_js_text()
+    i18n_js = dashboard_i18n_js_text()
     apply_translations = extract_js_function(js, "applyTranslations")
-    populate_options = extract_js_function(js, "populateLanguageOptions")
+    populate_options = extract_js_function(i18n_js, "populateLanguageOptions")
     set_language = extract_js_function(js, "setLanguage")
 
     assert "availableLanguages.map" in populate_options
     assert "language.native_name" in populate_options
-    assert "document.documentElement.lang = currentLanguage" in apply_translations
-    assert "document.documentElement.dir = languageDirection(currentLanguage)" in apply_translations
+    assert "document.documentElement.lang = i18n.currentLanguage" in apply_translations
+    assert "document.documentElement.dir = languageDirection(i18n.currentLanguage)" in apply_translations
     assert "if (element === detailEl) return" in apply_translations
     assert "renderLiveStatus()" in apply_translations
+    assert "i18n.setLanguage(language)" in set_language
     assert "rerenderSelectedDetail()" in set_language
 
 
 def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> None:
-    render_thread_calls = extract_js_function(dashboard_js_text(), "renderThreadCalls")
+    render_thread_calls = extract_js_function(dashboard_tables_js_text(), "renderThreadCalls")
 
     for label in [
         "table.time",
+        "table.initiated",
         "table.model",
         "table.effort",
-        "table.source",
-        "table.last_call",
+        "table.tokens",
+        "table.cached",
+        "table.uncached",
+        "table.output",
         "table.cost",
         "table.cache",
         "table.signals",
     ]:
         assert label in render_thread_calls
     assert "row.cache_ratio" in render_thread_calls
-    assert "flags.slice(0, 3)" in render_thread_calls
-    assert "translateEfficiencyFlag(row, flag, index)" in render_thread_calls
+    assert "cachedTokenCell(row)" in render_thread_calls
+    assert "uncachedTokenCell(row)" in render_thread_calls
+    assert "outputTokenCell(row)" in render_thread_calls
+    assert "renderSignalPucks(row, flags, 3" in render_thread_calls
     assert "</tr>" in render_thread_calls
 
 
 def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
     js = dashboard_js_text()
+    details_js = dashboard_details_js_text()
+    i18n_js = dashboard_i18n_js_text()
     recommendation_summary = extract_js_function(js, "recommendationSummary")
-    next_action = extract_js_function(js, "nextActionForRow")
-    show_detail = extract_js_function(js, "showDetail")
+    next_action = extract_js_function(details_js, "nextActionForRow")
+    show_detail = extract_js_function(details_js, "showDetail")
 
-    assert "'action.run': 'Run'" in js
-    assert "'button.run': 'Run'" not in js
+    assert "'action.run': 'Run'" in i18n_js
+    assert "'button.run': 'Run'" not in i18n_js
     assert "translatedField(recommendation.title_key, recommendation.title)" in recommendation_summary
     assert "translatedField(recommendation.why_key, recommendation.why)" in recommendation_summary
     assert "translatedField(row.recommended_action_key, row.recommended_action)" in next_action
@@ -387,9 +486,9 @@ def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
 
 
 def test_dashboard_js_refresh_preserves_selected_language_for_api_payloads() -> None:
-    refresh = extract_js_function(dashboard_js_text(), "refreshDashboardData")
+    refresh = extract_js_function(dashboard_live_js_text(), "refreshDashboardData")
 
-    assert "lang: currentLanguage" in refresh
+    assert "lang: i18n.currentLanguage" in refresh
 
 
 def _dashboard_payload_from_html(html: str) -> dict[str, object]:

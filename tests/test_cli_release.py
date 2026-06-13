@@ -275,19 +275,19 @@ def test_dashboard_history_scope_labels_remain_user_facing() -> None:
         / "dashboard"
         / "dashboard_template.html"
     ).read_text(encoding="utf-8")
-    script = (
+    live_runtime = (
         repo_root
         / "src"
         / "codex_usage_tracker"
         / "plugin_data"
         / "dashboard"
-        / "dashboard.js"
+        / "dashboard_live.js"
     ).read_text(encoding="utf-8")
 
     assert "Active sessions only" in template
     assert "All history" in template
-    assert "history.active_only" in script
-    assert "history.all_includes" in script
+    assert "history.active_only" in live_runtime
+    assert "history.all_includes" in live_runtime
 
     from codex_usage_tracker.i18n import translations_for
     en_trans = translations_for("en")
@@ -329,9 +329,9 @@ def test_usage_skills_prefer_live_dashboard_for_open_requests() -> None:
 
 
 def test_dashboard_launch_commands_refresh_by_default() -> None:
-    from codex_usage_tracker.cli import _build_parser
+    from codex_usage_tracker.cli_parser import build_parser
 
-    parser = _build_parser()
+    parser = build_parser()
 
     assert parser.parse_args(["open-dashboard"]).refresh is True
     assert parser.parse_args(["open-dashboard", "--refresh"]).refresh is True
@@ -394,6 +394,52 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
         "pricing_coverage_seconds",
         "project_summary_seconds",
     } <= set(payload["benchmarks"][0]["timings"])
+
+
+def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/benchmark_synthetic_history.py",
+            "--rows",
+            "100",
+            "--batch-size",
+            "25",
+            "--db-dir",
+            str(tmp_path),
+            "--with-source-logs",
+            "--json",
+            "--enforce-thresholds",
+            "--threshold-scale",
+            "5",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        env=_subprocess_env(),
+    )
+    payload = json.loads(result.stdout)
+    benchmark = payload["benchmarks"][0]
+
+    assert benchmark["threshold_status"] == "pass"
+    assert benchmark["threshold_failures"] == []
+    assert benchmark["source_logs_generated"] > 0
+    assert benchmark["source_log_bytes"] > 0
+    assert benchmark["context_load_seconds"] is not None
+    assert benchmark["context_payload_json_bytes"] > 0
+    assert benchmark["source_scan_ms"] >= 0
+    assert benchmark["serialized_estimate_ms"] >= 0
+    assert {
+        "dashboard_payload_with_source_logs_seconds",
+        "context_load_early_line_seconds",
+        "context_load_middle_line_seconds",
+        "context_load_late_line_seconds",
+    } <= set(benchmark["timings"])
+    assert {"early", "middle", "late"} == set(benchmark["context_loads"])
+    assert benchmark["context_loads"]["middle"]["context_payload_json_bytes"] > 0
+    assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
 
 
 def _subprocess_env() -> dict[str, str]:

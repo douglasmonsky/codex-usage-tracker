@@ -49,7 +49,7 @@ The dashboard language selector stores your browser preference locally. It local
 The server keeps the HTML aggregate-only and enables two live features:
 
 - `Refresh` rescans local Codex logs and updates the dashboard rows.
-- `Load context` reads one selected model call from the original local JSONL file only when you ask for it.
+- The call investigator automatically reads the selected model call from the original local JSONL file when the localhost context API is enabled.
 
 For a static snapshot, use:
 
@@ -75,7 +75,7 @@ The dashboard opens in `Insights` view. This view is designed to answer "what ne
 
 ## Calls View
 
-![Calls view showing filters, totals, the model-call table, and the details panel.](assets/dashboard-calls.png)
+![Calls view showing filters, totals, the model-call table, and the compact details rail.](assets/dashboard-calls.png)
 
 Use `Calls` view when you want to inspect individual model calls.
 
@@ -92,13 +92,15 @@ Use `Calls` view when you want to inspect individual model calls.
 - In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.
 - The cards summarize only the currently visible filtered rows.
 - Time values are shown in your browser's local date/time format while sorting and time filtering still use the logged timestamp.
+- Calls view token columns separate total tokens, cached input, uncached input, and output so the accounting can be scanned without expanding a row.
+- Source pucks are call-level estimates derived from local event metadata. `User` means the token-count segment included a user message, `Codex` means it followed tool output, compaction, or agent-continuation metadata, and `Unknown` means the source event metadata was unavailable or ambiguous.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
-- Hover or click a row to pin its aggregate fields in `Call Details`; on desktop, the details panel stays visible as you scroll.
-- The `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.
+- Hover a row to scan a compact aggregate preview in `Call Details`; click a Calls row to open the dedicated call investigator.
+- When expanded, the `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.
 - The first detail section includes a recommended action and a "why flagged" explanation derived only from aggregate counters and pricing/allowance metadata.
 - Raw aggregate identifiers and source file metadata are collapsed until you need them.
-- The details panel always reserves a visible scrollbar so long field lists are discoverable before you start scrolling.
-- Pagination appears only when the active Insights, Calls, or Threads view has more than one page.
+- The expanded details panel reserves a visible scrollbar so long field lists are discoverable before you start scrolling.
+- `Load more` appears when the active Insights, Calls, Threads, or expanded thread-call section has more rows to reveal.
 - When served from localhost, `/api/usage` accepts `limit` and `offset` so automation can page aggregate rows without loading an entire large history.
 - After you scroll down, the bottom-right `Top` button returns to the top of the dashboard.
 
@@ -113,7 +115,7 @@ Useful interpretation notes:
 
 ## Threads View
 
-![Threads view with one expanded thread and its calls in chronological order.](assets/dashboard-threads.png)
+![Threads view with one expanded thread and sortable newest-first calls.](assets/dashboard-threads.png)
 
 Use `Threads` view when you want to understand a work session as a group instead of one call at a time.
 
@@ -121,16 +123,35 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Thread rows show latest activity, call count, model mix, effort mix, total tokens, estimated cost, Codex credits, cache ratio, and signal count.
 - Mixed model summaries prefer the primary non-review model; `codex-auto-review` appears as the thread model only for review-only threads.
 - Click a thread row to expand or collapse its calls. Multiple thread rows can stay open.
-- Expanded calls are ordered oldest to newest by event timestamp, then cumulative token count.
+- Expanded calls default to newest first. Click an expanded-call header such as `Time`, `Tokens`, `Cost`, or `Cache` to sort that thread's visible calls without changing the top-level Threads ranking.
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
 
 The same search, time range, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, and `Threads` views.
 
+## Call Investigator
+
+![Call investigator showing exact token accounting, cache/accounting deltas, context estimates, and runtime evidence.](assets/dashboard-call-investigator.png)
+
+Clicking a Calls row opens `dashboard.html?view=call&record=<record_id>` for one model call. Hover remains the fast scanning surface; the investigator is the deeper diagnostic page for a single selected call. Expanded Threads rows and the details panel can still expose explicit investigator actions where a row click already has another meaning.
+
+The investigator separates evidence by confidence:
+
+- `Exact`: logged token callback counts, cost, Codex credits, cache ratio, model, effort, source, and context-window pressure.
+- `Derived`: previous/next calls in the same resolved thread and cache/accounting deltas versus the previous chronological call.
+- `Estimated`: visible new-context estimates, serialized local JSONL upper bounds, candidate serialized-overhead groups, and any remaining gap after that upper bound. These are attribution aids, not exact cached text spans.
+- `Evidence`: redacted local JSONL turn-log evidence loaded at runtime for the selected investigator call.
+
+Previous and next buttons move chronologically within the same resolved thread and keep the selected call in the URL. Cache diagnostics label common patterns such as warm cache reuse, cold resume or stale cache, partial cache miss, uncached spike, and post-compaction. Delta cards compare input, cached input, uncached input, output/reasoning output, and cache ratio to the previous call and use "cache/accounting delta" terminology because logs do not expose exact cached text spans.
+
 ## Details And Context
 
-![Details panel showing aggregate fields for the selected usage row.](assets/dashboard-details.png)
+![Calls view with a selected usage row and the compact Call Details rail collapsed.](assets/dashboard-details.png)
 
-The details panel is structured for progressive disclosure. On desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
+The details rail is collapsed by default to preserve table space. Open `Call Details` when you want a compact aggregate preview without leaving the table. When expanded on desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
+
+The call investigator loads a redacted turn-log evidence window by default when served from localhost with the context API enabled. The default request uses `mode=quick`: redacted tool output is included, no character cap is applied, and serialized local JSONL is reported as a fast character-based upper bound without bucket analysis. The default entry window is still bounded so very long sessions remain responsive. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable.
+
+Use `Run full serialized analysis` when you specifically want tokenizer-counted serialized JSONL groups such as encrypted reasoning/state, local goal metadata, token callback metadata, and rate-limit metadata. This full mode can explain why visible text is much smaller than exact uncached input, but it can overcount because local JSONL includes client metadata that may not be prompt text. Raw grouped text is not returned. `encrypted_content` is an opaque encrypted field found on some reasoning response items. The tracker cannot decrypt it and treats it as serialized state, not readable prompt, assistant, or tool text. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens.
 
 For selected calls, the panel shows:
 
@@ -147,10 +168,12 @@ For selected threads, the panel shows:
 - a compact thread timeline with recent calls, cost, credits, cache, context, and pricing cues
 - direct, subagent, auto-review, attached-call, and spawned-thread relationship counts
 
-When served from localhost, the details panel includes `Load context` and `Include tool output`.
+When served from localhost, the call investigator automatically fetches quick, redacted source evidence for only that call. The details panel still uses an explicit `Show turn log evidence` action so hovering rows does not pull raw context unexpectedly.
 
-- `Load context` fetches a size-limited, redacted context excerpt for only that call.
-- `Include tool output` repeats the request with tool output included, still redacted and capped.
+- `Hide tool output` reloads evidence without tool output when the output is noisy.
+- `Show tool output` appears after hiding it and reloads evidence with redacted tool output included again.
+- `Run full serialized analysis` reloads evidence with tokenizer-counted serialized JSONL group analysis.
+- Compaction events are shown as metadata first. Replacement history is transcript-like content and is returned only after an explicit `Show compaction history` action, with redaction still applied.
 - Raw context is not written to SQLite, CSV, or the generated dashboard HTML.
 - If the server was started with `--no-context-api`, context loading starts off. Use `Enable context loading` in the details panel when you want to allow explicit row actions without restarting the dashboard server.
 
@@ -167,7 +190,7 @@ When served from localhost, the details panel includes `Load context` and `Inclu
 9. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
 10. Use `Copy link` when you want to return to the same filter/sort/selection state later.
 11. Use `Export CSV` when the current filtered aggregate calls need spreadsheet review.
-12. Click into a row and use `Load context` only when aggregate fields are not enough to explain the call.
+12. Open the call investigator when aggregate fields are not enough; the investigator loads redacted evidence automatically when the context API is enabled.
 
 ## Investigating Long Chat Growth
 

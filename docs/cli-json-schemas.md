@@ -50,6 +50,13 @@ Tracked schema ids:
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
 | `codex-usage-tracker-context-settings-v1` | Dashboard server `/api/context-settings` response |
+| `codex-usage-tracker-open-investigator-v1` | Dashboard server `/api/open-investigator` response |
+| `codex-usage-tracker-live-api-v1` | Dashboard server live API payload family marker |
+| `codex-usage-tracker-status-v1` | Dashboard server `/api/status` response |
+| `codex-usage-tracker-calls-v1` | Dashboard server `/api/calls` response |
+| `codex-usage-tracker-call-v1` | Dashboard server `/api/call` response |
+| `codex-usage-tracker-threads-v1` | Dashboard server `/api/threads` response |
+| `codex-usage-tracker-thread-calls-v1` | Dashboard server `/api/thread-calls` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload |
@@ -270,4 +277,4 @@ Most setup and file-writing commands accept `--json` and return a schema-specifi
 - `init-thresholds --json`, `init-projects --json`
 - `support-bundle --json`
 
-`context` already returns JSON because it is an explicit on-demand context request. Treat `codex-usage-tracker-context-v1` output as sensitive local context even though it is redacted and size-limited. MCP returns `codex-usage-tracker-context-disabled-v1` when raw context loading has not been explicitly enabled with `CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1`.
+`context` already returns JSON because it is an explicit on-demand context request. Treat `codex-usage-tracker-context-v1` output as sensitive local context even though it is redacted and size-limited by default. `max_entries=0` requests all matching entries and `max_chars=0` removes the character cap for that explicit request. Tool output and compacted replacement history are omitted unless explicitly requested. Compaction entries may include metadata such as `replacement_history_available`, `replacement_entry_count`, and `replacement_history_included`; replacement text appears only when `include_compaction_history` is true for that local request. MCP returns `codex-usage-tracker-context-disabled-v1` when raw context loading has not been explicitly enabled with `CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1`.

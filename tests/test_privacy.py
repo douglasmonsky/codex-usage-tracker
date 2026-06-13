@@ -97,6 +97,17 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
     assert strict_row["git_branch"] is None
     assert strict_row["git_remote_label"] is None
     assert strict_row["project_tags"] == []
+    assert strict_row["call_initiator"] in {"user", "codex", "unknown"}
+    assert strict_row["call_initiator_reason"] in {
+        "user_message",
+        "post_compaction",
+        "tool_result",
+        "agent_continuation",
+        "no_signal",
+        "thread_source",
+        "missing_origin",
+    }
+    assert strict_row["call_initiator_confidence"] in {"high", "medium", "low"}
     assert csv_rows[0]["cwd"].startswith("[redacted cwd:")
     assert PRIVATE_BRANCH not in json.dumps(strict_payload)
     assert PRIVATE_TAG not in json.dumps(strict_payload)
@@ -192,11 +203,18 @@ def test_context_loading_is_explicit_redacted_and_not_static_html(tmp_path: Path
         assert sentinel not in static_html
     assert default_context["loaded_on_demand"] is True
     assert default_context["raw_context_persisted"] is False
+    assert default_context["context_mode"] == "quick"
+    assert default_context["serialized_evidence"]["deferred_buckets"] is True
     assert PROMPT_SENTINEL in default_context_text
     assert ASSISTANT_SENTINEL in default_context_text
+    assert "call_anchors" not in default_context
+    assert "thread_anchors" not in default_context
+    assert PROMPT_SENTINEL not in static_html
     assert TOOL_OUTPUT_SENTINEL not in default_context_text
-    assert "Tool output omitted by default" in default_context_text
+    assert "Tool output hidden for this request" in default_context_text
+    assert any(entry.get("tool_output_omitted") is True for entry in default_context["entries"])
     assert TOOL_OUTPUT_SENTINEL in tool_context_text
+    assert not any(entry.get("tool_output_omitted") is True for entry in tool_context["entries"])
     for secret in (OPENAI_SECRET, AWS_SECRET, BEARER_SECRET):
         assert secret not in default_context_text
         assert secret not in tool_context_text
@@ -278,6 +296,7 @@ def test_context_server_requires_loopback_origin_token_and_enablement(tmp_path: 
     assert settings_payload["raw_context_persisted"] is False
     assert context_payload["loaded_on_demand"] is True
     assert context_payload["raw_context_persisted"] is False
+    assert context_payload["context_mode"] == "quick"
 
 
 class _PrivacyFixture:

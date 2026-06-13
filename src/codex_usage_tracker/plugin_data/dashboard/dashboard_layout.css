@@ -1,0 +1,89 @@
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44px;
+      gap: 16px;
+      align-items: start;
+    }
+    body[data-detail-panel="expanded"] .grid {
+      grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .grid > section:not(.detail-section) {
+      min-width: 0;
+      overflow: visible;
+    }
+    @media (max-width: 1500px) {
+      body:not([data-active-view="call"]) .grid > section:not(.detail-section) {
+        overflow-x: auto;
+        overflow-y: clip;
+      }
+    }
+    .detail-section {
+      position: sticky;
+      top: 14px;
+      width: 44px;
+      max-height: calc(100dvh - 28px);
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+    }
+    body[data-detail-panel="expanded"] .detail-section {
+      width: auto;
+      overflow: hidden;
+    }
+    .detail-panel-content {
+      display: none;
+      min-height: 0;
+    }
+    body[data-detail-panel="expanded"] .detail-panel-content {
+      display: flex;
+      min-height: 0;
+      flex: 1 1 auto;
+      flex-direction: column;
+    }
+    .detail-toggle {
+      min-width: 42px;
+      min-height: 140px;
+      padding: 10px 6px;
+      border: 0;
+      border-radius: 8px;
+      background: #f8fafc;
+      color: var(--blue);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 780;
+      line-height: 1.15;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      cursor: pointer;
+    }
+    .detail-toggle:hover {
+      background: #eff6ff;
+    }
+    body[data-detail-panel="expanded"] .detail-toggle {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 2;
+      min-width: 0;
+      min-height: 0;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      writing-mode: horizontal-tb;
+    }
+    section h2 {
+      margin: 0;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 15px;
+    }
+    .detail-section h2 {
+      padding-right: 72px;
+    }

@@ -44,10 +44,9 @@ jobs:
         run: python -m compileall src
       - name: Dashboard JavaScript syntax
         run: |
-          node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
-          node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
-          node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
-          node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
+          for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
+            node --check "$file"
+          done
       - name: Release readiness
         run: python scripts/check_release.py
       - name: Whitespace

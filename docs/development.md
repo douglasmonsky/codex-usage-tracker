@@ -38,7 +38,7 @@ fix/<issue-number>-short-description
 docs/<issue-number>-short-description
 chore/<issue-number>-short-description
 test/<issue-number>-short-description
-release/0.5.0
+release/0.6.0
 hotfix/0.3.3
 ```
 
@@ -91,7 +91,7 @@ blocked
 Recommended milestones:
 
 ```text
-0.5.0
+0.6.0
 1.0-readiness
 1.0.0
 ```
@@ -116,10 +116,9 @@ python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
+for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
+  node --check "$file"
+done
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
@@ -147,8 +146,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.5.0
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.5.0
+python scripts/smoke_installed_package.py --from-pypi --version 0.6.0
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.6.0
 ```
 
 `scripts/check_release.py` treats these public-package smoke commands as release-state claims. Keep their `--version` and `codex-usage-tracking==...` values aligned with `pyproject.toml`; the release gate fails when the docs claim a different public version. It also checks that install docs point at the real PyPI distribution, `codex-usage-tracking`, and keep the warning that `codex-usage-tracker` is a different PyPI package.
@@ -187,6 +186,17 @@ codex-usage-tracker expensive --limit 5
 
 Dashboard screenshots in `docs/assets/` and `src/codex_usage_tracker/plugin_data/docs/assets/` must be generated from synthetic aggregate fixture data only.
 
+The tracked dashboard screenshot set is:
+
+- `dashboard-insights.png`
+- `dashboard-calls.png`
+- `dashboard-calls-preview.png`
+- `dashboard-threads.png`
+- `dashboard-details.png`
+- `dashboard-call-investigator.png`
+
+After refreshing screenshots, copy the same files into `src/codex_usage_tracker/plugin_data/docs/assets/` so the installed dashboard guide uses the same synthetic images as the repository README/docs.
+
 Do not use real session logs, real prompts, assistant text, tool output, secrets, or private data in docs or screenshots.
 
 ## Large-History Benchmarking
@@ -195,10 +205,11 @@ Use the synthetic benchmark script when changing SQLite filters, dashboard paylo
 
 ```bash
 python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds
+python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --json --enforce-thresholds
 python scripts/benchmark_synthetic_history.py --rows 500000 --json --enforce-thresholds
 ```
 
-The script creates synthetic aggregate-only SQLite databases and times common release-sensitive paths. It does not read real Codex logs.
+The default mode creates synthetic aggregate-only SQLite databases and times common release-sensitive paths. The optional `--with-source-logs` mode writes synthetic JSONL source files, points aggregate rows at matching synthetic `token_count` lines, times explicit one-call context loading, and fails if normal dashboard payload assembly opens those generated source files. Neither mode reads real Codex logs.
 
 Thresholds are regression sentinels, not universal performance guarantees. Each timed path uses:
 
@@ -223,8 +234,14 @@ Tracked timings:
 | `recommendations_report_seconds` | Recommendation report and thread rollup |
 | `pricing_coverage_seconds` | Pricing coverage report |
 | `project_summary_seconds` | Project summary report |
+| `dashboard_payload_with_source_logs_seconds` | Dashboard payload assembly while synthetic source logs exist; this path must not open those source logs |
+| `context_load_early_line_seconds` | Explicit context load for an early synthetic source-log line |
+| `context_load_middle_line_seconds` | Explicit context load for a middle synthetic source-log line |
+| `context_load_late_line_seconds` | Explicit context load for a late synthetic source-log line |
 
-The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
+Source-log benchmark JSON also reports `source_logs_generated`, `source_log_bytes`, `context_loads`, `context_payload_json_bytes`, `source_scan_ms`, and `serialized_estimate_ms` for explicit context loading.
+
+The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the source-log run is the local gate for context/evidence work; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
 
 ## Release Checklist
 
@@ -238,10 +255,9 @@ python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
+for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
+  node --check "$file"
+done
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
@@ -266,8 +282,8 @@ After the release branch merges, tag from updated `main`, not from an unreviewed
 ```bash
 git switch main
 git pull --ff-only
-git tag -a v0.5.0 -m "codex-usage-tracker 0.5.0"
-git push origin v0.5.0
+git tag -a v0.6.0 -m "codex-usage-tracker 0.6.0"
+git push origin v0.6.0
 ```
 
 Do not create or push release tags without maintainer approval.
@@ -276,7 +292,7 @@ Do not create or push release tags without maintainer approval.
 
 Publishing uses GitHub Actions Trusted Publishing through `.github/workflows/publish.yml`; do not upload from a local machine and do not add PyPI or TestPyPI API tokens.
 
-The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading. Minor release `0.4.0` added Python 3.14 support, release recovery docs, stricter privacy/support-bundle regression coverage, and large-history benchmark thresholds. Patch release `0.4.1` was published by workflow dispatch from `main`; it hardened the PyPI publish workflow and checked off completed 1.0 readiness gates. Minor release `0.5.0` added dashboard localization support and starter language catalogs.
+The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading. Minor release `0.4.0` added Python 3.14 support, release recovery docs, stricter privacy/support-bundle regression coverage, and large-history benchmark thresholds. Patch release `0.4.1` was published by workflow dispatch from `main`; it hardened the PyPI publish workflow and checked off completed 1.0 readiness gates. Minor release `0.5.0` added dashboard localization support and initial language catalogs. Minor release `0.6.0` is the performance and call-drilldown release with SQL-backed live API slices, materialized thread summaries, faster evidence loading, and dashboard runtime module refactors.
 
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.0`
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.1`

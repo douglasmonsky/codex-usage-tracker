@@ -1,0 +1,67 @@
+    @media (max-width: 980px) {
+      .filters, .cards, .grid, .insights-layout, .insight-cards { grid-template-columns: 1fr; }
+      main, header { padding-left: 16px; padding-right: 16px; }
+      table { font-size: 12px; }
+      th, td { padding: 8px; }
+      .header-main { flex-direction: column; }
+      .header-meta { align-items: flex-start; flex-direction: column; }
+      .live-bar { justify-content: flex-start; width: 100%; }
+      .detail-section { position: static; width: 100%; max-height: none; }
+      .detail { max-height: none; }
+      .detail-toggle {
+        width: 100%;
+        min-height: 36px;
+        writing-mode: horizontal-tb;
+      }
+      body[data-detail-panel="expanded"] .detail-toggle {
+        position: static;
+        width: auto;
+        margin: 8px;
+        align-self: flex-end;
+      }
+      .table-tools { align-items: stretch; grid-template-columns: 1fr; }
+      .segmented, .table-actions, .table-caption { grid-row: auto; grid-column: auto; }
+      .segmented, .segmented button { width: 100%; }
+      .grid > section:not(.detail-section) {
+        overflow-x: auto;
+        overflow-y: clip;
+      }
+      .load-control, .language-control, .table-actions { justify-content: space-between; width: 100%; }
+      .pager { width: auto; }
+      .action-status { min-width: 0; }
+      .preset-card { grid-template-columns: 1fr; }
+      body[data-active-view="call"] .call-investigator {
+        grid-template-columns: 1fr;
+      }
+      body[data-active-view="call"] .call-diagnostic-section,
+      body[data-active-view="call"] .call-investigator-header {
+        grid-column: 1 / -1;
+      }
+      body[data-active-view="call"] .call-metric-grid,
+      body[data-active-view="call"] .call-delta-grid,
+      body[data-active-view="call"] .call-metric-grid.two,
+      body[data-active-view="call"] .readout-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      body[data-active-view="call"] .call-nav {
+        justify-content: flex-start;
+      }
+    }
+    @media (min-width: 700px) and (max-width: 980px) {
+      body[data-active-view="call"] .call-metric-grid,
+      body[data-active-view="call"] .call-metric-grid.two,
+      body[data-active-view="call"] .readout-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 700px) {
+      body[data-active-view="call"] .cache-verdict {
+        grid-template-columns: 1fr;
+      }
+      body[data-active-view="call"] .cache-verdict-meta {
+        padding-top: 8px;
+        padding-left: 0;
+        border-top: 1px solid var(--line);
+        border-left: 0;
+      }
+    }

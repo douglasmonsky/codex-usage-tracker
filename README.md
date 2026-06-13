@@ -1,8 +1,8 @@
 # Codex Usage Tracker
 
 <p align="center">
-  <a href="docs/assets/plugin-prompts.png"><img src="docs/assets/plugin-prompts.png?v=short-prompts" alt="Codex Usage Tracker companion prompts for opening the dashboard, finding the heaviest thread, and showing a thread leaderboard." width="49%"></a>
-  <a href="docs/assets/dashboard-calls.png"><img src="docs/assets/dashboard-calls-preview.png?v=usage-dashboard" alt="Codex Usage Tracker dashboard showing filters, usage totals, call rows, and call details." width="49%"></a>
+  <a href="docs/assets/dashboard-calls.png"><img src="docs/assets/dashboard-calls-preview.png?v=runtime-modules" alt="Codex Usage Tracker dashboard showing filters, usage totals, and named model-call rows." width="49%"></a>
+  <a href="docs/assets/dashboard-call-investigator.png"><img src="docs/assets/dashboard-call-investigator.png?v=runtime-modules" alt="Codex Usage Tracker call investigator showing token accounting, cache diagnostics, and redacted runtime evidence." width="49%"></a>
 </p>
 
 Local-first dashboard, Codex plugin, and companion skill for understanding where your Codex tokens and usage credits are going.
@@ -47,7 +47,31 @@ pipx install "git+https://github.com/douglasmonsky/codex-usage-tracker.git"
 
 Want Codex to do it for you? Paste: `Install codex-usage-tracking with pipx, run codex-usage-tracker setup, and open the Codex Usage Tracker dashboard.`
 
-After plugin discovery, Codex can use the companion usage skill to refresh local aggregates, call the MCP tools, and explain usage patterns conversationally. Examples: [MCP And Codex Skills](docs/mcp.md).
+## Dashboard Preview
+
+The Calls table is the main investigation surface: filter, sort, inspect details, and export the exact aggregate rows you are looking at.
+
+![Calls view showing filters, totals, the model-call table, and the compact details rail.](docs/assets/dashboard-calls.png?v=runtime-modules)
+
+Click a call to open the dedicated investigator for exact token accounting, cache/accounting deltas, local serialized evidence buckets, and redacted turn-log evidence loaded only at runtime.
+
+![Call investigator showing token accounting, cache diagnostics, serialized evidence groups, and raw evidence controls.](docs/assets/dashboard-call-investigator.png?v=runtime-modules)
+
+Threads view groups related calls so long chats, subagents, and auto-review passes are easier to reason about as one work session.
+
+![Threads view with one expanded thread and its calls in chronological order.](docs/assets/dashboard-threads.png?v=runtime-modules)
+
+Insights still gives a fast triage layer for costly threads, low cache reuse, context bloat, and pricing gaps.
+
+![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=runtime-modules)
+
+The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt and chat previews are synthetic. They do not contain prompts from local logs, assistant responses, tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
+
+If this helped you track Codex usage, starring the repo helps others find it. Issues and feature requests are welcome.
+
+## Companion Skill And Plugin
+
+The dashboard is the core product surface. The Codex plugin and companion usage skill are add-ons that let Codex refresh local aggregates, call the MCP tools, and explain usage patterns conversationally after plugin discovery. Examples: [MCP And Codex Skills](docs/mcp.md).
 
 <p align="center">
   <a href="docs/assets/plugin-thread-leaderboard.png"><img src="docs/assets/plugin-thread-leaderboard.png?v=thread-leaderboard" alt="Synthetic Codex chat preview showing the companion skill ranking threads by token usage after refreshing the local aggregate index." width="86%"></a>
@@ -64,28 +88,6 @@ More install paths: [Install Guide](docs/install.md).
 ## Platform Support
 
 The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and localhost server are Python-based and CI-tested on Ubuntu for Python 3.10-3.14. The installed-package Docker smoke path uses `python:3.14-slim` by default so packaged resources and CLI entry points are exercised on the newest supported runtime. It defaults to `~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data; pass `--codex-home` or `--db` when your local layout differs. Codex plugin discovery depends on Codex's local plugin directories on your machine, so run `codex-usage-tracker doctor` after setup if plugin registration does not appear in Codex.
-
-## Dashboard Preview
-
-The Calls table is the main investigation surface: filter, sort, inspect details, and export the exact aggregate rows you are looking at.
-
-![Calls view showing filters, totals, the model-call table, and the details panel.](docs/assets/dashboard-calls.png?v=aa16502)
-
-Threads view groups related calls so long chats, subagents, and auto-review passes are easier to reason about as one work session.
-
-![Threads view with one expanded thread and its calls in chronological order.](docs/assets/dashboard-threads.png?v=3cd7338)
-
-The details panel keeps the primary cost, cache, context, allowance, and pricing signals visible before raw identifiers.
-
-![Details panel showing aggregate fields for the selected usage row.](docs/assets/dashboard-details.png?v=84cf6dd)
-
-Insights still gives a fast triage layer for costly threads, low cache reuse, context bloat, and pricing gaps.
-
-![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=4a40e4f)
-
-The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt and chat previews are synthetic. They do not contain prompts from local logs, assistant responses, tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
-
-If this helped you track Codex usage, starring the repo helps others find it. Issues and feature requests are welcome.
 
 ## Why This Exists
 
@@ -132,7 +134,7 @@ Then:
 4. Use investigation presets for highest-cost threads, highest-credit calls, context bloat, cache misses, pricing gaps, or estimated-price review.
 5. Open `Threads` to see how a conversation grew and whether subagent or auto-review work attached to it.
 6. Hover or click rows to inspect aggregate fields in `Call Details`.
-7. Use `Load context` only when aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
+7. Use `Show turn log evidence` only when aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
 
 Optional allowance context:
 
@@ -155,7 +157,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 ## Dashboard Language
 
-The dashboard supports localized UI text. English is the canonical catalog, and the project includes starter locale catalogs for common dashboard languages.
+The dashboard supports localized UI text. English is the canonical catalog, and the project includes translated locale catalogs for common dashboard languages.
 
 Set the initial dashboard language with `--lang`:
 
@@ -171,7 +173,7 @@ CODEX_USAGE_TRACKER_LANG=vi codex-usage-tracker serve-dashboard --open
 
 The dashboard also includes a language selector. Browser selections are stored locally and can override the generated default for that browser.
 
-Supported starter locales include English, Vietnamese, Spanish, French, German, Portuguese, Japanese, Simplified Chinese, Korean, Russian, Italian, and Arabic. This localizes dashboard UI text, not the full CLI output or data exports.
+Supported dashboard locales include English, Vietnamese, Spanish, French, German, Portuguese, Japanese, Simplified Chinese, Korean, Russian, Italian, and Arabic. This localizes dashboard UI text, not raw Codex log content, thread names, project names, paths, full CLI output, or data exports.
 
 ### Adding A Dashboard Language
 

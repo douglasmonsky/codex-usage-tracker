@@ -39,14 +39,22 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(rows) == 1
     assert rows[0]["record_id"] == "legacy-record"
     assert rows[0]["source_file"] == "/tmp/synthetic-session.jsonl"
+    assert rows[0]["call_initiator"] is None
+    assert rows[0]["call_initiator_reason"] is None
+    assert rows[0]["call_initiator_confidence"] is None
+    assert rows[0]["is_archived"] == 0
+    assert rows[0]["thread_key"] is None
+    assert rows[0]["thread_call_index"] is None
+    assert rows[0]["previous_record_id"] is None
+    assert rows[0]["next_record_id"] is None
     assert rows[0]["thread_source"] is None
     assert rows[0]["parent_thread_name"] is None
     assert rows[0]["model_context_window"] is None
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 2
+    assert state["schema_version"] == 7
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7]
 
 
 def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
@@ -63,14 +71,17 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     metadata = refresh_metadata(db_path)
 
     assert first.parsed_events == 1
-    assert second.parsed_events == 1
+    assert second.parsed_events == 0
+    assert second.inserted_or_updated_events == 0
     assert first_count == 2
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "2"
-    assert metadata["parsed_events"] == "1"
-    assert metadata["inserted_or_updated_events"] == "1"
+    assert metadata["schema_version"] == "7"
+    assert metadata["parsed_events"] == "0"
+    assert metadata["inserted_or_updated_events"] == "0"
+    assert metadata["parsed_source_files"] == "0"
+    assert metadata["skipped_source_files"] == "1"
 
 
 def test_csv_export_keeps_current_columns_after_legacy_migration(tmp_path: Path) -> None:
@@ -85,6 +96,14 @@ def test_csv_export_keeps_current_columns_after_legacy_migration(tmp_path: Path)
 
     assert exported == 1
     assert rows[0]["record_id"] == "legacy-record"
+    assert rows[0]["call_initiator"] == ""
+    assert rows[0]["call_initiator_reason"] == ""
+    assert rows[0]["call_initiator_confidence"] == ""
+    assert rows[0]["is_archived"] == "0"
+    assert rows[0]["thread_key"] == ""
+    assert rows[0]["thread_call_index"] == ""
+    assert rows[0]["previous_record_id"] == ""
+    assert rows[0]["next_record_id"] == ""
     assert list(rows[0]) == EVENT_COLUMNS
 
 

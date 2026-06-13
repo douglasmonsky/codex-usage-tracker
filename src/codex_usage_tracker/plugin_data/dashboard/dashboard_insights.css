@@ -1,0 +1,190 @@
+    .insights-panel {
+      margin-bottom: 18px;
+    }
+    .insights-panel[hidden] {
+      display: none;
+    }
+    .insights-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.8fr);
+      gap: 16px;
+      padding: 14px;
+    }
+    .section-heading,
+    .preset-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .section-heading h2,
+    .preset-heading h2 {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      font-size: 15px;
+    }
+    .section-heading p,
+    .preset-heading p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 680;
+      line-height: 1.35;
+    }
+    .insight-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .insight-card {
+      display: grid;
+      align-content: start;
+      min-height: 172px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+    .insight-card[data-severity="high"] {
+      border-color: #fecaca;
+      background: #fff7f7;
+    }
+    .insight-card[data-severity="medium"] {
+      border-color: #fed7aa;
+      background: #fffaf0;
+    }
+    .insight-card[data-severity="review"] {
+      border-color: #bfdbfe;
+      background: #f7fbff;
+    }
+    .insight-card h3 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .insight-card strong {
+      display: block;
+      margin: 9px 0 5px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+    .insight-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+    .insight-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .severity-chip,
+    .preset-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 780;
+      white-space: nowrap;
+    }
+    .severity-chip.high {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: var(--red);
+    }
+    .severity-chip.medium {
+      border-color: #fed7aa;
+      background: #fff7ed;
+      color: var(--amber);
+    }
+    .severity-chip.review {
+      border-color: #bfdbfe;
+      background: #eff6ff;
+      color: var(--blue);
+    }
+    .insight-action {
+      width: max-content;
+      max-width: 100%;
+      margin-top: 12px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 780;
+      text-align: left;
+      cursor: pointer;
+    }
+    .insight-action:hover,
+    .preset-clear:hover {
+      text-decoration: underline;
+    }
+    .preset-panel {
+      min-width: 0;
+    }
+    .preset-clear {
+      min-height: 28px;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 760;
+      cursor: pointer;
+    }
+    .preset-status {
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 680;
+    }
+    .preset-list {
+      display: grid;
+      gap: 8px;
+    }
+    .preset-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 68px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+    }
+    .preset-card[aria-pressed="true"] {
+      border-color: #bfdbfe;
+      background: #eff6ff;
+    }
+    .preset-copy b {
+      display: block;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+    .preset-copy span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      line-height: 1.32;
+    }

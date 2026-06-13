@@ -36,8 +36,12 @@ SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
     (
         re.compile(
-            r"(?i)\b([A-Z0-9_ -]*(?:password|api[_-]?key|token|secret|credential|private[_-]?key)[A-Z0-9_ -]*)\s*[:=]\s*"
-            r"(['\"]?)[^'\"\s,;}]+\2"
+            r"(?ix)\b("
+            r"[A-Z0-9_ -]*(?:password|api[_-]?key|secret|credential|private[_-]?key)[A-Z0-9_ -]*"
+            r"|(?:access|auth|bearer|refresh|session|api|github|gitlab|slack|openai|client|id)[ _-]*token"
+            r"|token[ _-]*(?:id|key|secret|value)"
+            r"|token"
+            r")\s*[:=]\s*(['\"]?)[^'\"\s,;}]+\2"
         ),
         r"\1=[REDACTED_SECRET]",
     ),

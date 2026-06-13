@@ -9,7 +9,9 @@ import shutil
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -18,6 +20,7 @@ SRC_PATH = REPO_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+from codex_usage_tracker.context import load_call_context  # noqa: E402
 from codex_usage_tracker.dashboard import dashboard_payload  # noqa: E402
 from codex_usage_tracker.models import UsageEvent  # noqa: E402
 from codex_usage_tracker.reports import (  # noqa: E402
@@ -30,12 +33,35 @@ from codex_usage_tracker.store import (  # noqa: E402
     init_db,
     query_dashboard_event_count,
     query_dashboard_events,
+    refresh_usage_event_links,
     upsert_usage_events,
 )
 
 DEFAULT_ROW_COUNTS = (10_000, 100_000, 500_000)
+SYNTHETIC_THREAD_NAMES = (
+    "Codex Usage Tracker Development",
+    "BugsInPy Solve Campaign",
+    "Algebra Steps Visual Model",
+    "Dashboard Performance Audit",
+    "Release Readiness Checklist",
+    "Plugin Prompt UX Polish",
+    "Thread Cost Leaderboard",
+    "Context Drilldown Diagnostics",
+    "Project Alias Cleanup",
+    "Pricing Coverage Review",
+    "Allowance Settings Calibration",
+    "CSV Export Validation",
+    "MCP Skill Smoke Test",
+    "Parser Drift Investigation",
+    "Subagent Usage Review",
+    "Auto Review Cost Spike",
+    "Synthetic Fixture Builder",
+    "Long Chat Cache Study",
+    "Documentation Screenshot Refresh",
+    "Dashboard Mobile QA",
+)
 BENCHMARK_THRESHOLDS: dict[str, dict[str, float]] = {
-    "populate_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.60},
+    "populate_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.90},
     "active_dashboard_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
     "all_history_dashboard_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
     "since_until_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
@@ -46,8 +72,28 @@ BENCHMARK_THRESHOLDS: dict[str, dict[str, float]] = {
     "recommendations_report_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.65},
     "pricing_coverage_seconds": {"base_seconds": 0.50, "per_10k_seconds": 0.06},
     "project_summary_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.45},
+    "dashboard_payload_with_source_logs_seconds": {
+        "base_seconds": 0.75,
+        "per_10k_seconds": 0.20,
+    },
+    "context_load_early_line_seconds": {"base_seconds": 0.50, "per_10k_seconds": 0.08},
+    "context_load_middle_line_seconds": {"base_seconds": 0.75, "per_10k_seconds": 0.12},
+    "context_load_late_line_seconds": {"base_seconds": 1.00, "per_10k_seconds": 0.16},
 }
 T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class SourceLogRecord:
+    source_file: Path
+    line_number: int
+
+
+@dataclass(frozen=True)
+class SourceLogBundle:
+    records: list[SourceLogRecord]
+    paths: frozenset[Path]
+    bytes_written: int
 
 
 def main() -> int:
@@ -74,6 +120,14 @@ def main() -> int:
         default=1.0,
         help="Multiplier for timing thresholds on slower local machines. Defaults to 1.0.",
     )
+    parser.add_argument(
+        "--with-source-logs",
+        action="store_true",
+        help=(
+            "Generate synthetic JSONL source files and benchmark explicit context loading. "
+            "Generated content is synthetic only and is never copied from real Codex logs."
+        ),
+    )
     args = parser.parse_args()
 
     if any(count <= 0 for count in args.rows):
@@ -98,6 +152,7 @@ def main() -> int:
                 db_dir=db_dir,
                 batch_size=args.batch_size,
                 threshold_scale=args.threshold_scale,
+                with_source_logs=args.with_source_logs,
             )
             for row_count in args.rows
         ]
@@ -138,15 +193,30 @@ def benchmark_size(
     db_dir: Path,
     batch_size: int,
     threshold_scale: float = 1.0,
+    with_source_logs: bool = False,
 ) -> dict[str, Any]:
     db_path = db_dir / f"synthetic-{row_count}.sqlite3"
     if db_path.exists():
         db_path.unlink()
     config = _write_benchmark_config(db_dir)
+    source_bundle = (
+        _write_synthetic_source_logs(db_dir / f"source-logs-{row_count}", row_count)
+        if with_source_logs
+        else None
+    )
     populate_start = time.perf_counter()
     for start in range(0, row_count, batch_size):
         end = min(start + batch_size, row_count)
-        upsert_usage_events(_synthetic_events(start, end), db_path=db_path)
+        upsert_usage_events(
+            _synthetic_events(
+                start,
+                end,
+                source_records=source_bundle.records if source_bundle else None,
+            ),
+            db_path=db_path,
+            refresh_links=False,
+        )
+    refresh_usage_event_links(db_path=db_path)
     populate_seconds = time.perf_counter() - populate_start
 
     active_rows, active_dashboard_query_seconds = _time_call(
@@ -181,8 +251,8 @@ def benchmark_size(
             min_tokens=9_000,
         )
     )
-    active_payload, dashboard_payload_active_seconds = _time_call(
-        lambda: dashboard_payload(
+    def payload_action() -> dict[str, Any]:
+        return dashboard_payload(
             db_path=db_path,
             limit=500,
             pricing_path=config["pricing_path"],
@@ -191,7 +261,13 @@ def benchmark_size(
             projects_path=config["projects_path"],
             include_archived=False,
         )
-    )
+
+    if source_bundle:
+        active_payload, dashboard_payload_active_seconds = _time_call(
+            lambda: _run_without_source_log_reads(source_bundle.paths, payload_action)
+        )
+    else:
+        active_payload, dashboard_payload_active_seconds = _time_call(payload_action)
     thread_summary, thread_summary_seconds = _time_call(
         lambda: build_summary_report(
             db_path=db_path,
@@ -255,6 +331,16 @@ def benchmark_size(
         "pricing_coverage_seconds": pricing_coverage_seconds,
         "project_summary_seconds": project_summary_seconds,
     }
+    context_metrics: dict[str, Any] = {}
+    if source_bundle:
+        timings["dashboard_payload_with_source_logs_seconds"] = (
+            dashboard_payload_active_seconds
+        )
+        context_metrics = _benchmark_context_loads(
+            db_path=db_path,
+            row_count=row_count,
+        )
+        timings.update(context_metrics["timings"])
     threshold_results, threshold_failures = _evaluate_thresholds(
         timings,
         row_count=row_count,
@@ -286,6 +372,13 @@ def benchmark_size(
         "recommendations_rows": recommendations.payload["row_count"],
         "pricing_coverage_rows": len(pricing_coverage.payload["rows"]),
         "project_summary_rows": len(project_summary.rows),
+        "source_logs_generated": len(source_bundle.paths) if source_bundle else 0,
+        "source_log_bytes": source_bundle.bytes_written if source_bundle else 0,
+        "context_loads": context_metrics.get("loads", {}),
+        "context_load_seconds": context_metrics.get("context_load_seconds"),
+        "context_payload_json_bytes": context_metrics.get("context_payload_json_bytes"),
+        "source_scan_ms": context_metrics.get("source_scan_ms"),
+        "serialized_estimate_ms": context_metrics.get("serialized_estimate_ms"),
         "threshold_status": "fail" if threshold_failures else "pass",
         "thresholds": threshold_results,
         "threshold_failures": threshold_failures,
@@ -342,6 +435,92 @@ def _time_call(action: Callable[[], T]) -> tuple[T, float]:
     return value, round(time.perf_counter() - start, 6)
 
 
+def _run_without_source_log_reads(
+    source_paths: frozenset[Path],
+    action: Callable[[], T],
+) -> T:
+    with _fail_on_source_log_open(source_paths):
+        return action()
+
+
+@contextmanager
+def _fail_on_source_log_open(source_paths: frozenset[Path]) -> Iterator[None]:
+    blocked = {path.resolve() for path in source_paths}
+    original_open = Path.open
+
+    def guarded_open(self: Path, *args: Any, **kwargs: Any) -> Any:
+        try:
+            resolved = self.resolve()
+        except OSError:
+            resolved = self
+        if resolved in blocked:
+            raise RuntimeError(f"dashboard_payload opened synthetic source log: {self}")
+        return original_open(self, *args, **kwargs)
+
+    Path.open = guarded_open  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        Path.open = original_open  # type: ignore[method-assign]
+
+
+def _benchmark_context_loads(
+    *,
+    db_path: Path,
+    row_count: int,
+) -> dict[str, Any]:
+    targets = {
+        "early": 0,
+        "middle": row_count // 2,
+        "late": row_count - 1,
+    }
+    timings: dict[str, float] = {}
+    loads: dict[str, dict[str, Any]] = {}
+    context_load_seconds: float | None = None
+    context_payload_json_bytes: int | None = None
+    source_scan_ms: float | None = None
+    serialized_estimate_ms: float | None = None
+    for label, index in targets.items():
+        record_id = f"record-{index:08d}"
+        payload, elapsed = _time_call(
+            lambda record_id=record_id: load_call_context(
+                record_id=record_id,
+                db_path=db_path,
+                max_chars=0,
+                max_entries=0,
+                include_tool_output=True,
+                include_compaction_history=True,
+                diagnostics=True,
+            )
+        )
+        timing_name = f"context_load_{label}_line_seconds"
+        timings[timing_name] = elapsed
+        diagnostics = payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else {}
+        loads[label] = {
+            "record_id": record_id,
+            "seconds": elapsed,
+            "entries_returned": len(payload.get("entries") or []),
+            "visible_char_count": payload.get("visible_char_count"),
+            "visible_token_estimate": payload.get("visible_token_estimate"),
+            "context_payload_json_bytes": diagnostics.get("json_bytes"),
+            "source_scan_ms": diagnostics.get("source_scan_ms"),
+            "serialized_estimate_ms": diagnostics.get("serialized_estimate_ms"),
+        }
+        if label == "middle":
+            context_load_seconds = elapsed
+            context_payload_json_bytes = _optional_int(diagnostics.get("json_bytes"))
+            source_scan_ms = _optional_float(diagnostics.get("source_scan_ms"))
+            serialized_estimate_ms = _optional_float(diagnostics.get("serialized_estimate_ms"))
+    return {
+        "timings": timings,
+        "loads": loads,
+        "context_load_seconds": context_load_seconds,
+        "context_payload_json_bytes": context_payload_json_bytes,
+        "source_scan_ms": source_scan_ms,
+        "serialized_estimate_ms": serialized_estimate_ms,
+    }
+
+
 def _evaluate_thresholds(
     timings: dict[str, float],
     *,
@@ -373,58 +552,291 @@ def _evaluate_thresholds(
     return results, failures
 
 
-def _synthetic_events(start: int, end: int) -> Iterable[UsageEvent]:
+def _optional_int(value: object) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value: object) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _write_synthetic_source_logs(source_dir: Path, row_count: int) -> SourceLogBundle:
+    events_per_file = 500
+    records: list[SourceLogRecord | None] = [None] * row_count
+    lines_by_path: dict[Path, list[str]] = {}
+    for index in range(row_count):
+        path = _synthetic_source_file(source_dir, index, events_per_file=events_per_file)
+        lines = lines_by_path.setdefault(path, [])
+        if not lines:
+            lines.append(_jsonl_line("session_meta", {"id": f"session-{index % 2500:04d}"}))
+        turn_id = f"turn-{index:08d}"
+        for envelope in _synthetic_source_envelopes(index, turn_id):
+            lines.append(json.dumps(envelope, separators=(",", ":"), sort_keys=True) + "\n")
+        records[index] = SourceLogRecord(
+            source_file=path,
+            line_number=len(lines),
+        )
+
+    bytes_written = 0
+    for path, lines in lines_by_path.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = "".join(lines)
+        path.write_text(payload, encoding="utf-8")
+        bytes_written += len(payload.encode("utf-8"))
+
+    return SourceLogBundle(
+        records=[record for record in records if record is not None],
+        paths=frozenset(lines_by_path),
+        bytes_written=bytes_written,
+    )
+
+
+def _synthetic_source_file(
+    source_dir: Path,
+    index: int,
+    *,
+    events_per_file: int,
+) -> Path:
+    scope = "archived_sessions" if index % 11 == 0 else "sessions"
+    return source_dir / scope / f"rollout-synthetic-{index // events_per_file:05d}.jsonl"
+
+
+def _synthetic_source_envelopes(index: int, turn_id: str) -> list[dict[str, Any]]:
+    metrics = _synthetic_token_metrics(index)
+    day = (index % 28) + 1
+    timestamp = f"2026-05-{day:02d}T12:{index % 60:02d}:00Z"
+    thread_name = _synthetic_thread_name(index)
+    envelopes = [
+        _envelope(
+            "turn_context",
+            timestamp,
+            {
+                "turn_id": turn_id,
+                "model": metrics["model"],
+                "effort": metrics["effort"],
+                "cwd": f"/tmp/project-{index % 50}",
+                "current_date": f"2026-05-{day:02d}",
+                "timezone": "UTC",
+                "summary": f"Synthetic benchmark turn {index}",
+            },
+        ),
+        _envelope(
+            "response_item",
+            timestamp,
+            {
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": (
+                            "Synthetic user request for benchmark coverage. "
+                            f"Thread {thread_name}, call {index}."
+                        ),
+                    }
+                ],
+            },
+        ),
+        _envelope(
+            "response_item",
+            timestamp,
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": (
+                            "Synthetic assistant progress update for benchmark coverage. "
+                            "No real transcript content is used."
+                        ),
+                    }
+                ],
+            },
+        ),
+        _envelope(
+            "response_item",
+            timestamp,
+            {
+                "type": "function_call_output",
+                "name": "exec_command",
+                "output": (
+                    "Synthetic tool output placeholder. "
+                    "This is deterministic benchmark text, not a real command result."
+                ),
+            },
+        ),
+    ]
+    if index % 37 == 0:
+        envelopes.append(
+            _envelope(
+                "compacted",
+                timestamp,
+                {
+                    "message": "Synthetic compaction marker.",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "output_text",
+                                    "text": "Synthetic compacted replacement summary.",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+        )
+    envelopes.append(_synthetic_token_envelope(index, timestamp, metrics))
+    return envelopes
+
+
+def _synthetic_token_envelope(
+    index: int,
+    timestamp: str,
+    metrics: dict[str, Any],
+) -> dict[str, Any]:
+    cumulative_input_tokens = metrics["input_tokens"] + index * 5
+    cumulative_cached_input_tokens = metrics["cached_input_tokens"] + index
+    cumulative_output_tokens = metrics["output_tokens"] + index
+    cumulative_reasoning_output_tokens = metrics["reasoning_tokens"] + index // 2
+    cumulative_total_tokens = metrics["total_tokens"] + index * 10
+    return _envelope(
+        "event_msg",
+        timestamp,
+        {
+            "type": "token_count",
+            "info": {
+                "last_token_usage": {
+                    "input_tokens": metrics["input_tokens"],
+                    "cached_input_tokens": metrics["cached_input_tokens"],
+                    "output_tokens": metrics["output_tokens"],
+                    "reasoning_output_tokens": metrics["reasoning_tokens"],
+                    "total_tokens": metrics["total_tokens"],
+                },
+                "total_token_usage": {
+                    "input_tokens": cumulative_input_tokens,
+                    "cached_input_tokens": cumulative_cached_input_tokens,
+                    "output_tokens": cumulative_output_tokens,
+                    "reasoning_output_tokens": cumulative_reasoning_output_tokens,
+                    "total_tokens": cumulative_total_tokens,
+                },
+                "model_context_window": 200_000,
+            },
+        },
+    )
+
+
+def _jsonl_line(entry_type: str, payload: dict[str, Any]) -> str:
+    return json.dumps(_envelope(entry_type, "2026-05-01T00:00:00Z", payload)) + "\n"
+
+
+def _envelope(entry_type: str, timestamp: str, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "timestamp": timestamp,
+        "type": entry_type,
+        "payload": payload,
+    }
+
+
+def _synthetic_token_metrics(index: int) -> dict[str, Any]:
+    is_review = index % 17 == 0
+    model = "codex-auto-review" if is_review else "gpt-5.5"
+    effort = "high" if index % 3 == 0 else "low"
+    input_tokens = 8_000 + (index % 9_000)
+    cached_input_tokens = index % 2_500
+    output_tokens = 80 + (index % 450)
+    reasoning_tokens = 10 + (index % 120)
+    return {
+        "model": model,
+        "effort": effort,
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "output_tokens": output_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "total_tokens": input_tokens + output_tokens,
+    }
+
+
+def _synthetic_events(
+    start: int,
+    end: int,
+    *,
+    source_records: list[SourceLogRecord] | None = None,
+) -> Iterable[UsageEvent]:
     for index in range(start, end):
         day = (index % 28) + 1
         is_review = index % 17 == 0
         is_subagent = index % 13 == 0
-        model = "codex-auto-review" if is_review else "gpt-5.5"
-        effort = "high" if index % 3 == 0 else "low"
-        input_tokens = 8_000 + (index % 9_000)
-        cached_input_tokens = index % 2_500
-        output_tokens = 80 + (index % 450)
-        reasoning_tokens = 10 + (index % 120)
-        total_tokens = input_tokens + output_tokens
+        metrics = _synthetic_token_metrics(index)
         session_id = f"session-{index % 2500:04d}"
+        source_record = source_records[index] if source_records is not None else None
         source_file = (
-            f"/tmp/synthetic/archived_sessions/{index % 2500}.jsonl"
-            if index % 11 == 0
-            else f"/tmp/synthetic/{index % 2500}.jsonl"
+            str(source_record.source_file)
+            if source_record is not None
+            else (
+                f"/tmp/synthetic/archived_sessions/{index % 2500}.jsonl"
+                if index % 11 == 0
+                else f"/tmp/synthetic/{index % 2500}.jsonl"
+            )
         )
+        thread_name = _synthetic_thread_name(index)
+        call_initiator = "codex" if is_subagent or is_review else "user"
+        call_reason = "thread_source" if is_subagent or is_review else "user_message"
         yield UsageEvent(
             record_id=f"record-{index:08d}",
             session_id=session_id,
-            thread_name=f"Thread {index % 500}",
+            thread_name=thread_name,
             session_updated_at=f"2026-05-{day:02d}T23:00:00Z",
             event_timestamp=f"2026-05-{day:02d}T12:{index % 60:02d}:00Z",
             source_file=source_file,
-            line_number=index + 1,
+            line_number=source_record.line_number if source_record is not None else index + 1,
             turn_id=f"turn-{index:08d}",
             turn_timestamp=f"2026-05-{day:02d}T12:{index % 60:02d}:00Z",
             cwd=f"/tmp/project-{index % 50}",
-            model=model,
-            effort=effort,
+            model=metrics["model"],
+            effort=metrics["effort"],
             current_date=f"2026-05-{day:02d}",
             timezone="UTC",
+            call_initiator=call_initiator,
+            call_initiator_reason=call_reason,
+            call_initiator_confidence="medium" if call_initiator == "codex" else "high",
+            is_archived=1 if "/archived_sessions/" in source_file else 0,
+            thread_key=f"thread:{thread_name}",
+            thread_call_index=None,
+            previous_record_id=None,
+            next_record_id=None,
             thread_source="subagent" if is_subagent or is_review else "user",
             subagent_type="guardian" if is_review else "thread_spawn" if is_subagent else None,
             agent_role="reviewer" if is_review else "worker" if is_subagent else None,
             agent_nickname=None,
             parent_session_id=f"session-{(index - 1) % 2500:04d}" if is_subagent or is_review else None,
-            parent_thread_name=f"Thread {(index - 1) % 500}" if is_subagent or is_review else None,
+            parent_thread_name=_synthetic_thread_name(index - 1) if is_subagent or is_review else None,
             parent_session_updated_at=f"2026-05-{day:02d}T22:00:00Z" if is_subagent or is_review else None,
             model_context_window=200_000,
-            input_tokens=input_tokens,
-            cached_input_tokens=cached_input_tokens,
-            output_tokens=output_tokens,
-            reasoning_output_tokens=reasoning_tokens,
-            total_tokens=total_tokens,
-            cumulative_input_tokens=input_tokens + index * 5,
-            cumulative_cached_input_tokens=cached_input_tokens + index,
-            cumulative_output_tokens=output_tokens + index,
-            cumulative_reasoning_output_tokens=reasoning_tokens + index // 2,
-            cumulative_total_tokens=total_tokens + index * 10,
+            input_tokens=metrics["input_tokens"],
+            cached_input_tokens=metrics["cached_input_tokens"],
+            output_tokens=metrics["output_tokens"],
+            reasoning_output_tokens=metrics["reasoning_tokens"],
+            total_tokens=metrics["total_tokens"],
+            cumulative_input_tokens=metrics["input_tokens"] + index * 5,
+            cumulative_cached_input_tokens=metrics["cached_input_tokens"] + index,
+            cumulative_output_tokens=metrics["output_tokens"] + index,
+            cumulative_reasoning_output_tokens=metrics["reasoning_tokens"] + index // 2,
+            cumulative_total_tokens=metrics["total_tokens"] + index * 10,
         )
+
+
+def _synthetic_thread_name(index: int) -> str:
+    return SYNTHETIC_THREAD_NAMES[index % len(SYNTHETIC_THREAD_NAMES)]
 
 
 if __name__ == "__main__":
