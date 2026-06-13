@@ -331,11 +331,13 @@
 
     function renderCallNavigation(row, previous, next) {
       const backUrl = tableUrlForRow(row);
+      const previousRecordId = previous?.record_id || row.previous_record_id || '';
+      const nextRecordId = next?.record_id || row.next_record_id || '';
       return `
         <div class="call-nav">
-          <a class="toolbar-button" href="${escapeHtml(backUrl)}">${escapeHtml(t('button.back_to_dashboard'))}</a>
-          <button class="toolbar-button" type="button" data-call-nav-record="${escapeHtml(previous?.record_id || '')}" ${previous ? '' : 'disabled'}>${escapeHtml(t('button.previous_call'))}</button>
-          <button class="toolbar-button" type="button" data-call-nav-record="${escapeHtml(next?.record_id || '')}" ${next ? '' : 'disabled'}>${escapeHtml(t('button.next_call'))}</button>
+          <a class="toolbar-button" href="${escapeHtml(backUrl)}" data-dashboard-route="calls">${escapeHtml(t('button.back_to_dashboard'))}</a>
+          <button class="toolbar-button" type="button" data-call-nav-record="${escapeHtml(previousRecordId)}" ${previousRecordId ? '' : 'disabled'}>${escapeHtml(t('button.previous_call'))}</button>
+          <button class="toolbar-button" type="button" data-call-nav-record="${escapeHtml(nextRecordId)}" ${nextRecordId ? '' : 'disabled'}>${escapeHtml(t('button.next_call'))}</button>
           <button class="toolbar-button" type="button" data-copy-call-link="${escapeHtml(row.record_id || '')}">${escapeHtml(t('button.copy_link'))}</button>
         </div>
       `;
@@ -438,7 +440,7 @@
                   ${callMetricCard(t('call.serialized_candidate'), serializedCandidateValue, evidenceStats ? t('call.serialized_candidate_hint') : t('call.evidence_label'))}
                   ${callMetricCard(t('call.remaining_after_serialized'), remainingAfterSerializedValue, evidenceStats ? t('call.remaining_after_serialized_hint') : t('call.evidence_label'))}
                 </div>
-                ${renderSerializedEvidenceBreakdown(evidenceStats)}
+                ${renderSerializedEvidenceBreakdown(row, evidenceStats)}
                 <p class="muted">${escapeHtml(t('call.context_estimate_hint'))}</p>
               </section>
               <section class="call-diagnostic-section raw-evidence">
@@ -568,13 +570,10 @@
       const toolOutputToggle = stored?.status === 'loaded' && !disabled
         ? `<button class="context-button secondary" type="button" data-context-toggle-tool-output>${escapeHtml(requestState.includeToolOutput ? t('button.hide_tool_output') : t('button.show_tool_output'))}</button>`
         : '';
-      const fullAnalysisButton = stored?.status === 'loaded' && requestState.mode !== 'full' && !disabled
-        ? `<button class="context-button secondary" type="button" data-context-full-analysis>${escapeHtml(t('button.full_serialized_analysis'))}</button>`
-        : '';
       const manualLoadButton = !automatic && stored?.status !== 'loaded'
         ? `<button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.show_turn_evidence'))}</button>`
         : '';
-      const actionHtml = [manualLoadButton, toolOutputToggle, fullAnalysisButton, enableButton].filter(Boolean).join('');
+      const actionHtml = [manualLoadButton, toolOutputToggle, enableButton].filter(Boolean).join('');
       const resultHtml = stored?.status === 'loaded'
         ? renderContext(stored.payload)
         : stored?.status === 'loading'
@@ -588,8 +587,13 @@
       `;
     }
 
-    function renderSerializedEvidenceBreakdown(stats) {
+    function renderSerializedEvidenceBreakdown(row, stats) {
       if (!stats || !stats.serializedTokens) return '';
+      const requestState = contextStateForRow(row);
+      const disabled = contextDisabledAttr();
+      const fullAnalysisButton = stats.serializedDeferred && requestState.mode !== 'full' && !disabled
+        ? `<button class="context-button secondary serialized-action" type="button" data-context-full-analysis>${escapeHtml(t('button.full_serialized_analysis'))}</button>`
+        : '';
       if (stats.serializedDeferred) {
         return `
           <div class="serialized-breakdown deferred">
@@ -597,6 +601,7 @@
               <strong>${escapeHtml(t('call.serialized_breakdown'))}</strong>
               <span>${escapeHtml(t('call.serialized_deferred'))}</span>
             </div>
+            ${fullAnalysisButton}
           </div>
         `;
       }

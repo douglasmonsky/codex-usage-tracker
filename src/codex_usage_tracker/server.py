@@ -27,7 +27,11 @@ from codex_usage_tracker.context import (
     DEFAULT_CONTEXT_ENTRIES,
     load_call_context,
 )
-from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
+from codex_usage_tracker.dashboard import (
+    dashboard_payload,
+    generate_dashboard,
+    render_dashboard_html,
+)
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -124,6 +128,7 @@ def serve_dashboard(
         privacy_mode=privacy_mode,
         include_archived=include_archived,
         language=selected_language,
+        include_rows=False,
     )
     handler = partial(
         _UsageDashboardHandler,
@@ -140,6 +145,7 @@ def serve_dashboard(
         codex_home=codex_home,
         include_archived=include_archived,
         dashboard_name=output.name,
+        dashboard_path=output,
         context_chars=context_chars,
         api_token=api_token,
         context_api_state=context_api_state,
@@ -183,6 +189,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         context_chars: int,
         api_token: str,
         refresh_lock: threading.Lock,
+        dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: _ContextApiState | None = None,
         privacy_mode: str = "normal",
@@ -203,6 +210,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._codex_home = codex_home
         self._include_archived = include_archived
         self._dashboard_name = dashboard_name
+        self._dashboard_path = (
+            Path(dashboard_path)
+            if dashboard_path is not None
+            else Path(str(kwargs.get("directory", "."))) / dashboard_name
+        )
         self._context_chars = context_chars
         self._api_token = api_token
         self._context_api_state = context_api_state or _ContextApiState(context_api_enabled)
@@ -247,8 +259,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
             return
-        if parsed.path == "/":
-            self.path = f"/{self._dashboard_name}"
+        if self._is_investigator_dashboard_request(parsed.path, parsed.query):
+            self._handle_investigator_dashboard(parsed.query)
+            return
+        if parsed.path in {"/", f"/{self._dashboard_name}"}:
+            self._handle_dashboard_shell(parsed.query)
+            return
         super().do_GET()
 
     def end_headers(self) -> None:
@@ -267,6 +283,97 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def _is_dashboard_html_request(self) -> bool:
         path = urlparse(self.path).path
         return path in {"/", f"/{self._dashboard_name}"}
+
+    def _is_investigator_dashboard_request(self, path: str, query: str) -> bool:
+        if path != f"/{self._dashboard_name}":
+            return False
+        params = parse_qs(query)
+        return _first(params.get("view")) == "call" and bool(_first(params.get("record")))
+
+    def _handle_investigator_dashboard(self, query: str) -> None:
+        payload = self._dashboard_shell_payload(query)
+        if payload is None:
+            return
+        payload["investigator_boot"] = True
+        payload["pricing_snapshot_warning"] = ""
+        body = render_dashboard_html(
+            payload,
+            output_path=self._dashboard_path,
+            guide_href="codex-usage-tracker-guide/dashboard-guide.html",
+            body_attrs={
+                "data-active-view": "call",
+                "data-investigator-boot": "true",
+                "data-dashboard-shell": "true",
+            },
+        ).encode("utf-8")
+        self._send_html(body)
+
+    def _handle_dashboard_shell(self, query: str) -> None:
+        payload = self._dashboard_shell_payload(query)
+        if payload is None:
+            return
+        payload["pricing_snapshot_warning"] = ""
+        body = render_dashboard_html(
+            payload,
+            output_path=self._dashboard_path,
+            guide_href="codex-usage-tracker-guide/dashboard-guide.html",
+            body_attrs={"data-dashboard-shell": "true"},
+        ).encode("utf-8")
+        self._send_html(body)
+
+    def _dashboard_shell_payload(self, query: str) -> dict[str, object] | None:
+        params = parse_qs(query)
+        include_archived = self._include_archived
+        history_scope = _first(params.get("history"))
+        if history_scope == "all":
+            include_archived = True
+        elif history_scope == "active":
+            include_archived = False
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            include_archived,
+        )
+        language = normalize_language(_first(params.get("lang")) or self._language)
+        try:
+            return dashboard_payload(
+                db_path=self._db_path,
+                limit=0,
+                offset=0,
+                pricing_path=self._pricing_path,
+                allowance_path=self._allowance_path,
+                rate_card_path=self._rate_card_path,
+                thresholds_path=self._thresholds_path,
+                projects_path=self._projects_path,
+                privacy_mode=self._privacy_mode,
+                since=self._since,
+                api_token=self._api_token,
+                context_api_enabled=self._context_api_state.enabled,
+                include_archived=include_archived,
+                language=language,
+                include_rows=False,
+            )
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while preparing dashboard shell: {exc}"},
+            )
+            return None
+        except OSError as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Could not prepare dashboard shell: {exc}"},
+            )
+            return None
+
+    def _send_html(self, body: bytes) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
     def log_message(self, format: str, *args: object) -> None:
         if self.path.startswith("/api/usage"):
@@ -494,18 +601,39 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             if row is None:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": f"No usage record found: {record_id}"})
                 return
-            rows = self._annotate_live_rows([row])
+            adjacent_raw_rows = [
+                query_usage_record(db_path=self._db_path, record_id=adjacent_id)
+                for adjacent_id in (row.get("previous_record_id"), row.get("next_record_id"))
+                if adjacent_id
+            ]
+            rows_by_id = {
+                candidate["record_id"]: candidate
+                for candidate in self._annotate_live_rows(
+                    [candidate for candidate in [row, *adjacent_raw_rows] if candidate]
+                )
+                if candidate.get("record_id")
+            }
+            selected_row = rows_by_id.get(record_id, row)
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"error": f"Database error while reading call: {exc}"},
             )
             return
+        previous_record = rows_by_id.get(str(row.get("previous_record_id") or ""))
+        next_record = rows_by_id.get(str(row.get("next_record_id") or ""))
         self._send_json(
             HTTPStatus.OK,
             {
                 "schema": "codex-usage-tracker-call-v1",
-                "record": rows[0],
+                "record": selected_row,
+                "previous_record": previous_record,
+                "next_record": next_record,
+                "adjacent_records": [
+                    candidate
+                    for candidate in (previous_record, selected_row, next_record)
+                    if candidate
+                ],
                 "previous_record_id": row.get("previous_record_id"),
                 "next_record_id": row.get("next_record_id"),
                 "raw_context_included": False,
@@ -763,6 +891,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
         language = normalize_language(_first(params.get("lang")) or self._language)
         diagnostics_enabled = _parse_bool(_first(params.get("diagnostics")), False)
+        shell_only = _parse_bool(_first(params.get("shell")), False)
         refresh_result = None
         refresh_ms: float | None = None
         try:
@@ -806,6 +935,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 context_api_enabled=self._context_api_state.enabled,
                 include_archived=include_archived,
                 language=language,
+                include_rows=not shell_only,
             )
             dashboard_payload_ms = _elapsed_ms(payload_started)
         except sqlite3.Error as exc:
@@ -859,7 +989,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
 
 def _first(values: list[str] | None) -> str | None:

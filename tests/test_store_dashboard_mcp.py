@@ -1130,6 +1130,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             timeout=5,
         ) as response:
             dashboard_cache_control = response.headers.get("Cache-Control")
+            dashboard_html = response.read().decode("utf-8")
         refresh_without_token = _http_error_json(
             f"http://127.0.0.1:{server.server_port}/api/usage?refresh=1&limit=2"
         )
@@ -1153,6 +1154,11 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             timeout=5,
         ) as response:
             offset_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"http://127.0.0.1:{server.server_port}/api/usage?shell=1&limit=all",
+            timeout=5,
+        ) as response:
+            shell_payload = json.loads(response.read().decode("utf-8"))
         forbidden_origin = _http_error_json(
             f"http://127.0.0.1:{server.server_port}/api/usage",
             headers={"Origin": "http://example.test"},
@@ -1164,6 +1170,15 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
 
     assert refresh_without_token["status"] == 403
     assert dashboard_cache_control == "no-store"
+    shell_raw_payload = dashboard_html.split(
+        '<script id="usage-data" type="application/json">',
+        1,
+    )[1].split("</script>", 1)[0]
+    dashboard_shell_payload = json.loads(shell_raw_payload)
+    assert 'data-dashboard-shell="true"' in dashboard_html
+    assert dashboard_shell_payload["shell_boot"] is True
+    assert dashboard_shell_payload["rows"] == []
+    assert dashboard_shell_payload["summary"]["visible_calls"] == 0
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}
@@ -1186,6 +1201,14 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert all_payload["has_more"] is False
     assert all_payload["limit_label"] == "All"
     assert len(offset_payload["rows"]) == 2
+    assert shell_payload["shell_boot"] is True
+    assert shell_payload["rows"] == []
+    assert shell_payload["summary"]["visible_calls"] == 4
+    assert shell_payload["summary"]["total_tokens"] == sum(
+        row["total_tokens"] for row in all_payload["rows"]
+    )
+    assert shell_payload["limit"] is None
+    assert shell_payload["loaded_row_count"] == 0
     assert offset_payload["loaded_row_count"] == 2
     assert offset_payload["total_available_rows"] == 4
     assert offset_payload["limit"] == 2
@@ -1559,6 +1582,144 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     )
     assert "SECRET RAW PROMPT" not in combined_payload
     assert "raw_context_included\": true" not in combined_payload
+
+
+def test_dashboard_server_serves_lightweight_call_investigator_boot_html(
+    tmp_path: Path,
+) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    dashboard_path = tmp_path / "dashboard.html"
+    generate_dashboard(
+        db_path=db_path,
+        output_path=dashboard_path,
+        pricing_path=pricing_path,
+        api_token="test-token",
+        context_api_enabled=True,
+        include_archived=True,
+    )
+    record_id = query_dashboard_events(db_path=db_path, include_archived=True)[0]["record_id"]
+    static_html = dashboard_path.read_text(encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=codex_home,
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        dashboard_path=dashboard_path,
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = (
+            f"http://127.0.0.1:{server.server_port}/dashboard.html"
+            f"?view=call&record={urllib.parse.quote(record_id)}&history=all"
+        )
+        with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - local test server only
+            html = response.read().decode("utf-8")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    raw_payload = html.split('<script id="usage-data" type="application/json">', 1)[1].split(
+        "</script>",
+        1,
+    )[0]
+    payload = json.loads(raw_payload)
+    assert 'data-active-view="call"' in html
+    assert 'data-investigator-boot="true"' in html
+    assert 'data-dashboard-shell="true"' in html
+    assert payload["investigator_boot"] is True
+    assert payload["rows"] == []
+    assert payload["include_archived"] is True
+    assert payload["api_token"] == "test-token"
+    assert len(html) < len(static_html)
+
+
+def test_dashboard_call_api_returns_adjacent_records_for_investigator(
+    tmp_path: Path,
+) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="a1",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T18:58:20Z",
+            cumulative_total_tokens=100,
+        ),
+        _usage_event(
+            record_id="a2",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T18:58:30Z",
+            cumulative_total_tokens=250,
+        ),
+        _usage_event(
+            record_id="a3",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T18:58:40Z",
+            cumulative_total_tokens=400,
+        ),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/call?record_id=a2",
+            headers={"X-Codex-Usage-Token": "test-token"},
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert payload["schema"] == "codex-usage-tracker-call-v1"
+    assert payload["record"]["record_id"] == "a2"
+    assert payload["previous_record"]["record_id"] == "a1"
+    assert payload["next_record"]["record_id"] == "a3"
+    assert [row["record_id"] for row in payload["adjacent_records"]] == ["a1", "a2", "a3"]
+    assert payload["raw_context_included"] is False
 
 
 def test_dashboard_server_opens_only_token_protected_investigator_urls(

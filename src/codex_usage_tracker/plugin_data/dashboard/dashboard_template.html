@@ -7,7 +7,7 @@
   <title>__TITLE__</title>
   <link rel="stylesheet" href="__STYLESHEET_HREF__">
 </head>
-<body>
+<body__BODY_ATTRS__>
   <header>
     <div class="header-main">
       <div>
@@ -107,6 +107,15 @@
             <button id="copyViewLink" class="toolbar-button" type="button" data-i18n="button.copy_link">Copy link</button>
             <button id="exportVisible" class="toolbar-button" type="button" data-i18n="button.export_csv">Export CSV</button>
             <span id="actionStatus" class="action-status" aria-live="polite"></span>
+          </div>
+        </div>
+        <div id="rowLoadProgress" class="row-load-progress" hidden>
+          <div class="row-load-progress-meta">
+            <strong id="rowLoadProgressLabel" data-i18n="state.loading_rows">Loading rows</strong>
+            <span id="rowLoadProgressCount"></span>
+          </div>
+          <div class="row-load-progress-track" aria-hidden="true">
+            <span id="rowLoadProgressBar"></span>
           </div>
         </div>
         <table>

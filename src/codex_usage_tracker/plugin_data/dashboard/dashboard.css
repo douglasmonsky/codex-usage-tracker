@@ -221,7 +221,47 @@
     }
     .card span { display: block; color: var(--muted); font-size: 12px; font-weight: 680; }
     .card strong { display: block; margin-top: 7px; font-size: 22px; }
+    .row-load-progress {
+      display: grid;
+      gap: 8px;
+      margin: 0 20px 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbff;
+    }
+    .row-load-progress[hidden] { display: none; }
+    .row-load-progress-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+    .row-load-progress-meta strong {
+      color: var(--ink);
+      font-size: 13px;
+    }
+    .row-load-progress-track {
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e7edf7;
+    }
+    .row-load-progress-track span {
+      display: block;
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), #74a3ff);
+      transition: width 160ms ease;
+    }
     #allowanceImpact { white-space: pre-line; line-height: 1.18; }
+    body[data-active-view="call"] > header {
+      display: none;
+    }
     body[data-active-view="call"] .filters,
     body[data-active-view="call"] .cards,
     body[data-active-view="call"] .detail-section,
@@ -551,6 +591,9 @@
     .serialized-breakdown-heading strong {
       color: var(--ink);
       font-size: 12px;
+    }
+    .serialized-action {
+      justify-self: start;
     }
     .serialized-bucket-grid {
       display: grid;

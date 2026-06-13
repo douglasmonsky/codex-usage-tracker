@@ -45,6 +45,54 @@
       rowReasoningTokens: dataRowReasoningTokens,
     } = dashboardData;
     const initialPayload = JSON.parse(document.getElementById('usage-data').textContent);
+    const aggregateCacheNamespace = 'codexUsageDashboardPayload:v1';
+    function aggregatePayloadCacheKey(payload = initialPayload) {
+      const key = payload && payload.payload_cache_key ? String(payload.payload_cache_key) : '';
+      return key ? `${aggregateCacheNamespace}:${key}` : '';
+    }
+    function cacheableAggregatePayload(payload) {
+      if (!payload || !Array.isArray(payload.rows) || payload.investigator_boot || payload.shell_boot) return null;
+      const cached = { ...payload };
+      delete cached.api_token;
+      cached.context_api_enabled = false;
+      cached.investigator_boot = false;
+      cached.shell_boot = false;
+      return cached;
+    }
+    function readAggregatePayloadCache(payload = initialPayload) {
+      const key = aggregatePayloadCacheKey(payload);
+      if (!key) return null;
+      try {
+        const parsed = JSON.parse(window.sessionStorage?.getItem(key) || 'null');
+        if (!parsed || parsed.payload_cache_key !== payload.payload_cache_key || !Array.isArray(parsed.rows)) return null;
+        return parsed;
+      } catch (_error) {
+        return null;
+      }
+    }
+    function writeAggregatePayloadCache(payload) {
+      const key = aggregatePayloadCacheKey(payload);
+      const cached = cacheableAggregatePayload(payload);
+      if (!key || !cached) return false;
+      try {
+        cached.cached_at = new Date().toISOString();
+        window.sessionStorage?.setItem(key, JSON.stringify(cached));
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+    const cachedInitialPayload = initialPayload.investigator_boot || initialPayload.shell_boot ? readAggregatePayloadCache(initialPayload) : null;
+    const activeInitialPayload = cachedInitialPayload
+      ? {
+          ...cachedInitialPayload,
+          api_token: initialPayload.api_token || '',
+          context_api_enabled: Boolean(initialPayload.context_api_enabled),
+          investigator_boot: Boolean(initialPayload.investigator_boot),
+          shell_boot: Boolean(initialPayload.shell_boot),
+        }
+      : initialPayload;
+    let restoredAggregatePayloadFromCache = Boolean(cachedInitialPayload);
     const builtInFallbackTranslations = {
       'dashboard.title': 'Usage Dashboard',
       'dashboard.eyebrow': 'Local Codex analytics',
@@ -92,11 +140,17 @@
       'option.all_confidence': 'All confidence',
       'section.needs_attention': 'Needs Attention',
       'section.investigation_presets': 'Investigation Presets',
+      'state.error': 'Error',
       'state.no_data': 'No data',
+      'state.loading_rows': 'Loading rows',
       'state.no_rows': 'No rows',
       'state.no_calls': 'No calls match the current filters.',
       'state.no_threads': 'No threads match the current filters.',
       'state.requires_evidence': 'Evidence needed',
+      'caption.rows_loading_background': 'Dashboard totals are ready. Rows are loading in the background.',
+      'caption.rows_loading_progress': 'Loading rows: {loaded} of {total}',
+      'caption.rows_loaded_progress': 'Rows loaded: {loaded} of {total}',
+      'live.loading_rows': 'Loading rows in the background...',
       'table.time': 'Time',
       'table.thread': 'Thread',
       'table.initiated': 'Initiated',
@@ -170,12 +224,12 @@
       'source.user_initiated': 'User initiated',
       'source.codex_initiated': 'Codex initiated',
     };
-    let availableLanguages = Array.isArray(initialPayload.available_languages) && initialPayload.available_languages.length
-      ? initialPayload.available_languages
+    let availableLanguages = Array.isArray(activeInitialPayload.available_languages) && activeInitialPayload.available_languages.length
+      ? activeInitialPayload.available_languages
       : [{ code: 'en', english_name: 'English', native_name: 'English', dir: 'ltr' }];
     let supportedLanguages = new Set(availableLanguages.map(language => language.code));
-    let translationCatalog = initialPayload.translation_catalog || { [initialPayload.language || 'en']: initialPayload.translations || {} };
-    let fallbackTranslations = { ...builtInFallbackTranslations, ...(translationCatalog.en || initialPayload.translations || {}) };
+    let translationCatalog = activeInitialPayload.translation_catalog || { [activeInitialPayload.language || 'en']: activeInitialPayload.translations || {} };
+    let fallbackTranslations = { ...builtInFallbackTranslations, ...(translationCatalog.en || activeInitialPayload.translations || {}) };
     function storedLanguage() {
       try {
         return window.localStorage ? window.localStorage.getItem('codex-usage-dashboard-language') : '';
@@ -228,7 +282,7 @@
       const candidate = aliases[normalized] || raw;
       return supportedLanguages.has(candidate) ? candidate : 'en';
     }
-    let currentLanguage = normalizeLanguage(storedLanguage() || initialPayload.language || 'en');
+    let currentLanguage = normalizeLanguage(storedLanguage() || activeInitialPayload.language || 'en');
     let translations = translationCatalog[currentLanguage] || fallbackTranslations;
     let liveStatusKey = window.location.protocol !== 'file:' ? 'badge.live' : 'status.static';
     let liveStatusDetail = '';
@@ -268,25 +322,28 @@
     const stateManager = window.CodexUsageDashboardState;
     const urlParams = new URLSearchParams(window.location.search);
     const initialState = stateManager ? stateManager.read(urlParams) : {};
-    let data = payloadRows(initialPayload);
-    let pricingConfigured = Boolean(initialPayload.pricing_configured);
-    let pricingSource = initialPayload.pricing_source || {};
-    let pricingSnapshotWarning = initialPayload.pricing_snapshot_warning || '';
-    let allowanceConfigured = Boolean(initialPayload.allowance_configured);
-    let allowanceSource = initialPayload.allowance_source || {};
-    let allowanceWindows = Array.isArray(initialPayload.allowance_windows) ? initialPayload.allowance_windows : [];
-    let allowanceError = initialPayload.allowance_error || '';
-    let rateCardError = initialPayload.rate_card_error || '';
-    let projectMetadataPrivacy = initialPayload.project_metadata_privacy || { mode: initialPayload.privacy_mode || 'normal' };
-    let parserDiagnostics = initialPayload.parser_diagnostics || {};
-    let apiToken = initialPayload.api_token || '';
-    let contextApiEnabled = Boolean(initialPayload.context_api_enabled);
-    let actionThresholds = initialPayload.action_thresholds || {};
-    let totalAvailableRows = Number(initialPayload.total_available_rows || data.length);
-    let activeAvailableRows = Number(initialPayload.active_available_rows || data.length);
-    let allHistoryAvailableRows = Number(initialPayload.all_history_available_rows || totalAvailableRows);
-    let archivedAvailableRows = Number(initialPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
-    let loadedLimit = payloadLimit(initialPayload);
+    let data = payloadRows(activeInitialPayload);
+    let summaryData = activeInitialPayload.summary || null;
+    let shellBoot = Boolean(activeInitialPayload.shell_boot);
+    let pricingConfigured = Boolean(activeInitialPayload.pricing_configured);
+    let pricingSource = activeInitialPayload.pricing_source || {};
+    let pricingSnapshotWarning = activeInitialPayload.pricing_snapshot_warning || '';
+    let latestRefreshAt = activeInitialPayload.latest_refresh_at || '';
+    let allowanceConfigured = Boolean(activeInitialPayload.allowance_configured);
+    let allowanceSource = activeInitialPayload.allowance_source || {};
+    let allowanceWindows = Array.isArray(activeInitialPayload.allowance_windows) ? activeInitialPayload.allowance_windows : [];
+    let allowanceError = activeInitialPayload.allowance_error || '';
+    let rateCardError = activeInitialPayload.rate_card_error || '';
+    let projectMetadataPrivacy = activeInitialPayload.project_metadata_privacy || { mode: activeInitialPayload.privacy_mode || 'normal' };
+    let parserDiagnostics = activeInitialPayload.parser_diagnostics || {};
+    let apiToken = initialPayload.api_token || activeInitialPayload.api_token || '';
+    let contextApiEnabled = Boolean(initialPayload.context_api_enabled || activeInitialPayload.context_api_enabled);
+    let actionThresholds = activeInitialPayload.action_thresholds || {};
+    let totalAvailableRows = Number(activeInitialPayload.total_available_rows || data.length);
+    let activeAvailableRows = Number(activeInitialPayload.active_available_rows || data.length);
+    let allHistoryAvailableRows = Number(activeInitialPayload.all_history_available_rows || totalAvailableRows);
+    let archivedAvailableRows = Number(activeInitialPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
+    let loadedLimit = payloadLimit(activeInitialPayload);
     const rowsEl = document.getElementById('rows');
     const detailEl = document.getElementById('detail');
     const detailToggleEl = document.getElementById('detailToggle');
@@ -322,6 +379,10 @@
     const loadMoreRowsEl = document.getElementById('loadMoreRows');
     const pageStatusEl = document.getElementById('pageStatus');
     const pagerEl = document.getElementById('pager');
+    const rowLoadProgressEl = document.getElementById('rowLoadProgress');
+    const rowLoadProgressLabelEl = document.getElementById('rowLoadProgressLabel');
+    const rowLoadProgressCountEl = document.getElementById('rowLoadProgressCount');
+    const rowLoadProgressBarEl = document.getElementById('rowLoadProgressBar');
     const toTopEl = document.getElementById('toTop');
     let rowByRecordId = new Map();
     let threadAttachmentByRecordId = new Map();
@@ -330,12 +391,14 @@
     const callFetchInFlightByRecordId = new Set();
     const expandedThreads = new Set();
     const liveRefreshSupported = window.location.protocol !== 'file:';
-    const initialPayloadIncludeArchived = Boolean(initialPayload.include_archived);
+    const initialPayloadIncludeArchived = Boolean(activeInitialPayload.include_archived);
     let includeArchived = initialPayloadIncludeArchived;
     if (liveRefreshSupported && initialState.historyScope === 'all') includeArchived = true;
     const needsInitialHistoryRefresh = liveRefreshSupported && includeArchived !== initialPayloadIncludeArchived;
     const liveRefreshIntervalMs = 10000;
     const pageSize = 500;
+    const initialHydrationChunkSize = 500;
+    const backgroundHydrationChunkSize = 2000;
     const threadCallPageSize = 100;
     const defaultContextEntries = 80;
     const datePresetLabels = {
@@ -348,6 +411,7 @@
     };
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
     let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : 'insights';
+    document.body.dataset.activeView = activeView;
     let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'attention';
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
     let threadCallSortKey = 'time';
@@ -356,6 +420,11 @@
     let selectedRecordId = initialState.record || '';
     let selectedThreadKey = initialState.thread || '';
     let refreshInFlight = false;
+    let rowHydrationInFlight = false;
+    let rowHydrationComplete = !shellBoot && data.length > 0;
+    let rowHydrationError = '';
+    let rowHydrationGeneration = 0;
+    let rowHydrationRestartRequested = false;
     let autoRefreshTimer = null;
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
@@ -620,6 +689,56 @@
         ? tf('caption.loaded_capped', { loaded, available })
         : tf('caption.loaded', { loaded });
     }
+    function rowHydrationTarget() {
+      const available = Math.max(0, Number(totalAvailableRows || 0));
+      if (!available) return 0;
+      return loadedLimit === null ? available : Math.min(available, Number(loadedLimit || available));
+    }
+    function rowsNeedHydration() {
+      const target = rowHydrationTarget();
+      return liveRefreshSupported && target > 0 && data.length < target;
+    }
+    function clientFiltersActive(dateRange = currentDateRange()) {
+      return Boolean(
+        searchEl.value.trim()
+        || modelEl.value
+        || effortEl.value
+        || pricingStatusEl.value
+        || activePreset
+        || dateRange.active
+        || dateRange.invalid
+      );
+    }
+    function summaryForCards(dateRange, rows) {
+      if (!summaryData || loadedLimit !== null || clientFiltersActive(dateRange) || data.length >= rowHydrationTarget()) return null;
+      return {
+        visibleCalls: Number(summaryData.visible_calls ?? summaryData.row_count ?? totalAvailableRows ?? rows.length),
+        totalTokens: Number(summaryData.total_tokens || 0),
+        cachedInputTokens: Number(summaryData.cached_input_tokens || 0),
+        uncachedInputTokens: Number(summaryData.uncached_input_tokens || 0),
+        reasoningOutputTokens: Number(summaryData.reasoning_output_tokens || 0),
+        estimatedCost: Number(summaryData.estimated_cost_usd || 0),
+        usageCredits: Number(summaryData.usage_credits || 0),
+      };
+    }
+    function updateRowLoadProgress() {
+      if (!rowLoadProgressEl) return;
+      const target = rowHydrationTarget();
+      const loaded = Math.min(data.length, target || data.length);
+      const shouldShow = activeView !== 'call' && liveRefreshSupported && (rowHydrationInFlight || rowsNeedHydration() || rowHydrationError);
+      rowLoadProgressEl.hidden = !shouldShow;
+      if (!shouldShow) return;
+      const totalText = number.format(target || totalAvailableRows || loaded);
+      const loadedText = number.format(loaded);
+      rowLoadProgressLabelEl.textContent = rowHydrationError ? t('state.error') : t('state.loading_rows');
+      rowLoadProgressCountEl.textContent = rowHydrationError
+        ? rowHydrationError
+        : (rowHydrationComplete
+            ? tf('caption.rows_loaded_progress', { loaded: loadedText, total: totalText })
+            : tf('caption.rows_loading_progress', { loaded: loadedText, total: totalText }));
+      const ratio = target ? Math.max(0, Math.min(100, (loaded / target) * 100)) : 0;
+      rowLoadProgressBarEl.style.width = `${ratio}%`;
+    }
     function historyRowsDescription() {
       const archived = Number(archivedAvailableRows || 0);
       if (includeArchived) {
@@ -657,6 +776,16 @@
       rowByRecordId = new Map(indexedRows.map(row => [row.record_id, row]));
       threadAttachmentByRecordId = new Map(indexedRows.map(row => [row.record_id, resolveThreadAttachment(row)]));
       callAdjacencyByRecordId = buildCallAdjacencyIndex(indexedRows);
+    }
+    function mergedRows(existingRows, nextRows) {
+      const seen = new Set(existingRows.map(row => row.record_id).filter(Boolean));
+      const merged = [...existingRows];
+      for (const row of nextRows) {
+        if (!row?.record_id || seen.has(row.record_id)) continue;
+        seen.add(row.record_id);
+        merged.push(row);
+      }
+      return merged;
     }
     function usageCreditStatusLabel(row) {
       if (usageCreditValue(row) === null) return t('allowance.row_no_rate');
@@ -2071,22 +2200,29 @@
       });
     }
     function render() {
-      const dateRange = updateDateFilterControls();
-      const rows = filtered(dateRange);
       rowsEl.textContent = '';
       document.body.dataset.activeView = activeView;
       updateSortControls();
-      const totalTokens = rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
-      const cachedInputTokens = rows.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0);
-      const uncachedInputTokens = rows.reduce((sum, row) => sum + Number(row.uncached_input_tokens || 0), 0);
-      const reasoningOutputTokens = rows.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0);
-      setSummaryNumber('visibleCalls', rows.length, 'metric.visible_calls');
+      if (activeView === 'call') {
+        callInvestigator.renderCallInvestigator(Array.from(rowByRecordId.values()));
+        fitModelPills();
+        syncUrlState();
+        return;
+      }
+      const dateRange = updateDateFilterControls();
+      const rows = filtered(dateRange);
+      const shellSummary = summaryForCards(dateRange, rows);
+      const totalTokens = shellSummary ? shellSummary.totalTokens : rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
+      const cachedInputTokens = shellSummary ? shellSummary.cachedInputTokens : rows.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0);
+      const uncachedInputTokens = shellSummary ? shellSummary.uncachedInputTokens : rows.reduce((sum, row) => sum + Number(row.uncached_input_tokens || 0), 0);
+      const reasoningOutputTokens = shellSummary ? shellSummary.reasoningOutputTokens : rows.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0);
+      setSummaryNumber('visibleCalls', shellSummary ? shellSummary.visibleCalls : rows.length, 'metric.visible_calls');
       setSummaryNumber('totalTokens', totalTokens, 'metric.total_tokens');
       setSummaryNumber('cachedTokens', cachedInputTokens, 'metric.cached_input');
       setSummaryNumber('uncachedTokens', uncachedInputTokens, 'metric.uncached_input');
       setSummaryNumber('reasoningTokens', reasoningOutputTokens, 'metric.reasoning_output');
-      const estimatedCost = rows.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
-      const usageCredits = sumUsageCredits(rows);
+      const estimatedCost = shellSummary ? shellSummary.estimatedCost : rows.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
+      const usageCredits = shellSummary ? shellSummary.usageCredits : sumUsageCredits(rows);
       document.getElementById('estimatedCost').textContent = pricingConfigured ? moneyText(estimatedCost) : t('state.not_configured');
       document.getElementById('usageCredits').textContent = credits(usageCredits);
       document.getElementById('allowanceImpact').textContent = allowanceImpactText(usageCredits);
@@ -2105,6 +2241,7 @@
         renderCalls(rows);
       }
       fitModelPills();
+      updateRowLoadProgress();
       syncUrlState();
       scheduleFocusPendingTarget();
     }
@@ -2150,7 +2287,10 @@
         showDetail(page.items[0]);
       }
       if (!rows.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('state.no_calls'))}</td></tr>`;
+        const message = rowsNeedHydration()
+          ? t('caption.rows_loading_background')
+          : t('state.no_calls');
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(message)}</td></tr>`;
       }
     }
     function renderThreads(rows, mode = 'threads') {
@@ -2524,6 +2664,20 @@
       resetVisibleRows();
       render();
     }
+    async function routeBackToDashboard(view = 'calls') {
+      activeView = ['calls', 'threads', 'insights'].includes(view) ? view : 'calls';
+      resetVisibleRows();
+      if (liveRefreshSupported && !data.length) {
+        autoRefreshEl.checked = true;
+        await refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+      } else {
+        render();
+      }
+      if (liveRefreshSupported && autoRefreshEl.checked) {
+        scheduleAutoRefresh();
+        refreshDashboardIfStale();
+      }
+    }
     function renderLiveStatus() {
       const label = t(liveStatusKey);
       const detail = liveStatusDetail || label;
@@ -2539,7 +2693,8 @@
     function updateToTopVisibility() {
       toTopEl.dataset.visible = window.scrollY > 320 ? 'true' : 'false';
     }
-    function applyDashboardPayload(nextPayload) {
+    function applyDashboardPayload(nextPayload, options = null) {
+      const applyOptions = options || {};
       if (nextPayload.translation_catalog) {
         translationCatalog = nextPayload.translation_catalog;
         fallbackTranslations = { ...builtInFallbackTranslations, ...(translationCatalog.en || fallbackTranslations) };
@@ -2551,7 +2706,16 @@
       }
       currentLanguage = normalizeLanguage(nextPayload.language || currentLanguage);
       applyTranslations();
-      data = payloadRows(nextPayload);
+      const nextRows = payloadRows(nextPayload);
+      if (applyOptions.appendRows) {
+        data = mergedRows(data, nextRows);
+      } else if (applyOptions.preserveRows) {
+        data = data.length ? data : nextRows;
+      } else {
+        data = nextRows;
+      }
+      summaryData = nextPayload.summary || summaryData;
+      if (!applyOptions.appendRows) shellBoot = Boolean(nextPayload.shell_boot);
       pricingConfigured = Boolean(nextPayload.pricing_configured);
       pricingSource = nextPayload.pricing_source || {};
       pricingSnapshotWarning = nextPayload.pricing_snapshot_warning || '';
@@ -2565,13 +2729,18 @@
       apiToken = nextPayload.api_token || apiToken;
       contextApiEnabled = Boolean(nextPayload.context_api_enabled);
       actionThresholds = nextPayload.action_thresholds || actionThresholds;
+      latestRefreshAt = nextPayload.latest_refresh_at || latestRefreshAt;
       totalAvailableRows = Number(nextPayload.total_available_rows || data.length);
       activeAvailableRows = Number(nextPayload.active_available_rows || data.length);
       allHistoryAvailableRows = Number(nextPayload.all_history_available_rows || totalAvailableRows);
       archivedAvailableRows = Number(nextPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
       includeArchived = Boolean(nextPayload.include_archived);
-      loadedLimit = payloadLimit(nextPayload);
-      supplementalRowsByRecordId = new Map();
+      if (!applyOptions.appendRows) loadedLimit = payloadLimit(nextPayload);
+      if (!applyOptions.appendRows) supplementalRowsByRecordId = new Map();
+      restoredAggregatePayloadFromCache = false;
+      if (!nextPayload.shell_boot && !applyOptions.appendRows) {
+        writeAggregatePayloadCache({ ...nextPayload, api_token: apiToken });
+      }
       rebuildDashboardIndexes();
       rebuildFilterOptions();
       updatePricingSourceLine();
@@ -2649,9 +2818,15 @@
         if (!response.ok) return null;
         const payload = await response.json();
         if (!payload?.record?.record_id) return null;
-        supplementalRowsByRecordId.set(payload.record.record_id, payload.record);
+        const adjacentRecords = Array.isArray(payload.adjacent_records) && payload.adjacent_records.length
+          ? payload.adjacent_records
+          : [payload.previous_record, payload.record, payload.next_record].filter(Boolean);
+        adjacentRecords.forEach(record => {
+          if (record?.record_id) supplementalRowsByRecordId.set(record.record_id, record);
+        });
         rebuildDashboardIndexes();
         if (activeView === 'call' && selectedRecordId === normalizedRecordId) {
+          selectedThreadKey = rowAttachment(payload.record).key;
           render();
         }
         return payload.record;
@@ -2661,24 +2836,156 @@
         callFetchInFlightByRecordId.delete(normalizedRecordId);
       }
     }
-    async function refreshDashboardData(manual = false) {
+    async function navigateToCallRecord(recordId) {
+      const normalizedRecordId = recordId || '';
+      if (!normalizedRecordId) return;
+      selectedRecordId = normalizedRecordId;
+      const existing = rowByRecordId.get(normalizedRecordId);
+      if (existing) selectedThreadKey = rowAttachment(existing).key;
+      activeView = 'call';
+      render();
+      if (!existing) {
+        const fetched = await fetchCallRecord(normalizedRecordId);
+        if (fetched && selectedRecordId === normalizedRecordId) {
+          selectedThreadKey = rowAttachment(fetched).key;
+          render();
+        }
+      }
+    }
+    async function hydrateDashboardRows(options = null) {
+      if (!liveRefreshSupported || activeView === 'call') return;
+      const hydrateOptions = options || {};
+      if (rowHydrationInFlight) {
+        if (hydrateOptions.reset) rowHydrationRestartRequested = true;
+        return;
+      }
+      const target = rowHydrationTarget();
+      if (!target) {
+        rowHydrationComplete = true;
+        updateRowLoadProgress();
+        return;
+      }
+      if (hydrateOptions.reset) {
+        data = [];
+        supplementalRowsByRecordId = new Map();
+        rowHydrationComplete = false;
+        rowHydrationGeneration += 1;
+        rebuildDashboardIndexes();
+        rebuildFilterOptions();
+        render();
+      }
+      if (data.length >= target) {
+        rowHydrationComplete = true;
+        updateRowLoadProgress();
+        return;
+      }
+      const generation = rowHydrationGeneration;
+      rowHydrationInFlight = true;
+      rowHydrationError = '';
+      updateLiveStatus('status.checking', t('live.loading_rows'));
+      updateRowLoadProgress();
+      try {
+        while (data.length < target && generation === rowHydrationGeneration && activeView !== 'call') {
+          const offset = data.length;
+          const remaining = target - offset;
+          const chunkSize = Math.min(
+            offset === 0 ? initialHydrationChunkSize : backgroundHydrationChunkSize,
+            remaining,
+          );
+          const params = new URLSearchParams({
+            limit: String(chunkSize),
+            offset: String(offset),
+            include_archived: includeArchived ? '1' : '0',
+            lang: currentLanguage,
+            _: String(Date.now()),
+          });
+          const response = await fetch(`/api/usage?${params.toString()}`, {
+            headers: {
+              'Accept': 'application/json',
+              'X-Codex-Usage-Token': apiToken,
+            },
+            cache: 'no-store',
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          if (payload.error) throw new Error(payload.error);
+          if (generation !== rowHydrationGeneration || activeView === 'call') break;
+          const rows = payloadRows(payload);
+          if (!rows.length) break;
+          applyDashboardPayload(payload, { appendRows: true });
+          updateRowLoadProgress();
+          if (!payload.has_more || rows.length < chunkSize) break;
+        }
+        rowHydrationComplete = data.length >= rowHydrationTarget();
+        updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      } catch (error) {
+        rowHydrationError = error.message || String(error);
+        updateLiveStatus('status.refresh_error', tf('live.refresh_unavailable', { message: rowHydrationError, suffix: '' }));
+      } finally {
+        rowHydrationInFlight = false;
+        updateRowLoadProgress();
+        const shouldRestart = rowHydrationRestartRequested && activeView !== 'call';
+        rowHydrationRestartRequested = false;
+        if (shouldRestart) {
+          hydrateDashboardRows();
+        } else {
+          render();
+        }
+      }
+    }
+    async function refreshDashboardIfStale() {
+      if (!liveRefreshSupported || !apiToken || activeView === 'call') return;
+      try {
+        const params = new URLSearchParams({
+          include_archived: includeArchived ? '1' : '0',
+          _: String(Date.now()),
+        });
+        const response = await fetch(`/api/status?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const statusRefreshAt = payload.latest_refresh_at || '';
+        const scopedRows = Number(payload.row_counts?.scoped_rows);
+        const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== totalAvailableRows;
+        const refreshChanged = statusRefreshAt && statusRefreshAt !== latestRefreshAt;
+        if (rowCountChanged || refreshChanged) {
+          refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+        } else if (rowsNeedHydration()) {
+          hydrateDashboardRows();
+        }
+      } catch (_error) {
+        // Background freshness checks must never interrupt the local dashboard.
+      }
+    }
+    async function refreshDashboardData(manual = false, options = null) {
       if (!liveRefreshSupported) {
         updateLiveStatus('status.reloading', t('live.reloading_static'));
         window.location.reload();
         return;
       }
+      if (activeView === 'call' && !manual) return;
       if (refreshInFlight) return;
+      const refreshOptions = options || {};
+      const refreshLogs = refreshOptions.refreshLogs === undefined ? manual : Boolean(refreshOptions.refreshLogs);
+      const resetRows = refreshOptions.resetRows !== undefined
+        ? Boolean(refreshOptions.resetRows)
+        : Boolean(manual || refreshLogs);
       refreshInFlight = true;
       refreshDashboardEl.disabled = true;
-      updateLiveStatus(manual ? 'status.refreshing' : 'status.checking', manual ? t('live.refreshing_index') : t('live.checking_usage'));
+      updateLiveStatus(refreshLogs ? 'status.refreshing' : 'status.checking', refreshLogs ? t('live.refreshing_index') : t('live.checking_usage'));
       try {
         const params = new URLSearchParams({
-          refresh: '1',
           limit: loadLimitEl.value,
           include_archived: includeArchived ? '1' : '0',
           lang: currentLanguage,
+          shell: '1',
           _: String(Date.now()),
         });
+        if (refreshLogs) params.set('refresh', '1');
         const response = await fetch(`/api/usage?${params.toString()}`, {
           headers: {
             'Accept': 'application/json',
@@ -2691,7 +2998,14 @@
         }
         const nextPayload = await response.json();
         if (nextPayload.error) throw new Error(nextPayload.error);
+        if (resetRows) {
+          data = [];
+          supplementalRowsByRecordId = new Map();
+          rowHydrationGeneration += 1;
+          rowHydrationComplete = false;
+        }
         applyDashboardPayload(nextPayload);
+        if (activeView !== 'call') hydrateDashboardRows({ reset: resetRows });
         const result = nextPayload.refresh_result || {};
         const indexed = result.inserted_or_updated_events === undefined
           ? ''
@@ -2712,9 +3026,9 @@
     function scheduleAutoRefresh() {
       if (autoRefreshTimer) window.clearInterval(autoRefreshTimer);
       autoRefreshTimer = null;
-      if (!autoRefreshEl.checked || !liveRefreshSupported) return;
+      if (!autoRefreshEl.checked || !liveRefreshSupported || activeView === 'call') return;
       autoRefreshTimer = window.setInterval(() => {
-        if (document.visibilityState === 'visible') refreshDashboardData(false);
+        if (document.visibilityState === 'visible') refreshDashboardIfStale();
       }, liveRefreshIntervalMs);
     }
     insightsViewEl.addEventListener('click', () => setView('insights'));
@@ -2730,7 +3044,7 @@
     loadLimitEl.addEventListener('change', () => {
       resetVisibleRows();
       if (liveRefreshSupported) {
-        refreshDashboardData(true);
+        refreshDashboardData(false, { refreshLogs: false, resetRows: true });
       } else {
         updateLiveStatus('status.static', t('live.load_static_hint'));
       }
@@ -2741,7 +3055,7 @@
       updateHistoryScopeControl();
       syncUrlState();
       if (liveRefreshSupported) {
-        refreshDashboardData(true);
+        refreshDashboardData(false, { refreshLogs: false, resetRows: true });
       } else {
         updateLiveStatus('status.static', t('live.history_static_hint'));
       }
@@ -2749,10 +3063,10 @@
     autoRefreshEl.addEventListener('change', () => {
       scheduleAutoRefresh();
       updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.paused', `${autoRefreshEl.checked ? tf('live.every', { seconds: liveRefreshIntervalMs / 1000 }) : t('live.paused')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
-      if (autoRefreshEl.checked) refreshDashboardData(false);
+      if (autoRefreshEl.checked) refreshDashboardIfStale();
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && autoRefreshEl.checked) refreshDashboardData(false);
+      if (document.visibilityState === 'visible' && autoRefreshEl.checked) refreshDashboardIfStale();
     });
     document.addEventListener('keydown', event => {
       const target = event.target;
@@ -2783,6 +3097,13 @@
       if (row) selectRow(row);
     });
     rowsEl.addEventListener('click', event => {
+      const dashboardRoute = event.target.closest('[data-dashboard-route]');
+      if (dashboardRoute && rowsEl.contains(dashboardRoute)) {
+        event.preventDefault();
+        event.stopPropagation();
+        routeBackToDashboard(dashboardRoute.dataset.dashboardRoute || 'calls');
+        return;
+      }
       const rowLink = event.target.closest('a.row-investigator-link');
       if (rowLink && rowsEl.contains(rowLink)) {
         if (!liveRefreshSupported) return;
@@ -2812,13 +3133,7 @@
         event.preventDefault();
         event.stopPropagation();
         const recordId = navButton.dataset.callNavRecord;
-        const row = rowByRecordId.get(recordId);
-        if (row) {
-          selectedRecordId = row.record_id || '';
-          selectedThreadKey = rowAttachment(row).key;
-          activeView = 'call';
-          render();
-        }
+        navigateToCallRecord(recordId);
         return;
       }
       const sortButton = event.target.closest('[data-thread-call-sort-key]');
@@ -2837,22 +3152,23 @@
         render();
         return;
       }
-      const callRow = event.target.closest('.thread-call-row');
+      const callRow = event.target.closest('.call-row, .thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
+      event.preventDefault();
+      event.stopPropagation();
       const row = rowByRecordId.get(callRow.dataset.recordId);
       if (row) openInvestigator(row);
     });
     rowsEl.addEventListener('dblclick', event => {
-      if (event.target.closest('a.row-investigator-link')) return;
-      const callRow = event.target.closest('.thread-call-row');
+      const callRow = event.target.closest('.call-row, .thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
-      const row = rowByRecordId.get(callRow.dataset.recordId);
-      if (row) openInvestigator(row);
+      event.preventDefault();
+      event.stopPropagation();
     });
     rowsEl.addEventListener('keydown', event => {
       if (event.target.closest('a.row-investigator-link')) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
-      const callRow = event.target.closest('.thread-call-row');
+      const callRow = event.target.closest('.call-row, .thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
       event.preventDefault();
       const row = rowByRecordId.get(callRow.dataset.recordId);
@@ -2902,6 +3218,7 @@
     applyTranslations();
     rebuildFilterOptions();
     applyInitialState();
+    if (!initialPayload.investigator_boot) writeAggregatePayloadCache(activeInitialPayload);
     updatePricingSourceLine();
     updateAllowanceSourceLine();
     updatePrivacyModeLine();
@@ -2914,10 +3231,19 @@
       loadLimitEl.disabled = true;
       historyScopeEl.disabled = true;
       updateLiveStatus('status.static', `${t('status.static')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+    } else if (activeView === 'call') {
+      autoRefreshEl.checked = false;
+      updateLiveStatus('badge.live', `${t('dashboard.view.call')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
     } else {
       updateLiveStatus('badge.live', `${tf('live.every', { seconds: liveRefreshIntervalMs / 1000 })}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       scheduleAutoRefresh();
-      if (needsInitialHistoryRefresh) refreshDashboardData(false);
+      if (needsInitialHistoryRefresh) {
+        refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+      } else if (rowsNeedHydration()) {
+        hydrateDashboardRows();
+      } else if (restoredAggregatePayloadFromCache) {
+        refreshDashboardIfStale();
+      }
     }
     updateToTopVisibility();
     render();

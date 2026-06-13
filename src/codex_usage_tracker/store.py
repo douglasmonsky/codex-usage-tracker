@@ -1149,6 +1149,67 @@ def query_dashboard_event_count(
         return int(row["row_count"] if row is not None else 0)
 
 
+def query_dashboard_token_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+    since: str | None = None,
+    include_archived: bool = True,
+) -> dict[str, Any]:
+    """Return cheap aggregate token totals for the dashboard shell."""
+
+    where_clause, params = _usage_where_clause(
+        since=since,
+        include_archived=include_archived,
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        total_row = conn.execute(
+            f"""
+            SELECT
+                COUNT(*) AS row_count,
+                coalesce(SUM(input_tokens), 0) AS input_tokens,
+                coalesce(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+                coalesce(SUM(uncached_input_tokens), 0) AS uncached_input_tokens,
+                coalesce(SUM(output_tokens), 0) AS output_tokens,
+                coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
+                coalesce(SUM(total_tokens), 0) AS total_tokens
+            FROM usage_events
+            {where_clause}
+            """,
+            params,
+        ).fetchone()
+        model_rows = [
+            _row_to_dict(row)
+            for row in conn.execute(
+                f"""
+                SELECT
+                    coalesce(model, 'Unknown model') AS model,
+                    COUNT(*) AS row_count,
+                    coalesce(SUM(input_tokens), 0) AS input_tokens,
+                    coalesce(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+                    coalesce(SUM(uncached_input_tokens), 0) AS uncached_input_tokens,
+                    coalesce(SUM(output_tokens), 0) AS output_tokens,
+                    coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
+                    coalesce(SUM(total_tokens), 0) AS total_tokens
+                FROM usage_events
+                {where_clause}
+                GROUP BY coalesce(model, 'Unknown model')
+                """,
+                params,
+            )
+        ]
+    summary = _row_to_dict(total_row) if total_row is not None else {}
+    return {
+        "row_count": int(summary.get("row_count") or 0),
+        "input_tokens": int(summary.get("input_tokens") or 0),
+        "cached_input_tokens": int(summary.get("cached_input_tokens") or 0),
+        "uncached_input_tokens": int(summary.get("uncached_input_tokens") or 0),
+        "output_tokens": int(summary.get("output_tokens") or 0),
+        "reasoning_output_tokens": int(summary.get("reasoning_output_tokens") or 0),
+        "total_tokens": int(summary.get("total_tokens") or 0),
+        "model_rows": model_rows,
+    }
+
+
 def query_usage_status(
     db_path: Path = DEFAULT_DB_PATH,
     *,
