@@ -179,9 +179,12 @@
       font-size: 12px;
       font-weight: 760;
       cursor: pointer;
+      text-decoration: none;
     }
+    .toolbar-button:visited,
     .toolbar-button:hover {
       background: #eff6ff;
+      text-decoration: none;
     }
     .action-status {
       min-width: 62px;
