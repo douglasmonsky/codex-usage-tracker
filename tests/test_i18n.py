@@ -95,6 +95,18 @@ def dashboard_js_text() -> str:
     ).read_text(encoding="utf-8")
 
 
+def dashboard_details_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_details.js"
+    ).read_text(encoding="utf-8")
+
+
 def dashboard_i18n_js_text() -> str:
     repo_root = Path(__file__).resolve().parents[1]
     return (
@@ -412,10 +424,11 @@ def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> No
 
 def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
     js = dashboard_js_text()
+    details_js = dashboard_details_js_text()
     i18n_js = dashboard_i18n_js_text()
     recommendation_summary = extract_js_function(js, "recommendationSummary")
-    next_action = extract_js_function(js, "nextActionForRow")
-    show_detail = extract_js_function(js, "showDetail")
+    next_action = extract_js_function(details_js, "nextActionForRow")
+    show_detail = extract_js_function(details_js, "showDetail")
 
     assert "'action.run': 'Run'" in i18n_js
     assert "'button.run': 'Run'" not in i18n_js
