@@ -16,10 +16,13 @@ from typing import Any
 from codex_usage_tracker.models import RefreshResult, UsageEvent
 from codex_usage_tracker.parser import (
     PARSER_DIAGNOSTIC_KEYS,
+    ParserState,
     compact_parser_diagnostics,
     find_session_logs,
     load_session_index,
-    parse_usage_events_from_file,
+    parse_usage_events_from_file_with_state,
+    parser_state_from_json,
+    parser_state_to_json,
 )
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
 from codex_usage_tracker.projects import apply_project_privacy_to_rows, validate_privacy_mode
@@ -32,7 +35,7 @@ from codex_usage_tracker.schema import (
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -40,6 +43,7 @@ MIGRATION_NAMES = {
     4: "persist dashboard query helper fields",
     5: "materialize thread summaries",
     6: "track source file refresh metadata",
+    7: "persist source file parser cursors",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -82,7 +86,9 @@ class SchemaMigrationError(RuntimeError):
 @dataclass(frozen=True)
 class SourceParsePlan:
     path: Path
-    skip_token_lines_through: int = 0
+    start_byte: int = 0
+    start_line: int = 0
+    initial_state: ParserState | None = None
     replace_existing: bool = True
 
 
@@ -98,21 +104,20 @@ def refresh_usage_index(
     parse_plans = _source_logs_requiring_parse(logs, db_path=db_path)
     stats: dict[str, int] = {}
     events: list[UsageEvent] = []
-    parsed_files: list[tuple[Path, list[UsageEvent], dict[str, int]]] = []
+    parsed_files: list[tuple[Path, list[UsageEvent], dict[str, int], ParserState]] = []
     for plan in parse_plans:
         file_stats: dict[str, int] = {}
-        all_file_events = parse_usage_events_from_file(
+        parsed_file = parse_usage_events_from_file_with_state(
             plan.path,
             session_index=session_index,
             stats=file_stats,
+            start_byte=plan.start_byte,
+            start_line=plan.start_line,
+            initial_state=plan.initial_state,
         )
-        file_events = [
-            event
-            for event in all_file_events
-            if event.line_number > plan.skip_token_lines_through
-        ]
+        file_events = parsed_file.events
         events.extend(file_events)
-        parsed_files.append((plan.path, file_events, file_stats))
+        parsed_files.append((plan.path, file_events, file_stats, parsed_file.state))
         for key, value in file_stats.items():
             stats[key] = stats.get(key, 0) + int(value)
     inserted = upsert_usage_events(
@@ -234,6 +239,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v6(conn)
         _record_migration_if_missing(conn, 6)
+    if user_version < 7:
+        _migrate_v7(conn)
+        _record_migration(conn, 7)
+    else:
+        _migrate_v7(conn)
+        _record_migration_if_missing(conn, 7)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -364,6 +375,14 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v7(conn: sqlite3.Connection) -> None:
+    _ensure_table_columns(
+        conn,
+        "source_files",
+        {"parser_state_json": "TEXT NOT NULL DEFAULT ''"},
+    )
+
+
 def _record_migration(conn: sqlite3.Connection, version: int) -> None:
     conn.execute(
         """
@@ -480,14 +499,22 @@ def schema_state(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
 
 
 def _ensure_columns(conn: sqlite3.Connection, columns: dict[str, str]) -> None:
+    _ensure_table_columns(conn, "usage_events", columns)
+
+
+def _ensure_table_columns(
+    conn: sqlite3.Connection,
+    table_name: str,
+    columns: dict[str, str],
+) -> None:
     existing = {
         str(row["name"])
-        for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
     }
     for column, column_type in columns.items():
         if column not in existing:
             try:
-                conn.execute(f"ALTER TABLE usage_events ADD COLUMN {column} {column_type}")
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column} {column_type}")
             except sqlite3.OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
@@ -527,6 +554,7 @@ def _source_logs_requiring_parse(
             row = conn.execute(
                 """
                 SELECT size_bytes, mtime_ns, parsed_until_line
+                    , parsed_until_byte, parser_state_json
                 FROM source_files
                 WHERE source_file = ?
                 """,
@@ -537,16 +565,24 @@ def _source_logs_requiring_parse(
                 continue
             previous_size = int(row["size_bytes"])
             previous_mtime_ns = int(row["mtime_ns"])
+            previous_byte = int(row["parsed_until_byte"])
+            previous_line = int(row["parsed_until_line"])
+            previous_state = parser_state_from_json(row["parser_state_json"])
+            if previous_state is None:
+                changed.append(SourceParsePlan(path=path))
+                continue
             if (
                 previous_size == metadata["size_bytes"]
                 and previous_mtime_ns == metadata["mtime_ns"]
             ):
                 continue
-            if metadata["size_bytes"] > previous_size:
+            if metadata["size_bytes"] > previous_size and 0 < previous_byte <= previous_size:
                 changed.append(
                     SourceParsePlan(
                         path=path,
-                        skip_token_lines_through=int(row["parsed_until_line"]),
+                        start_byte=previous_byte,
+                        start_line=previous_line,
+                        initial_state=previous_state,
                         replace_existing=False,
                     )
                 )
@@ -558,7 +594,7 @@ def _source_logs_requiring_parse(
 def record_source_file_metadata(
     db_path: Path = DEFAULT_DB_PATH,
     *,
-    parsed_files: Iterable[tuple[Path, list[UsageEvent], dict[str, int]]],
+    parsed_files: Iterable[tuple[Path, list[UsageEvent], dict[str, int], ParserState]],
 ) -> None:
     """Record metadata for source files parsed during refresh."""
 
@@ -567,7 +603,7 @@ def record_source_file_metadata(
         return
     indexed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     rows: list[dict[str, Any]] = []
-    for path, events, diagnostics in parsed:
+    for path, events, diagnostics, parser_state in parsed:
         metadata = _source_file_metadata(path)
         if metadata is None:
             continue
@@ -591,15 +627,22 @@ def record_source_file_metadata(
                 "mtime_ns": int(metadata["mtime_ns"]),
                 "parsed_until_line": _count_lines(path),
                 "parsed_until_byte": int(metadata["size_bytes"]),
-                "latest_record_id": latest_event.record_id if latest_event else None,
+                "latest_record_id": (
+                    latest_event.record_id
+                    if latest_event
+                    else parser_state.latest_record_id
+                ),
                 "latest_event_timestamp": (
-                    latest_event.event_timestamp if latest_event else None
+                    latest_event.event_timestamp
+                    if latest_event
+                    else parser_state.latest_event_timestamp
                 ),
                 "parser_adapter": "codex-jsonl-v1",
                 "parser_diagnostics_json": json.dumps(
                     compact_parser_diagnostics(diagnostics),
                     sort_keys=True,
                 ),
+                "parser_state_json": parser_state_to_json(parser_state),
                 "last_indexed_at": indexed_at,
             }
         )
@@ -618,6 +661,7 @@ def record_source_file_metadata(
         "latest_event_timestamp",
         "parser_adapter",
         "parser_diagnostics_json",
+        "parser_state_json",
         "last_indexed_at",
     ]
     placeholders = ", ".join("?" for _column in columns)

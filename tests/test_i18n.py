@@ -147,6 +147,25 @@ def test_catalog_placeholders_match_english(language: str) -> None:
         assert placeholders(current[key]) == placeholders(english_value), key
 
 
+@pytest.mark.parametrize("language", [lang for lang in SUPPORTED_LANGUAGES if lang != "en"])
+def test_non_english_catalogs_translate_core_visible_labels(language: str) -> None:
+    english = raw_catalog("en")
+    current = raw_catalog(language)
+
+    core_labels = [
+        "dashboard.title",
+        "button.refresh",
+        "filter.search",
+        "dashboard.view.calls",
+        "dashboard.view.threads",
+        "metric.total_tokens",
+        "table.cost",
+    ]
+
+    untranslated = [key for key in core_labels if current[key] == english[key]]
+    assert not untranslated, f"{language} leaves core dashboard labels untranslated: {untranslated}"
+
+
 def test_catalog_keys_use_expected_namespaces() -> None:
     for key in raw_catalog("en"):
         assert key.startswith(EXPECTED_KEY_PREFIXES), key
@@ -251,7 +270,7 @@ def test_arabic_direction_is_rtl() -> None:
 
 
 @pytest.mark.parametrize("language", [lang for lang in SUPPORTED_LANGUAGES if lang != "ar"])
-def test_non_arabic_starter_languages_are_ltr(language: str) -> None:
+def test_non_arabic_supported_languages_are_ltr(language: str) -> None:
     assert language_direction(language) == "ltr"
 
 

@@ -171,6 +171,7 @@
       const serialized = payload.serialized_evidence || {};
       const serializedTokens = Number(serialized.raw_json_token_estimate || 0);
       const serializedChars = Number(serialized.raw_json_char_count || 0);
+      const serializedDeferred = Boolean(serialized.deferred || serialized.deferred_buckets);
       const serializedBound = serializedTokens > 0 ? Math.min(serializedTokens, uncached) : 0;
       const visibleGap = Math.max(uncached - visibleTokenEstimate, 0);
       const serializedCandidate = serializedBound > visibleTokenEstimate ? serializedBound - visibleTokenEstimate : 0;
@@ -187,10 +188,12 @@
         serializedChars,
         serializedLineCount: Number(serialized.raw_line_count || 0),
         serializedEstimator: serialized.token_estimator || payload.visible_token_estimator || 'chars_per_4_fallback',
+        serializedDeferred,
         serializedCandidate,
         remainingAfterSerialized,
         serializedBuckets: Array.isArray(serialized.buckets) ? serialized.buckets : [],
         serializedUpperBound: Boolean(serialized.upper_bound),
+        contextMode: payload.context_mode || 'quick',
         source: payload.source || {},
       };
     }
@@ -241,7 +244,7 @@
         : 'No previous call is loaded for this resolved thread, so call-to-call deltas are unavailable.';
       const stats = contextEvidenceStats(row);
       const evidence = stats
-        ? `Evidence analyzed: ${number.format(stats.totalEntries)} selected-turn entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}. Serialized local upper bound: ${number.format(stats.serializedTokens)} tokens from ${number.format(stats.serializedChars)} raw JSON chars. ${number.format(stats.entries)} entries rendered initially.`
+        ? `Evidence analyzed: ${number.format(stats.totalEntries)} selected-turn entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}. ${stats.serializedDeferred ? 'Fast serialized estimate only; full serialized grouping is deferred.' : `Serialized local upper bound: ${number.format(stats.serializedTokens)} tokens from ${number.format(stats.serializedChars)} raw JSON chars.`} ${number.format(stats.entries)} entries rendered initially.`
         : 'Evidence is loading from the local JSONL source. Aggregate token counts are exact, but visible-context attribution needs that runtime evidence.';
       return `
         <section class="call-diagnostic-section readout">
@@ -430,7 +433,7 @@
                 <div class="call-metric-grid context-attribution">
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
                   ${callMetricCard(t('call.visible_estimate'), visibleEstimateValue, evidenceStats ? `${number.format(evidenceStats.visibleChars)} analyzed chars · ${evidenceStats.estimator}` : t('call.evidence_label'))}
-                  ${callMetricCard(t('call.serialized_upper_bound'), serializedUpperBoundValue, evidenceStats ? `${number.format(evidenceStats.serializedChars)} raw JSON chars · ${evidenceStats.serializedEstimator}` : t('call.evidence_label'))}
+                  ${callMetricCard(t('call.serialized_upper_bound'), serializedUpperBoundValue, evidenceStats ? `${number.format(evidenceStats.serializedChars)} raw JSON chars · ${evidenceStats.serializedEstimator}${evidenceStats.serializedDeferred ? ` · ${t('call.serialized_quick_hint')}` : ''}` : t('call.evidence_label'))}
                   ${callMetricCard(t('call.hidden_estimate'), hiddenEstimateValue, evidenceStats ? t('call.visible_gap') : t('call.evidence_label'))}
                   ${callMetricCard(t('call.serialized_candidate'), serializedCandidateValue, evidenceStats ? t('call.serialized_candidate_hint') : t('call.evidence_label'))}
                   ${callMetricCard(t('call.remaining_after_serialized'), remainingAfterSerializedValue, evidenceStats ? t('call.remaining_after_serialized_hint') : t('call.evidence_label'))}
@@ -565,10 +568,13 @@
       const toolOutputToggle = stored?.status === 'loaded' && !disabled
         ? `<button class="context-button secondary" type="button" data-context-toggle-tool-output>${escapeHtml(requestState.includeToolOutput ? t('button.hide_tool_output') : t('button.show_tool_output'))}</button>`
         : '';
+      const fullAnalysisButton = stored?.status === 'loaded' && requestState.mode !== 'full' && !disabled
+        ? `<button class="context-button secondary" type="button" data-context-full-analysis>${escapeHtml(t('button.full_serialized_analysis'))}</button>`
+        : '';
       const manualLoadButton = !automatic && stored?.status !== 'loaded'
         ? `<button class="context-button" type="button" data-context-load${disabled}>${escapeHtml(t('button.show_turn_evidence'))}</button>`
         : '';
-      const actionHtml = [manualLoadButton, toolOutputToggle, enableButton].filter(Boolean).join('');
+      const actionHtml = [manualLoadButton, toolOutputToggle, fullAnalysisButton, enableButton].filter(Boolean).join('');
       const resultHtml = stored?.status === 'loaded'
         ? renderContext(stored.payload)
         : stored?.status === 'loading'
@@ -584,6 +590,16 @@
 
     function renderSerializedEvidenceBreakdown(stats) {
       if (!stats || !stats.serializedTokens) return '';
+      if (stats.serializedDeferred) {
+        return `
+          <div class="serialized-breakdown deferred">
+            <div class="serialized-breakdown-heading">
+              <strong>${escapeHtml(t('call.serialized_breakdown'))}</strong>
+              <span>${escapeHtml(t('call.serialized_deferred'))}</span>
+            </div>
+          </div>
+        `;
+      }
       const buckets = stats.serializedBuckets.slice(0, 6);
       const bucketHtml = buckets.map(bucket => `
         <div class="serialized-bucket">
@@ -617,6 +633,11 @@
         button.addEventListener('click', () => {
           const current = contextStateForRow(row);
           loadContext(row, { includeToolOutput: !current.includeToolOutput }, contextResult);
+        });
+      });
+      root.querySelectorAll('[data-context-full-analysis]').forEach(button => {
+        button.addEventListener('click', () => {
+          loadContext(row, { mode: 'full' }, contextResult);
         });
       });
       root.querySelectorAll('[data-context-enable]').forEach(button => {
@@ -703,9 +724,10 @@
 
     function defaultContextRequest() {
       return {
-        includeToolOutput: true,
+        mode: 'quick',
+        includeToolOutput: false,
         includeCompactionHistory: false,
-        maxChars: 0,
+        maxChars: null,
         maxEntries: defaultContextEntries,
       };
     }
@@ -714,6 +736,7 @@
       const base = contextStateForRow(row);
       const updates = typeof options === 'boolean' ? { includeToolOutput: options } : (options || {});
       const next = { ...base, ...updates };
+      next.mode = next.mode === 'full' ? 'full' : 'quick';
       next.includeToolOutput = Boolean(next.includeToolOutput);
       next.includeCompactionHistory = Boolean(next.includeCompactionHistory);
       if (next.maxEntries === undefined) next.maxEntries = defaultContextEntries;
@@ -734,6 +757,7 @@
       target.innerHTML = `<p class="context-note">${escapeHtml(t('context.loading'))}</p>`;
       const requestState = nextContextState(row, options);
       const params = new URLSearchParams({ record_id: row.record_id });
+      params.set('mode', requestState.mode || 'quick');
       if (requestState.includeToolOutput) params.set('include_tool_output', '1');
       if (requestState.includeCompactionHistory) params.set('include_compaction_history', '1');
       if (requestState.maxChars !== null && requestState.maxChars !== undefined) {

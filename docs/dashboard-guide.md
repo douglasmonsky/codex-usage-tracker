@@ -136,7 +136,7 @@ The investigator separates evidence by confidence:
 
 - `Exact`: logged token callback counts, cost, Codex credits, cache ratio, model, effort, source, and context-window pressure.
 - `Derived`: previous/next calls in the same resolved thread and cache/accounting deltas versus the previous chronological call.
-- `Estimated`: visible new-context estimates, serialized local JSONL upper bounds, candidate serialized-overhead buckets, and any remaining gap after that upper bound. These are attribution aids, not exact cached text spans.
+- `Estimated`: visible new-context estimates, serialized local JSONL upper bounds, candidate serialized-overhead groups, and any remaining gap after that upper bound. These are attribution aids, not exact cached text spans.
 - `Evidence`: redacted local JSONL turn-log evidence loaded at runtime for the selected investigator call.
 
 Previous and next buttons move chronologically within the same resolved thread and keep the selected call in the URL. Cache diagnostics label common patterns such as warm cache reuse, cold resume or stale cache, partial cache miss, uncached spike, and post-compaction. Delta cards compare input, cached input, uncached input, output/reasoning output, and cache ratio to the previous call and use "cache/accounting delta" terminology because logs do not expose exact cached text spans.
@@ -147,7 +147,9 @@ Previous and next buttons move chronologically within the same resolved thread a
 
 The details panel is structured for progressive disclosure. On desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
-The call investigator loads a bounded redacted turn-log evidence window by default when served from localhost with the context API enabled. Tool output is included by default and can be hidden with `Hide tool output`. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable. The investigator also tokenizes a redacted raw-JSON representation of the same selected-turn log slice and reports it only as a serialized local upper bound. This upper bound can explain why visible text is much smaller than exact uncached input, but it can overcount because local JSONL includes client metadata that may not be prompt text. Bucket labels such as encrypted reasoning/state, local goal metadata, token callback metadata, and rate-limit metadata are counts only; raw text is not returned. `encrypted_content` is an opaque encrypted field found on some reasoning response items. The tracker cannot decrypt it and treats it as serialized state, not readable prompt, assistant, or tool text. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens.
+The call investigator loads a bounded redacted turn-log evidence window by default when served from localhost with the context API enabled. The default request uses `mode=quick`: tool output is omitted, normal size limits apply, and serialized local JSONL is reported as a fast character-based upper bound without bucket analysis. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable.
+
+Use `Run full serialized analysis` when you specifically want tokenizer-counted serialized JSONL groups such as encrypted reasoning/state, local goal metadata, token callback metadata, and rate-limit metadata. This full mode can explain why visible text is much smaller than exact uncached input, but it can overcount because local JSONL includes client metadata that may not be prompt text. Raw grouped text is not returned. `encrypted_content` is an opaque encrypted field found on some reasoning response items. The tracker cannot decrypt it and treats it as serialized state, not readable prompt, assistant, or tool text. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens.
 
 For selected calls, the panel shows:
 
@@ -164,10 +166,10 @@ For selected threads, the panel shows:
 - a compact thread timeline with recent calls, cost, credits, cache, context, and pricing cues
 - direct, subagent, auto-review, attached-call, and spawned-thread relationship counts
 
-When served from localhost, the call investigator automatically fetches a full, redacted source excerpt for only that call. The details panel still uses an explicit `Show turn log evidence` action so hovering rows does not pull raw context unexpectedly.
+When served from localhost, the call investigator automatically fetches quick, redacted source evidence for only that call. The details panel still uses an explicit `Show turn log evidence` action so hovering rows does not pull raw context unexpectedly.
 
-- `Hide tool output` repeats the investigator request without tool output when you want a quieter evidence stream.
-- If tool output is hidden, omitted tool-output entries can show a `Show tool output` button so you can reload from the specific context card that needs inspection.
+- `Show tool output` reloads evidence with redacted, size-limited tool output included.
+- `Run full serialized analysis` reloads evidence with tokenizer-counted serialized JSONL group analysis.
 - Compaction events are shown as metadata first. Replacement history is transcript-like content and is returned only after an explicit `Show compaction history` action, with redaction still applied.
 - Raw context is not written to SQLite, CSV, or the generated dashboard HTML.
 - If the server was started with `--no-context-api`, context loading starts off. Use `Enable context loading` in the details panel when you want to allow explicit row actions without restarting the dashboard server.

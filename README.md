@@ -155,7 +155,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 ## Dashboard Language
 
-The dashboard supports localized UI text. English is the canonical catalog, and the project includes starter locale catalogs for common dashboard languages.
+The dashboard supports localized UI text. English is the canonical catalog, and the project includes translated locale catalogs for common dashboard languages.
 
 Set the initial dashboard language with `--lang`:
 
@@ -171,7 +171,7 @@ CODEX_USAGE_TRACKER_LANG=vi codex-usage-tracker serve-dashboard --open
 
 The dashboard also includes a language selector. Browser selections are stored locally and can override the generated default for that browser.
 
-Supported starter locales include English, Vietnamese, Spanish, French, German, Portuguese, Japanese, Simplified Chinese, Korean, Russian, Italian, and Arabic. This localizes dashboard UI text, not the full CLI output or data exports.
+Supported dashboard locales include English, Vietnamese, Spanish, French, German, Portuguese, Japanese, Simplified Chinese, Korean, Russian, Italian, and Arabic. This localizes dashboard UI text, not raw Codex log content, thread names, project names, paths, full CLI output, or data exports.
 
 ### Adding A Dashboard Language
 

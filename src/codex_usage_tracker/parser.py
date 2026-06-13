@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable, MutableMapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -56,10 +56,54 @@ class ParserAdapter:
         session_index: dict[str, SessionInfo] | None = None,
         stats: MutableMapping[str, int] | None = None,
     ) -> list[UsageEvent]:
-        return _parse_codex_jsonl_v1(path, session_index=session_index, stats=stats)
+        return self.parse_file_with_state(
+            path,
+            session_index=session_index,
+            stats=stats,
+        ).events
+
+    def parse_file_with_state(
+        self,
+        path: Path,
+        session_index: dict[str, SessionInfo] | None = None,
+        stats: MutableMapping[str, int] | None = None,
+        *,
+        start_byte: int = 0,
+        start_line: int = 0,
+        initial_state: ParserState | None = None,
+    ) -> ParsedUsageFile:
+        return _parse_codex_jsonl_v1(
+            path,
+            session_index=session_index,
+            stats=stats,
+            start_byte=start_byte,
+            start_line=start_line,
+            initial_state=initial_state,
+        )
 
 
 DEFAULT_PARSER_ADAPTER = ParserAdapter()
+
+
+@dataclass(frozen=True)
+class ParserState:
+    """Aggregate-only parser cursor for continuing append-only JSONL parsing."""
+
+    session_id: str | None = None
+    session_meta: dict[str, str | None] = field(default_factory=dict)
+    current_turn: dict[str, Any] = field(default_factory=dict)
+    last_cumulative_total: int = -1
+    call_origin_segment: tuple[CallOriginFlags, ...] = ()
+    latest_record_id: str | None = None
+    latest_event_timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class ParsedUsageFile:
+    """Parsed aggregate usage events plus the final parser cursor."""
+
+    events: list[UsageEvent]
+    state: ParserState
 
 
 def load_session_index(codex_home: Path = DEFAULT_CODEX_HOME) -> dict[str, SessionInfo]:
@@ -120,6 +164,78 @@ def parse_usage_events_from_file(
     """Parse one Codex JSONL log without storing raw message content."""
 
     return DEFAULT_PARSER_ADAPTER.parse_file(path, session_index=session_index, stats=stats)
+
+
+def parse_usage_events_from_file_with_state(
+    path: Path,
+    session_index: dict[str, SessionInfo] | None = None,
+    stats: MutableMapping[str, int] | None = None,
+    *,
+    start_byte: int = 0,
+    start_line: int = 0,
+    initial_state: ParserState | None = None,
+) -> ParsedUsageFile:
+    """Parse one Codex JSONL log and return an aggregate-only continuation cursor."""
+
+    return DEFAULT_PARSER_ADAPTER.parse_file_with_state(
+        path,
+        session_index=session_index,
+        stats=stats,
+        start_byte=start_byte,
+        start_line=start_line,
+        initial_state=initial_state,
+    )
+
+
+def parser_state_from_json(raw: str | None) -> ParserState | None:
+    """Decode a persisted aggregate-only parser cursor."""
+
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict) or payload.get("version") != 1:
+        return None
+    segment = payload.get("call_origin_segment")
+    if not isinstance(segment, list):
+        segment = []
+    return ParserState(
+        session_id=_optional_str(payload.get("session_id")),
+        session_meta=_string_dict(payload.get("session_meta")),
+        current_turn=_string_dict(payload.get("current_turn")),
+        last_cumulative_total=_json_int(payload.get("last_cumulative_total"), -1),
+        call_origin_segment=tuple(_call_origin_flags_from_json(item) for item in segment),
+        latest_record_id=_optional_str(payload.get("latest_record_id")),
+        latest_event_timestamp=_optional_str(payload.get("latest_event_timestamp")),
+    )
+
+
+def parser_state_to_json(state: ParserState) -> str:
+    """Encode an aggregate-only parser cursor for source-file refresh metadata."""
+
+    return json.dumps(
+        {
+            "version": 1,
+            "session_id": state.session_id,
+            "session_meta": state.session_meta,
+            "current_turn": state.current_turn,
+            "last_cumulative_total": state.last_cumulative_total,
+            "call_origin_segment": [
+                {
+                    "user_message": flags.user_message,
+                    "compaction": flags.compaction,
+                    "tool_result": flags.tool_result,
+                    "codex_activity": flags.codex_activity,
+                }
+                for flags in state.call_origin_segment
+            ],
+            "latest_record_id": state.latest_record_id,
+            "latest_event_timestamp": state.latest_event_timestamp,
+        },
+        sort_keys=True,
+    )
 
 
 def inspect_log(
@@ -186,26 +302,40 @@ def _parse_codex_jsonl_v1(
     path: Path,
     session_index: dict[str, SessionInfo] | None = None,
     stats: MutableMapping[str, int] | None = None,
-) -> list[UsageEvent]:
+    *,
+    start_byte: int = 0,
+    start_line: int = 0,
+    initial_state: ParserState | None = None,
+) -> ParsedUsageFile:
     """Parse one Codex JSONL v1 log without storing raw message content."""
 
     index = session_index or {}
     file_session_id = _session_id_from_path(path)
-    if not file_session_id:
+    if not file_session_id and start_byte <= 0:
         _increment_stat(stats, "unknown_filename_format")
-    session_id = file_session_id
+    previous_state = initial_state or ParserState()
+    session_id = previous_state.session_id or file_session_id
     session_info = index.get(session_id) if session_id else None
-    current_turn: dict[str, Any] = {}
-    session_meta: dict[str, str | None] = {}
-    last_cumulative_total = -1
+    current_turn: dict[str, Any] = dict(previous_state.current_turn)
+    session_meta: dict[str, str | None] = (
+        dict(previous_state.session_meta)
+        if previous_state.session_meta
+        else _empty_session_metadata()
+    )
+    last_cumulative_total = previous_state.last_cumulative_total
     events: list[UsageEvent] = []
-    call_origin_segment: list[CallOriginFlags] = []
+    call_origin_segment: list[CallOriginFlags] = list(previous_state.call_origin_segment)
+    latest_record_id = previous_state.latest_record_id
+    latest_event_timestamp = previous_state.latest_event_timestamp
 
-    with path.open("r", encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
+    with path.open("rb") as handle:
+        if start_byte > 0:
+            handle.seek(start_byte)
+        for line_number, raw_line in enumerate(handle, start_line + 1):
             try:
+                line = raw_line.decode("utf-8")
                 envelope = json.loads(line)
-            except json.JSONDecodeError:
+            except (UnicodeDecodeError, json.JSONDecodeError):
                 _increment_stat(stats, "invalid_json")
                 continue
 
@@ -302,9 +432,22 @@ def _parse_codex_jsonl_v1(
                 _increment_stat(stats, "skipped_events")
                 continue
             last_cumulative_total = cumulative_total
+            latest_record_id = event.record_id
+            latest_event_timestamp = event.event_timestamp
             events.append(event)
 
-    return events
+    return ParsedUsageFile(
+        events=events,
+        state=ParserState(
+            session_id=session_id,
+            session_meta=session_meta,
+            current_turn=current_turn,
+            last_cumulative_total=last_cumulative_total,
+            call_origin_segment=tuple(call_origin_segment),
+            latest_record_id=latest_record_id,
+            latest_event_timestamp=latest_event_timestamp,
+        ),
+    )
 
 
 def _build_event(
@@ -398,15 +541,8 @@ def _session_metadata(
     session_index: dict[str, SessionInfo],
 ) -> dict[str, str | None]:
     source = payload.get("source")
-    metadata: dict[str, str | None] = {
-        "thread_source": _optional_str(payload.get("thread_source")),
-        "subagent_type": None,
-        "agent_role": None,
-        "agent_nickname": None,
-        "parent_session_id": None,
-        "parent_thread_name": None,
-        "parent_session_updated_at": None,
-    }
+    metadata = _empty_session_metadata()
+    metadata["thread_source"] = _optional_str(payload.get("thread_source"))
     if not isinstance(source, dict):
         return metadata
 
@@ -432,6 +568,18 @@ def _session_metadata(
                 metadata["parent_thread_name"] = parent_info.thread_name
                 metadata["parent_session_updated_at"] = parent_info.updated_at
     return metadata
+
+
+def _empty_session_metadata() -> dict[str, str | None]:
+    return {
+        "thread_source": None,
+        "subagent_type": None,
+        "agent_role": None,
+        "agent_nickname": None,
+        "parent_session_id": None,
+        "parent_thread_name": None,
+        "parent_session_updated_at": None,
+    }
 
 
 def _record_id(
@@ -486,6 +634,31 @@ def _optional_str(value: object) -> str | None:
     if isinstance(value, str):
         return value
     return None
+
+
+def _string_dict(value: object) -> dict[str, str | None]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): item if isinstance(item, str) else None
+        for key, item in value.items()
+        if isinstance(key, str)
+    }
+
+
+def _json_int(value: object, default: int) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _call_origin_flags_from_json(value: object) -> CallOriginFlags:
+    if not isinstance(value, dict):
+        return CallOriginFlags()
+    return CallOriginFlags(
+        user_message=value.get("user_message") is True,
+        compaction=value.get("compaction") is True,
+        tool_result=value.get("tool_result") is True,
+        codex_activity=value.get("codex_activity") is True,
+    )
 
 
 def _nullable_int(

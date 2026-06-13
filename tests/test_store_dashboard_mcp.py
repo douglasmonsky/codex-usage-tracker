@@ -10,9 +10,11 @@ import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from codex_usage_tracker import store as store_module
 from codex_usage_tracker.context import load_call_context
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
@@ -103,12 +105,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "6"
+    assert meta["schema_version"] == "7"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 6
+    assert state["schema_version"] == 7
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7]
     with connect(db_path) as conn:
         init_db(conn)
         source_rows = [
@@ -116,7 +118,7 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
             for row in conn.execute(
                 """
                 SELECT source_file, size_bytes, parsed_until_line, latest_record_id,
-                    parser_diagnostics_json
+                    parser_diagnostics_json, parser_state_json
                 FROM source_files
                 ORDER BY source_file
                 """
@@ -126,6 +128,7 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert all(row["size_bytes"] > 0 for row in source_rows)
     assert all(row["parsed_until_line"] > 0 for row in source_rows)
     assert any(row["latest_record_id"] for row in source_rows)
+    assert all(row["parser_state_json"] for row in source_rows)
     assert "SECRET RAW PROMPT" not in json.dumps(source_rows)
 
 
@@ -152,6 +155,7 @@ def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
 
 def test_refresh_indexes_only_appended_token_events_when_source_grows(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -160,20 +164,124 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     )
 
     first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        source_before = conn.execute(
+            """
+            SELECT parsed_until_byte, parsed_until_line, parser_state_json
+            FROM source_files
+            WHERE source_file = ?
+            """,
+            (str(log_path),),
+        ).fetchone()
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(_token_event(650, 350)) + "\n")
+    parse_calls: list[dict[str, Any]] = []
+    original_parse = store_module.parse_usage_events_from_file_with_state
+
+    def tracking_parse(*args: Any, **kwargs: Any):
+        parse_calls.append(
+            {
+                "path": args[0],
+                "start_byte": kwargs.get("start_byte"),
+                "start_line": kwargs.get("start_line"),
+                "initial_state": kwargs.get("initial_state"),
+            }
+        )
+        return original_parse(*args, **kwargs)
+
+    monkeypatch.setattr(
+        store_module,
+        "parse_usage_events_from_file_with_state",
+        tracking_parse,
+    )
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     third = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     rows = query_session_usage(db_path=db_path, session_id=SESSION_ID)
     metadata = refresh_metadata(db_path)
 
     assert first.parsed_events == 4
+    assert source_before is not None
+    assert source_before["parser_state_json"]
+    assert len(parse_calls) == 1
+    assert parse_calls[0]["path"] == log_path
+    assert parse_calls[0]["start_byte"] == source_before["parsed_until_byte"]
+    assert parse_calls[0]["start_line"] == source_before["parsed_until_line"]
+    assert parse_calls[0]["start_byte"] > 0
+    assert parse_calls[0]["initial_state"] is not None
     assert second.parsed_events == 1
     assert second.inserted_or_updated_events == 1
     assert third.parsed_events == 0
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
     assert metadata["parsed_source_files"] == "0"
     assert metadata["skipped_source_files"] == "3"
+
+
+def test_append_cursor_preserves_pending_call_origin_between_refreshes(
+    tmp_path: Path,
+) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c001"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Append cursor origin",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "SECRET PENDING USER TEXT"}],
+                },
+            ),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+
+    first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(_token_event(150, 50)) + "\n")
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    rows = query_session_usage(db_path=db_path, session_id=session_id)
+    source_rows_text = ""
+    with connect(db_path) as conn:
+        init_db(conn)
+        source_rows_text = json.dumps(
+            [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT parser_state_json FROM source_files WHERE source_file = ?",
+                    (str(log_path),),
+                ).fetchall()
+            ]
+        )
+
+    assert first.parsed_events == 1
+    assert second.parsed_events == 1
+    assert [row["cumulative_total_tokens"] for row in rows] == [100, 150]
+    assert rows[-1]["call_initiator"] == "user"
+    assert rows[-1]["call_initiator_reason"] == "user_message"
+    assert "SECRET PENDING USER TEXT" not in source_rows_text
 
 
 def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
@@ -186,7 +294,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 6
+    assert user_version == 7
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -256,8 +364,8 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_timestamp" in indexes
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
-    assert user_version == 6
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6]
+    assert user_version == 7
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7]
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:
@@ -668,6 +776,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "renderCallInvestigator" in dashboard_js
     assert "fetchCallRecord" in dashboard_js
     assert "fetchCallRecord" in dashboard_call_js
+    assert "/api/call?" in dashboard_js
     assert "supplementalRowsByRecordId" in dashboard_js
     assert 'body[data-active-view="call"] .detail-section' in dashboard_css
     assert 'body[data-active-view="call"] .table-tools' in dashboard_css
@@ -677,10 +786,13 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "renderInvestigationReadout" in dashboard_call_js
     assert "contextStateRecord(row)" in dashboard_call_js
     assert "defaultContextRequest" in dashboard_call_js
-    assert "includeToolOutput: true" in dashboard_call_js
-    assert "maxChars: 0" in dashboard_call_js
+    assert "mode: 'quick'" in dashboard_call_js
+    assert "mode: 'full'" in dashboard_call_js
+    assert "includeToolOutput: false" in dashboard_call_js
+    assert "maxChars: null" in dashboard_call_js
     assert "maxEntries: defaultContextEntries" in dashboard_call_js
     assert "data-context-toggle-tool-output" in dashboard_call_js
+    assert "data-context-full-analysis" in dashboard_call_js
     assert "button.hide_tool_output" in dashboard_call_js
     assert "data-context-autoload-toggle" not in dashboard_call_js
     assert "renderCacheVerdict" in dashboard_call_js
@@ -711,6 +823,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-context-entry-key" in dashboard_call_js
     assert "button.show_tool_output" in dashboard_call_js
     assert "data-context-entry-load-output" in dashboard_call_js
+    assert "button.full_serialized_analysis" in dashboard_call_js
     assert ".grid > section:not(.detail-section)" in dashboard_css
     assert "overflow-x: auto" in dashboard_css
     assert "overscroll-behavior-x: contain" in dashboard_css
@@ -763,6 +876,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["dashboard.view.call"] == "Call Investigator"
     assert en_trans["button.show_tool_output"] == "Show tool output"
     assert en_trans["button.hide_tool_output"] == "Hide tool output"
+    assert en_trans["button.full_serialized_analysis"] == "Run full serialized analysis"
     assert en_trans["button.hide_details"] == "Hide details"
     assert en_trans["table.initiated"] == "Initiated"
     assert en_trans["source.user_initiated"] == "User initiated"
@@ -1289,6 +1403,18 @@ def test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical(
             timeout=5,
         ) as response:
             context_false_payload = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"{base_url}/api/context?record_id={record_id}&mode=full",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            context_full_payload = json.loads(response.read().decode("utf-8"))
+        invalid_context_mode = _http_error_json(
+            f"{base_url}/api/context?record_id={record_id}&mode=slow",
+            headers={"X-Codex-Usage-Token": "test-token"},
+        )
     finally:
         server.shutdown()
         server.server_close()
@@ -1310,6 +1436,11 @@ def test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical(
 
     assert "diagnostics" not in context_default_payload
     assert "diagnostics" not in context_false_payload
+    assert context_default_payload["context_mode"] == "quick"
+    assert context_default_payload["serialized_evidence"]["deferred_buckets"] is True
+    assert context_full_payload["context_mode"] == "full"
+    assert context_full_payload["serialized_evidence"]["deferred_buckets"] is False
+    assert invalid_context_mode["status"] == 400
     context_diagnostics = context_diagnostics_payload["diagnostics"]
     assert context_diagnostics["db_lookup_ms"] >= 0
     assert context_diagnostics["source_scan_ms"] >= 0
@@ -1635,6 +1766,7 @@ def test_dashboard_server_can_enable_context_api_at_runtime(tmp_path: Path) -> N
     assert usage_payload["context_api_enabled"] is True
     assert context_payload["loaded_on_demand"] is True
     assert context_payload["raw_context_persisted"] is False
+    assert context_payload["context_mode"] == "quick"
     assert unlimited_context_payload["omitted"]["max_chars"] == 0
     assert unlimited_context_payload["omitted"]["max_entries"] == 0
     assert unlimited_context_payload["omitted"]["older_entries"] == 0
@@ -1661,6 +1793,7 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
 
     assert context["loaded_on_demand"] is True
     assert context["raw_context_persisted"] is False
+    assert context["context_mode"] == "quick"
     assert context["visible_char_count"] > 0
     assert context["visible_token_estimate"] > 0
     assert context["visible_token_estimator"] in {
@@ -1670,18 +1803,29 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     }
     serialized = context["serialized_evidence"]
     assert serialized["available"] is True
-    assert serialized["scope"] == "selected_turn_raw_jsonl"
+    assert serialized["scope"] == "selected_turn_raw_jsonl_fast_estimate"
     assert serialized["upper_bound"] is True
     assert serialized["raw_text_returned"] is False
+    assert serialized["deferred"] is True
+    assert serialized["deferred_buckets"] is True
+    assert serialized["reason"] == "full_serialized_analysis_not_requested"
     assert serialized["raw_line_count"] >= len(context["entries"])
     assert serialized["raw_json_char_count"] > context["visible_char_count"]
     assert serialized["raw_json_token_estimate"] >= context["visible_token_estimate"]
-    assert serialized["token_estimator"] in {
+    assert serialized["token_estimator"] == "chars_per_4_fallback"
+    assert serialized["buckets"] == []
+    full_context = load_call_context(rows[0]["record_id"], db_path=db_path, mode="full")
+    full_serialized = full_context["serialized_evidence"]
+    assert full_context["context_mode"] == "full"
+    assert full_serialized["scope"] == "selected_turn_raw_jsonl"
+    assert full_serialized["deferred"] is False
+    assert full_serialized["deferred_buckets"] is False
+    assert full_serialized["token_estimator"] in {
         "chars_per_4_fallback",
         "tiktoken:o200k_base",
         "tiktoken:cl100k_base",
     }
-    serialized_bucket_keys = {bucket["key"] for bucket in serialized["buckets"]}
+    serialized_bucket_keys = {bucket["key"] for bucket in full_serialized["buckets"]}
     assert "encrypted_reasoning_state" in serialized_bucket_keys
     assert "local_goal_metadata" in serialized_bucket_keys
     assert "call_anchors" not in context
@@ -1785,7 +1929,9 @@ def test_context_loading_uses_one_source_scan_for_evidence_and_serialized_estima
     assert open_count == 1
     assert any(entry["label"] == "message / user" for entry in context["entries"])
     assert context["include_tool_output"] is False
+    assert context["context_mode"] == "quick"
     assert context["serialized_evidence"]["available"] is True
+    assert context["serialized_evidence"]["deferred_buckets"] is True
     assert "call_anchors" not in context
     assert "thread_anchors" not in context
     assert context["diagnostics"]["source_scan_ms"] >= 0

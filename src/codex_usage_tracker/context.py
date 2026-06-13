@@ -15,6 +15,9 @@ from codex_usage_tracker.store import query_usage_record
 
 DEFAULT_CONTEXT_CHARS = 20_000
 DEFAULT_CONTEXT_ENTRIES = 80
+CONTEXT_MODE_QUICK = "quick"
+CONTEXT_MODE_FULL = "full"
+CONTEXT_MODES = {CONTEXT_MODE_QUICK, CONTEXT_MODE_FULL}
 
 _OUTPUT_OMITTED = (
     "Tool output hidden for this request. Reload with include_tool_output=true to inspect "
@@ -30,6 +33,7 @@ def load_call_context(
     include_tool_output: bool = False,
     include_compaction_history: bool = False,
     diagnostics: bool = False,
+    mode: str = CONTEXT_MODE_QUICK,
 ) -> dict[str, Any]:
     """Load logged turn context for one model call from the source JSONL file.
 
@@ -37,6 +41,7 @@ def load_call_context(
     context is not written back to SQLite or embedded in dashboard HTML.
     """
 
+    context_mode = _normalize_context_mode(mode)
     diagnostic_payload: dict[str, Any] | None = {} if diagnostics else None
     db_lookup_started = perf_counter()
     row = query_usage_record(db_path=db_path, record_id=record_id)
@@ -66,6 +71,7 @@ def load_call_context(
             include_tool_output=include_tool_output,
             include_compaction_history=include_compaction_history,
             model=_optional_str(row.get("model")),
+            context_mode=context_mode,
         )
     )
     source_scan_ms = _elapsed_ms(source_scan_started)
@@ -82,6 +88,7 @@ def load_call_context(
         "schema": "codex-usage-tracker-context-v1",
         "loaded_on_demand": True,
         "raw_context_persisted": False,
+        "context_mode": context_mode,
         "include_tool_output": include_tool_output,
         "include_compaction_history": include_compaction_history,
         "visible_char_count": visible_estimate["visible_char_count"],
@@ -114,6 +121,16 @@ def load_call_context(
     return payload
 
 
+def _normalize_context_mode(mode: str) -> str:
+    normalized = str(mode or CONTEXT_MODE_QUICK).strip().lower()
+    if normalized not in CONTEXT_MODES:
+        raise ValueError(
+            f"Unsupported context mode: {mode}. Expected one of: "
+            f"{', '.join(sorted(CONTEXT_MODES))}"
+        )
+    return normalized
+
+
 def _elapsed_ms(started_at: float) -> float:
     return round((perf_counter() - started_at) * 1000, 3)
 
@@ -138,15 +155,23 @@ def _read_context_entries(
     include_tool_output: bool,
     include_compaction_history: bool,
     model: str | None,
+    context_mode: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]], dict[str, Any], float]:
     candidates: list[dict[str, Any]] = []
     raw_entries: list[dict[str, Any]] = []
     field_buckets: dict[str, dict[str, Any]] = {}
+    serialized_line_count = 0
+    serialized_raw_char_count = 0
     omitted_parse_errors = 0
     current_turn_id: str | None = None
     collecting = target_turn_id is None
     pending_compactions: list[dict[str, Any]] = []
-    encoding, estimator = _context_encoding(model or "")
+    full_serialized_analysis = context_mode == CONTEXT_MODE_FULL
+    encoding, estimator = (
+        _context_encoding(model or "")
+        if full_serialized_analysis
+        else (None, "chars_per_4_fallback")
+    )
 
     with path.open(encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
@@ -170,14 +195,20 @@ def _read_context_entries(
                 if collecting:
                     raw_entries = []
                     field_buckets = {}
-                    _collect_serialized_envelope(
-                        raw_entries=raw_entries,
-                        field_buckets=field_buckets,
-                        envelope=envelope,
-                        entry_type=entry_type,
-                        payload=payload,
-                        encoding=encoding,
-                    )
+                    serialized_line_count = 0
+                    serialized_raw_char_count = 0
+                    if full_serialized_analysis:
+                        _collect_serialized_envelope(
+                            raw_entries=raw_entries,
+                            field_buckets=field_buckets,
+                            envelope=envelope,
+                            entry_type=entry_type,
+                            payload=payload,
+                            encoding=encoding,
+                        )
+                    else:
+                        serialized_line_count += 1
+                        serialized_raw_char_count += len(line)
                     carried_compactions = (
                         [entry for entry in candidates if entry.get("type") == "compacted"]
                         if was_collecting and target_turn_id is not None
@@ -199,14 +230,18 @@ def _read_context_entries(
                 continue
 
             if collecting:
-                _collect_serialized_envelope(
-                    raw_entries=raw_entries,
-                    field_buckets=field_buckets,
-                    envelope=envelope,
-                    entry_type=entry_type,
-                    payload=payload,
-                    encoding=encoding,
-                )
+                if full_serialized_analysis:
+                    _collect_serialized_envelope(
+                        raw_entries=raw_entries,
+                        field_buckets=field_buckets,
+                        envelope=envelope,
+                        entry_type=entry_type,
+                        payload=payload,
+                        encoding=encoding,
+                    )
+                else:
+                    serialized_line_count += 1
+                    serialized_raw_char_count += len(line)
 
             summarized = _summarize_payload(
                 entry_type=entry_type,
@@ -240,13 +275,20 @@ def _read_context_entries(
                 break
 
     serialized_started = perf_counter()
-    serialized_estimate = _serialized_context_estimate(
-        raw_entries=raw_entries,
-        field_buckets=field_buckets,
-        parse_errors=omitted_parse_errors,
-        encoding=encoding,
-        estimator=estimator,
-    )
+    if full_serialized_analysis:
+        serialized_estimate = _serialized_context_estimate(
+            raw_entries=raw_entries,
+            field_buckets=field_buckets,
+            parse_errors=omitted_parse_errors,
+            encoding=encoding,
+            estimator=estimator,
+        )
+    else:
+        serialized_estimate = _quick_serialized_context_estimate(
+            raw_line_count=serialized_line_count,
+            raw_json_char_count=serialized_raw_char_count,
+            parse_errors=omitted_parse_errors,
+        )
     serialized_estimate_ms = _elapsed_ms(serialized_started)
     candidates = _dedupe_chat_message_echoes(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
@@ -299,6 +341,31 @@ def _serialized_context_estimate(
         "upper_bound": True,
         "raw_text_returned": False,
         "buckets": top_buckets,
+        "deferred": False,
+        "deferred_buckets": False,
+    }
+
+
+def _quick_serialized_context_estimate(
+    *,
+    raw_line_count: int,
+    raw_json_char_count: int,
+    parse_errors: int,
+) -> dict[str, Any]:
+    return {
+        "available": raw_line_count > 0,
+        "scope": "selected_turn_raw_jsonl_fast_estimate",
+        "raw_line_count": raw_line_count,
+        "raw_json_char_count": raw_json_char_count,
+        "raw_json_token_estimate": ceil(raw_json_char_count / 4) if raw_json_char_count else 0,
+        "token_estimator": "chars_per_4_fallback",
+        "parse_errors": parse_errors,
+        "upper_bound": True,
+        "raw_text_returned": False,
+        "buckets": [],
+        "deferred": True,
+        "deferred_buckets": True,
+        "reason": "full_serialized_analysis_not_requested",
     }
 
 

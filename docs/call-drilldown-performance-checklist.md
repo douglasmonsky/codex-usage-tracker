@@ -229,19 +229,20 @@ Full branch closeout should also run the release validation listed in `docs/deve
 ## Known Remaining Slow Paths
 
 - Normal `dashboard_payload` no longer runs source-file call-origin annotation.
-- Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata. M9 preserves this compatibility endpoint while adding SQL-backed live API slices.
+- Live `/api/usage` still calls `dashboard_payload`, but after M3 it should not open source JSONL files for call-origin metadata. M9 preserves this compatibility endpoint while adding SQL-backed live API slices; only direct investigator hydration currently consumes `/api/call` from the frontend.
 - Active/all-history filtering now has a persisted `is_archived` flag and path fallback; future SQLite-backed API slices should reuse that helper instead of reintroducing path-only filtering.
 - Per-thread adjacency is persisted after upsert and M7 makes the browser build a `record_id` adjacency index once per payload. Investigator lookup now uses that index and prefers loaded `previous_record_id`/`next_record_id` neighbors when available.
-- Context loading now performs selected-turn evidence and serialized-evidence collection in one source-file scan for a selected call. Serialized evidence is still built in memory and timed separately as `serialized_estimate_ms`.
+- Context loading defaults to `mode=quick`, which reads selected-turn evidence in one source-file scan, omits tool output, and returns a fast serialized upper-bound estimate without building tokenizer-counted serialized groups. `mode=full` / `Run full serialized analysis` keeps the richer serialized group analysis available on demand and times it separately as `serialized_estimate_ms`.
 - M8 source-log benchmark mode now generates synthetic JSONL files, points synthetic aggregate rows at matching `token_count` lines, measures early/middle/late explicit context loads, and wraps source-log dashboard payload assembly with a guard that fails if a synthetic source file is opened.
-- M9 adds additive SQL-backed live endpoints: `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, and `/api/recommendations`. The frontend still uses `/api/usage` until a later split.
+- M9 adds additive SQL-backed live endpoints: `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, and `/api/recommendations`. The list/table frontend still uses `/api/usage` until a later split, while direct call-investigator fallback uses `/api/call`.
 - Direct `view=call&record=...` investigator links can hydrate the selected aggregate row through `/api/call` when the current dashboard payload is filtered, stale, or does not include that record.
 - M10 materializes per-thread active and all-history summary rows in SQLite so `/api/threads` can read pre-aggregated thread totals without grouping every usage row on each request.
-- M11 adds a `source_files` metadata table. Refresh skips unchanged logs, parses appended token events after the last indexed source line when safe, and fully replaces aggregate rows for changed/truncated source files.
+- M11 adds a `source_files` metadata table with aggregate-only parser cursors. Refresh skips unchanged logs, seeks to the last indexed byte for append-only growth when a cursor is available, and fully replaces aggregate rows for changed/truncated source files.
 - M5 adds opt-in timing fields for `/api/usage?diagnostics=true` and `/api/context?...&diagnostics=true`; diagnostics are technical metrics only and are absent unless explicitly requested.
 - Static dashboard generation remains supported as the export/compatibility path; M9 added live API slices without removing generated dashboard HTML.
 - Source-log reads are limited to refresh/indexing, explicit `/api/context` loading for one selected call, and explicit benchmark/diagnostic tooling. Normal `dashboard_payload` and `/api/usage` must remain aggregate-only.
 - No evidence cache was implemented in this branch.
+- Per-call byte offsets for context loading remain future work. Late calls in very large source JSONL files can still require scanning to the selected token line, although the default quick mode avoids the previous serialized-group cost.
 
 ## Privacy Notes
 

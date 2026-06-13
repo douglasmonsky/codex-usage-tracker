@@ -203,6 +203,8 @@ def test_context_loading_is_explicit_redacted_and_not_static_html(tmp_path: Path
         assert sentinel not in static_html
     assert default_context["loaded_on_demand"] is True
     assert default_context["raw_context_persisted"] is False
+    assert default_context["context_mode"] == "quick"
+    assert default_context["serialized_evidence"]["deferred_buckets"] is True
     assert PROMPT_SENTINEL in default_context_text
     assert ASSISTANT_SENTINEL in default_context_text
     assert "call_anchors" not in default_context
@@ -294,6 +296,7 @@ def test_context_server_requires_loopback_origin_token_and_enablement(tmp_path: 
     assert settings_payload["raw_context_persisted"] is False
     assert context_payload["loaded_on_demand"] is True
     assert context_payload["raw_context_persisted"] is False
+    assert context_payload["context_mode"] == "quick"
 
 
 class _PrivacyFixture:
