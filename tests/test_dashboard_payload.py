@@ -48,6 +48,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     )
     dashboard_i18n_js = (asset_dir / "dashboard_i18n.js").read_text(encoding="utf-8")
     dashboard_tooltips_js = (asset_dir / "dashboard_tooltips.js").read_text(encoding="utf-8")
+    dashboard_status_js = (asset_dir / "dashboard_status.js").read_text(encoding="utf-8")
     dashboard_call_js = (asset_dir / "dashboard_call_investigator.js").read_text(
         encoding="utf-8"
     )
@@ -79,6 +80,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         dashboard_payload_cache_js,
         dashboard_i18n_js,
         dashboard_tooltips_js,
+        dashboard_status_js,
         dashboard_call_js,
         dashboard_js,
         dashboard_state_js,
@@ -98,6 +100,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_payload_cache_js
     assert "SECRET RAW PROMPT" not in dashboard_i18n_js
     assert "SECRET RAW PROMPT" not in dashboard_tooltips_js
+    assert "SECRET RAW PROMPT" not in dashboard_status_js
     assert "SECRET RAW PROMPT" not in dashboard_call_js
     assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
@@ -112,6 +115,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_payload_cache_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_i18n_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_tooltips_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_status_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_js
@@ -124,6 +128,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_payload_cache_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_i18n_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_tooltips_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_status_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_js
     for stylesheet in dashboard_stylesheets:
         assert f'href="codex-usage-tracker-assets/{stylesheet}?v=' in dashboard
@@ -139,6 +144,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'src="codex-usage-tracker-assets/dashboard_payload_cache.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_i18n.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_tooltips.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_status.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_call_investigator.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard.js?v=' in dashboard
     assert "CodexUsageDashboardFormat" in dashboard_format_js
@@ -153,6 +159,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "CodexUsageDashboardPayloadCache" in dashboard_payload_cache_js
     assert "CodexUsageDashboardI18n" in dashboard_i18n_js
     assert "CodexUsageDashboardTooltips" in dashboard_tooltips_js
+    assert "CodexUsageDashboardStatus" in dashboard_status_js
     assert "CodexUsageCallInvestigator" in dashboard_call_js
     assert "copyViewLink" in dashboard
     assert "exportVisible" in dashboard
@@ -214,7 +221,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.project_tags" in dashboard_details_js
     assert "detail.git_branch" in dashboard_details_js
     assert "usage_credit_confidence" in dashboard
-    assert "allowance.credit_rates" in dashboard_js
+    assert "allowance.credit_rates" in dashboard_status_js
     assert "insight.codex_allowance_usage" in dashboard_insights_js
     assert "Highest Codex credits" in dashboard
     assert "Estimated Tokens" not in dashboard
@@ -398,6 +405,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_payload_cache.js").exists()
     assert (asset_dir / "dashboard_i18n.js").exists()
     assert (asset_dir / "dashboard_tooltips.js").exists()
+    assert (asset_dir / "dashboard_status.js").exists()
     for stylesheet in dashboard_stylesheets:
         assert (asset_dir / stylesheet).exists()
     assert "detail-section" in dashboard
@@ -408,8 +416,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "formatTimestamp" in dashboard_js
     assert "scrollbar-gutter: stable" in dashboard_css
     assert "overflow-y: scroll" in dashboard_css
-    assert "formatTimestamp(pricingSource.fetched_at)" in dashboard_js
-    assert "pricingSnapshotWarning" in dashboard_js
+    assert "pricingSource.fetched_at" in dashboard_status_js
+    assert "pricingSnapshotWarning" in dashboard_status_js
     assert "formatTimestamp(nextPayload.refreshed_at)" in dashboard_js
     assert "threadModelSummary" in dashboard_analysis_js
     assert "model-pill" in dashboard_surface

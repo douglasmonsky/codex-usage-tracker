@@ -235,6 +235,7 @@ def generate_dashboard(
     )
     i18n_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_i18n.js")
     tooltips_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_tooltips.js")
+    status_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_status.js")
     call_investigator_script_src = _versioned_asset_href(
         output_path, asset_base, "dashboard_call_investigator.js"
     )
@@ -277,6 +278,7 @@ def generate_dashboard(
             payload_cache_script_src=payload_cache_script_src,
             i18n_script_src=i18n_script_src,
             tooltips_script_src=tooltips_script_src,
+            status_script_src=status_script_src,
             call_investigator_script_src=call_investigator_script_src,
             script_src=script_src,
         ),
@@ -304,6 +306,7 @@ def render_dashboard_html(
     payload_cache_script_src: str | None = None,
     i18n_script_src: str | None = None,
     tooltips_script_src: str | None = None,
+    status_script_src: str | None = None,
     call_investigator_script_src: str | None = None,
     script_src: str | None = None,
 ) -> str:
@@ -349,6 +352,8 @@ def render_dashboard_html(
         or _versioned_asset_href(output_path, asset_base, "dashboard_i18n.js"),
         tooltips_script_src=tooltips_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_tooltips.js"),
+        status_script_src=status_script_src
+        or _versioned_asset_href(output_path, asset_base, "dashboard_status.js"),
         call_investigator_script_src=call_investigator_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_call_investigator.js"),
         script_src=script_src
@@ -578,6 +583,7 @@ def _html(
     payload_cache_script_src: str = "codex-usage-tracker-assets/dashboard_payload_cache.js",
     i18n_script_src: str = "codex-usage-tracker-assets/dashboard_i18n.js",
     tooltips_script_src: str = "codex-usage-tracker-assets/dashboard_tooltips.js",
+    status_script_src: str = "codex-usage-tracker-assets/dashboard_status.js",
     call_investigator_script_src: str = "codex-usage-tracker-assets/dashboard_call_investigator.js",
     script_src: str = "codex-usage-tracker-assets/dashboard.js",
     body_attrs: str = "",
@@ -615,6 +621,7 @@ def _html(
         .replace("__PAYLOAD_CACHE_SCRIPT_SRC__", html.escape(payload_cache_script_src, quote=True))
         .replace("__I18N_SCRIPT_SRC__", html.escape(i18n_script_src, quote=True))
         .replace("__TOOLTIPS_SCRIPT_SRC__", html.escape(tooltips_script_src, quote=True))
+        .replace("__STATUS_SCRIPT_SRC__", html.escape(status_script_src, quote=True))
         .replace(
             "__CALL_INVESTIGATOR_SCRIPT_SRC__",
             html.escape(call_investigator_script_src, quote=True),

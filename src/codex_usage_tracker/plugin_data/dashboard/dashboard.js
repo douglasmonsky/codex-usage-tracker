@@ -8,6 +8,7 @@
     const dashboardTablesFactory = window.CodexUsageDashboardTables;
     const dashboardPayloadCache = window.CodexUsageDashboardPayloadCache;
     const dashboardTooltipFactory = window.CodexUsageDashboardTooltips;
+    const dashboardStatusFactory = window.CodexUsageDashboardStatus;
     const {
       number,
       money,
@@ -69,8 +70,6 @@
     let restoredAggregatePayloadFromCache = initialRestoredAggregatePayloadFromCache;
     const i18n = window.CodexUsageDashboardI18n.create(activeInitialPayload, { escapeHtml });
     const tooltips = dashboardTooltipFactory.create({ escapeHtml, clamp });
-    let liveStatusKey = window.location.protocol !== 'file:' ? 'badge.live' : 'status.static';
-    let liveStatusDetail = '';
     function t(key) {
       return i18n.t(key);
     }
@@ -202,6 +201,7 @@
     let detailPanelExpanded = readDetailPanelPreference();
     let initialThreadExpansionApplied = false;
     let initialDetailApplied = false;
+    let dashboardStatus = null;
     const dashboardInsights = dashboardInsightsFactory.create({
       allowanceWindowText,
       applyPreset,
@@ -527,6 +527,36 @@
     function closestFastTooltipTarget(eventTarget) {
       return tooltips.closestFastTooltipTarget(eventTarget);
     }
+    dashboardStatus = dashboardStatusFactory.create({
+      allowanceImpactElement: document.getElementById('allowanceImpact'),
+      allowanceSourceElement: document.getElementById('allowanceSource'),
+      creditCoverageRatio,
+      credits,
+      formatTimestamp,
+      formatTimestampTitle,
+      getAllowanceConfigured: () => allowanceConfigured,
+      getAllowanceError: () => allowanceError,
+      getAllowanceSource: () => allowanceSource,
+      getAllowanceWindows: () => allowanceWindows,
+      getData: () => data,
+      getParserDiagnostics: () => parserDiagnostics,
+      getPricingConfigured: () => pricingConfigured,
+      getPricingSnapshotWarning: () => pricingSnapshotWarning,
+      getPricingSource: () => pricingSource,
+      getProjectMetadataPrivacy: () => projectMetadataPrivacy,
+      getRateCardError: () => rateCardError,
+      liveStatusElement: liveStatusEl,
+      number,
+      parserDiagnosticsElement: document.getElementById('parserDiagnostics'),
+      pct,
+      pricingSourceElement: document.getElementById('pricingSource'),
+      privacyModeElement: document.getElementById('privacyMode'),
+      setFastTooltip,
+      short,
+      t,
+      tf,
+      usageCreditValue,
+    });
     function investigatorUrl(row, overrides = {}) {
       if (!stateManager) return '#';
       return stateManager.urlFor({
@@ -597,65 +627,19 @@
       }
     }
     function allowanceWindowText(totalCredits, mode = 'impact') {
-      if (!allowanceWindows.length) return '';
-      const labels = allowanceWindows.map(window => {
-        const label = short(window.label || window.key, 'Window');
-        const total = Number(window.total_credits || 0);
-        const remainingCredits = window.remaining_credits === null || window.remaining_credits === undefined ? null : Number(window.remaining_credits);
-        const remainingPercent = window.remaining_percent === null || window.remaining_percent === undefined ? null : Number(window.remaining_percent);
-        if (mode === 'remaining-card' && remainingPercent !== null && Number.isFinite(remainingPercent)) {
-          return `${label} ${pct(remainingPercent)}`;
-        }
-        if (mode === 'remaining-card' && remainingCredits !== null && Number.isFinite(remainingCredits)) {
-          return `${label} ${tf('allowance.cr_left', { value: credits(remainingCredits) })}`;
-        }
-        if (mode === 'impact' && total > 0) {
-          return `${label} ${tf('allowance.of_allowance', { ratio: pct(totalCredits / total) })}`;
-        }
-        if (mode === 'impact' && remainingCredits !== null && Number.isFinite(remainingCredits)) {
-          return `${label} ${tf('allowance.used_vs_remaining', { used: credits(totalCredits), remaining: credits(remainingCredits) })}`;
-        }
-        if (remainingPercent !== null && Number.isFinite(remainingPercent)) {
-          return `${label} ${tf('allowance.remaining', { value: pct(remainingPercent) })}`;
-        }
-        if (remainingCredits !== null && Number.isFinite(remainingCredits)) {
-          return `${label} ${tf('allowance.credits_remaining', { value: credits(remainingCredits) })}`;
-        }
-        if (total > 0) {
-          return `${label} ${tf('allowance.of_total', { used: credits(totalCredits), total: credits(total) })}`;
-        }
-        return tf('allowance.window_configured', { label });
-      });
-      return labels.join(mode === 'remaining-card' ? '\n' : ' · ');
+      return dashboardStatus.allowanceWindowText(totalCredits, mode);
     }
     function allowanceImpactText(totalCredits) {
-      const windowImpact = allowanceWindowText(totalCredits, 'remaining-card') || allowanceWindowText(totalCredits, 'impact');
-      if (windowImpact) return windowImpact;
-      if (allowanceError) return t('state.allowance_config_error');
-      return allowanceConfigured ? t('state.allowance_configured') : t('action.set_limits');
+      return dashboardStatus.allowanceImpactText(totalCredits);
     }
     function rowAllowanceImpact(row) {
-      const value = usageCreditValue(row);
-      if (value === null) return t('allowance.row_no_rate');
-      const impact = allowanceWindowText(value, 'impact');
-      return impact || tf('allowance.counted', { value: credits(value) });
+      return dashboardStatus.rowAllowanceImpact(row);
+    }
+    function updateAllowanceImpact(totalCredits) {
+      dashboardStatus.updateAllowanceImpact(totalCredits);
     }
     function updateAllowanceSourceLine() {
-      const sourceEl = document.getElementById('allowanceSource');
-      const sourceName = allowanceSource.name || 'Codex credit rates';
-      const coverage = creditCoverageRatio(data);
-      sourceEl.textContent = t('badge.credits');
-      sourceEl.dataset.state = coverage > 0 ? 'ready' : 'missing';
-      setFastTooltip(sourceEl, [
-        allowanceSource.url ? `Source: ${allowanceSource.url}` : '',
-        allowanceSource.fetched_at ? `rate card snapshot ${allowanceSource.fetched_at}` : '',
-        tf('allowance.credit_rates', { source: sourceName }),
-        tf('allowance.credit_coverage', { ratio: pct(coverage) }),
-        allowanceWindows.length ? tf('allowance.windows', { windows: allowanceWindows.map(window => short(window.label || window.key)).join(', ') }) : t('allowance.init_hint'),
-        allowanceWindows.some(window => window.reset_at) ? tf('allowance.resets', { resets: allowanceWindows.map(window => window.reset_at ? `${short(window.label || window.key)} ${formatTimestamp(window.reset_at, window.reset_at)}` : '').filter(Boolean).join('; ') }) : '',
-        allowanceError ? `${t('state.allowance_config_error')}: ${allowanceError}` : '',
-        rateCardError ? tf('allowance.rate_card_error', { error: rateCardError }) : '',
-      ].filter(Boolean).join(' '));
+      dashboardStatus.updateAllowanceSourceLine();
     }
     function rebuildSelectOptions(select, values, label) {
       const previous = select.value;
@@ -711,57 +695,13 @@
       }
     }
     function updatePricingSourceLine() {
-      const sourceEl = document.getElementById('pricingSource');
-      if (pricingConfigured && pricingSource.url) {
-        const sourceParts = [
-          pricingSource.name || t('pricing.source'),
-          pricingSource.tier ? tf('pricing.tier', { tier: pricingSource.tier }) : '',
-          pricingSource.fetched_at ? tf('pricing.fetched', { time: formatTimestamp(pricingSource.fetched_at) }) : '',
-          pricingSource.pinned ? t('pricing.pinned') : '',
-        ].filter(Boolean);
-        sourceEl.textContent = t('badge.costs');
-        sourceEl.dataset.state = 'ready';
-        setFastTooltip(sourceEl, pricingSource.fetched_at
-          ? tf('pricing.title_fetched', { parts: sourceParts.join(' · '), url: pricingSource.url, time: formatTimestampTitle(pricingSource.fetched_at), warning: pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : '' })
-          : tf('pricing.title', { parts: sourceParts.join(' · '), warning: pricingSnapshotWarning ? ` ${pricingSnapshotWarning}` : '' }));
-      } else {
-        sourceEl.textContent = pricingConfigured ? t('badge.costs') : t('badge.no_costs');
-        sourceEl.dataset.state = pricingConfigured ? 'ready' : 'missing';
-        setFastTooltip(sourceEl, pricingConfigured ? (pricingSnapshotWarning || '') : t('pricing.configure_hint'));
-      }
+      dashboardStatus.updatePricingSourceLine();
     }
     function updateParserDiagnosticsLine() {
-      const sourceEl = document.getElementById('parserDiagnostics');
-      const entries = Object.entries(parserDiagnostics || {}).filter(([, value]) => Number(value || 0) > 0);
-      if (!entries.length) {
-        sourceEl.hidden = true;
-        sourceEl.textContent = '';
-        setFastTooltip(sourceEl, '');
-        return;
-      }
-      const total = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
-      sourceEl.hidden = false;
-      sourceEl.textContent = t('badge.parser_warnings');
-      sourceEl.dataset.state = 'missing';
-      setFastTooltip(sourceEl, tf('parser.warnings_title', { count: number.format(total), entries: entries.map(([key, value]) => `${key}=${value}`).join(', ') }));
+      dashboardStatus.updateParserDiagnosticsLine();
     }
     function updatePrivacyModeLine() {
-      const sourceEl = document.getElementById('privacyMode');
-      const mode = projectMetadataPrivacy.mode || 'normal';
-      sourceEl.textContent = mode === 'normal' ? t('badge.metadata_normal') : tf('badge.metadata_mode', { mode });
-      sourceEl.dataset.state = mode === 'normal' ? 'ready' : 'missing';
-      setFastTooltip(sourceEl, mode === 'normal'
-        ? t('privacy.normal_title')
-        : [
-            tf('privacy.mode', { mode }),
-            projectMetadataPrivacy.cwd_redacted ? t('privacy.cwd_redacted') : '',
-            projectMetadataPrivacy.project_names_redacted ? t('privacy.project_names_redacted') : '',
-            projectMetadataPrivacy.git_remote_label_hidden ? t('privacy.git_remote_label_hidden') : '',
-            projectMetadataPrivacy.relative_cwd_hidden ? t('privacy.relative_cwd_hidden') : '',
-            projectMetadataPrivacy.git_branch_hidden ? t('privacy.git_branch_hidden') : '',
-            projectMetadataPrivacy.tags_hidden ? t('privacy.tags_hidden') : '',
-            projectMetadataPrivacy.aliases_preserved ? t('privacy.aliases_preserved') : '',
-          ].filter(Boolean).join(' '));
+      dashboardStatus.updatePrivacyModeLine();
     }
     function formatDateRangeLabel(prefix, start, end) {
       return formatDateRangeLabelWithTranslator(prefix, start, end, tf);
@@ -1286,8 +1226,7 @@
       const usageCredits = shellSummary ? shellSummary.usageCredits : sumUsageCredits(rows);
       document.getElementById('estimatedCost').textContent = pricingConfigured ? moneyText(estimatedCost) : t('state.not_configured');
       document.getElementById('usageCredits').textContent = credits(usageCredits);
-      document.getElementById('allowanceImpact').textContent = allowanceImpactText(usageCredits);
-      setFastTooltip(document.getElementById('allowanceImpact'), allowanceWindowText(usageCredits, 'remaining') || t('allowance.title_hint'));
+      updateAllowanceImpact(usageCredits);
       insightsViewEl.setAttribute('aria-pressed', activeView === 'insights' ? 'true' : 'false');
       callsViewEl.setAttribute('aria-pressed', activeView === 'calls' ? 'true' : 'false');
       threadsViewEl.setAttribute('aria-pressed', activeView === 'threads' ? 'true' : 'false');
@@ -1390,16 +1329,10 @@
       }
     }
     function renderLiveStatus() {
-      const label = t(liveStatusKey);
-      const detail = liveStatusDetail || label;
-      liveStatusEl.textContent = label;
-      setFastTooltip(liveStatusEl, detail);
-      liveStatusEl.dataset.state = liveStatusKey === 'status.refresh_error' ? 'error' : 'ready';
+      dashboardStatus.renderLiveStatus();
     }
     function updateLiveStatus(statusKey, detail = '') {
-      liveStatusKey = statusKey;
-      liveStatusDetail = detail;
-      renderLiveStatus();
+      dashboardStatus.updateLiveStatus(statusKey, detail);
     }
     function updateToTopVisibility() {
       toTopEl.dataset.visible = window.scrollY > 320 ? 'true' : 'false';
