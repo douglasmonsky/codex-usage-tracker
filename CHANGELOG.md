@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.6.1 - 2026-06-13
+
+- Polish the README landing screenshots with matched dashboard/investigator previews and an additional lower investigator evidence view.
+- Restore the companion plugin prompt preview near the companion skill section and package companion screenshots with installed docs assets.
+- Keep dashboard toolbar links styled like buttons in the call investigator.
+
 ## 0.6.0 - 2026-06-13
 
 - Remove low-value call/thread anchor diagnostics from the experimental call investigator to avoid an extra source-log scan per context load.
