@@ -49,6 +49,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_i18n_js = (asset_dir / "dashboard_i18n.js").read_text(encoding="utf-8")
     dashboard_tooltips_js = (asset_dir / "dashboard_tooltips.js").read_text(encoding="utf-8")
     dashboard_status_js = (asset_dir / "dashboard_status.js").read_text(encoding="utf-8")
+    dashboard_events_js = (asset_dir / "dashboard_events.js").read_text(encoding="utf-8")
     dashboard_call_js = (asset_dir / "dashboard_call_investigator.js").read_text(
         encoding="utf-8"
     )
@@ -81,6 +82,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         dashboard_i18n_js,
         dashboard_tooltips_js,
         dashboard_status_js,
+        dashboard_events_js,
         dashboard_call_js,
         dashboard_js,
         dashboard_state_js,
@@ -101,6 +103,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_i18n_js
     assert "SECRET RAW PROMPT" not in dashboard_tooltips_js
     assert "SECRET RAW PROMPT" not in dashboard_status_js
+    assert "SECRET RAW PROMPT" not in dashboard_events_js
     assert "SECRET RAW PROMPT" not in dashboard_call_js
     assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
@@ -116,6 +119,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_i18n_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_tooltips_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_status_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_events_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_js
@@ -129,6 +133,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_i18n_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_tooltips_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_status_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_events_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_js
     for stylesheet in dashboard_stylesheets:
         assert f'href="codex-usage-tracker-assets/{stylesheet}?v=' in dashboard
@@ -145,6 +150,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'src="codex-usage-tracker-assets/dashboard_i18n.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_tooltips.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_status.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_events.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_call_investigator.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard.js?v=' in dashboard
     assert "CodexUsageDashboardFormat" in dashboard_format_js
@@ -160,6 +166,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "CodexUsageDashboardI18n" in dashboard_i18n_js
     assert "CodexUsageDashboardTooltips" in dashboard_tooltips_js
     assert "CodexUsageDashboardStatus" in dashboard_status_js
+    assert "CodexUsageDashboardEvents" in dashboard_events_js
     assert "CodexUsageCallInvestigator" in dashboard_call_js
     assert "copyViewLink" in dashboard
     assert "exportVisible" in dashboard
@@ -254,9 +261,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "rowInvestigatorLink(row" in render_calls_js
     assert "target=\"_blank\"" in dashboard_js
     assert "rel=\"noopener\"" in dashboard_js
-    assert "a.row-investigator-link" in dashboard_js
+    assert "a.row-investigator-link" in dashboard_events_js
     assert "/api/open-investigator" in dashboard_js
-    assert "openInvestigatorUrl(rowLink.href)" in dashboard_js
+    assert "openInvestigatorUrl(rowLink.href)" in dashboard_events_js
     assert "window.location.href = url" not in dashboard_js
     assert "window.open(url, '_blank')" in dashboard_js
     assert "opened.opener = null" in dashboard_js
@@ -298,7 +305,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "callInitiatorPuck" in dashboard_cells_js
     assert "row.call_initiator" in dashboard_js
     assert "data-open-investigator-record" in dashboard_details_js
-    assert "data-call-nav-record" in dashboard_js
+    assert "data-call-nav-record" in dashboard_events_js
     assert "call.cache_accounting_delta" in dashboard_call_js
     assert "call.hidden_estimate" in dashboard_call_js
     assert "call.serialized_upper_bound" in dashboard_call_js
@@ -406,6 +413,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_i18n.js").exists()
     assert (asset_dir / "dashboard_tooltips.js").exists()
     assert (asset_dir / "dashboard_status.js").exists()
+    assert (asset_dir / "dashboard_events.js").exists()
     for stylesheet in dashboard_stylesheets:
         assert (asset_dir / stylesheet).exists()
     assert "detail-section" in dashboard

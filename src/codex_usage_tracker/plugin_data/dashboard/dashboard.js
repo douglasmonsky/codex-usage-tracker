@@ -9,6 +9,7 @@
     const dashboardPayloadCache = window.CodexUsageDashboardPayloadCache;
     const dashboardTooltipFactory = window.CodexUsageDashboardTooltips;
     const dashboardStatusFactory = window.CodexUsageDashboardStatus;
+    const dashboardEventsFactory = window.CodexUsageDashboardEvents;
     const {
       number,
       money,
@@ -1668,188 +1669,76 @@
         if (document.visibilityState === 'visible') refreshDashboardIfStale();
       }, liveRefreshIntervalMs);
     }
-    insightsViewEl.addEventListener('click', () => setView('insights'));
-    callsViewEl.addEventListener('click', () => setView('calls'));
-    threadsViewEl.addEventListener('click', () => setView('threads'));
-    clearPresetEl.addEventListener('click', clearPreset);
-    copyViewLinkEl.addEventListener('click', copyCurrentViewLink);
-    exportVisibleEl.addEventListener('click', exportCurrentRows);
-    refreshDashboardEl.addEventListener('click', () => refreshDashboardData(true));
-    if (languageSelectEl) {
-      languageSelectEl.addEventListener('change', () => setLanguage(languageSelectEl.value));
-    }
-    loadLimitEl.addEventListener('change', () => {
-      resetVisibleRows();
-      if (liveRefreshSupported) {
-        refreshDashboardData(false, { refreshLogs: false, resetRows: true });
-      } else {
-        updateLiveStatus('status.static', t('live.load_static_hint'));
-      }
-    });
-    historyScopeEl.addEventListener('change', () => {
-      includeArchived = historyScopeEl.value === 'all';
-      resetVisibleRows();
-      updateHistoryScopeControl();
-      syncUrlState();
-      if (liveRefreshSupported) {
-        refreshDashboardData(false, { refreshLogs: false, resetRows: true });
-      } else {
-        updateLiveStatus('status.static', t('live.history_static_hint'));
-      }
-    });
-    autoRefreshEl.addEventListener('change', () => {
-      scheduleAutoRefresh();
-      updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.paused', `${autoRefreshEl.checked ? tf('live.every', { seconds: liveRefreshIntervalMs / 1000 }) : t('live.paused')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
-      if (autoRefreshEl.checked) refreshDashboardIfStale();
-    });
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && autoRefreshEl.checked) refreshDashboardIfStale();
-    });
-    document.addEventListener('keydown', event => {
-      const target = event.target;
-      const inEditable = target && target.closest && target.closest('input, select, textarea, button, [contenteditable="true"]');
-      if (inEditable) return;
-      if (event.key === '/') {
-        event.preventDefault();
-        searchEl.focus();
-        return;
-      }
-      if (event.key === '1') setView('insights');
-      if (event.key === '2') setView('calls');
-      if (event.key === '3') setView('threads');
-    });
-    window.addEventListener('scroll', updateToTopVisibility, { passive: true });
-    toTopEl.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-    loadMoreRowsEl.addEventListener('click', () => {
-      currentPage += 1;
-      render();
-    });
-    document.querySelectorAll('[data-sort-key]').forEach(button => {
-      button.addEventListener('click', () => handleHeaderSort(button.dataset.sortKey));
-    });
-    rowsEl.addEventListener('mouseover', event => {
-      const callRow = event.target.closest('.thread-call-row');
-      if (!callRow || !rowsEl.contains(callRow)) return;
-      const row = rowByRecordId.get(callRow.dataset.recordId);
-      if (row) selectRow(row);
-    });
-    rowsEl.addEventListener('click', event => {
-      const dashboardRoute = event.target.closest('[data-dashboard-route]');
-      if (dashboardRoute && rowsEl.contains(dashboardRoute)) {
-        event.preventDefault();
-        event.stopPropagation();
-        routeBackToDashboard(dashboardRoute.dataset.dashboardRoute || 'calls');
-        return;
-      }
-      const rowLink = event.target.closest('a.row-investigator-link');
-      if (rowLink && rowsEl.contains(rowLink)) {
-        if (!liveRefreshSupported) return;
-        event.preventDefault();
-        event.stopPropagation();
-        openInvestigatorUrl(rowLink.href);
-        return;
-      }
-      const openButton = event.target.closest('[data-open-investigator-record]');
-      if (openButton && rowsEl.contains(openButton)) {
-        event.preventDefault();
-        event.stopPropagation();
-        const row = rowByRecordId.get(openButton.dataset.openInvestigatorRecord);
-        if (row) openInvestigator(row);
-        return;
-      }
-      const copyButton = event.target.closest('[data-copy-call-link]');
-      if (copyButton && rowsEl.contains(copyButton)) {
-        event.preventDefault();
-        event.stopPropagation();
-        const row = rowByRecordId.get(copyButton.dataset.copyCallLink);
-        if (row) copyCallLink(row);
-        return;
-      }
-      const navButton = event.target.closest('[data-call-nav-record]');
-      if (navButton && rowsEl.contains(navButton)) {
-        event.preventDefault();
-        event.stopPropagation();
-        const recordId = navButton.dataset.callNavRecord;
-        navigateToCallRecord(recordId);
-        return;
-      }
-      const sortButton = event.target.closest('[data-thread-call-sort-key]');
-      if (sortButton && rowsEl.contains(sortButton)) {
-        event.preventDefault();
-        event.stopPropagation();
-        handleThreadCallHeaderSort(sortButton.dataset.threadCallSortKey);
-        return;
-      }
-      const loadMoreButton = event.target.closest('[data-thread-load-more]');
-      if (loadMoreButton && rowsEl.contains(loadMoreButton)) {
-        event.preventDefault();
-        event.stopPropagation();
-        const key = loadMoreButton.dataset.threadLoadMore;
-        threadCallVisiblePages.set(key, Math.max(1, threadCallVisiblePages.get(key) || 1) + 1);
+    dashboardEventsFactory.bind({
+      autoRefreshEl,
+      callsViewEl,
+      clearPreset,
+      clearPresetEl,
+      cleanDateInput,
+      closestFastTooltipTarget,
+      copyCallLink,
+      copyCurrentViewLink,
+      copyViewLinkEl,
+      dateEndEl,
+      datePresetEl,
+      dateStartEl,
+      defaultSortDirection,
+      detailToggleEl,
+      effortEl,
+      exportCurrentRows,
+      exportVisibleEl,
+      getRowByRecordId: recordId => rowByRecordId.get(recordId),
+      handleHeaderSort,
+      handleThreadCallHeaderSort,
+      hideFastTooltip,
+      historyRowsDescription,
+      historyScopeEl,
+      incrementCurrentPage: () => {
+        currentPage += 1;
         render();
-        return;
-      }
-      const callRow = event.target.closest('.call-row, .thread-call-row');
-      if (!callRow || !rowsEl.contains(callRow)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const row = rowByRecordId.get(callRow.dataset.recordId);
-      if (row) openInvestigator(row);
+      },
+      incrementThreadCallVisiblePage: key => {
+        threadCallVisiblePages.set(key, Math.max(1, threadCallVisiblePages.get(key) || 1) + 1);
+      },
+      insightsViewEl,
+      languageSelectEl,
+      liveRefreshIntervalMs,
+      liveRefreshSupported,
+      loadLimitEl,
+      loadedRowsDescription,
+      loadMoreRowsEl,
+      modelEl,
+      navigateToCallRecord,
+      openInvestigator,
+      openInvestigatorUrl,
+      pricingStatusEl,
+      refreshDashboardData,
+      refreshDashboardEl,
+      refreshDashboardIfStale,
+      render,
+      resetVisibleRows,
+      routeBackToDashboard,
+      rowsEl,
+      scheduleAutoRefresh,
+      scheduleFastTooltip,
+      searchEl,
+      selectRow,
+      setIncludeArchived: value => { includeArchived = Boolean(value); },
+      setLanguage,
+      setSort,
+      setView,
+      sortEl,
+      syncDatePresetInputs,
+      syncUrlState,
+      t,
+      tf,
+      threadsViewEl,
+      toggleDetailPanel: () => setDetailPanelExpanded(!detailPanelExpanded),
+      toTopEl,
+      updateHistoryScopeControl,
+      updateLiveStatus,
+      updateToTopVisibility,
     });
-    rowsEl.addEventListener('dblclick', event => {
-      const callRow = event.target.closest('.call-row, .thread-call-row');
-      if (!callRow || !rowsEl.contains(callRow)) return;
-      event.preventDefault();
-      event.stopPropagation();
-    });
-    rowsEl.addEventListener('keydown', event => {
-      if (event.target.closest('a.row-investigator-link')) return;
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      const callRow = event.target.closest('.call-row, .thread-call-row');
-      if (!callRow || !rowsEl.contains(callRow)) return;
-      event.preventDefault();
-      const row = rowByRecordId.get(callRow.dataset.recordId);
-      if (row) openInvestigator(row);
-    });
-    if (detailToggleEl) detailToggleEl.addEventListener('click', () => setDetailPanelExpanded(!detailPanelExpanded));
-    document.addEventListener('mouseover', event => {
-      const target = closestFastTooltipTarget(event.target);
-      if (!target || !document.body.contains(target)) return;
-      if (target.contains(event.relatedTarget)) return;
-      scheduleFastTooltip(target);
-    });
-    document.addEventListener('mouseout', event => {
-      const target = closestFastTooltipTarget(event.target);
-      if (!target) return;
-      if (target.contains(event.relatedTarget)) return;
-      hideFastTooltip();
-    });
-    document.addEventListener('focusin', event => {
-      const target = closestFastTooltipTarget(event.target);
-      if (target) scheduleFastTooltip(target);
-    });
-    document.addEventListener('focusout', event => {
-      const target = closestFastTooltipTarget(event.target);
-      if (target) hideFastTooltip();
-    });
-    window.addEventListener('scroll', hideFastTooltip, { passive: true });
-    window.addEventListener('resize', hideFastTooltip);
-    datePresetEl.addEventListener('input', () => {
-      syncDatePresetInputs();
-      resetVisibleRows();
-      render();
-    });
-    [dateStartEl, dateEndEl].forEach(el => el.addEventListener('input', () => {
-      if (datePresetEl.value !== 'custom') datePresetEl.value = 'custom';
-      el.value = cleanDateInput(el.value) || el.value;
-      resetVisibleRows();
-      render();
-    }));
-    [searchEl, modelEl, effortEl, pricingStatusEl].forEach(el => el.addEventListener('input', () => {
-      resetVisibleRows();
-      render();
-    }));
-    sortEl.addEventListener('input', () => setSort(sortEl.value, defaultSortDirection(sortEl.value)));
     rebuildDashboardIndexes();
     populateLanguageOptions();
     applyTranslations();
