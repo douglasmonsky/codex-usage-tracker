@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+from store_dashboard_helpers import _make_codex_home
 
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.i18n import (
@@ -19,7 +20,6 @@ from codex_usage_tracker.i18n import (
     translations_for,
 )
 from codex_usage_tracker.store import refresh_usage_index
-from tests.test_store_dashboard_mcp import _make_codex_home
 
 _PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 EXPECTED_KEY_PREFIXES = (
