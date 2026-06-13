@@ -38,6 +38,28 @@ from codex_usage_tracker.store import (  # noqa: E402
 )
 
 DEFAULT_ROW_COUNTS = (10_000, 100_000, 500_000)
+SYNTHETIC_THREAD_NAMES = (
+    "Codex Usage Tracker Development",
+    "BugsInPy Solve Campaign",
+    "Algebra Steps Visual Model",
+    "Dashboard Performance Audit",
+    "Release Readiness Checklist",
+    "Plugin Prompt UX Polish",
+    "Thread Cost Leaderboard",
+    "Context Drilldown Diagnostics",
+    "Project Alias Cleanup",
+    "Pricing Coverage Review",
+    "Allowance Settings Calibration",
+    "CSV Export Validation",
+    "MCP Skill Smoke Test",
+    "Parser Drift Investigation",
+    "Subagent Usage Review",
+    "Auto Review Cost Spike",
+    "Synthetic Fixture Builder",
+    "Long Chat Cache Study",
+    "Documentation Screenshot Refresh",
+    "Dashboard Mobile QA",
+)
 BENCHMARK_THRESHOLDS: dict[str, dict[str, float]] = {
     "populate_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.90},
     "active_dashboard_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
@@ -589,6 +611,7 @@ def _synthetic_source_envelopes(index: int, turn_id: str) -> list[dict[str, Any]
     metrics = _synthetic_token_metrics(index)
     day = (index % 28) + 1
     timestamp = f"2026-05-{day:02d}T12:{index % 60:02d}:00Z"
+    thread_name = _synthetic_thread_name(index)
     envelopes = [
         _envelope(
             "turn_context",
@@ -614,7 +637,7 @@ def _synthetic_source_envelopes(index: int, turn_id: str) -> list[dict[str, Any]
                         "type": "input_text",
                         "text": (
                             "Synthetic user request for benchmark coverage. "
-                            f"Thread bucket {index % 500}, call {index}."
+                            f"Thread {thread_name}, call {index}."
                         ),
                     }
                 ],
@@ -765,7 +788,7 @@ def _synthetic_events(
                 else f"/tmp/synthetic/{index % 2500}.jsonl"
             )
         )
-        thread_name = f"Thread {index % 500}"
+        thread_name = _synthetic_thread_name(index)
         call_initiator = "codex" if is_subagent or is_review else "user"
         call_reason = "thread_source" if is_subagent or is_review else "user_message"
         yield UsageEvent(
@@ -796,7 +819,7 @@ def _synthetic_events(
             agent_role="reviewer" if is_review else "worker" if is_subagent else None,
             agent_nickname=None,
             parent_session_id=f"session-{(index - 1) % 2500:04d}" if is_subagent or is_review else None,
-            parent_thread_name=f"Thread {(index - 1) % 500}" if is_subagent or is_review else None,
+            parent_thread_name=_synthetic_thread_name(index - 1) if is_subagent or is_review else None,
             parent_session_updated_at=f"2026-05-{day:02d}T22:00:00Z" if is_subagent or is_review else None,
             model_context_window=200_000,
             input_tokens=metrics["input_tokens"],
@@ -810,6 +833,10 @@ def _synthetic_events(
             cumulative_reasoning_output_tokens=metrics["reasoning_tokens"] + index // 2,
             cumulative_total_tokens=metrics["total_tokens"] + index * 10,
         )
+
+
+def _synthetic_thread_name(index: int) -> str:
+    return SYNTHETIC_THREAD_NAMES[index % len(SYNTHETIC_THREAD_NAMES)]
 
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@
       const windowImpact = allowanceWindowText(totalCredits, 'remaining-card') || allowanceWindowText(totalCredits, 'impact');
       if (windowImpact) return windowImpact;
       if (getAllowanceError()) return t('state.allowance_config_error');
-      return getAllowanceConfigured() ? t('state.allowance_configured') : t('action.set_limits');
+      return t('action.set_limits');
     }
 
     function rowAllowanceImpact(row) {

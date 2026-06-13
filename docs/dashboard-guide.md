@@ -75,7 +75,7 @@ The dashboard opens in `Insights` view. This view is designed to answer "what ne
 
 ## Calls View
 
-![Calls view showing filters, totals, the model-call table, and the details panel.](assets/dashboard-calls.png)
+![Calls view showing filters, totals, the model-call table, and the compact details rail.](assets/dashboard-calls.png)
 
 Use `Calls` view when you want to inspect individual model calls.
 
@@ -92,15 +92,15 @@ Use `Calls` view when you want to inspect individual model calls.
 - In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.
 - The cards summarize only the currently visible filtered rows.
 - Time values are shown in your browser's local date/time format while sorting and time filtering still use the logged timestamp.
-- Calls view token cells show total tokens plus compact `C`, `U`, and `O` chips for cached input, uncached input, and output tokens.
+- Calls view token columns separate total tokens, cached input, uncached input, and output so the accounting can be scanned without expanding a row.
 - Source pucks are call-level estimates derived from local event metadata. `User` means the token-count segment included a user message, `Codex` means it followed tool output, compaction, or agent-continuation metadata, and `Unknown` means the source event metadata was unavailable or ambiguous.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
 - Hover a row to scan a compact aggregate preview in `Call Details`; click a Calls row to open the dedicated call investigator.
-- The `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.
+- When expanded, the `Call Details` panel groups primary cost, Codex credit, allowance, cache, context, and pricing signals first, then thread narrative and token breakdowns.
 - The first detail section includes a recommended action and a "why flagged" explanation derived only from aggregate counters and pricing/allowance metadata.
 - Raw aggregate identifiers and source file metadata are collapsed until you need them.
-- The details panel always reserves a visible scrollbar so long field lists are discoverable before you start scrolling.
-- Pagination appears only when the active Insights, Calls, or Threads view has more than one page.
+- The expanded details panel reserves a visible scrollbar so long field lists are discoverable before you start scrolling.
+- `Load more` appears when the active Insights, Calls, Threads, or expanded thread-call section has more rows to reveal.
 - When served from localhost, `/api/usage` accepts `limit` and `offset` so automation can page aggregate rows without loading an entire large history.
 - After you scroll down, the bottom-right `Top` button returns to the top of the dashboard.
 
@@ -130,6 +130,8 @@ The same search, time range, confidence status, load limit, cards, and sort cont
 
 ## Call Investigator
 
+![Call investigator showing exact token accounting, cache/accounting deltas, context estimates, and runtime evidence.](assets/dashboard-call-investigator.png)
+
 Clicking a Calls row opens `dashboard.html?view=call&record=<record_id>` for one model call. Hover remains the fast scanning surface; the investigator is the deeper diagnostic page for a single selected call. Expanded Threads rows and the details panel can still expose explicit investigator actions where a row click already has another meaning.
 
 The investigator separates evidence by confidence:
@@ -143,9 +145,9 @@ Previous and next buttons move chronologically within the same resolved thread a
 
 ## Details And Context
 
-![Details panel showing aggregate fields for the selected usage row.](assets/dashboard-details.png)
+![Calls view with a selected usage row and the compact Call Details rail collapsed.](assets/dashboard-details.png)
 
-The details panel is structured for progressive disclosure. On desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
+The details rail is collapsed by default to preserve table space. Open `Call Details` when you want a compact aggregate preview without leaving the table. When expanded on desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
 The call investigator loads a redacted turn-log evidence window by default when served from localhost with the context API enabled. The default request uses `mode=quick`: redacted tool output is included, no character cap is applied, and serialized local JSONL is reported as a fast character-based upper bound without bucket analysis. The default entry window is still bounded so very long sessions remain responsive. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable.
 

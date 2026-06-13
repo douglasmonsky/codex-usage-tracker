@@ -22,6 +22,10 @@
       .table-tools { align-items: stretch; grid-template-columns: 1fr; }
       .segmented, .table-actions, .table-caption { grid-row: auto; grid-column: auto; }
       .segmented, .segmented button { width: 100%; }
+      .grid > section:not(.detail-section) {
+        overflow-x: auto;
+        overflow-y: clip;
+      }
       .load-control, .language-control, .table-actions { justify-content: space-between; width: 100%; }
       .pager { width: auto; }
       .action-status { min-width: 0; }

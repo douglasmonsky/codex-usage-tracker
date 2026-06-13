@@ -186,6 +186,17 @@ codex-usage-tracker expensive --limit 5
 
 Dashboard screenshots in `docs/assets/` and `src/codex_usage_tracker/plugin_data/docs/assets/` must be generated from synthetic aggregate fixture data only.
 
+The tracked dashboard screenshot set is:
+
+- `dashboard-insights.png`
+- `dashboard-calls.png`
+- `dashboard-calls-preview.png`
+- `dashboard-threads.png`
+- `dashboard-details.png`
+- `dashboard-call-investigator.png`
+
+After refreshing screenshots, copy the same files into `src/codex_usage_tracker/plugin_data/docs/assets/` so the installed dashboard guide uses the same synthetic images as the repository README/docs.
+
 Do not use real session logs, real prompts, assistant text, tool output, secrets, or private data in docs or screenshots.
 
 ## Large-History Benchmarking

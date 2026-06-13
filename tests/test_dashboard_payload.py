@@ -252,6 +252,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.git_branch" in dashboard_details_js
     assert "usage_credit_confidence" in dashboard
     assert "allowance.credit_rates" in dashboard_status_js
+    assert "getAllowanceConfigured() ? t('state.allowance_configured')" not in dashboard_status_js
     assert "insight.codex_allowance_usage" in dashboard_insights_js
     assert "Highest Codex credits" in dashboard
     assert "Estimated Tokens" not in dashboard
