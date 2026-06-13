@@ -292,6 +292,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "openInvestigatorUrl(rowLink.href)" in dashboard_events_js
     assert "window.location.href = url" not in dashboard_surface
     assert "window.open(url, '_blank')" in dashboard_actions_js
+    assert dashboard_actions_js.index("/api/open-investigator") < dashboard_actions_js.index(
+        "window.open(url, '_blank')"
+    )
     assert "opened.opener = null" in dashboard_actions_js
     assert "selectRow(row);" not in render_calls_js
     assert "dashboard.view.call" in dashboard_js
