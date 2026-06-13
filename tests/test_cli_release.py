@@ -329,9 +329,9 @@ def test_usage_skills_prefer_live_dashboard_for_open_requests() -> None:
 
 
 def test_dashboard_launch_commands_refresh_by_default() -> None:
-    from codex_usage_tracker.cli import _build_parser
+    from codex_usage_tracker.cli_parser import build_parser
 
-    parser = _build_parser()
+    parser = build_parser()
 
     assert parser.parse_args(["open-dashboard"]).refresh is True
     assert parser.parse_args(["open-dashboard", "--refresh"]).refresh is True
