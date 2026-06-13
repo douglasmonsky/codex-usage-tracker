@@ -614,6 +614,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_analysis_js = (asset_dir / "dashboard_analysis.js").read_text(encoding="utf-8")
     dashboard_cells_js = (asset_dir / "dashboard_cells.js").read_text(encoding="utf-8")
     dashboard_details_js = (asset_dir / "dashboard_details.js").read_text(encoding="utf-8")
+    dashboard_tables_js = (asset_dir / "dashboard_tables.js").read_text(encoding="utf-8")
     dashboard_filters_js = (asset_dir / "dashboard_filters.js").read_text(encoding="utf-8")
     dashboard_payload_cache_js = (asset_dir / "dashboard_payload_cache.js").read_text(
         encoding="utf-8"
@@ -637,7 +638,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         (asset_dir / stylesheet).read_text(encoding="utf-8")
         for stylesheet in dashboard_stylesheets
     )
-    render_calls_js = _extract_js_function(dashboard_js, "renderCalls")
+    render_calls_js = _extract_js_function(dashboard_tables_js, "renderCalls")
     dashboard_surface = "\n".join([
         dashboard,
         dashboard_format_js,
@@ -645,6 +646,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         dashboard_analysis_js,
         dashboard_cells_js,
         dashboard_details_js,
+        dashboard_tables_js,
         dashboard_filters_js,
         dashboard_payload_cache_js,
         dashboard_i18n_js,
@@ -662,6 +664,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_analysis_js
     assert "SECRET RAW PROMPT" not in dashboard_cells_js
     assert "SECRET RAW PROMPT" not in dashboard_details_js
+    assert "SECRET RAW PROMPT" not in dashboard_tables_js
     assert "SECRET RAW PROMPT" not in dashboard_filters_js
     assert "SECRET RAW PROMPT" not in dashboard_payload_cache_js
     assert "SECRET RAW PROMPT" not in dashboard_i18n_js
@@ -674,6 +677,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_analysis_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_cells_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_details_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_tables_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_filters_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_payload_cache_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_i18n_js
@@ -684,6 +688,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_analysis_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_cells_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_details_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_tables_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_filters_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_payload_cache_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_i18n_js
@@ -696,6 +701,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'src="codex-usage-tracker-assets/dashboard_analysis.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_cells.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_details.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_tables.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_filters.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_state.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_payload_cache.js?v=' in dashboard
@@ -708,6 +714,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "CodexUsageDashboardAnalysis" in dashboard_analysis_js
     assert "CodexUsageDashboardCells" in dashboard_cells_js
     assert "CodexUsageDashboardDetails" in dashboard_details_js
+    assert "CodexUsageDashboardTables" in dashboard_tables_js
     assert "CodexUsageDashboardFilters" in dashboard_filters_js
     assert "CodexUsageDashboardState" in dashboard_state_js
     assert "CodexUsageDashboardPayloadCache" in dashboard_payload_cache_js
@@ -794,7 +801,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "outputTokenCell" in dashboard_cells_js
     assert "signalPuckAbbreviation" in dashboard_cells_js
     assert "signal-puck" in dashboard_css
-    assert "data-thread-call-sort-key" in dashboard_js
+    assert "data-thread-call-sort-key" in dashboard_tables_js
     assert "threadCallSortKey = 'time'" in dashboard_js
     assert "threadCallSortDirection = 'desc'" in dashboard_js
     assert "detail.thread_attachment" in dashboard_details_js
@@ -845,7 +852,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert ".initiator-puck" in dashboard_css
     assert ".initiator-unknown" in dashboard_css
     assert ".initiator-cell" in dashboard_css
-    assert "table.initiated" in dashboard_js
+    assert "table.initiated" in dashboard_tables_js
     assert "callInitiatorCell" in dashboard_cells_js
     assert "sortLabelText(sortKey)" in dashboard_js
     assert "callInitiatorPuck" in dashboard_cells_js
@@ -895,8 +902,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "thread_attachment_label" in dashboard
     assert "thread_attachment_relation" in dashboard
     assert "explicit parent thread" in dashboard_surface
-    assert "thread.spawned_from" in dashboard_js
-    assert "thread.spawned_threads" in dashboard_js
+    assert "thread.spawned_from" in dashboard_tables_js
+    assert "thread.spawned_threads" in dashboard_tables_js
 
     from codex_usage_tracker.i18n import translations_for
     en_trans = translations_for("en")
@@ -951,6 +958,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_analysis.js").exists()
     assert (asset_dir / "dashboard_cells.js").exists()
     assert (asset_dir / "dashboard_details.js").exists()
+    assert (asset_dir / "dashboard_tables.js").exists()
     assert (asset_dir / "dashboard_filters.js").exists()
     assert (asset_dir / "dashboard_state.js").exists()
     assert (asset_dir / "dashboard_payload_cache.js").exists()
@@ -978,14 +986,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "loadLimit" in dashboard
     assert "pager" in dashboard
     assert "loadMoreRows" in dashboard
-    assert "visibleSlice(rows)" in dashboard_js
-    assert "updateLoadMoreControl(page, 'table.threads')" in dashboard_js
-    assert "data-thread-load-more" in dashboard_js
+    assert "visibleSlice(rows)" in dashboard_tables_js
+    assert "updateLoadMoreControl(page, 'table.threads')" in dashboard_tables_js
+    assert "data-thread-load-more" in dashboard_tables_js
     assert "data-fast-tooltip" in dashboard_surface
     assert "scheduleFastTooltip(target)" in dashboard_js
     assert "focusPendingTarget" in dashboard_js
     assert "queueFocusTarget(insight.target)" in dashboard_js
-    assert "selected-row" in dashboard_js
+    assert "selected-row" in dashboard_tables_js
     assert "selected-row" in dashboard_css
     assert "costUsageCell" in dashboard_cells_js
     assert "Codex credits" in dashboard

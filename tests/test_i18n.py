@@ -107,6 +107,18 @@ def dashboard_details_js_text() -> str:
     ).read_text(encoding="utf-8")
 
 
+def dashboard_tables_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_tables.js"
+    ).read_text(encoding="utf-8")
+
+
 def dashboard_i18n_js_text() -> str:
     repo_root = Path(__file__).resolve().parents[1]
     return (
@@ -398,7 +410,7 @@ def test_dashboard_js_generates_language_options_and_preserves_runtime_state() -
 
 
 def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> None:
-    render_thread_calls = extract_js_function(dashboard_js_text(), "renderThreadCalls")
+    render_thread_calls = extract_js_function(dashboard_tables_js_text(), "renderThreadCalls")
 
     for label in [
         "table.time",

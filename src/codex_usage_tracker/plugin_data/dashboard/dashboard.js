@@ -4,6 +4,7 @@
     const dashboardAnalysisFactory = window.CodexUsageDashboardAnalysis;
     const dashboardCellsFactory = window.CodexUsageDashboardCells;
     const dashboardDetailsFactory = window.CodexUsageDashboardDetails;
+    const dashboardTablesFactory = window.CodexUsageDashboardTables;
     const dashboardPayloadCache = window.CodexUsageDashboardPayloadCache;
     const dashboardTooltipFactory = window.CodexUsageDashboardTooltips;
     const {
@@ -1179,19 +1180,6 @@
       }
       render();
     }
-    function threadCallHeader(key, label, numeric = false) {
-      const active = threadCallSortKey === key;
-      const indicator = active ? (threadCallSortDirection === 'asc' ? '▲' : '▼') : '';
-      const ariaSort = active ? (threadCallSortDirection === 'asc' ? 'ascending' : 'descending') : 'none';
-      return `
-        <th${numeric ? ' class="num"' : ''} data-thread-call-sort-active="${active ? 'true' : 'false'}" aria-sort="${ariaSort}">
-          <button class="sort-header child-sort-header" type="button" data-thread-call-sort-key="${escapeHtml(key)}">
-            <span>${escapeHtml(label)}</span>
-            <span class="sort-indicator">${escapeHtml(indicator)}</span>
-          </button>
-        </th>
-      `;
-    }
     function rowAttachment(row) {
       return threadAttachmentByRecordId.get(row.record_id) || resolveThreadAttachment(row);
     }
@@ -1236,6 +1224,62 @@
         items: t(itemLabel),
       });
     }
+    const dashboardTables = dashboardTablesFactory.create({
+      activePresetDefinition,
+      callInitiatorCell,
+      cachedTokenCell,
+      costUsageCell,
+      dateCaptionPrefix,
+      effortCell,
+      ensurePendingFocusVisibleInGroups,
+      ensurePendingFocusVisibleInRows,
+      escapeHtml,
+      expandedThreads,
+      getActiveView: () => activeView,
+      getInitialDetailApplied: () => initialDetailApplied,
+      getInitialThreadExpansionApplied: () => initialThreadExpansionApplied,
+      getPricingConfigured: () => pricingConfigured,
+      getSelectedRecordId: () => selectedRecordId,
+      getSelectedThreadKey: () => selectedThreadKey,
+      getThreadCallSortDirection: () => threadCallSortDirection,
+      getThreadCallSortKey: () => threadCallSortKey,
+      getThreadCallVisiblePages: () => threadCallVisiblePages,
+      groupThreads,
+      initialUrlParams: urlParams,
+      loadedRowsDescription,
+      moneyText,
+      number,
+      outputTokenCell,
+      pct,
+      renderSignalPucks,
+      renderTimeCell,
+      renderWithState: () => render(),
+      rowInvestigatorLink,
+      rowThreadLabel,
+      rowsEl,
+      rowsNeedHydration,
+      selectThread,
+      setInitialDetailApplied: value => { initialDetailApplied = Boolean(value); },
+      setInitialThreadExpansionApplied: value => { initialThreadExpansionApplied = Boolean(value); },
+      short,
+      showDetail,
+      showThreadDetail,
+      sortedThreadCalls,
+      tableCaptionEl,
+      tableTitleEl,
+      t,
+      tf,
+      threadCallPageSize,
+      threadInitiatorSummary,
+      tokenNumberCell,
+      totalTokenCell,
+      translateEffort,
+      truncate,
+      uncachedTokenCell,
+      updateLoadMoreControl,
+      usageCreditValue,
+      visibleSlice,
+    });
     function buildInsights(rows) {
       const groups = groupThreads(rows);
       const insights = [];
@@ -1446,204 +1490,13 @@
       scheduleFocusPendingTarget();
     }
     function renderCalls(rows) {
-      ensurePendingFocusVisibleInRows(rows);
-      const page = visibleSlice(rows);
-      updateLoadMoreControl(page, 'table.calls');
-      tableTitleEl.textContent = t('dashboard.model_calls');
-      const preset = activePresetDefinition();
-      const prefix = preset ? `${t(preset.captionKey)}. ` : '';
-      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.calls', { sort: tableCaptionEl.dataset.sortDescription, loaded: loadedRowsDescription() })}`;
-      for (const row of page.items) {
-        const tr = document.createElement('tr');
-        const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
-        tr.className = `call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}`;
-        tr.dataset.recordId = row.record_id || '';
-        tr.innerHTML = `
-          <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
-          <td title="${escapeHtml(short(row.session_id))}">${rowInvestigatorLink(row, `<span class="thread-name">${escapeHtml(truncate(rowThreadLabel(row)))}</span>`)}</td>
-          <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
-          <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
-          <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
-          <td class="num token-cell">${rowInvestigatorLink(row, totalTokenCell(row))}</td>
-          <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
-          <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
-          <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
-          <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
-          <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
-          <td>${rowInvestigatorLink(row, `<div class="flags">${renderSignalPucks(row, flags, 3)}</div>`)}</td>
-        `;
-        tr.addEventListener('mouseenter', () => showDetail(row));
-        rowsEl.appendChild(tr);
-      }
-      if (!initialDetailApplied && selectedRecordId) {
-        const selected = rows.find(row => row.record_id === selectedRecordId);
-        if (selected) {
-          initialDetailApplied = true;
-          showDetail(selected);
-        }
-      }
-      if (!initialDetailApplied && urlParams.get('detail') === 'first' && page.items[0]) {
-        initialDetailApplied = true;
-        showDetail(page.items[0]);
-      }
-      if (!rows.length) {
-        const message = rowsNeedHydration()
-          ? t('caption.rows_loading_background')
-          : t('state.no_calls');
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(message)}</td></tr>`;
-      }
+      dashboardTables.renderCalls(rows);
     }
     function renderThreads(rows, mode = 'threads') {
-      const groups = groupThreads(rows);
-      ensurePendingFocusVisibleInGroups(groups);
-      if (!initialThreadExpansionApplied && (activeView === 'threads' || activeView === 'insights')) {
-        const expansion = urlParams.get('expand');
-        if (expansion === 'all') {
-          groups.forEach(group => expandedThreads.add(group.key));
-        } else if (expansion === 'first' && groups[0]) {
-          expandedThreads.add(groups[0].key);
-        }
-        initialThreadExpansionApplied = true;
-      }
-      const page = visibleSlice(groups);
-      updateLoadMoreControl(page, 'table.threads');
-      tableTitleEl.textContent = mode === 'insights' ? t('dashboard.top_threads_by_attention') : t('dashboard.view.threads');
-      const preset = activePresetDefinition();
-      const prefix = preset ? `${t(preset.captionKey)}. ` : '';
-      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.threads', { threads: number.format(groups.length), calls: number.format(rows.length), sort: tableCaptionEl.dataset.sortDescription, loaded: loadedRowsDescription() })}`;
-      for (const group of page.items) {
-        const tr = document.createElement('tr');
-        const expanded = expandedThreads.has(group.key);
-        const threadNotes = [
-          `${number.format(group.callCount)} ${t('table.calls')}`,
-          group.pricingStatus,
-          group.parentThreadLabel ? tf('thread.spawned_from', { thread: group.parentThreadLabel }) : '',
-          group.childThreadCount ? tf('thread.spawned_threads', { count: number.format(group.childThreadCount) }) : '',
-          group.subagentCount ? tf('thread.subagent', { count: number.format(group.subagentCount) }) : '',
-          group.autoReviewCount ? tf('thread.auto_review', { count: number.format(group.autoReviewCount) }) : '',
-          group.attachedCount ? t('thread.attached') : '',
-        ].filter(Boolean).join(' - ');
-        tr.className = `thread-row${group.parentThreadLabel ? ' spawned-thread' : ''}${selectedThreadKey === group.key ? ' selected-row' : ''}`;
-        tr.dataset.threadKey = group.key;
-        tr.tabIndex = 0;
-        tr.setAttribute('role', 'button');
-        tr.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        tr.setAttribute('aria-label', tf('thread.expand_label', { action: expanded ? t('thread.collapse') : t('thread.expand'), thread: group.label, score: Math.round(group.attentionScore) }));
-        tr.innerHTML = `
-          <td>${renderTimeCell(group.latestActivity)}</td>
-          <td>
-            <div class="thread-title">
-                <span class="thread-toggle" aria-hidden="true">${expanded ? '-' : '+'}</span>
-              <span class="thread-meta">
-                <span class="thread-name">${group.renderAsChild ? `<span class="thread-relation">${escapeHtml(t('thread.spawned'))}</span> ` : ''}${escapeHtml(truncate(group.label, 72))}</span>
-                <span class="thread-subtle">${escapeHtml(threadNotes)} · ${escapeHtml(tf('thread.attention', { score: number.format(Math.round(group.attentionScore)) }))}</span>
-              </span>
-            </div>
-          </td>
-          <td>${threadInitiatorSummary(group)}</td>
-          <td><span class="pill model-pill" data-full-label="${escapeHtml(short(group.modelSummary))}">${escapeHtml(short(group.modelSummary))}</span></td>
-          <td>${effortCell(truncate(group.effortSummary, 28), group.effortTooltip)}</td>
-          <td class="num token-cell">${tokenNumberCell(group.totalTokens, t('metric.total_tokens'))}</td>
-          <td class="num token-cell">${tokenNumberCell(group.cachedTokens, t('metric.cached_input'))}</td>
-          <td class="num token-cell">${tokenNumberCell(group.uncachedTokens, t('metric.uncached_input'))}</td>
-          <td class="num token-cell">${tokenNumberCell(group.outputTokens, t('metric.output_tokens'))}</td>
-          <td class="num">${costUsageCell(pricingConfigured ? moneyText(group.estimatedCost) : t('state.not_configured'), group.usageCredits)}</td>
-          <td class="num">${pct(group.cacheRatio)}</td>
-          <td class="num">${number.format(group.signalCount)}</td>
-        `;
-        tr.addEventListener('click', () => {
-          if (expandedThreads.has(group.key)) {
-            expandedThreads.delete(group.key);
-          } else {
-            expandedThreads.add(group.key);
-          }
-          selectThread(group);
-          render();
-        });
-        tr.addEventListener('keydown', event => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            tr.click();
-          }
-        });
-        tr.addEventListener('mouseenter', () => showThreadDetail(group));
-        rowsEl.appendChild(tr);
-        if (expanded) {
-          rowsEl.appendChild(renderThreadCalls(group));
-        }
-      }
-      if (!groups.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('state.no_threads'))}</td></tr>`;
-      }
-      if (!initialDetailApplied && selectedThreadKey) {
-        const selected = groups.find(group => group.key === selectedThreadKey);
-        if (selected) {
-          initialDetailApplied = true;
-          showThreadDetail(selected);
-        }
-      }
-      if (!initialDetailApplied && urlParams.get('detail') === 'first' && page.items[0]) {
-        initialDetailApplied = true;
-        showThreadDetail(page.items[0]);
-      }
+      dashboardTables.renderThreads(rows, mode);
     }
     function renderThreadCalls(group) {
-      const tr = document.createElement('tr');
-      tr.className = 'thread-child-row';
-      const sortedCalls = sortedThreadCalls(group.calls);
-      const visiblePages = Math.max(1, threadCallVisiblePages.get(group.key) || 1);
-      const visibleCount = Math.min(sortedCalls.length, visiblePages * threadCallPageSize);
-      const calls = sortedCalls.slice(0, visibleCount).map(row => {
-        const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
-        return `
-          <tr class="thread-call-row${selectedRecordId === row.record_id ? ' selected-row' : ''}" data-record-id="${escapeHtml(row.record_id || '')}">
-            <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
-            <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
-            <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
-            <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
-            <td class="num token-cell">${rowInvestigatorLink(row, totalTokenCell(row))}</td>
-            <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
-            <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
-            <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
-            <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
-            <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
-            <td>${rowInvestigatorLink(row, `<div class="flags compact-flags">${renderSignalPucks(row, flags, 3, t('state.none'))}</div>`)}</td>
-          </tr>
-        `;
-      }).join('');
-      const canLoadMore = visibleCount < sortedCalls.length;
-      const childLoadMore = canLoadMore
-        ? `
-          <div class="child-load-more">
-            <span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span>
-            <button class="pager-button" type="button" data-thread-load-more="${escapeHtml(group.key)}">${escapeHtml(t('button.load_more'))}</button>
-          </div>
-        `
-        : sortedCalls.length
-          ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span></div>`
-          : '';
-      tr.innerHTML = `
-        <td class="child-cell" colspan="12">
-          <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
-            <thead><tr>
-              ${threadCallHeader('time', t('table.time'))}
-              ${threadCallHeader('initiator', t('table.initiated'))}
-              ${threadCallHeader('model', t('table.model'))}
-              ${threadCallHeader('effort', t('table.effort'))}
-              ${threadCallHeader('total', t('table.tokens'), true)}
-              ${threadCallHeader('cached', t('table.cached'), true)}
-              ${threadCallHeader('uncached', t('table.uncached'), true)}
-              ${threadCallHeader('output', t('table.output'), true)}
-              ${threadCallHeader('cost', t('table.cost'), true)}
-              ${threadCallHeader('cache', t('table.cache'), true)}
-              ${threadCallHeader('signals', t('table.signals'))}
-            </tr></thead>
-            <tbody>${calls}</tbody>
-          </table>
-          ${childLoadMore}
-        </td>
-      `;
-      return tr;
+      return dashboardTables.renderThreadCalls(group);
     }
     let callInvestigator = null;
     const dashboardDetails = dashboardDetailsFactory.create({
