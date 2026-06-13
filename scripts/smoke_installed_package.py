@@ -76,6 +76,7 @@ RESOURCE_PATHS = [
     "dashboard/dashboard_responsive.css",
     "dashboard/dashboard_format.js",
     "dashboard/dashboard_data.js",
+    "dashboard/dashboard_cells.js",
     "dashboard/dashboard_filters.js",
     "dashboard/dashboard.js",
     "dashboard/dashboard_state.js",

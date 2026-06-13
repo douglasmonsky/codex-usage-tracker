@@ -223,6 +223,7 @@ def generate_dashboard(
     ]
     format_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_format.js")
     data_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_data.js")
+    cells_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_cells.js")
     filters_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_filters.js")
     state_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_state.js")
     payload_cache_script_src = _versioned_asset_href(
@@ -262,6 +263,7 @@ def generate_dashboard(
             stylesheet_hrefs=stylesheet_hrefs,
             format_script_src=format_script_src,
             data_script_src=data_script_src,
+            cells_script_src=cells_script_src,
             filters_script_src=filters_script_src,
             state_script_src=state_script_src,
             payload_cache_script_src=payload_cache_script_src,
@@ -284,6 +286,7 @@ def render_dashboard_html(
     stylesheet_hrefs: Sequence[str] | None = None,
     format_script_src: str | None = None,
     data_script_src: str | None = None,
+    cells_script_src: str | None = None,
     filters_script_src: str | None = None,
     state_script_src: str | None = None,
     payload_cache_script_src: str | None = None,
@@ -314,6 +317,8 @@ def render_dashboard_html(
         or _versioned_asset_href(output_path, asset_base, "dashboard_format.js"),
         data_script_src=data_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_data.js"),
+        cells_script_src=cells_script_src
+        or _versioned_asset_href(output_path, asset_base, "dashboard_cells.js"),
         filters_script_src=filters_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_filters.js"),
         state_script_src=state_script_src
@@ -543,6 +548,7 @@ def _html(
     stylesheet_hrefs: Sequence[str] = ("codex-usage-tracker-assets/dashboard.css",),
     format_script_src: str = "codex-usage-tracker-assets/dashboard_format.js",
     data_script_src: str = "codex-usage-tracker-assets/dashboard_data.js",
+    cells_script_src: str = "codex-usage-tracker-assets/dashboard_cells.js",
     filters_script_src: str = "codex-usage-tracker-assets/dashboard_filters.js",
     state_script_src: str = "codex-usage-tracker-assets/dashboard_state.js",
     payload_cache_script_src: str = "codex-usage-tracker-assets/dashboard_payload_cache.js",
@@ -575,6 +581,7 @@ def _html(
         .replace("__PAYLOAD__", payload)
         .replace("__FORMAT_SCRIPT_SRC__", html.escape(format_script_src, quote=True))
         .replace("__DATA_SCRIPT_SRC__", html.escape(data_script_src, quote=True))
+        .replace("__CELLS_SCRIPT_SRC__", html.escape(cells_script_src, quote=True))
         .replace("__FILTERS_SCRIPT_SRC__", html.escape(filters_script_src, quote=True))
         .replace("__STATE_SCRIPT_SRC__", html.escape(state_script_src, quote=True))
         .replace("__PAYLOAD_CACHE_SCRIPT_SRC__", html.escape(payload_cache_script_src, quote=True))
