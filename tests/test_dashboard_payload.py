@@ -266,6 +266,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "attentionScore" in dashboard_analysis_js
     assert "thread-row" in dashboard_surface
     assert "thread-call-table" in dashboard_surface
+    assert "--calls-table-min-width" in dashboard_css
+    assert "min-width: var(--calls-table-min-width)" in dashboard_css
     assert "cachedTokenCell" in dashboard_cells_js
     assert "uncachedTokenCell" in dashboard_cells_js
     assert "outputTokenCell" in dashboard_cells_js
@@ -288,7 +290,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/open-investigator" in dashboard_actions_js
     assert "openInvestigatorUrl(rowLink.href)" in dashboard_events_js
     assert "window.location.href = url" not in dashboard_surface
-    assert "window.open(url, '_blank', 'noopener')" in dashboard_actions_js
+    assert "window.open(url, '_blank')" in dashboard_actions_js
     assert "opened.opener = null" in dashboard_actions_js
     assert "selectRow(row);" not in render_calls_js
     assert "dashboard.view.call" in dashboard_js

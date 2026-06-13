@@ -91,7 +91,7 @@
     }
 
     async function openInvestigatorUrl(url) {
-      const opened = window.open(url, '_blank', 'noopener');
+      const opened = window.open(url, '_blank');
       if (opened) {
         opened.opener = null;
         return true;

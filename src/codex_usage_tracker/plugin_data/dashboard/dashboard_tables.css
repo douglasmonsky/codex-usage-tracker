@@ -6,6 +6,9 @@
       border-spacing: 0;
       font-size: 13px;
     }
+    .grid > section:first-child > table {
+      min-width: var(--calls-table-min-width);
+    }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
     .grid > section:first-child > table > thead,
     .thread-call-table thead {
