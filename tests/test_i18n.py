@@ -95,6 +95,18 @@ def dashboard_js_text() -> str:
     ).read_text(encoding="utf-8")
 
 
+def dashboard_i18n_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_i18n.js"
+    ).read_text(encoding="utf-8")
+
+
 def extract_js_function(source: str, name: str) -> str:
     start = source.index(f"function {name}(")
     brace = source.index("{", start)
@@ -358,16 +370,18 @@ def test_dashboard_template_has_dynamic_language_selector_and_runtime_status_own
 
 def test_dashboard_js_generates_language_options_and_preserves_runtime_state() -> None:
     js = dashboard_js_text()
+    i18n_js = dashboard_i18n_js_text()
     apply_translations = extract_js_function(js, "applyTranslations")
-    populate_options = extract_js_function(js, "populateLanguageOptions")
+    populate_options = extract_js_function(i18n_js, "populateLanguageOptions")
     set_language = extract_js_function(js, "setLanguage")
 
     assert "availableLanguages.map" in populate_options
     assert "language.native_name" in populate_options
-    assert "document.documentElement.lang = currentLanguage" in apply_translations
-    assert "document.documentElement.dir = languageDirection(currentLanguage)" in apply_translations
+    assert "document.documentElement.lang = i18n.currentLanguage" in apply_translations
+    assert "document.documentElement.dir = languageDirection(i18n.currentLanguage)" in apply_translations
     assert "if (element === detailEl) return" in apply_translations
     assert "renderLiveStatus()" in apply_translations
+    assert "i18n.setLanguage(language)" in set_language
     assert "rerenderSelectedDetail()" in set_language
 
 
@@ -398,12 +412,13 @@ def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> No
 
 def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
     js = dashboard_js_text()
+    i18n_js = dashboard_i18n_js_text()
     recommendation_summary = extract_js_function(js, "recommendationSummary")
     next_action = extract_js_function(js, "nextActionForRow")
     show_detail = extract_js_function(js, "showDetail")
 
-    assert "'action.run': 'Run'" in js
-    assert "'button.run': 'Run'" not in js
+    assert "'action.run': 'Run'" in i18n_js
+    assert "'button.run': 'Run'" not in i18n_js
     assert "translatedField(recommendation.title_key, recommendation.title)" in recommendation_summary
     assert "translatedField(recommendation.why_key, recommendation.why)" in recommendation_summary
     assert "translatedField(row.recommended_action_key, row.recommended_action)" in next_action
@@ -414,7 +429,7 @@ def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
 def test_dashboard_js_refresh_preserves_selected_language_for_api_payloads() -> None:
     refresh = extract_js_function(dashboard_js_text(), "refreshDashboardData")
 
-    assert "lang: currentLanguage" in refresh
+    assert "lang: i18n.currentLanguage" in refresh
 
 
 def _dashboard_payload_from_html(html: str) -> dict[str, object]:

@@ -633,6 +633,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_js = (asset_dir / "dashboard.js").read_text(encoding="utf-8")
     dashboard_format_js = (asset_dir / "dashboard_format.js").read_text(encoding="utf-8")
     dashboard_data_js = (asset_dir / "dashboard_data.js").read_text(encoding="utf-8")
+    dashboard_payload_cache_js = (asset_dir / "dashboard_payload_cache.js").read_text(
+        encoding="utf-8"
+    )
+    dashboard_i18n_js = (asset_dir / "dashboard_i18n.js").read_text(encoding="utf-8")
+    dashboard_tooltips_js = (asset_dir / "dashboard_tooltips.js").read_text(encoding="utf-8")
     dashboard_call_js = (asset_dir / "dashboard_call_investigator.js").read_text(
         encoding="utf-8"
     )
@@ -643,6 +648,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         dashboard,
         dashboard_format_js,
         dashboard_data_js,
+        dashboard_payload_cache_js,
+        dashboard_i18n_js,
+        dashboard_tooltips_js,
         dashboard_call_js,
         dashboard_js,
         dashboard_state_js,
@@ -653,24 +661,39 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert exported_with_zero_limit == 4
     assert "SECRET RAW PROMPT" not in dashboard
     assert "SECRET RAW PROMPT" not in dashboard_js
+    assert "SECRET RAW PROMPT" not in dashboard_payload_cache_js
+    assert "SECRET RAW PROMPT" not in dashboard_i18n_js
+    assert "SECRET RAW PROMPT" not in dashboard_tooltips_js
     assert "SECRET RAW PROMPT" not in dashboard_call_js
     assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_payload_cache_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_i18n_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_tooltips_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_payload_cache_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_i18n_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_tooltips_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_js
     assert 'href="codex-usage-tracker-assets/dashboard.css?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_format.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_data.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_state.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_payload_cache.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_i18n.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_tooltips.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_call_investigator.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard.js?v=' in dashboard
     assert "CodexUsageDashboardFormat" in dashboard_format_js
     assert "CodexUsageDashboardData" in dashboard_data_js
     assert "CodexUsageDashboardState" in dashboard_state_js
+    assert "CodexUsageDashboardPayloadCache" in dashboard_payload_cache_js
+    assert "CodexUsageDashboardI18n" in dashboard_i18n_js
+    assert "CodexUsageDashboardTooltips" in dashboard_tooltips_js
     assert "CodexUsageCallInvestigator" in dashboard_call_js
     assert "copyViewLink" in dashboard
     assert "exportVisible" in dashboard
@@ -679,8 +702,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "currentDashboardState" in dashboard_js
     assert "copyCurrentViewLink" in dashboard_js
     assert "exportCurrentRows" in dashboard_js
-    assert "last call" in dashboard_js.lower()
-    assert "metric.session_cumulative" in dashboard_js.lower()
+    assert "last call" in dashboard_surface.lower()
+    assert "metric.session_cumulative" in dashboard_surface.lower()
 
     from codex_usage_tracker.i18n import translations_for
     en_trans = translations_for("en")
@@ -758,9 +781,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.thread_attachment" in dashboard_js
     assert "detail.subagent_type" in dashboard_js
     assert "source.auto_review" in dashboard_js
-    assert "button.load_context" in dashboard_js
+    assert "button.load_context" in dashboard_surface
     assert "button.open_investigator" in dashboard_js
-    assert "Click a call row for deep diagnostics." in dashboard_js
+    assert "Click a call row for deep diagnostics." in dashboard_surface
     assert "data-open-investigator-record" not in render_calls_js
     assert "rowInvestigatorLink(row" in render_calls_js
     assert "target=\"_blank\"" in dashboard_js
@@ -907,6 +930,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_format.js").exists()
     assert (asset_dir / "dashboard_data.js").exists()
     assert (asset_dir / "dashboard_state.js").exists()
+    assert (asset_dir / "dashboard_payload_cache.js").exists()
+    assert (asset_dir / "dashboard_i18n.js").exists()
+    assert (asset_dir / "dashboard_tooltips.js").exists()
     assert (asset_dir / "dashboard.css").exists()
     assert "detail-section" in dashboard
     assert "detailToggle" in dashboard
@@ -931,7 +957,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "visibleSlice(rows)" in dashboard_js
     assert "updateLoadMoreControl(page, 'table.threads')" in dashboard_js
     assert "data-thread-load-more" in dashboard_js
-    assert "data-fast-tooltip" in dashboard_js
+    assert "data-fast-tooltip" in dashboard_surface
     assert "scheduleFastTooltip(target)" in dashboard_js
     assert "focusPendingTarget" in dashboard_js
     assert "queueFocusTarget(insight.target)" in dashboard_js

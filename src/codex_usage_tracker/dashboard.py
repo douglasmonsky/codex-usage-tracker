@@ -210,6 +210,11 @@ def generate_dashboard(
     format_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_format.js")
     data_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_data.js")
     state_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_state.js")
+    payload_cache_script_src = _versioned_asset_href(
+        output_path, asset_base, "dashboard_payload_cache.js"
+    )
+    i18n_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_i18n.js")
+    tooltips_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_tooltips.js")
     call_investigator_script_src = _versioned_asset_href(
         output_path, asset_base, "dashboard_call_investigator.js"
     )
@@ -243,6 +248,9 @@ def generate_dashboard(
             format_script_src=format_script_src,
             data_script_src=data_script_src,
             state_script_src=state_script_src,
+            payload_cache_script_src=payload_cache_script_src,
+            i18n_script_src=i18n_script_src,
+            tooltips_script_src=tooltips_script_src,
             call_investigator_script_src=call_investigator_script_src,
             script_src=script_src,
         ),
@@ -261,6 +269,9 @@ def render_dashboard_html(
     format_script_src: str | None = None,
     data_script_src: str | None = None,
     state_script_src: str | None = None,
+    payload_cache_script_src: str | None = None,
+    i18n_script_src: str | None = None,
+    tooltips_script_src: str | None = None,
     call_investigator_script_src: str | None = None,
     script_src: str | None = None,
 ) -> str:
@@ -285,6 +296,12 @@ def render_dashboard_html(
         or _versioned_asset_href(output_path, asset_base, "dashboard_data.js"),
         state_script_src=state_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_state.js"),
+        payload_cache_script_src=payload_cache_script_src
+        or _versioned_asset_href(output_path, asset_base, "dashboard_payload_cache.js"),
+        i18n_script_src=i18n_script_src
+        or _versioned_asset_href(output_path, asset_base, "dashboard_i18n.js"),
+        tooltips_script_src=tooltips_script_src
+        or _versioned_asset_href(output_path, asset_base, "dashboard_tooltips.js"),
         call_investigator_script_src=call_investigator_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_call_investigator.js"),
         script_src=script_src
@@ -505,6 +522,9 @@ def _html(
     format_script_src: str = "codex-usage-tracker-assets/dashboard_format.js",
     data_script_src: str = "codex-usage-tracker-assets/dashboard_data.js",
     state_script_src: str = "codex-usage-tracker-assets/dashboard_state.js",
+    payload_cache_script_src: str = "codex-usage-tracker-assets/dashboard_payload_cache.js",
+    i18n_script_src: str = "codex-usage-tracker-assets/dashboard_i18n.js",
+    tooltips_script_src: str = "codex-usage-tracker-assets/dashboard_tooltips.js",
     call_investigator_script_src: str = "codex-usage-tracker-assets/dashboard_call_investigator.js",
     script_src: str = "codex-usage-tracker-assets/dashboard.js",
     body_attrs: str = "",
@@ -529,6 +549,9 @@ def _html(
         .replace("__FORMAT_SCRIPT_SRC__", html.escape(format_script_src, quote=True))
         .replace("__DATA_SCRIPT_SRC__", html.escape(data_script_src, quote=True))
         .replace("__STATE_SCRIPT_SRC__", html.escape(state_script_src, quote=True))
+        .replace("__PAYLOAD_CACHE_SCRIPT_SRC__", html.escape(payload_cache_script_src, quote=True))
+        .replace("__I18N_SCRIPT_SRC__", html.escape(i18n_script_src, quote=True))
+        .replace("__TOOLTIPS_SCRIPT_SRC__", html.escape(tooltips_script_src, quote=True))
         .replace(
             "__CALL_INVESTIGATOR_SCRIPT_SRC__",
             html.escape(call_investigator_script_src, quote=True),
