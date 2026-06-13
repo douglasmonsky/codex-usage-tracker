@@ -50,6 +50,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_tooltips_js = (asset_dir / "dashboard_tooltips.js").read_text(encoding="utf-8")
     dashboard_status_js = (asset_dir / "dashboard_status.js").read_text(encoding="utf-8")
     dashboard_events_js = (asset_dir / "dashboard_events.js").read_text(encoding="utf-8")
+    dashboard_call_diagnostics_js = (
+        asset_dir / "dashboard_call_diagnostics.js"
+    ).read_text(encoding="utf-8")
     dashboard_call_js = (asset_dir / "dashboard_call_investigator.js").read_text(
         encoding="utf-8"
     )
@@ -83,6 +86,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         dashboard_tooltips_js,
         dashboard_status_js,
         dashboard_events_js,
+        dashboard_call_diagnostics_js,
         dashboard_call_js,
         dashboard_js,
         dashboard_state_js,
@@ -104,6 +108,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_tooltips_js
     assert "SECRET RAW PROMPT" not in dashboard_status_js
     assert "SECRET RAW PROMPT" not in dashboard_events_js
+    assert "SECRET RAW PROMPT" not in dashboard_call_diagnostics_js
     assert "SECRET RAW PROMPT" not in dashboard_call_js
     assert "SECRET RAW PROMPT" not in dashboard_css
     assert "SECRET RAW PROMPT" not in csv_text
@@ -120,6 +125,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_tooltips_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_status_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_events_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_diagnostics_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_js
@@ -134,6 +140,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_tooltips_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_status_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_events_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_diagnostics_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_js
     for stylesheet in dashboard_stylesheets:
         assert f'href="codex-usage-tracker-assets/{stylesheet}?v=' in dashboard
@@ -151,6 +158,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'src="codex-usage-tracker-assets/dashboard_tooltips.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_status.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_events.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_call_diagnostics.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_call_investigator.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard.js?v=' in dashboard
     assert "CodexUsageDashboardFormat" in dashboard_format_js
@@ -167,6 +175,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "CodexUsageDashboardTooltips" in dashboard_tooltips_js
     assert "CodexUsageDashboardStatus" in dashboard_status_js
     assert "CodexUsageDashboardEvents" in dashboard_events_js
+    assert "CodexUsageCallDiagnostics" in dashboard_call_diagnostics_js
     assert "CodexUsageCallInvestigator" in dashboard_call_js
     assert "copyViewLink" in dashboard
     assert "exportVisible" in dashboard
@@ -279,7 +288,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert ".call-diagnostic-section.exact" in dashboard_css
     assert "creditsText(usageCreditValue(row))" in dashboard_call_js
     assert "const contextPayloadState = new Map()" in dashboard_call_js
-    assert "renderInvestigationReadout" in dashboard_call_js
+    assert "renderInvestigationReadout" in dashboard_call_diagnostics_js
     assert "contextStateRecord(row)" in dashboard_call_js
     assert "defaultContextRequest" in dashboard_call_js
     assert "mode: 'quick'" in dashboard_call_js
@@ -291,7 +300,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-context-full-analysis" in dashboard_call_js
     assert "button.hide_tool_output" in dashboard_call_js
     assert "data-context-autoload-toggle" not in dashboard_call_js
-    assert "renderCacheVerdict" in dashboard_call_js
+    assert "renderCacheVerdict" in dashboard_call_diagnostics_js
     assert "data-context-scroll" not in dashboard_call_js
     assert ".readout-grid" in dashboard_css
     assert ".cache-verdict" in dashboard_css
@@ -327,8 +336,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert ".grid > section:first-child > table > thead" in dashboard_css
     assert "${callInitiatorPuck(row)}" in dashboard_details_js
     assert "<span>${escapeHtml(initiator.source)}</span>" not in dashboard_details_js
-    assert "tooltipAttributes(label)" in dashboard_call_js
-    assert "tooltipAttributes(badge)" in dashboard_call_js
+    assert "tooltipAttributes(label)" in dashboard_call_diagnostics_js
+    assert "tooltipAttributes(badge)" in dashboard_call_diagnostics_js
     assert "data-context-load-older" in dashboard_call_js
     assert "data-context-no-budget" not in dashboard_call_js
     assert "renderContextTokenUsage" in dashboard_call_js
@@ -337,7 +346,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "payload.call_anchors" not in dashboard_call_js
     assert "payload.thread_anchors" not in dashboard_call_js
     assert "context-entry-collapsed" in dashboard_call_js
-    assert "Evidence analyzed:" in dashboard_call_js
+    assert "Evidence analyzed:" in dashboard_call_diagnostics_js
     assert "total_entries" in dashboard_call_js
     assert ".context-anchor-panel" not in dashboard_css
     assert ".context-entry-summary" in dashboard_css
@@ -414,6 +423,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_tooltips.js").exists()
     assert (asset_dir / "dashboard_status.js").exists()
     assert (asset_dir / "dashboard_events.js").exists()
+    assert (asset_dir / "dashboard_call_diagnostics.js").exists()
     for stylesheet in dashboard_stylesheets:
         assert (asset_dir / stylesheet).exists()
     assert "detail-section" in dashboard
