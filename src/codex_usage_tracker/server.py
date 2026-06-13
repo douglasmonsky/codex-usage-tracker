@@ -3,21 +3,19 @@
 from __future__ import annotations
 
 import hmac
-import json
 import secrets
 import sqlite3
 import threading
 import webbrowser
-from datetime import datetime, timezone
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from ipaddress import ip_address
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from codex_usage_tracker import server_utils
 from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
 from codex_usage_tracker.call_origin import ensure_call_origin
 from codex_usage_tracker.context import (
@@ -68,6 +66,30 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
+
+_allowed_loopback_host = server_utils.allowed_loopback_host
+_elapsed_ms = server_utils.elapsed_ms
+_first = server_utils.first_query_value
+_has_more = server_utils.has_more_rows
+_host_header_name = server_utils.host_header_name
+_json_response_body = server_utils.json_response_body
+_matches_live_derived_filters = server_utils.matches_live_derived_filters
+_next_offset = server_utils.next_row_offset
+_optional_filter = server_utils.optional_choice_filter
+_parse_api_limit = server_utils.parse_api_limit
+_parse_api_offset = server_utils.parse_api_offset
+_parse_bool = server_utils.parse_bool_query_value
+_parse_context_limit = server_utils.parse_context_limit
+_parse_limit = server_utils.parse_dashboard_limit
+_parse_offset = server_utils.parse_dashboard_offset
+_parse_optional_float = server_utils.parse_optional_float
+_parse_report_limit = server_utils.parse_report_limit
+_safe_int = server_utils.safe_int
+_truthy = server_utils.truthy_query_value
+_url_host = server_utils.url_host
+_utc_now = server_utils.utc_now
+_validate_context_api_mode = server_utils.validate_context_api_mode
+_validate_loopback_host = server_utils.validate_loopback_host
 
 
 class _ContextApiState:
@@ -993,211 +1015,3 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
             return
-
-
-def _first(values: list[str] | None) -> str | None:
-    return values[0] if values else None
-
-
-def _truthy(value: str | None) -> bool:
-    return str(value or "").lower() in {"1", "true", "yes", "on"}
-
-
-def _parse_bool(value: str | None, default: bool) -> bool:
-    if value is None or value == "":
-        return default
-    normalized = value.lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    return default
-
-
-def _parse_limit(value: str | None, default: int | None) -> int | None:
-    if value is None or value == "":
-        return default
-    if value.lower() == "all":
-        return None
-    try:
-        limit = int(value)
-    except ValueError:
-        return default
-    if limit <= 0:
-        return None
-    return limit
-
-
-def _parse_offset(value: str | None) -> int:
-    if value is None or value == "":
-        return 0
-    try:
-        offset = int(value)
-    except ValueError:
-        return 0
-    return max(offset, 0)
-
-
-def _parse_api_limit(value: str | None, default: int) -> int | None:
-    if value is None or value == "":
-        return default
-    if value.lower() == "all":
-        return None
-    try:
-        limit = int(value)
-    except ValueError as exc:
-        raise ValueError("limit must be a positive integer or all") from exc
-    if limit <= 0:
-        raise ValueError("limit must be a positive integer or all")
-    return min(limit, 10_000)
-
-
-def _parse_report_limit(value: str | None, default: int) -> int:
-    limit = _parse_api_limit(value, default)
-    return 10_000 if limit is None else limit
-
-
-def _parse_api_offset(value: str | None) -> int:
-    if value is None or value == "":
-        return 0
-    try:
-        offset = int(value)
-    except ValueError as exc:
-        raise ValueError("offset must be a non-negative integer") from exc
-    if offset < 0:
-        raise ValueError("offset must be a non-negative integer")
-    return offset
-
-
-def _parse_optional_float(value: str | None, name: str) -> float | None:
-    if value is None or value == "":
-        return None
-    try:
-        return float(value)
-    except ValueError as exc:
-        raise ValueError(f"{name} must be a number") from exc
-
-
-def _optional_filter(
-    value: str | None,
-    allowed: tuple[str, ...],
-    name: str,
-) -> str | None:
-    if value is None or value == "":
-        return None
-    if value not in allowed:
-        raise ValueError(f"{name} must be one of: {', '.join(allowed)}")
-    return value
-
-
-def _matches_live_derived_filters(
-    row: dict[str, Any],
-    *,
-    pricing_status: str | None,
-    credit_confidence: str | None,
-) -> bool:
-    if pricing_status == "priced" and not row.get("pricing_model"):
-        return False
-    if pricing_status == "estimated" and not row.get("pricing_estimated"):
-        return False
-    if pricing_status == "unpriced" and row.get("pricing_model"):
-        return False
-    return not (credit_confidence and row.get("usage_credit_confidence") != credit_confidence)
-
-
-def _has_more(limit: int | None, offset: int, row_count: int, total_matched: int) -> bool:
-    return limit is not None and offset + row_count < total_matched
-
-
-def _next_offset(
-    limit: int | None,
-    offset: int,
-    row_count: int,
-    total_matched: int,
-) -> int | None:
-    return offset + row_count if _has_more(limit, offset, row_count, total_matched) else None
-
-
-def _parse_context_limit(value: str | None, default: int) -> int:
-    if value is None or value == "":
-        return default
-    if value.lower() == "all":
-        return 0
-    try:
-        limit = int(value)
-    except ValueError:
-        return default
-    return max(limit, 0)
-
-
-def _elapsed_ms(started_at: float) -> float:
-    return round((perf_counter() - started_at) * 1000, 3)
-
-
-def _safe_int(value: object) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _json_response_body(payload: dict[str, object]) -> bytes:
-    diagnostics = payload.get("diagnostics")
-    if not isinstance(diagnostics, dict):
-        return json.dumps(payload, ensure_ascii=True).encode("utf-8")
-
-    previous_size: int | None = None
-    while True:
-        body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-        current_size = len(body)
-        if current_size == previous_size:
-            return body
-        diagnostics["json_bytes"] = current_size
-        previous_size = current_size
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-
-
-def _validate_loopback_host(host: str) -> None:
-    if host == "localhost":
-        return
-    try:
-        address = ip_address(host)
-    except ValueError as exc:
-        raise ValueError(
-            "serve-dashboard --host must be localhost, 127.0.0.1, or ::1"
-        ) from exc
-    if not address.is_loopback:
-        raise ValueError("serve-dashboard refuses to expose raw context off localhost")
-
-
-def _validate_context_api_mode(mode: str) -> None:
-    if mode not in {"explicit", "disabled"}:
-        raise ValueError("--context-api must be explicit or disabled")
-
-
-def _allowed_loopback_host(host: str | None) -> bool:
-    if not host:
-        return False
-    if host == "localhost":
-        return True
-    try:
-        return ip_address(host).is_loopback
-    except ValueError:
-        return False
-
-
-def _host_header_name(value: str | None) -> str | None:
-    if not value:
-        return None
-    host = value.strip()
-    if host.startswith("["):
-        end = host.find("]")
-        return host[1:end] if end > 0 else None
-    return host.split(":", 1)[0]
-
-
-def _url_host(host: str) -> str:
-    return f"[{host}]" if ":" in host and not host.startswith("[") else host
