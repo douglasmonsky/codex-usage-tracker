@@ -226,6 +226,7 @@ def generate_dashboard(
     analysis_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_analysis.js")
     cells_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_cells.js")
     details_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_details.js")
+    insights_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_insights.js")
     tables_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_tables.js")
     filters_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_filters.js")
     state_script_src = _versioned_asset_href(output_path, asset_base, "dashboard_state.js")
@@ -269,6 +270,7 @@ def generate_dashboard(
             analysis_script_src=analysis_script_src,
             cells_script_src=cells_script_src,
             details_script_src=details_script_src,
+            insights_script_src=insights_script_src,
             tables_script_src=tables_script_src,
             filters_script_src=filters_script_src,
             state_script_src=state_script_src,
@@ -295,6 +297,7 @@ def render_dashboard_html(
     analysis_script_src: str | None = None,
     cells_script_src: str | None = None,
     details_script_src: str | None = None,
+    insights_script_src: str | None = None,
     tables_script_src: str | None = None,
     filters_script_src: str | None = None,
     state_script_src: str | None = None,
@@ -332,6 +335,8 @@ def render_dashboard_html(
         or _versioned_asset_href(output_path, asset_base, "dashboard_cells.js"),
         details_script_src=details_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_details.js"),
+        insights_script_src=insights_script_src
+        or _versioned_asset_href(output_path, asset_base, "dashboard_insights.js"),
         tables_script_src=tables_script_src
         or _versioned_asset_href(output_path, asset_base, "dashboard_tables.js"),
         filters_script_src=filters_script_src
@@ -566,6 +571,7 @@ def _html(
     analysis_script_src: str = "codex-usage-tracker-assets/dashboard_analysis.js",
     cells_script_src: str = "codex-usage-tracker-assets/dashboard_cells.js",
     details_script_src: str = "codex-usage-tracker-assets/dashboard_details.js",
+    insights_script_src: str = "codex-usage-tracker-assets/dashboard_insights.js",
     tables_script_src: str = "codex-usage-tracker-assets/dashboard_tables.js",
     filters_script_src: str = "codex-usage-tracker-assets/dashboard_filters.js",
     state_script_src: str = "codex-usage-tracker-assets/dashboard_state.js",
@@ -602,6 +608,7 @@ def _html(
         .replace("__ANALYSIS_SCRIPT_SRC__", html.escape(analysis_script_src, quote=True))
         .replace("__CELLS_SCRIPT_SRC__", html.escape(cells_script_src, quote=True))
         .replace("__DETAILS_SCRIPT_SRC__", html.escape(details_script_src, quote=True))
+        .replace("__INSIGHTS_SCRIPT_SRC__", html.escape(insights_script_src, quote=True))
         .replace("__TABLES_SCRIPT_SRC__", html.escape(tables_script_src, quote=True))
         .replace("__FILTERS_SCRIPT_SRC__", html.escape(filters_script_src, quote=True))
         .replace("__STATE_SCRIPT_SRC__", html.escape(state_script_src, quote=True))

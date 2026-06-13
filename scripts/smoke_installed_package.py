@@ -79,6 +79,7 @@ RESOURCE_PATHS = [
     "dashboard/dashboard_analysis.js",
     "dashboard/dashboard_cells.js",
     "dashboard/dashboard_details.js",
+    "dashboard/dashboard_insights.js",
     "dashboard/dashboard_tables.js",
     "dashboard/dashboard_filters.js",
     "dashboard/dashboard.js",

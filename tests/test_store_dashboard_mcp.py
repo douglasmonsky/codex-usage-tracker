@@ -614,6 +614,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_analysis_js = (asset_dir / "dashboard_analysis.js").read_text(encoding="utf-8")
     dashboard_cells_js = (asset_dir / "dashboard_cells.js").read_text(encoding="utf-8")
     dashboard_details_js = (asset_dir / "dashboard_details.js").read_text(encoding="utf-8")
+    dashboard_insights_js = (asset_dir / "dashboard_insights.js").read_text(encoding="utf-8")
     dashboard_tables_js = (asset_dir / "dashboard_tables.js").read_text(encoding="utf-8")
     dashboard_filters_js = (asset_dir / "dashboard_filters.js").read_text(encoding="utf-8")
     dashboard_payload_cache_js = (asset_dir / "dashboard_payload_cache.js").read_text(
@@ -646,6 +647,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         dashboard_analysis_js,
         dashboard_cells_js,
         dashboard_details_js,
+        dashboard_insights_js,
         dashboard_tables_js,
         dashboard_filters_js,
         dashboard_payload_cache_js,
@@ -664,6 +666,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_analysis_js
     assert "SECRET RAW PROMPT" not in dashboard_cells_js
     assert "SECRET RAW PROMPT" not in dashboard_details_js
+    assert "SECRET RAW PROMPT" not in dashboard_insights_js
     assert "SECRET RAW PROMPT" not in dashboard_tables_js
     assert "SECRET RAW PROMPT" not in dashboard_filters_js
     assert "SECRET RAW PROMPT" not in dashboard_payload_cache_js
@@ -677,6 +680,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_analysis_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_cells_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_details_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_insights_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_tables_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_filters_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_payload_cache_js
@@ -688,6 +692,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_analysis_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_cells_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_details_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_insights_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_tables_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_filters_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_payload_cache_js
@@ -701,6 +706,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'src="codex-usage-tracker-assets/dashboard_analysis.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_cells.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_details.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_insights.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_tables.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_filters.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_state.js?v=' in dashboard
@@ -714,6 +720,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "CodexUsageDashboardAnalysis" in dashboard_analysis_js
     assert "CodexUsageDashboardCells" in dashboard_cells_js
     assert "CodexUsageDashboardDetails" in dashboard_details_js
+    assert "CodexUsageDashboardInsights" in dashboard_insights_js
     assert "CodexUsageDashboardTables" in dashboard_tables_js
     assert "CodexUsageDashboardFilters" in dashboard_filters_js
     assert "CodexUsageDashboardState" in dashboard_state_js
@@ -782,7 +789,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.git_branch" in dashboard_details_js
     assert "usage_credit_confidence" in dashboard
     assert "allowance.credit_rates" in dashboard_js
-    assert "insight.codex_allowance_usage" in dashboard_js
+    assert "insight.codex_allowance_usage" in dashboard_insights_js
     assert "Highest Codex credits" in dashboard
     assert "Estimated Tokens" not in dashboard
     assert "Unpriced Tokens" not in dashboard
@@ -791,8 +798,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "threadsView" in dashboard
     assert "Needs Attention" in dashboard
     assert "Investigation Presets" in dashboard
-    assert "presetDefinitions" in dashboard_js
-    assert "renderInsightPanel" in dashboard_js
+    assert "presetDefinitions" in dashboard_insights_js
+    assert "renderInsightPanel" in dashboard_insights_js
     assert "attentionScore" in dashboard_analysis_js
     assert "thread-row" in dashboard_surface
     assert "thread-call-table" in dashboard_surface
@@ -958,6 +965,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_analysis.js").exists()
     assert (asset_dir / "dashboard_cells.js").exists()
     assert (asset_dir / "dashboard_details.js").exists()
+    assert (asset_dir / "dashboard_insights.js").exists()
     assert (asset_dir / "dashboard_tables.js").exists()
     assert (asset_dir / "dashboard_filters.js").exists()
     assert (asset_dir / "dashboard_state.js").exists()
