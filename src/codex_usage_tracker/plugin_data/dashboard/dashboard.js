@@ -1,5 +1,6 @@
     const dashboardFormat = window.CodexUsageDashboardFormat;
     const dashboardData = window.CodexUsageDashboardData;
+    const dashboardFilters = window.CodexUsageDashboardFilters;
     const dashboardPayloadCache = window.CodexUsageDashboardPayloadCache;
     const dashboardTooltipFactory = window.CodexUsageDashboardTooltips;
     const {
@@ -46,6 +47,15 @@
       outputTokens: dataOutputTokens,
       rowReasoningTokens: dataRowReasoningTokens,
     } = dashboardData;
+    const {
+      addDays,
+      cleanDateInput,
+      formatDateRangeLabel: formatDateRangeLabelWithTranslator,
+      localDateKey,
+      parseDateInput,
+      presetDateRange,
+      rowMatchesDateRange,
+    } = dashboardFilters;
     const initialPayload = JSON.parse(document.getElementById('usage-data').textContent);
     const {
       activeInitialPayload,
@@ -1048,52 +1058,8 @@
             projectMetadataPrivacy.aliases_preserved ? t('privacy.aliases_preserved') : '',
           ].filter(Boolean).join(' '));
     }
-    function padDatePart(value) {
-      return String(value).padStart(2, '0');
-    }
-    function localDateKey(date) {
-      return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
-    }
-    function localDay(value = new Date()) {
-      return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-    }
-    function addDays(date, days) {
-      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-    }
-    function parseDateInput(value) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
-      const [year, month, day] = value.split('-').map(Number);
-      const date = new Date(year, month - 1, day);
-      return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
-    }
-    function cleanDateInput(value) {
-      const date = parseDateInput(value);
-      return date ? localDateKey(date) : '';
-    }
-    function weekStart(date) {
-      const day = date.getDay();
-      const offset = day === 0 ? -6 : 1 - day;
-      return addDays(date, offset);
-    }
-    function presetDateRange(preset) {
-      const today = localDay();
-      if (preset === 'today') {
-        return { start: today, endExclusive: addDays(today, 1) };
-      }
-      if (preset === 'this-week') {
-        const start = weekStart(today);
-        return { start, endExclusive: addDays(start, 7) };
-      }
-      if (preset === 'last-7-days') {
-        return { start: addDays(today, -6), endExclusive: addDays(today, 1) };
-      }
-      if (preset === 'this-month') {
-        return {
-          start: new Date(today.getFullYear(), today.getMonth(), 1),
-          endExclusive: new Date(today.getFullYear(), today.getMonth() + 1, 1),
-        };
-      }
-      return { start: null, endExclusive: null };
+    function formatDateRangeLabel(prefix, start, end) {
+      return formatDateRangeLabelWithTranslator(prefix, start, end, tf);
     }
     function syncDatePresetInputs() {
       const preset = datePresetEl.value;
@@ -1106,15 +1072,6 @@
       const range = presetDateRange(preset);
       dateStartEl.value = range.start ? localDateKey(range.start) : '';
       dateEndEl.value = range.endExclusive ? localDateKey(addDays(range.endExclusive, -1)) : '';
-    }
-    function formatDateRangeLabel(prefix, start, end) {
-      const startLabel = start ? localDateKey(start) : '';
-      const endLabel = end ? localDateKey(end) : '';
-      if (startLabel && endLabel && startLabel === endLabel) return tf('date.range_exact', { prefix, date: startLabel });
-      if (startLabel && endLabel) return tf('date.range_between', { prefix, start: startLabel, end: endLabel });
-      if (startLabel) return tf('date.range_from', { prefix, start: startLabel });
-      if (endLabel) return tf('date.range_through', { prefix, end: endLabel });
-      return prefix;
     }
     function currentDateRange() {
       const preset = allowedDatePresets.has(datePresetEl.value) ? datePresetEl.value : 'all';
@@ -1149,15 +1106,6 @@
         };
       }
       return { active: false, invalid: false, start: null, endExclusive: null, label: t('option.all_time') };
-    }
-    function rowMatchesDateRange(row, range) {
-      if (range.invalid) return false;
-      if (!range.active) return true;
-      const timestamp = row.event_timestamp ? new Date(row.event_timestamp) : null;
-      if (!timestamp || Number.isNaN(timestamp.getTime())) return false;
-      if (range.start && timestamp < range.start) return false;
-      if (range.endExclusive && timestamp >= range.endExclusive) return false;
-      return true;
     }
     function updateDateFilterControls() {
       const range = currentDateRange();

@@ -116,11 +116,9 @@ python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
+for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
+  node --check "$file"
+done
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
@@ -246,11 +244,9 @@ python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard.js
-node --check src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js
+for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
+  node --check "$file"
+done
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info

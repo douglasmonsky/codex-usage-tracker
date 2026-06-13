@@ -633,6 +633,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_js = (asset_dir / "dashboard.js").read_text(encoding="utf-8")
     dashboard_format_js = (asset_dir / "dashboard_format.js").read_text(encoding="utf-8")
     dashboard_data_js = (asset_dir / "dashboard_data.js").read_text(encoding="utf-8")
+    dashboard_filters_js = (asset_dir / "dashboard_filters.js").read_text(encoding="utf-8")
     dashboard_payload_cache_js = (asset_dir / "dashboard_payload_cache.js").read_text(
         encoding="utf-8"
     )
@@ -642,12 +643,25 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     dashboard_state_js = (asset_dir / "dashboard_state.js").read_text(encoding="utf-8")
-    dashboard_css = (asset_dir / "dashboard.css").read_text(encoding="utf-8")
+    dashboard_stylesheets = [
+        "dashboard.css",
+        "dashboard_call.css",
+        "dashboard_insights.css",
+        "dashboard_layout.css",
+        "dashboard_tables.css",
+        "dashboard_detail.css",
+        "dashboard_responsive.css",
+    ]
+    dashboard_css = "\n".join(
+        (asset_dir / stylesheet).read_text(encoding="utf-8")
+        for stylesheet in dashboard_stylesheets
+    )
     render_calls_js = _extract_js_function(dashboard_js, "renderCalls")
     dashboard_surface = "\n".join([
         dashboard,
         dashboard_format_js,
         dashboard_data_js,
+        dashboard_filters_js,
         dashboard_payload_cache_js,
         dashboard_i18n_js,
         dashboard_tooltips_js,
@@ -661,6 +675,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert exported_with_zero_limit == 4
     assert "SECRET RAW PROMPT" not in dashboard
     assert "SECRET RAW PROMPT" not in dashboard_js
+    assert "SECRET RAW PROMPT" not in dashboard_filters_js
     assert "SECRET RAW PROMPT" not in dashboard_payload_cache_js
     assert "SECRET RAW PROMPT" not in dashboard_i18n_js
     assert "SECRET RAW PROMPT" not in dashboard_tooltips_js
@@ -669,19 +684,23 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in csv_text
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_filters_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_payload_cache_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_i18n_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_tooltips_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_filters_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_payload_cache_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_i18n_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_tooltips_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_js
-    assert 'href="codex-usage-tracker-assets/dashboard.css?v=' in dashboard
+    for stylesheet in dashboard_stylesheets:
+        assert f'href="codex-usage-tracker-assets/{stylesheet}?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_format.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_data.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_filters.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_state.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_payload_cache.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_i18n.js?v=' in dashboard
@@ -690,6 +709,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'src="codex-usage-tracker-assets/dashboard.js?v=' in dashboard
     assert "CodexUsageDashboardFormat" in dashboard_format_js
     assert "CodexUsageDashboardData" in dashboard_data_js
+    assert "CodexUsageDashboardFilters" in dashboard_filters_js
     assert "CodexUsageDashboardState" in dashboard_state_js
     assert "CodexUsageDashboardPayloadCache" in dashboard_payload_cache_js
     assert "CodexUsageDashboardI18n" in dashboard_i18n_js
@@ -929,11 +949,13 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_call_investigator.js").exists()
     assert (asset_dir / "dashboard_format.js").exists()
     assert (asset_dir / "dashboard_data.js").exists()
+    assert (asset_dir / "dashboard_filters.js").exists()
     assert (asset_dir / "dashboard_state.js").exists()
     assert (asset_dir / "dashboard_payload_cache.js").exists()
     assert (asset_dir / "dashboard_i18n.js").exists()
     assert (asset_dir / "dashboard_tooltips.js").exists()
-    assert (asset_dir / "dashboard.css").exists()
+    for stylesheet in dashboard_stylesheets:
+        assert (asset_dir / stylesheet).exists()
     assert "detail-section" in dashboard
     assert "detailToggle" in dashboard
     assert "body[data-detail-panel=\"expanded\"] .grid" in dashboard_css
