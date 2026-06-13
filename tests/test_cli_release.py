@@ -275,19 +275,19 @@ def test_dashboard_history_scope_labels_remain_user_facing() -> None:
         / "dashboard"
         / "dashboard_template.html"
     ).read_text(encoding="utf-8")
-    script = (
+    live_runtime = (
         repo_root
         / "src"
         / "codex_usage_tracker"
         / "plugin_data"
         / "dashboard"
-        / "dashboard.js"
+        / "dashboard_live.js"
     ).read_text(encoding="utf-8")
 
     assert "Active sessions only" in template
     assert "All history" in template
-    assert "history.active_only" in script
-    assert "history.all_includes" in script
+    assert "history.active_only" in live_runtime
+    assert "history.all_includes" in live_runtime
 
     from codex_usage_tracker.i18n import translations_for
     en_trans = translations_for("en")

@@ -131,6 +131,18 @@ def dashboard_i18n_js_text() -> str:
     ).read_text(encoding="utf-8")
 
 
+def dashboard_live_js_text() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    return (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_live.js"
+    ).read_text(encoding="utf-8")
+
+
 def extract_js_function(source: str, name: str) -> str:
     start = source.index(f"function {name}(")
     brace = source.index("{", start)
@@ -452,7 +464,7 @@ def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
 
 
 def test_dashboard_js_refresh_preserves_selected_language_for_api_payloads() -> None:
-    refresh = extract_js_function(dashboard_js_text(), "refreshDashboardData")
+    refresh = extract_js_function(dashboard_live_js_text(), "refreshDashboardData")
 
     assert "lang: i18n.currentLanguage" in refresh
 

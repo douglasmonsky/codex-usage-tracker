@@ -9,7 +9,9 @@
     const dashboardPayloadCache = window.CodexUsageDashboardPayloadCache;
     const dashboardTooltipFactory = window.CodexUsageDashboardTooltips;
     const dashboardStatusFactory = window.CodexUsageDashboardStatus;
+    const dashboardActionsFactory = window.CodexUsageDashboardActions;
     const dashboardEventsFactory = window.CodexUsageDashboardEvents;
+    const dashboardLiveFactory = window.CodexUsageDashboardLive;
     const {
       number,
       money,
@@ -94,7 +96,6 @@
     const initialState = stateManager ? stateManager.read(urlParams) : {};
     let data = payloadRows(activeInitialPayload);
     let summaryData = activeInitialPayload.summary || null;
-    let shellBoot = Boolean(activeInitialPayload.shell_boot);
     let pricingConfigured = Boolean(activeInitialPayload.pricing_configured);
     let pricingSource = activeInitialPayload.pricing_source || {};
     let pricingSnapshotWarning = activeInitialPayload.pricing_snapshot_warning || '';
@@ -189,13 +190,6 @@
     let activePreset = '';
     let selectedRecordId = initialState.record || '';
     let selectedThreadKey = initialState.thread || '';
-    let refreshInFlight = false;
-    let rowHydrationInFlight = false;
-    let rowHydrationComplete = !shellBoot && data.length > 0;
-    let rowHydrationError = '';
-    let rowHydrationGeneration = 0;
-    let rowHydrationRestartRequested = false;
-    let autoRefreshTimer = null;
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
     let pendingFocusTarget = null;
@@ -407,23 +401,6 @@
     function creditsText(value) {
       return credits(value, t('state.no_rate'));
     }
-    function loadedRowsDescription() {
-      const loaded = number.format(data.length);
-      const available = number.format(totalAvailableRows || data.length);
-      const capped = loadedLimit !== null && totalAvailableRows > data.length;
-      return capped
-        ? tf('caption.loaded_capped', { loaded, available })
-        : tf('caption.loaded', { loaded });
-    }
-    function rowHydrationTarget() {
-      const available = Math.max(0, Number(totalAvailableRows || 0));
-      if (!available) return 0;
-      return loadedLimit === null ? available : Math.min(available, Number(loadedLimit || available));
-    }
-    function rowsNeedHydration() {
-      const target = rowHydrationTarget();
-      return liveRefreshSupported && target > 0 && data.length < target;
-    }
     function clientFiltersActive(dateRange = currentDateRange()) {
       return Boolean(
         searchEl.value.trim()
@@ -446,52 +423,6 @@
         estimatedCost: Number(summaryData.estimated_cost_usd || 0),
         usageCredits: Number(summaryData.usage_credits || 0),
       };
-    }
-    function updateRowLoadProgress() {
-      if (!rowLoadProgressEl) return;
-      const target = rowHydrationTarget();
-      const loaded = Math.min(data.length, target || data.length);
-      const shouldShow = activeView !== 'call' && liveRefreshSupported && (rowHydrationInFlight || rowsNeedHydration() || rowHydrationError);
-      rowLoadProgressEl.hidden = !shouldShow;
-      if (!shouldShow) return;
-      const totalText = number.format(target || totalAvailableRows || loaded);
-      const loadedText = number.format(loaded);
-      rowLoadProgressLabelEl.textContent = rowHydrationError ? t('state.error') : t('state.loading_rows');
-      rowLoadProgressCountEl.textContent = rowHydrationError
-        ? rowHydrationError
-        : (rowHydrationComplete
-            ? tf('caption.rows_loaded_progress', { loaded: loadedText, total: totalText })
-            : tf('caption.rows_loading_progress', { loaded: loadedText, total: totalText }));
-      const ratio = target ? Math.max(0, Math.min(100, (loaded / target) * 100)) : 0;
-      rowLoadProgressBarEl.style.width = `${ratio}%`;
-    }
-    function historyRowsDescription() {
-      const archived = Number(archivedAvailableRows || 0);
-      if (includeArchived) {
-        return archived
-          ? tf('history.all_includes', { count: number.format(archived) })
-          : t('history.all_empty');
-      }
-      return archived
-        ? tf('history.active_hidden', { count: number.format(archived) })
-        : t('history.active_only');
-    }
-    function updateHistoryScopeControl() {
-      historyScopeEl.value = includeArchived ? 'all' : 'active';
-      const detail = historyRowsDescription();
-      setFastTooltip(historyScopeEl, detail);
-      setFastTooltip(historyScopeEl.parentElement, tf('history.archived_scan_hint', { detail }));
-    }
-    function updateLoadLimitControl() {
-      const value = limitValue(loadedLimit);
-      const existing = new Set(Array.from(loadLimitEl.options).map(option => option.value));
-      if (!existing.has(value)) {
-        const option = document.createElement('option');
-        option.value = value;
-        option.textContent = tf('caption.loaded', { loaded: number.format(loadedLimit) });
-        loadLimitEl.insertBefore(option, loadLimitEl.lastElementChild);
-      }
-      loadLimitEl.value = value;
     }
     function rebuildDashboardIndexes() {
       const indexedRows = [...data];
@@ -558,75 +489,58 @@
       tf,
       usageCreditValue,
     });
-    function investigatorUrl(row, overrides = {}) {
-      if (!stateManager) return '#';
-      return stateManager.urlFor({
-        ...currentDashboardState(),
-        ...overrides,
-        view: 'call',
-        record: row.record_id || '',
-        thread: rowAttachment(row).key,
-        expandedThreads: Array.from(expandedThreads),
-      });
-    }
-    function tableUrlForRow(row) {
-      if (!stateManager) return '#';
-      return stateManager.urlFor({
-        ...currentDashboardState(),
-        view: 'calls',
-        record: row.record_id || '',
-        thread: rowAttachment(row).key,
-        expandedThreads: Array.from(expandedThreads),
-      });
-    }
-    async function openInvestigatorUrl(url) {
-      if (liveRefreshSupported) {
-        if (apiToken) {
-          try {
-            const params = new URLSearchParams({ url });
-            const response = await fetch(`/api/open-investigator?${params.toString()}`, {
-              headers: {
-                'Accept': 'application/json',
-                'X-Codex-Usage-Token': apiToken,
-              },
-              cache: 'no-store',
-            });
-            if (response.ok) return true;
-          } catch (_error) {
-            // Fall through to copying the link; never mutate this window on failure.
-          }
-        }
-      } else {
-        const opened = window.open(url, '_blank');
-        if (opened) {
-          opened.opener = null;
-          return true;
-        }
-      }
-      try {
-        await stateManager.copyText(url);
-        showActionStatus(t('action.copied'));
-      } catch (_error) {
-        showActionStatus(t('action.copy_failed'));
-      }
-      return false;
-    }
-    async function openInvestigator(row) {
-      await openInvestigatorUrl(investigatorUrl(row));
-    }
-    function rowInvestigatorLink(row, html, focusable = false) {
-      const tabIndex = focusable ? '' : ' tabindex="-1"';
-      return `<a class="row-investigator-link" href="${escapeHtml(investigatorUrl(row))}" target="_blank" rel="noopener"${tabIndex}>${html}</a>`;
-    }
-    async function copyCallLink(row) {
-      if (!stateManager) return;
-      try {
-        await stateManager.copyText(investigatorUrl(row));
-        showActionStatus(t('action.copied'));
-      } catch (error) {
-        showActionStatus(t('action.copy_failed'));
-      }
-    }
+    const dashboardLive = dashboardLiveFactory.create({
+      activeView: () => activeView,
+      apiToken: () => apiToken,
+      applyDashboardPayload,
+      autoRefreshEl,
+      backgroundHydrationChunkSize,
+      formatTimestamp,
+      getArchivedAvailableRows: () => archivedAvailableRows,
+      getData: () => data,
+      getIncludeArchived: () => includeArchived,
+      getLoadedLimit: () => loadedLimit,
+      getTotalAvailableRows: () => totalAvailableRows,
+      historyScopeEl,
+      i18n,
+      initialHydrationChunkSize,
+      latestRefreshAt: () => latestRefreshAt,
+      limitValue,
+      liveRefreshIntervalMs,
+      liveRefreshSupported,
+      loadLimitEl,
+      number,
+      payloadRows,
+      rebuildDashboardIndexes,
+      rebuildFilterOptions,
+      refreshDashboardEl,
+      render,
+      resetRowsForHydration: () => {
+        data = [];
+        supplementalRowsByRecordId = new Map();
+      },
+      rowLoadProgressBarEl,
+      rowLoadProgressCountEl,
+      rowLoadProgressEl,
+      rowLoadProgressLabelEl,
+      setFastTooltip,
+      t,
+      tf,
+      updateLiveStatus,
+    });
+    const {
+      historyRowsDescription,
+      hydrateDashboardRows,
+      loadedRowsDescription,
+      refreshDashboardData,
+      refreshDashboardIfStale,
+      rowHydrationTarget,
+      rowsNeedHydration,
+      scheduleAutoRefresh,
+      updateHistoryScopeControl,
+      updateLoadLimitControl,
+      updateRowLoadProgress,
+    } = dashboardLive;
     function allowanceWindowText(totalCredits, mode = 'impact') {
       return dashboardStatus.allowanceWindowText(totalCredits, mode);
     }
@@ -805,78 +719,6 @@
       rows.sort(compareCalls);
       return rows;
     }
-    function currentDashboardState() {
-      return {
-        view: activeView,
-        search: searchEl.value.trim(),
-        model: modelEl.value,
-        effort: effortEl.value,
-        confidence: pricingStatusEl.value,
-        datePreset: datePresetEl.value,
-        dateStart: datePresetEl.value === 'custom' ? dateStartEl.value : '',
-        dateEnd: datePresetEl.value === 'custom' ? dateEndEl.value : '',
-        historyScope: includeArchived ? 'all' : 'active',
-        sort: sortKey,
-        direction: sortDirection,
-        preset: activePreset,
-        page: currentPage,
-        record: selectedRecordId,
-        thread: selectedThreadKey,
-        expandedThreads: Array.from(expandedThreads),
-      };
-    }
-    function syncUrlState() {
-      if (!stateManager) return;
-      stateManager.replace(currentDashboardState());
-    }
-    function showActionStatus(message) {
-      actionStatusEl.textContent = message;
-      if (!message) return;
-      window.setTimeout(() => {
-        if (actionStatusEl.textContent === message) actionStatusEl.textContent = '';
-      }, 2200);
-    }
-    async function copyCurrentViewLink() {
-      if (!stateManager) return;
-      const url = stateManager.urlFor(currentDashboardState());
-      try {
-        await stateManager.copyText(url);
-        showActionStatus(t('action.copied'));
-      } catch (error) {
-        showActionStatus(t('action.copy_failed'));
-      }
-    }
-    function exportCurrentRows() {
-      if (!stateManager) return;
-      const rows = filtered();
-      const columns = [
-        { label: 'timestamp', field: 'event_timestamp' },
-        { label: 'thread', field: row => rowThreadLabel(row) },
-        { label: 'initiated', field: row => callInitiator(row).label },
-        { label: 'initiated_reason', field: row => callInitiator(row).source },
-        { label: 'project', field: 'project_name' },
-        { label: 'model', field: 'model' },
-        { label: 'effort', field: 'effort' },
-        { label: 'total_tokens', field: 'total_tokens' },
-        { label: 'input_tokens', field: 'input_tokens' },
-        { label: 'cached_input_tokens', field: 'cached_input_tokens' },
-        { label: 'uncached_input_tokens', field: 'uncached_input_tokens' },
-        { label: 'output_tokens', field: 'output_tokens' },
-        { label: 'reasoning_output_tokens', field: 'reasoning_output_tokens' },
-        { label: 'estimated_cost_usd', field: 'estimated_cost_usd' },
-        { label: 'usage_credits', field: 'usage_credits' },
-        { label: 'cache_ratio', field: 'cache_ratio' },
-        { label: 'context_window_percent', field: 'context_window_percent' },
-        { label: 'pricing_model', field: 'pricing_model' },
-        { label: 'usage_credit_confidence', field: 'usage_credit_confidence' },
-        { label: 'recommendation', field: row => row.recommended_action || recommendationSummary(row) },
-        { label: 'record_id', field: 'record_id' },
-      ];
-      const csv = stateManager.toCsv(rows, columns);
-      const suffix = activeView === 'threads' ? 'thread-filtered-calls' : `${activeView}-calls`;
-      stateManager.downloadText(`codex-usage-${suffix}.csv`, csv, 'text/csv;charset=utf-8');
-      showActionStatus(tf('action.exported', { count: number.format(rows.length) }));
-    }
     function activePresetDefinition() {
       return dashboardInsights.activePresetDefinition(activePreset);
     }
@@ -964,6 +806,48 @@
       translateEfficiencyFlag,
       usageCreditValue,
     });
+    const dashboardActions = dashboardActionsFactory.create({
+      actionStatusEl,
+      apiToken: () => apiToken,
+      callInitiator,
+      currentPage: () => currentPage,
+      dateEndEl,
+      datePresetEl,
+      dateStartEl,
+      effortEl,
+      escapeHtml,
+      expandedThreads,
+      filtered,
+      getActivePreset: () => activePreset,
+      getActiveView: () => activeView,
+      getIncludeArchived: () => includeArchived,
+      getSelectedRecordId: () => selectedRecordId,
+      getSelectedThreadKey: () => selectedThreadKey,
+      getSortDirection: () => sortDirection,
+      getSortKey: () => sortKey,
+      liveRefreshSupported,
+      modelEl,
+      number,
+      pricingStatusEl,
+      recommendationSummary,
+      rowAttachment,
+      rowThreadLabel,
+      searchEl,
+      stateManager,
+      t,
+      tf,
+      usageCreditValue,
+    });
+    const {
+      copyCallLink,
+      copyCurrentViewLink,
+      exportCurrentRows,
+      openInvestigator,
+      openInvestigatorUrl,
+      rowInvestigatorLink,
+      syncUrlState,
+      tableUrlForRow,
+    } = dashboardActions;
     const dashboardAnalysis = dashboardAnalysisFactory.create({
       cachedInputTokens,
       callInitiatorText,
@@ -1353,7 +1237,6 @@
         data = nextRows;
       }
       summaryData = nextPayload.summary || summaryData;
-      if (!applyOptions.appendRows) shellBoot = Boolean(nextPayload.shell_boot);
       pricingConfigured = Boolean(nextPayload.pricing_configured);
       pricingSource = nextPayload.pricing_source || {};
       pricingSnapshotWarning = nextPayload.pricing_snapshot_warning || '';
@@ -1489,185 +1372,6 @@
           render();
         }
       }
-    }
-    async function hydrateDashboardRows(options = null) {
-      if (!liveRefreshSupported || activeView === 'call') return;
-      const hydrateOptions = options || {};
-      if (rowHydrationInFlight) {
-        if (hydrateOptions.reset) rowHydrationRestartRequested = true;
-        return;
-      }
-      const target = rowHydrationTarget();
-      if (!target) {
-        rowHydrationComplete = true;
-        updateRowLoadProgress();
-        return;
-      }
-      if (hydrateOptions.reset) {
-        data = [];
-        supplementalRowsByRecordId = new Map();
-        rowHydrationComplete = false;
-        rowHydrationGeneration += 1;
-        rebuildDashboardIndexes();
-        rebuildFilterOptions();
-        render();
-      }
-      if (data.length >= target) {
-        rowHydrationComplete = true;
-        updateRowLoadProgress();
-        return;
-      }
-      const generation = rowHydrationGeneration;
-      rowHydrationInFlight = true;
-      rowHydrationError = '';
-      updateLiveStatus('status.checking', t('live.loading_rows'));
-      updateRowLoadProgress();
-      try {
-        while (data.length < target && generation === rowHydrationGeneration && activeView !== 'call') {
-          const offset = data.length;
-          const remaining = target - offset;
-          const chunkSize = Math.min(
-            offset === 0 ? initialHydrationChunkSize : backgroundHydrationChunkSize,
-            remaining,
-          );
-          const params = new URLSearchParams({
-            limit: String(chunkSize),
-            offset: String(offset),
-            include_archived: includeArchived ? '1' : '0',
-            lang: i18n.currentLanguage,
-            _: String(Date.now()),
-          });
-          const response = await fetch(`/api/usage?${params.toString()}`, {
-            headers: {
-              'Accept': 'application/json',
-              'X-Codex-Usage-Token': apiToken,
-            },
-            cache: 'no-store',
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const payload = await response.json();
-          if (payload.error) throw new Error(payload.error);
-          if (generation !== rowHydrationGeneration || activeView === 'call') break;
-          const rows = payloadRows(payload);
-          if (!rows.length) break;
-          applyDashboardPayload(payload, { appendRows: true });
-          updateRowLoadProgress();
-          if (!payload.has_more || rows.length < chunkSize) break;
-        }
-        rowHydrationComplete = data.length >= rowHydrationTarget();
-        updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
-      } catch (error) {
-        rowHydrationError = error.message || String(error);
-        updateLiveStatus('status.refresh_error', tf('live.refresh_unavailable', { message: rowHydrationError, suffix: '' }));
-      } finally {
-        rowHydrationInFlight = false;
-        updateRowLoadProgress();
-        const shouldRestart = rowHydrationRestartRequested && activeView !== 'call';
-        rowHydrationRestartRequested = false;
-        if (shouldRestart) {
-          hydrateDashboardRows();
-        } else {
-          render();
-        }
-      }
-    }
-    async function refreshDashboardIfStale() {
-      if (!liveRefreshSupported || !apiToken || activeView === 'call') return;
-      try {
-        const params = new URLSearchParams({
-          include_archived: includeArchived ? '1' : '0',
-          _: String(Date.now()),
-        });
-        const response = await fetch(`/api/status?${params.toString()}`, {
-          headers: {
-            'Accept': 'application/json',
-          },
-          cache: 'no-store',
-        });
-        if (!response.ok) return;
-        const payload = await response.json();
-        const statusRefreshAt = payload.latest_refresh_at || '';
-        const scopedRows = Number(payload.row_counts?.scoped_rows);
-        const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== totalAvailableRows;
-        const refreshChanged = statusRefreshAt && statusRefreshAt !== latestRefreshAt;
-        if (rowCountChanged || refreshChanged) {
-          refreshDashboardData(false, { refreshLogs: false, resetRows: true });
-        } else if (rowsNeedHydration()) {
-          hydrateDashboardRows();
-        }
-      } catch (_error) {
-        // Background freshness checks must never interrupt the local dashboard.
-      }
-    }
-    async function refreshDashboardData(manual = false, options = null) {
-      if (!liveRefreshSupported) {
-        updateLiveStatus('status.reloading', t('live.reloading_static'));
-        window.location.reload();
-        return;
-      }
-      if (activeView === 'call' && !manual) return;
-      if (refreshInFlight) return;
-      const refreshOptions = options || {};
-      const refreshLogs = refreshOptions.refreshLogs === undefined ? manual : Boolean(refreshOptions.refreshLogs);
-      const resetRows = refreshOptions.resetRows !== undefined
-        ? Boolean(refreshOptions.resetRows)
-        : Boolean(manual || refreshLogs);
-      refreshInFlight = true;
-      refreshDashboardEl.disabled = true;
-      updateLiveStatus(refreshLogs ? 'status.refreshing' : 'status.checking', refreshLogs ? t('live.refreshing_index') : t('live.checking_usage'));
-      try {
-        const params = new URLSearchParams({
-          limit: loadLimitEl.value,
-          include_archived: includeArchived ? '1' : '0',
-          lang: i18n.currentLanguage,
-          shell: '1',
-          _: String(Date.now()),
-        });
-        if (refreshLogs) params.set('refresh', '1');
-        const response = await fetch(`/api/usage?${params.toString()}`, {
-          headers: {
-            'Accept': 'application/json',
-            'X-Codex-Usage-Token': apiToken,
-          },
-          cache: 'no-store',
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const nextPayload = await response.json();
-        if (nextPayload.error) throw new Error(nextPayload.error);
-        if (resetRows) {
-          data = [];
-          supplementalRowsByRecordId = new Map();
-          rowHydrationGeneration += 1;
-          rowHydrationComplete = false;
-        }
-        applyDashboardPayload(nextPayload);
-        if (activeView !== 'call') hydrateDashboardRows({ reset: resetRows });
-        const result = nextPayload.refresh_result || {};
-        const indexed = result.inserted_or_updated_events === undefined
-          ? ''
-          : tf('live.indexed', { rows: number.format(result.inserted_or_updated_events), files: number.format(result.scanned_files || 0) });
-        const skipped = result.skipped_events
-          ? tf('live.skipped', { count: number.format(result.skipped_events) })
-          : '';
-        updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', tf('live.updated_detail', { time: formatTimestamp(nextPayload.refreshed_at), loaded: loadedRowsDescription(), history: historyRowsDescription(), indexed, skipped }));
-      } catch (error) {
-        const message = error.message || String(error);
-        updateLiveStatus('status.refresh_error', tf('live.refresh_unavailable', { message, suffix: manual ? t('live.refresh_suffix') : '' }));
-        if (manual && message === 'HTTP 404') window.location.reload();
-      } finally {
-        refreshInFlight = false;
-        refreshDashboardEl.disabled = false;
-      }
-    }
-    function scheduleAutoRefresh() {
-      if (autoRefreshTimer) window.clearInterval(autoRefreshTimer);
-      autoRefreshTimer = null;
-      if (!autoRefreshEl.checked || !liveRefreshSupported || activeView === 'call') return;
-      autoRefreshTimer = window.setInterval(() => {
-        if (document.visibilityState === 'visible') refreshDashboardIfStale();
-      }, liveRefreshIntervalMs);
     }
     dashboardEventsFactory.bind({
       autoRefreshEl,
