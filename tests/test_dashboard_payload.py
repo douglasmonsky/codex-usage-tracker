@@ -268,6 +268,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "thread-call-table" in dashboard_surface
     assert "--calls-table-min-width" in dashboard_css
     assert "min-width: var(--calls-table-min-width)" in dashboard_css
+    assert "tr:hover { background" not in dashboard_css
     assert "cachedTokenCell" in dashboard_cells_js
     assert "uncachedTokenCell" in dashboard_cells_js
     assert "outputTokenCell" in dashboard_cells_js

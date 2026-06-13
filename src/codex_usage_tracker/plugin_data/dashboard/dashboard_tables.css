@@ -43,11 +43,17 @@
       z-index: 22;
       background: #fbfcfe;
     }
-    .grid > section:first-child > table > tbody > tr:hover > td:nth-child(1),
-    .grid > section:first-child > table > tbody > tr:hover > td:nth-child(2) {
+    .grid > section:first-child > table > tbody > tr.call-row:hover > td,
+    .grid > section:first-child > table > tbody > tr.thread-row:hover > td,
+    .thread-call-table > tbody > tr.thread-call-row:hover > td {
       background: #eff6ff;
     }
-    tr:hover { background: #eff6ff; }
+    .grid > section:first-child > table > tbody > tr.call-row:hover > td:nth-child(1),
+    .grid > section:first-child > table > tbody > tr.call-row:hover > td:nth-child(2),
+    .grid > section:first-child > table > tbody > tr.thread-row:hover > td:nth-child(1),
+    .grid > section:first-child > table > tbody > tr.thread-row:hover > td:nth-child(2) {
+      background: #eff6ff;
+    }
     .call-row {
       cursor: pointer;
     }
@@ -464,6 +470,9 @@
     .thread-call-table th:first-child {
       z-index: 14;
       background: #eef3fb;
+    }
+    .thread-call-table > tbody > tr.thread-call-row:hover > td:first-child {
+      background: #eff6ff;
     }
     .thread-call-table td, .thread-call-table th {
       padding: 8px 10px;
