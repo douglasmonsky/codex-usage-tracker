@@ -591,9 +591,9 @@
     function defaultContextRequest() {
       return {
         mode: 'quick',
-        includeToolOutput: false,
+        includeToolOutput: true,
         includeCompactionHistory: false,
-        maxChars: null,
+        maxChars: 0,
         maxEntries: defaultContextEntries,
       };
     }

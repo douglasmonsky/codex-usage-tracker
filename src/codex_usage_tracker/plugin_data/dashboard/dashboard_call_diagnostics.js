@@ -84,32 +84,37 @@
       const uncached = delta.uncached;
       const cached = delta.cached;
       if (uncached > 0 && cached < 0) {
-        return `Fresh input rose by ${number.format(uncached)} while cached input fell by ${number.format(Math.abs(cached))}; this is the classic cache-drop profile.`;
+        return tf('call.delta.cache_drop', {
+          uncached: number.format(uncached),
+          cached: number.format(Math.abs(cached)),
+        });
       }
       if (uncached > 0) {
-        return `Fresh input increased by ${number.format(uncached)} from the previous call; inspect evidence for new files, tool results, or rewritten context.`;
+        return tf('call.delta.uncached_increase', { uncached: number.format(uncached) });
       }
       if (uncached < 0 && cached >= 0) {
-        return `Fresh input fell by ${number.format(Math.abs(uncached))} while cached input increased, so this call is reusing context more efficiently than the previous one.`;
+        return tf('call.delta.uncached_decrease_cached_increase', {
+          uncached: number.format(Math.abs(uncached)),
+        });
       }
-      return 'Token accounting is broadly stable compared with the previous call in this resolved thread.';
+      return t('call.delta.stable');
     }
 
     function diagnosticNextStep(row, diagnostic, previous) {
       if (diagnostic.key === 'post-compaction') {
-        return 'Check the loaded evidence for an explicit compaction marker or replacement history before interpreting the cache delta.';
+        return t('call.next_step.post_compaction');
       }
       if (diagnostic.key === 'cold') {
-        return 'Compare the previous call, then inspect the loaded evidence to see what fresh context was sent after the cache miss.';
+        return t('call.next_step.cold');
       }
       if (diagnostic.key === 'spike') {
-        return 'Inspect the most recent evidence entries first; the spike is in fresh uncached input, not cached history.';
+        return t('call.next_step.spike');
       }
       if (diagnostic.key === 'warm') {
-        return `Cache reuse is healthy; focus on the ${number.format(uncachedInputTokens(row))} uncached tokens that were still billed as fresh input.`;
+        return tf('call.next_step.warm', { uncached: number.format(uncachedInputTokens(row)) });
       }
-      if (previous) return 'Use the delta cards to locate whether the change is cached input, uncached input, or output/reasoning.';
-      return 'Use the loaded evidence if the aggregate totals are not enough to understand this isolated call.';
+      if (previous) return t('call.next_step.delta');
+      return t('call.next_step.isolated');
     }
 
     function renderCacheVerdict(row, previous, diagnostic, callPosition) {
@@ -151,34 +156,57 @@
       callPosition,
       stats,
     ) {
-      const exact = `${number.format(rowInputTokens(row))} input tokens = ${number.format(cachedInputTokens(row))} cached + ${number.format(uncachedInputTokens(row))} uncached; ${number.format(outputTokens(row))} output tokens; ${pct(row.cache_ratio)} cache reuse.`;
+      const exact = tf('call.readout.exact_body', {
+        input: number.format(rowInputTokens(row)),
+        cached: number.format(cachedInputTokens(row)),
+        uncached: number.format(uncachedInputTokens(row)),
+        output: number.format(outputTokens(row)),
+        cache: pct(row.cache_ratio),
+      });
       const derived = previous
         ? deltaInterpretation(row, previous)
-        : 'No previous call is loaded for this resolved thread, so call-to-call deltas are unavailable.';
+        : t('call.readout.previous_unavailable');
+      const serializedDetail = stats
+        ? (
+          stats.serializedDeferred
+            ? t('call.readout.evidence_serialized_deferred')
+            : tf('call.readout.evidence_serialized_bound', {
+              tokens: number.format(stats.serializedTokens),
+              chars: number.format(stats.serializedChars),
+            })
+        )
+        : '';
       const evidence = stats
-        ? `Evidence analyzed: ${number.format(stats.totalEntries)} selected-turn entries, ${number.format(stats.visibleChars)} visible redacted chars, ${number.format(stats.visibleTokenEstimate)} visible tokens via ${stats.estimator}. ${stats.serializedDeferred ? 'Fast serialized estimate only; full serialized grouping is deferred.' : `Serialized local upper bound: ${number.format(stats.serializedTokens)} tokens from ${number.format(stats.serializedChars)} raw JSON chars.`} ${number.format(stats.entries)} entries rendered initially.`
-        : 'Evidence is loading from the local JSONL source. Aggregate token counts are exact, but visible-context attribution needs that runtime evidence.';
+        ? tf('call.readout.evidence_analyzed', {
+          totalEntries: number.format(stats.totalEntries),
+          visibleChars: number.format(stats.visibleChars),
+          visibleTokens: number.format(stats.visibleTokenEstimate),
+          estimator: stats.estimator,
+          serializedDetail,
+          renderedEntries: number.format(stats.entries),
+        })
+        : t('call.readout.evidence_loading');
       return `
         <section class="call-diagnostic-section readout">
           <div class="section-heading compact">
-            <h3>Investigation readout</h3>
-            <span class="evidence-chip exact">Exact + derived + on-demand evidence</span>
+            <h3>${escapeHtml(t('call.readout.title'))}</h3>
+            <span class="evidence-chip exact">${escapeHtml(t('call.readout.badge'))}</span>
           </div>
           <div class="readout-grid">
             <div class="readout-card">
-              <span>Exact callback accounting</span>
+              <span>${escapeHtml(t('call.readout.exact_label'))}</span>
               <p>${escapeHtml(exact)}</p>
             </div>
             <div class="readout-card">
-              <span>Compared with previous call</span>
+              <span>${escapeHtml(t('call.readout.previous_label'))}</span>
               <p>${escapeHtml(derived)}</p>
             </div>
             <div class="readout-card">
-              <span>Evidence state</span>
+              <span>${escapeHtml(t('call.readout.evidence_label'))}</span>
               <p>${escapeHtml(evidence)}</p>
             </div>
             <div class="readout-card">
-              <span>Next diagnostic move</span>
+              <span>${escapeHtml(t('call.readout.next_label'))}</span>
               <p>${escapeHtml(diagnosticNextStep(row, diagnostic, previous))}</p>
               <small>${escapeHtml(tf('call.position', { position: callPosition }))}</small>
             </div>

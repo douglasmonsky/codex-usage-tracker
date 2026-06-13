@@ -91,6 +91,11 @@
     }
 
     async function openInvestigatorUrl(url) {
+      const opened = window.open(url, '_blank', 'noopener');
+      if (opened) {
+        opened.opener = null;
+        return true;
+      }
       if (liveRefreshSupported) {
         if (apiToken()) {
           try {
@@ -106,12 +111,6 @@
           } catch (_error) {
             // Fall through to copying the link; never mutate this window on failure.
           }
-        }
-      } else {
-        const opened = window.open(url, '_blank');
-        if (opened) {
-          opened.opener = null;
-          return true;
         }
       }
       try {

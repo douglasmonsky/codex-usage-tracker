@@ -288,7 +288,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/open-investigator" in dashboard_actions_js
     assert "openInvestigatorUrl(rowLink.href)" in dashboard_events_js
     assert "window.location.href = url" not in dashboard_surface
-    assert "window.open(url, '_blank')" in dashboard_actions_js
+    assert "window.open(url, '_blank', 'noopener')" in dashboard_actions_js
     assert "opened.opener = null" in dashboard_actions_js
     assert "selectRow(row);" not in render_calls_js
     assert "dashboard.view.call" in dashboard_js
@@ -307,8 +307,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "defaultContextRequest" in dashboard_call_js
     assert "mode: 'quick'" in dashboard_call_js
     assert "mode: 'full'" in dashboard_call_js
-    assert "includeToolOutput: false" in dashboard_call_js
-    assert "maxChars: null" in dashboard_call_js
+    assert "includeToolOutput: true" in dashboard_call_js
+    assert "maxChars: 0" in dashboard_call_js
     assert "maxEntries: defaultContextEntries" in dashboard_call_js
     assert "data-context-toggle-tool-output" in dashboard_call_js
     assert "data-context-full-analysis" in dashboard_call_js
@@ -344,8 +344,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-context-entry-load-output" in dashboard_call_js
     assert "button.full_serialized_analysis" in dashboard_call_js
     assert ".grid > section:not(.detail-section)" in dashboard_css
-    assert "overflow-x: auto" in dashboard_css
-    assert "overscroll-behavior-x: contain" in dashboard_css
+    assert "overflow: visible" in dashboard_css
+    assert "table-layout: fixed" in dashboard_css
     assert "position: sticky" in dashboard_css
     assert ".grid > section:first-child > table > thead" in dashboard_css
     assert "${callInitiatorPuck(row)}" in dashboard_details_js
@@ -360,7 +360,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "payload.call_anchors" not in dashboard_call_js
     assert "payload.thread_anchors" not in dashboard_call_js
     assert "context-entry-collapsed" in dashboard_call_js
-    assert "Evidence analyzed:" in dashboard_call_diagnostics_js
+    assert "call.readout.evidence_analyzed" in dashboard_call_diagnostics_js
+    assert "call.delta.cache_drop" in dashboard_call_diagnostics_js
+    assert "call.next_step.warm" in dashboard_call_diagnostics_js
     assert "total_entries" in dashboard_call_js
     assert ".context-anchor-panel" not in dashboard_css
     assert ".context-entry-summary" in dashboard_css

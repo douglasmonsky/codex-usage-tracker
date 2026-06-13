@@ -147,7 +147,7 @@ Previous and next buttons move chronologically within the same resolved thread a
 
 The details panel is structured for progressive disclosure. On desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
-The call investigator loads a bounded redacted turn-log evidence window by default when served from localhost with the context API enabled. The default request uses `mode=quick`: tool output is omitted, normal size limits apply, and serialized local JSONL is reported as a fast character-based upper bound without bucket analysis. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable.
+The call investigator loads a redacted turn-log evidence window by default when served from localhost with the context API enabled. The default request uses `mode=quick`: redacted tool output is included, no character cap is applied, and serialized local JSONL is reported as a fast character-based upper bound without bucket analysis. The default entry window is still bounded so very long sessions remain responsive. Older surrounding evidence is collapsed by default and can be expanded or loaded explicitly. Visible evidence token estimates are calculated from the full selected-turn evidence set before display limiting, using `tiktoken` when available and a conservative character fallback only when the tokenizer is unavailable.
 
 Use `Run full serialized analysis` when you specifically want tokenizer-counted serialized JSONL groups such as encrypted reasoning/state, local goal metadata, token callback metadata, and rate-limit metadata. This full mode can explain why visible text is much smaller than exact uncached input, but it can overcount because local JSONL includes client metadata that may not be prompt text. Raw grouped text is not returned. `encrypted_content` is an opaque encrypted field found on some reasoning response items. The tracker cannot decrypt it and treats it as serialized state, not readable prompt, assistant, or tool text. Token-count context entries are labeled as the selected call, previous token count in the same turn, or earlier token count in the same turn when possible, and show call/session cumulative totals for input, cached input, uncached input, output, reasoning output, and total tokens.
 
@@ -168,7 +168,8 @@ For selected threads, the panel shows:
 
 When served from localhost, the call investigator automatically fetches quick, redacted source evidence for only that call. The details panel still uses an explicit `Show turn log evidence` action so hovering rows does not pull raw context unexpectedly.
 
-- `Show tool output` reloads evidence with redacted, size-limited tool output included.
+- `Hide tool output` reloads evidence without tool output when the output is noisy.
+- `Show tool output` appears after hiding it and reloads evidence with redacted tool output included again.
 - `Run full serialized analysis` reloads evidence with tokenizer-counted serialized JSONL group analysis.
 - Compaction events are shown as metadata first. Replacement history is transcript-like content and is returned only after an explicit `Show compaction history` action, with redaction still applied.
 - Raw context is not written to SQLite, CSV, or the generated dashboard HTML.

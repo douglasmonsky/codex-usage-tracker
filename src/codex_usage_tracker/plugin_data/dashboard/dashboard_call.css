@@ -3,6 +3,7 @@
     }
     body[data-active-view="call"] .filters,
     body[data-active-view="call"] .cards,
+    body[data-active-view="call"] #insightsPanel,
     body[data-active-view="call"] .detail-section,
     body[data-active-view="call"] .grid > section:first-child > h2,
     body[data-active-view="call"] .table-tools {

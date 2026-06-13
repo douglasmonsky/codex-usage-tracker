@@ -206,12 +206,34 @@ def test_non_english_catalogs_translate_core_visible_labels(language: str) -> No
         "filter.search",
         "dashboard.view.calls",
         "dashboard.view.threads",
+        "call.readout.title",
+        "call.readout.badge",
         "metric.total_tokens",
         "table.cost",
     ]
 
     untranslated = [key for key in core_labels if current[key] == english[key]]
     assert not untranslated, f"{language} leaves core dashboard labels untranslated: {untranslated}"
+
+
+@pytest.mark.parametrize("language", [lang for lang in SUPPORTED_LANGUAGES if lang != "en"])
+def test_non_english_catalogs_translate_call_investigator_readout(language: str) -> None:
+    english = raw_catalog("en")
+    current = raw_catalog(language)
+
+    readout_labels = [
+        "call.readout.title",
+        "call.readout.badge",
+        "call.readout.exact_label",
+        "call.readout.previous_label",
+        "call.readout.evidence_label",
+        "call.readout.next_label",
+        "call.delta.cache_drop",
+        "call.next_step.warm",
+    ]
+
+    untranslated = [key for key in readout_labels if current[key] == english[key]]
+    assert not untranslated, f"{language} leaves call investigator readout untranslated: {untranslated}"
 
 
 def test_catalog_keys_use_expected_namespaces() -> None:

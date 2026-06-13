@@ -922,41 +922,41 @@
         return {
           key: 'post-compaction',
           label: t('call.post_compaction'),
-          body: 'A compaction marker or reset-like profile is associated with this call. Check loaded evidence to confirm replacement context.',
+          body: t('call.cache_body_post_compaction'),
         };
       }
       if (diagnostic === 'cold') {
         return {
           key: 'cold',
           label: t('call.cache_cold'),
-          body: 'Conversation-specific cache likely expired or missed; remaining cache is probably stable Codex scaffolding or tool schema prefix.',
+          body: t('call.cache_body_cold'),
         };
       }
       if (diagnostic === 'spike') {
         return {
           key: 'spike',
           label: t('call.cache_spike'),
-          body: 'Fresh input rose sharply compared with the previous call in this resolved thread.',
+          body: t('call.cache_body_spike'),
         };
       }
       if (diagnostic === 'warm') {
         return {
           key: 'warm',
           label: t('call.cache_warm'),
-          body: 'Most input tokens reused prompt cache. The uncached portion is the most likely investigation target.',
+          body: t('call.cache_body_warm'),
         };
       }
       if (diagnostic === 'partial') {
         return {
           key: 'partial',
           label: t('call.cache_partial'),
-          body: 'Some prefix reused cache, but a meaningful share of the input was fresh or reserialized.',
+          body: t('call.cache_body_partial'),
         };
       }
       return {
         key: 'cold',
         label: t('call.cache_cold'),
-        body: 'This call has little or no cache reuse, so most input was charged as fresh.',
+        body: t('call.cache_body_uncached'),
       };
     }
     function handleThreadCallHeaderSort(key) {
@@ -1090,6 +1090,9 @@
       document.body.dataset.activeView = activeView;
       updateSortControls();
       if (activeView === 'call') {
+        insightsViewEl.setAttribute('aria-pressed', 'false');
+        callsViewEl.setAttribute('aria-pressed', 'false');
+        threadsViewEl.setAttribute('aria-pressed', 'false');
         callInvestigator.renderCallInvestigator(Array.from(rowByRecordId.values()));
         fitModelPills();
         syncUrlState();

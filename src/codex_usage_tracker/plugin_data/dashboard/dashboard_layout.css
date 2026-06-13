@@ -16,10 +16,7 @@
     }
     .grid > section:not(.detail-section) {
       min-width: 0;
-      overflow-x: auto;
-      overflow-y: visible;
-      scrollbar-gutter: stable;
-      overscroll-behavior-x: contain;
+      overflow: visible;
     }
     .detail-section {
       position: sticky;
