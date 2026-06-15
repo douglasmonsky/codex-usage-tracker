@@ -102,6 +102,48 @@ def test_parser_skips_missing_info_and_duplicate_snapshots(tmp_path: Path) -> No
     assert all("SECRET" not in str(event.to_row()) for event in events)
 
 
+def test_parser_persists_observed_usage_snapshot_fields(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    token_event = _token_event(100, 100)
+    token_event["payload"]["rate_limits"] = {  # type: ignore[index]
+        "plan_type": "pro",
+        "limit_id": "codex",
+        "primary": {
+            "used_percent": 2.5,
+            "window_minutes": 300,
+            "resets_at": 1781562696,
+        },
+        "secondary": {
+            "used_percent": 29,
+            "window_minutes": 10080,
+            "resets_at": 1781887793,
+        },
+    }
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry(
+                "turn_context",
+                {"turn_id": "turn-a", "model": "gpt-5.5", "effort": "high"},
+            ),
+            token_event,
+        ],
+    )
+
+    [event] = parse_usage_events_from_file(log_path, {})
+
+    assert event.rate_limit_plan_type == "pro"
+    assert event.rate_limit_limit_id == "codex"
+    assert event.rate_limit_primary_used_percent == 2.5
+    assert event.rate_limit_primary_window_minutes == 300
+    assert event.rate_limit_primary_resets_at == 1781562696
+    assert event.rate_limit_secondary_used_percent == 29.0
+    assert event.rate_limit_secondary_window_minutes == 10080
+    assert event.rate_limit_secondary_resets_at == 1781887793
+    assert "rate_limits" not in event.to_row()
+
+
 def test_parser_skips_corrupt_token_count_and_continues(tmp_path: Path) -> None:
     log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
     corrupt = _token_event(100, 100)

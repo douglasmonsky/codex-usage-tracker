@@ -12,6 +12,7 @@
       getAllowanceSource,
       getAllowanceWindows,
       getData,
+      getObservedUsage,
       getParserDiagnostics,
       getPricingConfigured,
       getPricingSnapshotWarning,
@@ -68,10 +69,78 @@
     }
 
     function allowanceImpactText(totalCredits) {
+      const observed = observedUsageText();
+      if (observed) return observed;
       const windowImpact = allowanceWindowText(totalCredits, 'remaining-card') || allowanceWindowText(totalCredits, 'impact');
       if (windowImpact) return windowImpact;
       if (getAllowanceError()) return t('state.allowance_config_error');
       return t('action.set_limits');
+    }
+
+    function observedUsageText() {
+      const observed = getObservedUsage() || {};
+      const windows = Array.isArray(observed.windows) ? observed.windows : [];
+      if (!observed.available || !windows.length) return '';
+      return windows
+        .map(window => observedWindowText(window))
+        .filter(Boolean)
+        .join('\n');
+    }
+
+    function observedWindowText(window) {
+      const used = observedPercent(window.used_percent);
+      if (!used) return '';
+      const reset = observedResetText(window.resets_at);
+      return reset
+        ? tf('allowance.observed_window_reset', { label: short(window.label || window.key, 'Usage'), used, reset })
+        : tf('allowance.observed_window', { label: short(window.label || window.key, 'Usage'), used });
+    }
+
+    function observedUsageTooltip() {
+      const observed = getObservedUsage() || {};
+      const windows = Array.isArray(observed.windows) ? observed.windows : [];
+      if (!observed.available || !windows.length) return '';
+      return [
+        t('allowance.observed_source_hint'),
+        observed.observed_at ? tf('allowance.observed_last', { age: observedAgeText(observed.observed_at) }) : '',
+        observed.plan_type ? tf('allowance.observed_plan', { plan: observed.plan_type }) : '',
+        observed.limit_id ? tf('allowance.observed_limit', { limit: observed.limit_id }) : '',
+        ...windows.map(window => observedWindowTooltip(window)).filter(Boolean),
+      ].filter(Boolean).join(' ');
+    }
+
+    function observedWindowTooltip(window) {
+      const used = observedPercent(window.used_percent);
+      if (!used) return '';
+      const reset = observedResetText(window.resets_at);
+      return reset
+        ? tf('allowance.observed_window_reset', { label: short(window.label || window.key, 'Usage'), used, reset })
+        : tf('allowance.observed_window', { label: short(window.label || window.key, 'Usage'), used });
+    }
+
+    function observedPercent(value) {
+      if (value === null || value === undefined || value === '') return '';
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return '';
+      const digits = Math.abs(numeric) >= 10 ? 0 : 1;
+      return `${numeric.toFixed(digits)}%`;
+    }
+
+    function observedResetText(value) {
+      if (value === null || value === undefined || value === '') return '';
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return '';
+      return formatTimestamp(new Date(numeric * 1000).toISOString(), '');
+    }
+
+    function observedAgeText(value) {
+      const observedAt = new Date(value);
+      if (Number.isNaN(observedAt.getTime())) return formatTimestamp(value, value);
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - observedAt.getTime()) / 1000));
+      if (elapsedSeconds < 60) return t('allowance.observed_age_now');
+      if (elapsedSeconds < 3600) return tf('allowance.observed_age_minutes', { count: Math.floor(elapsedSeconds / 60) });
+      if (elapsedSeconds < 86400) return tf('allowance.observed_age_hours', { count: Math.floor(elapsedSeconds / 3600) });
+      return tf('allowance.observed_age_days', { count: Math.floor(elapsedSeconds / 86400) });
     }
 
     function rowAllowanceImpact(row) {
@@ -167,7 +236,7 @@
       allowanceImpactElement.textContent = allowanceImpactText(totalCredits);
       setFastTooltip(
         allowanceImpactElement,
-        allowanceWindowText(totalCredits, 'remaining') || t('allowance.title_hint'),
+        observedUsageTooltip() || allowanceWindowText(totalCredits, 'remaining') || t('allowance.title_hint'),
       );
     }
 

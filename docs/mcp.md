@@ -47,7 +47,7 @@ The API skill should refresh the local index, call aggregate tools such as `usag
 
 If MCP tools are not available, the same questions can be answered through CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
 
-The companion skill cannot read your logged-in Codex account plan, native remaining allowance, or usage from other agentic surfaces. Remaining allowance context is only as accurate as the values you manually copy into `~/.codex-usage-tracker/allowance.json`.
+The companion skill cannot read your logged-in Codex account plan, poll live account usage, or see usage from other agentic surfaces unless that usage appears in indexed local Codex logs. When local logs include `token_count.rate_limits`, the skill can explain the latest observed 5-hour and weekly usage snapshot. Copied allowance context in `~/.codex-usage-tracker/allowance.json` is only a fallback when no observed snapshot is available.
 
 ## Tools
 

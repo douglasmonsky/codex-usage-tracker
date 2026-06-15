@@ -13,10 +13,11 @@ The installed `codex-usage-api` skill is the recommended conversational entrypoi
 | Why did usage spike? | `usage_query(...)` with `since`, `project`, `thread`, `model`, `effort`, `min_tokens`, or `min_credits` filters |
 | What should I inspect next? | `usage_recommendations(response_format="json")` |
 | What is estimated or unpriced? | `usage_pricing_coverage(response_format="json")`, `usage_query(pricing_status="unpriced")`, or `usage_query(credit_confidence="estimated")` |
+| What is my latest observed usage state? | Dashboard/status payload `observed_usage` from local `token_count.rate_limits` snapshots |
 | How does this affect my allowance? | `usage_query(...)` rows with `usage_credits`, `usage_credit_confidence`, and allowance annotations |
 | What happened in one session? | `session_usage(session_id=..., response_format="json")` |
 
-The skill should separate exact facts from estimates. Remaining allowance is not native account data; it is only copied local state from `~/.codex-usage-tracker/allowance.json` when configured.
+The skill should separate exact facts from estimates. Observed usage snapshots are passive local-log data from indexed Codex token-count records, not native live account data. Copied remaining allowance in `~/.codex-usage-tracker/allowance.json` is a fallback when no observed snapshot is available.
 
 Use the global `--privacy-mode redacted` or `--privacy-mode strict` option, or the MCP `privacy_mode` argument, when project metadata should be hidden from JSON answers. The CLI option goes before the subcommand.
 

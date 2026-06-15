@@ -66,6 +66,14 @@ USAGE_EVENT_COLUMNS = (
     UsageColumn("cache_ratio", "REAL NOT NULL", "REAL"),
     UsageColumn("reasoning_output_ratio", "REAL NOT NULL", "REAL"),
     UsageColumn("context_window_percent", "REAL NOT NULL", "REAL"),
+    UsageColumn("rate_limit_plan_type", "TEXT", "TEXT", repairable=True),
+    UsageColumn("rate_limit_limit_id", "TEXT", "TEXT", repairable=True),
+    UsageColumn("rate_limit_primary_used_percent", "REAL", "REAL", repairable=True),
+    UsageColumn("rate_limit_primary_window_minutes", "INTEGER", "INTEGER", repairable=True),
+    UsageColumn("rate_limit_primary_resets_at", "INTEGER", "INTEGER", repairable=True),
+    UsageColumn("rate_limit_secondary_used_percent", "REAL", "REAL", repairable=True),
+    UsageColumn("rate_limit_secondary_window_minutes", "INTEGER", "INTEGER", repairable=True),
+    UsageColumn("rate_limit_secondary_resets_at", "INTEGER", "INTEGER", repairable=True),
 )
 
 USAGE_EVENT_COLUMN_NAMES = tuple(column.name for column in USAGE_EVENT_COLUMNS)

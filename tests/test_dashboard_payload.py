@@ -211,7 +211,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Uncached Input" in dashboard
     assert "uncachedTokens" in dashboard
     assert "Codex Credits" in dashboard
+    assert "Usage observed" in dashboard
     assert "Usage Remaining" in dashboard
+    assert "observed_usage" in dashboard
     assert "Price Coverage" not in dashboard
     assert "priceCoverage" not in dashboard_surface
     assert "usageCredits" in dashboard
@@ -538,7 +540,11 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "parser_adapter",
         "action_thresholds",
         "project_metadata_privacy",
+        "observed_usage",
     } <= set(payload)
+    assert payload["observed_usage"]["available"] is True
+    assert payload["observed_usage"]["windows"][0]["label"] == "5h"
+    assert payload["observed_usage"]["windows"][1]["label"] == "Weekly"
     assert {
         "record_id",
         "session_id",
@@ -552,6 +558,8 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "call_initiator",
         "call_initiator_reason",
         "call_initiator_confidence",
+        "rate_limit_primary_used_percent",
+        "rate_limit_secondary_used_percent",
         "project_name",
         "project_key",
         "thread_attachment_label",

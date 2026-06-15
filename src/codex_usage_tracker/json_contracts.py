@@ -174,6 +174,7 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "include_archived": bool,
             "row_counts": dict,
             "max_event_timestamp": (str, NoneType),
+            "observed_usage": dict,
             "parser_diagnostics": dict,
         }
     },

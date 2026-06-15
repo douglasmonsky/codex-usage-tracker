@@ -389,6 +389,20 @@ def _token_event(cumulative_total: int, last_total: int) -> dict[str, object]:
                 },
                 "model_context_window": 258400,
             },
+            "rate_limits": {
+                "plan_type": "pro",
+                "limit_id": "codex",
+                "primary": {
+                    "used_percent": 2.0,
+                    "window_minutes": 300,
+                    "resets_at": 1781562696,
+                },
+                "secondary": {
+                    "used_percent": 29.0,
+                    "window_minutes": 10080,
+                    "resets_at": 1781887793,
+                },
+            },
         },
     )
 

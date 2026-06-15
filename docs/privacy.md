@@ -104,7 +104,7 @@ Cost estimates are calculated only from aggregate token fields and your local pr
 
 Codex credit estimates are calculated only from aggregate token fields and bundled or locally configured rate-card values.
 
-The optional allowance config is local and stores only the remaining percentages, reset times, or credit totals you manually enter.
+Observed usage snapshots are parsed only from structured local `token_count.rate_limits` fields when Codex writes them. They store plan type, limit id, used percentages, window lengths, and reset timestamps, not raw account payloads or transcript content. The optional allowance config is local and stores only the remaining percentages, reset times, or credit totals you manually enter as a fallback.
 
 ## Sharing Checklist
 

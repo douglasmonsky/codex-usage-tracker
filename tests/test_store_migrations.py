@@ -50,11 +50,13 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert rows[0]["thread_source"] is None
     assert rows[0]["parent_thread_name"] is None
     assert rows[0]["model_context_window"] is None
+    assert rows[0]["rate_limit_primary_used_percent"] is None
+    assert rows[0]["rate_limit_secondary_used_percent"] is None
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 7
+    assert state["schema_version"] == 8
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
@@ -77,7 +79,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "7"
+    assert metadata["schema_version"] == "8"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -167,6 +169,14 @@ def _write_legacy_usage_database(db_path: Path, *, omit_source_file: bool = Fals
         ("cache_ratio", "REAL NOT NULL"),
         ("reasoning_output_ratio", "REAL NOT NULL"),
         ("context_window_percent", "REAL NOT NULL"),
+        ("rate_limit_plan_type", "TEXT"),
+        ("rate_limit_limit_id", "TEXT"),
+        ("rate_limit_primary_used_percent", "REAL"),
+        ("rate_limit_primary_window_minutes", "INTEGER"),
+        ("rate_limit_primary_resets_at", "INTEGER"),
+        ("rate_limit_secondary_used_percent", "REAL"),
+        ("rate_limit_secondary_window_minutes", "INTEGER"),
+        ("rate_limit_secondary_resets_at", "INTEGER"),
     ]
     if omit_source_file:
         columns = [column for column in columns if column[0] != "source_file"]
@@ -191,6 +201,14 @@ def _write_legacy_usage_database(db_path: Path, *, omit_source_file: bool = Fals
         "cache_ratio": 20 / 90,
         "reasoning_output_ratio": 0.5,
         "context_window_percent": 0.0,
+        "rate_limit_plan_type": None,
+        "rate_limit_limit_id": None,
+        "rate_limit_primary_used_percent": None,
+        "rate_limit_primary_window_minutes": None,
+        "rate_limit_primary_resets_at": None,
+        "rate_limit_secondary_used_percent": None,
+        "rate_limit_secondary_window_minutes": None,
+        "rate_limit_secondary_resets_at": None,
     }
     raw = sqlite3.connect(db_path)
     try:

@@ -144,13 +144,13 @@ Then:
 6. Hover or click rows to inspect aggregate fields in `Call Details`.
 7. Use `Show turn log evidence` only when aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
 
-Optional allowance context:
+Optional copied allowance fallback:
 
 ```bash
 codex-usage-tracker parse-allowance "5h 79% 6:50 PM Weekly 33% Jun 7"
 ```
 
-The tracker cannot read your logged-in ChatGPT plan or live remaining usage automatically. Allowance values are only as accurate as the values you manually copy from Codex Settings, `/status`, or another trusted usage display. Details: [Pricing, Credits, And Allowance](docs/pricing-and-credits.md).
+When Codex writes `token_count.rate_limits` snapshots to local JSONL logs, the dashboard shows the latest observed 5-hour and weekly usage snapshot automatically after refresh/live indexing. This is passive local-log data, not a live account API. If no observed snapshot is available, you can still copy current values into `~/.codex-usage-tracker/allowance.json`. Details: [Pricing, Credits, And Allowance](docs/pricing-and-credits.md).
 
 ## What It Includes
 
@@ -161,7 +161,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
 - Companion Codex skills for operational setup and conversational usage analysis.
-- Optional local pricing, Codex credit, allowance, threshold, project alias, and privacy-mode configuration.
+- Optional local pricing, Codex credit, copied allowance fallback, threshold, project alias, and privacy-mode configuration.
 
 ## Dashboard Language
 
@@ -258,16 +258,16 @@ This is optional. The normal shell install above is the fastest trusted path for
 - Token counts come from Codex's logged counters; the tracker does not re-tokenize prompts.
 - Pricing and rate-card sources can change outside this project.
 - Pricing and Codex credit estimates depend on local rate data and confidence labels and are not guaranteed to match exact billing.
-- Live account allowance cannot be read automatically by this local tracker; remaining 5-hour and weekly allowance is only available when you configure copied values.
-- Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
+- Observed 5-hour and weekly usage snapshots come only from local Codex logs when Codex records `token_count.rate_limits`; the tracker does not poll a live account API.
+- Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance, so observed usage can differ from your full account usage.
 - Plugin discovery limitations are separate from core Python CLI/dashboard support.
 - Parent-child thread relationships are only as good as the metadata Codex logs; inferred auto-review attachments are labeled as inferred.
 
 ## Roadmap
 
 - Keep Python runtime support validated with CI matrix coverage, package classifiers, release docs, and installed-package smoke tests.
-- Improve the `Set limits` flow with a paste/import experience for 5-hour and weekly allowance snapshots.
-- Track allowance snapshot history so local Codex credits can be compared against visible remaining-usage changes over time.
+- Track observed usage snapshot history so local Codex credits can be compared against visible usage changes over time.
+- Improve the copied-allowance fallback with a paste/import experience for 5-hour and weekly allowance snapshots.
 - Clarify top-card token accounting by showing output tokens and reasoning output as a subset instead of implying all token cards add together.
 - Add more insight presets for cache drift, context growth, subagent-heavy workflows, and pricing/credit confidence gaps.
 - Keep the allowance provider boundary ready for an official usage or allowance API if one becomes available.

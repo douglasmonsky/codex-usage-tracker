@@ -31,6 +31,7 @@
       rowLoadProgressEl,
       rowLoadProgressLabelEl,
       setFastTooltip,
+      setObservedUsage,
       t,
       tf,
       updateLiveStatus,
@@ -216,6 +217,9 @@
         const payload = await response.json();
         const statusRefreshAt = payload.latest_refresh_at || '';
         const scopedRows = Number(payload.row_counts?.scoped_rows);
+        if (payload.observed_usage) {
+          setObservedUsage(payload.observed_usage);
+        }
         const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows();
         const refreshChanged = statusRefreshAt && statusRefreshAt !== deps.latestRefreshAt();
         if (rowCountChanged || refreshChanged) {

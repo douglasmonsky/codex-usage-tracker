@@ -44,6 +44,7 @@ from codex_usage_tracker.store import (
     query_dashboard_event_count,
     query_dashboard_events,
     query_dashboard_token_summary,
+    query_latest_observed_usage,
     refresh_metadata,
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
@@ -153,6 +154,10 @@ def dashboard_payload(
         token_summary["priced_model_rows"],
         allowance,
     )
+    observed_usage = query_latest_observed_usage(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
     normalized_limit = _normalize_limit(limit)
     total_available_rows = query_dashboard_event_count(
         db_path=db_path,
@@ -187,6 +192,7 @@ def dashboard_payload(
         "allowance_source": allowance_summary["source"],
         "allowance_windows": allowance_summary["windows"],
         "allowance_error": allowance_summary["error"],
+        "observed_usage": observed_usage,
         "rate_card_configured": allowance_summary["rate_card_loaded"],
         "rate_card_error": allowance_summary["rate_card_error"],
         "loaded_row_count": len(rows),

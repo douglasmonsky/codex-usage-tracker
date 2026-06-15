@@ -78,12 +78,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "7"
+    assert meta["schema_version"] == "8"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 7
+    assert state["schema_version"] == 8
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8]
     with connect(db_path) as conn:
         init_db(conn)
         source_rows = [
@@ -337,8 +337,9 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_timestamp" in indexes
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
-    assert user_version == 7
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7]
+    assert "idx_usage_observed_rate_limit_timestamp" in indexes
+    assert user_version == 8
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:

@@ -672,6 +672,101 @@ def query_usage_status(
     }
 
 
+def query_latest_observed_usage(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    include_archived: bool = False,
+) -> dict[str, Any]:
+    """Return the latest passive usage-limit snapshot from token-count rows."""
+
+    where_clause, params = _usage_where_clause(include_archived=include_archived)
+    observed_clause = (
+        "rate_limit_primary_used_percent IS NOT NULL "
+        "OR rate_limit_secondary_used_percent IS NOT NULL"
+    )
+    scoped_where = (
+        f"{where_clause} AND ({observed_clause})"
+        if where_clause
+        else f"WHERE {observed_clause}"
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            f"""
+            SELECT
+                record_id,
+                event_timestamp,
+                line_number,
+                rate_limit_plan_type,
+                rate_limit_limit_id,
+                rate_limit_primary_used_percent,
+                rate_limit_primary_window_minutes,
+                rate_limit_primary_resets_at,
+                rate_limit_secondary_used_percent,
+                rate_limit_secondary_window_minutes,
+                rate_limit_secondary_resets_at
+            FROM usage_events
+            {scoped_where}
+            ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
+            LIMIT 1
+            """,
+            params,
+        ).fetchone()
+    if row is None:
+        return {"available": False, "windows": []}
+    data = _row_to_dict(row)
+    return {
+        "available": True,
+        "record_id": data.get("record_id"),
+        "observed_at": data.get("event_timestamp"),
+        "line_number": data.get("line_number"),
+        "plan_type": data.get("rate_limit_plan_type"),
+        "limit_id": data.get("rate_limit_limit_id"),
+        "source": "token_count.rate_limits",
+        "windows": [
+            window
+            for window in (
+                _observed_usage_window(data, "primary"),
+                _observed_usage_window(data, "secondary"),
+            )
+            if window is not None
+        ],
+    }
+
+
+def _observed_usage_window(row: dict[str, Any], key: str) -> dict[str, Any] | None:
+    used_percent = row.get(f"rate_limit_{key}_used_percent")
+    window_minutes = row.get(f"rate_limit_{key}_window_minutes")
+    resets_at = row.get(f"rate_limit_{key}_resets_at")
+    if used_percent is None and window_minutes is None and resets_at is None:
+        return None
+    return {
+        "key": key,
+        "label": _observed_usage_window_label(window_minutes),
+        "used_percent": used_percent,
+        "window_minutes": window_minutes,
+        "resets_at": resets_at,
+    }
+
+
+def _observed_usage_window_label(window_minutes: object) -> str:
+    try:
+        minutes = int(window_minutes)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return "Usage"
+    if minutes == 300:
+        return "5h"
+    if minutes == 10080:
+        return "Weekly"
+    if minutes % 1440 == 0:
+        days = minutes // 1440
+        return f"{days}d"
+    if minutes % 60 == 0:
+        hours = minutes // 60
+        return f"{hours}h"
+    return f"{minutes}m"
+
+
 def query_usage_api_events(
     db_path: Path = DEFAULT_DB_PATH,
     *,

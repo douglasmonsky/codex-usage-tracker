@@ -104,6 +104,7 @@
     let allowanceSource = activeInitialPayload.allowance_source || {};
     let allowanceWindows = Array.isArray(activeInitialPayload.allowance_windows) ? activeInitialPayload.allowance_windows : [];
     let allowanceError = activeInitialPayload.allowance_error || '';
+    let observedUsage = activeInitialPayload.observed_usage || {};
     let rateCardError = activeInitialPayload.rate_card_error || '';
     let projectMetadataPrivacy = activeInitialPayload.project_metadata_privacy || { mode: activeInitialPayload.privacy_mode || 'normal' };
     let parserDiagnostics = activeInitialPayload.parser_diagnostics || {};
@@ -471,6 +472,7 @@
       getAllowanceSource: () => allowanceSource,
       getAllowanceWindows: () => allowanceWindows,
       getData: () => data,
+      getObservedUsage: () => observedUsage,
       getParserDiagnostics: () => parserDiagnostics,
       getPricingConfigured: () => pricingConfigured,
       getPricingSnapshotWarning: () => pricingSnapshotWarning,
@@ -524,6 +526,14 @@
       rowLoadProgressEl,
       rowLoadProgressLabelEl,
       setFastTooltip,
+      setObservedUsage: value => {
+        observedUsage = value || {};
+        const dateRange = updateDateFilterControls();
+        const rows = filtered(dateRange);
+        const shellSummary = summaryForCards(dateRange, rows);
+        const usageCredits = shellSummary ? shellSummary.usageCredits : sumUsageCredits(rows);
+        updateAllowanceImpact(usageCredits);
+      },
       t,
       tf,
       updateLiveStatus,
@@ -1247,6 +1257,7 @@
       allowanceSource = nextPayload.allowance_source || {};
       allowanceWindows = Array.isArray(nextPayload.allowance_windows) ? nextPayload.allowance_windows : [];
       allowanceError = nextPayload.allowance_error || '';
+      observedUsage = nextPayload.observed_usage || observedUsage || {};
       rateCardError = nextPayload.rate_card_error || '';
       parserDiagnostics = nextPayload.parser_diagnostics || {};
       projectMetadataPrivacy = nextPayload.project_metadata_privacy || { mode: nextPayload.privacy_mode || 'normal' };

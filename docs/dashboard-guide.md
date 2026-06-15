@@ -15,7 +15,9 @@ codex-usage-tracker update-rate-card
 codex-usage-tracker serve-dashboard --open
 ```
 
-For optional allowance context, initialize a local template and copy values from Codex Usage or `/status`:
+Observed 5-hour and weekly usage snapshots appear automatically when indexed local Codex logs contain `token_count.rate_limits` fields. These snapshots update after Codex records a model call and the dashboard refreshes or live status sees the newer row. They are passive local-log data, not a live account API, and may exclude usage from other ChatGPT agentic surfaces.
+
+For an optional copied allowance fallback, initialize a local template and copy values from Codex Usage or `/status`:
 
 ```bash
 codex-usage-tracker init-allowance
@@ -80,7 +82,7 @@ The dashboard opens in `Insights` view. This view is designed to answer "what ne
 Use `Calls` view when you want to inspect individual model calls.
 
 - The header stays compact: refresh controls on the right, and short status chips on the left. Exact refresh time, pricing source, and credit-rate source live in hover titles so live refreshes do not reflow the page.
-- The top cards include cached input, uncached input, Codex credit usage, and optional usage remaining instead of estimated-token, unpriced-token, and price-coverage counters.
+- The top cards include cached input, uncached input, Codex credit usage, and observed usage when local rate-limit snapshots are present. If no observed snapshot exists, the usage card falls back to optional copied allowance values.
 - The `Confidence` filter separates exact cost, estimated cost, unpriced cost, exact credit-rate matches, inferred credit mappings, user credit overrides, and missing credit rates.
 - The `Time` filter supports all time, today, this week, last 7 days, this month, and custom calendar ranges. Presets are relative to your browser's local date. Custom ranges use inclusive start and end dates.
 - The `History` control defaults to `Active sessions only`. Switch to `All history` only when you want live refresh to scan archived session logs and include any archived rows already present in SQLite.
@@ -111,7 +113,7 @@ Useful interpretation notes:
 - `Cached input` and `Uncached input` are split so cache behavior is visible without storing transcript text.
 - A cost with `*` means the pricing row is marked as a best-guess estimate.
 - Codex credits are estimated from aggregate input, cached-input, and output token counters. Direct model matches use the bundled OpenAI Codex rate-card snapshot; inferred labels are marked estimated, and local credit-rate overrides are marked user-provided.
-- `Usage Remaining` is not read from the logged-in account plan. Configure `~/.codex-usage-tracker/allowance.json` with values copied from Codex Settings > Usage, the Codex Usage dashboard, or `/status` when you want current remaining allowance context.
+- `Usage observed` is read only from local Codex `token_count.rate_limits` snapshots when present. It is not a live account API and may omit usage outside indexed local Codex logs. Configure `~/.codex-usage-tracker/allowance.json` only as a copied fallback when no observed snapshot is available.
 
 ## Threads View
 
@@ -182,7 +184,7 @@ When served from localhost, the call investigator automatically fetches quick, r
 1. Start with `serve-dashboard --open`.
 2. Leave `Live` enabled while you work, or click `Refresh` after a Codex run finishes.
 3. Leave `History` on `Active sessions only` for current work. Switch to `All history` when you intentionally want archived sessions included in the live refresh.
-4. Optionally run `parse-allowance` with copied values from Codex Usage or `/status`, or initialize and edit `allowance.json` manually.
+4. Let observed usage snapshots populate from local Codex logs when available, or optionally run `parse-allowance` with copied values from Codex Usage or `/status` as a fallback.
 5. Start in `Insights` view and review the highest-severity attention cards.
 6. Narrow the `Time` filter when you are investigating a recent spike or a specific work window.
 7. Use a preset when the question is already clear: highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
@@ -212,7 +214,7 @@ The dashboard is designed to be shareable as an aggregate report, but only after
 
 It includes:
 
-- session ids, thread names, cwd values, source file paths, timestamps, model labels, reasoning effort, token counts, cost estimates, Codex credit estimates, optional manually entered allowance windows, and derived ratios
+- session ids, thread names, cwd values, source file paths, timestamps, model labels, reasoning effort, token counts, cost estimates, Codex credit estimates, observed usage snapshot percentages/reset times when present, optional manually entered allowance fallback windows, and derived ratios
 
 It does not include:
 
@@ -222,7 +224,7 @@ The screenshots in this guide are produced from synthetic fixture data used by t
 
 Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing generated dashboards, CSV exports, query JSON, or support bundles. Redacted mode removes raw cwd/source paths and hides unnamed project names behind stable hashes. Strict mode also hides project-relative cwd, branch, and tags. Configured project aliases are treated as explicit display opt-ins in both modes.
 
-Remaining 5-hour and weekly allowance is not read from Codex logs or inferred from the logged-in account plan automatically. Add `~/.codex-usage-tracker/allowance.json` only when you want the dashboard to show current copied allowance state. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.
+Observed 5-hour and weekly usage is read only from local Codex `token_count.rate_limits` snapshots when those fields are present. The tracker does not poll Codex or infer live remaining allowance from the logged-in account plan. Add `~/.codex-usage-tracker/allowance.json` only when you want a copied fallback. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.
 
 Archived sessions are excluded from dashboard payloads by default. The `All history` mode is an explicit opt-in because archived logs can make refreshes slower and can make current dashboards look inflated by older work.
 
