@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sys
@@ -23,6 +24,7 @@ if str(SRC_PATH) not in sys.path:
 from codex_usage_tracker.context import load_call_context  # noqa: E402
 from codex_usage_tracker.dashboard import dashboard_payload  # noqa: E402
 from codex_usage_tracker.models import UsageEvent  # noqa: E402
+from codex_usage_tracker.parser import PARSER_ADAPTER_VERSION  # noqa: E402
 from codex_usage_tracker.reports import (  # noqa: E402
     build_pricing_coverage_report,
     build_recommendations_report,
@@ -87,12 +89,17 @@ T = TypeVar("T")
 class SourceLogRecord:
     source_file: Path
     line_number: int
+    source_byte_start: int
+    source_byte_end: int
+    turn_start_line: int
+    turn_start_byte: int
 
 
 @dataclass(frozen=True)
 class SourceLogBundle:
     records: list[SourceLogRecord]
     paths: frozenset[Path]
+    line_counts: dict[Path, int]
     bytes_written: int
 
 
@@ -217,6 +224,8 @@ def benchmark_size(
             refresh_links=False,
         )
     refresh_usage_event_links(db_path=db_path)
+    if source_bundle:
+        _insert_synthetic_source_metadata(db_path=db_path, source_bundle=source_bundle)
     populate_seconds = time.perf_counter() - populate_start
 
     active_rows, active_dashboard_query_seconds = _time_call(
@@ -489,7 +498,7 @@ def _benchmark_context_loads(
                 max_chars=0,
                 max_entries=0,
                 include_tool_output=True,
-                include_compaction_history=True,
+                include_compaction_history=False,
                 diagnostics=True,
             )
         )
@@ -502,6 +511,10 @@ def _benchmark_context_loads(
             "entries_returned": len(payload.get("entries") or []),
             "visible_char_count": payload.get("visible_char_count"),
             "visible_token_estimate": payload.get("visible_token_estimate"),
+            "seek_used": diagnostics.get("seek_used"),
+            "seek_fallback_reason": diagnostics.get("seek_fallback_reason"),
+            "bytes_scanned": diagnostics.get("bytes_scanned"),
+            "lines_scanned": diagnostics.get("lines_scanned"),
             "context_payload_json_bytes": diagnostics.get("json_bytes"),
             "source_scan_ms": diagnostics.get("source_scan_ms"),
             "serialized_estimate_ms": diagnostics.get("serialized_estimate_ms"),
@@ -511,6 +524,30 @@ def _benchmark_context_loads(
             context_payload_json_bytes = _optional_int(diagnostics.get("json_bytes"))
             source_scan_ms = _optional_float(diagnostics.get("source_scan_ms"))
             serialized_estimate_ms = _optional_float(diagnostics.get("serialized_estimate_ms"))
+    scan_payload, scan_elapsed = _time_call(
+        lambda: load_call_context(
+            record_id=f"record-{row_count - 1:08d}",
+            db_path=db_path,
+            max_chars=0,
+            max_entries=0,
+            include_tool_output=True,
+            include_compaction_history=True,
+            diagnostics=True,
+        )
+    )
+    scan_diagnostics = (
+        scan_payload.get("diagnostics")
+        if isinstance(scan_payload.get("diagnostics"), dict)
+        else {}
+    )
+    loads["late_scan_fallback"] = {
+        "record_id": f"record-{row_count - 1:08d}",
+        "seconds": scan_elapsed,
+        "seek_used": scan_diagnostics.get("seek_used"),
+        "seek_fallback_reason": scan_diagnostics.get("seek_fallback_reason"),
+        "bytes_scanned": scan_diagnostics.get("bytes_scanned"),
+        "lines_scanned": scan_diagnostics.get("lines_scanned"),
+    }
     return {
         "timings": timings,
         "loads": loads,
@@ -570,17 +607,39 @@ def _write_synthetic_source_logs(source_dir: Path, row_count: int) -> SourceLogB
     events_per_file = 500
     records: list[SourceLogRecord | None] = [None] * row_count
     lines_by_path: dict[Path, list[str]] = {}
+    byte_offsets_by_path: dict[Path, int] = {}
     for index in range(row_count):
         path = _synthetic_source_file(source_dir, index, events_per_file=events_per_file)
         lines = lines_by_path.setdefault(path, [])
+        byte_offsets_by_path.setdefault(path, 0)
         if not lines:
-            lines.append(_jsonl_line("session_meta", {"id": f"session-{index % 2500:04d}"}))
+            session_line = _jsonl_line("session_meta", {"id": f"session-{index % 2500:04d}"})
+            lines.append(session_line)
+            byte_offsets_by_path[path] += len(session_line.encode("utf-8"))
         turn_id = f"turn-{index:08d}"
+        turn_start_line = len(lines) + 1
+        turn_start_byte = byte_offsets_by_path[path]
+        token_line_number = 0
+        token_byte_start = 0
+        token_byte_end = 0
         for envelope in _synthetic_source_envelopes(index, turn_id):
-            lines.append(json.dumps(envelope, separators=(",", ":"), sort_keys=True) + "\n")
+            line = json.dumps(envelope, separators=(",", ":"), sort_keys=True) + "\n"
+            line_byte_start = byte_offsets_by_path[path]
+            line_byte_end = line_byte_start + len(line.encode("utf-8"))
+            lines.append(line)
+            byte_offsets_by_path[path] = line_byte_end
+            payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
+            if envelope.get("type") == "event_msg" and payload.get("type") == "token_count":
+                token_line_number = len(lines)
+                token_byte_start = line_byte_start
+                token_byte_end = line_byte_end
         records[index] = SourceLogRecord(
             source_file=path,
-            line_number=len(lines),
+            line_number=token_line_number,
+            source_byte_start=token_byte_start,
+            source_byte_end=token_byte_end,
+            turn_start_line=turn_start_line,
+            turn_start_byte=turn_start_byte,
         )
 
     bytes_written = 0
@@ -593,8 +652,64 @@ def _write_synthetic_source_logs(source_dir: Path, row_count: int) -> SourceLogB
     return SourceLogBundle(
         records=[record for record in records if record is not None],
         paths=frozenset(lines_by_path),
+        line_counts={path: len(lines) for path, lines in lines_by_path.items()},
         bytes_written=bytes_written,
     )
+
+
+def _insert_synthetic_source_metadata(
+    *,
+    db_path: Path,
+    source_bundle: SourceLogBundle,
+) -> None:
+    rows: list[tuple[object, ...]] = []
+    for path in sorted(source_bundle.paths):
+        stat = path.stat()
+        source_hash = hashlib.sha256(str(path).encode("utf-8")).hexdigest()
+        rows.append(
+            (
+                source_hash,
+                str(path),
+                source_hash,
+                1 if "/archived_sessions/" in str(path).replace("\\", "/") else 0,
+                int(stat.st_size),
+                int(stat.st_mtime_ns),
+                int(source_bundle.line_counts.get(path, 0)),
+                int(stat.st_size),
+                None,
+                None,
+                PARSER_ADAPTER_VERSION,
+                "{}",
+                "{}",
+                "2026-05-01T00:00:00+00:00",
+            )
+        )
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.executemany(
+            """
+            INSERT INTO source_files (
+                source_file_id, source_file, source_file_hash, is_archived,
+                size_bytes, mtime_ns, parsed_until_line, parsed_until_byte,
+                latest_record_id, latest_event_timestamp, parser_adapter,
+                parser_diagnostics_json, parser_state_json, last_indexed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source_file_id) DO UPDATE SET
+                source_file = excluded.source_file,
+                source_file_hash = excluded.source_file_hash,
+                is_archived = excluded.is_archived,
+                size_bytes = excluded.size_bytes,
+                mtime_ns = excluded.mtime_ns,
+                parsed_until_line = excluded.parsed_until_line,
+                parsed_until_byte = excluded.parsed_until_byte,
+                parser_adapter = excluded.parser_adapter,
+                parser_diagnostics_json = excluded.parser_diagnostics_json,
+                parser_state_json = excluded.parser_state_json,
+                last_indexed_at = excluded.last_indexed_at
+            """,
+            rows,
+        )
 
 
 def _synthetic_source_file(
@@ -799,6 +914,12 @@ def _synthetic_events(
             event_timestamp=f"2026-05-{day:02d}T12:{index % 60:02d}:00Z",
             source_file=source_file,
             line_number=source_record.line_number if source_record is not None else index + 1,
+            source_byte_start=(
+                source_record.source_byte_start if source_record is not None else None
+            ),
+            source_byte_end=source_record.source_byte_end if source_record is not None else None,
+            turn_start_line=source_record.turn_start_line if source_record is not None else None,
+            turn_start_byte=source_record.turn_start_byte if source_record is not None else None,
             turn_id=f"turn-{index:08d}",
             turn_timestamp=f"2026-05-{day:02d}T12:{index % 60:02d}:00Z",
             cwd=f"/tmp/project-{index % 50}",

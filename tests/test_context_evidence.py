@@ -173,6 +173,27 @@ def test_context_loading_uses_one_source_scan_for_evidence_and_serialized_estima
     assert "thread_anchors" not in context
     assert context["diagnostics"]["source_scan_ms"] >= 0
     assert context["diagnostics"]["serialized_estimate_ms"] >= 0
+    assert context["source"]["seek_used"] is True
+    assert context["source"]["seek_fallback_reason"] is None
+    assert context["diagnostics"]["seek_used"] is True
+    assert context["diagnostics"]["bytes_scanned"] > 0
+    assert context["diagnostics"]["lines_scanned"] > 0
+
+
+def test_context_loading_falls_back_when_source_metadata_changes(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    row = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]
+    source_file = Path(str(row["source_file"]))
+    source_file.write_text(source_file.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    context = load_call_context(row["record_id"], db_path=db_path, diagnostics=True)
+
+    assert context["source"]["seek_used"] is False
+    assert context["source"]["seek_fallback_reason"] == "source_metadata_mismatch"
+    assert context["diagnostics"]["seek_used"] is False
+    assert any(entry["label"] == "message / user" for entry in context["entries"])
 
 
 def test_context_carries_incoming_compaction_history_into_selected_turn(tmp_path: Path) -> None:

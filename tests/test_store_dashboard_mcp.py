@@ -81,12 +81,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == PARSER_ADAPTER_VERSION
-    assert meta["schema_version"] == "8"
+    assert meta["schema_version"] == "9"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 8
+    assert state["schema_version"] == 9
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     with connect(db_path) as conn:
         init_db(conn)
         source_rows = [
@@ -600,7 +600,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 8
+    assert user_version == 9
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -671,8 +671,8 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
     assert "idx_usage_observed_rate_limit_timestamp" in indexes
-    assert user_version == 8
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert user_version == 9
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:

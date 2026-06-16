@@ -437,9 +437,18 @@ def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> N
         "context_load_middle_line_seconds",
         "context_load_late_line_seconds",
     } <= set(benchmark["timings"])
-    assert {"early", "middle", "late"} == set(benchmark["context_loads"])
+    assert {"early", "middle", "late", "late_scan_fallback"} == set(
+        benchmark["context_loads"]
+    )
     assert benchmark["context_loads"]["middle"]["context_payload_json_bytes"] > 0
     assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
+    assert benchmark["context_loads"]["middle"]["seek_used"] is True
+    assert benchmark["context_loads"]["middle"]["bytes_scanned"] > 0
+    assert benchmark["context_loads"]["late_scan_fallback"]["seek_used"] is False
+    assert (
+        benchmark["context_loads"]["late_scan_fallback"]["seek_fallback_reason"]
+        == "compaction_history_requires_pre_turn_scan"
+    )
 
 
 def _subprocess_env() -> dict[str, str]:

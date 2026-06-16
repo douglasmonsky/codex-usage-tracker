@@ -22,7 +22,7 @@ SESSION_ID_RE = re.compile(
     r"rollout-[^-]+-[0-9T:-]+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
 )
 
-PARSER_ADAPTER_VERSION = "codex-jsonl-v2-rate-limits"
+PARSER_ADAPTER_VERSION = "codex-jsonl-v3-source-offsets"
 PARSER_DIAGNOSTIC_KEYS = (
     "invalid_json",
     "missing_payload",
@@ -217,7 +217,7 @@ def parser_state_from_json(raw: str | None) -> ParserState | None:
     return ParserState(
         session_id=_optional_str(payload.get("session_id")),
         session_meta=_string_dict(payload.get("session_meta")),
-        current_turn=_string_dict(payload.get("current_turn")),
+        current_turn=_turn_state_dict(payload.get("current_turn")),
         last_cumulative_total=_json_int(payload.get("last_cumulative_total"), -1),
         call_origin_segment=tuple(_call_origin_flags_from_json(item) for item in segment),
         latest_record_id=_optional_str(payload.get("latest_record_id")),
@@ -345,7 +345,14 @@ def _parse_codex_jsonl_v1(
     with path.open("rb") as handle:
         if start_byte > 0:
             handle.seek(start_byte)
-        for line_number, raw_line in enumerate(handle, start_line + 1):
+        line_number = start_line
+        while True:
+            byte_start = handle.tell()
+            raw_line = handle.readline()
+            if not raw_line:
+                break
+            byte_end = handle.tell()
+            line_number += 1
             parsed_until_line = line_number
             try:
                 line = raw_line.decode("utf-8")
@@ -378,6 +385,8 @@ def _parse_codex_jsonl_v1(
                     "effort": _optional_str(payload.get("effort")),
                     "current_date": _optional_str(payload.get("current_date")),
                     "timezone": _optional_str(payload.get("timezone")),
+                    "turn_start_line": line_number,
+                    "turn_start_byte": byte_start,
                 }
                 continue
 
@@ -428,6 +437,8 @@ def _parse_codex_jsonl_v1(
                 event = _build_event(
                     path=path,
                     line_number=line_number,
+                    source_byte_start=byte_start,
+                    source_byte_end=byte_end,
                     event_timestamp=timestamp,
                     session_id=effective_session_id,
                     session_info=session_info,
@@ -470,6 +481,8 @@ def _parse_codex_jsonl_v1(
 def _build_event(
     path: Path,
     line_number: int,
+    source_byte_start: int,
+    source_byte_end: int,
     event_timestamp: str,
     session_id: str,
     session_info: SessionInfo | None,
@@ -511,6 +524,10 @@ def _build_event(
         event_timestamp=event_timestamp,
         source_file=str(path),
         line_number=line_number,
+        source_byte_start=source_byte_start,
+        source_byte_end=source_byte_end,
+        turn_start_line=_nullable_turn_int(current_turn.get("turn_start_line")),
+        turn_start_byte=_nullable_turn_int(current_turn.get("turn_start_byte")),
         turn_id=_optional_str(current_turn.get("turn_id")),
         turn_timestamp=_optional_str(current_turn.get("turn_timestamp")),
         cwd=_optional_str(current_turn.get("cwd")),
@@ -707,8 +724,26 @@ def _string_dict(value: object) -> dict[str, str | None]:
     }
 
 
+def _turn_state_dict(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    safe: dict[str, Any] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            continue
+        if isinstance(item, str) or isinstance(item, int) and not isinstance(item, bool):
+            safe[key] = item
+        elif item is None:
+            safe[key] = None
+    return safe
+
+
 def _json_int(value: object, default: int) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _nullable_turn_int(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _call_origin_flags_from_json(value: object) -> CallOriginFlags:

@@ -11,7 +11,7 @@ from typing import Any
 
 from codex_usage_tracker.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.redaction import redact_secrets
-from codex_usage_tracker.store import query_usage_record
+from codex_usage_tracker.store import query_source_file_metadata, query_usage_record
 
 DEFAULT_CONTEXT_CHARS = 20_000
 DEFAULT_CONTEXT_ENTRIES = 80
@@ -53,13 +53,21 @@ def load_call_context(
     source_file = Path(str(row.get("source_file") or ""))
     if not source_file.exists():
         raise FileNotFoundError(f"Source log not found: {source_file}")
-    source_file_bytes = source_file.stat().st_size
+    source_file_stat = source_file.stat()
+    source_file_bytes = source_file_stat.st_size
 
     line_number = _positive_int(row.get("line_number"))
     if line_number is None:
         raise ValueError(f"Usage record has no valid source line: {record_id}")
 
     target_turn_id = _optional_str(row.get("turn_id"))
+    seek_plan = _context_seek_plan(
+        row=row,
+        db_path=db_path,
+        source_file=source_file,
+        source_file_stat=source_file_stat,
+        include_compaction_history=include_compaction_history,
+    )
     source_scan_started = perf_counter()
     entries, omitted, estimate_entries, serialized_estimate, serialized_estimate_ms = (
         _read_context_entries(
@@ -72,11 +80,18 @@ def load_call_context(
             include_compaction_history=include_compaction_history,
             model=_optional_str(row.get("model")),
             context_mode=context_mode,
+            start_byte=seek_plan["start_byte"],
+            start_line=seek_plan["start_line"],
+            end_byte=seek_plan["end_byte"],
         )
     )
     source_scan_ms = _elapsed_ms(source_scan_started)
     if diagnostic_payload is not None:
         diagnostic_payload["source_scan_ms"] = source_scan_ms
+        diagnostic_payload["seek_used"] = seek_plan["seek_used"]
+        diagnostic_payload["seek_fallback_reason"] = seek_plan["fallback_reason"]
+        diagnostic_payload["bytes_scanned"] = omitted["bytes_scanned"]
+        diagnostic_payload["lines_scanned"] = omitted["lines_scanned"]
     visible_estimate = _estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
     if diagnostic_payload is not None:
         diagnostic_payload["serialized_estimate_ms"] = serialized_estimate_ms
@@ -111,6 +126,12 @@ def load_call_context(
         "source": {
             "file": str(source_file),
             "line_number": line_number,
+            "source_byte_start": row.get("source_byte_start"),
+            "source_byte_end": row.get("source_byte_end"),
+            "turn_start_line": row.get("turn_start_line"),
+            "turn_start_byte": row.get("turn_start_byte"),
+            "seek_used": seek_plan["seek_used"],
+            "seek_fallback_reason": seek_plan["fallback_reason"],
         },
         "entries": entries,
         "omitted": omitted,
@@ -135,6 +156,56 @@ def _elapsed_ms(started_at: float) -> float:
     return round((perf_counter() - started_at) * 1000, 3)
 
 
+def _context_seek_plan(
+    *,
+    row: dict[str, Any],
+    db_path: Path,
+    source_file: Path,
+    source_file_stat: Any,
+    include_compaction_history: bool,
+) -> dict[str, Any]:
+    if include_compaction_history:
+        return _seek_plan_disabled("compaction_history_requires_pre_turn_scan")
+
+    source_byte_start = _nonnegative_int(row.get("source_byte_start"))
+    source_byte_end = _nonnegative_int(row.get("source_byte_end"))
+    turn_start_byte = _nonnegative_int(row.get("turn_start_byte"))
+    turn_start_line = _positive_int(row.get("turn_start_line"))
+    if source_byte_start is None or source_byte_end is None:
+        return _seek_plan_disabled("missing_source_byte_offsets")
+    if turn_start_byte is None or turn_start_line is None:
+        return _seek_plan_disabled("missing_turn_byte_offset")
+    if source_byte_end <= source_byte_start or source_byte_start < turn_start_byte:
+        return _seek_plan_disabled("invalid_byte_offsets")
+
+    metadata = query_source_file_metadata(db_path=db_path, source_file=str(source_file))
+    if metadata is None:
+        return _seek_plan_disabled("source_metadata_missing")
+    if (
+        _nonnegative_int(metadata.get("size_bytes")) != int(source_file_stat.st_size)
+        or _nonnegative_int(metadata.get("mtime_ns")) != int(source_file_stat.st_mtime_ns)
+    ):
+        return _seek_plan_disabled("source_metadata_mismatch")
+
+    return {
+        "seek_used": True,
+        "fallback_reason": None,
+        "start_byte": turn_start_byte,
+        "start_line": turn_start_line - 1,
+        "end_byte": source_byte_end,
+    }
+
+
+def _seek_plan_disabled(reason: str) -> dict[str, Any]:
+    return {
+        "seek_used": False,
+        "fallback_reason": reason,
+        "start_byte": None,
+        "start_line": 0,
+        "end_byte": None,
+    }
+
+
 def _json_byte_count(payload: dict[str, Any]) -> int:
     previous_size: int | None = None
     diagnostics = payload.get("diagnostics")
@@ -156,6 +227,9 @@ def _read_context_entries(
     include_compaction_history: bool,
     model: str | None,
     context_mode: str,
+    start_byte: int | None = None,
+    start_line: int = 0,
+    end_byte: int | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]], dict[str, Any], float]:
     candidates: list[dict[str, Any]] = []
     raw_entries: list[dict[str, Any]] = []
@@ -172,14 +246,29 @@ def _read_context_entries(
         if full_serialized_analysis
         else (None, "chars_per_4_fallback")
     )
+    bytes_scanned = 0
+    lines_scanned = 0
 
-    with path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
+    with path.open("rb") as handle:
+        if start_byte is not None:
+            handle.seek(start_byte)
+        line_number = start_line
+        while True:
+            byte_start = handle.tell()
+            raw_line = handle.readline()
+            if not raw_line:
+                break
+            if end_byte is not None and byte_start > end_byte:
+                break
+            bytes_scanned += len(raw_line)
+            lines_scanned += 1
+            line_number += 1
             if line_number > token_line:
                 break
             try:
+                line = raw_line.decode("utf-8")
                 envelope = json.loads(line)
-            except json.JSONDecodeError:
+            except (UnicodeDecodeError, json.JSONDecodeError):
                 omitted_parse_errors += 1
                 continue
             if not isinstance(envelope, dict):
@@ -295,6 +384,9 @@ def _read_context_entries(
     omitted["parse_errors"] = omitted_parse_errors
     omitted["target_turn_id"] = target_turn_id
     omitted["total_entries"] = len(candidates)
+    omitted["seek_used"] = start_byte is not None
+    omitted["bytes_scanned"] = bytes_scanned
+    omitted["lines_scanned"] = lines_scanned
     return limited, omitted, candidates, serialized_estimate, serialized_estimate_ms
 
 

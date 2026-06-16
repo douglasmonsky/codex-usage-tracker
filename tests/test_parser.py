@@ -13,6 +13,9 @@ from codex_usage_tracker.parser import (
     inspect_log,
     load_session_index,
     parse_usage_events_from_file,
+    parse_usage_events_from_file_with_state,
+    parser_state_from_json,
+    parser_state_to_json,
 )
 
 SESSION_ID = "019e374d-c19f-7da3-a44f-8de043a7a64e"
@@ -143,6 +146,49 @@ def test_parser_persists_observed_usage_snapshot_fields(tmp_path: Path) -> None:
     assert event.rate_limit_secondary_window_minutes == 10080
     assert event.rate_limit_secondary_resets_at == 1781887793
     assert "rate_limits" not in event.to_row()
+
+
+def test_parser_persists_source_byte_offsets_without_raw_text(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    rows = [
+        _entry("session_meta", {"id": SESSION_ID}),
+        _entry(
+            "turn_context",
+            {"turn_id": "turn-a", "model": "gpt-5.5", "effort": "high"},
+        ),
+        _entry(
+            "response_item",
+            {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "SECRET RAW PROMPT"}],
+            },
+        ),
+        _token_event(100, 100),
+    ]
+    _write_jsonl(log_path, rows)
+    lines = log_path.read_bytes().splitlines(keepends=True)
+    starts: list[int] = []
+    cursor = 0
+    for line in lines:
+        starts.append(cursor)
+        cursor += len(line)
+
+    parsed = parse_usage_events_from_file_with_state(log_path, {})
+    [event] = parsed.events
+
+    assert event.line_number == 4
+    assert event.source_byte_start == starts[3]
+    assert event.source_byte_end == starts[3] + len(lines[3])
+    assert event.turn_start_line == 2
+    assert event.turn_start_byte == starts[1]
+    state_json = parser_state_to_json(parsed.state)
+    restored = parser_state_from_json(state_json)
+    assert restored is not None
+    assert restored.current_turn["turn_start_line"] == 2
+    assert restored.current_turn["turn_start_byte"] == starts[1]
+    assert "SECRET RAW PROMPT" not in state_json
+    assert "SECRET RAW PROMPT" not in json.dumps(event.to_row())
 
 
 def test_parser_skips_corrupt_token_count_and_continues(tmp_path: Path) -> None:
