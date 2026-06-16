@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker import server_utils
 from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
+from codex_usage_tracker.api_payloads import refresh_result_payload
 from codex_usage_tracker.call_origin import ensure_call_origin
 from codex_usage_tracker.context import (
     CONTEXT_MODE_QUICK,
@@ -92,6 +93,20 @@ _url_host = server_utils.url_host
 _utc_now = server_utils.utc_now
 _validate_context_api_mode = server_utils.validate_context_api_mode
 _validate_loopback_host = server_utils.validate_loopback_host
+
+
+def _refresh_result_invalidates_usage_impact(result: object) -> bool:
+    if bool(getattr(result, "skipped_downstream_work", False)):
+        return False
+    return any(
+        int(getattr(result, field, 0) or 0) > 0
+        for field in (
+            "inserted_records",
+            "deleted_records",
+            "full_reparse_source_files",
+            "inserted_or_updated_events",
+        )
+    )
 
 
 class _ContextApiState:
@@ -550,7 +565,17 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def _handle_status(self, query: str) -> None:
         params = parse_qs(query)
         include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
+        refresh_result: dict[str, object] | None = None
+        refresh_ms: float | None = None
         try:
+            if _truthy(_first(params.get("refresh"))):
+                if not self._has_valid_api_token(params):
+                    self._send_json(
+                        HTTPStatus.FORBIDDEN,
+                        {"error": "Valid API token is required for refresh"},
+                    )
+                    return
+                refresh_result, refresh_ms = self._refresh_usage_index(include_archived)
             counts = query_usage_status(
                 db_path=self._db_path,
                 include_archived=include_archived,
@@ -567,20 +592,21 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             )
             return
         parser_diagnostics = dashboard_parser_diagnostics(metadata)
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-status-v1",
-                "payload_schema": "codex-usage-tracker-live-api-v1",
-                "latest_refresh_at": metadata.get("latest_refresh_at"),
-                "include_archived": include_archived,
-                "row_counts": counts,
-                "max_event_timestamp": counts.get("max_event_timestamp"),
-                "observed_usage": observed_usage,
-                "parser_adapter": metadata.get("parser_adapter"),
-                "parser_diagnostics": parser_diagnostics,
-            },
-        )
+        payload: dict[str, object] = {
+            "schema": "codex-usage-tracker-status-v1",
+            "payload_schema": "codex-usage-tracker-live-api-v1",
+            "latest_refresh_at": metadata.get("latest_refresh_at"),
+            "include_archived": include_archived,
+            "row_counts": counts,
+            "max_event_timestamp": counts.get("max_event_timestamp"),
+            "observed_usage": observed_usage,
+            "parser_adapter": metadata.get("parser_adapter"),
+            "parser_diagnostics": parser_diagnostics,
+        }
+        if refresh_result is not None:
+            payload["refresh_result"] = refresh_result
+            payload["refresh_ms"] = refresh_ms
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_calls(self, query: str) -> None:
         params = parse_qs(query)
@@ -958,25 +984,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                         {"error": "Valid API token is required for refresh"},
                     )
                     return
-                refresh_started = perf_counter()
-                with self._refresh_lock:
-                    result = refresh_usage_index(
-                        codex_home=self._codex_home,
-                        db_path=self._db_path,
-                        include_archived=include_archived,
-                    )
-                self._usage_impact_cache.invalidate()
-                self._usage_impact_cache.warm_async(include_archived=include_archived)
-                refresh_ms = _elapsed_ms(refresh_started)
-                refresh_result = {
-                    "scanned_files": result.scanned_files,
-                    "parsed_events": result.parsed_events,
-                    "skipped_events": result.skipped_events,
-                    "inserted_or_updated_events": result.inserted_or_updated_events,
-                    "db_path": result.db_path,
-                    "parser_diagnostics": result.parser_diagnostics,
-                    "include_archived": include_archived,
-                }
+                refresh_result, refresh_ms = self._refresh_usage_index(include_archived)
             payload_started = perf_counter()
             payload = dashboard_payload(
                 db_path=self._db_path,
@@ -1035,6 +1043,28 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 diagnostic_payload["refresh_ms"] = refresh_ms
             payload["diagnostics"] = diagnostic_payload
         self._send_json(HTTPStatus.OK, payload)
+
+    def _refresh_usage_index(self, include_archived: bool) -> tuple[dict[str, object], float]:
+        refresh_started = perf_counter()
+        with self._refresh_lock:
+            result = refresh_usage_index(
+                codex_home=self._codex_home,
+                db_path=self._db_path,
+                include_archived=include_archived,
+            )
+        if _refresh_result_invalidates_usage_impact(result):
+            self._usage_impact_cache.invalidate()
+            self._usage_impact_cache.warm_async(include_archived=include_archived)
+        payload = refresh_result_payload(
+            result,
+            schema="codex-usage-tracker-refresh-v1",
+        )
+        payload.pop("schema", None)
+        payload["include_archived"] = include_archived
+        return (
+            payload,
+            _elapsed_ms(refresh_started),
+        )
 
     def _request_origin_allowed(self) -> bool:
         if not _allowed_loopback_host(_host_header_name(self.headers.get("Host"))):

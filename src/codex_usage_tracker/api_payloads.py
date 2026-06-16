@@ -39,6 +39,13 @@ def refresh_result_payload(result: Any, *, schema: str) -> dict[str, Any]:
         "parsed_events": result.parsed_events,
         "skipped_events": result.skipped_events,
         "inserted_or_updated_events": result.inserted_or_updated_events,
+        "changed_source_files": result.changed_source_files,
+        "append_source_files": result.append_source_files,
+        "full_reparse_source_files": result.full_reparse_source_files,
+        "inserted_records": result.inserted_records,
+        "deleted_records": result.deleted_records,
+        "affected_threads": result.affected_threads,
+        "skipped_downstream_work": result.skipped_downstream_work,
         "db_path": result.db_path,
         "parser_diagnostics": result.parser_diagnostics,
     }

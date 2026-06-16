@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import csv
 import sqlite3
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager, suppress
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ from codex_usage_tracker.store_query_sql import (
     _normalize_offset,
     _normalize_sort_direction,
     _since_where_clause,
+    _thread_key_expression,
     _usage_api_sort_expression,
     _usage_api_where_clause,
     _usage_where_clause,
@@ -52,6 +54,40 @@ __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
 
 
+@dataclass
+class RefreshDelta:
+    changed_source_files: set[str] = field(default_factory=set)
+    append_source_files: set[str] = field(default_factory=set)
+    full_reparse_source_files: set[str] = field(default_factory=set)
+    inserted_record_ids: set[str] = field(default_factory=set)
+    deleted_record_ids: set[str] = field(default_factory=set)
+    affected_thread_keys: set[str] = field(default_factory=set)
+    changed_time_start: str | None = None
+    changed_time_end: str | None = None
+    skipped_downstream_work: bool = False
+
+    def merge_upsert(self, upsert_delta: UpsertDelta) -> None:
+        self.inserted_record_ids.update(upsert_delta.inserted_record_ids)
+        self.deleted_record_ids.update(upsert_delta.deleted_record_ids)
+        self.affected_thread_keys.update(upsert_delta.affected_thread_keys)
+        self.changed_time_start, self.changed_time_end = _merge_time_ranges(
+            (self.changed_time_start, self.changed_time_end),
+            (upsert_delta.changed_time_start, upsert_delta.changed_time_end),
+        )
+        self.skipped_downstream_work = upsert_delta.skipped_downstream_work
+
+
+@dataclass
+class UpsertDelta:
+    inserted_or_updated_count: int = 0
+    inserted_record_ids: set[str] = field(default_factory=set)
+    deleted_record_ids: set[str] = field(default_factory=set)
+    affected_thread_keys: set[str] = field(default_factory=set)
+    changed_time_start: str | None = None
+    changed_time_end: str | None = None
+    skipped_downstream_work: bool = False
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
@@ -60,10 +96,44 @@ def refresh_usage_index(
     """Scan Codex logs and upsert aggregate usage events."""
 
     logs = find_session_logs(codex_home=codex_home, include_archived=include_archived)
-    session_index = load_session_index(codex_home)
     with connect(db_path) as conn:
         init_db(conn)
         parse_plans = source_logs_requiring_parse(conn, logs)
+    delta = RefreshDelta(
+        changed_source_files={str(plan.path) for plan in parse_plans},
+        append_source_files={str(plan.path) for plan in parse_plans if not plan.replace_existing},
+        full_reparse_source_files={
+            str(plan.path) for plan in parse_plans if plan.replace_existing
+        },
+    )
+    if not parse_plans:
+        delta.skipped_downstream_work = True
+        record_refresh_metadata(
+            db_path=db_path,
+            scanned_files=len(logs),
+            parsed_events=0,
+            skipped_events=0,
+            inserted_or_updated_events=0,
+            parser_diagnostics={},
+            parsed_source_files=0,
+            skipped_source_files=len(logs),
+        )
+        return RefreshResult(
+            scanned_files=len(logs),
+            parsed_events=0,
+            inserted_or_updated_events=0,
+            db_path=str(db_path),
+            skipped_events=0,
+            parser_diagnostics={},
+            changed_source_files=0,
+            append_source_files=0,
+            full_reparse_source_files=0,
+            inserted_records=0,
+            deleted_records=0,
+            affected_threads=0,
+            skipped_downstream_work=True,
+        )
+    session_index = load_session_index(codex_home)
     stats: dict[str, int] = {}
     events: list[UsageEvent] = []
     parsed_files: list[ParsedSourceFile] = []
@@ -90,11 +160,12 @@ def refresh_usage_index(
         )
         for key, value in file_stats.items():
             stats[key] = stats.get(key, 0) + int(value)
-    inserted = upsert_usage_events(
+    upsert_delta = _upsert_usage_events_with_delta(
         events,
         db_path=db_path,
         replace_source_files=(plan.path for plan in parse_plans if plan.replace_existing),
     )
+    delta.merge_upsert(upsert_delta)
     record_source_file_metadata(db_path=db_path, parsed_files=parsed_files)
     skipped_events = stats.get("skipped_events", 0)
     diagnostics = compact_parser_diagnostics(stats)
@@ -103,7 +174,7 @@ def refresh_usage_index(
         scanned_files=len(logs),
         parsed_events=len(events),
         skipped_events=skipped_events,
-        inserted_or_updated_events=inserted,
+        inserted_or_updated_events=upsert_delta.inserted_or_updated_count,
         parser_diagnostics=diagnostics,
         parsed_source_files=len(parse_plans),
         skipped_source_files=len(logs) - len(parse_plans),
@@ -111,10 +182,17 @@ def refresh_usage_index(
     return RefreshResult(
         scanned_files=len(logs),
         parsed_events=len(events),
-        inserted_or_updated_events=inserted,
+        inserted_or_updated_events=upsert_delta.inserted_or_updated_count,
         db_path=str(db_path),
         skipped_events=skipped_events,
         parser_diagnostics=diagnostics,
+        changed_source_files=len(delta.changed_source_files),
+        append_source_files=len(delta.append_source_files),
+        full_reparse_source_files=len(delta.full_reparse_source_files),
+        inserted_records=len(delta.inserted_record_ids),
+        deleted_records=len(delta.deleted_record_ids),
+        affected_threads=len(delta.affected_thread_keys),
+        skipped_downstream_work=delta.skipped_downstream_work,
     )
 
 
@@ -273,6 +351,45 @@ def record_source_file_metadata(
         upsert_source_file_metadata(conn, parsed_files=parsed)
 
 
+def _row_value(row: Mapping[str, Any] | sqlite3.Row, key: str) -> Any:
+    try:
+        return row[key]
+    except (IndexError, KeyError):
+        return None
+
+
+def _usage_event_partition_key(row: Mapping[str, Any] | sqlite3.Row) -> str:
+    thread_key = _row_value(row, "thread_key")
+    if thread_key:
+        return str(thread_key)
+    thread_name = _row_value(row, "thread_name")
+    if thread_name:
+        return f"thread:{thread_name}"
+    return f"session:{_row_value(row, 'session_id')}"
+
+
+def _row_time_range(
+    rows: Iterable[Mapping[str, Any] | sqlite3.Row],
+) -> tuple[str | None, str | None]:
+    timestamps = [
+        str(timestamp)
+        for row in rows
+        if (timestamp := _row_value(row, "event_timestamp"))
+    ]
+    if not timestamps:
+        return None, None
+    return min(timestamps), max(timestamps)
+
+
+def _merge_time_ranges(
+    first: tuple[str | None, str | None],
+    second: tuple[str | None, str | None],
+) -> tuple[str | None, str | None]:
+    starts = [value for value in (first[0], second[0]) if value is not None]
+    ends = [value for value in (first[1], second[1]) if value is not None]
+    return (min(starts) if starts else None, max(ends) if ends else None)
+
+
 def upsert_usage_events(
     events: Iterable[UsageEvent],
     db_path: Path = DEFAULT_DB_PATH,
@@ -280,21 +397,69 @@ def upsert_usage_events(
     refresh_links: bool = True,
     replace_source_files: Iterable[Path] | None = None,
 ) -> int:
+    return _upsert_usage_events_with_delta(
+        events,
+        db_path=db_path,
+        refresh_links=refresh_links,
+        replace_source_files=replace_source_files,
+    ).inserted_or_updated_count
+
+
+def _upsert_usage_events_with_delta(
+    events: Iterable[UsageEvent],
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    refresh_links: bool = True,
+    replace_source_files: Iterable[Path] | None = None,
+) -> UpsertDelta:
     rows = [event.to_row() for event in events]
     source_files_to_replace = [str(path) for path in replace_source_files or []]
+    delta = UpsertDelta(
+        inserted_or_updated_count=len(rows),
+        inserted_record_ids={str(row["record_id"]) for row in rows},
+        affected_thread_keys={
+            _usage_event_partition_key(row)
+            for row in rows
+            if _usage_event_partition_key(row)
+        },
+    )
+    delta.changed_time_start, delta.changed_time_end = _row_time_range(rows)
     with connect(db_path) as conn:
         init_db(conn)
+        old_rows: list[sqlite3.Row] = []
         if source_files_to_replace:
             placeholders = ", ".join("?" for _source in source_files_to_replace)
+            old_rows = conn.execute(
+                f"""
+                SELECT record_id, thread_key, thread_name, session_id, event_timestamp
+                FROM usage_events
+                WHERE source_file IN ({placeholders})
+                """,
+                source_files_to_replace,
+            ).fetchall()
+            delta.deleted_record_ids.update(str(row["record_id"]) for row in old_rows)
+            delta.affected_thread_keys.update(
+                key
+                for row in old_rows
+                if (key := _usage_event_partition_key(row))
+            )
+            old_time_start, old_time_end = _row_time_range(old_rows)
+            delta.changed_time_start, delta.changed_time_end = _merge_time_ranges(
+                (delta.changed_time_start, delta.changed_time_end),
+                (old_time_start, old_time_end),
+            )
             conn.execute(
                 f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
                 source_files_to_replace,
             )
         if not rows:
-            if source_files_to_replace and refresh_links:
-                _refresh_usage_event_links(conn)
-                rebuild_thread_summaries(conn)
-            return 0
+            if source_files_to_replace and refresh_links and delta.affected_thread_keys:
+                refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
+                rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
+            delta.skipped_downstream_work = not (
+                refresh_links and delta.affected_thread_keys
+            )
+            return delta
         placeholders = ", ".join("?" for _ in EVENT_COLUMNS)
         update_clause = ", ".join(
             f"{column}=excluded.{column}"
@@ -307,10 +472,13 @@ def upsert_usage_events(
             f"ON CONFLICT(record_id) DO UPDATE SET {update_clause}"
         )
         conn.executemany(sql, [[row[column] for column in EVENT_COLUMNS] for row in rows])
-        if refresh_links:
-            _refresh_usage_event_links(conn)
-            rebuild_thread_summaries(conn)
-        return len(rows)
+        if refresh_links and delta.affected_thread_keys:
+            refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
+            rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
+            delta.skipped_downstream_work = False
+        else:
+            delta.skipped_downstream_work = True
+        return delta
 
 
 def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
@@ -323,28 +491,58 @@ def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
         return changed
 
 
+def refresh_usage_event_links_for_threads(
+    conn: sqlite3.Connection,
+    affected_thread_keys: Iterable[str],
+) -> int:
+    """Recompute chronological adjacency for affected thread partitions only."""
+
+    thread_keys = sorted({key for key in affected_thread_keys if key})
+    if not thread_keys:
+        return 0
+    placeholders = ", ".join("?" for _key in thread_keys)
+    thread_key_expr = _thread_key_expression()
+    return _refresh_usage_event_links_scoped(
+        conn,
+        where_clause=f"WHERE {thread_key_expr} IN ({placeholders})",
+        params=thread_keys,
+    )
+
+
 def _refresh_usage_event_links(conn: sqlite3.Connection) -> int:
+    return _refresh_usage_event_links_scoped(conn)
+
+
+def _refresh_usage_event_links_scoped(
+    conn: sqlite3.Connection,
+    *,
+    where_clause: str = "",
+    params: Iterable[Any] = (),
+) -> int:
     before = conn.total_changes
+    thread_key_expr = _thread_key_expression()
     conn.execute("DROP TABLE IF EXISTS temp_usage_event_links")
     conn.execute(
-        """
+        f"""
         CREATE TEMP TABLE temp_usage_event_links AS
         SELECT
             record_id,
             ROW_NUMBER() OVER (
-                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                PARTITION BY {thread_key_expr}
                 ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
             ) AS next_thread_call_index,
             LAG(record_id) OVER (
-                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                PARTITION BY {thread_key_expr}
                 ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
             ) AS previous_id,
             LEAD(record_id) OVER (
-                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                PARTITION BY {thread_key_expr}
                 ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
             ) AS next_id
         FROM usage_events
-        """
+        {where_clause}
+        """,
+        list(params),
     )
     conn.execute(
         "CREATE UNIQUE INDEX temp_usage_event_links_record_id ON temp_usage_event_links(record_id)"

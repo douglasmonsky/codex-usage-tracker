@@ -471,6 +471,7 @@
     }
     dashboardStatus = dashboardStatusFactory.create({
       allowanceImpactElement: document.getElementById('allowanceImpact'),
+      allowanceReconcileElement: document.getElementById('allowanceReconcile'),
       allowanceSourceElement: document.getElementById('allowanceSource'),
       creditCoverageRatio,
       credits,
@@ -515,7 +516,6 @@
       historyScopeEl,
       i18n,
       initialHydrationChunkSize,
-      latestRefreshAt: () => latestRefreshAt,
       limitValue,
       liveRefreshIntervalMs,
       liveRefreshSupported,
@@ -1247,12 +1247,13 @@
     }
     function applyDashboardPayload(nextPayload, options = null) {
       const applyOptions = options || {};
+      const appendRows = Boolean(applyOptions.appendRows);
       if (i18n.updatePayload(nextPayload)) {
         populateLanguageOptions();
       }
       applyTranslations();
       const nextRows = payloadRows(nextPayload);
-      if (applyOptions.appendRows) {
+      if (appendRows) {
         data = mergedRows(data, nextRows);
       } else if (applyOptions.preserveRows) {
         data = data.length ? data : nextRows;
@@ -1260,30 +1261,49 @@
         data = nextRows;
       }
       summaryData = nextPayload.summary || summaryData;
-      pricingConfigured = Boolean(nextPayload.pricing_configured);
-      pricingSource = nextPayload.pricing_source || {};
-      pricingSnapshotWarning = nextPayload.pricing_snapshot_warning || '';
-      allowanceConfigured = Boolean(nextPayload.allowance_configured);
-      allowanceSource = nextPayload.allowance_source || {};
-      allowanceWindows = Array.isArray(nextPayload.allowance_windows) ? nextPayload.allowance_windows : [];
-      allowanceError = nextPayload.allowance_error || '';
+      if (!appendRows || Object.prototype.hasOwnProperty.call(nextPayload, 'pricing_configured')) {
+        pricingConfigured = Boolean(nextPayload.pricing_configured);
+      }
+      pricingSource = nextPayload.pricing_source || pricingSource || {};
+      pricingSnapshotWarning = nextPayload.pricing_snapshot_warning ?? pricingSnapshotWarning;
+      if (!appendRows || Object.prototype.hasOwnProperty.call(nextPayload, 'allowance_configured')) {
+        allowanceConfigured = Boolean(nextPayload.allowance_configured);
+      }
+      allowanceSource = nextPayload.allowance_source || allowanceSource || {};
+      allowanceWindows = Array.isArray(nextPayload.allowance_windows) ? nextPayload.allowance_windows : allowanceWindows;
+      allowanceError = nextPayload.allowance_error ?? allowanceError;
       observedUsage = nextPayload.observed_usage || observedUsage || {};
-      rateCardError = nextPayload.rate_card_error || '';
-      parserDiagnostics = nextPayload.parser_diagnostics || {};
-      projectMetadataPrivacy = nextPayload.project_metadata_privacy || { mode: nextPayload.privacy_mode || 'normal' };
+      rateCardError = nextPayload.rate_card_error ?? rateCardError;
+      parserDiagnostics = nextPayload.parser_diagnostics || parserDiagnostics || {};
+      projectMetadataPrivacy = nextPayload.project_metadata_privacy || projectMetadataPrivacy || { mode: nextPayload.privacy_mode || 'normal' };
       apiToken = nextPayload.api_token || apiToken;
-      contextApiEnabled = Boolean(nextPayload.context_api_enabled);
+      if (!appendRows || Object.prototype.hasOwnProperty.call(nextPayload, 'context_api_enabled')) {
+        contextApiEnabled = Boolean(nextPayload.context_api_enabled);
+      }
       actionThresholds = nextPayload.action_thresholds || actionThresholds;
       latestRefreshAt = nextPayload.latest_refresh_at || latestRefreshAt;
-      totalAvailableRows = Number(nextPayload.total_available_rows || data.length);
-      activeAvailableRows = Number(nextPayload.active_available_rows || data.length);
-      allHistoryAvailableRows = Number(nextPayload.all_history_available_rows || totalAvailableRows);
-      archivedAvailableRows = Number(nextPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
-      includeArchived = Boolean(nextPayload.include_archived);
-      if (!applyOptions.appendRows) loadedLimit = payloadLimit(nextPayload);
-      if (!applyOptions.appendRows) supplementalRowsByRecordId = new Map();
+      if (nextPayload.total_available_rows !== undefined) {
+        totalAvailableRows = Number(nextPayload.total_available_rows || data.length);
+      }
+      if (nextPayload.total_matched_rows !== undefined && !nextPayload.total_available_rows && totalAvailableRows < Number(nextPayload.total_matched_rows || 0)) {
+        totalAvailableRows = Number(nextPayload.total_matched_rows || totalAvailableRows);
+      }
+      if (nextPayload.active_available_rows !== undefined) {
+        activeAvailableRows = Number(nextPayload.active_available_rows || data.length);
+      }
+      if (nextPayload.all_history_available_rows !== undefined) {
+        allHistoryAvailableRows = Number(nextPayload.all_history_available_rows || totalAvailableRows);
+      }
+      if (nextPayload.archived_available_rows !== undefined) {
+        archivedAvailableRows = Number(nextPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
+      }
+      if (Object.prototype.hasOwnProperty.call(nextPayload, 'include_archived')) {
+        includeArchived = Boolean(nextPayload.include_archived);
+      }
+      if (!appendRows) loadedLimit = payloadLimit(nextPayload);
+      if (!appendRows) supplementalRowsByRecordId = new Map();
       restoredAggregatePayloadFromCache = false;
-      if (!nextPayload.shell_boot && !applyOptions.appendRows) {
+      if (!nextPayload.shell_boot && !appendRows) {
         dashboardPayloadCache.writeAggregatePayloadCache({ ...nextPayload, api_token: apiToken });
       }
       rebuildDashboardIndexes();

@@ -36,6 +36,7 @@ from codex_usage_tracker.store import (
     schema_state,
     upsert_usage_events,
 )
+from codex_usage_tracker.store_query_sql import _thread_key_expression
 
 
 def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
@@ -105,6 +106,44 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert any(row["latest_record_id"] for row in source_rows)
     assert all(row["parser_state_json"] for row in source_rows)
     assert "SECRET RAW PROMPT" not in json.dumps(source_rows)
+
+
+def test_noop_refresh_skips_parser_upsert_and_downstream_rebuilds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("no-op refresh should not parse or rebuild downstream models")
+
+    monkeypatch.setattr(
+        store_module,
+        "parse_usage_events_from_file_with_state",
+        fail_if_called,
+    )
+    monkeypatch.setattr(store_module, "_upsert_usage_events_with_delta", fail_if_called)
+    monkeypatch.setattr(store_module, "refresh_usage_event_links_for_threads", fail_if_called)
+    monkeypatch.setattr(store_module, "rebuild_thread_summaries", fail_if_called)
+
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    metadata = refresh_metadata(db_path)
+
+    assert first.parsed_events == 4
+    assert second.parsed_events == 0
+    assert second.inserted_or_updated_events == 0
+    assert second.changed_source_files == 0
+    assert second.append_source_files == 0
+    assert second.full_reparse_source_files == 0
+    assert second.inserted_records == 0
+    assert second.deleted_records == 0
+    assert second.affected_threads == 0
+    assert second.skipped_downstream_work is True
+    assert metadata["parsed_source_files"] == "0"
+    assert metadata["skipped_source_files"] == "3"
 
 
 def test_latest_observed_usage_prefers_normal_codex_limit_pool(tmp_path: Path) -> None:
@@ -302,7 +341,37 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
         "parse_usage_events_from_file_with_state",
         tracking_parse,
     )
+    link_calls: list[set[str]] = []
+    summary_calls: list[set[str] | None] = []
+    original_link_refresh = store_module.refresh_usage_event_links_for_threads
+    original_summary_rebuild = store_module.rebuild_thread_summaries
+
+    def tracking_link_refresh(conn: sqlite3.Connection, thread_keys: object) -> int:
+        normalized = set(thread_keys) if thread_keys is not None else set()
+        link_calls.append(normalized)
+        return original_link_refresh(conn, thread_keys)  # type: ignore[arg-type]
+
+    def tracking_summary_rebuild(
+        conn: sqlite3.Connection,
+        *,
+        thread_keys: object = None,
+    ) -> int:
+        normalized = set(thread_keys) if thread_keys is not None else None
+        summary_calls.append(normalized)
+        return original_summary_rebuild(conn, thread_keys=thread_keys)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(store_module, "refresh_usage_event_links_for_threads", tracking_link_refresh)
+    monkeypatch.setattr(store_module, "rebuild_thread_summaries", tracking_summary_rebuild)
+
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    partial_link_calls = list(link_calls)
+    partial_summary_calls = list(summary_calls)
+    affected_keys = link_calls[0] if link_calls else set()
+    before_full_repair_links = _thread_link_snapshot(db_path, affected_keys)
+    before_full_repair_summaries = _thread_summary_snapshot(db_path, affected_keys)
+    store_module.refresh_usage_event_links(db_path)
+    after_full_repair_links = _thread_link_snapshot(db_path, affected_keys)
+    after_full_repair_summaries = _thread_summary_snapshot(db_path, affected_keys)
     third = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     rows = query_session_usage(db_path=db_path, session_id=SESSION_ID)
     metadata = refresh_metadata(db_path)
@@ -318,7 +387,19 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert parse_calls[0]["initial_state"] is not None
     assert second.parsed_events == 1
     assert second.inserted_or_updated_events == 1
+    assert second.changed_source_files == 1
+    assert second.append_source_files == 1
+    assert second.full_reparse_source_files == 0
+    assert second.inserted_records == 1
+    assert second.deleted_records == 0
+    assert second.affected_threads == 1
+    assert second.skipped_downstream_work is False
+    assert partial_link_calls == [{"thread:Add Codex token tracking"}]
+    assert partial_summary_calls == [{"thread:Add Codex token tracking"}]
+    assert before_full_repair_links == after_full_repair_links
+    assert before_full_repair_summaries == after_full_repair_summaries
     assert third.parsed_events == 0
+    assert third.skipped_downstream_work is True
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
     assert metadata["parsed_source_files"] == "0"
     assert metadata["skipped_source_files"] == "3"
@@ -374,6 +455,72 @@ def test_refresh_replaces_source_when_parser_adapter_changes(
             (str(log_path),),
         ).fetchone()
     assert source_after["parser_adapter"] == PARSER_ADAPTER_VERSION
+
+
+def test_full_reparse_invalidates_old_and_new_thread_summaries(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c002"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T19-00-00-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Original thread",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+
+    first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Replacement thread",
+                "updated_at": "2026-05-17T19:05:00Z",
+            }
+        ],
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute(
+            "UPDATE source_files SET parser_adapter = ? WHERE source_file = ?",
+            ("codex-jsonl-v1", str(log_path)),
+        )
+
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    summaries = query_thread_summaries(db_path=db_path, limit=0)
+    summary_keys = {row["thread_key"] for row in summaries}
+
+    assert first.parsed_events == 1
+    assert second.parsed_events == 1
+    assert second.changed_source_files == 1
+    assert second.append_source_files == 0
+    assert second.full_reparse_source_files == 1
+    assert second.inserted_records == 1
+    assert second.deleted_records == 1
+    assert second.affected_threads == 2
+    assert second.skipped_downstream_work is False
+    assert "thread:Original thread" not in summary_keys
+    assert "thread:Replacement thread" in summary_keys
 
 
 def test_append_cursor_preserves_pending_call_origin_between_refreshes(
@@ -773,6 +920,63 @@ def test_thread_summaries_keep_active_and_all_history_scopes_separate(
     assert sum(row["call_count"] for row in all_summaries) == 5
     assert sum(row["archived_call_count"] for row in active_summaries) == 0
     assert sum(row["archived_call_count"] for row in all_summaries) == 1
+
+
+def _thread_link_snapshot(db_path: Path, thread_keys: set[str]) -> list[dict[str, object]]:
+    if not thread_keys:
+        return []
+    placeholders = ", ".join("?" for _key in thread_keys)
+    thread_key_expr = _thread_key_expression()
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT record_id, thread_call_index, previous_record_id, next_record_id
+            FROM usage_events
+            WHERE {thread_key_expr} IN ({placeholders})
+            ORDER BY record_id
+            """,
+            sorted(thread_keys),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _thread_summary_snapshot(db_path: Path, thread_keys: set[str]) -> list[dict[str, object]]:
+    if not thread_keys:
+        return []
+    placeholders = ", ".join("?" for _key in thread_keys)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                thread_key,
+                is_archived_scope,
+                thread_label,
+                first_event_timestamp,
+                latest_event_timestamp,
+                call_count,
+                session_count,
+                input_tokens,
+                cached_input_tokens,
+                uncached_input_tokens,
+                output_tokens,
+                reasoning_output_tokens,
+                total_tokens,
+                avg_cache_ratio,
+                max_context_window_percent,
+                max_recommendation_score,
+                primary_recommendation,
+                call_initiator_summary,
+                archived_call_count
+            FROM thread_summaries
+            WHERE thread_key IN ({placeholders})
+            ORDER BY thread_key, is_archived_scope
+            """,
+            sorted(thread_keys),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
 
 def test_dashboard_query_limit_zero_loads_all_rows(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
