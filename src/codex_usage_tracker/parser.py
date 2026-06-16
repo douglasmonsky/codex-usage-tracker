@@ -560,7 +560,7 @@ def _observed_usage_from_rate_limits(
     value: object,
     *,
     stats: MutableMapping[str, int] | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     primary = _rate_limit_window(value.get("primary"), "primary", stats=stats)

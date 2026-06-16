@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 _DASHBOARD_BENIGN_PARSER_DIAGNOSTICS = {
     "duplicate_cumulative_total",
 }

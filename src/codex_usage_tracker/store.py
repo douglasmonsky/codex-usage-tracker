@@ -12,8 +12,8 @@ from typing import Any
 
 from codex_usage_tracker.models import RefreshResult, UsageEvent
 from codex_usage_tracker.parser import (
-    PARSER_DIAGNOSTIC_KEYS,
     PARSER_ADAPTER_VERSION,
+    PARSER_DIAGNOSTIC_KEYS,
     compact_parser_diagnostics,
     find_session_logs,
     load_session_index,
@@ -762,8 +762,10 @@ def _observed_usage_window(row: dict[str, Any], key: str) -> dict[str, Any] | No
 
 
 def _observed_usage_window_label(window_minutes: object) -> str:
+    if not isinstance(window_minutes, (int, float, str)):
+        return "Usage"
     try:
-        minutes = int(window_minutes)  # type: ignore[arg-type]
+        minutes = int(window_minutes)
     except (TypeError, ValueError):
         return "Usage"
     if minutes == 300:

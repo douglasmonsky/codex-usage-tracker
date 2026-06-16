@@ -285,20 +285,23 @@ def _apply_calibrated_estimates(
         if weight <= 0:
             continue
         existing = impact.get(window_key)
+        if isinstance(existing, dict) and (
+            _observed_interval_should_be_suppressed(existing)
+            or _observed_estimate_is_noisy(
+                existing,
+                row=row,
+                calibration=calibration,
+            )
+        ):
+            impact[window_key] = _calibrated_impact(
+                row=row,
+                window_key=window_key,
+                calibration=calibration,
+                window_minutes=window_minutes,
+                observed_impact=existing,
+            )
+            continue
         if existing is not None:
-            if isinstance(existing, dict):
-                if _observed_interval_should_be_suppressed(existing) or _observed_estimate_is_noisy(
-                    existing,
-                    row=row,
-                    calibration=calibration,
-                ):
-                    impact[window_key] = _calibrated_impact(
-                        row=row,
-                        window_key=window_key,
-                        calibration=calibration,
-                        window_minutes=window_minutes,
-                        observed_impact=existing,
-                    )
             continue
         impact[window_key] = _calibrated_impact(
             row=row,
@@ -495,14 +498,12 @@ def _same_window(previous: _Snapshot, current: _Snapshot, window_key: WindowKey)
     if _scope_changed(previous.limit_id, current.limit_id):
         return False
     if window_key == "primary":
-        if (
+        return not (
             previous.resets_at is not None
             and current.resets_at is not None
             and current.resets_at
             < previous.resets_at - _PRIMARY_RESET_ROLLBACK_TOLERANCE_SECONDS
-        ):
-            return False
-        return True
+        )
     return previous.resets_at == current.resets_at
 
 
