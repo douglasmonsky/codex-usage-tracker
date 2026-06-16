@@ -39,6 +39,8 @@
   "allowance.observed_source_hint": "Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.",
   "allowance.observed_window": "{label} {used} used",
   "allowance.observed_window_reset": "{label} {used} used · resets {reset}",
+  "allowance.live_check_short": "Verificar ao vivo",
+  "allowance.live_check_recommended": "As últimas {count} chamadas do Codex relataram o bucket de limite alternativo {limit}, então este snapshot local pode estar desatualizado. Recomenda-se uma verificação de uso ao vivo antes de confiar no uso restante do cartão superior.",
   "allowance.alternate_limit_hint": "Esta chamada informou limit_id {limit}. O snapshot local não mostrou movimento observado de uso de 5h ou semanal para esse grupo, então o impacto na cota não é estimado.",
   "aria.current_view_actions": "Ações de visualização atual",
   "aria.dashboard_status": "Status do painel",

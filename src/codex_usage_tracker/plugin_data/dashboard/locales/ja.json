@@ -39,6 +39,8 @@
   "allowance.observed_source_hint": "Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.",
   "allowance.observed_window": "{label} {used} used",
   "allowance.observed_window_reset": "{label} {used} used · resets {reset}",
+  "allowance.live_check_short": "ライブ確認",
+  "allowance.live_check_recommended": "最新の {count} 件の Codex 呼び出しが代替制限バケット {limit} を報告したため、このローカルスナップショットは古い可能性があります。上部カードの残り使用量を信頼する前に、ライブ使用量チェックを推奨します。",
   "allowance.alternate_limit_hint": "この呼び出しは limit_id {limit} を報告しました。ローカルスナップショットでは、この枠の 5h/Weekly 使用量の変化が観測されなかったため、利用枠への影響は推定していません。",
   "aria.current_view_actions": "現在のビューのアクション",
   "aria.dashboard_status": "ダッシュボードのステータス",

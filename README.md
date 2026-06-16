@@ -150,7 +150,7 @@ Optional copied allowance fallback:
 codex-usage-tracker parse-allowance "5h 79% 6:50 PM Weekly 33% Jun 7"
 ```
 
-When Codex writes `token_count.rate_limits` snapshots to local JSONL logs, the dashboard shows the latest observed 5-hour and weekly usage snapshot automatically after refresh/live indexing. This is passive local-log data, not a live account API. If no observed snapshot is available, you can still copy current values into `~/.codex-usage-tracker/allowance.json`. Details: [Pricing, Credits, And Allowance](docs/pricing-and-credits.md).
+When Codex writes `token_count.rate_limits` snapshots to local JSONL logs, the dashboard shows the latest observed 5-hour and weekly usage snapshot automatically after refresh/live indexing. This is passive local-log data, not a live account API. If several newest calls report alternate Codex limit buckets, the card warns that the local snapshot may be stale and recommends a live usage check instead of silently trusting the older snapshot. If no observed snapshot is available, you can still copy current values into `~/.codex-usage-tracker/allowance.json`. Details: [Pricing, Credits, And Allowance](docs/pricing-and-credits.md).
 
 ## What It Includes
 

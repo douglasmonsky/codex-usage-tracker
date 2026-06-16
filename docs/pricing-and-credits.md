@@ -64,6 +64,8 @@ The local snapshot is written to `~/.codex-usage-tracker/rate-card.json`. Each b
 
 This is passive local-log data. The tracker does not poll Codex, call a live account API, or read usage from your logged-in account plan. It updates after Codex writes a model-call usage record and the dashboard refreshes or live status sees the newer row. Usage from other ChatGPT agentic surfaces may be missing if it does not appear in the indexed local Codex logs.
 
+If several newest Codex calls report alternate `codex_*` limit buckets while the latest normal `codex` snapshot is older, the dashboard keeps showing the last reliable normal snapshot but marks it as needing verification. That warning is a trigger for a future opt-in live usage check; it is not an automatic network call.
+
 A plan name such as Free, Plus, Pro, Business, or Enterprise can provide context, but it is not enough to know the current remaining allowance. If no observed local snapshot is available, the dashboard can fall back to copied values in `~/.codex-usage-tracker/allowance.json`.
 
 Enable the optional copied allowance fallback:

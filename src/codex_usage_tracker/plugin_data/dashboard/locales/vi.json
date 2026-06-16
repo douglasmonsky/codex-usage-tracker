@@ -39,6 +39,8 @@
   "allowance.observed_source_hint": "Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.",
   "allowance.observed_window": "{label} {used} used",
   "allowance.observed_window_reset": "{label} {used} used · resets {reset}",
+  "allowance.live_check_short": "Kiểm tra trực tiếp",
+  "allowance.live_check_recommended": "{count} lệnh gọi Codex gần nhất báo cáo nhóm giới hạn thay thế {limit}, nên ảnh chụp cục bộ này có thể đã cũ. Nên kiểm tra mức dùng trực tiếp trước khi tin vào mức dùng còn lại trên thẻ trên cùng.",
   "allowance.alternate_limit_hint": "Lượt gọi này báo cáo limit_id {limit}. Ảnh chụp cục bộ không cho thấy mức dùng 5h hoặc hằng tuần thay đổi trong nhóm này, nên không ước tính tác động đến hạn mức.",
   "aria.current_view_actions": "Hành động xem hiện tại",
   "aria.dashboard_status": "Trạng thái trang tổng quan",

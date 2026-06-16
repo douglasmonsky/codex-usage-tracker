@@ -49,6 +49,7 @@ from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
+OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
 
 
 def refresh_usage_index(
@@ -724,8 +725,14 @@ def query_latest_observed_usage(
             """,
             params,
         ).fetchone()
+        reconciliation = _observed_usage_reconciliation(
+            conn,
+            scoped_where=scoped_where,
+            params=params,
+            selected_row=row,
+        )
     if row is None:
-        return {"available": False, "windows": []}
+        return {"available": False, "windows": [], "reconciliation": reconciliation}
     data = _row_to_dict(row)
     return {
         "available": True,
@@ -743,7 +750,69 @@ def query_latest_observed_usage(
             )
             if window is not None
         ],
+        "reconciliation": reconciliation,
     }
+
+
+def _observed_usage_reconciliation(
+    conn: sqlite3.Connection,
+    *,
+    scoped_where: str,
+    params: list[Any],
+    selected_row: sqlite3.Row | None,
+) -> dict[str, Any]:
+    recent_rows = [
+        _row_to_dict(row)
+        for row in conn.execute(
+            f"""
+            SELECT
+                record_id,
+                event_timestamp,
+                rate_limit_plan_type,
+                rate_limit_limit_id
+            FROM usage_events
+            {scoped_where}
+            ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
+            LIMIT ?
+            """,
+            [*params, OBSERVED_USAGE_RECONCILIATION_THRESHOLD],
+        ).fetchall()
+    ]
+    consecutive_alternate_rows = 0
+    latest_alternate: dict[str, Any] | None = None
+    for row in recent_rows:
+        limit_id = row.get("rate_limit_limit_id")
+        if not _is_alternate_codex_limit(limit_id):
+            break
+        consecutive_alternate_rows += 1
+        if latest_alternate is None:
+            latest_alternate = row
+    selected = _row_to_dict(selected_row) if selected_row is not None else {}
+    selected_record_id = selected.get("record_id")
+    latest_record_id = latest_alternate.get("record_id") if latest_alternate else None
+    recommended = (
+        consecutive_alternate_rows >= OBSERVED_USAGE_RECONCILIATION_THRESHOLD
+        and latest_alternate is not None
+        and latest_record_id != selected_record_id
+    )
+    return {
+        "recommended": recommended,
+        "reason": "latest_alternate_codex_limit_rows" if recommended else None,
+        "suggested_action": "live_usage_check" if recommended else None,
+        "consecutive_alternate_rows": consecutive_alternate_rows,
+        "threshold": OBSERVED_USAGE_RECONCILIATION_THRESHOLD,
+        "latest_limit_id": latest_alternate.get("rate_limit_limit_id") if latest_alternate else None,
+        "latest_plan_type": latest_alternate.get("rate_limit_plan_type") if latest_alternate else None,
+        "latest_observed_at": latest_alternate.get("event_timestamp") if latest_alternate else None,
+        "selected_observed_at": selected.get("event_timestamp"),
+        "selected_limit_id": selected.get("rate_limit_limit_id"),
+    }
+
+
+def _is_alternate_codex_limit(limit_id: object) -> bool:
+    if not isinstance(limit_id, str):
+        return False
+    return limit_id.startswith("codex_") and limit_id != "codex"
 
 
 def _observed_usage_window(row: dict[str, Any], key: str) -> dict[str, Any] | None:

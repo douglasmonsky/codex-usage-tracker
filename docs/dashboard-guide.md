@@ -15,7 +15,7 @@ codex-usage-tracker update-rate-card
 codex-usage-tracker serve-dashboard --open
 ```
 
-Observed 5-hour and weekly usage snapshots appear automatically when indexed local Codex logs contain `token_count.rate_limits` fields. These snapshots update after Codex records a model call and the dashboard refreshes or live status sees the newer row. They are passive local-log data, not a live account API, and may exclude usage from other ChatGPT agentic surfaces.
+Observed 5-hour and weekly usage snapshots appear automatically when indexed local Codex logs contain `token_count.rate_limits` fields. These snapshots update after Codex records a model call and the dashboard refreshes or live status sees the newer row. They are passive local-log data, not a live account API, and may exclude usage from other ChatGPT agentic surfaces. If several newest calls report alternate `codex_*` limit buckets, the usage card warns that the displayed local snapshot may be stale and should be verified live.
 
 For an optional copied allowance fallback, initialize a local template and copy values from Codex Usage or `/status`:
 

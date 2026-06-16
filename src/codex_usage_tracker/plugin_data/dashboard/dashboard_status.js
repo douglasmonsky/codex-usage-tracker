@@ -81,10 +81,13 @@
       const observed = getObservedUsage() || {};
       const windows = Array.isArray(observed.windows) ? observed.windows : [];
       if (!observed.available || !windows.length) return '';
-      return windows
+      const lines = windows
         .map(window => observedWindowText(window))
-        .filter(Boolean)
-        .join('\n');
+        .filter(Boolean);
+      if (observed.reconciliation && observed.reconciliation.recommended) {
+        lines.push(t('allowance.live_check_short'));
+      }
+      return lines.join('\n');
     }
 
     function observedWindowText(window) {
@@ -99,11 +102,21 @@
       if (!observed.available || !windows.length) return '';
       return [
         t('allowance.observed_source_hint'),
+        observedReconciliationTooltip(observed),
         observed.observed_at ? tf('allowance.observed_last', { age: observedAgeText(observed.observed_at) }) : '',
         observed.plan_type ? tf('allowance.observed_plan', { plan: observed.plan_type }) : '',
         observed.limit_id ? tf('allowance.observed_limit', { limit: observed.limit_id }) : '',
         ...windows.map(window => observedWindowTooltip(window)).filter(Boolean),
       ].filter(Boolean).join(' ');
+    }
+
+    function observedReconciliationTooltip(observed) {
+      const reconciliation = observed.reconciliation || {};
+      if (!reconciliation.recommended) return '';
+      return tf('allowance.live_check_recommended', {
+        count: reconciliation.consecutive_alternate_rows || 0,
+        limit: reconciliation.latest_limit_id || 'alternate Codex limit',
+      });
     }
 
     function observedWindowTooltip(window) {
