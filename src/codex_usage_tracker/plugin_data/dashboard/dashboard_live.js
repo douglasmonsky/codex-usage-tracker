@@ -127,8 +127,8 @@
       usageImpactRetryTimer = window.setTimeout(() => {
         usageImpactRetryTimer = null;
         usageImpactRetryAttempts += 1;
-        hydrateDashboardRows({ reset: true, usageImpactRetry: true });
-      }, 1200);
+        refreshLoadedUsageImpactRows();
+      }, Math.min(5000, 1200 + (usageImpactRetryAttempts * 600)));
     }
 
     function refreshResultNumber(result, key) {
@@ -200,6 +200,28 @@
       const payload = await response.json();
       if (payload.error) throw new Error(payload.error);
       return payload;
+    }
+
+    async function refreshLoadedUsageImpactRows() {
+      if (!liveRefreshSupported || activeView() === 'call' || !getData().length) return;
+      if (rowHydrationInFlight) {
+        scheduleUsageImpactRetry();
+        return;
+      }
+      try {
+        const limit = Math.max(1, Math.min(getData().length, initialHydrationChunkSize || 500));
+        const payload = await fetchCallRows(limit, 0);
+        applyDashboardPayload(payload, { appendRows: true });
+        if (payload.usage_impact_pending) {
+          scheduleUsageImpactRetry();
+        } else {
+          usageImpactRetryAttempts = 0;
+        }
+        render();
+      } catch (_error) {
+        // Usage-impact estimates are supplemental. Row hydration and live
+        // refresh must stay usable even if this background update fails.
+      }
     }
 
     async function refreshAppendedRows(refreshResult, scopedRows) {

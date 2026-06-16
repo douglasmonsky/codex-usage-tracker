@@ -231,6 +231,117 @@ console.log(JSON.stringify({
     assert payload["appliedPayloads"][0]["appendRows"] is True
 
 
+def test_live_usage_impact_retry_updates_loaded_rows_without_rehydrating_table() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let data = [];
+let requestUrls = [];
+let resetCalls = 0;
+let renderCount = 0;
+let fetchIndex = 0;
+const responses = [
+  {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      rows: [
+        { record_id: 'a', usage_impact_pending: true, usage_impact: { primary: null, secondary: null } },
+        { record_id: 'b', usage_impact_pending: true, usage_impact: { primary: null, secondary: null } },
+      ],
+      row_count: 2,
+      total_matched_rows: 2,
+      has_more: false,
+      usage_impact_pending: true,
+    }),
+  },
+  {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      rows: [
+        { record_id: 'a', usage_impact: { primary: null, secondary: { estimate_percent: 0.123 } } },
+        { record_id: 'b', usage_impact: { primary: null, secondary: { estimate_percent: 0.456 } } },
+      ],
+      row_count: 2,
+      total_matched_rows: 2,
+      has_more: false,
+      usage_impact_pending: false,
+    }),
+  },
+];
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return responses[fetchIndex++];
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: (payload, options = {}) => {
+    if (!options.appendRows) {
+      data = payload.rows || [];
+      return;
+    }
+    const indexById = new Map(data.map((row, index) => [row.record_id, index]));
+    for (const row of payload.rows || []) {
+      if (indexById.has(row.record_id)) {
+        data[indexById.get(row.record_id)] = { ...data[indexById.get(row.record_id)], ...row };
+      } else {
+        indexById.set(row.record_id, data.length);
+        data.push(row);
+      }
+    }
+  },
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => data,
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 2,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => { renderCount += 1; },
+  resetRowsForHydration: () => { resetCalls += 1; data = []; },
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+});
+await runtime.hydrateDashboardRows();
+await new Promise(resolve => setTimeout(resolve, 2100));
+console.log(JSON.stringify({
+  requestUrls,
+  resetCalls,
+  renderCount,
+  data,
+}));
+"""
+    )
+
+    assert payload["resetCalls"] == 0
+    assert payload["renderCount"] >= 1
+    assert len(payload["requestUrls"]) == 2
+    assert all(url.startswith("/api/calls?") for url in payload["requestUrls"])
+    assert payload["data"][0]["record_id"] == "a"
+    assert payload["data"][0]["usage_impact"]["secondary"]["estimate_percent"] == 0.123
+
+
 def test_live_refresh_auth_failure_stops_polling_and_surfaces_error() -> None:
     payload = _run_dashboard_live_script(
         """

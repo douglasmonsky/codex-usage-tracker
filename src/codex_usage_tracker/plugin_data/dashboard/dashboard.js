@@ -445,11 +445,19 @@
       callAdjacencyByRecordId = buildCallAdjacencyIndex(indexedRows);
     }
     function mergedRows(existingRows, nextRows) {
-      const seen = new Set(existingRows.map(row => row.record_id).filter(Boolean));
       const merged = [...existingRows];
+      const indexesByRecordId = new Map();
+      existingRows.forEach((row, index) => {
+        if (row?.record_id) indexesByRecordId.set(row.record_id, index);
+      });
       for (const row of nextRows) {
-        if (!row?.record_id || seen.has(row.record_id)) continue;
-        seen.add(row.record_id);
+        if (!row?.record_id) continue;
+        if (indexesByRecordId.has(row.record_id)) {
+          const index = indexesByRecordId.get(row.record_id);
+          merged[index] = { ...merged[index], ...row };
+          continue;
+        }
+        indexesByRecordId.set(row.record_id, merged.length);
         merged.push(row);
       }
       return merged;
