@@ -189,6 +189,11 @@
       const weekly = usageImpactWindow(row, 'secondary');
       const primary = usageImpactWindow(row, 'primary');
       if (!weekly && !primary) {
+        const limitId = String(row?.rate_limit_limit_id || '').trim();
+        if (limitId && limitId !== 'codex') {
+          const title = tf('allowance.separate_pool_hint', { limit: limitId });
+          return `<span class="metric-stack usage-impact-cell muted" ${tooltipAttributes(title)}><span>${escapeHtml(t('allowance.separate_pool'))}</span></span>`;
+        }
         const title = `No matching observed usage movement yet. Estimates require a local rate-limit snapshot increase with Codex credits or cost in the same plan/window. ${t('allowance.observed_source_hint')}`;
         return `<span class="metric-stack usage-impact-cell muted" ${tooltipAttributes(title)}>-</span>`;
       }

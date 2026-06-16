@@ -150,14 +150,24 @@
         : null;
     }
 
+    function separateUsagePool(row) {
+      const limitId = String(row?.rate_limit_limit_id || '').trim();
+      return limitId && limitId !== 'codex' ? limitId : '';
+    }
+
     function usageImpactValue(row, key) {
       const impact = usageImpactWindow(row, key);
-      return impact ? formatUsageImpactPercent(impact.estimate_percent) : t('state.unknown');
+      if (impact) return formatUsageImpactPercent(impact.estimate_percent);
+      return separateUsagePool(row) ? t('allowance.separate_pool') : t('state.unknown');
     }
 
     function usageImpactSubtitle(row, key) {
       const impact = usageImpactWindow(row, key);
-      if (!impact) return t('allowance.observed_source_hint');
+      if (!impact) {
+        const limitId = separateUsagePool(row);
+        if (limitId) return tf('allowance.separate_pool_hint', { limit: limitId });
+        return t('allowance.observed_source_hint');
+      }
       const halfWidth = Math.max(
         Math.abs(Number(impact.estimate_percent || 0) - Number(impact.lower_percent || 0)),
         Math.abs(Number(impact.upper_percent || 0) - Number(impact.estimate_percent || 0)),

@@ -708,7 +708,10 @@ def query_latest_observed_usage(
                 rate_limit_secondary_resets_at
             FROM usage_events
             {scoped_where}
-            ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
+            ORDER BY
+                CASE WHEN rate_limit_limit_id = 'codex' THEN 0 ELSE 1 END,
+                event_timestamp DESC,
+                cumulative_total_tokens DESC
             LIMIT 1
             """,
             params,

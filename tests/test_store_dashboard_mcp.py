@@ -25,6 +25,7 @@ from codex_usage_tracker.store import (
     init_db,
     query_dashboard_event_count,
     query_dashboard_events,
+    query_latest_observed_usage,
     query_most_expensive_calls,
     query_session_usage,
     query_summary,
@@ -104,6 +105,50 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert any(row["latest_record_id"] for row in source_rows)
     assert all(row["parser_state_json"] for row in source_rows)
     assert "SECRET RAW PROMPT" not in json.dumps(source_rows)
+
+
+def test_latest_observed_usage_prefers_normal_codex_limit_pool(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="normal-codex",
+            session_id=SESSION_ID,
+            thread_key="thread:Main allowance",
+            event_timestamp="2026-06-16T10:00:00Z",
+            cumulative_total_tokens=1000,
+            rate_limit_plan_type="pro",
+            rate_limit_limit_id="codex",
+            rate_limit_primary_used_percent=3.0,
+            rate_limit_primary_window_minutes=300,
+            rate_limit_primary_resets_at=1781562696,
+            rate_limit_secondary_used_percent=29.0,
+            rate_limit_secondary_window_minutes=10080,
+            rate_limit_secondary_resets_at=1781887793,
+        ),
+        _usage_event(
+            record_id="separate-pool",
+            session_id=SESSION_ID,
+            thread_key="thread:Separate pool",
+            event_timestamp="2026-06-16T11:00:00Z",
+            cumulative_total_tokens=2000,
+            rate_limit_plan_type="pro",
+            rate_limit_limit_id="codex_bengalfox",
+            rate_limit_primary_used_percent=0.0,
+            rate_limit_primary_window_minutes=300,
+            rate_limit_primary_resets_at=1781566296,
+            rate_limit_secondary_used_percent=0.0,
+            rate_limit_secondary_window_minutes=10080,
+            rate_limit_secondary_resets_at=1781891393,
+        ),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+
+    observed = query_latest_observed_usage(db_path=db_path)
+
+    assert observed["record_id"] == "normal-codex"
+    assert observed["limit_id"] == "codex"
+    assert observed["windows"][0]["used_percent"] == 3.0
+    assert observed["windows"][1]["used_percent"] == 29.0
 
 
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:

@@ -266,6 +266,14 @@ def _usage_event(
     thread_key: str,
     event_timestamp: str,
     cumulative_total_tokens: int,
+    rate_limit_plan_type: str | None = None,
+    rate_limit_limit_id: str | None = None,
+    rate_limit_primary_used_percent: float | None = None,
+    rate_limit_primary_window_minutes: int | None = None,
+    rate_limit_primary_resets_at: int | None = None,
+    rate_limit_secondary_used_percent: float | None = None,
+    rate_limit_secondary_window_minutes: int | None = None,
+    rate_limit_secondary_resets_at: int | None = None,
 ) -> UsageEvent:
     return UsageEvent(
         record_id=record_id,
@@ -308,6 +316,14 @@ def _usage_event(
         cumulative_output_tokens=10,
         cumulative_reasoning_output_tokens=5,
         cumulative_total_tokens=cumulative_total_tokens,
+        rate_limit_plan_type=rate_limit_plan_type,
+        rate_limit_limit_id=rate_limit_limit_id,
+        rate_limit_primary_used_percent=rate_limit_primary_used_percent,
+        rate_limit_primary_window_minutes=rate_limit_primary_window_minutes,
+        rate_limit_primary_resets_at=rate_limit_primary_resets_at,
+        rate_limit_secondary_used_percent=rate_limit_secondary_used_percent,
+        rate_limit_secondary_window_minutes=rate_limit_secondary_window_minutes,
+        rate_limit_secondary_resets_at=rate_limit_secondary_resets_at,
     )
 
 
