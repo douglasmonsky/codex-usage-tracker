@@ -19,7 +19,7 @@ Branch: `refactor/source-byte-offsets-context-seek`
 - [x] M5: Keep safe fallbacks for missing offsets, changed source metadata, and compaction-history loads.
 - [x] M6: Add parser, context, migration, privacy, and source-log benchmark coverage.
 - [x] M7: Run full branch validation.
-- [ ] M8: Commit, push, and open the branch PR without merging to `main`.
+- [x] M8: Commit, push, and open the branch PR without merging to `main`.
 
 ## Non-Goals
 
