@@ -527,6 +527,7 @@
   "table.more_efforts": "{effort} +{count} усилий",
   "table.more_models": "Модели {model} +{count}",
   "table.output": "Выход",
+  "table.usage_impact": "Использование",
   "table.page_status": "{start}-{end} из {total} {items} · страница {page}/{pages}",
   "table.rows": "ряды",
   "table.signals": "Сигналы",

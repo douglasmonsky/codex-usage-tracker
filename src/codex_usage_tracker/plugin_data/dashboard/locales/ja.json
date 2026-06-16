@@ -527,6 +527,7 @@
   "table.more_efforts": "{effort} +{count} の取り組み",
   "table.more_models": "{model} +{count} モデル",
   "table.output": "出力",
+  "table.usage_impact": "使用量",
   "table.page_status": "{start}-{end} / {total} {items} · ページ {page}/{pages}",
   "table.rows": "行",
   "table.signals": "信号",

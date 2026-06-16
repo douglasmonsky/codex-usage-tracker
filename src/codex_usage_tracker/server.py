@@ -30,6 +30,7 @@ from codex_usage_tracker.dashboard import (
     generate_dashboard,
     render_dashboard_html,
 )
+from codex_usage_tracker.dashboard_diagnostics import dashboard_parser_diagnostics
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -67,6 +68,10 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
+from codex_usage_tracker.usage_impact import (
+    annotate_rows_with_usage_impact,
+    copy_usage_impact_from_context,
+)
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
 _elapsed_ms = server_utils.elapsed_ms
@@ -85,7 +90,6 @@ _parse_limit = server_utils.parse_dashboard_limit
 _parse_offset = server_utils.parse_dashboard_offset
 _parse_optional_float = server_utils.parse_optional_float
 _parse_report_limit = server_utils.parse_report_limit
-_safe_int = server_utils.safe_int
 _truthy = server_utils.truthy_query_value
 _url_host = server_utils.url_host
 _utc_now = server_utils.utc_now
@@ -550,11 +554,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": f"Database error while reading status: {exc}"},
             )
             return
-        parser_diagnostics = {
-            key.removeprefix("parser_"): _safe_int(value)
-            for key, value in metadata.items()
-            if key.startswith("parser_") and _safe_int(value)
-        }
+        parser_diagnostics = dashboard_parser_diagnostics(metadata)
         self._send_json(
             HTTPStatus.OK,
             {
@@ -634,10 +634,19 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 for adjacent_id in (row.get("previous_record_id"), row.get("next_record_id"))
                 if adjacent_id
             ]
+            impact_context_rows = query_usage_api_events(
+                db_path=self._db_path,
+                limit=None,
+                offset=0,
+                include_archived=self._include_archived,
+                sort="time",
+                direction="asc",
+            )
             rows_by_id = {
                 candidate["record_id"]: candidate
                 for candidate in self._annotate_live_rows(
-                    [candidate for candidate in [row, *adjacent_raw_rows] if candidate]
+                    [candidate for candidate in [row, *adjacent_raw_rows] if candidate],
+                    impact_context_rows=impact_context_rows,
                 )
                 if candidate.get("record_id")
             }
@@ -864,7 +873,19 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             sort=query_params["sort"],
             direction=query_params["direction"],
         )
-        rows = self._annotate_live_rows(rows)
+        impact_context_rows = (
+            query_usage_api_events(
+                db_path=self._db_path,
+                limit=None,
+                offset=0,
+                include_archived=query_params["include_archived"],
+                sort="time",
+                direction="asc",
+            )
+            if rows
+            else None
+        )
+        rows = self._annotate_live_rows(rows, impact_context_rows=impact_context_rows)
         if derived_filter:
             rows = [
                 row
@@ -893,7 +914,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
         return rows, total_matched
 
-    def _annotate_live_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _annotate_live_rows(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        impact_context_rows: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         if not rows:
             return []
         rows = annotate_thread_attachments([ensure_call_origin(row) for row in rows])
@@ -908,6 +934,17 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             annotate_rows_with_efficiency(rows, pricing),
             allowance,
         )
+        if impact_context_rows is not None:
+            context_rows = annotate_thread_attachments(
+                [ensure_call_origin(row) for row in impact_context_rows]
+            )
+            context_rows = annotate_rows_with_allowance(
+                annotate_rows_with_efficiency(context_rows, pricing),
+                allowance,
+            )
+            rows = copy_usage_impact_from_context(rows, context_rows)
+        else:
+            rows = annotate_rows_with_usage_impact(rows)
         rows = annotate_rows_with_recommendations(rows, thresholds)
         rows = annotate_rows_with_project_identity(rows, projects)
         return apply_project_privacy_to_rows(rows, privacy_mode=self._privacy_mode)

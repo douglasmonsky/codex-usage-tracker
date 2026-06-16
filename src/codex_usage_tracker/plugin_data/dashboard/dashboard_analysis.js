@@ -27,6 +27,44 @@
       return Array.isArray(row.efficiency_flags) ? row.efficiency_flags.length : 0;
     }
 
+    function usageImpactWindow(row, key = 'secondary') {
+      const impact = row && row.usage_impact && typeof row.usage_impact === 'object'
+        ? row.usage_impact[key]
+        : null;
+      return impact && typeof impact === 'object' ? impact : null;
+    }
+
+    function usageImpactValue(row, key = 'secondary') {
+      const window = usageImpactWindow(row, key);
+      return window ? Number(window.estimate_percent || 0) : 0;
+    }
+
+    function aggregateUsageImpact(rows) {
+      return {
+        primary: aggregateUsageImpactWindow(rows, 'primary'),
+        secondary: aggregateUsageImpactWindow(rows, 'secondary'),
+      };
+    }
+
+    function aggregateUsageImpactWindow(rows, key) {
+      const windows = rows.map(row => usageImpactWindow(row, key)).filter(Boolean);
+      if (!windows.length) return null;
+      const first = windows[0];
+      const bases = [...new Set(windows.map(window => window.basis).filter(Boolean))];
+      return {
+        schema: 'codex-usage-tracker-usage-impact-estimate-v1',
+        label: first.label,
+        window_minutes: first.window_minutes,
+        estimate_percent: windows.reduce((sum, window) => sum + Number(window.estimate_percent || 0), 0),
+        lower_percent: windows.reduce((sum, window) => sum + Number(window.lower_percent || 0), 0),
+        upper_percent: windows.reduce((sum, window) => sum + Number(window.upper_percent || 0), 0),
+        observed_delta_percent: windows.reduce((sum, window) => sum + Number(window.observed_delta_percent || 0), 0),
+        interval_call_count: rows.length,
+        basis: bases.length === 1 ? bases[0] : 'mixed',
+        resets_at: first.resets_at,
+      };
+    }
+
     function rowAttentionScore(row) {
       const costScore = clamp(Number(row.estimated_cost_usd || 0) * 24, 0, 60);
       const tokenScore = clamp(Number(row.total_tokens || 0) / 2500, 0, 36);
@@ -73,6 +111,7 @@
       if (key === 'signals') return signalCount(row);
       if (key === 'thread') return textValue(rowThreadLabel(row));
       if (key === 'time') return String(row.event_timestamp || '');
+      if (key === 'usage_impact') return usageImpactValue(row, 'secondary');
       if (key === 'usage') return Number(row.usage_credits || 0);
       return Number(row.total_tokens || 0);
     }
@@ -98,6 +137,7 @@
       if (key === 'signals') return signalCount(row);
       if (key === 'source') return textValue(callInitiatorText(row));
       if (key === 'time') return String(row.event_timestamp || '');
+      if (key === 'usage_impact') return usageImpactValue(row, 'secondary');
       return Number(row.total_tokens || 0);
     }
 
@@ -131,6 +171,7 @@
       if (key === 'signals') return group.signalCount;
       if (key === 'thread') return textValue(group.label);
       if (key === 'time') return String(group.latestActivity || '');
+      if (key === 'usage_impact') return usageImpactValue(group, 'secondary');
       if (key === 'usage') return group.usageCredits;
       return group.totalTokens;
     }
@@ -327,6 +368,7 @@
         const reasoningOutputTokens = calls.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0);
         const estimatedCost = calls.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
         const usageCredits = sumUsageCredits(calls);
+        const usageImpact = aggregateUsageImpact(calls);
         const signalTotal = calls.reduce((sum, row) => sum + signalCount(row), 0);
         const latestActivity = calls.reduce((latest, row) => String(row.event_timestamp || '') > latest ? String(row.event_timestamp || '') : latest, '');
         const maxContextUse = calls.reduce((max, row) => Math.max(max, Number(row.context_window_percent || 0)), 0);
@@ -355,6 +397,7 @@
           reasoningOutputTokens,
           estimatedCost,
           usageCredits,
+          usage_impact: usageImpact,
           cacheRatio: inputTokens ? cachedTokens / inputTokens : 0,
           maxContextUse,
           pricingStatusCode: pricingStatusCodeFor(calls),
@@ -381,6 +424,7 @@
       severityForScore,
       signalCount,
       sortedThreadCalls,
+      usageImpactValue,
     };
   }
 

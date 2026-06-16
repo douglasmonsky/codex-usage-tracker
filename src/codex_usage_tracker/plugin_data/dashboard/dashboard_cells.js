@@ -140,6 +140,74 @@
       return `<span class="cost-cell" ${tooltipAttributes(`${t('metric.codex_credits')}: ${usage}`)}>${escapeHtml(costText)}</span>`;
     }
 
+    function usageImpactWindow(row, key) {
+      const impact = row && row.usage_impact && typeof row.usage_impact === 'object'
+        ? row.usage_impact[key]
+        : null;
+      return impact && typeof impact === 'object' && Number.isFinite(Number(impact.estimate_percent))
+        ? impact
+        : null;
+    }
+
+    function formatUsageImpactPercent(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return '~0%';
+      if (numeric < 0.001) return '<0.001%';
+      if (numeric < 0.1) return `~${numeric.toFixed(3)}%`;
+      if (numeric < 1) return `~${numeric.toFixed(2)}%`;
+      return `~${numeric.toFixed(1)}%`;
+    }
+
+    function formatUsageImpactDelta(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return '0%';
+      if (numeric < 0.001) return '<0.001%';
+      if (numeric < 0.1) return `${numeric.toFixed(3)}%`;
+      if (numeric < 1) return `${numeric.toFixed(2)}%`;
+      return `${numeric.toFixed(1)}%`;
+    }
+
+    function usageImpactTooltipLine(label, window) {
+      if (!window) return `${label}: ${t('state.unknown')}`;
+      const estimate = formatUsageImpactPercent(window.estimate_percent);
+      const halfWidth = Math.max(
+        Math.abs(Number(window.estimate_percent || 0) - Number(window.lower_percent || 0)),
+        Math.abs(Number(window.upper_percent || 0) - Number(window.estimate_percent || 0)),
+      );
+      const basis = window.basis === 'cost'
+        ? t('table.cost')
+        : window.basis === 'mixed'
+          ? t('state.mixed')
+          : t('metric.codex_credits');
+      const source = window.source === 'calibrated_history'
+        ? `calibrated from ${number.format(window.calibration_sample_count || 0)} observed intervals`
+        : `${number.format(window.interval_call_count || 0)} ${t('table.calls')}`;
+      return `${label}: ${estimate} ±${formatUsageImpactDelta(halfWidth)}; ${source}; ${basis}`;
+    }
+
+    function usageImpactCell(row) {
+      const weekly = usageImpactWindow(row, 'secondary');
+      const primary = usageImpactWindow(row, 'primary');
+      if (!weekly && !primary) {
+        const title = `No matching observed usage movement yet. Estimates require a local rate-limit snapshot increase with Codex credits or cost in the same plan/window. ${t('allowance.observed_source_hint')}`;
+        return `<span class="metric-stack usage-impact-cell muted" ${tooltipAttributes(title)}>-</span>`;
+      }
+      const weeklyLabel = weekly?.label || 'Weekly';
+      const primaryLabel = primary?.label || '5h';
+      const title = [
+        t('detail.allowance_impact'),
+        usageImpactTooltipLine(weeklyLabel, weekly),
+        usageImpactTooltipLine(primaryLabel, primary),
+        t('allowance.observed_source_hint'),
+      ].join(' ');
+      return `
+        <span class="metric-stack usage-impact-cell" ${tooltipAttributes(title)}>
+          <span>${escapeHtml(weekly ? `W ${formatUsageImpactPercent(weekly.estimate_percent)}` : 'W -')}</span>
+          <span class="metric-sub">${escapeHtml(primary ? `${primaryLabel} ${formatUsageImpactPercent(primary.estimate_percent)}` : `${primaryLabel} -`)}</span>
+        </span>
+      `;
+    }
+
     function cachedInputTokens(row) {
       return dataCachedInputTokens(row);
     }
@@ -265,6 +333,7 @@
       totalTokenCell,
       uncachedInputTokens,
       uncachedTokenCell,
+      usageImpactCell,
       usageCreditsWithStatus,
       usageCreditStatusLabel,
     };

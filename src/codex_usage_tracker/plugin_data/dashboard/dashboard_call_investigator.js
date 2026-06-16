@@ -141,6 +141,56 @@
       return String(value);
     }
 
+    function usageImpactWindow(row, key) {
+      const impact = row && row.usage_impact && typeof row.usage_impact === 'object'
+        ? row.usage_impact[key]
+        : null;
+      return impact && typeof impact === 'object' && Number.isFinite(Number(impact.estimate_percent))
+        ? impact
+        : null;
+    }
+
+    function usageImpactValue(row, key) {
+      const impact = usageImpactWindow(row, key);
+      return impact ? formatUsageImpactPercent(impact.estimate_percent) : t('state.unknown');
+    }
+
+    function usageImpactSubtitle(row, key) {
+      const impact = usageImpactWindow(row, key);
+      if (!impact) return t('allowance.observed_source_hint');
+      const halfWidth = Math.max(
+        Math.abs(Number(impact.estimate_percent || 0) - Number(impact.lower_percent || 0)),
+        Math.abs(Number(impact.upper_percent || 0) - Number(impact.estimate_percent || 0)),
+      );
+      const basis = impact.basis === 'cost'
+        ? t('table.cost')
+        : impact.basis === 'mixed'
+          ? t('state.mixed')
+          : t('metric.codex_credits');
+      const source = impact.source === 'calibrated_history'
+        ? `calibrated from ${number.format(impact.calibration_sample_count || 0)} observed intervals`
+        : `${number.format(impact.interval_call_count || 0)} ${t('table.calls')}`;
+      return `${formatUsageImpactPercent(impact.estimate_percent)} ±${formatUsageImpactDelta(halfWidth)} · ${source} · ${basis}`;
+    }
+
+    function formatUsageImpactPercent(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return '~0%';
+      if (numeric < 0.001) return '<0.001%';
+      if (numeric < 0.1) return `~${numeric.toFixed(3)}%`;
+      if (numeric < 1) return `~${numeric.toFixed(2)}%`;
+      return `~${numeric.toFixed(1)}%`;
+    }
+
+    function formatUsageImpactDelta(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return '0%';
+      if (numeric < 0.001) return '<0.001%';
+      if (numeric < 0.1) return `${numeric.toFixed(3)}%`;
+      if (numeric < 1) return `${numeric.toFixed(2)}%`;
+      return `${numeric.toFixed(1)}%`;
+    }
+
     function parentUpdatedAt(row) {
       return row.resolved_parent_session_updated_at || row.parent_session_updated_at || '';
     }
@@ -253,7 +303,7 @@
         : 'Not loaded yet';
       rowsEl.innerHTML = `
         <tr class="call-investigator-row">
-          <td colspan="12">
+          <td colspan="13">
             <article class="call-investigator" data-record-id="${escapeHtml(row.record_id || '')}">
               <header class="call-investigator-header">
                 <div>
@@ -275,6 +325,8 @@
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
                   ${callMetricCard(t('metric.output'), number.format(outputTokens(row)), t('metric.reasoning_output'))}
                   ${callMetricCard(t('table.initiated'), callInitiatorText(row), t('call.exact_label'))}
+                  ${callMetricCard(t('table.usage_impact'), usageImpactValue(row, 'secondary'), usageImpactSubtitle(row, 'secondary'))}
+                  ${callMetricCard('5h', usageImpactValue(row, 'primary'), usageImpactSubtitle(row, 'primary'))}
                   ${callMetricCard(t('metric.estimated_cost'), moneyText(row.estimated_cost_usd), pricingStatusText(row))}
                   ${callMetricCard(t('metric.codex_credits'), creditsText(usageCreditValue(row)), usageCreditStatusLabel(row), usageCreditsWithStatus(row))}
                 </div>

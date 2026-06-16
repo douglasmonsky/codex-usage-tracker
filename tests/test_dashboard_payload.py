@@ -564,6 +564,7 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "call_initiator_confidence",
         "rate_limit_primary_used_percent",
         "rate_limit_secondary_used_percent",
+        "usage_impact",
         "project_name",
         "project_key",
         "thread_attachment_label",

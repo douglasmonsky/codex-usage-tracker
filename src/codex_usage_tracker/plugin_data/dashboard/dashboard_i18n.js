@@ -66,6 +66,7 @@
     'table.cached': 'Cached',
     'table.uncached': 'Uncached',
     'table.output': 'Output',
+    'table.usage_impact': 'Usage',
     'table.cost': 'Cost',
     'table.cache': 'Cache',
     'table.signals': 'Signals',

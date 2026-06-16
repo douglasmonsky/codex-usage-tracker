@@ -52,6 +52,7 @@
       truncate,
       uncachedTokenCell,
       updateLoadMoreControl,
+      usageImpactCell,
       usageCreditValue,
       visibleSlice,
       groupThreads,
@@ -71,6 +72,11 @@
       `;
     }
 
+    function translationOrFallback(key, fallback) {
+      const translated = t(key);
+      return translated === key ? fallback : translated;
+    }
+
     function renderCalls(rows) {
       ensurePendingFocusVisibleInRows(rows);
       const page = visibleSlice(rows);
@@ -87,7 +93,7 @@
         tr.dataset.recordId = row.record_id || '';
         tr.innerHTML = `
           <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
-          <td>${rowInvestigatorLink(row, `<span class="thread-name" ${tooltipAttributes(threadTooltip)}>${escapeHtml(truncate(threadLabel, 34))}</span>`)}</td>
+          <td>${rowInvestigatorLink(row, `<span class="thread-name" ${tooltipAttributes(threadTooltip)}>${escapeHtml(threadLabel)}</span>`)}</td>
           <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
           <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
           <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
@@ -96,6 +102,7 @@
           <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, tokenNumberCell(row.reasoning_output_tokens || 0, t('metric.reasoning_output')))}</td>
+          <td class="num usage-impact-column">${rowInvestigatorLink(row, usageImpactCell(row))}</td>
           <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
           <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
         `;
@@ -117,7 +124,7 @@
         const message = rowsNeedHydration()
           ? t('caption.rows_loading_background')
           : t('state.no_calls');
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(message)}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="13">${escapeHtml(message)}</td></tr>`;
       }
     }
 
@@ -163,7 +170,7 @@
             <div class="thread-title">
                 <span class="thread-toggle" aria-hidden="true">${expanded ? '-' : '+'}</span>
               <span class="thread-meta">
-                <span class="thread-name" ${tooltipAttributes(group.label)}>${group.renderAsChild ? `<span class="thread-relation">${escapeHtml(t('thread.spawned'))}</span> ` : ''}${escapeHtml(truncate(group.label, 34))}</span>
+                <span class="thread-name" ${tooltipAttributes(group.label)}>${group.renderAsChild ? `<span class="thread-relation">${escapeHtml(t('thread.spawned'))}</span> ` : ''}${escapeHtml(group.label)}</span>
                 <span class="thread-subtle">${escapeHtml(threadNotes)} · ${escapeHtml(tf('thread.attention', { score: number.format(Math.round(group.attentionScore)) }))}</span>
               </span>
             </div>
@@ -176,6 +183,7 @@
           <td class="num token-cell">${tokenNumberCell(group.uncachedTokens, t('metric.uncached_input'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.outputTokens, t('metric.output_tokens'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.reasoningOutputTokens, t('metric.reasoning_output'))}</td>
+          <td class="num usage-impact-column">${usageImpactCell(group)}</td>
           <td class="num">${costUsageCell(getPricingConfigured() ? moneyText(group.estimatedCost) : t('state.not_configured'), group.usageCredits)}</td>
           <td class="num">${pct(group.cacheRatio)}</td>
         `;
@@ -201,7 +209,7 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('state.no_threads'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="13">${escapeHtml(t('state.no_threads'))}</td></tr>`;
       }
       if (!getInitialDetailApplied() && getSelectedThreadKey()) {
         const selected = groups.find(group => group.key === getSelectedThreadKey());
@@ -234,6 +242,7 @@
             <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
             <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
             <td class="num token-cell">${rowInvestigatorLink(row, tokenNumberCell(row.reasoning_output_tokens || 0, t('metric.reasoning_output')))}</td>
+            <td class="num usage-impact-column">${rowInvestigatorLink(row, usageImpactCell(row))}</td>
             <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
             <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
           </tr>
@@ -251,7 +260,7 @@
           ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span></div>`
           : '';
       tr.innerHTML = `
-        <td class="child-cell" colspan="12">
+        <td class="child-cell" colspan="13">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
             <colgroup>
               <col class="col-time">
@@ -263,6 +272,7 @@
               <col class="col-uncached">
               <col class="col-output">
               <col class="col-reasoning">
+              <col class="col-usage-impact">
               <col class="col-cost">
               <col class="col-cache">
             </colgroup>
@@ -276,6 +286,7 @@
               ${threadCallHeader('uncached', t('table.uncached'), true)}
               ${threadCallHeader('output', t('table.output'), true)}
               ${threadCallHeader('reasoning', t('context.token_reasoning'), true)}
+              ${threadCallHeader('usage_impact', translationOrFallback('table.usage_impact', 'Usage'), true)}
               ${threadCallHeader('cost', t('table.cost'), true)}
               ${threadCallHeader('cache', t('table.cache'), true)}
             </tr></thead>

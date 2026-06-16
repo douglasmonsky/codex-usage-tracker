@@ -456,6 +456,7 @@ def test_dashboard_js_thread_call_rows_include_cache_and_reasoning_columns() -> 
         "table.uncached",
         "table.output",
         "context.token_reasoning",
+        "table.usage_impact",
         "table.cost",
         "table.cache",
     ]:

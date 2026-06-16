@@ -19,6 +19,7 @@ from codex_usage_tracker.allowance import (
     summarize_allowance_usage,
 )
 from codex_usage_tracker.call_origin import ensure_call_origin
+from codex_usage_tracker.dashboard_diagnostics import dashboard_parser_diagnostics
 from codex_usage_tracker.i18n import dashboard_i18n_payload, language_direction, translations_for
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -48,6 +49,10 @@ from codex_usage_tracker.store import (
     refresh_metadata,
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
+from codex_usage_tracker.usage_impact import (
+    annotate_rows_with_usage_impact,
+    copy_usage_impact_from_context,
+)
 
 DASHBOARD_STYLESHEETS = (
     "dashboard.css",
@@ -115,6 +120,7 @@ def dashboard_payload(
     """Return aggregate-only dashboard data without rendering HTML."""
 
     privacy_mode = validate_privacy_mode(privacy_mode)
+    normalized_limit = _normalize_limit(limit)
     normalized_offset = _normalize_offset(offset)
     rows = (
         annotate_thread_attachments(
@@ -140,6 +146,26 @@ def dashboard_payload(
         annotate_rows_with_efficiency(rows, pricing),
         allowance,
     )
+    if include_rows and (normalized_limit is not None or normalized_offset):
+        impact_context_rows = annotate_rows_with_allowance(
+            annotate_rows_with_efficiency(
+                [
+                    ensure_call_origin(row)
+                    for row in query_dashboard_events(
+                        db_path=db_path,
+                        limit=None,
+                        offset=0,
+                        since=since,
+                        include_archived=include_archived,
+                    )
+                ],
+                pricing,
+            ),
+            allowance,
+        )
+        annotated_rows = copy_usage_impact_from_context(annotated_rows, impact_context_rows)
+    else:
+        annotated_rows = annotate_rows_with_usage_impact(annotated_rows)
     annotated_rows = annotate_rows_with_recommendations(annotated_rows, thresholds)
     annotated_rows = annotate_rows_with_project_identity(annotated_rows, projects)
     annotated_rows = apply_project_privacy_to_rows(annotated_rows, privacy_mode=privacy_mode)
@@ -158,7 +184,6 @@ def dashboard_payload(
         db_path=db_path,
         include_archived=include_archived,
     )
-    normalized_limit = _normalize_limit(limit)
     total_available_rows = query_dashboard_event_count(
         db_path=db_path,
         since=since,
@@ -175,11 +200,7 @@ def dashboard_payload(
         include_archived=True,
     )
     metadata = refresh_metadata(db_path)
-    parser_diagnostics = {
-        key.removeprefix("parser_"): _safe_int(value)
-        for key, value in metadata.items()
-        if key.startswith("parser_") and _safe_int(value)
-    }
+    parser_diagnostics = dashboard_parser_diagnostics(metadata)
     return {
         **dashboard_i18n_payload(language),
         "rows": annotated_rows,
@@ -635,13 +656,6 @@ def _format_body_attrs(attrs: dict[str, str] | None) -> str:
 def _read_dashboard_asset(name: str) -> str:
     asset = resources.files("codex_usage_tracker.plugin_data").joinpath("dashboard", name)
     return asset.read_text(encoding="utf-8")
-
-
-def _safe_int(value: object) -> int:
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return 0
 
 
 _USAGE_DATA_RE = re.compile(

@@ -91,6 +91,10 @@
     function translateEffort(value) {
       return i18n.translateEffort(value);
     }
+    function translationOrFallback(key, fallback) {
+      const translated = t(key);
+      return translated === key ? fallback : translated;
+    }
     const stateManager = window.CodexUsageDashboardState;
     const urlParams = new URLSearchParams(window.location.search);
     const initialState = stateManager ? stateManager.read(urlParams) : {};
@@ -233,7 +237,11 @@
       if (languageSelectEl) languageSelectEl.value = i18n.currentLanguage;
       document.querySelectorAll('[data-i18n]').forEach(element => {
         if (element === detailEl) return;
-        element.textContent = t(element.dataset.i18n);
+        const key = element.dataset.i18n;
+        const translated = t(key);
+        element.textContent = translated === key
+          ? (element.dataset.i18nFallback || element.textContent || key)
+          : translated;
       });
       document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
         element.setAttribute('placeholder', t(element.dataset.i18nPlaceholder));
@@ -393,6 +401,7 @@
         thread: t('table.thread'),
         time: t('table.time'),
         total: t('table.tokens'),
+        usage_impact: translationOrFallback('table.usage_impact', 'Usage'),
         usage: t('metric.codex_credits'),
       }[key] || t('filter.sort');
     }
@@ -796,6 +805,7 @@
       totalTokenCell,
       uncachedInputTokens,
       uncachedTokenCell,
+      usageImpactCell,
       usageCreditsWithStatus,
       usageCreditStatusLabel,
     } = dashboardCellsFactory.create({
@@ -973,7 +983,7 @@
         threadCallSortDirection = threadCallSortDirection === 'asc' ? 'desc' : 'asc';
       } else {
         threadCallSortKey = key;
-        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'reasoning' || key === 'cost' || key === 'cache' ? 'desc' : 'asc';
+        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'reasoning' || key === 'usage_impact' || key === 'cost' || key === 'cache' ? 'desc' : 'asc';
       }
       render();
     }
@@ -1074,6 +1084,7 @@
       truncate,
       uncachedTokenCell,
       updateLoadMoreControl,
+      usageImpactCell,
       usageCreditValue,
       visibleSlice,
     });

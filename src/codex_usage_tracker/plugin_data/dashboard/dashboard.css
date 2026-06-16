@@ -12,9 +12,9 @@
       --violet: #6d28d9;
       --shadow: 0 12px 32px rgba(23, 32, 51, 0.09);
       --sticky-time-width: 132px;
-      --sticky-thread-width: 250px;
-      --calls-table-min-width: 1480px;
-      --thread-call-table-min-width: 1180px;
+      --sticky-thread-width: 200px;
+      --calls-table-min-width: 1500px;
+      --thread-call-table-min-width: 1260px;
     }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }

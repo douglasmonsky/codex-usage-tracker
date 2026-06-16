@@ -23,6 +23,7 @@ API_USAGE_SORTS = {
     "effort": "usage_events.effort",
     "thread": "coalesce(usage_events.thread_name, usage_events.parent_thread_name, usage_events.session_id)",
     "initiator": "coalesce(usage_events.call_initiator, 'unknown')",
+    "usage_impact": "usage_events.event_timestamp",
 }
 
 

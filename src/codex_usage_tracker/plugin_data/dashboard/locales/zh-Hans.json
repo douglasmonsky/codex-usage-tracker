@@ -527,6 +527,7 @@
   "table.more_efforts": "{effort} +{count} 努力",
   "table.more_models": "{model} +{count} 型号",
   "table.output": "输出",
+  "table.usage_impact": "用量",
   "table.page_status": "{total} {items} 的 {start}-{end} · 页 {page}/{pages}",
   "table.rows": "行",
   "table.signals": "信号",

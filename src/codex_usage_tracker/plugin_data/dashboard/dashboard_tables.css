@@ -11,14 +11,15 @@
     }
     col.col-time { width: var(--sticky-time-width); }
     col.col-thread { width: var(--sticky-thread-width); }
-    col.col-initiated { width: 112px; }
-    col.col-model { width: 112px; }
-    col.col-effort { width: 96px; }
+    col.col-initiated { width: 106px; }
+    col.col-model { width: 104px; }
+    col.col-effort { width: 72px; }
     col.col-tokens,
     col.col-cached,
     col.col-uncached { width: 118px; }
     col.col-output { width: 96px; }
     col.col-reasoning { width: 112px; }
+    col.col-usage-impact { width: 102px; }
     col.col-cost { width: 92px; }
     col.col-cache { width: 82px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -253,6 +254,13 @@
     .effort-cell {
       display: inline-block;
       max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .usage-impact-cell {
+      min-width: 72px;
+      font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
     .token-cell {
@@ -450,10 +458,9 @@
       display: inline-block;
       max-width: 100%;
       font-weight: 760;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      overflow-wrap: anywhere;
       vertical-align: bottom;
-      white-space: nowrap;
+      white-space: normal;
     }
     .thread-subtle {
       color: var(--muted);

@@ -527,6 +527,7 @@
   "table.more_efforts": "{effort} +{count} الجهود",
   "table.more_models": "نماذج {model} +{count}",
   "table.output": "الإخراج",
+  "table.usage_impact": "الاستخدام",
   "table.page_status": "{start}-{end} من {total} {items} · الصفحة {page}/{pages}",
   "table.rows": "صفوف",
   "table.signals": "إشارات",

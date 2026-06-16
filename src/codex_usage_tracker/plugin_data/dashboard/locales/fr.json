@@ -527,6 +527,7 @@
   "table.more_efforts": "{effort} +{count} efforts",
   "table.more_models": "Modèles {model} +{count}",
   "table.output": "Sortie",
+  "table.usage_impact": "Utilisation",
   "table.page_status": "{start}-{end} de {total} {items} · page {page}/{pages}",
   "table.rows": "lignes",
   "table.signals": "Signaux",

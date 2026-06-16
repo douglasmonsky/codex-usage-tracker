@@ -152,6 +152,15 @@
       }
     }
 
+    function usageImpactExportValue(row, key) {
+      const impact = row && row.usage_impact && typeof row.usage_impact === 'object'
+        ? row.usage_impact[key]
+        : null;
+      return impact && typeof impact === 'object' && impact.estimate_percent !== undefined
+        ? impact.estimate_percent
+        : '';
+    }
+
     function exportCurrentRows() {
       if (!stateManager) return;
       const rows = filtered();
@@ -171,6 +180,8 @@
         { label: 'reasoning_output_tokens', field: 'reasoning_output_tokens' },
         { label: 'estimated_cost_usd', field: 'estimated_cost_usd' },
         { label: 'usage_credits', field: 'usage_credits' },
+        { label: 'estimated_weekly_usage_impact_percent', field: row => usageImpactExportValue(row, 'secondary') },
+        { label: 'estimated_5h_usage_impact_percent', field: row => usageImpactExportValue(row, 'primary') },
         { label: 'cache_ratio', field: 'cache_ratio' },
         { label: 'context_window_percent', field: 'context_window_percent' },
         { label: 'pricing_model', field: 'pricing_model' },

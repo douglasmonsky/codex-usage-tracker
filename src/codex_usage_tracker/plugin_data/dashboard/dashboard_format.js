@@ -124,6 +124,7 @@
       thread: 'Thread',
       time: 'Time',
       total: 'Tokens',
+      usage_impact: 'Usage',
       usage: 'Codex credits',
     }[key] || 'Sort';
   }
