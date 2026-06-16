@@ -182,7 +182,16 @@
       const source = window.source === 'calibrated_history'
         ? `calibrated from ${number.format(window.calibration_sample_count || 0)} observed intervals`
         : `${number.format(window.interval_call_count || 0)} ${t('table.calls')}`;
-      return `${label}: ${estimate} ±${formatUsageImpactDelta(halfWidth)}; ${source}; ${basis}`;
+      const familyFallback = String(window.source_note || '').startsWith('calibrated_from_codex_limit_family')
+        && window.limit_id
+        && window.calibration_limit_id;
+      const fallbackScope = window.calibration_plan_type
+        ? `${window.calibration_limit_id}/${window.calibration_plan_type}`
+        : window.calibration_limit_id;
+      const fallbackNote = familyFallback
+        ? `; ${window.limit_id} estimated with ${fallbackScope} calibration`
+        : '';
+      return `${label}: ${estimate} ±${formatUsageImpactDelta(halfWidth)}; ${source}${fallbackNote}; ${basis}`;
     }
 
     function usageImpactCell(row) {
@@ -195,8 +204,8 @@
         }
         const limitId = String(row?.rate_limit_limit_id || '').trim();
         if (limitId && limitId !== 'codex') {
-          const title = tf('allowance.separate_pool_hint', { limit: limitId });
-          return `<span class="metric-stack usage-impact-cell muted" ${tooltipAttributes(title)}><span>${escapeHtml(t('allowance.separate_pool'))}</span></span>`;
+          const title = tf('allowance.alternate_limit_hint', { limit: limitId });
+          return `<span class="metric-stack usage-impact-cell muted" ${tooltipAttributes(title)}>-</span>`;
         }
         const title = `No matching observed usage movement yet. Estimates require a local rate-limit snapshot increase with Codex credits or cost in the same plan/window. ${t('allowance.observed_source_hint')}`;
         return `<span class="metric-stack usage-impact-cell muted" ${tooltipAttributes(title)}>-</span>`;

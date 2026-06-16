@@ -39,6 +39,7 @@
   "allowance.observed_source_hint": "Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.",
   "allowance.observed_window": "{label} {used} used",
   "allowance.observed_window_reset": "{label} {used} used · resets {reset}",
+  "allowance.alternate_limit_hint": "Dieser Aufruf meldete limit_id {limit}. Der lokale Snapshot zeigte keine beobachtete 5h- oder wöchentliche Nutzungsbewegung für diesen Bereich, daher wird kein Kontingenteffekt geschätzt.",
   "aria.current_view_actions": "Aktuelle Ansichtsaktionen",
   "aria.dashboard_status": "Dashboard-Status",
   "aria.dashboard_view": "Dashboard-Ansicht",

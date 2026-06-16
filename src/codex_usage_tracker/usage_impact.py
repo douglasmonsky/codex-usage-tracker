@@ -51,6 +51,13 @@ class _Calibration:
     sample_count: int
 
 
+@dataclass(frozen=True)
+class _CalibrationMatch:
+    calibration: _Calibration
+    calibration_plan_type: str | None = None
+    calibration_limit_id: str | None = None
+
+
 def annotate_rows_with_usage_impact(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return copied rows with estimated per-call usage impact.
 
@@ -256,22 +263,28 @@ def _apply_calibrated_estimates(
     window_key: WindowKey,
     samples: list[_CalibrationSample],
 ) -> None:
-    calibration_cache: dict[tuple[int, str | None, str | None], _Calibration | None] = {}
+    calibration_cache: dict[
+        tuple[int, str | None, str | None, SortKey | None],
+        _CalibrationMatch | None,
+    ] = {}
     for row in rows:
         impact = row.setdefault("usage_impact", {"primary": None, "secondary": None})
         window_minutes = _window_minutes(row, window_key)
         plan_type = _optional_str(row.get("rate_limit_plan_type"))
         limit_id = _optional_str(row.get("rate_limit_limit_id"))
-        cache_key = (window_minutes, plan_type, limit_id)
+        row_key = _sort_key(row)
+        row_scoped_key = row_key if plan_type is None and _codex_limit_family_fallback(limit_id) else None
+        cache_key = (window_minutes, plan_type, limit_id, row_scoped_key)
         if cache_key not in calibration_cache:
-            calibration_cache[cache_key] = _calibration(
+            calibration_cache[cache_key] = _calibration_for_scope(
                 samples,
                 window_minutes=window_minutes,
                 plan_type=plan_type,
                 limit_id=limit_id,
+                row_key=row_key,
             )
-        calibration = calibration_cache[cache_key]
-        if calibration is None:
+        calibration_result = calibration_cache[cache_key]
+        if calibration_result is None:
             existing = impact.get(window_key)
             if isinstance(existing, dict) and _observed_interval_should_be_suppressed(existing):
                 impact[window_key] = _suppressed_observed_interval(
@@ -281,6 +294,7 @@ def _apply_calibrated_estimates(
                     window_minutes=window_minutes,
                 )
             continue
+        calibration = calibration_result.calibration
         weight = _row_weight(row, calibration.basis)
         if weight <= 0:
             continue
@@ -299,6 +313,8 @@ def _apply_calibrated_estimates(
                 calibration=calibration,
                 window_minutes=window_minutes,
                 observed_impact=existing,
+                calibration_plan_type=calibration_result.calibration_plan_type,
+                calibration_limit_id=calibration_result.calibration_limit_id,
             )
             continue
         if existing is not None:
@@ -308,6 +324,8 @@ def _apply_calibrated_estimates(
             window_key=window_key,
             calibration=calibration,
             window_minutes=window_minutes,
+            calibration_plan_type=calibration_result.calibration_plan_type,
+            calibration_limit_id=calibration_result.calibration_limit_id,
         )
 
 
@@ -318,6 +336,8 @@ def _calibrated_impact(
     calibration: _Calibration,
     window_minutes: int,
     observed_impact: dict[str, Any] | None = None,
+    calibration_plan_type: str | None = None,
+    calibration_limit_id: str | None = None,
 ) -> dict[str, Any]:
     weight = _row_weight(row, calibration.basis)
     estimate = calibration.rate * weight
@@ -337,13 +357,22 @@ def _calibrated_impact(
         "limit_id": _optional_str(row.get("rate_limit_limit_id")),
         "resets_at": _optional_int(row.get(f"rate_limit_{window_key}_resets_at")),
     }
+    if calibration_plan_type is not None:
+        impact["calibration_plan_type"] = calibration_plan_type
+    if calibration_limit_id is not None:
+        impact["calibration_limit_id"] = calibration_limit_id
+        impact["source_note"] = "calibrated_from_codex_limit_family"
     if observed_impact is not None:
         impact["observed_delta_percent"] = observed_impact.get("observed_delta_percent")
         impact["observed_interval_call_count"] = observed_impact.get("interval_call_count")
         impact["observed_interval_estimate_percent"] = observed_impact.get("estimate_percent")
         impact["previous_used_percent"] = observed_impact.get("previous_used_percent")
         impact["current_used_percent"] = observed_impact.get("current_used_percent")
-        impact["source_note"] = "calibrated_after_noisy_observed_interval"
+        impact["source_note"] = (
+            "calibrated_from_codex_limit_family_after_noisy_observed_interval"
+            if calibration_limit_id is not None
+            else "calibrated_after_noisy_observed_interval"
+        )
     return impact
 
 
@@ -437,6 +466,88 @@ def _calibration(
         upper_rate=max(total_upper_delta, total_delta) / total_weight,
         sample_count=len(basis_samples),
     )
+
+
+def _calibration_for_scope(
+    samples: list[_CalibrationSample],
+    *,
+    window_minutes: int,
+    plan_type: str | None,
+    limit_id: str | None,
+    row_key: SortKey | None = None,
+) -> _CalibrationMatch | None:
+    exact = _calibration(
+        samples,
+        window_minutes=window_minutes,
+        plan_type=plan_type,
+        limit_id=limit_id,
+    )
+    if exact is not None:
+        return _CalibrationMatch(exact)
+    fallback_limit_id = _codex_limit_family_fallback(limit_id)
+    if fallback_limit_id is None:
+        return None
+    fallback = _calibration(
+        samples,
+        window_minutes=window_minutes,
+        plan_type=plan_type,
+        limit_id=fallback_limit_id,
+    )
+    if fallback is not None:
+        return _CalibrationMatch(
+            fallback,
+            calibration_plan_type=plan_type,
+            calibration_limit_id=fallback_limit_id,
+        )
+    if plan_type is not None or row_key is None:
+        return None
+    inferred_plan_type = _latest_prior_plan_for_limit(
+        samples,
+        window_minutes=window_minutes,
+        limit_id=fallback_limit_id,
+        row_key=row_key,
+    )
+    if inferred_plan_type is None:
+        return None
+    inferred_fallback = _calibration(
+        samples,
+        window_minutes=window_minutes,
+        plan_type=inferred_plan_type,
+        limit_id=fallback_limit_id,
+    )
+    if inferred_fallback is None:
+        return None
+    return _CalibrationMatch(
+        inferred_fallback,
+        calibration_plan_type=inferred_plan_type,
+        calibration_limit_id=fallback_limit_id,
+    )
+
+
+def _latest_prior_plan_for_limit(
+    samples: list[_CalibrationSample],
+    *,
+    window_minutes: int,
+    limit_id: str,
+    row_key: SortKey,
+) -> str | None:
+    prior_samples = [
+        sample
+        for sample in samples
+        if sample.window_minutes == window_minutes
+        and sample.limit_id == limit_id
+        and sample.plan_type is not None
+        and sample.observed_after_key <= row_key
+    ]
+    if not prior_samples:
+        return None
+    return max(prior_samples, key=lambda sample: sample.observed_after_key).plan_type
+
+
+def _codex_limit_family_fallback(limit_id: str | None) -> str | None:
+    if limit_id and limit_id != "codex" and limit_id.startswith("codex_"):
+        return "codex"
+    return None
 
 
 def _weighted_rows(rows: list[dict[str, Any]]) -> tuple[list[tuple[dict[str, Any], float]], Basis | None]:

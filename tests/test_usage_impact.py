@@ -116,6 +116,112 @@ def test_usage_impact_uses_matching_calibrated_history_after_enough_observed_int
     assert by_id["later"]["usage_impact"]["primary"]["calibration_sample_count"] == 5  # type: ignore[index]
 
 
+def test_usage_impact_uses_codex_family_calibration_for_alternate_codex_ids() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("baseline-1", timestamp="2026-06-15T12:00:00Z", line_number=1, credits=None, cost=None, primary_used=10, secondary_used=20),
+            _row("direct-1", timestamp="2026-06-15T12:01:00Z", line_number=2, credits=2, primary_used=12, secondary_used=22),
+            _row("baseline-2", timestamp="2026-06-15T12:02:00Z", line_number=3, credits=None, cost=None, primary_used=12, secondary_used=22),
+            _row("direct-2", timestamp="2026-06-15T12:03:00Z", line_number=4, credits=2, primary_used=14, secondary_used=24),
+            _row("baseline-3", timestamp="2026-06-15T12:04:00Z", line_number=5, credits=None, cost=None, primary_used=14, secondary_used=24),
+            _row("direct-3", timestamp="2026-06-15T12:05:00Z", line_number=6, credits=2, primary_used=16, secondary_used=26),
+            _row("baseline-4", timestamp="2026-06-15T12:06:00Z", line_number=7, credits=None, cost=None, primary_used=16, secondary_used=26),
+            _row("direct-4", timestamp="2026-06-15T12:07:00Z", line_number=8, credits=2, primary_used=18, secondary_used=28),
+            _row("baseline-5", timestamp="2026-06-15T12:08:00Z", line_number=9, credits=None, cost=None, primary_used=18, secondary_used=28),
+            _row("direct-5", timestamp="2026-06-15T12:09:00Z", line_number=10, credits=2, primary_used=20, secondary_used=30),
+            _row(
+                "alternate-baseline",
+                timestamp="2026-06-16T08:20:00Z",
+                line_number=11,
+                credits=None,
+                cost=None,
+                primary_used=0,
+                secondary_used=0,
+                limit_id="codex_bengalfox",
+            ),
+            _row(
+                "alternate-call",
+                timestamp="2026-06-16T08:21:00Z",
+                line_number=12,
+                credits=2,
+                primary_used=0,
+                secondary_used=0,
+                limit_id="codex_bengalfox",
+            ),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+    primary = by_id["alternate-call"]["usage_impact"]["primary"]  # type: ignore[index]
+    secondary = by_id["alternate-call"]["usage_impact"]["secondary"]  # type: ignore[index]
+
+    assert usage_impact_estimate(by_id["alternate-call"], "primary") == pytest.approx(2.0)
+    assert usage_impact_estimate(by_id["alternate-call"], "secondary") == pytest.approx(2.0)
+    assert primary["limit_id"] == "codex_bengalfox"
+    assert primary["calibration_limit_id"] == "codex"
+    assert primary["calibration_plan_type"] == "pro"
+    assert primary["source_note"] == "calibrated_from_codex_limit_family"
+    assert secondary["calibration_sample_count"] == 5
+
+
+def test_usage_impact_infers_recent_codex_plan_for_alternate_id_without_plan() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("lite-baseline-1", timestamp="2026-06-15T10:00:00Z", line_number=1, credits=None, cost=None, primary_used=10, secondary_used=20, plan_type="prolite"),
+            _row("lite-direct-1", timestamp="2026-06-15T10:01:00Z", line_number=2, credits=10, primary_used=11, secondary_used=21, plan_type="prolite"),
+            _row("lite-baseline-2", timestamp="2026-06-15T10:02:00Z", line_number=3, credits=None, cost=None, primary_used=11, secondary_used=21, plan_type="prolite"),
+            _row("lite-direct-2", timestamp="2026-06-15T10:03:00Z", line_number=4, credits=10, primary_used=12, secondary_used=22, plan_type="prolite"),
+            _row("lite-baseline-3", timestamp="2026-06-15T10:04:00Z", line_number=5, credits=None, cost=None, primary_used=12, secondary_used=22, plan_type="prolite"),
+            _row("lite-direct-3", timestamp="2026-06-15T10:05:00Z", line_number=6, credits=10, primary_used=13, secondary_used=23, plan_type="prolite"),
+            _row("lite-baseline-4", timestamp="2026-06-15T10:06:00Z", line_number=7, credits=None, cost=None, primary_used=13, secondary_used=23, plan_type="prolite"),
+            _row("lite-direct-4", timestamp="2026-06-15T10:07:00Z", line_number=8, credits=10, primary_used=14, secondary_used=24, plan_type="prolite"),
+            _row("lite-baseline-5", timestamp="2026-06-15T10:08:00Z", line_number=9, credits=None, cost=None, primary_used=14, secondary_used=24, plan_type="prolite"),
+            _row("lite-direct-5", timestamp="2026-06-15T10:09:00Z", line_number=10, credits=10, primary_used=15, secondary_used=25, plan_type="prolite"),
+            _row("pro-baseline-1", timestamp="2026-06-16T08:00:00Z", line_number=11, credits=None, cost=None, primary_used=30, secondary_used=40, plan_type="pro"),
+            _row("pro-direct-1", timestamp="2026-06-16T08:01:00Z", line_number=12, credits=2, primary_used=32, secondary_used=42, plan_type="pro"),
+            _row("pro-baseline-2", timestamp="2026-06-16T08:02:00Z", line_number=13, credits=None, cost=None, primary_used=32, secondary_used=42, plan_type="pro"),
+            _row("pro-direct-2", timestamp="2026-06-16T08:03:00Z", line_number=14, credits=2, primary_used=34, secondary_used=44, plan_type="pro"),
+            _row("pro-baseline-3", timestamp="2026-06-16T08:04:00Z", line_number=15, credits=None, cost=None, primary_used=34, secondary_used=44, plan_type="pro"),
+            _row("pro-direct-3", timestamp="2026-06-16T08:05:00Z", line_number=16, credits=2, primary_used=36, secondary_used=46, plan_type="pro"),
+            _row("pro-baseline-4", timestamp="2026-06-16T08:06:00Z", line_number=17, credits=None, cost=None, primary_used=36, secondary_used=46, plan_type="pro"),
+            _row("pro-direct-4", timestamp="2026-06-16T08:07:00Z", line_number=18, credits=2, primary_used=38, secondary_used=48, plan_type="pro"),
+            _row("pro-baseline-5", timestamp="2026-06-16T08:08:00Z", line_number=19, credits=None, cost=None, primary_used=38, secondary_used=48, plan_type="pro"),
+            _row("pro-direct-5", timestamp="2026-06-16T08:09:00Z", line_number=20, credits=2, primary_used=40, secondary_used=50, plan_type="pro"),
+            _row(
+                "alternate-baseline",
+                timestamp="2026-06-16T10:55:00Z",
+                line_number=21,
+                credits=None,
+                cost=None,
+                primary_used=0,
+                secondary_used=0,
+                plan_type=None,
+                limit_id="codex_bengalfox",
+            ),
+            _row(
+                "alternate-call",
+                timestamp="2026-06-16T10:56:00Z",
+                line_number=22,
+                credits=2,
+                primary_used=0,
+                secondary_used=0,
+                plan_type=None,
+                limit_id="codex_bengalfox",
+            ),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+    primary = by_id["alternate-call"]["usage_impact"]["primary"]  # type: ignore[index]
+    secondary = by_id["alternate-call"]["usage_impact"]["secondary"]  # type: ignore[index]
+
+    assert usage_impact_estimate(by_id["alternate-call"], "primary") == pytest.approx(2.0)
+    assert usage_impact_estimate(by_id["alternate-call"], "secondary") == pytest.approx(2.0)
+    assert primary["plan_type"] is None
+    assert primary["limit_id"] == "codex_bengalfox"
+    assert primary["calibration_plan_type"] == "pro"
+    assert primary["calibration_limit_id"] == "codex"
+    assert secondary["calibration_plan_type"] == "pro"
+
+
 def test_usage_impact_calibration_includes_flat_observed_intervals() -> None:
     rows = annotate_rows_with_usage_impact(
         [

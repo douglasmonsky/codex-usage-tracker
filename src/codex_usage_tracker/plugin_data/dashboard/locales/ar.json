@@ -39,6 +39,7 @@
   "allowance.observed_source_hint": "Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.",
   "allowance.observed_window": "{label} {used} used",
   "allowance.observed_window_reset": "{label} {used} used · resets {reset}",
+  "allowance.alternate_limit_hint": "أبلغت هذه المكالمة عن limit_id {limit}. لم تُظهر اللقطة المحلية أي حركة استخدام مرصودة لمدة 5 ساعات أو أسبوعية لهذا النطاق، لذلك لا يتم تقدير أثر الحصة.",
   "aria.current_view_actions": "إجراءات العرض الحالية",
   "aria.dashboard_status": "حالة لوحة القيادة",
   "aria.dashboard_view": "عرض لوحة القيادة",

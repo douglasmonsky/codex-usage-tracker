@@ -39,6 +39,7 @@
   "allowance.observed_source_hint": "Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.",
   "allowance.observed_window": "{label} {used} used",
   "allowance.observed_window_reset": "{label} {used} used · resets {reset}",
+  "allowance.alternate_limit_hint": "Lượt gọi này báo cáo limit_id {limit}. Ảnh chụp cục bộ không cho thấy mức dùng 5h hoặc hằng tuần thay đổi trong nhóm này, nên không ước tính tác động đến hạn mức.",
   "aria.current_view_actions": "Hành động xem hiện tại",
   "aria.dashboard_status": "Trạng thái trang tổng quan",
   "aria.dashboard_view": "Chế độ xem trang tổng quan",

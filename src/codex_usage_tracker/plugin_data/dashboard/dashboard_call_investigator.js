@@ -158,14 +158,14 @@
     function usageImpactValue(row, key) {
       const impact = usageImpactWindow(row, key);
       if (impact) return formatUsageImpactPercent(impact.estimate_percent);
-      return separateUsagePool(row) ? t('allowance.separate_pool') : t('state.unknown');
+      return separateUsagePool(row) ? '-' : t('state.unknown');
     }
 
     function usageImpactSubtitle(row, key) {
       const impact = usageImpactWindow(row, key);
       if (!impact) {
         const limitId = separateUsagePool(row);
-        if (limitId) return tf('allowance.separate_pool_hint', { limit: limitId });
+        if (limitId) return tf('allowance.alternate_limit_hint', { limit: limitId });
         return t('allowance.observed_source_hint');
       }
       const halfWidth = Math.max(
@@ -180,7 +180,16 @@
       const source = impact.source === 'calibrated_history'
         ? `calibrated from ${number.format(impact.calibration_sample_count || 0)} observed intervals`
         : `${number.format(impact.interval_call_count || 0)} ${t('table.calls')}`;
-      return `${formatUsageImpactPercent(impact.estimate_percent)} ±${formatUsageImpactDelta(halfWidth)} · ${source} · ${basis}`;
+      const familyFallback = String(impact.source_note || '').startsWith('calibrated_from_codex_limit_family')
+        && impact.limit_id
+        && impact.calibration_limit_id;
+      const fallbackScope = impact.calibration_plan_type
+        ? `${impact.calibration_limit_id}/${impact.calibration_plan_type}`
+        : impact.calibration_limit_id;
+      const fallbackNote = familyFallback
+        ? ` · ${impact.limit_id} estimated with ${fallbackScope} calibration`
+        : '';
+      return `${formatUsageImpactPercent(impact.estimate_percent)} ±${formatUsageImpactDelta(halfWidth)} · ${source}${fallbackNote} · ${basis}`;
     }
 
     function formatUsageImpactPercent(value) {

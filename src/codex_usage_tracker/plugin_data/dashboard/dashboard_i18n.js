@@ -84,6 +84,7 @@
     'allowance.observed_source_hint': 'Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.',
     'allowance.observed_window': '{label} {used} used',
     'allowance.observed_window_reset': '{label} {used} used · resets {reset}',
+    'allowance.alternate_limit_hint': 'This call reported limit_id {limit}. The local snapshot showed no observed 5h/weekly usage movement for that bucket, so allowance impact is not estimated.',
     'allowance.separate_pool': 'Separate pool',
     'allowance.separate_pool_hint': 'This call reported limit_id {limit}, which appears to be a separate Codex limit pool. No normal 5h/weekly allowance movement was observed for this bucket.',
     'language.label': 'Language',

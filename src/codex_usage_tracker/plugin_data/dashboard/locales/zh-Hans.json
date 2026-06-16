@@ -39,6 +39,7 @@
   "allowance.observed_source_hint": "Read from the latest local Codex token-count log that includes usage remaining. Updates after Codex records a model call, not continuously in real time.",
   "allowance.observed_window": "{label} {used} used",
   "allowance.observed_window_reset": "{label} {used} used · resets {reset}",
+  "allowance.alternate_limit_hint": "此调用报告了 limit_id {limit}。本地快照未显示该分组有 5h 或每周使用量变化，因此不会估算配额影响。",
   "aria.current_view_actions": "当前视图操作",
   "aria.dashboard_status": "仪表板状态",
   "aria.dashboard_view": "仪表板视图",
