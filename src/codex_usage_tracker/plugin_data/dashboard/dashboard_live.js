@@ -153,6 +153,83 @@
         || refreshResultNumber(result, 'full_reparse_source_files') > 0;
     }
 
+    function liveApiHttpMessage(status) {
+      const reloadHint = t('live.refresh_suffix').replace(/^\.\s*/, '');
+      return `${tf('context.api_http', { status })} ${reloadHint}`;
+    }
+
+    function liveApiResponseMessage(response) {
+      if (response.status === 401 || response.status === 403) {
+        return liveApiHttpMessage(String(response.status));
+      }
+      return `HTTP ${response.status}`;
+    }
+
+    function stopLiveRefreshForAuthFailure(response) {
+      if (response.status !== 401 && response.status !== 403) return false;
+      if (autoRefreshEl) autoRefreshEl.checked = false;
+      scheduleAutoRefresh();
+      rowHydrationRestartRequested = false;
+      rowHydrationError = liveApiResponseMessage(response);
+      updateLiveStatus('status.refresh_error', tf('live.refresh_unavailable', { message: rowHydrationError, suffix: '' }));
+      updateRowLoadProgress();
+      return true;
+    }
+
+    async function fetchCallRows(limit, offset) {
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+        include_archived: getIncludeArchived() ? '1' : '0',
+        sort: 'time',
+        direction: 'desc',
+        lang: i18n.currentLanguage,
+        _: String(Date.now()),
+      });
+      const response = await fetch(`/api/calls?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Codex-Usage-Token': apiToken(),
+        },
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        stopLiveRefreshForAuthFailure(response);
+        throw new Error(liveApiResponseMessage(response));
+      }
+      const payload = await response.json();
+      if (payload.error) throw new Error(payload.error);
+      return payload;
+    }
+
+    async function refreshAppendedRows(refreshResult, scopedRows) {
+      if (!liveRefreshSupported || activeView() === 'call') return;
+      if (rowHydrationInFlight) {
+        rowHydrationRestartRequested = true;
+        return;
+      }
+      const inserted = Math.max(
+        refreshResultNumber(refreshResult, 'inserted_records'),
+        refreshResultNumber(refreshResult, 'inserted_or_updated_events'),
+        1,
+      );
+      const chunkLimit = Math.min(
+        Math.max(inserted, initialHydrationChunkSize),
+        Math.max(initialHydrationChunkSize, backgroundHydrationChunkSize),
+      );
+      rowHydrationError = '';
+      updateLiveStatus('status.checking', t('live.loading_rows'));
+      updateRowLoadProgress();
+      const payload = await fetchCallRows(chunkLimit, 0);
+      if (Number.isFinite(scopedRows) && payload.total_matched_rows === undefined) {
+        payload.total_matched_rows = scopedRows;
+      }
+      applyDashboardPayload(payload, { appendRows: true });
+      rowHydrationComplete = getData().length >= rowHydrationTarget();
+      updateRowLoadProgress();
+      updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
+    }
+
     async function hydrateDashboardRows(options = null) {
       if (!liveRefreshSupported || activeView() === 'call') return;
       const hydrateOptions = options || {};
@@ -193,23 +270,7 @@
             offset === 0 ? initialHydrationChunkSize : backgroundHydrationChunkSize,
             remaining,
           );
-          const params = new URLSearchParams({
-            limit: String(chunkSize),
-            offset: String(offset),
-            include_archived: getIncludeArchived() ? '1' : '0',
-            lang: i18n.currentLanguage,
-            _: String(Date.now()),
-          });
-          const response = await fetch(`/api/usage?${params.toString()}`, {
-            headers: {
-              'Accept': 'application/json',
-              'X-Codex-Usage-Token': apiToken(),
-            },
-            cache: 'no-store',
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const payload = await response.json();
-          if (payload.error) throw new Error(payload.error);
+          const payload = await fetchCallRows(chunkSize, offset);
           if (payload.usage_impact_pending) usageImpactPending = true;
           if (generation !== rowHydrationGeneration || activeView() === 'call') break;
           const rows = payloadRows(payload);
@@ -253,7 +314,10 @@
           },
           cache: 'no-store',
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          stopLiveRefreshForAuthFailure(response);
+          return;
+        }
         const payload = await response.json();
         const scopedRows = Number(payload.row_counts?.scoped_rows);
         if (payload.observed_usage) {
@@ -268,7 +332,7 @@
         if (refreshResultNeedsReset(refreshResult)) {
           refreshDashboardData(false, { refreshLogs: false, resetRows: true });
         } else if (refreshResultHasRowChanges(refreshResult) || rowCountChanged) {
-          refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+          await refreshAppendedRows(refreshResult, scopedRows);
         } else if (rowsNeedHydration()) {
           hydrateDashboardRows();
         }
@@ -310,7 +374,8 @@
           cache: 'no-store',
         });
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          stopLiveRefreshForAuthFailure(response);
+          throw new Error(liveApiResponseMessage(response));
         }
         const nextPayload = await response.json();
         if (nextPayload.error) throw new Error(nextPayload.error);
