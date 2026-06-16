@@ -117,6 +117,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert dashboard_shell_payload["summary"]["visible_calls"] == 0
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
+    assert limited_payload["refresh_result"]["changed_source_files"] >= 1
+    assert limited_payload["refresh_result"]["inserted_records"] == 4
+    assert limited_payload["refresh_result"]["skipped_downstream_work"] is False
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}
     assert len(limited_payload["rows"]) == 2
     assert limited_payload["loaded_row_count"] == 2
@@ -169,9 +172,22 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
 def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_path: Path) -> None:
     from codex_usage_tracker.server import _UsageDashboardHandler
 
+    class FakeUsageImpactCache:
+        def __init__(self) -> None:
+            self.invalidations = 0
+            self.warms = 0
+
+        def invalidate(self) -> None:
+            self.invalidations += 1
+
+        def warm_async(self, *, include_archived: bool) -> None:
+            _ = include_archived
+            self.warms += 1
+
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
+    usage_impact_cache = FakeUsageImpactCache()
     log_path = next(
         path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name
     )
@@ -195,6 +211,7 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
         api_token="test-token",
         context_api_enabled=True,
         refresh_lock=threading.Lock(),
+        usage_impact_cache=usage_impact_cache,
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -220,9 +237,22 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
     assert forbidden["status"] == 403
     assert live_payload["refresh_result"]["parsed_events"] == 1
     assert live_payload["refresh_result"]["inserted_or_updated_events"] == 1
+    assert live_payload["refresh_result"]["changed_source_files"] == 1
+    assert live_payload["refresh_result"]["append_source_files"] == 1
+    assert live_payload["refresh_result"]["full_reparse_source_files"] == 0
+    assert live_payload["refresh_result"]["inserted_records"] == 1
+    assert live_payload["refresh_result"]["deleted_records"] == 0
+    assert live_payload["refresh_result"]["affected_threads"] == 1
+    assert live_payload["refresh_result"]["skipped_downstream_work"] is False
     assert live_payload["row_counts"]["scoped_rows"] == 5
     assert second_payload["refresh_result"]["parsed_events"] == 0
     assert second_payload["refresh_result"]["inserted_or_updated_events"] == 0
+    assert second_payload["refresh_result"]["changed_source_files"] == 0
+    assert second_payload["refresh_result"]["inserted_records"] == 0
+    assert second_payload["refresh_result"]["affected_threads"] == 0
+    assert second_payload["refresh_result"]["skipped_downstream_work"] is True
+    assert usage_impact_cache.invalidations == 1
+    assert usage_impact_cache.warms == 1
 
 
 def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Path) -> None:

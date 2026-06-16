@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker import server_utils
 from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
+from codex_usage_tracker.api_payloads import refresh_result_payload
 from codex_usage_tracker.call_origin import ensure_call_origin
 from codex_usage_tracker.context import (
     CONTEXT_MODE_QUICK,
@@ -92,6 +93,20 @@ _url_host = server_utils.url_host
 _utc_now = server_utils.utc_now
 _validate_context_api_mode = server_utils.validate_context_api_mode
 _validate_loopback_host = server_utils.validate_loopback_host
+
+
+def _refresh_result_invalidates_usage_impact(result: object) -> bool:
+    if bool(getattr(result, "skipped_downstream_work", False)):
+        return False
+    return any(
+        int(getattr(result, field, 0) or 0) > 0
+        for field in (
+            "inserted_records",
+            "deleted_records",
+            "full_reparse_source_files",
+            "inserted_or_updated_events",
+        )
+    )
 
 
 class _ContextApiState:
@@ -1037,18 +1052,17 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 db_path=self._db_path,
                 include_archived=include_archived,
             )
-        self._usage_impact_cache.invalidate()
-        self._usage_impact_cache.warm_async(include_archived=include_archived)
+        if _refresh_result_invalidates_usage_impact(result):
+            self._usage_impact_cache.invalidate()
+            self._usage_impact_cache.warm_async(include_archived=include_archived)
+        payload = refresh_result_payload(
+            result,
+            schema="codex-usage-tracker-refresh-v1",
+        )
+        payload.pop("schema", None)
+        payload["include_archived"] = include_archived
         return (
-            {
-                "scanned_files": result.scanned_files,
-                "parsed_events": result.parsed_events,
-                "skipped_events": result.skipped_events,
-                "inserted_or_updated_events": result.inserted_or_updated_events,
-                "db_path": result.db_path,
-                "parser_diagnostics": result.parser_diagnostics,
-                "include_archived": include_archived,
-            },
+            payload,
             _elapsed_ms(refresh_started),
         )
 

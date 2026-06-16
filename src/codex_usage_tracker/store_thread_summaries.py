@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable
 from datetime import datetime, timezone
 
 from codex_usage_tracker.store_query_sql import (
@@ -11,23 +12,39 @@ from codex_usage_tracker.store_query_sql import (
 )
 
 
-def rebuild_thread_summaries(conn: sqlite3.Connection) -> int:
+def rebuild_thread_summaries(
+    conn: sqlite3.Connection,
+    *,
+    thread_keys: Iterable[str] | None = None,
+) -> int:
     """Rebuild materialized per-thread aggregate summaries."""
 
     before = conn.total_changes
-    conn.execute("DELETE FROM thread_summaries")
+    normalized_thread_keys = sorted({key for key in thread_keys or [] if key})
+    if thread_keys is None:
+        conn.execute("DELETE FROM thread_summaries")
+    elif not normalized_thread_keys:
+        return 0
+    else:
+        placeholders = ", ".join("?" for _key in normalized_thread_keys)
+        conn.execute(
+            f"DELETE FROM thread_summaries WHERE thread_key IN ({placeholders})",
+            normalized_thread_keys,
+        )
     updated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     _insert_thread_summary_scope(
         conn,
         scope="active",
         include_archived=False,
         updated_at=updated_at,
+        thread_keys=normalized_thread_keys if thread_keys is not None else None,
     )
     _insert_thread_summary_scope(
         conn,
         scope="all-history",
         include_archived=True,
         updated_at=updated_at,
+        thread_keys=normalized_thread_keys if thread_keys is not None else None,
     )
     return conn.total_changes - before
 
@@ -38,9 +55,20 @@ def _insert_thread_summary_scope(
     scope: str,
     include_archived: bool,
     updated_at: str,
+    thread_keys: list[str] | None = None,
 ) -> None:
     where_clause, params = _usage_where_clause(include_archived=include_archived)
     thread_key_expr = _thread_key_expression()
+    clauses: list[str] = []
+    if where_clause:
+        clauses.append(where_clause.removeprefix("WHERE "))
+    if thread_keys is not None:
+        placeholders = ", ".join("?" for _key in thread_keys)
+        clauses.append(f"{thread_key_expr} IN ({placeholders})")
+        params = [*params, *thread_keys]
+    scoped_where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
+    if not clauses:
+        scoped_where_clause = ""
     conn.execute(
         f"""
         INSERT INTO thread_summaries (
@@ -128,7 +156,7 @@ def _insert_thread_summary_scope(
                 AS archived_call_count,
             ? AS updated_at
         FROM usage_events
-        {where_clause}
+        {scoped_where_clause}
         GROUP BY {thread_key_expr}
         """,
         [scope, updated_at, *params],

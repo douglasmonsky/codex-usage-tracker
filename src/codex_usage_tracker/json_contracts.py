@@ -14,6 +14,13 @@ REFRESH_RESULT_FIELDS = {
     "parsed_events": int,
     "skipped_events": int,
     "inserted_or_updated_events": int,
+    "changed_source_files": int,
+    "append_source_files": int,
+    "full_reparse_source_files": int,
+    "inserted_records": int,
+    "deleted_records": int,
+    "affected_threads": int,
+    "skipped_downstream_work": bool,
     "db_path": str,
     "parser_diagnostics": dict,
 }

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Make refresh delta-aware so no-op refreshes skip downstream adjacency and
+  thread-summary rebuild work, and append refreshes update only affected thread
+  read models.
+
 ## 0.6.1 - 2026-06-13
 
 - Polish the README landing screenshots with matched dashboard/investigator previews and an additional lower investigator evidence view.

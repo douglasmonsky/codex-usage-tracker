@@ -108,3 +108,10 @@ class RefreshResult:
     db_path: str
     skipped_events: int = 0
     parser_diagnostics: dict[str, int] = field(default_factory=dict)
+    changed_source_files: int = 0
+    append_source_files: int = 0
+    full_reparse_source_files: int = 0
+    inserted_records: int = 0
+    deleted_records: int = 0
+    affected_threads: int = 0
+    skipped_downstream_work: bool = False

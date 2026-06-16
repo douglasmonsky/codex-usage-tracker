@@ -131,6 +131,28 @@
       }, 1200);
     }
 
+    function refreshResultNumber(result, key) {
+      return Number(result?.[key] || 0);
+    }
+
+    function refreshResultHasDelta(result) {
+      return result && Object.prototype.hasOwnProperty.call(result, 'skipped_downstream_work');
+    }
+
+    function refreshResultIsNoOp(result) {
+      return refreshResultHasDelta(result) && result.skipped_downstream_work === true;
+    }
+
+    function refreshResultHasRowChanges(result) {
+      return refreshResultNumber(result, 'inserted_records') > 0
+        || refreshResultNumber(result, 'inserted_or_updated_events') > 0;
+    }
+
+    function refreshResultNeedsReset(result) {
+      return refreshResultNumber(result, 'deleted_records') > 0
+        || refreshResultNumber(result, 'full_reparse_source_files') > 0;
+    }
+
     async function hydrateDashboardRows(options = null) {
       if (!liveRefreshSupported || activeView() === 'call') return;
       const hydrateOptions = options || {};
@@ -237,8 +259,15 @@
         if (payload.observed_usage) {
           setObservedUsage(payload.observed_usage);
         }
+        const refreshResult = payload.refresh_result || {};
+        if (refreshResultIsNoOp(refreshResult)) {
+          if (rowsNeedHydration()) hydrateDashboardRows();
+          return;
+        }
         const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows();
-        if (rowCountChanged) {
+        if (refreshResultNeedsReset(refreshResult)) {
+          refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+        } else if (refreshResultHasRowChanges(refreshResult) || rowCountChanged) {
           refreshDashboardData(false, { refreshLogs: false, resetRows: true });
         } else if (rowsNeedHydration()) {
           hydrateDashboardRows();
