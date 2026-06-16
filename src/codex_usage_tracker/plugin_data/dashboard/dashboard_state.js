@@ -52,7 +52,7 @@
   function serialize(state) {
     const params = new URLSearchParams(window.location.search);
     STATE_KEYS.forEach(key => params.delete(key));
-    set(params, 'view', ALLOWED_VIEWS.has(state.view) && state.view !== 'insights' ? state.view : '');
+    set(params, 'view', ALLOWED_VIEWS.has(state.view) && state.view !== 'calls' ? state.view : '');
     set(params, 'q', state.search);
     set(params, 'model', state.model);
     set(params, 'effort', state.effort);
@@ -61,7 +61,7 @@
     set(params, 'from', state.dateStart);
     set(params, 'to', state.dateEnd);
     set(params, 'history', state.historyScope === 'all' ? 'all' : '');
-    set(params, 'sort', state.sort && state.sort !== 'attention' ? state.sort : '');
+    set(params, 'sort', state.sort && state.sort !== 'time' ? state.sort : '');
     set(params, 'direction', ALLOWED_DIRECTIONS.has(state.direction) ? state.direction : '');
     set(params, 'preset', state.preset);
     set(params, 'page', state.page && Number(state.page) > 1 ? String(Math.floor(Number(state.page))) : '');

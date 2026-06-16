@@ -26,7 +26,6 @@
       number,
       outputTokenCell,
       pct,
-      renderSignalPucks,
       renderTimeCell,
       renderWithState,
       rowInvestigatorLink,
@@ -47,6 +46,7 @@
       threadCallPageSize,
       threadInitiatorSummary,
       tokenNumberCell,
+      tooltipAttributes,
       totalTokenCell,
       translateEffort,
       truncate,
@@ -81,12 +81,13 @@
       tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.calls', { sort: tableCaptionEl.dataset.sortDescription, loaded: loadedRowsDescription() })}`;
       for (const row of page.items) {
         const tr = document.createElement('tr');
-        const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
+        const threadLabel = rowThreadLabel(row);
+        const threadTooltip = `${threadLabel} - ${short(row.session_id)}`;
         tr.className = `call-row${getSelectedRecordId() === row.record_id ? ' selected-row' : ''}`;
         tr.dataset.recordId = row.record_id || '';
         tr.innerHTML = `
           <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
-          <td title="${escapeHtml(short(row.session_id))}">${rowInvestigatorLink(row, `<span class="thread-name">${escapeHtml(truncate(rowThreadLabel(row)))}</span>`)}</td>
+          <td>${rowInvestigatorLink(row, `<span class="thread-name" ${tooltipAttributes(threadTooltip)}>${escapeHtml(truncate(threadLabel, 34))}</span>`)}</td>
           <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
           <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
           <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
@@ -94,9 +95,9 @@
           <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
+          <td class="num token-cell">${rowInvestigatorLink(row, tokenNumberCell(row.reasoning_output_tokens || 0, t('metric.reasoning_output')))}</td>
           <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
           <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
-          <td>${rowInvestigatorLink(row, `<div class="flags">${renderSignalPucks(row, flags, 3)}</div>`)}</td>
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
         rowsEl.appendChild(tr);
@@ -162,7 +163,7 @@
             <div class="thread-title">
                 <span class="thread-toggle" aria-hidden="true">${expanded ? '-' : '+'}</span>
               <span class="thread-meta">
-                <span class="thread-name">${group.renderAsChild ? `<span class="thread-relation">${escapeHtml(t('thread.spawned'))}</span> ` : ''}${escapeHtml(truncate(group.label, 72))}</span>
+                <span class="thread-name" ${tooltipAttributes(group.label)}>${group.renderAsChild ? `<span class="thread-relation">${escapeHtml(t('thread.spawned'))}</span> ` : ''}${escapeHtml(truncate(group.label, 34))}</span>
                 <span class="thread-subtle">${escapeHtml(threadNotes)} · ${escapeHtml(tf('thread.attention', { score: number.format(Math.round(group.attentionScore)) }))}</span>
               </span>
             </div>
@@ -174,9 +175,9 @@
           <td class="num token-cell">${tokenNumberCell(group.cachedTokens, t('metric.cached_input'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.uncachedTokens, t('metric.uncached_input'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.outputTokens, t('metric.output_tokens'))}</td>
+          <td class="num token-cell">${tokenNumberCell(group.reasoningOutputTokens, t('metric.reasoning_output'))}</td>
           <td class="num">${costUsageCell(getPricingConfigured() ? moneyText(group.estimatedCost) : t('state.not_configured'), group.usageCredits)}</td>
           <td class="num">${pct(group.cacheRatio)}</td>
-          <td class="num">${number.format(group.signalCount)}</td>
         `;
         tr.addEventListener('click', () => {
           if (expandedThreads.has(group.key)) {
@@ -222,7 +223,6 @@
       const visiblePages = Math.max(1, getThreadCallVisiblePages().get(group.key) || 1);
       const visibleCount = Math.min(sortedCalls.length, visiblePages * threadCallPageSize);
       const calls = sortedCalls.slice(0, visibleCount).map(row => {
-        const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         return `
           <tr class="thread-call-row${getSelectedRecordId() === row.record_id ? ' selected-row' : ''}" data-record-id="${escapeHtml(row.record_id || '')}">
             <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
@@ -233,9 +233,9 @@
             <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
             <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
             <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(row, tokenNumberCell(row.reasoning_output_tokens || 0, t('metric.reasoning_output')))}</td>
             <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
             <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
-            <td>${rowInvestigatorLink(row, `<div class="flags compact-flags">${renderSignalPucks(row, flags, 3, t('state.none'))}</div>`)}</td>
           </tr>
         `;
       }).join('');
@@ -253,6 +253,19 @@
       tr.innerHTML = `
         <td class="child-cell" colspan="12">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
+            <colgroup>
+              <col class="col-time">
+              <col class="col-initiated">
+              <col class="col-model">
+              <col class="col-effort">
+              <col class="col-tokens">
+              <col class="col-cached">
+              <col class="col-uncached">
+              <col class="col-output">
+              <col class="col-reasoning">
+              <col class="col-cost">
+              <col class="col-cache">
+            </colgroup>
             <thead><tr>
               ${threadCallHeader('time', t('table.time'))}
               ${threadCallHeader('initiator', t('table.initiated'))}
@@ -262,9 +275,9 @@
               ${threadCallHeader('cached', t('table.cached'), true)}
               ${threadCallHeader('uncached', t('table.uncached'), true)}
               ${threadCallHeader('output', t('table.output'), true)}
+              ${threadCallHeader('reasoning', t('context.token_reasoning'), true)}
               ${threadCallHeader('cost', t('table.cost'), true)}
               ${threadCallHeader('cache', t('table.cache'), true)}
-              ${threadCallHeader('signals', t('table.signals'))}
             </tr></thead>
             <tbody>${calls}</tbody>
           </table>

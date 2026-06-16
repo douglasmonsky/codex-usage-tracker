@@ -443,7 +443,7 @@ def test_dashboard_js_generates_language_options_and_preserves_runtime_state() -
     assert "rerenderSelectedDetail()" in set_language
 
 
-def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> None:
+def test_dashboard_js_thread_call_rows_include_cache_and_reasoning_columns() -> None:
     render_thread_calls = extract_js_function(dashboard_tables_js_text(), "renderThreadCalls")
 
     for label in [
@@ -455,16 +455,17 @@ def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> No
         "table.cached",
         "table.uncached",
         "table.output",
+        "context.token_reasoning",
         "table.cost",
         "table.cache",
-        "table.signals",
     ]:
         assert label in render_thread_calls
     assert "row.cache_ratio" in render_thread_calls
     assert "cachedTokenCell(row)" in render_thread_calls
     assert "uncachedTokenCell(row)" in render_thread_calls
     assert "outputTokenCell(row)" in render_thread_calls
-    assert "renderSignalPucks(row, flags, 3" in render_thread_calls
+    assert "row.reasoning_output_tokens || 0" in render_thread_calls
+    assert "renderSignalPucks(row, flags, 3" not in render_thread_calls
     assert "</tr>" in render_thread_calls
 
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
+from codex_usage_tracker.schema import USAGE_EVENT_COLUMN_NAMES
+
 
 @dataclass(frozen=True)
 class SessionInfo:
@@ -95,7 +97,7 @@ class UsageEvent:
         row["cache_ratio"] = self.cache_ratio
         row["reasoning_output_ratio"] = self.reasoning_output_ratio
         row["context_window_percent"] = self.context_window_percent
-        return row
+        return {column: row[column] for column in USAGE_EVENT_COLUMN_NAMES}
 
 
 @dataclass(frozen=True)

@@ -16,13 +16,11 @@
     }
     .grid > section:not(.detail-section) {
       min-width: 0;
-      overflow: visible;
+      overflow-x: auto;
+      overflow-y: clip;
     }
-    @media (max-width: 1500px) {
-      body:not([data-active-view="call"]) .grid > section:not(.detail-section) {
-        overflow-x: auto;
-        overflow-y: clip;
-      }
+    body[data-active-view="call"] .grid > section:not(.detail-section) {
+      overflow: visible;
     }
     .detail-section {
       position: sticky;

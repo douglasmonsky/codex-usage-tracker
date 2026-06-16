@@ -9,6 +9,18 @@
     .grid > section:first-child > table {
       min-width: var(--calls-table-min-width);
     }
+    col.col-time { width: var(--sticky-time-width); }
+    col.col-thread { width: var(--sticky-thread-width); }
+    col.col-initiated { width: 112px; }
+    col.col-model { width: 112px; }
+    col.col-effort { width: 96px; }
+    col.col-tokens,
+    col.col-cached,
+    col.col-uncached { width: 118px; }
+    col.col-output { width: 96px; }
+    col.col-reasoning { width: 112px; }
+    col.col-cost { width: 92px; }
+    col.col-cache { width: 82px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
     .grid > section:first-child > table > thead,
     .thread-call-table thead {
@@ -435,8 +447,13 @@
       min-width: 0;
     }
     .thread-name {
+      display: inline-block;
+      max-width: 100%;
       font-weight: 760;
-      overflow-wrap: anywhere;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+      white-space: nowrap;
     }
     .thread-subtle {
       color: var(--muted);
@@ -452,9 +469,10 @@
     }
     .thread-call-table {
       width: 100%;
-      min-width: 1120px;
+      min-width: var(--thread-call-table-min-width);
       border-collapse: collapse;
       font-size: 12px;
+      table-layout: fixed;
     }
     .thread-call-table th {
       position: sticky;

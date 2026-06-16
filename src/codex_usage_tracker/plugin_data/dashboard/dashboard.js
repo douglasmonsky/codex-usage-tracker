@@ -182,9 +182,9 @@
       custom: 'option.custom_range',
     };
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
-    let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : 'insights';
+    let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : 'calls';
     document.body.dataset.activeView = activeView;
-    let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'attention';
+    let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'time';
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
     let threadCallSortKey = 'time';
     let threadCallSortDirection = 'desc';
@@ -389,7 +389,7 @@
         cached: t('table.cached'),
         uncached: t('table.uncached'),
         output: t('table.output'),
-        signals: t('table.signals'),
+        reasoning: t('metric.reasoning_output'),
         thread: t('table.thread'),
         time: t('table.time'),
         total: t('table.tokens'),
@@ -751,7 +751,7 @@
     function clearPreset() {
       activePreset = '';
       pricingStatusEl.value = '';
-      sortKey = 'attention';
+      sortKey = 'time';
       sortDirection = defaultSortDirection(sortKey);
       sortEl.value = sortKey;
       resetVisibleRows();
@@ -790,7 +790,6 @@
       effortTooltipText,
       outputTokenCell,
       outputTokens,
-      renderSignalPucks,
       sourceLabelText,
       threadInitiatorSummary,
       tokenNumberCell,
@@ -974,7 +973,7 @@
         threadCallSortDirection = threadCallSortDirection === 'asc' ? 'desc' : 'asc';
       } else {
         threadCallSortKey = key;
-        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'cost' || key === 'cache' || key === 'signals' ? 'desc' : 'asc';
+        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'reasoning' || key === 'cost' || key === 'cache' ? 'desc' : 'asc';
       }
       render();
     }
@@ -1049,7 +1048,6 @@
       number,
       outputTokenCell,
       pct,
-      renderSignalPucks,
       renderTimeCell,
       renderWithState: () => render(),
       rowInvestigatorLink,
@@ -1070,6 +1068,7 @@
       threadCallPageSize,
       threadInitiatorSummary,
       tokenNumberCell,
+      tooltipAttributes,
       totalTokenCell,
       translateEffort,
       truncate,

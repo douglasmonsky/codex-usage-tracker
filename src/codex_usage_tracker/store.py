@@ -910,6 +910,9 @@ def query_thread_summaries(
         "time": "latest_event_timestamp",
         "calls": "call_count",
         "cache": "avg_cache_ratio",
+        "cost": "estimated_cost_usd",
+        "output": "output_tokens",
+        "reasoning": "reasoning_output_tokens",
         "thread": "thread_label",
     }
     if sort not in sort_map:

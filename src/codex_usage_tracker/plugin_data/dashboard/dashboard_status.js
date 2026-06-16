@@ -88,12 +88,9 @@
     }
 
     function observedWindowText(window) {
-      const used = observedPercent(window.used_percent);
-      if (!used) return '';
-      const reset = observedResetText(window.resets_at);
-      return reset
-        ? tf('allowance.observed_window_reset', { label: short(window.label || window.key, 'Usage'), used, reset })
-        : tf('allowance.observed_window', { label: short(window.label || window.key, 'Usage'), used });
+      const remaining = observedRemainingPercent(window.used_percent);
+      if (!remaining) return '';
+      return `${short(window.label || window.key, 'Usage')}: ${remaining}`;
     }
 
     function observedUsageTooltip() {
@@ -112,10 +109,13 @@
     function observedWindowTooltip(window) {
       const used = observedPercent(window.used_percent);
       if (!used) return '';
+      const remaining = observedRemainingPercent(window.used_percent);
       const reset = observedResetText(window.resets_at);
-      return reset
-        ? tf('allowance.observed_window_reset', { label: short(window.label || window.key, 'Usage'), used, reset })
-        : tf('allowance.observed_window', { label: short(window.label || window.key, 'Usage'), used });
+      const label = short(window.label || window.key, 'Usage');
+      const usage = remaining
+        ? `${label}: ${tf('allowance.remaining', { value: remaining })}; ${used} used`
+        : tf('allowance.observed_window', { label, used });
+      return reset ? `${usage} ${tf('allowance.resets', { resets: reset })}` : usage;
     }
 
     function observedPercent(value) {
@@ -124,6 +124,15 @@
       if (!Number.isFinite(numeric)) return '';
       const digits = Math.abs(numeric) >= 10 ? 0 : 1;
       return `${numeric.toFixed(digits)}%`;
+    }
+
+    function observedRemainingPercent(value) {
+      if (value === null || value === undefined || value === '') return '';
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return '';
+      const remaining = Math.max(0, Math.min(100, 100 - numeric));
+      const digits = Math.abs(remaining) >= 10 ? 0 : 1;
+      return `${remaining.toFixed(digits)}%`;
     }
 
     function observedResetText(value) {

@@ -267,7 +267,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 7
+    assert user_version == 8
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:

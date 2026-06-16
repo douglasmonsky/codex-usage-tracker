@@ -177,7 +177,12 @@
     }
 
     function outputTokenCell(row) {
-      return tokenNumberCell(outputTokens(row), t('metric.output_tokens'));
+      const output = outputTokens(row);
+      const reasoning = Number(row.reasoning_output_tokens || 0);
+      const title = reasoning
+        ? `${t('metric.output_tokens')}: ${number.format(output)} - ${t('metric.reasoning_output')}: ${number.format(reasoning)} (${t('context.token_reasoning')} is included in output)`
+        : `${t('metric.output_tokens')}: ${number.format(output)}`;
+      return `<span class="token-number" ${tooltipAttributes(title)}>${escapeHtml(number.format(output))}</span>`;
     }
 
     function effortTooltipText(values) {

@@ -211,8 +211,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Uncached Input" in dashboard
     assert "uncachedTokens" in dashboard
     assert "Codex Credits" in dashboard
-    assert "Usage observed" in dashboard
-    assert "Usage Remaining" in dashboard
+    assert "Remaining usage" in dashboard
     assert "observed_usage" in dashboard
     assert "Price Coverage" not in dashboard
     assert "priceCoverage" not in dashboard_surface
@@ -494,9 +493,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.credit_model" in dashboard_details_js
     assert 'data-sort-key="time"' in dashboard
     assert 'data-sort-key="thread"' in dashboard
-    assert '<option value="attention" selected data-i18n="option.needs_attention">Needs attention</option>' in dashboard
+    assert '<option value="time" selected data-i18n="option.newest_calls">Newest calls</option>' in dashboard
+    assert '<option value="attention" data-i18n="option.needs_attention">Needs attention</option>' in dashboard
     assert '<option value="initiator" data-i18n="table.initiated">Initiated</option>' in dashboard
+    assert '<option value="reasoning" data-i18n="metric.reasoning_output">Reasoning output</option>' in dashboard
     assert '<option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option>' in dashboard
+    assert 'data-sort-key="signals"' not in dashboard
+    assert '<option value="signals"' not in dashboard
+    assert "renderSignalPucks(row, flags, 3" not in dashboard_tables_js
 
     pricing_path.write_text(
         json.dumps(
