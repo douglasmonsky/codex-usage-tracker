@@ -13,6 +13,7 @@ from typing import Any
 from codex_usage_tracker.models import RefreshResult, UsageEvent
 from codex_usage_tracker.parser import (
     PARSER_DIAGNOSTIC_KEYS,
+    PARSER_ADAPTER_VERSION,
     compact_parser_diagnostics,
     find_session_logs,
     load_session_index,
@@ -179,7 +180,7 @@ def record_refresh_metadata(
         "parsed_events": str(parsed_events),
         "skipped_events": str(skipped_events),
         "inserted_or_updated_events": str(inserted_or_updated_events),
-        "parser_adapter": "codex-jsonl-v1",
+        "parser_adapter": PARSER_ADAPTER_VERSION,
         "schema_version": str(SCHEMA_VERSION),
         "usage_events_schema_checksum": USAGE_EVENT_SCHEMA_CHECKSUM,
     }

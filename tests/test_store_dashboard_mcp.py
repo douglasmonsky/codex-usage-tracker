@@ -19,6 +19,7 @@ from store_dashboard_helpers import (
 
 from codex_usage_tracker import store as store_module
 from codex_usage_tracker.models import UsageEvent
+from codex_usage_tracker.parser import PARSER_ADAPTER_VERSION
 from codex_usage_tracker.store import (
     connect,
     init_db,
@@ -77,7 +78,7 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["inserted_or_updated_events"] == "0"
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
-    assert meta["parser_adapter"] == "codex-jsonl-v1"
+    assert meta["parser_adapter"] == PARSER_ADAPTER_VERSION
     assert meta["schema_version"] == "8"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
@@ -188,6 +189,58 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
     assert metadata["parsed_source_files"] == "0"
     assert metadata["skipped_source_files"] == "3"
+
+
+def test_refresh_replaces_source_when_parser_adapter_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = next(
+        path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name
+    )
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute(
+            "UPDATE source_files SET parser_adapter = ? WHERE source_file = ?",
+            ("codex-jsonl-v1", str(log_path)),
+        )
+
+    parse_calls: list[dict[str, Any]] = []
+    original_parse = store_module.parse_usage_events_from_file_with_state
+
+    def tracking_parse(*args: Any, **kwargs: Any):
+        parse_calls.append(
+            {
+                "path": args[0],
+                "start_byte": kwargs.get("start_byte"),
+                "start_line": kwargs.get("start_line"),
+            }
+        )
+        return original_parse(*args, **kwargs)
+
+    monkeypatch.setattr(
+        store_module,
+        "parse_usage_events_from_file_with_state",
+        tracking_parse,
+    )
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    assert result.parsed_events == 2
+    assert len(parse_calls) == 1
+    assert parse_calls[0]["path"] == log_path
+    assert parse_calls[0]["start_byte"] == 0
+    assert parse_calls[0]["start_line"] == 0
+    with connect(db_path) as conn:
+        init_db(conn)
+        source_after = conn.execute(
+            "SELECT parser_adapter FROM source_files WHERE source_file = ?",
+            (str(log_path),),
+        ).fetchone()
+    assert source_after["parser_adapter"] == PARSER_ADAPTER_VERSION
 
 
 def test_append_cursor_preserves_pending_call_origin_between_refreshes(

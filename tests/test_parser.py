@@ -8,6 +8,7 @@ from pathlib import Path
 
 from codex_usage_tracker.models import SessionInfo
 from codex_usage_tracker.parser import (
+    PARSER_ADAPTER_VERSION,
     find_session_logs,
     inspect_log,
     load_session_index,
@@ -341,7 +342,7 @@ def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: P
 
     payload = inspect_log(log_path)
 
-    assert payload["adapter"] == "codex-jsonl-v1"
+    assert payload["adapter"] == PARSER_ADAPTER_VERSION
     assert payload["file_session_id"] is None
     assert payload["event_count"] == 1
     assert payload["session_ids"] == [SESSION_ID]
@@ -366,7 +367,7 @@ def test_cli_inspect_log_outputs_parser_summary(tmp_path: Path) -> None:
         env=_subprocess_env(),
     )
 
-    assert "Adapter: codex-jsonl-v1" in result.stdout
+    assert f"Adapter: {PARSER_ADAPTER_VERSION}" in result.stdout
     assert "Parsed events: 1" in result.stdout
     assert "Diagnostics: none" in result.stdout
 

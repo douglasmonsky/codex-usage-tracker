@@ -10,6 +10,10 @@ Basis = Literal["credits", "cost"]
 SortKey = tuple[str, int, str]
 
 
+_MIN_CALIBRATION_SAMPLES = 5
+_PRIMARY_RESET_ROLLBACK_TOLERANCE_SECONDS = 120
+
+
 @dataclass(frozen=True)
 class _Snapshot:
     used_percent: float
@@ -123,7 +127,8 @@ def _annotate_window(rows: list[dict[str, Any]], window_key: WindowKey) -> None:
             continue
         delta = snapshot.used_percent - previous.used_percent
         if delta < 0:
-            previous = snapshot
+            if not _is_stale_decrease(previous, snapshot, window_key):
+                previous = snapshot
             pending.clear()
             continue
         if delta == 0:
@@ -255,6 +260,8 @@ def _calibration(
 
     preferred_basis: Basis = "credits" if any(sample.basis == "credits" for sample in matching) else "cost"
     basis_samples = [sample for sample in matching if sample.basis == preferred_basis]
+    if len(basis_samples) < _MIN_CALIBRATION_SAMPLES:
+        return None
     rates = sorted(sample.rate for sample in basis_samples if sample.rate > 0)
     lower_rates = sorted(sample.lower_rate for sample in basis_samples if sample.lower_rate >= 0)
     upper_rates = sorted(sample.upper_rate for sample in basis_samples if sample.upper_rate > 0)
@@ -328,8 +335,23 @@ def _same_window(previous: _Snapshot, current: _Snapshot, window_key: WindowKey)
     if _scope_changed(previous.limit_id, current.limit_id):
         return False
     if window_key == "primary":
+        if (
+            previous.resets_at is not None
+            and current.resets_at is not None
+            and current.resets_at
+            < previous.resets_at - _PRIMARY_RESET_ROLLBACK_TOLERANCE_SECONDS
+        ):
+            return False
         return True
     return previous.resets_at == current.resets_at
+
+
+def _is_stale_decrease(previous: _Snapshot, current: _Snapshot, window_key: WindowKey) -> bool:
+    if window_key == "secondary":
+        return previous.resets_at == current.resets_at
+    if previous.resets_at is None or current.resets_at is None:
+        return False
+    return current.resets_at <= previous.resets_at
 
 
 def _rounding_margin(previous: float, current: float) -> float:

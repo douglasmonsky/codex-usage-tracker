@@ -75,7 +75,7 @@ def test_usage_impact_uses_cost_when_credits_are_unavailable() -> None:
     assert by_id["a"]["usage_impact"]["primary"]["basis"] == "cost"  # type: ignore[index]
 
 
-def test_usage_impact_uses_matching_calibrated_history_after_observed_interval() -> None:
+def test_usage_impact_does_not_calibrate_from_sparse_observed_history() -> None:
     rows = annotate_rows_with_usage_impact(
         [
             _row("baseline", primary_used=10),
@@ -86,9 +86,31 @@ def test_usage_impact_uses_matching_calibrated_history_after_observed_interval()
     by_id = {str(row["record_id"]): row for row in rows}
 
     assert usage_impact_estimate(by_id["direct"], "primary") == pytest.approx(2.0)
+    assert usage_impact_estimate(by_id["later"], "primary") is None
+
+
+def test_usage_impact_uses_matching_calibrated_history_after_enough_observed_intervals() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("baseline-1", timestamp="2026-06-15T12:00:00Z", line_number=1, credits=None, cost=None, primary_used=10),
+            _row("direct-1", timestamp="2026-06-15T12:01:00Z", line_number=2, credits=2, primary_used=12),
+            _row("baseline-2", timestamp="2026-06-15T12:02:00Z", line_number=3, credits=None, cost=None, primary_used=12),
+            _row("direct-2", timestamp="2026-06-15T12:03:00Z", line_number=4, credits=2, primary_used=14),
+            _row("baseline-3", timestamp="2026-06-15T12:04:00Z", line_number=5, credits=None, cost=None, primary_used=14),
+            _row("direct-3", timestamp="2026-06-15T12:05:00Z", line_number=6, credits=2, primary_used=16),
+            _row("baseline-4", timestamp="2026-06-15T12:06:00Z", line_number=7, credits=None, cost=None, primary_used=16),
+            _row("direct-4", timestamp="2026-06-15T12:07:00Z", line_number=8, credits=2, primary_used=18),
+            _row("baseline-5", timestamp="2026-06-15T12:08:00Z", line_number=9, credits=None, cost=None, primary_used=18),
+            _row("direct-5", timestamp="2026-06-15T12:09:00Z", line_number=10, credits=2, primary_used=20),
+            _row("later", timestamp="2026-06-15T12:10:00Z", line_number=11, credits=3),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+
     assert usage_impact_estimate(by_id["later"], "primary") == pytest.approx(3.0)
     assert by_id["later"]["usage_impact"]["primary"]["source"] == "calibrated_history"  # type: ignore[index]
     assert by_id["later"]["usage_impact"]["primary"]["basis"] == "credits"  # type: ignore[index]
+    assert by_id["later"]["usage_impact"]["primary"]["calibration_sample_count"] == 5  # type: ignore[index]
 
 
 def test_usage_impact_calibrates_legacy_rows_with_missing_scope() -> None:
@@ -102,13 +124,21 @@ def test_usage_impact_calibrates_legacy_rows_with_missing_scope() -> None:
                 plan_type=None,
                 limit_id=None,
             ),
-            _row("baseline", timestamp="2026-06-15T12:00:00Z", line_number=2, primary_used=10),
-            _row("direct", timestamp="2026-06-15T12:01:00Z", line_number=3, credits=2, primary_used=12),
+            _row("baseline-1", timestamp="2026-06-15T12:00:00Z", line_number=2, credits=None, cost=None, primary_used=10),
+            _row("direct-1", timestamp="2026-06-15T12:01:00Z", line_number=3, credits=2, primary_used=12),
+            _row("baseline-2", timestamp="2026-06-15T12:02:00Z", line_number=4, credits=None, cost=None, primary_used=12),
+            _row("direct-2", timestamp="2026-06-15T12:03:00Z", line_number=5, credits=2, primary_used=14),
+            _row("baseline-3", timestamp="2026-06-15T12:04:00Z", line_number=6, credits=None, cost=None, primary_used=14),
+            _row("direct-3", timestamp="2026-06-15T12:05:00Z", line_number=7, credits=2, primary_used=16),
+            _row("baseline-4", timestamp="2026-06-15T12:06:00Z", line_number=8, credits=None, cost=None, primary_used=16),
+            _row("direct-4", timestamp="2026-06-15T12:07:00Z", line_number=9, credits=2, primary_used=18),
+            _row("baseline-5", timestamp="2026-06-15T12:08:00Z", line_number=10, credits=None, cost=None, primary_used=18),
+            _row("direct-5", timestamp="2026-06-15T12:09:00Z", line_number=11, credits=2, primary_used=20),
         ]
     )
     by_id = {str(row["record_id"]): row for row in rows}
 
-    assert by_id["baseline"]["usage_impact"]["primary"] is None  # type: ignore[index]
+    assert by_id["baseline-1"]["usage_impact"]["primary"] is None  # type: ignore[index]
     assert usage_impact_estimate(by_id["legacy"], "primary") == pytest.approx(3.0)
     assert by_id["legacy"]["usage_impact"]["primary"]["source"] == "calibrated_history"  # type: ignore[index]
 
@@ -164,6 +194,96 @@ def test_usage_impact_does_not_estimate_across_reset_boundaries() -> None:
     by_id = {str(row["record_id"]): row for row in rows}
 
     assert usage_impact_estimate(by_id["s1-reset"], "primary") is None
+
+
+def test_usage_impact_negative_delta_clears_pending_interval_before_later_growth() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("before-reset-base", primary_used=8),
+            _row("before-reset-call", timestamp="2026-06-15T12:01:00Z", line_number=2, credits=5),
+            _row(
+                "reset",
+                timestamp="2026-06-15T12:02:00Z",
+                line_number=3,
+                credits=None,
+                cost=None,
+                primary_used=2,
+                primary_resets=1781563000,
+            ),
+            _row("after-reset-call", timestamp="2026-06-15T12:03:00Z", line_number=4, credits=1),
+            _row(
+                "after-reset-snapshot",
+                timestamp="2026-06-15T12:04:00Z",
+                line_number=5,
+                credits=None,
+                cost=None,
+                primary_used=3,
+                primary_resets=1781563000,
+            ),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+
+    assert usage_impact_estimate(by_id["before-reset-call"], "primary") is None
+    assert usage_impact_estimate(by_id["after-reset-call"], "primary") == pytest.approx(1.0)
+
+
+def test_usage_impact_treats_large_primary_reset_rollback_as_boundary() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("baseline", primary_used=1, primary_resets=1780527008),
+            _row("call", timestamp="2026-06-15T12:01:00Z", line_number=2, credits=5),
+            _row(
+                "rollback-snapshot",
+                timestamp="2026-06-15T12:02:00Z",
+                line_number=3,
+                primary_used=94,
+                primary_resets=1780508966,
+            ),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+
+    assert usage_impact_estimate(by_id["call"], "primary") is None
+    assert usage_impact_estimate(by_id["rollback-snapshot"], "primary") is None
+
+
+def test_usage_impact_ignores_same_week_stale_decrease_before_return_to_high_watermark() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("baseline", secondary_used=26),
+            _row("first-call", timestamp="2026-06-15T12:01:00Z", line_number=2, credits=1),
+            _row(
+                "first-rise",
+                timestamp="2026-06-15T12:02:00Z",
+                line_number=3,
+                credits=None,
+                cost=None,
+                secondary_used=30,
+            ),
+            _row(
+                "stale-lower",
+                timestamp="2026-06-15T12:03:00Z",
+                line_number=4,
+                credits=None,
+                cost=None,
+                secondary_used=26,
+            ),
+            _row("second-call", timestamp="2026-06-15T12:04:00Z", line_number=5, credits=1),
+            _row(
+                "same-high-watermark",
+                timestamp="2026-06-15T12:05:00Z",
+                line_number=6,
+                credits=None,
+                cost=None,
+                secondary_used=30,
+            ),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+
+    assert usage_impact_estimate(by_id["first-call"], "secondary") == pytest.approx(4.0)
+    assert usage_impact_estimate(by_id["second-call"], "secondary") is None
 
 
 def test_usage_impact_allocates_account_window_movement_across_sessions() -> None:
