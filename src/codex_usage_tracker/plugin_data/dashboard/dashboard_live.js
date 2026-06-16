@@ -43,6 +43,8 @@
     let rowHydrationError = '';
     let rowHydrationGeneration = 0;
     let rowHydrationRestartRequested = false;
+    let usageImpactRetryTimer = null;
+    let usageImpactRetryAttempts = 0;
     let autoRefreshTimer = null;
 
     function loadedRowsDescription() {
@@ -119,6 +121,16 @@
       loadLimitEl.value = value;
     }
 
+    function scheduleUsageImpactRetry() {
+      if (usageImpactRetryTimer || activeView() === 'call') return;
+      if (usageImpactRetryAttempts >= 6) return;
+      usageImpactRetryTimer = window.setTimeout(() => {
+        usageImpactRetryTimer = null;
+        usageImpactRetryAttempts += 1;
+        hydrateDashboardRows({ reset: true, usageImpactRetry: true });
+      }, 1200);
+    }
+
     async function hydrateDashboardRows(options = null) {
       if (!liveRefreshSupported || activeView() === 'call') return;
       const hydrateOptions = options || {};
@@ -148,6 +160,7 @@
       const generation = rowHydrationGeneration;
       rowHydrationInFlight = true;
       rowHydrationError = '';
+      let usageImpactPending = false;
       updateLiveStatus('status.checking', t('live.loading_rows'));
       updateRowLoadProgress();
       try {
@@ -175,6 +188,7 @@
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const payload = await response.json();
           if (payload.error) throw new Error(payload.error);
+          if (payload.usage_impact_pending) usageImpactPending = true;
           if (generation !== rowHydrationGeneration || activeView() === 'call') break;
           const rows = payloadRows(payload);
           if (!rows.length) break;
@@ -183,6 +197,7 @@
           if (!payload.has_more || rows.length < chunkSize) break;
         }
         rowHydrationComplete = getData().length >= rowHydrationTarget();
+        if (!usageImpactPending) usageImpactRetryAttempts = 0;
         updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
       } catch (error) {
         rowHydrationError = error.message || String(error);
@@ -196,6 +211,7 @@
           hydrateDashboardRows();
         } else {
           render();
+          if (usageImpactPending) scheduleUsageImpactRetry();
         }
       }
     }

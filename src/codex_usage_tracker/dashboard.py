@@ -116,6 +116,7 @@ def dashboard_payload(
     include_archived: bool = False,
     language: str | None = None,
     include_rows: bool = True,
+    estimate_usage_impact: bool = True,
 ) -> dict[str, object]:
     """Return aggregate-only dashboard data without rendering HTML."""
 
@@ -146,7 +147,10 @@ def dashboard_payload(
         annotate_rows_with_efficiency(rows, pricing),
         allowance,
     )
-    if include_rows and (normalized_limit is not None or normalized_offset):
+    if not estimate_usage_impact:
+        for row in annotated_rows:
+            row["usage_impact"] = {"primary": None, "secondary": None}
+    elif include_rows and (normalized_limit is not None or normalized_offset):
         impact_context_rows = annotate_rows_with_allowance(
             annotate_rows_with_efficiency(
                 [
@@ -275,6 +279,7 @@ def generate_dashboard(
     include_archived: bool = False,
     language: str | None = None,
     include_rows: bool = True,
+    estimate_usage_impact: bool = True,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     guide_href = _dashboard_guide_href(output_path)
@@ -300,6 +305,7 @@ def generate_dashboard(
         include_archived=include_archived,
         language=language,
         include_rows=include_rows,
+        estimate_usage_impact=estimate_usage_impact,
     )
     payload_dict["pricing_snapshot_warning"] = _pricing_snapshot_warning(
         previous_payload, payload_dict

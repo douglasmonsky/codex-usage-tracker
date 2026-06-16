@@ -116,6 +116,7 @@ class ParsedUsageFile:
 
     events: list[UsageEvent]
     state: ParserState
+    parsed_until_line: int = 0
 
 
 def load_session_index(codex_home: Path = DEFAULT_CODEX_HOME) -> dict[str, SessionInfo]:
@@ -339,11 +340,13 @@ def _parse_codex_jsonl_v1(
     call_origin_segment: list[CallOriginFlags] = list(previous_state.call_origin_segment)
     latest_record_id = previous_state.latest_record_id
     latest_event_timestamp = previous_state.latest_event_timestamp
+    parsed_until_line = start_line
 
     with path.open("rb") as handle:
         if start_byte > 0:
             handle.seek(start_byte)
         for line_number, raw_line in enumerate(handle, start_line + 1):
+            parsed_until_line = line_number
             try:
                 line = raw_line.decode("utf-8")
                 envelope = json.loads(line)
@@ -460,6 +463,7 @@ def _parse_codex_jsonl_v1(
             latest_record_id=latest_record_id,
             latest_event_timestamp=latest_event_timestamp,
         ),
+        parsed_until_line=parsed_until_line,
     )
 
 

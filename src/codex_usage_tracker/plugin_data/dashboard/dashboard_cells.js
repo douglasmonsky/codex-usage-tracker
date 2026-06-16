@@ -189,6 +189,10 @@
       const weekly = usageImpactWindow(row, 'secondary');
       const primary = usageImpactWindow(row, 'primary');
       if (!weekly && !primary) {
+        if (row?.usage_impact_pending) {
+          const title = `${t('state.loading')}: usage-impact calibration is running in the background. ${t('allowance.observed_source_hint')}`;
+          return `<span class="metric-stack usage-impact-cell muted" ${tooltipAttributes(title)}><span>${escapeHtml(t('state.loading'))}</span></span>`;
+        }
         const limitId = String(row?.rate_limit_limit_id || '').trim();
         if (limitId && limitId !== 'codex') {
           const title = tf('allowance.separate_pool_hint', { limit: limitId });

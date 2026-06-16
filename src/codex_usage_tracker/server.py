@@ -617,6 +617,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 "rows": rows,
                 "row_count": len(rows),
                 "total_matched_rows": total_matched,
+                "usage_impact_pending": any(row.get("usage_impact_pending") for row in rows),
                 "limit": query_params["limit"],
                 "offset": query_params["offset"],
                 "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
@@ -750,6 +751,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 "rows": rows,
                 "row_count": len(rows),
                 "total_matched_rows": total_matched,
+                "usage_impact_pending": any(row.get("usage_impact_pending") for row in rows),
                 "limit": query_params["limit"],
                 "offset": query_params["offset"],
                 "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
@@ -932,6 +934,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         rows = self._usage_impact_cache.copy_usage_impact(
             rows,
             include_archived=include_archived,
+            block=False,
         )
         rows = annotate_rows_with_recommendations(rows, thresholds)
         rows = annotate_rows_with_project_identity(rows, projects)
@@ -991,7 +994,20 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 include_archived=include_archived,
                 language=language,
                 include_rows=not shell_only,
+                estimate_usage_impact=shell_only,
             )
+            if not shell_only:
+                rows = payload.get("rows")
+                if isinstance(rows, list):
+                    rows_with_impact = self._usage_impact_cache.copy_usage_impact(
+                        rows,
+                        include_archived=include_archived,
+                        block=False,
+                    )
+                    payload["rows"] = rows_with_impact
+                    payload["usage_impact_pending"] = any(
+                        row.get("usage_impact_pending") for row in rows_with_impact
+                    )
             dashboard_payload_ms = _elapsed_ms(payload_started)
         except sqlite3.Error as exc:
             self._send_json(

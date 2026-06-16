@@ -66,9 +66,17 @@ class UsageImpactCache:
     def warm_async(self, *, include_archived: bool) -> None:
         """Warm estimates in the background without blocking first dashboard paint."""
 
+        key = self._cache_key(include_archived=include_archived)
+        with self._condition:
+            cached = self._cache.get(include_archived)
+            if cached is not None and cached[0] == key:
+                return
+            if key in self._building:
+                return
+            self._building.add(key)
         thread = threading.Thread(
             target=self._warm_safely,
-            kwargs={"include_archived": include_archived},
+            kwargs={"include_archived": include_archived, "key": key},
             name=f"codex-usage-impact-cache-{int(include_archived)}",
             daemon=True,
         )
@@ -79,40 +87,75 @@ class UsageImpactCache:
         rows: list[dict[str, Any]],
         *,
         include_archived: bool,
+        block: bool = True,
     ) -> list[dict[str, Any]]:
         """Return copied rows with cached usage-impact estimates attached."""
 
         if not rows:
             return []
-        impact_by_record_id = self._impact_by_record_id(include_archived=include_archived)
+        impact_by_record_id = self._impact_by_record_id(
+            include_archived=include_archived,
+            block=block,
+        )
+        pending = impact_by_record_id is None
         copied: list[dict[str, Any]] = []
         default_impact = {"primary": None, "secondary": None}
         for row in rows:
             next_row = dict(row)
             record_id = str(row.get("record_id") or "")
-            next_row["usage_impact"] = impact_by_record_id.get(record_id, default_impact)
+            next_row["usage_impact"] = (
+                default_impact
+                if impact_by_record_id is None
+                else impact_by_record_id.get(record_id, default_impact)
+            )
+            if pending:
+                next_row["usage_impact_pending"] = True
             copied.append(next_row)
         return copied
 
-    def _warm_safely(self, *, include_archived: bool) -> None:
+    def _warm_safely(self, *, include_archived: bool, key: _ImpactCacheKey) -> None:
         try:
-            self._impact_by_record_id(include_archived=include_archived)
+            impact_by_record_id = self._build_impact_map(include_archived=include_archived)
         except Exception:
+            with self._condition:
+                self._building.discard(key)
+                self._condition.notify_all()
             # Cache warming is a latency optimization; foreground API requests
             # still surface normal errors if the database or config is broken.
             return
+        with self._condition:
+            self._cache[include_archived] = (key, impact_by_record_id)
+            self._building.discard(key)
+            self._condition.notify_all()
 
-    def _impact_by_record_id(self, *, include_archived: bool) -> dict[str, dict[str, Any]]:
+    def _impact_by_record_id(
+        self,
+        *,
+        include_archived: bool,
+        block: bool,
+    ) -> dict[str, dict[str, Any]] | None:
         key = self._cache_key(include_archived=include_archived)
         with self._condition:
             cached = self._cache.get(include_archived)
             if cached is not None and cached[0] == key:
                 return cached[1]
             while key in self._building:
+                if not block:
+                    return None
                 self._condition.wait()
                 cached = self._cache.get(include_archived)
                 if cached is not None and cached[0] == key:
                     return cached[1]
+            if not block:
+                self._building.add(key)
+                thread = threading.Thread(
+                    target=self._warm_safely,
+                    kwargs={"include_archived": include_archived, "key": key},
+                    name=f"codex-usage-impact-cache-{int(include_archived)}",
+                    daemon=True,
+                )
+                thread.start()
+                return None
             self._building.add(key)
         try:
             impact_by_record_id = self._build_impact_map(include_archived=include_archived)

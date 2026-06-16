@@ -30,7 +30,7 @@ class SourceParsePlan:
     replace_existing: bool = True
 
 
-ParsedSourceFile = tuple[Path, list[UsageEvent], dict[str, int], ParserState]
+ParsedSourceFile = tuple[Path, list[UsageEvent], dict[str, int], ParserState, int]
 
 
 def source_logs_requiring_parse(
@@ -101,7 +101,7 @@ def upsert_source_file_metadata(
         return
     indexed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     rows: list[dict[str, Any]] = []
-    for path, events, diagnostics, parser_state in parsed:
+    for path, events, diagnostics, parser_state, parsed_until_line in parsed:
         metadata = _source_file_metadata(path)
         if metadata is None:
             continue
@@ -123,7 +123,7 @@ def upsert_source_file_metadata(
                 "is_archived": int(metadata["is_archived"]),
                 "size_bytes": int(metadata["size_bytes"]),
                 "mtime_ns": int(metadata["mtime_ns"]),
-                "parsed_until_line": _count_lines(path),
+                "parsed_until_line": int(parsed_until_line),
                 "parsed_until_byte": int(metadata["size_bytes"]),
                 "latest_record_id": (
                     latest_event.record_id
@@ -199,11 +199,3 @@ def _source_file_id(path: Path) -> str:
 
 def _source_file_hash(path: Path) -> str:
     return hashlib.sha256(str(path).encode("utf-8")).hexdigest()
-
-
-def _count_lines(path: Path) -> int:
-    try:
-        with path.open("rb") as handle:
-            return sum(1 for _line in handle)
-    except OSError:
-        return 0
