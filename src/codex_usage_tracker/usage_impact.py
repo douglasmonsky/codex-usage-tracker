@@ -12,6 +12,9 @@ SortKey = tuple[str, int, str]
 
 _MIN_CALIBRATION_SAMPLES = 5
 _PRIMARY_RESET_ROLLBACK_TOLERANCE_SECONDS = 120
+_MAX_OBSERVED_TO_CALIBRATED_RATIO = 3.0
+_MIN_OBSERVED_CALIBRATED_EXCESS_PERCENT = 0.2
+_MAX_UNCALIBRATED_SINGLE_CALL_OBSERVED_PERCENT = 0.5
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,10 @@ class _CalibrationSample:
     plan_type: str | None
     limit_id: str | None
     observed_after_key: SortKey
+    weight: float
+    delta: float
+    lower_delta: float
+    upper_delta: float
     rate: float
     lower_rate: float
     upper_rate: float
@@ -132,6 +139,18 @@ def _annotate_window(rows: list[dict[str, Any]], window_key: WindowKey) -> None:
             pending.clear()
             continue
         if delta == 0:
+            sample = _calibration_sample(
+                rows=pending,
+                previous=previous,
+                current=snapshot,
+                observed_after_key=_sort_key(row),
+                delta=0.0,
+                include_rounding_margin=False,
+            )
+            if sample is not None:
+                calibration_samples.append(sample)
+            previous = snapshot
+            pending.clear()
             continue
         sample = _allocate_interval(
             rows=pending,
@@ -157,12 +176,18 @@ def _allocate_interval(
     observed_after_key: SortKey,
     delta: float,
 ) -> _CalibrationSample | None:
+    sample = _calibration_sample(
+        rows=rows,
+        previous=previous,
+        current=current,
+        observed_after_key=observed_after_key,
+        delta=delta,
+        include_rounding_margin=True,
+    )
+    if sample is None:
+        return None
     weighted_rows, basis = _weighted_rows(rows)
-    if not weighted_rows:
-        return None
-    total_weight = sum(weight for _row, weight in weighted_rows)
-    if total_weight <= 0:
-        return None
+    total_weight = sample.weight
     margin = _rounding_margin(previous.used_percent, current.used_percent)
     lower_delta = max(0.0, delta - margin)
     upper_delta = max(delta, delta + margin)
@@ -189,12 +214,37 @@ def _allocate_interval(
             "limit_id": current.limit_id,
             "resets_at": current.resets_at,
         }
+    return sample
+
+
+def _calibration_sample(
+    *,
+    rows: list[dict[str, Any]],
+    previous: _Snapshot,
+    current: _Snapshot,
+    observed_after_key: SortKey,
+    delta: float,
+    include_rounding_margin: bool,
+) -> _CalibrationSample | None:
+    weighted_rows, basis = _weighted_rows(rows)
+    if not weighted_rows:
+        return None
+    total_weight = sum(weight for _row, weight in weighted_rows)
+    if total_weight <= 0:
+        return None
+    margin = _rounding_margin(previous.used_percent, current.used_percent) if include_rounding_margin else 0.0
+    lower_delta = max(0.0, delta - margin)
+    upper_delta = max(delta, delta + margin)
     return _CalibrationSample(
         basis=basis,
         window_minutes=current.window_minutes,
         plan_type=current.plan_type,
         limit_id=current.limit_id,
         observed_after_key=observed_after_key,
+        weight=total_weight,
+        delta=delta,
+        lower_delta=lower_delta,
+        upper_delta=upper_delta,
         rate=delta / total_weight,
         lower_rate=lower_delta / total_weight,
         upper_rate=upper_delta / total_weight,
@@ -206,52 +256,159 @@ def _apply_calibrated_estimates(
     window_key: WindowKey,
     samples: list[_CalibrationSample],
 ) -> None:
+    calibration_cache: dict[tuple[int, str | None, str | None], _Calibration | None] = {}
     for row in rows:
         impact = row.setdefault("usage_impact", {"primary": None, "secondary": None})
-        if impact.get(window_key) is not None:
-            continue
         window_minutes = _window_minutes(row, window_key)
-        calibration = _calibration(samples, row=row, window_key=window_key)
+        plan_type = _optional_str(row.get("rate_limit_plan_type"))
+        limit_id = _optional_str(row.get("rate_limit_limit_id"))
+        cache_key = (window_minutes, plan_type, limit_id)
+        if cache_key not in calibration_cache:
+            calibration_cache[cache_key] = _calibration(
+                samples,
+                window_minutes=window_minutes,
+                plan_type=plan_type,
+                limit_id=limit_id,
+            )
+        calibration = calibration_cache[cache_key]
         if calibration is None:
+            existing = impact.get(window_key)
+            if isinstance(existing, dict) and _observed_interval_should_be_suppressed(existing):
+                impact[window_key] = _suppressed_observed_interval(
+                    existing,
+                    row=row,
+                    window_key=window_key,
+                    window_minutes=window_minutes,
+                )
             continue
         weight = _row_weight(row, calibration.basis)
         if weight <= 0:
             continue
-        estimate = calibration.rate * weight
-        impact[window_key] = {
-            "schema": "codex-usage-tracker-usage-impact-estimate-v1",
-            "label": _window_label(window_minutes),
-            "window_minutes": window_minutes,
-            "estimate_percent": estimate,
-            "lower_percent": calibration.lower_rate * weight,
-            "upper_percent": calibration.upper_rate * weight,
-            "observed_delta_percent": None,
-            "interval_call_count": None,
-            "basis": calibration.basis,
-            "source": "calibrated_history",
-            "calibration_sample_count": calibration.sample_count,
-            "plan_type": _optional_str(row.get("rate_limit_plan_type")),
-            "limit_id": _optional_str(row.get("rate_limit_limit_id")),
-            "resets_at": _optional_int(row.get(f"rate_limit_{window_key}_resets_at")),
-        }
+        existing = impact.get(window_key)
+        if existing is not None:
+            if isinstance(existing, dict):
+                if _observed_interval_should_be_suppressed(existing) or _observed_estimate_is_noisy(
+                    existing,
+                    row=row,
+                    calibration=calibration,
+                ):
+                    impact[window_key] = _calibrated_impact(
+                        row=row,
+                        window_key=window_key,
+                        calibration=calibration,
+                        window_minutes=window_minutes,
+                        observed_impact=existing,
+                    )
+            continue
+        impact[window_key] = _calibrated_impact(
+            row=row,
+            window_key=window_key,
+            calibration=calibration,
+            window_minutes=window_minutes,
+        )
+
+
+def _calibrated_impact(
+    *,
+    row: dict[str, Any],
+    window_key: WindowKey,
+    calibration: _Calibration,
+    window_minutes: int,
+    observed_impact: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    weight = _row_weight(row, calibration.basis)
+    estimate = calibration.rate * weight
+    impact: dict[str, Any] = {
+        "schema": "codex-usage-tracker-usage-impact-estimate-v1",
+        "label": _window_label(window_minutes),
+        "window_minutes": window_minutes,
+        "estimate_percent": estimate,
+        "lower_percent": calibration.lower_rate * weight,
+        "upper_percent": calibration.upper_rate * weight,
+        "observed_delta_percent": None,
+        "interval_call_count": None,
+        "basis": calibration.basis,
+        "source": "calibrated_history",
+        "calibration_sample_count": calibration.sample_count,
+        "plan_type": _optional_str(row.get("rate_limit_plan_type")),
+        "limit_id": _optional_str(row.get("rate_limit_limit_id")),
+        "resets_at": _optional_int(row.get(f"rate_limit_{window_key}_resets_at")),
+    }
+    if observed_impact is not None:
+        impact["observed_delta_percent"] = observed_impact.get("observed_delta_percent")
+        impact["observed_interval_call_count"] = observed_impact.get("interval_call_count")
+        impact["observed_interval_estimate_percent"] = observed_impact.get("estimate_percent")
+        impact["previous_used_percent"] = observed_impact.get("previous_used_percent")
+        impact["current_used_percent"] = observed_impact.get("current_used_percent")
+        impact["source_note"] = "calibrated_after_noisy_observed_interval"
+    return impact
+
+
+def _observed_interval_should_be_suppressed(impact: dict[str, Any]) -> bool:
+    if impact.get("source") != "observed_interval":
+        return False
+    if int(impact.get("interval_call_count") or 0) != 1:
+        return False
+    return _number(impact.get("estimate_percent")) > _MAX_UNCALIBRATED_SINGLE_CALL_OBSERVED_PERCENT
+
+
+def _suppressed_observed_interval(
+    observed_impact: dict[str, Any],
+    *,
+    row: dict[str, Any],
+    window_key: WindowKey,
+    window_minutes: int,
+) -> dict[str, Any]:
+    return {
+        "schema": "codex-usage-tracker-usage-impact-estimate-v1",
+        "label": _window_label(window_minutes),
+        "window_minutes": window_minutes,
+        "estimate_percent": None,
+        "lower_percent": None,
+        "upper_percent": None,
+        "observed_delta_percent": observed_impact.get("observed_delta_percent"),
+        "observed_interval_call_count": observed_impact.get("interval_call_count"),
+        "observed_interval_estimate_percent": observed_impact.get("estimate_percent"),
+        "basis": observed_impact.get("basis"),
+        "source": "observed_interval",
+        "source_note": "suppressed_unvalidated_single_call_observed_jump",
+        "plan_type": _optional_str(row.get("rate_limit_plan_type")),
+        "limit_id": _optional_str(row.get("rate_limit_limit_id")),
+        "resets_at": _optional_int(row.get(f"rate_limit_{window_key}_resets_at")),
+    }
+
+
+def _observed_estimate_is_noisy(
+    impact: dict[str, Any],
+    *,
+    row: dict[str, Any],
+    calibration: _Calibration,
+) -> bool:
+    if impact.get("source") != "observed_interval":
+        return False
+    observed = _number(impact.get("estimate_percent"))
+    if observed <= 0:
+        return False
+    calibrated = calibration.rate * _row_weight(row, calibration.basis)
+    if calibrated <= 0:
+        return False
+    return observed > max(
+        calibrated * _MAX_OBSERVED_TO_CALIBRATED_RATIO,
+        calibrated + _MIN_OBSERVED_CALIBRATED_EXCESS_PERCENT,
+    )
 
 
 def _calibration(
     samples: list[_CalibrationSample],
     *,
-    row: dict[str, Any],
-    window_key: WindowKey,
+    window_minutes: int,
+    plan_type: str | None,
+    limit_id: str | None,
 ) -> _Calibration | None:
-    window_minutes = _window_minutes(row, window_key)
-    plan_type = _optional_str(row.get("rate_limit_plan_type"))
-    limit_id = _optional_str(row.get("rate_limit_limit_id"))
-    row_key = _sort_key(row)
-    row_has_snapshot = _snapshot(row, window_key) is not None
     matching = [
         sample
         for sample in samples
         if sample.window_minutes == window_minutes
-        and (not row_has_snapshot or sample.observed_after_key <= row_key)
         and _scope_matches(sample.plan_type, plan_type)
         and _scope_matches(sample.limit_id, limit_id)
     ]
@@ -262,16 +419,19 @@ def _calibration(
     basis_samples = [sample for sample in matching if sample.basis == preferred_basis]
     if len(basis_samples) < _MIN_CALIBRATION_SAMPLES:
         return None
-    rates = sorted(sample.rate for sample in basis_samples if sample.rate > 0)
-    lower_rates = sorted(sample.lower_rate for sample in basis_samples if sample.lower_rate >= 0)
-    upper_rates = sorted(sample.upper_rate for sample in basis_samples if sample.upper_rate > 0)
-    if not rates:
+    total_weight = sum(sample.weight for sample in basis_samples)
+    if total_weight <= 0:
         return None
+    total_delta = sum(sample.delta for sample in basis_samples)
+    if total_delta <= 0:
+        return None
+    total_lower_delta = sum(sample.lower_delta for sample in basis_samples)
+    total_upper_delta = sum(sample.upper_delta for sample in basis_samples)
     return _Calibration(
         basis=preferred_basis,
-        rate=_median(rates),
-        lower_rate=_median(lower_rates) if lower_rates else 0.0,
-        upper_rate=_median(upper_rates) if upper_rates else _median(rates),
+        rate=total_delta / total_weight,
+        lower_rate=total_lower_delta / total_weight,
+        upper_rate=max(total_upper_delta, total_delta) / total_weight,
         sample_count=len(basis_samples),
     )
 
@@ -384,20 +544,11 @@ def _window_minutes(row: dict[str, Any], window_key: WindowKey) -> int:
 
 
 def _scope_changed(previous: str | None, current: str | None) -> bool:
-    return previous is not None and current is not None and previous != current
+    return previous != current
 
 
 def _scope_matches(sample_value: str | None, row_value: str | None) -> bool:
-    return sample_value is None or row_value is None or sample_value == row_value
-
-
-def _median(values: list[float]) -> float:
-    if not values:
-        return 0.0
-    midpoint = len(values) // 2
-    if len(values) % 2:
-        return values[midpoint]
-    return (values[midpoint - 1] + values[midpoint]) / 2
+    return sample_value == row_value
 
 
 def _number(value: object) -> float:

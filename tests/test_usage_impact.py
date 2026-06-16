@@ -85,7 +85,10 @@ def test_usage_impact_does_not_calibrate_from_sparse_observed_history() -> None:
     )
     by_id = {str(row["record_id"]): row for row in rows}
 
-    assert usage_impact_estimate(by_id["direct"], "primary") == pytest.approx(2.0)
+    direct = by_id["direct"]["usage_impact"]["primary"]  # type: ignore[index]
+    assert usage_impact_estimate(by_id["direct"], "primary") is None
+    assert direct["observed_interval_estimate_percent"] == pytest.approx(2.0)
+    assert direct["source_note"] == "suppressed_unvalidated_single_call_observed_jump"
     assert usage_impact_estimate(by_id["later"], "primary") is None
 
 
@@ -113,7 +116,57 @@ def test_usage_impact_uses_matching_calibrated_history_after_enough_observed_int
     assert by_id["later"]["usage_impact"]["primary"]["calibration_sample_count"] == 5  # type: ignore[index]
 
 
-def test_usage_impact_calibrates_legacy_rows_with_missing_scope() -> None:
+def test_usage_impact_calibration_includes_flat_observed_intervals() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("baseline", timestamp="2026-06-15T12:00:00Z", line_number=1, credits=None, cost=None, primary_used=10),
+            _row("flat-1", timestamp="2026-06-15T12:01:00Z", line_number=2, credits=9, primary_used=10),
+            _row("rise-1", timestamp="2026-06-15T12:02:00Z", line_number=3, credits=1, primary_used=11),
+            _row("flat-2", timestamp="2026-06-15T12:03:00Z", line_number=4, credits=9, primary_used=11),
+            _row("rise-2", timestamp="2026-06-15T12:04:00Z", line_number=5, credits=1, primary_used=12),
+            _row("flat-3", timestamp="2026-06-15T12:05:00Z", line_number=6, credits=9, primary_used=12),
+            _row("rise-3", timestamp="2026-06-15T12:06:00Z", line_number=7, credits=1, primary_used=13),
+            _row("flat-4", timestamp="2026-06-15T12:07:00Z", line_number=8, credits=9, primary_used=13),
+            _row("rise-4", timestamp="2026-06-15T12:08:00Z", line_number=9, credits=1, primary_used=14),
+            _row("flat-5", timestamp="2026-06-15T12:09:00Z", line_number=10, credits=9, primary_used=14),
+            _row("rise-5", timestamp="2026-06-15T12:10:00Z", line_number=11, credits=1, primary_used=15),
+            _row("later", timestamp="2026-06-15T12:11:00Z", line_number=12, credits=10),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+
+    assert usage_impact_estimate(by_id["later"], "primary") == pytest.approx(1.0)
+    assert by_id["later"]["usage_impact"]["primary"]["source"] == "calibrated_history"  # type: ignore[index]
+    assert by_id["later"]["usage_impact"]["primary"]["calibration_sample_count"] == 10  # type: ignore[index]
+
+
+def test_usage_impact_replaces_noisy_observed_jump_with_calibrated_estimate() -> None:
+    rows = annotate_rows_with_usage_impact(
+        [
+            _row("baseline", timestamp="2026-06-15T12:00:00Z", line_number=1, credits=None, cost=None, primary_used=10),
+            _row("flat-1", timestamp="2026-06-15T12:01:00Z", line_number=2, credits=9, primary_used=10),
+            _row("rise-1", timestamp="2026-06-15T12:02:00Z", line_number=3, credits=1, primary_used=11),
+            _row("flat-2", timestamp="2026-06-15T12:03:00Z", line_number=4, credits=9, primary_used=11),
+            _row("rise-2", timestamp="2026-06-15T12:04:00Z", line_number=5, credits=1, primary_used=12),
+            _row("flat-3", timestamp="2026-06-15T12:05:00Z", line_number=6, credits=9, primary_used=12),
+            _row("rise-3", timestamp="2026-06-15T12:06:00Z", line_number=7, credits=1, primary_used=13),
+            _row("flat-4", timestamp="2026-06-15T12:07:00Z", line_number=8, credits=9, primary_used=13),
+            _row("rise-4", timestamp="2026-06-15T12:08:00Z", line_number=9, credits=1, primary_used=14),
+            _row("flat-5", timestamp="2026-06-15T12:09:00Z", line_number=10, credits=9, primary_used=14),
+            _row("rise-5", timestamp="2026-06-15T12:10:00Z", line_number=11, credits=1, primary_used=15),
+            _row("noisy-jump", timestamp="2026-06-15T12:11:00Z", line_number=12, credits=1, primary_used=25),
+        ]
+    )
+    by_id = {str(row["record_id"]): row for row in rows}
+    noisy = by_id["noisy-jump"]["usage_impact"]["primary"]  # type: ignore[index]
+
+    assert usage_impact_estimate(by_id["noisy-jump"], "primary") == pytest.approx(15 / 51)
+    assert noisy["source"] == "calibrated_history"
+    assert noisy["source_note"] == "calibrated_after_noisy_observed_interval"
+    assert noisy["observed_interval_estimate_percent"] == pytest.approx(10.0)
+
+
+def test_usage_impact_does_not_calibrate_legacy_rows_from_known_scope() -> None:
     rows = annotate_rows_with_usage_impact(
         [
             _row(
@@ -139,8 +192,7 @@ def test_usage_impact_calibrates_legacy_rows_with_missing_scope() -> None:
     by_id = {str(row["record_id"]): row for row in rows}
 
     assert by_id["baseline-1"]["usage_impact"]["primary"] is None  # type: ignore[index]
-    assert usage_impact_estimate(by_id["legacy"], "primary") == pytest.approx(3.0)
-    assert by_id["legacy"]["usage_impact"]["primary"]["source"] == "calibrated_history"  # type: ignore[index]
+    assert usage_impact_estimate(by_id["legacy"], "primary") is None
 
 
 def test_usage_impact_does_not_calibrate_across_plan_or_limit_changes() -> None:
@@ -168,7 +220,10 @@ def test_usage_impact_does_not_calibrate_across_plan_or_limit_changes() -> None:
     )
     by_id = {str(row["record_id"]): row for row in rows}
 
-    assert usage_impact_estimate(by_id["direct"], "primary") == pytest.approx(2.0)
+    direct = by_id["direct"]["usage_impact"]["primary"]  # type: ignore[index]
+    assert usage_impact_estimate(by_id["direct"], "primary") is None
+    assert direct["observed_interval_estimate_percent"] == pytest.approx(2.0)
+    assert direct["source_note"] == "suppressed_unvalidated_single_call_observed_jump"
     assert usage_impact_estimate(by_id["changed-plan"], "primary") is None
 
 
@@ -328,7 +383,10 @@ def test_usage_impact_allows_rolling_reset_timestamp_drift() -> None:
     )
     by_id = {str(row["record_id"]): row for row in rows}
 
-    assert usage_impact_estimate(by_id["later"], "primary") == pytest.approx(4.0)
+    later = by_id["later"]["usage_impact"]["primary"]  # type: ignore[index]
+    assert usage_impact_estimate(by_id["later"], "primary") is None
+    assert later["observed_interval_estimate_percent"] == pytest.approx(4.0)
+    assert later["source_note"] == "suppressed_unvalidated_single_call_observed_jump"
 
 
 def test_usage_impact_keeps_weekly_reset_timestamp_as_boundary() -> None:

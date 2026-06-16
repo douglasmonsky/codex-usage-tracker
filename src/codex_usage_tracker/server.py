@@ -68,10 +68,7 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
-from codex_usage_tracker.usage_impact import (
-    annotate_rows_with_usage_impact,
-    copy_usage_impact_from_context,
-)
+from codex_usage_tracker.usage_impact_cache import UsageImpactCache
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
 _elapsed_ms = server_utils.elapsed_ms
@@ -140,6 +137,13 @@ def serve_dashboard(
     context_api_enabled = context_api != "disabled"
     selected_language = normalize_language(language)
     context_api_state = _ContextApiState(context_api_enabled)
+    usage_impact_cache = UsageImpactCache(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+    )
+    usage_impact_cache.warm_async(include_archived=include_archived)
     output = generate_dashboard(
         db_path=db_path,
         output_path=output_path,
@@ -178,6 +182,7 @@ def serve_dashboard(
         context_api_state=context_api_state,
         language=selected_language,
         refresh_lock=threading.Lock(),
+        usage_impact_cache=usage_impact_cache,
     )
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{_url_host(host)}:{port}/{output.name}"
@@ -219,6 +224,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: _ContextApiState | None = None,
+        usage_impact_cache: UsageImpactCache | None = None,
         privacy_mode: str = "normal",
         rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
         language: str = "en",
@@ -246,6 +252,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._api_token = api_token
         self._context_api_state = context_api_state or _ContextApiState(context_api_enabled)
         self._refresh_lock = refresh_lock
+        self._usage_impact_cache = usage_impact_cache or UsageImpactCache(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+        )
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
@@ -634,19 +646,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 for adjacent_id in (row.get("previous_record_id"), row.get("next_record_id"))
                 if adjacent_id
             ]
-            impact_context_rows = query_usage_api_events(
-                db_path=self._db_path,
-                limit=None,
-                offset=0,
-                include_archived=self._include_archived,
-                sort="time",
-                direction="asc",
-            )
             rows_by_id = {
                 candidate["record_id"]: candidate
                 for candidate in self._annotate_live_rows(
                     [candidate for candidate in [row, *adjacent_raw_rows] if candidate],
-                    impact_context_rows=impact_context_rows,
+                    include_archived=self._include_archived,
                 )
                 if candidate.get("record_id")
             }
@@ -873,19 +877,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             sort=query_params["sort"],
             direction=query_params["direction"],
         )
-        impact_context_rows = (
-            query_usage_api_events(
-                db_path=self._db_path,
-                limit=None,
-                offset=0,
-                include_archived=query_params["include_archived"],
-                sort="time",
-                direction="asc",
-            )
-            if rows
-            else None
+        rows = self._annotate_live_rows(
+            rows,
+            include_archived=query_params["include_archived"],
         )
-        rows = self._annotate_live_rows(rows, impact_context_rows=impact_context_rows)
         if derived_filter:
             rows = [
                 row
@@ -918,7 +913,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self,
         rows: list[dict[str, Any]],
         *,
-        impact_context_rows: list[dict[str, Any]] | None = None,
+        include_archived: bool,
     ) -> list[dict[str, Any]]:
         if not rows:
             return []
@@ -934,17 +929,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             annotate_rows_with_efficiency(rows, pricing),
             allowance,
         )
-        if impact_context_rows is not None:
-            context_rows = annotate_thread_attachments(
-                [ensure_call_origin(row) for row in impact_context_rows]
-            )
-            context_rows = annotate_rows_with_allowance(
-                annotate_rows_with_efficiency(context_rows, pricing),
-                allowance,
-            )
-            rows = copy_usage_impact_from_context(rows, context_rows)
-        else:
-            rows = annotate_rows_with_usage_impact(rows)
+        rows = self._usage_impact_cache.copy_usage_impact(
+            rows,
+            include_archived=include_archived,
+        )
         rows = annotate_rows_with_recommendations(rows, thresholds)
         rows = annotate_rows_with_project_identity(rows, projects)
         return apply_project_privacy_to_rows(rows, privacy_mode=self._privacy_mode)
@@ -974,6 +962,8 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                         db_path=self._db_path,
                         include_archived=include_archived,
                     )
+                self._usage_impact_cache.invalidate()
+                self._usage_impact_cache.warm_async(include_archived=include_archived)
                 refresh_ms = _elapsed_ms(refresh_started)
                 refresh_result = {
                     "scanned_files": result.scanned_files,
