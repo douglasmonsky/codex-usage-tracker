@@ -68,6 +68,10 @@ class UsageEvent:
     rate_limit_secondary_used_percent: float | None = None
     rate_limit_secondary_window_minutes: int | None = None
     rate_limit_secondary_resets_at: int | None = None
+    source_byte_start: int | None = None
+    source_byte_end: int | None = None
+    turn_start_line: int | None = None
+    turn_start_byte: int | None = None
 
     @property
     def uncached_input_tokens(self) -> int:

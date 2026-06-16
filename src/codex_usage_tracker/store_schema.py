@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -22,6 +22,7 @@ MIGRATION_NAMES = {
     6: "track source file refresh metadata",
     7: "persist source file parser cursors",
     8: "persist observed Codex usage snapshots",
+    9: "persist source byte offsets for context seeking",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -95,6 +96,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v8(conn)
         _record_migration_if_missing(conn, 8)
+    if user_version < 9:
+        _migrate_v9(conn)
+        _record_migration(conn, 9)
+    else:
+        _migrate_v9(conn)
+        _record_migration_if_missing(conn, 9)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -243,6 +250,10 @@ def _migrate_v8(conn: sqlite3.Connection) -> None:
                OR rate_limit_secondary_used_percent IS NOT NULL;
         """
     )
+
+
+def _migrate_v9(conn: sqlite3.Connection) -> None:
+    _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
 
 
 def _record_migration(conn: sqlite3.Connection, version: int) -> None:

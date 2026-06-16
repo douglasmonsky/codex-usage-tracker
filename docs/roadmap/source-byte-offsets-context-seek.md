@@ -9,6 +9,18 @@ Branch: `refactor/source-byte-offsets-context-seek`
 - Keep old databases usable when offset fields are null.
 - Add diagnostics that prove whether a seek path or fallback scan was used.
 
+## Implementation Checklist
+
+- [x] M0: Create this roadmap/checklist before implementation.
+- [x] M1: Add nullable source byte and turn-start offset fields to `usage_events`.
+- [x] M2: Bump schema/parser adapter versions so existing indexes repair and reparse safely.
+- [x] M3: Capture source byte offsets and turn-start cursors during binary JSONL parsing.
+- [x] M4: Make context loading seek to selected turns when offsets and source metadata are valid.
+- [x] M5: Keep safe fallbacks for missing offsets, changed source metadata, and compaction-history loads.
+- [x] M6: Add parser, context, migration, privacy, and source-log benchmark coverage.
+- [x] M7: Run full branch validation.
+- [ ] M8: Commit, push, and open the branch PR without merging to `main`.
+
 ## Non-Goals
 
 - No task receipts.

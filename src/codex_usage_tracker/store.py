@@ -676,6 +676,28 @@ def query_usage_record(
         return _row_to_dict(row) if row is not None else None
 
 
+def query_source_file_metadata(
+    db_path: Path = DEFAULT_DB_PATH,
+    source_file: str | None = None,
+) -> dict[str, Any] | None:
+    """Return indexed source-file metadata without reading raw log content."""
+
+    if not source_file:
+        return None
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            """
+            SELECT source_file, size_bytes, mtime_ns, parsed_until_line, parsed_until_byte
+            FROM source_files
+            WHERE source_file = ?
+            LIMIT 1
+            """,
+            (source_file,),
+        ).fetchone()
+        return _row_to_dict(row) if row is not None else None
+
+
 def query_dashboard_events(
     db_path: Path = DEFAULT_DB_PATH,
     limit: int | None = 5000,
