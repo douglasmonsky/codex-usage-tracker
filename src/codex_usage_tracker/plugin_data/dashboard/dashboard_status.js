@@ -2,6 +2,7 @@
   function createDashboardStatus(deps) {
     const {
       allowanceImpactElement,
+      allowanceReconcileElement,
       allowanceSourceElement,
       creditCoverageRatio,
       credits,
@@ -84,9 +85,6 @@
       const lines = windows
         .map(window => observedWindowText(window))
         .filter(Boolean);
-      if (observed.reconciliation && observed.reconciliation.recommended) {
-        lines.push(t('allowance.live_check_short'));
-      }
       return lines.join('\n');
     }
 
@@ -260,6 +258,21 @@
         allowanceImpactElement,
         observedUsageTooltip() || allowanceWindowText(totalCredits, 'remaining') || t('allowance.title_hint'),
       );
+      updateAllowanceReconciliation();
+    }
+
+    function updateAllowanceReconciliation() {
+      if (!allowanceReconcileElement) return;
+      const observed = getObservedUsage() || {};
+      const tooltip = observedReconciliationTooltip(observed);
+      const show = Boolean(observed.reconciliation && observed.reconciliation.recommended);
+      allowanceReconcileElement.hidden = !show;
+      if (!show) {
+        setFastTooltip(allowanceReconcileElement, '');
+        return;
+      }
+      allowanceReconcileElement.textContent = t('allowance.live_check_short');
+      setFastTooltip(allowanceReconcileElement, tooltip || t('allowance.observed_source_hint'));
     }
 
     function renderLiveStatus() {

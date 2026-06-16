@@ -16,6 +16,7 @@ from store_dashboard_helpers import (
     _http_error_json,
     _make_codex_home,
     _read_json,
+    _token_event,
     _usage_event,
     _write_archived_log,
     _write_pricing,
@@ -163,6 +164,65 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert limited_payload["context_api_enabled"] is True
     assert forbidden_origin["status"] == 403
     assert "SECRET RAW PROMPT" not in json.dumps(limited_payload)
+
+
+def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    log_path = next(
+        path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name
+    )
+    first_refresh = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(_token_event(650, 350)) + "\n")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=codex_home,
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        forbidden = _http_error_json(
+            f"http://127.0.0.1:{server.server_port}/api/status?refresh=1"
+        )
+        live_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/status?refresh=1",
+            headers={"X-Codex-Usage-Token": "test-token"},
+        )
+        second_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/status?refresh=1",
+            headers={"X-Codex-Usage-Token": "test-token"},
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert first_refresh.parsed_events == 4
+    assert forbidden["status"] == 403
+    assert live_payload["refresh_result"]["parsed_events"] == 1
+    assert live_payload["refresh_result"]["inserted_or_updated_events"] == 1
+    assert live_payload["row_counts"]["scoped_rows"] == 5
+    assert second_payload["refresh_result"]["parsed_events"] == 0
+    assert second_payload["refresh_result"]["inserted_or_updated_events"] == 0
 
 
 def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Path) -> None:

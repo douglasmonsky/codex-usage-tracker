@@ -471,6 +471,7 @@
     }
     dashboardStatus = dashboardStatusFactory.create({
       allowanceImpactElement: document.getElementById('allowanceImpact'),
+      allowanceReconcileElement: document.getElementById('allowanceReconcile'),
       allowanceSourceElement: document.getElementById('allowanceSource'),
       creditCoverageRatio,
       credits,
@@ -515,7 +516,6 @@
       historyScopeEl,
       i18n,
       initialHydrationChunkSize,
-      latestRefreshAt: () => latestRefreshAt,
       limitValue,
       liveRefreshIntervalMs,
       liveRefreshSupported,

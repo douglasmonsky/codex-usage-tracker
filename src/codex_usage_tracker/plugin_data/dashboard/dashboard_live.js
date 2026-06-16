@@ -221,24 +221,24 @@
       try {
         const params = new URLSearchParams({
           include_archived: getIncludeArchived() ? '1' : '0',
+          refresh: '1',
           _: String(Date.now()),
         });
         const response = await fetch(`/api/status?${params.toString()}`, {
           headers: {
             'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken(),
           },
           cache: 'no-store',
         });
         if (!response.ok) return;
         const payload = await response.json();
-        const statusRefreshAt = payload.latest_refresh_at || '';
         const scopedRows = Number(payload.row_counts?.scoped_rows);
         if (payload.observed_usage) {
           setObservedUsage(payload.observed_usage);
         }
         const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows();
-        const refreshChanged = statusRefreshAt && statusRefreshAt !== deps.latestRefreshAt();
-        if (rowCountChanged || refreshChanged) {
+        if (rowCountChanged) {
           refreshDashboardData(false, { refreshLogs: false, resetRows: true });
         } else if (rowsNeedHydration()) {
           hydrateDashboardRows();
