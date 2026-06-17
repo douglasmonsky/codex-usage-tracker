@@ -79,7 +79,7 @@ Use `Insights` view when you want a triage layer that answers "what needs attent
 
 ![Calls view showing filters, totals, the model-call table, and the compact details rail.](assets/dashboard-calls.png)
 
-Use `Calls` view when you want to inspect individual model calls.
+The dashboard opens in `Calls` view. Use it when you want to inspect individual model calls newest-first.
 
 - The header stays compact: refresh controls on the right, and short status chips on the left. Exact refresh time, pricing source, and credit-rate source live in hover titles so live refreshes do not reflow the page.
 - The top cards include cached input, uncached input, Codex credit usage, and observed usage when local rate-limit snapshots are present. If no observed snapshot exists, the usage card falls back to optional copied allowance values.
@@ -102,7 +102,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - The first detail section includes a recommended action and a "why flagged" explanation derived only from aggregate counters and pricing/allowance metadata.
 - Raw aggregate identifiers and source file metadata are collapsed until you need them.
 - The expanded details panel reserves a visible scrollbar so long field lists are discoverable before you start scrolling.
-- `Load more` appears when the active Insights, Calls, Threads, or expanded thread-call section has more rows to reveal.
+- `Load more` appears when the active Insights, Calls, Threads, Sessions, or expanded thread-call section has more rows to reveal.
 - When served from localhost, `/api/usage` accepts `limit` and `offset` so automation can page aggregate rows without loading an entire large history.
 - After you scroll down, the bottom-right `Top` button returns to the top of the dashboard.
 
@@ -128,9 +128,11 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Expanded calls default to newest first. Click an expanded-call header such as `Time`, `Tokens`, `Cost`, or `Cache` to sort that thread's visible calls without changing the top-level Threads ranking.
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
 
-The same search, time range, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, and `Threads` views.
+The same search, time range, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, `Threads`, and `Sessions` views.
 
 ## Sessions View
+
+![Sessions view showing cold-resume work sessions, cache misses, and session-level action cues.](assets/dashboard-sessions.png)
 
 Use `Sessions` view when one thread has multiple work windows and you want to find the resume boundaries that deserve inspection.
 
