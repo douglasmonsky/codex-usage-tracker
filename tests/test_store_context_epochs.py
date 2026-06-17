@@ -14,6 +14,10 @@ from codex_usage_tracker.store_context_epochs import (
 from codex_usage_tracker.store_work_sessions import query_thread_work_sessions
 
 
+def _without_updated_at(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [{key: value for key, value in row.items() if key != "updated_at"} for row in rows]
+
+
 def test_materialize_session_without_compaction_creates_one_epoch() -> None:
     rows = [
         _row(
@@ -207,6 +211,7 @@ def test_partial_context_epoch_rebuild_touches_only_affected_thread(tmp_path: Pa
         ],
         db_path=db_path,
     )
+    beta_after_partial = query_context_epochs(db_path=db_path, thread_key="thread:Beta", limit=0)
     partial = query_context_epochs(db_path=db_path, limit=0)
     with connect(db_path) as conn:
         init_db(conn)
@@ -220,7 +225,8 @@ def test_partial_context_epoch_rebuild_touches_only_affected_thread(tmp_path: Pa
     assert sorted(row["context_epoch_id"] for row in partial) == sorted(
         row["context_epoch_id"] for row in full
     )
-    assert query_context_epochs(db_path=db_path, thread_key="thread:Beta", limit=0) == beta_before
+    assert beta_after_partial == beta_before
+    assert _without_updated_at(partial) == _without_updated_at(full)
 
 
 def test_context_epoch_payload_is_aggregate_only() -> None:
