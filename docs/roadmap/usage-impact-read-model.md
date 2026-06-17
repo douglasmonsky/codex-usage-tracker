@@ -61,17 +61,17 @@ Target `usage_impact` table fields:
 - [x] M1: Audit existing usage-impact code and mark what already satisfies this roadmap.
 - [x] M2: Add or repair `usage_impact` schema, migration, indexes, and repair behavior.
 - [x] M3: Add calculator behavior for observed primary/secondary deltas and confidence/status labels.
-- [ ] M4: Wire refresh-delta invalidation so no-op skips work and append/full-reparse rebuild affected intervals only.
+- [x] M4: Wire refresh-delta invalidation so no-op skips work and append/full-reparse rebuild affected intervals only.
 - [x] M5: Expose usage-impact CLI/API/call payload contracts with schema id `codex-usage-tracker-usage-impact-v1`.
-- [ ] M6: Add compact dashboard call-detail chips without exact-billing language.
+- [x] M6: Add compact dashboard call-detail chips without exact-billing language.
 - [x] M7: Add focused tests for windows, pools, no-op, append, ambiguity, JSON contracts, and privacy.
 - [x] M8: Run validation and benchmarks.
 - [ ] M9: Commit, push, and open the branch PR without merging to `main`.
 
 Progress notes:
 
-- M4 is partially implemented: refresh deltas now delete stale records, insert pending rows for newly appended records, and no-op refreshes avoid usage-impact invalidation. Recalculating only affected observed intervals remains open; the current cache rebuild still materializes from full-history rows when a recalculation is needed.
-- M6 is partially implemented through existing dashboard usage-impact cells and call payload exposure. The final call-detail presentation still needs a focused UI pass after the persistent read model is stable.
+- M4 is implemented: refresh deltas delete stale records, insert pending rows for newly appended records, no-op refreshes avoid usage-impact invalidation, and live refreshes warm only pending/stale/missing usage-impact record ids instead of immediately scheduling a full-history read-model rebuild. Targeted recalculation still uses full aggregate context for estimator correctness, but only affected read-model rows are replaced.
+- M6 is implemented: the call investigator now keeps exact token accounting separate from estimated allowance impact and presents compact weekly/5h impact cards with derived/on-demand wording instead of exact-billing language.
 
 ## Tests
 

@@ -6,9 +6,10 @@ from pathlib import Path
 
 from store_dashboard_helpers import SESSION_ID, _usage_event, _write_pricing
 
-from codex_usage_tracker.store import query_usage_api_events, upsert_usage_events
+from codex_usage_tracker.store import connect, query_usage_api_events, upsert_usage_events
 from codex_usage_tracker.usage_impact_cache import UsageImpactCache
 from codex_usage_tracker.usage_impact_store import (
+    query_usage_impact_recalculation_record_ids,
     query_usage_impact_rows,
     replace_usage_impact_from_annotated_rows,
 )
@@ -240,6 +241,106 @@ def test_usage_impact_cache_warm_async_is_single_flight_per_history_scope(
     cache.warm_async(include_archived=True)
 
     assert len(started_threads) == 2
+
+
+def test_usage_impact_cache_warm_pending_targets_recalculation_records(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    events = [
+        _usage_event(
+            record_id="fresh",
+            session_id=SESSION_ID,
+            thread_key="thread:Cache pending",
+            event_timestamp="2026-06-15T12:00:00Z",
+            cumulative_total_tokens=100,
+        ),
+        _usage_event(
+            record_id="target",
+            session_id=SESSION_ID,
+            thread_key="thread:Cache pending",
+            event_timestamp="2026-06-15T12:01:00Z",
+            cumulative_total_tokens=200,
+        ),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+    replace_usage_impact_from_annotated_rows(
+        db_path=db_path,
+        rows=[
+            {
+                "record_id": "fresh",
+                "total_tokens": 100,
+                "usage_credits": 1.0,
+                "usage_impact": {
+                    "primary": {
+                        "estimate_percent": 0.1,
+                        "lower_percent": 0.05,
+                        "upper_percent": 0.15,
+                        "basis": "credits",
+                        "source": "observed_interval",
+                    },
+                    "secondary": None,
+                },
+            },
+            {
+                "record_id": "target",
+                "total_tokens": 200,
+                "usage_credits": 2.0,
+                "usage_impact": {
+                    "primary": {
+                        "estimate_percent": 0.2,
+                        "lower_percent": 0.1,
+                        "upper_percent": 0.3,
+                        "basis": "credits",
+                        "source": "observed_interval",
+                    },
+                    "secondary": None,
+                },
+            },
+        ],
+    )
+    with connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE usage_impact
+            SET status = 'stale'
+            WHERE record_id = 'target'
+            """
+        )
+    captured_record_ids: list[list[str]] = []
+
+    class ImmediateThread:
+        def __init__(self, *args, **kwargs) -> None:
+            self.kwargs = kwargs
+
+        def start(self) -> None:
+            self.kwargs["target"](**self.kwargs["kwargs"])
+
+    cache = UsageImpactCache(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+    )
+
+    def capture_rebuild(record_ids: list[str], *, include_archived: bool) -> dict[str, int]:
+        assert include_archived is False
+        captured_record_ids.append(record_ids)
+        return {"records": len(record_ids), "rows": len(record_ids) * 2}
+
+    monkeypatch.setattr(threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(cache, "_rebuild_records", capture_rebuild)
+
+    pending_ids = query_usage_impact_recalculation_record_ids(
+        db_path=db_path,
+        include_archived=False,
+    )
+    cache.warm_pending_async(include_archived=False)
+
+    assert pending_ids == ["target"]
+    assert captured_record_ids == [["target"]]
 
 
 def test_usage_impact_read_model_materializes_without_raw_content(tmp_path: Path) -> None:

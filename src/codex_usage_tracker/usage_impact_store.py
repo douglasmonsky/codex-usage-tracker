@@ -83,6 +83,33 @@ def replace_usage_impact_from_annotated_rows(
     }
 
 
+def replace_usage_impact_for_records_from_annotated_rows(
+    db_path: Path = DEFAULT_DB_PATH,
+    rows: Iterable[dict[str, Any]] = (),
+    *,
+    record_ids: Iterable[str] = (),
+) -> dict[str, int]:
+    """Replace read-model rows only for selected records from annotated context."""
+
+    target_ids = sorted({record_id for record_id in record_ids if record_id})
+    if not target_ids:
+        return {"records": 0, "rows": 0}
+    target_set = set(target_ids)
+    materialized = [
+        row
+        for row in materialize_usage_impact_rows(rows)
+        if str(row.get("record_id") or "") in target_set
+    ]
+    with _connect(db_path) as conn:
+        init_db(conn)
+        delete_usage_impact_for_records(conn, target_ids)
+        upsert_usage_impact_rows(conn, materialized)
+    return {
+        "records": len(target_ids),
+        "rows": len(materialized),
+    }
+
+
 def materialize_usage_impact_rows(
     rows: Iterable[dict[str, Any]],
     *,
@@ -256,6 +283,46 @@ def query_usage_impact_map_for_records(
         if item.get("status") in {"pending", "stale"}:
             pending = True
     return mapped, pending
+
+
+def query_usage_impact_recalculation_record_ids(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    include_archived: bool = False,
+    limit: int | None = None,
+) -> list[str]:
+    """Return records whose persisted usage-impact rows need recalculation."""
+
+    archive_clause = "" if include_archived else "WHERE usage_events.is_archived = 0"
+    normalized_limit = None if limit is None or limit <= 0 else int(limit)
+    limit_clause = "LIMIT ?" if normalized_limit is not None else ""
+    params: list[Any] = []
+    if normalized_limit is not None:
+        params.append(normalized_limit)
+    with _connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT usage_events.record_id
+            FROM usage_events
+            LEFT JOIN usage_impact
+                ON usage_impact.record_id = usage_events.record_id
+            {archive_clause}
+            GROUP BY usage_events.record_id
+            HAVING
+                SUM(CASE WHEN usage_impact.window_type = 'primary' THEN 1 ELSE 0 END) = 0
+                OR SUM(CASE WHEN usage_impact.window_type = 'secondary' THEN 1 ELSE 0 END) = 0
+                OR SUM(
+                    CASE WHEN usage_impact.status IN ('pending', 'stale') THEN 1 ELSE 0 END
+                ) > 0
+            ORDER BY MAX(usage_events.event_timestamp) ASC,
+                MAX(usage_events.cumulative_total_tokens) ASC,
+                usage_events.record_id ASC
+            {limit_clause}
+            """,
+            params,
+        ).fetchall()
+    return [str(row["record_id"]) for row in rows]
 
 
 def _materialize_window(

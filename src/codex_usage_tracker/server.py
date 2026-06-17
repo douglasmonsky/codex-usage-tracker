@@ -1106,7 +1106,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             )
         if _refresh_result_invalidates_usage_impact(result):
             self._usage_impact_cache.invalidate()
-            self._usage_impact_cache.warm_async(include_archived=include_archived)
+            self._usage_impact_cache.warm_pending_async(include_archived=include_archived)
         payload = refresh_result_payload(
             result,
             schema="codex-usage-tracker-refresh-v1",

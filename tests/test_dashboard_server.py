@@ -177,6 +177,7 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
         def __init__(self) -> None:
             self.invalidations = 0
             self.warms = 0
+            self.pending_warms = 0
 
         def invalidate(self) -> None:
             self.invalidations += 1
@@ -184,6 +185,10 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
         def warm_async(self, *, include_archived: bool) -> None:
             _ = include_archived
             self.warms += 1
+
+        def warm_pending_async(self, *, include_archived: bool) -> None:
+            _ = include_archived
+            self.pending_warms += 1
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -253,7 +258,8 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
     assert second_payload["refresh_result"]["affected_threads"] == 0
     assert second_payload["refresh_result"]["skipped_downstream_work"] is True
     assert usage_impact_cache.invalidations == 1
-    assert usage_impact_cache.warms == 1
+    assert usage_impact_cache.warms == 0
+    assert usage_impact_cache.pending_warms == 1
 
 
 def test_dashboard_server_exposes_usage_impact_read_model(tmp_path: Path) -> None:

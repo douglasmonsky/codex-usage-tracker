@@ -5,6 +5,9 @@
 - Make refresh delta-aware so no-op refreshes skip downstream adjacency and
   thread-summary rebuild work, and append refreshes update only affected thread
   read models.
+- Warm usage-impact estimates only for pending/stale affected records after live
+  refreshes, and keep investigator allowance-impact estimates separate from
+  exact token accounting.
 
 ## 0.6.1 - 2026-06-13
 
