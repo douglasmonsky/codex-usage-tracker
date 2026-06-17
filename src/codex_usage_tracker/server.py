@@ -67,6 +67,7 @@ from codex_usage_tracker.store import (
     query_thread_model_buckets,
     query_thread_summaries,
     query_thread_summary_count,
+    query_thread_usage_impact_summaries,
     query_usage_api_event_count,
     query_usage_api_events,
     query_usage_record,
@@ -161,7 +162,85 @@ def _thread_summary_label(
     return f"{primary} +{len(labels) - 1} {noun}"
 
 
+def _split_distinct_csv(value: object) -> list[str]:
+    if not isinstance(value, str):
+        return []
+    return sorted({part.strip() for part in value.split(",") if part.strip()})
+
+
+def _single_or_mixed(value: object) -> str | None:
+    parts = _split_distinct_csv(value)
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    return "mixed"
+
+
+def _usage_window_label(minutes: object) -> str | None:
+    if not isinstance(minutes, int | float):
+        return None
+    value = int(minutes)
+    if value == 300:
+        return "5h"
+    if value == 10080:
+        return "Weekly"
+    if value % 1440 == 0:
+        return f"{value // 1440}d"
+    if value % 60 == 0:
+        return f"{value // 60}h"
+    return f"{value}m"
+
+
+def _usage_impact_sort_value(row: dict[str, Any]) -> float:
+    impact = row.get("usage_impact")
+    if not isinstance(impact, dict):
+        return float("-inf")
+    secondary = impact.get("secondary")
+    if not isinstance(secondary, dict):
+        return float("-inf")
+    value = secondary.get("estimate_percent")
+    return float(value) if isinstance(value, int | float) else float("-inf")
+
+
+def _thread_usage_impact_by_thread(
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, bool]]:
+    """Build per-thread usage-impact summaries from persisted per-call estimates."""
+
+    by_thread: dict[str, dict[str, Any]] = {}
+    pending_by_thread: dict[str, bool] = {}
+    for row in rows:
+        thread_key = str(row.get("thread_key") or "")
+        window_type = str(row.get("window_type") or "")
+        if not thread_key or window_type not in {"primary", "secondary"}:
+            continue
+        pending_count = int(row.get("pending_row_count") or 0)
+        pending_by_thread[thread_key] = pending_by_thread.get(thread_key, False) or pending_count > 0
+        if int(row.get("estimate_row_count") or 0) <= 0:
+            continue
+        by_thread.setdefault(thread_key, {"primary": None, "secondary": None})
+        by_thread[thread_key][window_type] = {
+            "schema": "codex-usage-tracker-usage-impact-estimate-v1",
+            "label": _usage_window_label(row.get("observed_window_minutes")),
+            "window_minutes": row.get("observed_window_minutes"),
+            "estimate_percent": row.get("estimated_usage_percent"),
+            "lower_percent": row.get("lower_percent"),
+            "upper_percent": row.get("upper_percent"),
+            "observed_delta_percent": row.get("delta_used_percent"),
+            "interval_call_count": row.get("estimate_row_count"),
+            "basis": _single_or_mixed(row.get("bases")),
+            "source": _single_or_mixed(row.get("sources")),
+            "resets_at": row.get("observed_resets_at"),
+            "confidence": _single_or_mixed(row.get("confidences")),
+            "status": _single_or_mixed(row.get("statuses")),
+        }
+    return by_thread, pending_by_thread
+
+
 def _thread_summary_computed_sort_key(row: dict[str, Any], sort: str) -> tuple[float, str]:
+    if sort == "usage_impact":
+        return _usage_impact_sort_value(row), str(row.get("latest_event_timestamp") or "")
     numeric_value = {
         "cost": row.get("estimated_cost_usd"),
         "usage": row.get("usage_credits"),
@@ -1069,7 +1148,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 search=search,
                 include_archived=include_archived,
             )
-            if sort in {"cost", "usage"}:
+            if sort in {"cost", "usage", "usage_impact"}:
                 sorted_rows = query_thread_summaries(
                     db_path=self._db_path,
                     limit=None,
@@ -1152,6 +1231,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             if not key:
                 continue
             buckets_by_thread.setdefault(key, []).append(bucket)
+        impact_summaries = query_thread_usage_impact_summaries(
+            db_path=self._db_path,
+            thread_keys=thread_keys,
+            include_archived=include_archived,
+        )
+        usage_impact_by_thread, pending_impact_by_thread = _thread_usage_impact_by_thread(
+            impact_summaries
+        )
         annotated_rows: list[dict[str, Any]] = []
         for row in rows:
             copy = dict(row)
@@ -1173,6 +1260,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 copy["usage_credits"] = _sum_optional_number(
                     bucket.get("usage_credits") for bucket in thread_buckets
                 )
+            if key in usage_impact_by_thread:
+                copy["usage_impact"] = usage_impact_by_thread[key]
+            if pending_impact_by_thread.get(key):
+                copy["usage_impact_pending"] = True
             annotated_rows.append(copy)
         return annotated_rows
 

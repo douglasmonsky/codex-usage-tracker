@@ -33,6 +33,7 @@ from codex_usage_tracker.store import (
     upsert_usage_events,
 )
 from codex_usage_tracker.usage_impact_cache import UsageImpactCache
+from codex_usage_tracker.usage_impact_store import replace_usage_impact_from_annotated_rows
 
 
 def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> None:
@@ -426,6 +427,170 @@ def test_dashboard_server_exposes_task_receipt_read_model(tmp_path: Path) -> Non
     assert "SECRET RAW PROMPT" not in json.dumps(receipt_payload)
     _assert_contract(receipt_payload)
     _assert_contract(call_payload["task_receipts"])
+
+
+def test_dashboard_server_thread_api_exposes_usage_impact_summary(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id="alpha-1",
+                session_id=SESSION_ID,
+                thread_key="thread:Alpha usage",
+                event_timestamp="2026-06-15T12:00:00Z",
+                cumulative_total_tokens=1000,
+            ),
+            _usage_event(
+                record_id="alpha-2",
+                session_id=SESSION_ID,
+                thread_key="thread:Alpha usage",
+                event_timestamp="2026-06-15T12:01:00Z",
+                cumulative_total_tokens=2000,
+            ),
+            _usage_event(
+                record_id="beta-1",
+                session_id=SESSION_ID,
+                thread_key="thread:Beta usage",
+                event_timestamp="2026-06-15T12:02:00Z",
+                cumulative_total_tokens=3000,
+            ),
+        ],
+        db_path=db_path,
+    )
+    rows_by_record_id = {
+        str(row["record_id"]): row for row in query_dashboard_events(db_path=db_path, limit=0)
+    }
+    replace_usage_impact_from_annotated_rows(
+        db_path=db_path,
+        rows=[
+            {
+                **rows_by_record_id["alpha-1"],
+                "rate_limit_primary_window_minutes": 300,
+                "rate_limit_secondary_window_minutes": 10080,
+                "usage_impact": {
+                    "primary": {
+                        "estimate_percent": 0.25,
+                        "lower_percent": 0.2,
+                        "upper_percent": 0.3,
+                        "observed_delta_percent": 0.25,
+                        "interval_call_count": 1,
+                        "basis": "codex_credits",
+                        "source": "observed_interval",
+                        "confidence": "medium",
+                    },
+                    "secondary": {
+                        "estimate_percent": 0.1,
+                        "lower_percent": 0.08,
+                        "upper_percent": 0.12,
+                        "observed_delta_percent": 0.1,
+                        "interval_call_count": 1,
+                        "basis": "codex_credits",
+                        "source": "observed_interval",
+                        "confidence": "medium",
+                    },
+                },
+            },
+            {
+                **rows_by_record_id["alpha-2"],
+                "rate_limit_primary_window_minutes": 300,
+                "rate_limit_secondary_window_minutes": 10080,
+                "usage_impact": {
+                    "primary": {
+                        "estimate_percent": 0.5,
+                        "lower_percent": 0.4,
+                        "upper_percent": 0.6,
+                        "observed_delta_percent": 0.5,
+                        "interval_call_count": 1,
+                        "basis": "codex_credits",
+                        "source": "observed_interval",
+                        "confidence": "medium",
+                    },
+                    "secondary": {
+                        "estimate_percent": 0.2,
+                        "lower_percent": 0.16,
+                        "upper_percent": 0.24,
+                        "observed_delta_percent": 0.2,
+                        "interval_call_count": 1,
+                        "basis": "codex_credits",
+                        "source": "observed_interval",
+                        "confidence": "medium",
+                    },
+                },
+            },
+            {
+                **rows_by_record_id["beta-1"],
+                "rate_limit_primary_window_minutes": 300,
+                "rate_limit_secondary_window_minutes": 10080,
+                "usage_impact": {
+                    "primary": {
+                        "estimate_percent": 0.05,
+                        "lower_percent": 0.04,
+                        "upper_percent": 0.06,
+                        "observed_delta_percent": 0.05,
+                        "interval_call_count": 1,
+                        "basis": "codex_credits",
+                        "source": "observed_interval",
+                        "confidence": "medium",
+                    },
+                    "secondary": {
+                        "estimate_percent": 0.01,
+                        "lower_percent": 0.008,
+                        "upper_percent": 0.012,
+                        "observed_delta_percent": 0.01,
+                        "interval_call_count": 1,
+                        "basis": "codex_credits",
+                        "source": "observed_interval",
+                        "confidence": "medium",
+                    },
+                },
+            },
+        ],
+    )
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        threads_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}"
+            "/api/threads?sort=usage_impact&direction=desc&limit=2"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert threads_payload["schema"] == "codex-usage-tracker-threads-v1"
+    assert threads_payload["rows"][0]["thread_key"] == "thread:Alpha usage"
+    usage_impact = threads_payload["rows"][0]["usage_impact"]
+    assert usage_impact["primary"]["label"] == "5h"
+    assert usage_impact["secondary"]["label"] == "Weekly"
+    assert abs(usage_impact["primary"]["estimate_percent"] - 0.75) < 0.000001
+    assert abs(usage_impact["secondary"]["estimate_percent"] - 0.3) < 0.000001
+    assert usage_impact["secondary"]["basis"] == "codex_credits"
+    assert usage_impact["secondary"]["interval_call_count"] == 2
+    assert threads_payload["raw_context_included"] is False
 
 
 def test_dashboard_server_exposes_lifecycle_recommendations(tmp_path: Path) -> None:

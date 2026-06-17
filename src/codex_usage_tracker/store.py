@@ -1418,6 +1418,77 @@ def query_thread_model_buckets(
         return [_row_to_dict(row) for row in rows]
 
 
+def query_thread_usage_impact_summaries(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    thread_keys: Iterable[str],
+    include_archived: bool = False,
+) -> list[dict[str, Any]]:
+    """Return aggregate usage-impact read-model rows for thread summaries."""
+
+    normalized_thread_keys = sorted({key for key in thread_keys if key})
+    if not normalized_thread_keys:
+        return []
+    where_clause, params = _usage_where_clause(include_archived=include_archived)
+    thread_key_expr = _thread_key_expression()
+    clauses: list[str] = []
+    if where_clause:
+        clauses.append(where_clause.removeprefix("WHERE "))
+    placeholders = ", ".join("?" for _key in normalized_thread_keys)
+    clauses.append(f"{thread_key_expr} IN ({placeholders})")
+    query_params: list[Any] = [*params, *normalized_thread_keys]
+    scoped_where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                {thread_key_expr} AS thread_key,
+                usage_impact.window_type AS window_type,
+                COUNT(*) AS impact_row_count,
+                SUM(
+                    CASE WHEN usage_impact.status IN ('pending', 'stale')
+                    THEN 1 ELSE 0 END
+                ) AS pending_row_count,
+                SUM(
+                    CASE WHEN usage_impact.estimated_usage_percent IS NOT NULL
+                    THEN 1 ELSE 0 END
+                ) AS estimate_row_count,
+                MIN(usage_impact.observed_window_minutes) AS observed_window_minutes,
+                MAX(usage_impact.observed_resets_at) AS observed_resets_at,
+                SUM(
+                    CASE WHEN usage_impact.estimated_usage_percent IS NOT NULL
+                    THEN usage_impact.estimated_usage_percent ELSE 0 END
+                ) AS estimated_usage_percent,
+                SUM(
+                    CASE WHEN usage_impact.estimated_usage_percent IS NOT NULL
+                    THEN coalesce(usage_impact.lower_percent, usage_impact.estimated_usage_percent)
+                    ELSE 0 END
+                ) AS lower_percent,
+                SUM(
+                    CASE WHEN usage_impact.estimated_usage_percent IS NOT NULL
+                    THEN coalesce(usage_impact.upper_percent, usage_impact.estimated_usage_percent)
+                    ELSE 0 END
+                ) AS upper_percent,
+                SUM(
+                    CASE WHEN usage_impact.estimated_usage_percent IS NOT NULL
+                    THEN coalesce(usage_impact.delta_used_percent, 0) ELSE 0 END
+                ) AS delta_used_percent,
+                GROUP_CONCAT(DISTINCT NULLIF(usage_impact.basis, '')) AS bases,
+                GROUP_CONCAT(DISTINCT NULLIF(usage_impact.source, '')) AS sources,
+                GROUP_CONCAT(DISTINCT NULLIF(usage_impact.confidence, '')) AS confidences,
+                GROUP_CONCAT(DISTINCT NULLIF(usage_impact.status, '')) AS statuses
+            FROM usage_events
+            JOIN usage_impact
+                ON usage_impact.record_id = usage_events.record_id
+            {scoped_where_clause}
+            GROUP BY {thread_key_expr}, usage_impact.window_type
+            """,
+            query_params,
+        )
+        return [_row_to_dict(row) for row in rows]
+
+
 def query_thread_summary_count(
     db_path: Path = DEFAULT_DB_PATH,
     *,
