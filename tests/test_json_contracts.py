@@ -21,6 +21,7 @@ RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "mcp_server.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "reports.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "server.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "store_work_sessions.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "usage_impact_store.py",
 ]
 

@@ -266,6 +266,15 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
         SESSION_ID,
         "--json",
     )
+    sessions = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "sessions",
+        "--limit",
+        "5",
+        "--json",
+    )
     expensive = _run_cli(
         tmp_path,
         "--db",
@@ -291,17 +300,20 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     )
 
     assert refresh.returncode == 0
+    assert sessions.returncode == 0
     refresh_payload = json.loads(refresh.stdout)
     summary_payload = json.loads(summary.stdout)
     query_payload = json.loads(query.stdout)
     recommendations_payload = json.loads(recommendations.stdout)
     session_payload = json.loads(session.stdout)
+    sessions_payload = json.loads(sessions.stdout)
     expensive_payload = json.loads(expensive.stdout)
     _assert_contract(refresh_payload)
     _assert_contract(summary_payload)
     _assert_contract(query_payload)
     _assert_contract(recommendations_payload)
     _assert_contract(session_payload)
+    _assert_contract(sessions_payload)
     _assert_contract(expensive_payload)
     assert refresh_payload["schema"] == "codex-usage-tracker-refresh-v1"
     assert summary_payload["schema"] == "codex-usage-tracker-summary-v1"
@@ -323,6 +335,9 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     assert recommendations_payload["threads"][0]["primary_recommendation"]["key"] == "pricing-gap"
     assert session_payload["schema"] == "codex-usage-tracker-session-v1"
     assert session_payload["resolved_session_id"] == SESSION_ID
+    assert sessions_payload["schema"] == "codex-usage-tracker-sessions-v1"
+    assert sessions_payload["row_count"] >= 1
+    assert sessions_payload["raw_context_included"] is False
     assert expensive_payload["schema"] == "codex-usage-tracker-summary-v1"
     assert expensive_payload["is_expensive"] is True
     export_payload = json.loads(export.stdout)

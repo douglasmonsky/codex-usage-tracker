@@ -138,6 +138,22 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "reason": (str, NoneType),
         }
     },
+    "codex-usage-tracker-sessions-v1": {
+        "required": {
+            "row_count": int,
+            "rows": list,
+            "limit": (int, NoneType),
+            "offset": int,
+            "include_archived": bool,
+            "raw_context_included": bool,
+        }
+    },
+    "codex-usage-tracker-work-session-v1": {
+        "required": {
+            "record": (dict, NoneType),
+            "raw_context_included": bool,
+        }
+    },
     "codex-usage-tracker-recommendations-v1": {
         "required": {
             "filters": dict,

@@ -48,6 +48,8 @@ Tracked schema ids:
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-usage-impact-v1` | CLI `usage-impact --json`, dashboard server `/api/usage-impact`, `/api/call` usage-impact payload |
 | `codex-usage-tracker-usage-impact-estimate-v1` | Nested dashboard row `usage_impact.primary` and `usage_impact.secondary` estimate objects |
+| `codex-usage-tracker-sessions-v1` | CLI `sessions --json`, dashboard server `/api/sessions` response |
+| `codex-usage-tracker-work-session-v1` | Dashboard server `/api/session` response |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
@@ -191,6 +193,45 @@ Schema: `codex-usage-tracker-usage-impact-v1`
 ```
 
 Rows are derived from local observed Codex usage snapshots and the configured/local Codex credit estimate. They are useful for comparing likely per-call allowance movement, but they are not exact billing data and may exclude usage outside local Codex logs.
+
+## Thread Work Sessions
+
+Command:
+
+```bash
+codex-usage-tracker sessions --json
+```
+
+Dashboard API:
+
+- `/api/sessions`
+- `/api/session?work_session_id=<work-session-id>`
+
+Schema: `codex-usage-tracker-sessions-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-sessions-v1",
+  "row_count": 1,
+  "rows": [],
+  "limit": 100,
+  "offset": 0,
+  "include_archived": false,
+  "raw_context_included": false
+}
+```
+
+Schema: `codex-usage-tracker-work-session-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-work-session-v1",
+  "record": {},
+  "raw_context_included": false
+}
+```
+
+Rows are materialized from aggregate usage counters only. They group adjacent calls in the same resolved thread and split at cold-cache resume boundaries inferred from idle gaps, uncached input, and cache ratio. They do not contain prompts, assistant messages, tool output, or raw JSONL fragments.
 
 ## Recommendations
 

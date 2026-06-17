@@ -57,6 +57,10 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
     reset_usage_database,
 )
+from codex_usage_tracker.store_work_sessions import (
+    query_thread_work_sessions,
+    sessions_payload,
+)
 from codex_usage_tracker.support import build_support_bundle
 from codex_usage_tracker.usage_impact_cache import UsageImpactCache
 from codex_usage_tracker.usage_impact_store import (
@@ -403,6 +407,43 @@ def _run_usage_impact(args: argparse.Namespace) -> int:
         print(
             f"{row['record_id']} {label}: {estimate_text} "
             f"({row['status']}, {row['confidence']})"
+        )
+    return 0
+
+
+def _run_sessions(args: argparse.Namespace) -> int:
+    limit = None if args.limit <= 0 else args.limit
+    rows = query_thread_work_sessions(
+        db_path=args.db,
+        limit=limit,
+        offset=args.offset,
+        search=args.search,
+        thread_key=args.thread_key,
+        include_archived=args.include_archived,
+        sort=args.sort,
+        direction=args.direction,
+        cold_resumes_only=args.cold_resumes_only,
+        high_uncached_only=args.high_uncached_only,
+        needs_handoff_only=args.needs_handoff_only,
+        recent_only=args.recent_only,
+    )
+    payload = sessions_payload(
+        rows,
+        limit=limit,
+        offset=args.offset,
+        include_archived=args.include_archived,
+    )
+    if args.as_json:
+        _print_json(payload)
+        return 0
+    if not rows:
+        print("No thread work sessions found. Run refresh or rebuild-index to materialize sessions.")
+        return 0
+    for row in rows:
+        print(
+            f"{row['started_at']} {row['thread_label']} "
+            f"calls={row['call_count']} uncached={row['uncached_input_tokens']} "
+            f"cache={float(row['avg_cache_ratio']):.1%} action={row['suggested_next_action']}"
         )
     return 0
 
@@ -848,6 +889,7 @@ _COMMAND_HANDLERS = {
     "summary": _run_summary,
     "query": _run_query,
     "usage-impact": _run_usage_impact,
+    "sessions": _run_sessions,
     "recommendations": _run_recommendations,
     "session": _run_session,
     "context": _run_context,

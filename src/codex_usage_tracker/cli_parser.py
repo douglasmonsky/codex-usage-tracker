@@ -70,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_summary_parser(subparsers)
     _add_query_parser(subparsers)
     _add_usage_impact_parser(subparsers)
+    _add_sessions_parser(subparsers)
     _add_recommendations_parser(subparsers)
     _add_session_parser(subparsers)
     _add_context_parser(subparsers)
@@ -295,6 +296,43 @@ def _add_usage_impact_parser(
         help="Read the current table without rebuilding estimates first.",
     )
     usage_impact.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_sessions_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    sessions = subparsers.add_parser(
+        "sessions",
+        help="Show aggregate thread work-session rows",
+    )
+    sessions.add_argument("--thread-key", help="Only include work sessions for one resolved thread key")
+    sessions.add_argument("--search", help="Search thread labels and resolved thread keys")
+    sessions.add_argument(
+        "--sort",
+        choices=(
+            "started",
+            "ended",
+            "duration",
+            "calls",
+            "tokens",
+            "uncached",
+            "cache",
+            "largest_miss",
+            "context",
+            "thread",
+            "action",
+        ),
+        default="uncached",
+    )
+    sessions.add_argument("--direction", choices=("asc", "desc"), default="desc")
+    sessions.add_argument("--limit", type=int, default=100, help="Maximum rows to return; use 0 for all")
+    sessions.add_argument("--offset", type=int, default=0)
+    sessions.add_argument("--include-archived", action="store_true")
+    sessions.add_argument("--cold-resumes-only", action="store_true")
+    sessions.add_argument("--high-uncached-only", action="store_true")
+    sessions.add_argument("--needs-handoff-only", action="store_true")
+    sessions.add_argument("--recent-only", action="store_true")
+    sessions.add_argument("--json", action="store_true", dest="as_json")
 
 
 def _add_recommendations_parser(

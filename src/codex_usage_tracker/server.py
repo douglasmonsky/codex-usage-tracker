@@ -68,6 +68,12 @@ from codex_usage_tracker.store import (
     refresh_metadata,
     refresh_usage_index,
 )
+from codex_usage_tracker.store_work_sessions import (
+    query_thread_work_session,
+    query_thread_work_sessions,
+    sessions_payload,
+    work_session_payload,
+)
 from codex_usage_tracker.threads import annotate_thread_attachments
 from codex_usage_tracker.usage_impact_cache import UsageImpactCache
 from codex_usage_tracker.usage_impact_store import (
@@ -304,6 +310,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/usage-impact":
             self._handle_usage_impact(parsed.query)
+            return
+        if parsed.path == "/api/sessions":
+            self._handle_sessions(parsed.query)
+            return
+        if parsed.path == "/api/session":
+            self._handle_work_session(parsed.query)
             return
         if parsed.path == "/api/threads":
             self._handle_threads(parsed.query)
@@ -758,6 +770,78 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 limit=limit,
             ),
         )
+
+    def _handle_sessions(self, query: str) -> None:
+        params = parse_qs(query)
+        try:
+            limit = _parse_api_limit(_first(params.get("limit")), 100)
+            offset = _parse_api_offset(_first(params.get("offset")))
+            include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
+            rows = query_thread_work_sessions(
+                db_path=self._db_path,
+                limit=limit,
+                offset=offset,
+                search=_first(params.get("q")) or _first(params.get("search")),
+                thread_key=_first(params.get("thread_key")) or _first(params.get("thread")),
+                include_archived=include_archived,
+                sort=_first(params.get("sort")) or "uncached",
+                direction=_first(params.get("direction")) or "desc",
+                cold_resumes_only=_truthy(_first(params.get("cold_resumes_only"))),
+                high_uncached_only=_truthy(_first(params.get("high_uncached_only"))),
+                needs_handoff_only=_truthy(_first(params.get("needs_handoff_only"))),
+                recent_only=_truthy(_first(params.get("recent_only"))),
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading sessions: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            sessions_payload(
+                rows,
+                limit=limit,
+                offset=offset,
+                include_archived=include_archived,
+            ),
+        )
+
+    def _handle_work_session(self, query: str) -> None:
+        params = parse_qs(query)
+        work_session_id = _first(params.get("work_session_id")) or _first(params.get("id"))
+        thread_key = _first(params.get("thread_key")) or _first(params.get("thread"))
+        raw_index = _first(params.get("session_index"))
+        session_index: int | None = None
+        if raw_index is not None and raw_index != "":
+            try:
+                session_index = int(raw_index)
+            except ValueError:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "session_index must be an integer"})
+                return
+        try:
+            row = query_thread_work_session(
+                db_path=self._db_path,
+                work_session_id=work_session_id,
+                thread_key=thread_key,
+                session_index=session_index,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading session: {exc}"},
+            )
+            return
+        if row is None:
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": "No thread work session found"})
+            return
+        self._send_json(HTTPStatus.OK, work_session_payload(row))
 
     def _handle_threads(self, query: str) -> None:
         params = parse_qs(query)

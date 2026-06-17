@@ -46,6 +46,7 @@ CLI_HELP_SUBCOMMANDS = [
     "summary",
     "query",
     "usage-impact",
+    "sessions",
     "recommendations",
     "session",
     "context",

@@ -640,6 +640,11 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         thread_calls_payload = _read_json(
             f"{base_url}/api/thread-calls?thread_key={urllib.parse.quote(thread_key)}&limit=2"
         )
+        sessions_payload = _read_json(f"{base_url}/api/sessions?limit=2&sort=uncached")
+        work_session_id = sessions_payload["rows"][0]["work_session_id"]
+        work_session_payload = _read_json(
+            f"{base_url}/api/session?work_session_id={urllib.parse.quote(work_session_id)}"
+        )
         summary_payload = _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
         recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
         invalid_sort = _http_error_json(f"{base_url}/api/calls?sort=not-a-sort")
@@ -681,6 +686,17 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert thread_calls_payload["thread_key"] == thread_key
     assert thread_calls_payload["row_count"] >= 1
 
+    assert sessions_payload["schema"] == "codex-usage-tracker-sessions-v1"
+    _assert_contract(sessions_payload)
+    assert sessions_payload["row_count"] >= 1
+    assert sessions_payload["raw_context_included"] is False
+    assert "uncached_input_tokens" in sessions_payload["rows"][0]
+
+    assert work_session_payload["schema"] == "codex-usage-tracker-work-session-v1"
+    _assert_contract(work_session_payload)
+    assert work_session_payload["record"]["work_session_id"] == work_session_id
+    assert work_session_payload["raw_context_included"] is False
+
     assert summary_payload["schema"] == "codex-usage-tracker-summary-v1"
     _assert_contract(summary_payload)
     assert summary_payload["group_by"] == "model"
@@ -696,6 +712,8 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
             call_payload,
             threads_payload,
             thread_calls_payload,
+            sessions_payload,
+            work_session_payload,
             summary_payload,
             recommendations_payload,
         ]
