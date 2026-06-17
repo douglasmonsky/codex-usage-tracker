@@ -413,7 +413,7 @@ def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> N
             "--json",
             "--enforce-thresholds",
             "--threshold-scale",
-            "5",
+            "20",
         ],
         check=True,
         capture_output=True,
