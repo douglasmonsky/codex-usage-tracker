@@ -1012,6 +1012,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             rows,
             include_archived=include_archived,
             block=False,
+            schedule_warm=False,
         )
         rows = annotate_rows_with_recommendations(rows, thresholds)
         rows = annotate_rows_with_project_identity(rows, projects)

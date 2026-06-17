@@ -151,6 +151,46 @@ def test_usage_impact_cache_can_return_pending_without_blocking(
     assert second[0]["usage_impact"]["primary"]["estimate_percent"] == 0.12
 
 
+def test_usage_impact_cache_can_return_pending_without_scheduling_warm(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    event = _usage_event(
+        record_id="target",
+        session_id=SESSION_ID,
+        thread_key="thread:Cache pending",
+        event_timestamp="2026-06-15T12:00:00Z",
+        cumulative_total_tokens=1000,
+    )
+    upsert_usage_events([event], db_path=db_path)
+    rows = query_usage_api_events(db_path=db_path, limit=1, include_archived=False)
+    cache = UsageImpactCache(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+    )
+
+    def fail_if_scheduled(*, include_archived: bool) -> None:
+        raise AssertionError("live row slices must not schedule a full usage-impact warm")
+
+    monkeypatch.setattr(cache, "warm_async", fail_if_scheduled)
+
+    result = cache.copy_usage_impact(
+        rows,
+        include_archived=False,
+        block=False,
+        schedule_warm=False,
+    )
+
+    assert result[0]["record_id"] == "target"
+    assert result[0]["usage_impact_pending"] is True
+    assert result[0]["usage_impact"]["primary"]["status"] == "pending"
+    assert result[0]["usage_impact"]["secondary"]["status"] == "pending"
+
+
 def test_usage_impact_cache_warm_async_is_single_flight_per_history_scope(
     tmp_path: Path,
     monkeypatch,

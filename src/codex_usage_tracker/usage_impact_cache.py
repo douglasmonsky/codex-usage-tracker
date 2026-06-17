@@ -103,6 +103,7 @@ class UsageImpactCache:
         *,
         include_archived: bool,
         block: bool = True,
+        schedule_warm: bool = True,
     ) -> list[dict[str, Any]]:
         """Return copied rows with cached usage-impact estimates attached."""
 
@@ -117,7 +118,8 @@ class UsageImpactCache:
         if persisted and not missing and not persisted_pending:
             return _copy_persisted_usage_impact(rows, persisted, pending=False)
         if not block:
-            self.warm_async(include_archived=include_archived)
+            if schedule_warm:
+                self.warm_async(include_archived=include_archived)
             return _copy_persisted_usage_impact(rows, persisted, pending=True)
         impact_by_record_id = self._impact_by_record_id(
             include_archived=include_archived,
