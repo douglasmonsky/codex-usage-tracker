@@ -56,4 +56,4 @@ Speed up initial and large backfill refreshes by parsing multiple changed source
 - [x] M5: Add tests for sequential/parallel equivalence, stats aggregation, worker errors, and default threshold behavior.
 - [x] M6: Add benchmark coverage for multi-file backfill refresh.
 - [x] M7: Run validation and document results.
-- [ ] M8: Commit, push, and open the branch PR without merging to `main`.
+- [x] M8: Commit, push, and open the branch PR without merging to `main`.
