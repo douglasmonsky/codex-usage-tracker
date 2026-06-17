@@ -42,6 +42,7 @@ from codex_usage_tracker.store_schema import (
     SchemaMigrationError,
     init_db,
 )
+from codex_usage_tracker.store_context_epochs import rebuild_thread_context_epochs
 from codex_usage_tracker.store_sources import (
     ParsedSourceFile,
     source_logs_requiring_parse,
@@ -463,6 +464,7 @@ def _upsert_usage_events_with_delta(
                 refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
                 rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
                 rebuild_thread_work_sessions(conn, thread_keys=delta.affected_thread_keys)
+                rebuild_thread_context_epochs(conn, thread_keys=delta.affected_thread_keys)
                 invalidate_usage_impact_for_delta(
                     conn,
                     inserted_record_ids=delta.inserted_record_ids,
@@ -490,6 +492,7 @@ def _upsert_usage_events_with_delta(
             refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
             rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
             rebuild_thread_work_sessions(conn, thread_keys=delta.affected_thread_keys)
+            rebuild_thread_context_epochs(conn, thread_keys=delta.affected_thread_keys)
             invalidate_usage_impact_for_delta(
                 conn,
                 inserted_record_ids=delta.inserted_record_ids,
@@ -511,6 +514,7 @@ def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
         changed = _refresh_usage_event_links(conn)
         rebuild_thread_summaries(conn)
         rebuild_thread_work_sessions(conn)
+        rebuild_thread_context_epochs(conn)
         return changed
 
 

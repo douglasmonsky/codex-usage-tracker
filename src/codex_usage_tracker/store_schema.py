@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -25,6 +25,7 @@ MIGRATION_NAMES = {
     9: "persist source byte offsets for context seeking",
     10: "materialize usage-impact read model",
     11: "materialize thread work sessions",
+    12: "materialize thread context epochs",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -116,6 +117,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v11(conn)
         _record_migration_if_missing(conn, 11)
+    if user_version < 12:
+        _migrate_v12(conn)
+        _record_migration(conn, 12)
+    else:
+        _migrate_v12(conn)
+        _record_migration_if_missing(conn, 12)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -363,6 +370,57 @@ def _migrate_v11(conn: sqlite3.Connection) -> None:
             ON thread_work_sessions(uncached_input_tokens);
         CREATE INDEX IF NOT EXISTS idx_thread_work_sessions_action
             ON thread_work_sessions(suggested_next_action);
+        """
+    )
+
+
+def _migrate_v12(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS thread_context_epochs (
+            context_epoch_id TEXT PRIMARY KEY,
+            work_session_id TEXT NOT NULL,
+            thread_key TEXT NOT NULL,
+            epoch_index INTEGER NOT NULL,
+            start_record_id TEXT NOT NULL,
+            end_record_id TEXT NOT NULL,
+            start_reason TEXT NOT NULL,
+            compaction_before_record_id TEXT,
+            compaction_detected_at TEXT,
+            started_at TEXT NOT NULL,
+            ended_at TEXT NOT NULL,
+            duration_minutes REAL NOT NULL,
+            call_count INTEGER NOT NULL,
+            input_tokens INTEGER NOT NULL,
+            cached_input_tokens INTEGER NOT NULL,
+            uncached_input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            reasoning_output_tokens INTEGER NOT NULL,
+            total_tokens INTEGER NOT NULL,
+            avg_cache_ratio REAL NOT NULL,
+            min_cache_ratio REAL NOT NULL,
+            max_context_window_percent REAL NOT NULL,
+            largest_uncached_record_id TEXT,
+            largest_uncached_input_tokens INTEGER NOT NULL,
+            first_call_cache_ratio REAL,
+            first_call_uncached_input_tokens INTEGER,
+            post_compaction_uncached_spike INTEGER NOT NULL DEFAULT 0,
+            subagent_call_count INTEGER NOT NULL DEFAULT 0,
+            auto_review_call_count INTEGER NOT NULL DEFAULT 0,
+            compaction_effectiveness TEXT,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_thread_context_epochs_session_index
+            ON thread_context_epochs(work_session_id, epoch_index);
+        CREATE INDEX IF NOT EXISTS idx_thread_context_epochs_thread_index
+            ON thread_context_epochs(thread_key, epoch_index);
+        CREATE INDEX IF NOT EXISTS idx_thread_context_epochs_started
+            ON thread_context_epochs(started_at);
+        CREATE INDEX IF NOT EXISTS idx_thread_context_epochs_uncached
+            ON thread_context_epochs(uncached_input_tokens);
+        CREATE INDEX IF NOT EXISTS idx_thread_context_epochs_effectiveness
+            ON thread_context_epochs(compaction_effectiveness);
         """
     )
 
