@@ -110,6 +110,34 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    "codex-usage-tracker-usage-impact-v1": {
+        "required": {
+            "record_id": (str, NoneType),
+            "limit": (int, NoneType),
+            "row_count": int,
+            "rows": list,
+            "raw_context_included": bool,
+        }
+    },
+    "codex-usage-tracker-usage-impact-estimate-v1": {
+        "required": {
+            "label": (str, NoneType),
+            "window_minutes": (int, NoneType),
+            "estimate_percent": (int, float, NoneType),
+            "lower_percent": (int, float, NoneType),
+            "upper_percent": (int, float, NoneType),
+            "observed_delta_percent": (int, float, NoneType),
+            "interval_call_count": (int, NoneType),
+            "basis": (str, NoneType),
+            "source": (str, NoneType),
+            "plan_type": (str, NoneType),
+            "limit_id": (str, NoneType),
+            "resets_at": (int, NoneType),
+            "confidence": (str, NoneType),
+            "status": (str, NoneType),
+            "reason": (str, NoneType),
+        }
+    },
     "codex-usage-tracker-recommendations-v1": {
         "required": {
             "filters": dict,
@@ -203,6 +231,7 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "record": dict,
             "previous_record_id": (str, NoneType),
             "next_record_id": (str, NoneType),
+            "usage_impact": dict,
             "raw_context_included": bool,
         }
     },

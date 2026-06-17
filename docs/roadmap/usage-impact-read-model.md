@@ -43,6 +43,12 @@ Target `usage_impact` table fields:
 - `tokens_since_previous INTEGER`
 - `estimated_tokens_per_percent REAL`
 - `estimated_usage_credits REAL`
+- `estimated_usage_percent REAL`
+- `lower_percent REAL`
+- `upper_percent REAL`
+- `basis TEXT`
+- `source TEXT`
+- `interval_call_count INTEGER`
 - `confidence TEXT NOT NULL` (`high`, `medium`, `low`, `unknown`)
 - `status TEXT NOT NULL` (`fresh`, `pending`, `stale`, `unavailable`)
 - `reason TEXT`
@@ -51,16 +57,21 @@ Target `usage_impact` table fields:
 
 ## Implementation Checklist
 
-- [ ] M0: Add this roadmap/checklist before implementation.
-- [ ] M1: Audit existing usage-impact code and mark what already satisfies this roadmap.
-- [ ] M2: Add or repair `usage_impact` schema, migration, indexes, and repair behavior.
-- [ ] M3: Add calculator behavior for observed primary/secondary deltas and confidence/status labels.
+- [x] M0: Add this roadmap/checklist before implementation.
+- [x] M1: Audit existing usage-impact code and mark what already satisfies this roadmap.
+- [x] M2: Add or repair `usage_impact` schema, migration, indexes, and repair behavior.
+- [x] M3: Add calculator behavior for observed primary/secondary deltas and confidence/status labels.
 - [ ] M4: Wire refresh-delta invalidation so no-op skips work and append/full-reparse rebuild affected intervals only.
-- [ ] M5: Expose usage-impact CLI/API/call payload contracts with schema id `codex-usage-tracker-usage-impact-v1`.
+- [x] M5: Expose usage-impact CLI/API/call payload contracts with schema id `codex-usage-tracker-usage-impact-v1`.
 - [ ] M6: Add compact dashboard call-detail chips without exact-billing language.
-- [ ] M7: Add focused tests for windows, pools, no-op, append, ambiguity, JSON contracts, and privacy.
-- [ ] M8: Run validation and benchmarks.
+- [x] M7: Add focused tests for windows, pools, no-op, append, ambiguity, JSON contracts, and privacy.
+- [x] M8: Run validation and benchmarks.
 - [ ] M9: Commit, push, and open the branch PR without merging to `main`.
+
+Progress notes:
+
+- M4 is partially implemented: refresh deltas now delete stale records, insert pending rows for newly appended records, and no-op refreshes avoid usage-impact invalidation. Recalculating only affected observed intervals remains open; the current cache rebuild still materializes from full-history rows when a recalculation is needed.
+- M6 is partially implemented through existing dashboard usage-impact cells and call payload exposure. The final call-detail presentation still needs a focused UI pass after the persistent read model is stable.
 
 ## Tests
 

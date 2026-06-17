@@ -46,6 +46,8 @@ Tracked schema ids:
 | `codex-usage-tracker-reset-db-v1` | CLI `reset-db --yes --json` |
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
+| `codex-usage-tracker-usage-impact-v1` | CLI `usage-impact --json`, dashboard server `/api/usage-impact`, `/api/call` usage-impact payload |
+| `codex-usage-tracker-usage-impact-estimate-v1` | Nested dashboard row `usage_impact.primary` and `usage_impact.secondary` estimate objects |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
@@ -161,6 +163,34 @@ Supported filters:
 - `privacy_mode`: `normal`, `redacted`, or `strict`
 
 Privacy mode affects returned metadata after matching rows. `redacted` hides raw cwd/source paths, hides Git remote labels, and hashes unnamed project names. `strict` also hides project-relative cwd, Git branch, and tags. Configured project aliases are treated as explicit display opt-ins.
+
+## Usage Impact
+
+Command:
+
+```bash
+codex-usage-tracker usage-impact --record-id <record-id> --json
+```
+
+Dashboard API:
+
+- `/api/usage-impact?record_id=<record-id>`
+- `/api/call?record_id=<record-id>` includes a nested `usage_impact` payload
+
+Schema: `codex-usage-tracker-usage-impact-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-usage-impact-v1",
+  "record_id": "record-123",
+  "limit": 100,
+  "row_count": 2,
+  "rows": [],
+  "raw_context_included": false
+}
+```
+
+Rows are derived from local observed Codex usage snapshots and the configured/local Codex credit estimate. They are useful for comparing likely per-call allowance movement, but they are not exact billing data and may exclude usage outside local Codex logs.
 
 ## Recommendations
 

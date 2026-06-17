@@ -48,6 +48,7 @@ from codex_usage_tracker.store_sources import (
     upsert_source_file_metadata,
 )
 from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
+from codex_usage_tracker.usage_impact_store import invalidate_usage_impact_for_delta
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
@@ -207,6 +208,7 @@ def rebuild_usage_index(
         init_db(conn)
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
+        conn.execute("DELETE FROM usage_impact")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
     return refresh_usage_index(
@@ -225,6 +227,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         deleted_rows = int(row["count"] if row is not None else 0)
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
+        conn.execute("DELETE FROM usage_impact")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
@@ -456,6 +459,13 @@ def _upsert_usage_events_with_delta(
             if source_files_to_replace and refresh_links and delta.affected_thread_keys:
                 refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
                 rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
+                invalidate_usage_impact_for_delta(
+                    conn,
+                    inserted_record_ids=delta.inserted_record_ids,
+                    deleted_record_ids=delta.deleted_record_ids,
+                    changed_time_start=delta.changed_time_start,
+                    changed_time_end=delta.changed_time_end,
+                )
             delta.skipped_downstream_work = not (
                 refresh_links and delta.affected_thread_keys
             )
@@ -475,6 +485,13 @@ def _upsert_usage_events_with_delta(
         if refresh_links and delta.affected_thread_keys:
             refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
             rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
+            invalidate_usage_impact_for_delta(
+                conn,
+                inserted_record_ids=delta.inserted_record_ids,
+                deleted_record_ids=delta.deleted_record_ids,
+                changed_time_start=delta.changed_time_start,
+                changed_time_end=delta.changed_time_end,
+            )
             delta.skipped_downstream_work = False
         else:
             delta.skipped_downstream_work = True

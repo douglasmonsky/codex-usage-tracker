@@ -70,6 +70,10 @@ from codex_usage_tracker.store import (
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
 from codex_usage_tracker.usage_impact_cache import UsageImpactCache
+from codex_usage_tracker.usage_impact_store import (
+    query_usage_impact_rows,
+    usage_impact_payload,
+)
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
 _elapsed_ms = server_utils.elapsed_ms
@@ -297,6 +301,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/call":
             self._handle_call(parsed.query)
+            return
+        if parsed.path == "/api/usage-impact":
+            self._handle_usage_impact(parsed.query)
             return
         if parsed.path == "/api/threads":
             self._handle_threads(parsed.query)
@@ -682,6 +689,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 if candidate.get("record_id")
             }
             selected_row = rows_by_id.get(record_id, row)
+            usage_impact_rows = query_usage_impact_rows(
+                db_path=self._db_path,
+                record_id=record_id,
+                limit=0,
+            )
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -704,8 +716,47 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 ],
                 "previous_record_id": row.get("previous_record_id"),
                 "next_record_id": row.get("next_record_id"),
+                "usage_impact": usage_impact_payload(
+                    usage_impact_rows,
+                    record_id=record_id,
+                    limit=None,
+                ),
                 "raw_context_included": False,
             },
+        )
+
+    def _handle_usage_impact(self, query: str) -> None:
+        params = parse_qs(query)
+        record_id = _first(params.get("record_id")) or _first(params.get("record"))
+        limit = _parse_api_limit(_first(params.get("limit")), 100)
+        offset = _parse_api_offset(_first(params.get("offset")))
+        window_type = _first(params.get("window_type"))
+        try:
+            rows = query_usage_impact_rows(
+                db_path=self._db_path,
+                record_id=record_id,
+                limit=limit,
+                offset=offset,
+                window_type=window_type,
+            )
+            if not rows:
+                self._usage_impact_cache.warm_async(include_archived=self._include_archived)
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading usage impact: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            usage_impact_payload(
+                rows,
+                record_id=record_id,
+                limit=limit,
+            ),
         )
 
     def _handle_threads(self, query: str) -> None:

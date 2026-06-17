@@ -8,6 +8,10 @@ from store_dashboard_helpers import SESSION_ID, _usage_event, _write_pricing
 
 from codex_usage_tracker.store import query_usage_api_events, upsert_usage_events
 from codex_usage_tracker.usage_impact_cache import UsageImpactCache
+from codex_usage_tracker.usage_impact_store import (
+    query_usage_impact_rows,
+    replace_usage_impact_from_annotated_rows,
+)
 
 
 def test_usage_impact_cache_reuses_full_history_estimates(
@@ -85,7 +89,10 @@ def test_usage_impact_cache_reuses_full_history_estimates(
     assert third[0]["usage_impact"] == first[0]["usage_impact"]
     assert first[0]["record_id"] == "target"
     assert first[0]["usage_impact"]["primary"]["estimate_percent"] > 0
-    assert calls == 2
+    assert calls == 1
+    persisted = query_usage_impact_rows(db_path=db_path, record_id="target", limit=0)
+    assert {row["window_type"] for row in persisted} == {"primary", "secondary"}
+    assert persisted[0]["status"] in {"fresh", "unavailable"}
 
 
 def test_usage_impact_cache_can_return_pending_without_blocking(
@@ -134,10 +141,52 @@ def test_usage_impact_cache_can_return_pending_without_blocking(
     assert started.wait(timeout=1)
     assert first[0]["record_id"] == "target"
     assert first[0]["usage_impact_pending"] is True
-    assert first[0]["usage_impact"] == {"primary": None, "secondary": None}
+    assert first[0]["usage_impact"]["primary"]["status"] == "pending"
+    assert first[0]["usage_impact"]["secondary"]["status"] == "pending"
 
     release.set()
     second = cache.copy_usage_impact(rows, include_archived=False, block=True)
 
     assert "usage_impact_pending" not in second[0]
     assert second[0]["usage_impact"]["primary"]["estimate_percent"] == 0.12
+
+
+def test_usage_impact_read_model_materializes_without_raw_content(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    replace_usage_impact_from_annotated_rows(
+        db_path=db_path,
+        rows=[
+            {
+                "record_id": "record-secret",
+                "total_tokens": 100,
+                "usage_credits": 1.5,
+                "rate_limit_primary_used_percent": 10,
+                "rate_limit_primary_window_minutes": 300,
+                "rate_limit_primary_resets_at": 1781562696,
+                "usage_impact": {
+                    "primary": {
+                        "estimate_percent": 0.25,
+                        "lower_percent": 0.1,
+                        "upper_percent": 0.3,
+                        "observed_delta_percent": 1.0,
+                        "interval_call_count": 4,
+                        "basis": "credits",
+                        "source": "observed_interval",
+                        "previous_observed_record_id": "baseline",
+                        "previous_used_percent": 9.0,
+                        "next_observed_record_id": "record-secret",
+                        "source_note": "SECRET RAW PROMPT should not persist",
+                    },
+                    "secondary": None,
+                },
+            }
+        ],
+    )
+
+    rows = query_usage_impact_rows(db_path=db_path, record_id="record-secret", limit=0)
+    serialized = str(rows)
+
+    assert len(rows) == 2
+    assert rows[0]["record_id"] == "record-secret"
+    assert any(row["estimated_usage_percent"] == 0.25 for row in rows)
+    assert "SECRET RAW PROMPT" not in serialized

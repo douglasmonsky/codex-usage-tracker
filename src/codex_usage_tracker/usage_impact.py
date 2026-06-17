@@ -19,6 +19,7 @@ _MAX_UNCALIBRATED_SINGLE_CALL_OBSERVED_PERCENT = 0.5
 
 @dataclass(frozen=True)
 class _Snapshot:
+    record_id: str | None
     used_percent: float
     window_minutes: int
     resets_at: int | None
@@ -213,9 +214,14 @@ def _allocate_interval(
             "upper_percent": upper,
             "observed_delta_percent": delta,
             "interval_call_count": len(rows),
+            "tokens_since_previous": sum(
+                int(_number(candidate.get("total_tokens"))) for candidate in rows
+            ),
             "basis": basis,
             "source": "observed_interval",
+            "previous_observed_record_id": previous.record_id,
             "previous_used_percent": previous.used_percent,
+            "next_observed_record_id": current.record_id,
             "current_used_percent": current.used_percent,
             "plan_type": current.plan_type,
             "limit_id": current.limit_id,
@@ -580,6 +586,7 @@ def _snapshot(row: dict[str, Any], window_key: WindowKey) -> _Snapshot | None:
     if used is None or minutes is None:
         return None
     return _Snapshot(
+        record_id=_optional_str(row.get("record_id")),
         used_percent=used,
         window_minutes=minutes,
         resets_at=_optional_int(row.get(f"rate_limit_{window_key}_resets_at")),

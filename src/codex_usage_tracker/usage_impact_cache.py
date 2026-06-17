@@ -17,6 +17,10 @@ from codex_usage_tracker.store import (
 )
 from codex_usage_tracker.threads import annotate_thread_attachments
 from codex_usage_tracker.usage_impact import annotate_rows_with_usage_impact
+from codex_usage_tracker.usage_impact_store import (
+    query_usage_impact_map_for_records,
+    replace_usage_impact_from_annotated_rows,
+)
 
 
 @dataclass(frozen=True)
@@ -82,6 +86,17 @@ class UsageImpactCache:
         )
         thread.start()
 
+    def rebuild(self, *, include_archived: bool) -> dict[str, dict[str, Any]]:
+        """Rebuild and persist usage-impact estimates synchronously."""
+
+        key = self._cache_key(include_archived=include_archived)
+        impact_by_record_id = self._build_impact_map(include_archived=include_archived)
+        with self._condition:
+            self._cache[include_archived] = (key, impact_by_record_id)
+            self._building.discard(key)
+            self._condition.notify_all()
+        return impact_by_record_id
+
     def copy_usage_impact(
         self,
         rows: list[dict[str, Any]],
@@ -93,6 +108,17 @@ class UsageImpactCache:
 
         if not rows:
             return []
+        record_ids = [str(row.get("record_id") or "") for row in rows if row.get("record_id")]
+        persisted, persisted_pending = query_usage_impact_map_for_records(
+            self._db_path,
+            record_ids,
+        )
+        missing = any(record_id not in persisted for record_id in record_ids)
+        if persisted and not missing and not persisted_pending:
+            return _copy_persisted_usage_impact(rows, persisted, pending=False)
+        if not block:
+            self.warm_async(include_archived=include_archived)
+            return _copy_persisted_usage_impact(rows, persisted, pending=True)
         impact_by_record_id = self._impact_by_record_id(
             include_archived=include_archived,
             block=block,
@@ -189,11 +215,16 @@ class UsageImpactCache:
             annotate_rows_with_efficiency(rows, pricing),
             allowance,
         )
-        return {
-            str(row.get("record_id")): row.get("usage_impact")  # type: ignore[dict-item]
-            for row in annotate_rows_with_usage_impact(rows)
-            if row.get("record_id")
-        }
+        annotated_rows = annotate_rows_with_usage_impact(rows)
+        replace_usage_impact_from_annotated_rows(
+            db_path=self._db_path,
+            rows=annotated_rows,
+        )
+        impact_by_record_id, _pending = query_usage_impact_map_for_records(
+            self._db_path,
+            [str(row.get("record_id")) for row in annotated_rows if row.get("record_id")],
+        )
+        return impact_by_record_id
 
     def _cache_key(self, *, include_archived: bool) -> _ImpactCacheKey:
         metadata = refresh_metadata(self._db_path)
@@ -222,3 +253,21 @@ def _file_signature(path: Path) -> _FileSignature:
         mtime_ns=int(stat.st_mtime_ns),
         size_bytes=int(stat.st_size),
     )
+
+
+def _copy_persisted_usage_impact(
+    rows: list[dict[str, Any]],
+    impact_by_record_id: dict[str, dict[str, Any]],
+    *,
+    pending: bool,
+) -> list[dict[str, Any]]:
+    default_impact = {"primary": None, "secondary": None}
+    copied: list[dict[str, Any]] = []
+    for row in rows:
+        next_row = dict(row)
+        record_id = str(row.get("record_id") or "")
+        next_row["usage_impact"] = impact_by_record_id.get(record_id, default_impact)
+        if pending:
+            next_row["usage_impact_pending"] = True
+        copied.append(next_row)
+    return copied

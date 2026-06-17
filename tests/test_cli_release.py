@@ -25,6 +25,7 @@ STABLE_CLI_COMMANDS = {
     "reset-db",
     "summary",
     "query",
+    "usage-impact",
     "recommendations",
     "session",
     "context",

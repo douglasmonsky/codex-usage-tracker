@@ -58,6 +58,11 @@ from codex_usage_tracker.store import (
     reset_usage_database,
 )
 from codex_usage_tracker.support import build_support_bundle
+from codex_usage_tracker.usage_impact_cache import UsageImpactCache
+from codex_usage_tracker.usage_impact_store import (
+    query_usage_impact_rows,
+    usage_impact_payload,
+)
 
 
 def main() -> int:
@@ -361,6 +366,44 @@ def _run_query(args: argparse.Namespace) -> int:
         privacy_mode=args.privacy_mode,
     )
     _print_json(report.payload)
+    return 0
+
+
+def _run_usage_impact(args: argparse.Namespace) -> int:
+    if not args.no_rebuild:
+        cache = UsageImpactCache(
+            db_path=args.db,
+            pricing_path=args.pricing,
+            allowance_path=args.allowance,
+            rate_card_path=args.rate_card,
+        )
+        cache.rebuild(include_archived=args.include_archived)
+    rows = query_usage_impact_rows(
+        db_path=args.db,
+        record_id=args.record_id,
+        limit=args.limit,
+        offset=args.offset,
+        window_type=args.window_type,
+    )
+    payload = usage_impact_payload(
+        rows,
+        record_id=args.record_id,
+        limit=None if args.limit <= 0 else args.limit,
+    )
+    if args.as_json:
+        _print_json(payload)
+        return 0
+    if not rows:
+        print("No usage-impact rows found.")
+        return 0
+    for row in rows:
+        estimate = row.get("estimated_usage_percent")
+        label = row.get("window_type")
+        estimate_text = "-" if estimate is None else f"~{float(estimate):.3f}%"
+        print(
+            f"{row['record_id']} {label}: {estimate_text} "
+            f"({row['status']}, {row['confidence']})"
+        )
     return 0
 
 
@@ -804,6 +847,7 @@ _COMMAND_HANDLERS = {
     "reset-db": _run_reset_db,
     "summary": _run_summary,
     "query": _run_query,
+    "usage-impact": _run_usage_impact,
     "recommendations": _run_recommendations,
     "session": _run_session,
     "context": _run_context,

@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -23,6 +23,7 @@ MIGRATION_NAMES = {
     7: "persist source file parser cursors",
     8: "persist observed Codex usage snapshots",
     9: "persist source byte offsets for context seeking",
+    10: "materialize usage-impact read model",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -102,6 +103,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v9(conn)
         _record_migration_if_missing(conn, 9)
+    if user_version < 10:
+        _migrate_v10(conn)
+        _record_migration(conn, 10)
+    else:
+        _migrate_v10(conn)
+        _record_migration_if_missing(conn, 10)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -254,6 +261,49 @@ def _migrate_v8(conn: sqlite3.Connection) -> None:
 
 def _migrate_v9(conn: sqlite3.Connection) -> None:
     _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
+
+
+def _migrate_v10(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS usage_impact (
+            record_id TEXT NOT NULL,
+            window_type TEXT NOT NULL,
+            plan_type TEXT,
+            limit_id TEXT,
+            observed_used_percent REAL,
+            observed_window_minutes INTEGER,
+            observed_resets_at INTEGER,
+            previous_observed_record_id TEXT,
+            previous_observed_used_percent REAL,
+            next_observed_record_id TEXT,
+            delta_used_percent REAL,
+            tokens_since_previous INTEGER,
+            estimated_tokens_per_percent REAL,
+            estimated_usage_credits REAL,
+            estimated_usage_percent REAL,
+            lower_percent REAL,
+            upper_percent REAL,
+            basis TEXT,
+            source TEXT,
+            interval_call_count INTEGER,
+            confidence TEXT NOT NULL,
+            status TEXT NOT NULL,
+            reason TEXT,
+            recalculated_at TEXT NOT NULL,
+            PRIMARY KEY (record_id, window_type)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_usage_impact_record
+            ON usage_impact(record_id);
+        CREATE INDEX IF NOT EXISTS idx_usage_impact_window_status
+            ON usage_impact(window_type, status);
+        CREATE INDEX IF NOT EXISTS idx_usage_impact_limit_window
+            ON usage_impact(limit_id, window_type);
+        CREATE INDEX IF NOT EXISTS idx_usage_impact_delta
+            ON usage_impact(delta_used_percent);
+        """
+    )
 
 
 def _record_migration(conn: sqlite3.Connection, version: int) -> None:

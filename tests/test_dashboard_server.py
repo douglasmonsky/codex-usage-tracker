@@ -30,6 +30,7 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
     upsert_usage_events,
 )
+from codex_usage_tracker.usage_impact_cache import UsageImpactCache
 
 
 def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> None:
@@ -253,6 +254,97 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
     assert second_payload["refresh_result"]["skipped_downstream_work"] is True
     assert usage_impact_cache.invalidations == 1
     assert usage_impact_cache.warms == 1
+
+
+def test_dashboard_server_exposes_usage_impact_read_model(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    events = []
+    for index in range(5):
+        events.append(
+            _usage_event(
+                record_id=f"baseline-{index}",
+                session_id=SESSION_ID,
+                thread_key="thread:Usage impact API",
+                event_timestamp=f"2026-06-15T12:{index * 2:02d}:00Z",
+                cumulative_total_tokens=100 + index * 100,
+                rate_limit_primary_used_percent=10 + index,
+                rate_limit_primary_window_minutes=300,
+                rate_limit_primary_resets_at=1781562696,
+            )
+        )
+        events.append(
+            _usage_event(
+                record_id=f"observed-{index}",
+                session_id=SESSION_ID,
+                thread_key="thread:Usage impact API",
+                event_timestamp=f"2026-06-15T12:{index * 2 + 1:02d}:00Z",
+                cumulative_total_tokens=150 + index * 100,
+                rate_limit_primary_used_percent=11 + index,
+                rate_limit_primary_window_minutes=300,
+                rate_limit_primary_resets_at=1781562696,
+            )
+        )
+    events.append(
+        _usage_event(
+            record_id="target-impact",
+            session_id=SESSION_ID,
+            thread_key="thread:Usage impact API",
+            event_timestamp="2026-06-15T12:15:00Z",
+            cumulative_total_tokens=1000,
+        )
+    )
+    upsert_usage_events(events, db_path=db_path)
+    UsageImpactCache(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+    ).rebuild(include_archived=False)
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        impact_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/usage-impact?record_id=target-impact"
+        )
+        call_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/call?record_id=target-impact"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert impact_payload["schema"] == "codex-usage-tracker-usage-impact-v1"
+    assert impact_payload["record_id"] == "target-impact"
+    assert impact_payload["row_count"] == 2
+    assert impact_payload["raw_context_included"] is False
+    assert any(row["status"] == "fresh" for row in impact_payload["rows"])
+    assert "usage_impact" in call_payload
+    assert call_payload["usage_impact"]["schema"] == "codex-usage-tracker-usage-impact-v1"
+    assert "SECRET RAW PROMPT" not in json.dumps(impact_payload)
 
 
 def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Path) -> None:

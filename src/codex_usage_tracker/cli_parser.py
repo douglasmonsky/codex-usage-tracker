@@ -69,6 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_reset_db_parser(subparsers)
     _add_summary_parser(subparsers)
     _add_query_parser(subparsers)
+    _add_usage_impact_parser(subparsers)
     _add_recommendations_parser(subparsers)
     _add_session_parser(subparsers)
     _add_context_parser(subparsers)
@@ -261,6 +262,39 @@ def _add_query_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
         dest="as_json",
         help="Accepted for consistency; query always returns JSON.",
     )
+
+
+def _add_usage_impact_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    usage_impact = subparsers.add_parser(
+        "usage-impact",
+        help="Show estimated usage-impact read-model rows",
+    )
+    usage_impact.add_argument("--record-id", help="Only include one aggregate usage record")
+    usage_impact.add_argument(
+        "--window-type",
+        choices=("primary", "secondary"),
+        help="Only include one observed usage window type.",
+    )
+    usage_impact.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Maximum read-model rows to return; use 0 for all",
+    )
+    usage_impact.add_argument("--offset", type=int, default=0)
+    usage_impact.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived sessions when materializing usage-impact estimates.",
+    )
+    usage_impact.add_argument(
+        "--no-rebuild",
+        action="store_true",
+        help="Read the current table without rebuilding estimates first.",
+    )
+    usage_impact.add_argument("--json", action="store_true", dest="as_json")
 
 
 def _add_recommendations_parser(

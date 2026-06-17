@@ -45,6 +45,7 @@ CLI_HELP_SUBCOMMANDS = [
     "reset-db",
     "summary",
     "query",
+    "usage-impact",
     "recommendations",
     "session",
     "context",

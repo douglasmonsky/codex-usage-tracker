@@ -119,11 +119,14 @@ Useful investigations:
 codex-usage-tracker query --since 2026-06-01 --project codex-usage-tracker --min-credits 1
 codex-usage-tracker query --pricing-status unpriced --limit 0
 codex-usage-tracker recommendations --since 2026-06-01 --json
+codex-usage-tracker usage-impact --record-id <record-id> --json
 codex-usage-tracker summary --group-by model --json
 codex-usage-tracker session <session-id> --json
 ```
 
 Use `query` when you need stable JSON for automation across project, model, effort, thread, pricing, token, or credit filters.
+
+Use `usage-impact` when you need the persisted, derived estimate of how a selected call likely moved observed Codex usage windows. By default it rebuilds the local read model first; add `--no-rebuild` to inspect the current table only. Use `--window-type primary` or `--window-type secondary` to isolate one observed window. These rows are estimates from local observed rate-limit snapshots and Codex credit weights, not exact billing impact.
 
 ## Session And Context
 
