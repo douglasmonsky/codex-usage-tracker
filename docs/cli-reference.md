@@ -16,15 +16,21 @@ Refresh the local aggregate index:
 
 ```bash
 codex-usage-tracker refresh
+codex-usage-tracker refresh --refresh-workers 4
 ```
 
 Rebuild the local aggregate index after parser or schema changes:
 
 ```bash
 codex-usage-tracker rebuild-index
+codex-usage-tracker rebuild-index --refresh-workers 4
 ```
 
 `rebuild-index` clears only the local aggregate `usage_events` and refresh metadata tables, then rescans local Codex logs.
+
+Large multi-file refreshes can parse source logs concurrently with `--refresh-workers N`
+or `CODEX_USAGE_TRACKER_REFRESH_WORKERS=N`. SQLite writes and read-model rebuilds stay
+serialized; small refreshes still default to the sequential parser path.
 
 Inspect one Codex log without writing to SQLite:
 

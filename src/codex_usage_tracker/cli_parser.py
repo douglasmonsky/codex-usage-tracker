@@ -117,6 +117,19 @@ def _add_setup_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
         help="Fetch current pricing during setup instead of writing a local template.",
     )
     setup.add_argument("--json", action="store_true", dest="as_json")
+    _add_refresh_workers_argument(setup)
+
+
+def _add_refresh_workers_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--refresh-workers",
+        type=int,
+        default=None,
+        help=(
+            "Maximum source-log parser workers for large refreshes. "
+            "Defaults to sequential for small refreshes and an automatic cap for large backfills."
+        ),
+    )
 
 
 def _add_doctor_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -189,6 +202,7 @@ def _add_refresh_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     refresh.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     refresh.add_argument("--include-archived", action="store_true")
     refresh.add_argument("--json", action="store_true", dest="as_json")
+    _add_refresh_workers_argument(refresh)
 
 
 def _add_inspect_log_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -211,6 +225,7 @@ def _add_rebuild_index_parser(
     rebuild.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     rebuild.add_argument("--include-archived", action="store_true")
     rebuild.add_argument("--json", action="store_true", dest="as_json")
+    _add_refresh_workers_argument(rebuild)
 
 
 def _add_reset_db_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -484,6 +499,7 @@ def _add_dashboard_parsers(
     )
     open_dashboard.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     open_dashboard.add_argument("--json", action="store_true", dest="as_json")
+    _add_refresh_workers_argument(open_dashboard)
 
     serve = subparsers.add_parser(
         "serve-dashboard",
@@ -518,6 +534,7 @@ def _add_dashboard_parsers(
     )
     serve.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     serve.add_argument("--include-archived", action="store_true")
+    _add_refresh_workers_argument(serve)
     serve.add_argument(
         "--json",
         action="store_true",

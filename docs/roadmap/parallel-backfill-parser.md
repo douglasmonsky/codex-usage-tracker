@@ -49,11 +49,11 @@ Speed up initial and large backfill refreshes by parsing multiple changed source
 ## Implementation Checklist
 
 - [x] M0: Add this roadmap/checklist before implementation.
-- [ ] M1: Inspect current refresh planning and parser result boundaries.
-- [ ] M2: Add parser worker-pool helpers with deterministic result ordering.
-- [ ] M3: Add CLI/config controls for refresh worker count.
-- [ ] M4: Integrate worker parsing into the refresh delta path without parallel DB writes.
-- [ ] M5: Add tests for sequential/parallel equivalence, stats aggregation, worker errors, and default threshold behavior.
-- [ ] M6: Add benchmark coverage for multi-file backfill refresh.
-- [ ] M7: Run validation and document results.
+- [x] M1: Inspect current refresh planning and parser result boundaries.
+- [x] M2: Add parser worker-pool helpers with deterministic result ordering.
+- [x] M3: Add CLI/config controls for refresh worker count.
+- [x] M4: Integrate worker parsing into the refresh delta path without parallel DB writes.
+- [x] M5: Add tests for sequential/parallel equivalence, stats aggregation, worker errors, and default threshold behavior.
+- [x] M6: Add benchmark coverage for multi-file backfill refresh.
+- [x] M7: Run validation and document results.
 - [ ] M8: Commit, push, and open the branch PR without merging to `main`.

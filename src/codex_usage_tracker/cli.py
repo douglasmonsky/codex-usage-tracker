@@ -145,6 +145,7 @@ def _run_setup(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        refresh_workers=args.refresh_workers,
     )
     lines.append(
         f"Refresh: scanned {refresh_result.scanned_files} files, parsed "
@@ -258,6 +259,7 @@ def _run_refresh(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        refresh_workers=args.refresh_workers,
     )
     if args.as_json:
         _print_json(refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1"))
@@ -305,6 +307,7 @@ def _run_rebuild_index(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        refresh_workers=args.refresh_workers,
     )
     if args.as_json:
         _print_json(refresh_result_payload(result, schema="codex-usage-tracker-rebuild-index-v1"))
@@ -626,6 +629,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
                 codex_home=args.codex_home,
                 db_path=args.db,
                 include_archived=args.include_archived,
+                refresh_workers=args.refresh_workers,
             ),
             schema="codex-usage-tracker-refresh-v1",
         )
@@ -686,6 +690,7 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
             codex_home=args.codex_home,
             db_path=args.db,
             include_archived=args.include_archived,
+            refresh_workers=args.refresh_workers,
         )
     serve_dashboard(
         db_path=args.db,

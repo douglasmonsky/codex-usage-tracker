@@ -123,6 +123,102 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in json.dumps(source_rows)
 
 
+def test_parallel_refresh_matches_sequential_output(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    sequential_db = tmp_path / "sequential.sqlite3"
+    parallel_db = tmp_path / "parallel.sqlite3"
+
+    sequential = refresh_usage_index(
+        codex_home=codex_home,
+        db_path=sequential_db,
+        refresh_workers=1,
+    )
+    parallel = refresh_usage_index(
+        codex_home=codex_home,
+        db_path=parallel_db,
+        refresh_workers=2,
+    )
+    sequential_rows = query_dashboard_events(
+        db_path=sequential_db,
+        limit=0,
+        include_archived=True,
+    )
+    parallel_rows = query_dashboard_events(
+        db_path=parallel_db,
+        limit=0,
+        include_archived=True,
+    )
+    parallel_metadata = refresh_metadata(parallel_db)
+
+    assert sequential.parsed_events == parallel.parsed_events == 4
+    assert sequential.refresh_workers == 1
+    assert sequential.parallel_parse_files == 0
+    assert parallel.refresh_workers == 2
+    assert parallel.parallel_parse_files == 3
+    assert parallel_metadata["refresh_workers"] == "2"
+    assert parallel_metadata["parallel_parse_files"] == "3"
+    assert [
+        (row["record_id"], row["cumulative_total_tokens"], row["thread_key"])
+        for row in sequential_rows
+    ] == [
+        (row["record_id"], row["cumulative_total_tokens"], row["thread_key"])
+        for row in parallel_rows
+    ]
+
+
+def test_default_refresh_stays_sequential_for_small_plan_count(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    metadata = refresh_metadata(db_path)
+
+    assert result.parsed_events == 4
+    assert result.refresh_workers == 1
+    assert result.parallel_parse_files == 0
+    assert metadata["refresh_workers"] == "1"
+    assert metadata["parallel_parse_files"] == "0"
+
+
+def test_refresh_workers_environment_enables_parallel_parse(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    monkeypatch.setenv("CODEX_USAGE_TRACKER_REFRESH_WORKERS", "2")
+
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    assert result.parsed_events == 4
+    assert result.refresh_workers == 2
+    assert result.parallel_parse_files == 3
+
+
+def test_parallel_refresh_surfaces_worker_parse_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    original_parse = store_module.parse_usage_events_from_file_with_state
+
+    def failing_parse(*args: Any, **kwargs: Any):
+        path = Path(args[0])
+        if path.name.endswith(f"{SESSION_ID}.jsonl"):
+            raise ValueError("synthetic parser failure")
+        return original_parse(*args, **kwargs)
+
+    monkeypatch.setattr(
+        store_module,
+        "parse_usage_events_from_file_with_state",
+        failing_parse,
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to parse source log .*synthetic parser failure"):
+        refresh_usage_index(codex_home=codex_home, db_path=db_path, refresh_workers=2)
+
+
 def test_noop_refresh_skips_parser_upsert_and_downstream_rebuilds(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

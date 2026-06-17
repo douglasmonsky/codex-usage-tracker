@@ -21,6 +21,8 @@ REFRESH_RESULT_FIELDS = {
     "deleted_records": int,
     "affected_threads": int,
     "skipped_downstream_work": bool,
+    "refresh_workers": int,
+    "parallel_parse_files": int,
     "db_path": str,
     "parser_diagnostics": dict,
 }

@@ -345,6 +345,18 @@ def test_dashboard_launch_commands_refresh_by_default() -> None:
     assert parser.parse_args(["serve-dashboard", "--no-refresh"]).refresh is False
 
 
+def test_refresh_worker_flag_is_available_on_refresh_commands() -> None:
+    from codex_usage_tracker.cli_parser import build_parser
+
+    parser = build_parser()
+
+    assert parser.parse_args(["setup", "--refresh-workers", "3"]).refresh_workers == 3
+    assert parser.parse_args(["refresh", "--refresh-workers", "3"]).refresh_workers == 3
+    assert parser.parse_args(["rebuild-index", "--refresh-workers", "3"]).refresh_workers == 3
+    assert parser.parse_args(["open-dashboard", "--refresh-workers", "3"]).refresh_workers == 3
+    assert parser.parse_args(["serve-dashboard", "--refresh-workers", "3"]).refresh_workers == 3
+
+
 def test_cli_json_schema_doc_lists_tracked_contracts() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     docs = (repo_root / "docs" / "cli-json-schemas.md").read_text(encoding="utf-8")

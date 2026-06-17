@@ -5,6 +5,9 @@
 - Make refresh delta-aware so no-op refreshes skip downstream adjacency and
   thread-summary rebuild work, and append refreshes update only affected thread
   read models.
+- Add opt-in parallel parser workers for large multi-file refreshes, including
+  CLI controls, refresh result counters, and synthetic backfill benchmark
+  coverage while keeping SQLite writes serialized.
 - Warm usage-impact estimates only for pending/stale affected records after live
   refreshes, and keep investigator allowance-impact estimates separate from
   exact token accounting.

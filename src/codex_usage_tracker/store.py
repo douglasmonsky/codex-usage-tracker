@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import csv
+import os
 import sqlite3
 from collections.abc import Iterable, Iterator, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker.models import RefreshResult, UsageEvent
+from codex_usage_tracker.models import RefreshResult, SessionInfo, UsageEvent
 from codex_usage_tracker.parser import (
     PARSER_ADAPTER_VERSION,
     PARSER_DIAGNOSTIC_KEYS,
@@ -45,6 +47,7 @@ from codex_usage_tracker.store_schema import (
 )
 from codex_usage_tracker.store_sources import (
     ParsedSourceFile,
+    SourceParsePlan,
     source_logs_requiring_parse,
     upsert_source_file_metadata,
 )
@@ -59,6 +62,9 @@ from codex_usage_tracker.usage_impact_store import invalidate_usage_impact_for_d
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
+REFRESH_WORKERS_ENV = "CODEX_USAGE_TRACKER_REFRESH_WORKERS"
+DEFAULT_PARALLEL_PARSE_THRESHOLD = 4
+DEFAULT_MAX_AUTO_REFRESH_WORKERS = 4
 
 
 @dataclass
@@ -95,10 +101,17 @@ class UpsertDelta:
     skipped_downstream_work: bool = False
 
 
+@dataclass(frozen=True)
+class ParsedPlanResult:
+    plan: SourceParsePlan
+    parsed_file: ParsedSourceFile
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    refresh_workers: int | None = None,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
@@ -124,6 +137,8 @@ def refresh_usage_index(
             parser_diagnostics={},
             parsed_source_files=0,
             skipped_source_files=len(logs),
+            refresh_workers=1,
+            parallel_parse_files=0,
         )
         return RefreshResult(
             scanned_files=len(logs),
@@ -139,34 +154,15 @@ def refresh_usage_index(
             deleted_records=0,
             affected_threads=0,
             skipped_downstream_work=True,
+            refresh_workers=1,
+            parallel_parse_files=0,
         )
     session_index = load_session_index(codex_home)
-    stats: dict[str, int] = {}
-    events: list[UsageEvent] = []
-    parsed_files: list[ParsedSourceFile] = []
-    for plan in parse_plans:
-        file_stats: dict[str, int] = {}
-        parsed_file = parse_usage_events_from_file_with_state(
-            plan.path,
-            session_index=session_index,
-            stats=file_stats,
-            start_byte=plan.start_byte,
-            start_line=plan.start_line,
-            initial_state=plan.initial_state,
-        )
-        file_events = parsed_file.events
-        events.extend(file_events)
-        parsed_files.append(
-            (
-                plan.path,
-                file_events,
-                file_stats,
-                parsed_file.state,
-                parsed_file.parsed_until_line,
-            )
-        )
-        for key, value in file_stats.items():
-            stats[key] = stats.get(key, 0) + int(value)
+    events, parsed_files, stats, workers_used, parallel_parse_files = _parse_source_plans(
+        parse_plans,
+        session_index=session_index,
+        refresh_workers=refresh_workers,
+    )
     upsert_delta = _upsert_usage_events_with_delta(
         events,
         db_path=db_path,
@@ -185,6 +181,8 @@ def refresh_usage_index(
         parser_diagnostics=diagnostics,
         parsed_source_files=len(parse_plans),
         skipped_source_files=len(logs) - len(parse_plans),
+        refresh_workers=workers_used,
+        parallel_parse_files=parallel_parse_files,
     )
     return RefreshResult(
         scanned_files=len(logs),
@@ -200,13 +198,106 @@ def refresh_usage_index(
         deleted_records=len(delta.deleted_record_ids),
         affected_threads=len(delta.affected_thread_keys),
         skipped_downstream_work=delta.skipped_downstream_work,
+        refresh_workers=workers_used,
+        parallel_parse_files=parallel_parse_files,
     )
+
+
+def _parse_source_plans(
+    parse_plans: list[SourceParsePlan],
+    *,
+    session_index: dict[str, SessionInfo],
+    refresh_workers: int | None = None,
+) -> tuple[list[UsageEvent], list[ParsedSourceFile], dict[str, int], int, int]:
+    workers = _refresh_worker_count(refresh_workers, plan_count=len(parse_plans))
+    if workers <= 1:
+        results = [
+            _parse_source_plan(plan, session_index=session_index)
+            for plan in parse_plans
+        ]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            results = list(
+                executor.map(
+                    lambda plan: _parse_source_plan(plan, session_index=session_index),
+                    parse_plans,
+                )
+            )
+    events: list[UsageEvent] = []
+    parsed_files: list[ParsedSourceFile] = []
+    stats: dict[str, int] = {}
+    for result in results:
+        _path, file_events, file_stats, _state, _parsed_until_line = result.parsed_file
+        events.extend(file_events)
+        parsed_files.append(result.parsed_file)
+        for key, value in file_stats.items():
+            stats[key] = stats.get(key, 0) + int(value)
+    parallel_parse_files = len(parse_plans) if workers > 1 else 0
+    return events, parsed_files, stats, workers, parallel_parse_files
+
+
+def _parse_source_plan(
+    plan: SourceParsePlan,
+    *,
+    session_index: dict[str, SessionInfo],
+) -> ParsedPlanResult:
+    file_stats: dict[str, int] = {}
+    try:
+        parsed_file = parse_usage_events_from_file_with_state(
+            plan.path,
+            session_index=session_index,
+            stats=file_stats,
+            start_byte=plan.start_byte,
+            start_line=plan.start_line,
+            initial_state=plan.initial_state,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to parse source log {plan.path}: {exc}") from exc
+    return ParsedPlanResult(
+        plan=plan,
+        parsed_file=(
+            plan.path,
+            parsed_file.events,
+            file_stats,
+            parsed_file.state,
+            parsed_file.parsed_until_line,
+        ),
+    )
+
+
+def _refresh_worker_count(refresh_workers: int | None, *, plan_count: int) -> int:
+    if plan_count <= 1:
+        return 1
+    configured = refresh_workers
+    if configured is None:
+        configured = _refresh_workers_from_env()
+    if configured is None:
+        if plan_count < DEFAULT_PARALLEL_PARSE_THRESHOLD:
+            return 1
+        configured = min(
+            DEFAULT_MAX_AUTO_REFRESH_WORKERS,
+            os.cpu_count() or 1,
+        )
+    if configured <= 1:
+        return 1
+    return max(1, min(int(configured), plan_count))
+
+
+def _refresh_workers_from_env() -> int | None:
+    raw = os.environ.get(REFRESH_WORKERS_ENV)
+    if raw is None or raw.strip() == "":
+        return None
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{REFRESH_WORKERS_ENV} must be an integer") from exc
 
 
 def rebuild_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    refresh_workers: int | None = None,
 ) -> RefreshResult:
     """Clear aggregate rows and rescan local Codex logs."""
 
@@ -224,6 +315,7 @@ def rebuild_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
+        refresh_workers=refresh_workers,
     )
 
 
@@ -273,6 +365,8 @@ def record_refresh_metadata(
     parser_diagnostics: dict[str, int] | None = None,
     parsed_source_files: int | None = None,
     skipped_source_files: int | None = None,
+    refresh_workers: int = 1,
+    parallel_parse_files: int = 0,
 ) -> None:
     """Record the latest refresh counters in refresh_meta."""
 
@@ -285,6 +379,8 @@ def record_refresh_metadata(
         "parser_adapter": PARSER_ADAPTER_VERSION,
         "schema_version": str(SCHEMA_VERSION),
         "usage_events_schema_checksum": USAGE_EVENT_SCHEMA_CHECKSUM,
+        "refresh_workers": str(refresh_workers),
+        "parallel_parse_files": str(parallel_parse_files),
     }
     if parsed_source_files is not None:
         values["parsed_source_files"] = str(parsed_source_files)

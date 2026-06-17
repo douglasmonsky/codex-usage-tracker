@@ -46,6 +46,8 @@ def refresh_result_payload(result: Any, *, schema: str) -> dict[str, Any]:
         "deleted_records": result.deleted_records,
         "affected_threads": result.affected_threads,
         "skipped_downstream_work": result.skipped_downstream_work,
+        "refresh_workers": result.refresh_workers,
+        "parallel_parse_files": result.parallel_parse_files,
         "db_path": result.db_path,
         "parser_diagnostics": result.parser_diagnostics,
     }

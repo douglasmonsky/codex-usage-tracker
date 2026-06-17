@@ -36,6 +36,7 @@ from codex_usage_tracker.store import (  # noqa: E402
     query_dashboard_event_count,
     query_dashboard_events,
     refresh_usage_event_links,
+    refresh_usage_index,
     upsert_usage_events,
 )
 
@@ -81,6 +82,7 @@ BENCHMARK_THRESHOLDS: dict[str, dict[str, float]] = {
     "context_load_early_line_seconds": {"base_seconds": 0.50, "per_10k_seconds": 0.08},
     "context_load_middle_line_seconds": {"base_seconds": 0.75, "per_10k_seconds": 0.12},
     "context_load_late_line_seconds": {"base_seconds": 1.00, "per_10k_seconds": 0.16},
+    "source_refresh_backfill_seconds": {"base_seconds": 1.00, "per_10k_seconds": 0.75},
 }
 T = TypeVar("T")
 
@@ -135,6 +137,14 @@ def main() -> int:
             "Generated content is synthetic only and is never copied from real Codex logs."
         ),
     )
+    parser.add_argument(
+        "--refresh-workers",
+        type=int,
+        help=(
+            "Maximum parser workers for the optional synthetic source refresh benchmark. "
+            "Only used with --with-source-logs."
+        ),
+    )
     args = parser.parse_args()
 
     if any(count <= 0 for count in args.rows):
@@ -143,6 +153,8 @@ def main() -> int:
         parser.error("--batch-size must be positive")
     if args.threshold_scale <= 0:
         parser.error("--threshold-scale must be positive")
+    if args.refresh_workers is not None and args.refresh_workers <= 0:
+        parser.error("--refresh-workers must be positive")
 
     temp_dir: Path | None = None
     if args.db_dir:
@@ -160,6 +172,7 @@ def main() -> int:
                 batch_size=args.batch_size,
                 threshold_scale=args.threshold_scale,
                 with_source_logs=args.with_source_logs,
+                refresh_workers=args.refresh_workers,
             )
             for row_count in args.rows
         ]
@@ -201,6 +214,7 @@ def benchmark_size(
     batch_size: int,
     threshold_scale: float = 1.0,
     with_source_logs: bool = False,
+    refresh_workers: int | None = None,
 ) -> dict[str, Any]:
     db_path = db_dir / f"synthetic-{row_count}.sqlite3"
     if db_path.exists():
@@ -210,6 +224,16 @@ def benchmark_size(
         _write_synthetic_source_logs(db_dir / f"source-logs-{row_count}", row_count)
         if with_source_logs
         else None
+    )
+    source_refresh_metrics = (
+        _benchmark_source_refresh(
+            db_dir=db_dir,
+            source_bundle=source_bundle,
+            row_count=row_count,
+            refresh_workers=refresh_workers,
+        )
+        if source_bundle
+        else {}
     )
     populate_start = time.perf_counter()
     for start in range(0, row_count, batch_size):
@@ -345,6 +369,7 @@ def benchmark_size(
         timings["dashboard_payload_with_source_logs_seconds"] = (
             dashboard_payload_active_seconds
         )
+        timings.update(source_refresh_metrics.get("timings", {}))
         context_metrics = _benchmark_context_loads(
             db_path=db_path,
             row_count=row_count,
@@ -383,6 +408,7 @@ def benchmark_size(
         "project_summary_rows": len(project_summary.rows),
         "source_logs_generated": len(source_bundle.paths) if source_bundle else 0,
         "source_log_bytes": source_bundle.bytes_written if source_bundle else 0,
+        "source_refresh": source_refresh_metrics.get("refresh"),
         "context_loads": context_metrics.get("loads", {}),
         "context_load_seconds": context_metrics.get("context_load_seconds"),
         "context_payload_json_bytes": context_metrics.get("context_payload_json_bytes"),
@@ -393,6 +419,52 @@ def benchmark_size(
         "threshold_failures": threshold_failures,
         "query_plan": plan,
     }
+
+
+def _benchmark_source_refresh(
+    *,
+    db_dir: Path,
+    source_bundle: SourceLogBundle,
+    row_count: int,
+    refresh_workers: int | None,
+) -> dict[str, Any]:
+    refresh_db_path = db_dir / f"synthetic-{row_count}-source-refresh.sqlite3"
+    if refresh_db_path.exists():
+        refresh_db_path.unlink()
+    result, seconds = _time_call(
+        lambda: refresh_usage_index(
+            codex_home=_synthetic_codex_home(source_bundle),
+            db_path=refresh_db_path,
+            include_archived=True,
+            refresh_workers=refresh_workers,
+        )
+    )
+    return {
+        "timings": {"source_refresh_backfill_seconds": seconds},
+        "refresh": {
+            "db_path": str(refresh_db_path),
+            "seconds": seconds,
+            "scanned_files": result.scanned_files,
+            "parsed_events": result.parsed_events,
+            "inserted_or_updated_events": result.inserted_or_updated_events,
+            "changed_source_files": result.changed_source_files,
+            "append_source_files": result.append_source_files,
+            "full_reparse_source_files": result.full_reparse_source_files,
+            "affected_threads": result.affected_threads,
+            "refresh_workers": result.refresh_workers,
+            "parallel_parse_files": result.parallel_parse_files,
+        },
+    }
+
+
+def _synthetic_codex_home(source_bundle: SourceLogBundle) -> Path:
+    if not source_bundle.paths:
+        raise ValueError("source_bundle must include at least one source log path")
+    sample = next(iter(source_bundle.paths))
+    for parent in sample.parents:
+        if parent.name in {"sessions", "archived_sessions"}:
+            return parent.parent
+    raise ValueError(f"Could not identify synthetic Codex home for {sample}")
 
 
 def _write_benchmark_config(db_dir: Path) -> dict[str, Path]:

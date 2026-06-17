@@ -90,6 +90,45 @@ Error: [invalid_value] reset-db clears local aggregate usage rows. Re-run with -
 
 Known codes are `invalid_value`, `file_exists`, `file_not_found`, `permission_denied`, `runtime_error`, and `os_error`.
 
+## Refresh
+
+Commands:
+
+```bash
+codex-usage-tracker refresh --json
+codex-usage-tracker rebuild-index --refresh-workers 4 --json
+```
+
+Schemas:
+
+- `codex-usage-tracker-refresh-v1`
+- `codex-usage-tracker-rebuild-index-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-refresh-v1",
+  "scanned_files": 4,
+  "parsed_events": 12,
+  "skipped_events": 0,
+  "inserted_or_updated_events": 12,
+  "changed_source_files": 4,
+  "append_source_files": 0,
+  "full_reparse_source_files": 4,
+  "inserted_records": 12,
+  "deleted_records": 0,
+  "affected_threads": 3,
+  "skipped_downstream_work": false,
+  "refresh_workers": 4,
+  "parallel_parse_files": 4,
+  "db_path": "/home/user/.codex-usage-tracker/usage.sqlite3",
+  "parser_diagnostics": {}
+}
+```
+
+`refresh_workers` reports the parser worker count used for that refresh. `parallel_parse_files`
+is `0` when refresh used the sequential parser path. SQLite writes and read-model
+maintenance remain serialized after parsing.
+
 ## Summary
 
 Commands:
