@@ -48,6 +48,7 @@ from codex_usage_tracker.store_sources import (
     upsert_source_file_metadata,
 )
 from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
+from codex_usage_tracker.store_work_sessions import rebuild_thread_work_sessions
 from codex_usage_tracker.usage_impact_store import invalidate_usage_impact_for_delta
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
@@ -208,6 +209,7 @@ def rebuild_usage_index(
         init_db(conn)
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
+        conn.execute("DELETE FROM thread_work_sessions")
         conn.execute("DELETE FROM usage_impact")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
@@ -227,6 +229,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         deleted_rows = int(row["count"] if row is not None else 0)
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
+        conn.execute("DELETE FROM thread_work_sessions")
         conn.execute("DELETE FROM usage_impact")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
@@ -459,6 +462,7 @@ def _upsert_usage_events_with_delta(
             if source_files_to_replace and refresh_links and delta.affected_thread_keys:
                 refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
                 rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
+                rebuild_thread_work_sessions(conn, thread_keys=delta.affected_thread_keys)
                 invalidate_usage_impact_for_delta(
                     conn,
                     inserted_record_ids=delta.inserted_record_ids,
@@ -485,6 +489,7 @@ def _upsert_usage_events_with_delta(
         if refresh_links and delta.affected_thread_keys:
             refresh_usage_event_links_for_threads(conn, delta.affected_thread_keys)
             rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
+            rebuild_thread_work_sessions(conn, thread_keys=delta.affected_thread_keys)
             invalidate_usage_impact_for_delta(
                 conn,
                 inserted_record_ids=delta.inserted_record_ids,
@@ -505,6 +510,7 @@ def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
         init_db(conn)
         changed = _refresh_usage_event_links(conn)
         rebuild_thread_summaries(conn)
+        rebuild_thread_work_sessions(conn)
         return changed
 
 

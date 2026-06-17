@@ -157,10 +157,10 @@ Filters:
 ## Implementation Checklist
 
 - [x] M0: Create this roadmap/checklist before implementation.
-- [ ] M1: Add threshold defaults, config template coverage, and docs wording.
-- [ ] M2: Add `thread_work_sessions` schema, migration, indexes, and repair behavior.
-- [ ] M3: Add materializer and query helpers with synthetic unit tests.
-- [ ] M4: Wire affected-thread refresh rebuilds without global session rebuilds on append/no-op.
+- [x] M1: Add threshold defaults, config template coverage, and docs wording.
+- [x] M2: Add `thread_work_sessions` schema, migration, indexes, and repair behavior.
+- [x] M3: Add materializer and query helpers with synthetic unit tests.
+- [x] M4: Wire affected-thread refresh rebuilds without global session rebuilds on append/no-op.
 - [ ] M5: Add CLI, API, and JSON contract coverage.
 - [ ] M6: Add Sessions dashboard tab with SQL-backed row loading.
 - [ ] M7: Update docs and run full branch validation.

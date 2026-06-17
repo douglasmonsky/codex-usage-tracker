@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -24,6 +24,7 @@ MIGRATION_NAMES = {
     8: "persist observed Codex usage snapshots",
     9: "persist source byte offsets for context seeking",
     10: "materialize usage-impact read model",
+    11: "materialize thread work sessions",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -109,6 +110,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v10(conn)
         _record_migration_if_missing(conn, 10)
+    if user_version < 11:
+        _migrate_v11(conn)
+        _record_migration(conn, 11)
+    else:
+        _migrate_v11(conn)
+        _record_migration_if_missing(conn, 11)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -302,6 +309,60 @@ def _migrate_v10(conn: sqlite3.Connection) -> None:
             ON usage_impact(limit_id, window_type);
         CREATE INDEX IF NOT EXISTS idx_usage_impact_delta
             ON usage_impact(delta_used_percent);
+        """
+    )
+
+
+def _migrate_v11(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS thread_work_sessions (
+            work_session_id TEXT PRIMARY KEY,
+            thread_key TEXT NOT NULL,
+            thread_label TEXT,
+            session_index INTEGER NOT NULL,
+            start_record_id TEXT NOT NULL,
+            end_record_id TEXT NOT NULL,
+            cold_start_record_id TEXT,
+            start_reason TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ended_at TEXT NOT NULL,
+            duration_minutes REAL NOT NULL,
+            idle_minutes_before REAL,
+            call_count INTEGER NOT NULL,
+            model_summary TEXT,
+            effort_summary TEXT,
+            input_tokens INTEGER NOT NULL,
+            cached_input_tokens INTEGER NOT NULL,
+            uncached_input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            reasoning_output_tokens INTEGER NOT NULL,
+            total_tokens INTEGER NOT NULL,
+            avg_cache_ratio REAL NOT NULL,
+            min_cache_ratio REAL NOT NULL,
+            max_context_window_percent REAL NOT NULL,
+            largest_uncached_record_id TEXT,
+            largest_uncached_input_tokens INTEGER NOT NULL,
+            cold_resume_uncached_tokens INTEGER NOT NULL,
+            compaction_count INTEGER NOT NULL DEFAULT 0,
+            subagent_call_count INTEGER NOT NULL DEFAULT 0,
+            auto_review_call_count INTEGER NOT NULL DEFAULT 0,
+            suggested_next_action TEXT,
+            recommendation_score REAL,
+            recommendation_reasons_json TEXT NOT NULL DEFAULT '[]',
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_thread_work_sessions_thread_index
+            ON thread_work_sessions(thread_key, session_index);
+        CREATE INDEX IF NOT EXISTS idx_thread_work_sessions_started
+            ON thread_work_sessions(started_at);
+        CREATE INDEX IF NOT EXISTS idx_thread_work_sessions_total_tokens
+            ON thread_work_sessions(total_tokens);
+        CREATE INDEX IF NOT EXISTS idx_thread_work_sessions_uncached
+            ON thread_work_sessions(uncached_input_tokens);
+        CREATE INDEX IF NOT EXISTS idx_thread_work_sessions_action
+            ON thread_work_sessions(suggested_next_action);
         """
     )
 

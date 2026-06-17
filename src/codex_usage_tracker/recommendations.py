@@ -20,6 +20,13 @@ DEFAULT_THRESHOLDS: dict[str, float] = {
     "expensive_low_output_total_tokens": 20_000,
     "low_output_tokens": 100,
     "high_cost_usd": 1.00,
+    "cold_resume_idle_minutes": 45,
+    "cold_resume_max_cache_ratio": 0.10,
+    "cold_resume_min_input_tokens": 25_000,
+    "cold_resume_min_uncached_tokens": 20_000,
+    "cold_resume_huge_uncached_tokens": 100_000,
+    "cold_resume_huge_max_cache_ratio": 0.15,
+    "cold_resume_cluster_suppression_minutes": 10,
 }
 
 SEVERITY_POINTS = {

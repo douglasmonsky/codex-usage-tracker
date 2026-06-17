@@ -54,7 +54,7 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert rows[0]["rate_limit_secondary_used_percent"] is None
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 10
+    assert state["schema_version"] == 11
     assert state["checksum_matches"] is True
     assert [row["version"] for row in state["migrations"]] == [
         1,
@@ -67,6 +67,7 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
         8,
         9,
         10,
+        11,
     ]
 
 
@@ -90,7 +91,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "10"
+    assert metadata["schema_version"] == "11"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -144,6 +145,34 @@ def test_usage_impact_read_model_table_is_created(tmp_path: Path) -> None:
     } <= columns
     assert "idx_usage_impact_window_status" in indexes
     assert "idx_usage_impact_limit_window" in indexes
+
+
+def test_thread_work_sessions_table_is_created(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(thread_work_sessions)").fetchall()
+        }
+        indexes = {
+            row["name"]
+            for row in conn.execute("PRAGMA index_list(thread_work_sessions)").fetchall()
+        }
+
+    assert {
+        "work_session_id",
+        "thread_key",
+        "session_index",
+        "start_record_id",
+        "end_record_id",
+        "start_reason",
+        "uncached_input_tokens",
+        "suggested_next_action",
+    } <= columns
+    assert "idx_thread_work_sessions_thread_index" in indexes
+    assert "idx_thread_work_sessions_uncached" in indexes
 
 
 def test_malformed_legacy_schema_reports_actionable_error_without_data_loss(

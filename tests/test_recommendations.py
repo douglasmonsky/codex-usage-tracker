@@ -77,5 +77,14 @@ def test_threshold_template_and_overrides(tmp_path: Path) -> None:
     assert written == path
     assert config.loaded is True
     assert config.thresholds == DEFAULT_THRESHOLDS
+    assert {
+        "cold_resume_idle_minutes",
+        "cold_resume_max_cache_ratio",
+        "cold_resume_min_input_tokens",
+        "cold_resume_min_uncached_tokens",
+        "cold_resume_huge_uncached_tokens",
+        "cold_resume_huge_max_cache_ratio",
+        "cold_resume_cluster_suppression_minutes",
+    }.issubset(payload)
     assert overridden.thresholds["low_cache_ratio"] == 0.42
     assert "unknown" not in overridden.thresholds

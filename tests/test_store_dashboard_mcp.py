@@ -81,12 +81,24 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == PARSER_ADAPTER_VERSION
-    assert meta["schema_version"] == "10"
+    assert meta["schema_version"] == "11"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 10
+    assert state["schema_version"] == 11
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert [row["version"] for row in state["migrations"]] == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+    ]
     with connect(db_path) as conn:
         init_db(conn)
         source_rows = [
@@ -128,6 +140,7 @@ def test_noop_refresh_skips_parser_upsert_and_downstream_rebuilds(
     monkeypatch.setattr(store_module, "_upsert_usage_events_with_delta", fail_if_called)
     monkeypatch.setattr(store_module, "refresh_usage_event_links_for_threads", fail_if_called)
     monkeypatch.setattr(store_module, "rebuild_thread_summaries", fail_if_called)
+    monkeypatch.setattr(store_module, "rebuild_thread_work_sessions", fail_if_called)
     monkeypatch.setattr(store_module, "invalidate_usage_impact_for_delta", fail_if_called)
 
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
@@ -344,9 +357,11 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     )
     link_calls: list[set[str]] = []
     summary_calls: list[set[str] | None] = []
+    work_session_calls: list[set[str] | None] = []
     usage_impact_invalidations: list[dict[str, object]] = []
     original_link_refresh = store_module.refresh_usage_event_links_for_threads
     original_summary_rebuild = store_module.rebuild_thread_summaries
+    original_work_session_rebuild = store_module.rebuild_thread_work_sessions
     original_usage_impact_invalidate = store_module.invalidate_usage_impact_for_delta
 
     def tracking_link_refresh(conn: sqlite3.Connection, thread_keys: object) -> int:
@@ -363,6 +378,15 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
         summary_calls.append(normalized)
         return original_summary_rebuild(conn, thread_keys=thread_keys)  # type: ignore[arg-type]
 
+    def tracking_work_session_rebuild(
+        conn: sqlite3.Connection,
+        *,
+        thread_keys: object = None,
+    ) -> int:
+        normalized = set(thread_keys) if thread_keys is not None else None
+        work_session_calls.append(normalized)
+        return original_work_session_rebuild(conn, thread_keys=thread_keys)  # type: ignore[arg-type]
+
     def tracking_usage_impact_invalidate(
         conn: sqlite3.Connection,
         **kwargs: object,
@@ -372,11 +396,13 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
 
     monkeypatch.setattr(store_module, "refresh_usage_event_links_for_threads", tracking_link_refresh)
     monkeypatch.setattr(store_module, "rebuild_thread_summaries", tracking_summary_rebuild)
+    monkeypatch.setattr(store_module, "rebuild_thread_work_sessions", tracking_work_session_rebuild)
     monkeypatch.setattr(store_module, "invalidate_usage_impact_for_delta", tracking_usage_impact_invalidate)
 
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     partial_link_calls = list(link_calls)
     partial_summary_calls = list(summary_calls)
+    partial_work_session_calls = list(work_session_calls)
     affected_keys = link_calls[0] if link_calls else set()
     before_full_repair_links = _thread_link_snapshot(db_path, affected_keys)
     before_full_repair_summaries = _thread_summary_snapshot(db_path, affected_keys)
@@ -407,6 +433,7 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert second.skipped_downstream_work is False
     assert partial_link_calls == [{"thread:Add Codex token tracking"}]
     assert partial_summary_calls == [{"thread:Add Codex token tracking"}]
+    assert partial_work_session_calls == [{"thread:Add Codex token tracking"}]
     assert len(usage_impact_invalidations) == 1
     assert len(usage_impact_invalidations[0]["inserted_record_ids"]) == 1
     assert before_full_repair_links == after_full_repair_links
@@ -613,7 +640,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 10
+    assert user_version == 11
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -684,8 +711,20 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
     assert "idx_usage_observed_rate_limit_timestamp" in indexes
-    assert user_version == 10
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert user_version == 11
+    assert [row["version"] for row in migrations] == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+    ]
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:

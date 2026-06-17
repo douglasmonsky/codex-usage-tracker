@@ -184,7 +184,7 @@ Stable local config files:
 - `pricing.json`: schema `_schema: codex-usage-tracker-pricing-v1`, optional `_source`, `models`, `aliases`, and `_estimated_models`. `models` maps model labels to USD-per-million-token rates such as `input`, `cached_input`, and `output`.
 - `rate-card.json`: schema `codex-usage-tracker-codex-rate-card-v1`, optional `_source`, `credit_rates`, and `aliases`. `credit_rates` maps Codex model labels to credit rates for aggregate token counters.
 - `allowance.json`: schema `codex-usage-tracker-allowance-v1`, `windows`, optional `credit_rates`, and `aliases`. `windows` stores copied 5-hour, weekly, or other allowance snapshots such as `remaining_percent`, `reset_at`, `remaining_credits`, and `total_credits`.
-- `thresholds.json`: JSON object keyed by recommendation threshold names such as `low_cache_ratio`, `high_context_percent`, and `high_cost_usd`. Unknown keys are ignored.
+- `thresholds.json`: JSON object keyed by recommendation threshold names such as `low_cache_ratio`, `high_context_percent`, `high_cost_usd`, and `cold_resume_idle_minutes`. Unknown keys are ignored. Cold-resume keys tune the aggregate-only work-session splitter; missing keys fall back to bundled defaults.
 - `projects.json`: JSON object with `aliases`, `ignored_paths`, and `tags` for local project attribution.
 
 These config schemas are part of the 1.0 compatibility surface. New optional fields may be added, but existing meanings should not change without documentation and a compatibility plan.
