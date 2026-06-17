@@ -105,7 +105,7 @@ Indexes:
 - [x] M6: Add compact dashboard investigator receipt signals and session/epoch filter-ready API fields.
 - [x] M7: Add parser, migration, refresh, JSON contract, dashboard, and privacy tests.
 - [x] M8: Run validation and benchmarks.
-- [ ] M9: Commit, push, and open the branch PR without merging to `main`.
+- [x] M9: Commit, push, and open the branch PR without merging to `main`.
 
 ## Tests
 
