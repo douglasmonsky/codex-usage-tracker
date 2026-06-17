@@ -33,13 +33,13 @@ Base: `feature/context-epochs`
 - [x] M4: Keep Sessions list and context-segment expansion on `/api/sessions`, `/api/session`, and `/api/context-epochs`.
 - [x] M5: Make live refresh reload only the active view when status changes.
 - [x] M6: Add tests for active-view endpoint usage, no full-payload reloads, and static compatibility.
-- [ ] M7: Open the branch PR without merging to `main`.
+- [x] M7: Open the branch PR without merging to `main`.
 
 Current branch status:
 
 - `5dc7a8a` implements SQL-backed live Threads list loading, expanded thread-call loading, active-view-aware live refresh behavior, and regression tests for the read-model path.
 - The branch has been validated and pushed to `origin/refactor/live-dashboard-read-model-api`.
-- A pull request still needs to be opened and reviewed before any merge to `main`.
+- PR #42 is open for review and must not be merged to `main` until explicitly approved.
 
 ## Endpoint Targets
 
