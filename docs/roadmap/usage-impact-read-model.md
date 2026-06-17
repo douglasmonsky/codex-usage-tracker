@@ -66,12 +66,13 @@ Target `usage_impact` table fields:
 - [x] M6: Add compact dashboard call-detail chips without exact-billing language.
 - [x] M7: Add focused tests for windows, pools, no-op, append, ambiguity, JSON contracts, and privacy.
 - [x] M8: Run validation and benchmarks.
-- [ ] M9: Commit, push, and open the branch PR without merging to `main`.
+- [x] M9: Commit, push, and open the branch PR without merging to `main`.
 
 Progress notes:
 
 - M4 is implemented: refresh deltas delete stale records, insert pending rows for newly appended records, no-op refreshes avoid usage-impact invalidation, and live refreshes warm only pending/stale/missing usage-impact record ids instead of immediately scheduling a full-history read-model rebuild. Targeted recalculation still uses full aggregate context for estimator correctness, but only affected read-model rows are replaced.
 - M6 is implemented: the call investigator now keeps exact token accounting separate from estimated allowance impact and presents compact weekly/5h impact cards with derived/on-demand wording instead of exact-billing language.
+- M9 is complete on PR #39, targeting `perf/parallel-refresh-indexing`; this branch is not merged to `main`.
 
 ## Tests
 
