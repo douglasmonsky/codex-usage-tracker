@@ -2,15 +2,29 @@
 
 ## Unreleased
 
+## 0.7.0 - 2026-06-17
+
+- Capture observed Codex usage snapshots from local token-count logs and show
+  remaining 5h/weekly usage with careful passive-data wording.
+- Add estimated per-call usage impact, usage-impact CLI/API surfaces, and
+  cache-backed impact warming without claiming exact billing impact.
+- Add work Sessions and context-epoch read models so cold resumes, long work
+  windows, post-compaction segments, and handoff candidates are easier to find.
 - Make refresh delta-aware so no-op refreshes skip downstream adjacency and
   thread-summary rebuild work, and append refreshes update only affected thread
   read models.
-- Warm usage-impact estimates only for pending/stale affected records after live
-  refreshes, and keep investigator allowance-impact estimates separate from
-  exact token accounting.
+- Add SQL-backed live read-model APIs for calls, threads, thread calls, sessions,
+  status, and context epochs so the dashboard can avoid large static payload
+  reloads during normal live polling.
+- Add opt-in parallel parser workers for large multi-file refreshes, including
+  CLI controls, refresh result counters, and synthetic backfill benchmark
+  coverage while keeping SQLite writes serialized.
 - Add aggregate-only task receipt signals, including parser-state carryover,
   SQLite read-model materialization, CLI/API JSON surfaces, and compact call
   investigator receipt chips without persisting raw transcript or tool content.
+- Add aggregate-only lifecycle recommendations that combine exact token counters,
+  usage-impact estimates, work-session/context-epoch metadata, and task-receipt
+  signals into cautious continue/start-fresh/summarize/lower-reasoning guidance.
 
 ## 0.6.1 - 2026-06-13
 

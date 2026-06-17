@@ -428,6 +428,80 @@ def test_dashboard_server_exposes_task_receipt_read_model(tmp_path: Path) -> Non
     _assert_contract(call_payload["task_receipts"])
 
 
+def test_dashboard_server_exposes_lifecycle_recommendations(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    db_path = tmp_path / "usage.sqlite3"
+    event = replace(
+        _usage_event(
+            record_id="lifecycle-target",
+            session_id=SESSION_ID,
+            thread_key="thread:Lifecycle API",
+            event_timestamp="2026-06-15T12:15:00Z",
+            cumulative_total_tokens=50_000,
+        ),
+        input_tokens=40_000,
+        cached_input_tokens=2_000,
+        output_tokens=80,
+        reasoning_output_tokens=20,
+        total_tokens=40_080,
+        cumulative_input_tokens=49_900,
+        cumulative_cached_input_tokens=2_000,
+        cumulative_output_tokens=80,
+        cumulative_reasoning_output_tokens=20,
+    )
+    upsert_usage_events([event], db_path=db_path)
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        lifecycle_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/lifecycle-recommendations"
+            "?record_id=lifecycle-target"
+        )
+        call_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/call?record_id=lifecycle-target"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert lifecycle_payload["schema"] == "codex-usage-tracker-lifecycle-recommendations-v1"
+    assert lifecycle_payload["raw_context_included"] is False
+    assert lifecycle_payload["row_count"] >= 1
+    assert lifecycle_payload["rows"][0]["recommendation_key"] in {
+        "inspect_low_evidence",
+        "start_fresh",
+    }
+    assert call_payload["lifecycle_recommendations"]["schema"] == (
+        "codex-usage-tracker-lifecycle-recommendations-v1"
+    )
+    assert call_payload["lifecycle_recommendations"]["raw_context_included"] is False
+    assert "SECRET RAW PROMPT" not in json.dumps(lifecycle_payload)
+    _assert_contract(lifecycle_payload)
+    _assert_contract(call_payload["lifecycle_recommendations"])
+
+
 def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     _write_archived_log(codex_home)

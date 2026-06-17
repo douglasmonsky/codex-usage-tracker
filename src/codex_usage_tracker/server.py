@@ -33,6 +33,10 @@ from codex_usage_tracker.dashboard import (
 )
 from codex_usage_tracker.dashboard_diagnostics import dashboard_parser_diagnostics
 from codex_usage_tracker.i18n import normalize_language
+from codex_usage_tracker.lifecycle_recommendations import (
+    lifecycle_recommendations_payload,
+    query_lifecycle_recommendations,
+)
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
@@ -344,6 +348,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/recommendations":
             self._handle_recommendations(parsed.query)
+            return
+        if parsed.path == "/api/lifecycle-recommendations":
+            self._handle_lifecycle_recommendations(parsed.query)
             return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
@@ -729,6 +736,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 sort="category",
                 direction="asc",
             )
+            lifecycle_rows, lifecycle_total = query_lifecycle_recommendations(
+                db_path=self._db_path,
+                record_id=record_id,
+                limit=3,
+            )
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -760,6 +772,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                     task_receipt_rows,
                     record_id=record_id,
                     limit=None,
+                ),
+                "lifecycle_recommendations": lifecycle_recommendations_payload(
+                    lifecycle_rows,
+                    filters={"record_id": record_id},
+                    limit=3,
+                    total_matched_rows=lifecycle_total,
                 ),
                 "raw_context_included": False,
             },
@@ -833,6 +851,49 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 record_id=record_id,
                 limit=limit,
                 offset=offset,
+            ),
+        )
+
+    def _handle_lifecycle_recommendations(self, query: str) -> None:
+        params = parse_qs(query)
+        record_id = _first(params.get("record_id")) or _first(params.get("record"))
+        limit = _parse_api_limit_allow_zero(_first(params.get("limit")), 100)
+        offset = _parse_api_offset(_first(params.get("offset")))
+        filters = {
+            "record_id": record_id,
+            "thread_key": _first(params.get("thread_key")) or _first(params.get("thread")),
+            "work_session_id": _first(params.get("work_session_id")) or _first(params.get("session")),
+            "context_epoch_id": _first(params.get("context_epoch_id")) or _first(params.get("epoch")),
+            "scope": _first(params.get("scope")),
+        }
+        try:
+            rows, total = query_lifecycle_recommendations(
+                db_path=self._db_path,
+                record_id=record_id,
+                thread_key=filters["thread_key"],
+                work_session_id=filters["work_session_id"],
+                context_epoch_id=filters["context_epoch_id"],
+                scope=filters["scope"],
+                limit=limit,
+                offset=offset,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading lifecycle recommendations: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            lifecycle_recommendations_payload(
+                rows,
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                total_matched_rows=total,
             ),
         )
 
