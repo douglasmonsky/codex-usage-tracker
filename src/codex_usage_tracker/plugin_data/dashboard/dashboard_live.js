@@ -363,17 +363,21 @@
           setObservedUsage(payload.observed_usage);
         }
         const refreshResult = payload.refresh_result || {};
+        const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows();
         if (activeView() === 'sessions') {
-          if (!refreshResultIsNoOp(refreshResult) || (Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows())) {
+          if (!refreshResultIsNoOp(refreshResult) || rowCountChanged) {
             refreshSessions();
           }
           return;
         }
         if (refreshResultIsNoOp(refreshResult)) {
-          if (rowsNeedHydration()) hydrateDashboardRows();
+          if (rowCountChanged) {
+            await refreshAppendedRows(refreshResult, scopedRows);
+          } else if (rowsNeedHydration()) {
+            hydrateDashboardRows();
+          }
           return;
         }
-        const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows();
         if (refreshResultNeedsReset(refreshResult)) {
           refreshDashboardData(false, { refreshLogs: false, resetRows: true });
         } else if (refreshResultHasRowChanges(refreshResult) || rowCountChanged) {

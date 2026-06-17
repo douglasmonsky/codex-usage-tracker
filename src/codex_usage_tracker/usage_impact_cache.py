@@ -19,6 +19,8 @@ from codex_usage_tracker.threads import annotate_thread_attachments
 from codex_usage_tracker.usage_impact import annotate_rows_with_usage_impact
 from codex_usage_tracker.usage_impact_store import (
     query_usage_impact_map_for_records,
+    query_usage_impact_recalculation_record_ids,
+    replace_usage_impact_for_records_from_annotated_rows,
     replace_usage_impact_from_annotated_rows,
 )
 
@@ -86,6 +88,32 @@ class UsageImpactCache:
         )
         thread.start()
 
+    def warm_pending_async(self, *, include_archived: bool) -> None:
+        """Warm only usage-impact rows marked pending/stale by refresh deltas."""
+
+        record_ids = query_usage_impact_recalculation_record_ids(
+            self._db_path,
+            include_archived=include_archived,
+        )
+        if not record_ids:
+            return
+        key = self._cache_key(include_archived=include_archived)
+        with self._condition:
+            if self._is_building_scope_locked(include_archived):
+                return
+            self._building.add(key)
+        thread = threading.Thread(
+            target=self._warm_pending_safely,
+            kwargs={
+                "include_archived": include_archived,
+                "key": key,
+                "record_ids": record_ids,
+            },
+            name=f"codex-usage-impact-pending-{int(include_archived)}",
+            daemon=True,
+        )
+        thread.start()
+
     def rebuild(self, *, include_archived: bool) -> dict[str, dict[str, Any]]:
         """Rebuild and persist usage-impact estimates synchronously."""
 
@@ -103,6 +131,7 @@ class UsageImpactCache:
         *,
         include_archived: bool,
         block: bool = True,
+        schedule_warm: bool = True,
     ) -> list[dict[str, Any]]:
         """Return copied rows with cached usage-impact estimates attached."""
 
@@ -117,7 +146,8 @@ class UsageImpactCache:
         if persisted and not missing and not persisted_pending:
             return _copy_persisted_usage_impact(rows, persisted, pending=False)
         if not block:
-            self.warm_async(include_archived=include_archived)
+            if schedule_warm:
+                self.warm_async(include_archived=include_archived)
             return _copy_persisted_usage_impact(rows, persisted, pending=True)
         impact_by_record_id = self._impact_by_record_id(
             include_archived=include_archived,
@@ -151,6 +181,28 @@ class UsageImpactCache:
             return
         with self._condition:
             self._cache[include_archived] = (key, impact_by_record_id)
+            self._building.discard(key)
+            self._condition.notify_all()
+
+    def _warm_pending_safely(
+        self,
+        *,
+        include_archived: bool,
+        key: _ImpactCacheKey,
+        record_ids: list[str],
+    ) -> None:
+        try:
+            self._rebuild_records(
+                record_ids,
+                include_archived=include_archived,
+            )
+        except Exception:
+            with self._condition:
+                self._building.discard(key)
+                self._condition.notify_all()
+            return
+        with self._condition:
+            self._cache.pop(include_archived, None)
             self._building.discard(key)
             self._condition.notify_all()
 
@@ -197,6 +249,31 @@ class UsageImpactCache:
             return impact_by_record_id
 
     def _build_impact_map(self, *, include_archived: bool) -> dict[str, dict[str, Any]]:
+        rows = self._annotated_context_rows(include_archived=include_archived)
+        replace_usage_impact_from_annotated_rows(
+            db_path=self._db_path,
+            rows=rows,
+        )
+        impact_by_record_id, _pending = query_usage_impact_map_for_records(
+            self._db_path,
+            [str(row.get("record_id")) for row in rows if row.get("record_id")],
+        )
+        return impact_by_record_id
+
+    def _rebuild_records(
+        self,
+        record_ids: list[str],
+        *,
+        include_archived: bool,
+    ) -> dict[str, int]:
+        rows = self._annotated_context_rows(include_archived=include_archived)
+        return replace_usage_impact_for_records_from_annotated_rows(
+            db_path=self._db_path,
+            rows=rows,
+            record_ids=record_ids,
+        )
+
+    def _annotated_context_rows(self, *, include_archived: bool) -> list[dict[str, Any]]:
         pricing = load_pricing_config(self._pricing_path)
         allowance = load_allowance_config(
             self._allowance_path,
@@ -215,16 +292,7 @@ class UsageImpactCache:
             annotate_rows_with_efficiency(rows, pricing),
             allowance,
         )
-        annotated_rows = annotate_rows_with_usage_impact(rows)
-        replace_usage_impact_from_annotated_rows(
-            db_path=self._db_path,
-            rows=annotated_rows,
-        )
-        impact_by_record_id, _pending = query_usage_impact_map_for_records(
-            self._db_path,
-            [str(row.get("record_id")) for row in annotated_rows if row.get("record_id")],
-        )
-        return impact_by_record_id
+        return annotate_rows_with_usage_impact(rows)
 
     def _cache_key(self, *, include_archived: bool) -> _ImpactCacheKey:
         metadata = refresh_metadata(self._db_path)

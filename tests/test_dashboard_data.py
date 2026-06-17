@@ -231,6 +231,114 @@ console.log(JSON.stringify({
     assert payload["appliedPayloads"][0]["appendRows"] is True
 
 
+def test_live_refresh_noop_with_row_count_change_hydrates_rows() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let data = [{ record_id: 'b' }, { record_id: 'c' }];
+let totalAvailableRows = 2;
+let requestUrls = [];
+let appliedPayloads = [];
+let liveStatuses = [];
+let fetchIndex = 0;
+const responses = [
+  {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      row_counts: { scoped_rows: 3 },
+      refresh_result: {
+        skipped_downstream_work: true,
+        inserted_records: 0,
+        inserted_or_updated_events: 0,
+        deleted_records: 0,
+        full_reparse_source_files: 0,
+      },
+    }),
+  },
+  {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      rows: [{ record_id: 'a' }, { record_id: 'b' }],
+      row_count: 2,
+      total_matched_rows: 3,
+      has_more: true,
+      usage_impact_pending: false,
+    }),
+  },
+];
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return responses[fetchIndex++];
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: (payload, options = {}) => {
+    appliedPayloads.push({ appendRows: Boolean(options.appendRows), keys: Object.keys(payload).sort() });
+    if (options.appendRows) {
+      const seen = new Set(data.map(row => row.record_id));
+      data = data.concat((payload.rows || []).filter(row => {
+        if (!row.record_id || seen.has(row.record_id)) return false;
+        seen.add(row.record_id);
+        return true;
+      }));
+    } else {
+      data = payload.rows || [];
+      if (payload.total_available_rows !== undefined) totalAvailableRows = payload.total_available_rows;
+    }
+  },
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => data,
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => totalAvailableRows,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => { data = []; },
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: (key, detail) => liveStatuses.push({ key, detail }),
+});
+await runtime.refreshDashboardIfStale();
+await new Promise(resolve => setTimeout(resolve, 25));
+console.log(JSON.stringify({
+  requestUrls,
+  appliedPayloads,
+  dataLength: data.length,
+  liveStatuses,
+}));
+"""
+    )
+
+    assert payload["dataLength"] == 3
+    assert payload["requestUrls"][0].startswith("/api/status?")
+    assert payload["requestUrls"][1].startswith("/api/calls?")
+    assert len(payload["requestUrls"]) == 2
+    assert all(not url.startswith("/api/usage?") for url in payload["requestUrls"])
+    assert payload["appliedPayloads"][0]["appendRows"] is True
+
+
 def test_live_usage_impact_retry_updates_loaded_rows_without_rehydrating_table() -> None:
     payload = _run_dashboard_live_script(
         """

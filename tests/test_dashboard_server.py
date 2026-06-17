@@ -177,6 +177,7 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
         def __init__(self) -> None:
             self.invalidations = 0
             self.warms = 0
+            self.pending_warms = 0
 
         def invalidate(self) -> None:
             self.invalidations += 1
@@ -184,6 +185,10 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
         def warm_async(self, *, include_archived: bool) -> None:
             _ = include_archived
             self.warms += 1
+
+        def warm_pending_async(self, *, include_archived: bool) -> None:
+            _ = include_archived
+            self.pending_warms += 1
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -253,7 +258,8 @@ def test_dashboard_status_live_refresh_parses_appended_events_incrementally(tmp_
     assert second_payload["refresh_result"]["affected_threads"] == 0
     assert second_payload["refresh_result"]["skipped_downstream_work"] is True
     assert usage_impact_cache.invalidations == 1
-    assert usage_impact_cache.warms == 1
+    assert usage_impact_cache.warms == 0
+    assert usage_impact_cache.pending_warms == 1
 
 
 def test_dashboard_server_exposes_usage_impact_read_model(tmp_path: Path) -> None:
@@ -598,10 +604,33 @@ def test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical(
 def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path) -> None:
     from codex_usage_tracker.server import _UsageDashboardHandler
 
+    class FakeUsageImpactCache:
+        def __init__(self) -> None:
+            self.copy_calls: list[dict[str, object]] = []
+
+        def copy_usage_impact(
+            self,
+            rows: list[dict[str, object]],
+            *,
+            include_archived: bool,
+            block: bool = True,
+            schedule_warm: bool = True,
+        ) -> list[dict[str, object]]:
+            self.copy_calls.append(
+                {
+                    "row_count": len(rows),
+                    "include_archived": include_archived,
+                    "block": block,
+                    "schedule_warm": schedule_warm,
+                }
+            )
+            return [dict(row) for row in rows]
+
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    usage_impact_cache = FakeUsageImpactCache()
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
@@ -619,6 +648,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         api_token="test-token",
         context_api_enabled=True,
         refresh_lock=threading.Lock(),
+        usage_impact_cache=usage_impact_cache,
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -678,6 +708,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     _assert_contract(call_payload)
     assert call_payload["record"]["record_id"] == record_id
     assert call_payload["raw_context_included"] is False
+    assert usage_impact_cache.copy_calls
+    assert all(call["block"] is False for call in usage_impact_cache.copy_calls)
+    assert all(call["schedule_warm"] is False for call in usage_impact_cache.copy_calls)
 
     assert threads_payload["schema"] == "codex-usage-tracker-threads-v1"
     _assert_contract(threads_payload)
