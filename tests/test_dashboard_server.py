@@ -719,6 +719,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert threads_payload["schema"] == "codex-usage-tracker-threads-v1"
     _assert_contract(threads_payload)
     assert threads_payload["row_count"] >= 1
+    assert threads_payload["total_matched_rows"] >= threads_payload["row_count"]
+    assert "has_more" in threads_payload
+    assert "next_offset" in threads_payload
     assert "total_tokens" in threads_payload["rows"][0]
 
     assert thread_calls_payload["schema"] == "codex-usage-tracker-thread-calls-v1"

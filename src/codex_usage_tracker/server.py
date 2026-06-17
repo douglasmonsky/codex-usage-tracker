@@ -61,6 +61,7 @@ from codex_usage_tracker.reports import (
 from codex_usage_tracker.store import (
     query_latest_observed_usage,
     query_thread_summaries,
+    query_thread_summary_count,
     query_usage_api_event_count,
     query_usage_api_events,
     query_usage_record,
@@ -908,14 +909,20 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
             sort = _first(params.get("sort")) or "tokens"
             direction = _first(params.get("direction")) or "desc"
+            search = _first(params.get("q")) or _first(params.get("search"))
             rows = query_thread_summaries(
                 db_path=self._db_path,
                 limit=limit,
                 offset=offset,
-                search=_first(params.get("q")) or _first(params.get("search")),
+                search=search,
                 include_archived=include_archived,
                 sort=sort,
                 direction=direction,
+            )
+            total_matched = query_thread_summary_count(
+                db_path=self._db_path,
+                search=search,
+                include_archived=include_archived,
             )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -932,8 +939,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 "schema": "codex-usage-tracker-threads-v1",
                 "rows": rows,
                 "row_count": len(rows),
+                "total_matched_rows": total_matched,
                 "limit": limit,
                 "offset": offset,
+                "has_more": _has_more(limit, offset, len(rows), total_matched),
+                "next_offset": _next_offset(limit, offset, len(rows), total_matched),
                 "include_archived": include_archived,
                 "raw_context_included": False,
             },

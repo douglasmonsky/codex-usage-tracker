@@ -50,6 +50,7 @@
       tf,
       threadCallPageSize,
       threadInitiatorSummary,
+      toggleThread,
       tokenNumberCell,
       tooltipAttributes,
       totalTokenCell,
@@ -192,8 +193,15 @@
     }
 
     function renderThreads(rows, mode = 'threads') {
-      configureCallTable();
       const groups = groupThreads(rows);
+      renderThreadGroups(groups, mode, {
+        calls: rows.length,
+        loaded: loadedRowsDescription(),
+      });
+    }
+
+    function renderThreadGroups(groups, mode = 'threads', meta = {}) {
+      configureCallTable();
       ensurePendingFocusVisibleInGroups(groups);
       if (!getInitialThreadExpansionApplied() && (getActiveView() === 'threads' || getActiveView() === 'insights')) {
         const expansion = initialUrlParams.get('expand');
@@ -204,12 +212,18 @@
         }
         setInitialThreadExpansionApplied(true);
       }
-      const page = visibleSlice(groups);
-      updateLoadMoreControl(page, 'table.threads');
       tableTitleEl.textContent = mode === 'insights' ? t('dashboard.top_threads_by_attention') : t('dashboard.view.threads');
       const preset = activePresetDefinition();
       const prefix = preset ? `${t(preset.captionKey)}. ` : '';
-      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.threads', { threads: number.format(groups.length), calls: number.format(rows.length), sort: tableCaptionEl.dataset.sortDescription, loaded: loadedRowsDescription() })}`;
+      const threadTotal = Number.isFinite(Number(meta.totalThreads)) ? Number(meta.totalThreads) : groups.length;
+      const callTotal = Number.isFinite(Number(meta.totalCalls)) ? Number(meta.totalCalls) : Number(meta.calls || 0);
+      const loaded = meta.loaded || loadedRowsDescription();
+      const serverPaged = Boolean(meta.serverPaged);
+      const page = serverPaged
+        ? { items: groups, start: 0, end: groups.length, total: threadTotal, pageCount: 1 }
+        : visibleSlice(groups);
+      updateLoadMoreControl(page, 'table.threads');
+      tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.threads', { threads: number.format(threadTotal), calls: number.format(callTotal), sort: tableCaptionEl.dataset.sortDescription, loaded })}`;
       for (const group of page.items) {
         const tr = document.createElement('tr');
         const expanded = expandedThreads.has(group.key);
@@ -252,6 +266,10 @@
           <td class="num">${pct(group.cacheRatio)}</td>
         `;
         tr.addEventListener('click', () => {
+          if (typeof toggleThread === 'function') {
+            toggleThread(group);
+            return;
+          }
           if (expandedThreads.has(group.key)) {
             expandedThreads.delete(group.key);
           } else {
@@ -273,7 +291,12 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="${tableColumnCount}">${escapeHtml(t('state.no_threads'))}</td></tr>`;
+        const message = meta.error
+          ? meta.error
+          : meta.loading
+            ? t('state.loading_rows')
+            : t('state.no_threads');
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="${tableColumnCount}">${escapeHtml(message)}</td></tr>`;
       }
       if (!getInitialDetailApplied() && getSelectedThreadKey()) {
         const selected = groups.find(group => group.key === getSelectedThreadKey());
@@ -291,9 +314,11 @@
     function renderThreadCalls(group) {
       const tr = document.createElement('tr');
       tr.className = 'thread-child-row';
-      const sortedCalls = sortedThreadCalls(group.calls);
+      const sortedCalls = sortedThreadCalls(group.calls || []);
       const visiblePages = Math.max(1, getThreadCallVisiblePages().get(group.key) || 1);
-      const visibleCount = Math.min(sortedCalls.length, visiblePages * threadCallPageSize);
+      const visibleCount = group.callsServerPaged
+        ? sortedCalls.length
+        : Math.min(sortedCalls.length, visiblePages * threadCallPageSize);
       const calls = sortedCalls.slice(0, visibleCount).map(row => {
         return `
           <tr class="thread-call-row${getSelectedRecordId() === row.record_id ? ' selected-row' : ''}" data-record-id="${escapeHtml(row.record_id || '')}">
@@ -312,17 +337,25 @@
           </tr>
         `;
       }).join('');
-      const canLoadMore = visibleCount < sortedCalls.length;
+      const totalCalls = Number.isFinite(Number(group.callsTotal)) ? Number(group.callsTotal) : sortedCalls.length;
+      const canLoadMore = visibleCount < sortedCalls.length || Boolean(group.callsHasMore);
       const childLoadMore = canLoadMore
         ? `
           <div class="child-load-more">
-            <span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span>
+            <span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(totalCalls), items: t('table.calls') }))}</span>
             <button class="pager-button" type="button" data-thread-load-more="${escapeHtml(group.key)}">${escapeHtml(t('button.load_more'))}</button>
           </div>
         `
         : sortedCalls.length
-          ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span></div>`
+          ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(totalCalls), items: t('table.calls') }))}</span></div>`
           : '';
+      const childRows = group.callsError
+        ? `<tr><td colspan="12" class="empty-state">${escapeHtml(group.callsError)}</td></tr>`
+        : group.callsLoading && !sortedCalls.length
+          ? `<tr><td colspan="12" class="empty-state">${escapeHtml(t('state.loading_rows'))}</td></tr>`
+          : !sortedCalls.length
+            ? `<tr><td colspan="12" class="empty-state">${escapeHtml(t('state.no_calls'))}</td></tr>`
+            : calls;
       tr.innerHTML = `
         <td class="child-cell" colspan="${tableColumnCount}">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
@@ -354,7 +387,7 @@
               ${threadCallHeader('cost', t('table.cost'), true)}
               ${threadCallHeader('cache', t('table.cache'), true)}
             </tr></thead>
-            <tbody>${calls}</tbody>
+            <tbody>${childRows}</tbody>
           </table>
           ${childLoadMore}
         </td>
@@ -585,6 +618,7 @@
     return {
       renderCalls,
       renderSessions,
+      renderThreadGroups,
       renderThreads,
       renderThreadCalls,
       threadCallHeader,

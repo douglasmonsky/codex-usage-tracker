@@ -195,7 +195,6 @@
         event.preventDefault();
         event.stopPropagation();
         incrementThreadCallVisiblePage(loadMoreButton.dataset.threadLoadMore);
-        render();
         return;
       }
       const sessionRow = event.target.closest('.work-session-row');

@@ -50,11 +50,13 @@
       buildCallAdjacencyIndex,
       classifyCacheDiagnostic,
       callAccountingDelta,
+      compactListSummary,
       rowInputTokens: dataRowInputTokens,
       cachedInputTokens: dataCachedInputTokens,
       uncachedInputTokens: dataUncachedInputTokens,
       outputTokens: dataOutputTokens,
       rowReasoningTokens: dataRowReasoningTokens,
+      threadModelSummary,
     } = dashboardData;
     const {
       addDays,
@@ -214,6 +216,18 @@
     const sessionEpochs = new Map();
     const sessionEpochErrors = new Map();
     const sessionEpochLoading = new Set();
+    const threadPageSize = 500;
+    let threadRows = [];
+    let threadRowsTotal = 0;
+    let threadsNextOffset = 0;
+    let threadsHasMore = false;
+    let threadsLoading = false;
+    let threadsError = '';
+    let threadsLoadedOnce = false;
+    let threadLoadScheduled = false;
+    const threadCallsByKey = new Map();
+    const threadCallLoading = new Set();
+    const threadCallErrors = new Map();
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
     let pendingFocusTarget = null;
@@ -290,6 +304,10 @@
         return;
       }
       if (selectedThreadKey) {
+        const dateRange = currentDateRange();
+        const groups = activeView === 'threads' && threadReadModelEligible(dateRange)
+          ? threadRows.map(threadSummaryGroup)
+          : groupThreads(filtered(dateRange));
         const group = groups.find(candidate => candidate.key === selectedThreadKey);
         if (group) showThreadDetail(group);
       }
@@ -408,6 +426,49 @@
       sessionEpochErrors.clear();
       sessionEpochLoading.clear();
     }
+    function resetThreadRows() {
+      threadRows = [];
+      threadRowsTotal = 0;
+      threadsNextOffset = 0;
+      threadsHasMore = false;
+      threadsError = '';
+      threadsLoadedOnce = false;
+      threadLoadScheduled = false;
+      threadCallsByKey.clear();
+      threadCallLoading.clear();
+      threadCallErrors.clear();
+    }
+    function threadApiSortKey() {
+      const map = {
+        attention: 'attention',
+        cache: 'cache',
+        cached: 'cached',
+        context: 'context',
+        cost: 'cost',
+        effort: 'effort',
+        initiator: 'initiator',
+        model: 'model',
+        output: 'output',
+        reasoning: 'reasoning',
+        thread: 'thread',
+        time: 'time',
+        total: 'tokens',
+        tokens: 'tokens',
+        uncached: 'uncached',
+        usage: 'usage',
+        usage_impact: 'usage_impact',
+      };
+      return map[sortKey] || 'tokens';
+    }
+    function threadReadModelEligible(dateRange = currentDateRange()) {
+      return liveRefreshSupported
+        && !modelEl.value
+        && !effortEl.value
+        && !pricingStatusEl.value
+        && !activePreset
+        && !dateRange.active
+        && !dateRange.invalid;
+    }
     function sessionFilterParams(params) {
       if (sessionFilter === 'cold') params.set('cold_resumes_only', '1');
       if (sessionFilter === 'high_uncached') params.set('high_uncached_only', '1');
@@ -456,6 +517,104 @@
         sessionsError = error.message || String(error);
       } finally {
         sessionsLoading = false;
+        render();
+      }
+    }
+    async function loadThreads(options = null) {
+      if (!liveRefreshSupported || !apiToken || activeView !== 'threads' || !threadReadModelEligible()) return;
+      const loadOptions = options || {};
+      if (threadsLoading) return;
+      threadLoadScheduled = false;
+      if (loadOptions.reset) resetThreadRows();
+      threadsLoading = true;
+      threadsError = '';
+      render();
+      try {
+        const params = new URLSearchParams({
+          limit: String(threadPageSize),
+          offset: String(threadsNextOffset),
+          include_archived: includeArchived ? '1' : '0',
+          sort: threadApiSortKey(),
+          direction: sortDirection,
+          lang: i18n.currentLanguage,
+          _: String(Date.now()),
+        });
+        const query = searchEl.value.trim();
+        if (query) params.set('q', query);
+        const response = await fetch(`/api/threads?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken,
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (payload.error) throw new Error(payload.error);
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        threadRows = loadOptions.reset ? rows : threadRows.concat(rows);
+        threadsNextOffset = Number.isFinite(Number(payload.next_offset))
+          ? Number(payload.next_offset)
+          : Number(payload.offset || 0) + rows.length;
+        threadsHasMore = Boolean(payload.has_more);
+        threadRowsTotal = Number(payload.total_matched_rows ?? threadRows.length);
+        threadsLoadedOnce = true;
+      } catch (error) {
+        threadsError = error.message || String(error);
+      } finally {
+        threadsLoading = false;
+        render();
+      }
+    }
+    async function loadThreadCalls(threadKey, options = null) {
+      if (!liveRefreshSupported || !apiToken || activeView !== 'threads' || !threadKey) return;
+      const existing = threadCallsByKey.get(threadKey) || { rows: [], nextOffset: 0, hasMore: true, total: 0 };
+      const loadOptions = options || {};
+      if (threadCallLoading.has(threadKey)) return;
+      if (!loadOptions.reset && existing.rows.length && !existing.hasMore) return;
+      const nextOffset = loadOptions.reset ? 0 : Number(existing.nextOffset || existing.rows.length || 0);
+      threadCallLoading.add(threadKey);
+      threadCallErrors.delete(threadKey);
+      render();
+      try {
+        const params = new URLSearchParams({
+          thread_key: threadKey,
+          limit: String(threadCallPageSize),
+          offset: String(nextOffset),
+          include_archived: includeArchived ? '1' : '0',
+          sort: threadCallSortKey,
+          direction: threadCallSortDirection,
+          lang: i18n.currentLanguage,
+          _: String(Date.now()),
+        });
+        const response = await fetch(`/api/thread-calls?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken,
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (payload.error) throw new Error(payload.error);
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        const previousRows = loadOptions.reset ? [] : existing.rows || [];
+        threadCallsByKey.set(threadKey, {
+          rows: mergedRows(previousRows, rows),
+          nextOffset: Number.isFinite(Number(payload.next_offset))
+            ? Number(payload.next_offset)
+            : nextOffset + rows.length,
+          hasMore: Boolean(payload.has_more),
+          total: Number(payload.total_matched_rows ?? previousRows.length + rows.length),
+        });
+        rows.forEach(row => {
+          if (row?.record_id) supplementalRowsByRecordId.set(row.record_id, row);
+        });
+        rebuildDashboardIndexes();
+      } catch (error) {
+        threadCallErrors.set(threadKey, error.message || String(error));
+      } finally {
+        threadCallLoading.delete(threadKey);
         render();
       }
     }
@@ -513,6 +672,13 @@
         loadSessions({ reset: true });
         return;
       }
+      if (activeView === 'threads') {
+        resetThreadRows();
+        normalizeSortForView();
+        render();
+        if (threadReadModelEligible()) loadThreads({ reset: true });
+        return;
+      }
       normalizeSortForView();
       render();
     }
@@ -529,6 +695,13 @@
         normalizeSortForView();
         render();
         loadSessions({ reset: true });
+        return;
+      }
+      if (activeView === 'threads') {
+        resetThreadRows();
+        normalizeSortForView();
+        render();
+        if (threadReadModelEligible()) loadThreads({ reset: true });
         return;
       }
       normalizeSortForView();
@@ -707,6 +880,7 @@
       rebuildFilterOptions,
       refreshDashboardEl,
       refreshSessions,
+      refreshThreads,
       render,
       resetRowsForHydration: () => {
         data = [];
@@ -727,6 +901,7 @@
       },
       t,
       tf,
+      threadsUseReadModel: () => activeView === 'threads' && threadReadModelEligible(),
       updateLiveStatus,
     });
     const {
@@ -937,8 +1112,10 @@
       sortDirection = preset.direction || defaultSortDirection(preset.sort);
       sortEl.value = preset.sort;
       resetVisibleRows();
+      if (activeView === 'threads') resetThreadRows();
       queueFocusTarget(focusTarget);
       render();
+      if (activeView === 'threads' && threadReadModelEligible()) loadThreads({ reset: true });
     }
     function clearPreset() {
       activePreset = '';
@@ -947,7 +1124,9 @@
       sortDirection = defaultSortDirection(sortKey);
       sortEl.value = sortKey;
       resetVisibleRows();
+      if (activeView === 'threads') resetThreadRows();
       render();
+      if (activeView === 'threads' && threadReadModelEligible()) loadThreads({ reset: true });
     }
     function threshold(key, fallback) {
       const value = Number(actionThresholds[key]);
@@ -1095,6 +1274,62 @@
         highContext: threshold('high_context_percent', 0.6),
       });
     }
+    function threadSummaryGroup(row) {
+      const key = String(row.thread_key || '');
+      const childState = threadCallsByKey.get(key) || {};
+      const calls = Array.isArray(childState.rows) ? childState.rows : [];
+      const modelSummary = calls.length ? threadModelSummary(calls) : t('state.unknown');
+      const effortValues = calls.map(call => call.effort);
+      const effortSummary = calls.length
+        ? compactListSummary(effortValues, t('table.more_efforts'))
+        : t('state.unknown');
+      const effortTooltip = calls.length ? effortTooltipText(effortValues) : t('state.unknown');
+      return {
+        key,
+        label: row.thread_label || key || t('state.unknown'),
+        calls,
+        callCount: Number(row.call_count || calls.length || 0),
+        latestActivity: row.latest_event_timestamp || row.first_event_timestamp || '',
+        parentThreadLabel: '',
+        modelSummary,
+        effortSummary,
+        effortTooltip,
+        totalTokens: Number(row.total_tokens || 0),
+        cachedTokens: Number(row.cached_input_tokens || 0),
+        uncachedTokens: Number(row.uncached_input_tokens || 0),
+        outputTokens: Number(row.output_tokens || 0),
+        reasoningOutputTokens: Number(row.reasoning_output_tokens || 0),
+        estimatedCost: Number(row.estimated_cost_usd || 0),
+        usageCredits: Number(row.usage_credits || 0),
+        usage_impact: null,
+        cacheRatio: Number(row.avg_cache_ratio || 0),
+        maxContextUse: Number(row.max_context_window_percent || 0),
+        pricingStatus: t('state.unknown'),
+        creditStatus: t('state.unknown'),
+        signalCount: 0,
+        subagentCount: 0,
+        autoReviewCount: 0,
+        attachedCount: 0,
+        lifecycle: null,
+        attentionScore: Number(row.max_recommendation_score || 0),
+        callInitiatorSummary: row.call_initiator_summary || '',
+        callsLoading: threadCallLoading.has(key),
+        callsError: threadCallErrors.get(key) || '',
+        callsHasMore: Boolean(childState.hasMore),
+        callsServerPaged: true,
+        callsTotal: Number(childState.total || row.call_count || calls.length || 0),
+      };
+    }
+    function threadReadModelLoadedDescription() {
+      const total = threadRowsTotal || threadRows.length;
+      return threadRows.length
+        ? tf('table.visible_status', {
+            end: number.format(threadRows.length),
+            total: number.format(total),
+            items: t('dashboard.view.threads'),
+          })
+        : loadedRowsDescription();
+    }
     function setSummaryNumber(id, value, labelKey) {
       const element = document.getElementById(id);
       if (!element) return;
@@ -1169,6 +1404,13 @@
       } else {
         threadCallSortKey = key;
         threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'reasoning' || key === 'usage_impact' || key === 'cost' || key === 'cache' ? 'desc' : 'asc';
+      }
+      if (activeView === 'threads' && threadReadModelEligible()) {
+        threadCallsByKey.clear();
+        threadCallErrors.clear();
+        render();
+        expandedThreads.forEach(threadKey => loadThreadCalls(threadKey, { reset: true }));
+        return;
       }
       render();
     }
@@ -1267,6 +1509,7 @@
       tf,
       threadCallPageSize,
       threadInitiatorSummary,
+      toggleThread,
       tokenNumberCell,
       tooltipAttributes,
       totalTokenCell,
@@ -1286,8 +1529,10 @@
         sortEl.value = sortKey;
       }
       resetVisibleRows();
+      if (activeView === 'threads') resetThreadRows();
       queueFocusTarget(insight.target);
       render();
+      if (activeView === 'threads' && threadReadModelEligible()) loadThreads({ reset: true });
     }
     function renderInsightPanel(rows) {
       dashboardInsights.renderInsightPanel(rows, activeView, activePreset);
@@ -1359,7 +1604,11 @@
           }
         }
       } else if (activeView === 'threads') {
-        renderThreads(rows);
+        if (threadReadModelEligible(dateRange)) {
+          renderReadModelThreads();
+        } else {
+          renderThreads(rows);
+        }
       } else if (activeView === 'insights') {
         renderThreads(rows, 'insights');
       } else {
@@ -1375,6 +1624,32 @@
     }
     function renderThreads(rows, mode = 'threads') {
       dashboardTables.renderThreads(rows, mode);
+    }
+    function renderReadModelThreads() {
+      const groups = threadRows.map(threadSummaryGroup);
+      dashboardTables.renderThreadGroups(groups, 'threads', {
+        totalThreads: threadRowsTotal || groups.length,
+        totalCalls: totalAvailableRows,
+        loaded: threadReadModelLoadedDescription(),
+        loading: threadsLoading,
+        error: threadsError,
+        serverPaged: true,
+      });
+      if (!threadsLoading && !threadsError && !threadsLoadedOnce && !threadRows.length && !threadLoadScheduled) {
+        threadLoadScheduled = true;
+        window.setTimeout(() => loadThreads({ reset: true }), 0);
+      }
+      for (const group of groups) {
+        const childState = threadCallsByKey.get(group.key);
+        if (
+          expandedThreads.has(group.key)
+          && !childState
+          && !threadCallLoading.has(group.key)
+          && !threadCallErrors.has(group.key)
+        ) {
+          window.setTimeout(() => loadThreadCalls(group.key, { reset: true }), 0);
+        }
+      }
     }
     function renderThreadCalls(group) {
       return dashboardTables.renderThreadCalls(group);
@@ -1442,6 +1717,16 @@
         loadSessions({ reset: true });
         return;
       }
+      if (activeView === 'threads') {
+        resetThreadRows();
+        render();
+        if (threadReadModelEligible()) {
+          loadThreads({ reset: true });
+        } else if (rowsNeedHydration()) {
+          hydrateDashboardRows();
+        }
+        return;
+      }
       render();
     }
     function setSessionFilter(value) {
@@ -1458,12 +1743,39 @@
       render();
       loadSessions({ reset: true });
     }
+    function refreshThreads() {
+      resetThreadRows();
+      render();
+      if (activeView !== 'threads') return;
+      if (threadReadModelEligible()) {
+        loadThreads({ reset: true });
+      } else if (rowsNeedHydration()) {
+        hydrateDashboardRows({ reset: true });
+      }
+    }
+    function toggleThread(group) {
+      if (!group?.key) return;
+      if (expandedThreads.has(group.key)) {
+        expandedThreads.delete(group.key);
+        selectThread(group);
+        render();
+        return;
+      }
+      expandedThreads.add(group.key);
+      selectThread(group);
+      render();
+      if (activeView === 'threads' && threadReadModelEligible()) {
+        loadThreadCalls(group.key, { reset: true });
+      }
+    }
     function setView(view) {
       activeView = ['calls', 'threads', 'insights', 'sessions', 'call'].includes(view) ? view : 'calls';
       normalizeSortForView();
       resetVisibleRows();
       render();
-      if (!['call', 'sessions'].includes(activeView) && rowsNeedHydration()) {
+      if (activeView === 'threads' && threadReadModelEligible()) {
+        loadThreads({ reset: !threadsLoadedOnce });
+      } else if (!['call', 'sessions'].includes(activeView) && rowsNeedHydration()) {
         hydrateDashboardRows();
       }
     }
@@ -1477,6 +1789,9 @@
       } else if (activeView === 'sessions' && !sessionRows.length) {
         render();
         await loadSessions({ reset: true });
+      } else if (activeView === 'threads' && threadReadModelEligible() && !threadRows.length) {
+        render();
+        await loadThreads({ reset: true });
       } else {
         render();
       }
@@ -1700,10 +2015,25 @@
           }
           return;
         }
+        if (activeView === 'threads' && threadReadModelEligible()) {
+          if (threadsHasMore) {
+            loadThreads();
+          } else {
+            render();
+          }
+          return;
+        }
         currentPage += 1;
         render();
       },
       incrementThreadCallVisiblePage: key => {
+        if (activeView === 'threads' && threadReadModelEligible()) {
+          const childState = threadCallsByKey.get(key);
+          if (!childState || childState.hasMore) {
+            loadThreadCalls(key);
+            return;
+          }
+        }
         threadCallVisiblePages.set(key, Math.max(1, threadCallVisiblePages.get(key) || 1) + 1);
       },
       insightsViewEl,
@@ -1732,6 +2062,7 @@
       setIncludeArchived: value => {
         includeArchived = Boolean(value);
         if (activeView === 'sessions') resetSessionRows();
+        if (activeView === 'threads') resetThreadRows();
       },
       setLanguage,
       setSessionFilter,
@@ -1778,6 +2109,8 @@
       scheduleAutoRefresh();
       if (needsInitialHistoryRefresh) {
         refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+      } else if (activeView === 'threads' && threadReadModelEligible()) {
+        loadThreads({ reset: true });
       } else if (rowsNeedHydration()) {
         hydrateDashboardRows();
       } else if (restoredAggregatePayloadFromCache) {

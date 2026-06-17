@@ -101,6 +101,52 @@ const helpers = context.window.CodexUsageDashboardLive;
     return json.loads(result.stdout)
 
 
+def _run_dashboard_tables_script(script: str) -> dict[str, object]:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for dashboard table helper tests")
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "dashboard_tables.js"
+    wrapped = f"""
+const fs = require('fs');
+const vm = require('vm');
+const code = fs.readFileSync({json.dumps(str(script_path))}, 'utf8');
+function fakeElement(tagName) {{
+  return {{
+    tagName,
+    attributes: {{}},
+    children: [],
+    className: '',
+    dataset: {{}},
+    hidden: false,
+    innerHTML: '',
+    textContent: '',
+    tabIndex: 0,
+    appendChild(child) {{ this.children.push(child); return child; }},
+    addEventListener() {{}},
+    setAttribute(name, value) {{ this.attributes[name] = String(value); }},
+  }};
+}}
+const context = {{
+  window: {{}},
+  document: {{
+    createElement: fakeElement,
+  }},
+}};
+vm.createContext(context);
+vm.runInContext(code, context);
+const helpers = context.window.CodexUsageDashboardTables;
+{script}
+"""
+    result = subprocess.run(
+        [node, "-e", wrapped],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
 def test_compact_number_collapses_billion_scale_values() -> None:
     payload = _run_dashboard_format_script(
         """
@@ -229,6 +275,195 @@ console.log(JSON.stringify({
     assert len(payload["requestUrls"]) == 2
     assert all(not url.startswith("/api/usage?") for url in payload["requestUrls"])
     assert payload["appliedPayloads"][0]["appendRows"] is True
+
+
+def test_live_refresh_threads_uses_thread_read_model_refresh() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let requestUrls = [];
+let refreshThreadsCalls = 0;
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      row_counts: { scoped_rows: 3 },
+      refresh_result: {
+        skipped_downstream_work: false,
+        inserted_records: 1,
+        deleted_records: 0,
+        full_reparse_source_files: 0,
+      },
+      observed_usage: { available: true },
+    }),
+  };
+};
+const runtime = helpers.create({
+  activeView: () => 'threads',
+  apiToken: () => 'token',
+  applyDashboardPayload: () => {},
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => [],
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 2,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  refreshThreads: () => { refreshThreadsCalls += 1; },
+  render: () => {},
+  resetRowsForHydration: () => {},
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  threadsUseReadModel: () => true,
+  updateLiveStatus: () => {},
+});
+await runtime.refreshDashboardIfStale();
+console.log(JSON.stringify({
+  requestUrls,
+  refreshThreadsCalls,
+  rowsNeedHydration: runtime.rowsNeedHydration(),
+}));
+"""
+    )
+
+    assert len(payload["requestUrls"]) == 1
+    assert payload["requestUrls"][0].startswith("/api/status?")
+    assert payload["refreshThreadsCalls"] == 1
+    assert payload["rowsNeedHydration"] is False
+    assert all(not url.startswith("/api/calls?") for url in payload["requestUrls"])
+    assert all(not url.startswith("/api/usage?") for url in payload["requestUrls"])
+
+
+def test_thread_read_model_renderer_uses_server_paged_rows() -> None:
+    payload = _run_dashboard_tables_script(
+        """
+const rowsEl = fakeElement('tbody');
+const capturedPages = [];
+const expandedThreads = new Set(['thread-a']);
+const runtime = helpers.create({
+  activePresetDefinition: () => null,
+  callInitiatorCell: () => 'User',
+  cachedTokenCell: row => String(row.cached_input_tokens || 0),
+  costUsageCell: value => String(value),
+  dateCaptionPrefix: () => '',
+  effortCell: value => String(value || ''),
+  ensurePendingFocusVisibleInGroups: () => {},
+  ensurePendingFocusVisibleInRows: () => {},
+  escapeHtml: value => String(value ?? ''),
+  expandedThreads,
+  getActiveView: () => 'threads',
+  getInitialDetailApplied: () => true,
+  getInitialThreadExpansionApplied: () => true,
+  getPricingConfigured: () => true,
+  getSelectedRecordId: () => '',
+  getSelectedThreadKey: () => '',
+  getSessionFilter: () => '',
+  getSortDirection: () => 'desc',
+  getSortKey: () => 'time',
+  getThreadCallSortDirection: () => 'desc',
+  getThreadCallSortKey: () => 'time',
+  getThreadCallVisiblePages: () => new Map(),
+  groupThreads: rows => rows,
+  initialUrlParams: { get: () => null },
+  loadedRowsDescription: () => 'loaded',
+  moneyText: value => `$${value}`,
+  number: { format: value => String(value) },
+  outputTokenCell: row => String(row.output_tokens || 0),
+  pct: value => `${value}`,
+  renderTimeCell: value => String(value || ''),
+  renderWithState: () => {},
+  rowInvestigatorLink: (_row, html) => html,
+  rowThreadLabel: row => row.thread_name || '',
+  rowsEl,
+  rowsNeedHydration: () => false,
+  selectThread: () => {},
+  setInitialDetailApplied: () => {},
+  setInitialThreadExpansionApplied: () => {},
+  short: value => String(value || ''),
+  showDetail: () => {},
+  showThreadDetail: () => {},
+  sortedThreadCalls: calls => calls,
+  tableCaptionEl: { textContent: '', dataset: { sortDescription: 'Time descending' } },
+  tableColgroupEl: { innerHTML: '' },
+  tableHeadEl: { innerHTML: '' },
+  tableTitleEl: { textContent: '' },
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  threadCallPageSize: 1,
+  threadInitiatorSummary: () => 'User',
+  toggleThread: () => {},
+  tokenNumberCell: value => String(value || 0),
+  tooltipAttributes: () => '',
+  totalTokenCell: row => String(row.total_tokens || 0),
+  translateEffort: value => String(value || ''),
+  truncate: value => String(value || ''),
+  uncachedTokenCell: row => String(row.uncached_input_tokens || 0),
+  updateLoadMoreControl: page => capturedPages.push(page),
+  usageImpactCell: () => '-',
+  usageCreditValue: () => 0,
+  visibleSlice: () => { throw new Error('server-paged thread render should not client-slice'); },
+});
+runtime.renderThreadGroups([
+  {
+    key: 'thread-a',
+    label: 'Thread A',
+    calls: [
+      { record_id: 'a', event_timestamp: '2026-06-01T00:00:02Z', model: 'gpt-5.5' },
+      { record_id: 'b', event_timestamp: '2026-06-01T00:00:01Z', model: 'gpt-5.5' },
+    ],
+    callsServerPaged: true,
+    callsTotal: 3,
+    callsHasMore: true,
+    callCount: 3,
+    latestActivity: '2026-06-01T00:00:02Z',
+    modelSummary: 'gpt-5.5',
+    effortSummary: 'high',
+    effortTooltip: 'high',
+    totalTokens: 10,
+    cachedTokens: 4,
+    uncachedTokens: 5,
+    outputTokens: 1,
+    reasoningOutputTokens: 0,
+    estimatedCost: 0.01,
+    usageCredits: 0.1,
+    cacheRatio: 0.4,
+    attentionScore: 1,
+  },
+], 'threads', { serverPaged: true, totalThreads: 2, totalCalls: 3 });
+console.log(JSON.stringify({
+  rowsRendered: rowsEl.children.length,
+  page: capturedPages[0],
+  childHtml: rowsEl.children[1].innerHTML,
+}));
+"""
+    )
+
+    assert payload["rowsRendered"] == 2
+    assert payload["page"]["end"] == 1
+    assert payload["page"]["total"] == 2
+    assert '"end":"2"' in payload["childHtml"]
+    assert '"total":"3"' in payload["childHtml"]
+    assert 'data-thread-load-more="thread-a"' in payload["childHtml"]
 
 
 def test_live_refresh_noop_with_row_count_change_hydrates_rows() -> None:

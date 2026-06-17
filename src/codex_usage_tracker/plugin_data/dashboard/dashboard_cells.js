@@ -98,6 +98,20 @@
     }
 
     function threadInitiatorSummary(group) {
+      if ((!group.calls || !group.calls.length) && group.callInitiatorSummary) {
+        const summary = String(group.callInitiatorSummary || 'unknown');
+        const meta = {
+          mostly_user: ['user', t('source.user')],
+          mostly_codex: ['codex', 'Codex'],
+          mixed: ['unknown', 'Mixed'],
+          unknown: ['unknown', t('state.unknown')],
+        }[summary] || ['unknown', t('state.unknown')];
+        return `
+          <div class="initiator-summary">
+            <span class="initiator-puck initiator-${escapeHtml(meta[0])}" ${tooltipAttributes(meta[1])}>${escapeHtml(meta[1])}</span>
+          </div>
+        `;
+      }
       const counts = (group.calls || []).reduce((acc, row) => {
         const key = callInitiator(row).key || 'unknown';
         acc[key] = (acc[key] || 0) + 1;

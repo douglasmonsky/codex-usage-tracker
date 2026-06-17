@@ -1228,23 +1228,11 @@ def query_thread_summaries(
 ) -> list[dict[str, Any]]:
     """Return materialized thread summaries for live dashboard APIs."""
 
-    clauses = ["is_archived_scope = ?"]
-    params: list[Any] = ["all-history" if include_archived else "active"]
-    if search:
-        like = f"%{search}%"
-        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
-        params.extend([like, like])
-    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
-    sort_map = {
-        "tokens": "total_tokens",
-        "time": "latest_event_timestamp",
-        "calls": "call_count",
-        "cache": "avg_cache_ratio",
-        "cost": "estimated_cost_usd",
-        "output": "output_tokens",
-        "reasoning": "reasoning_output_tokens",
-        "thread": "thread_label",
-    }
+    where_clause, params = _thread_summary_where_clause(
+        search=search,
+        include_archived=include_archived,
+    )
+    sort_map = _thread_summary_sort_map()
     if sort not in sort_map:
         allowed = ", ".join(sorted(sort_map))
         raise ValueError(f"sort must be one of: {allowed}")
@@ -1275,6 +1263,65 @@ def query_thread_summaries(
             query_params,
         )
         return [_row_to_dict(row) for row in rows]
+
+
+def query_thread_summary_count(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    search: str | None = None,
+    include_archived: bool = False,
+) -> int:
+    """Return count for materialized thread summaries in live dashboard APIs."""
+
+    where_clause, params = _thread_summary_where_clause(
+        search=search,
+        include_archived=include_archived,
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            f"SELECT COUNT(*) AS row_count FROM thread_summaries {where_clause}",
+            params,
+        ).fetchone()
+        return int(row["row_count"] if row is not None else 0)
+
+
+def _thread_summary_where_clause(
+    *,
+    search: str | None,
+    include_archived: bool,
+) -> tuple[str, list[Any]]:
+    clauses = ["is_archived_scope = ?"]
+    params: list[Any] = ["all-history" if include_archived else "active"]
+    if search:
+        like = f"%{search}%"
+        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
+        params.extend([like, like])
+    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
+    return where_clause, params
+
+
+def _thread_summary_sort_map() -> dict[str, str]:
+    return {
+        "attention": "max_recommendation_score",
+        "cached": "cached_input_tokens",
+        "context": "max_context_window_percent",
+        "initiator": "call_initiator_summary",
+        "model": "thread_label",
+        "tokens": "total_tokens",
+        "total": "total_tokens",
+        "time": "latest_event_timestamp",
+        "calls": "call_count",
+        "cache": "avg_cache_ratio",
+        "cost": "estimated_cost_usd",
+        "effort": "thread_label",
+        "output": "output_tokens",
+        "reasoning": "reasoning_output_tokens",
+        "thread": "thread_label",
+        "uncached": "uncached_input_tokens",
+        "usage": "usage_credits",
+        "usage_impact": "usage_credits",
+    }
 
 
 def query_most_expensive_calls(
