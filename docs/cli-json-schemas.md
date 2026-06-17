@@ -50,6 +50,7 @@ Tracked schema ids:
 | `codex-usage-tracker-usage-impact-estimate-v1` | Nested dashboard row `usage_impact.primary` and `usage_impact.secondary` estimate objects |
 | `codex-usage-tracker-sessions-v1` | CLI `sessions --json`, dashboard server `/api/sessions` response |
 | `codex-usage-tracker-work-session-v1` | Dashboard server `/api/session` response |
+| `codex-usage-tracker-context-epochs-v1` | Dashboard server `/api/context-epochs` response and nested `/api/session` context epochs |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
@@ -206,6 +207,7 @@ Dashboard API:
 
 - `/api/sessions`
 - `/api/session?work_session_id=<work-session-id>`
+- `/api/context-epochs?work_session_id=<work-session-id>`
 
 Schema: `codex-usage-tracker-sessions-v1`
 
@@ -227,11 +229,28 @@ Schema: `codex-usage-tracker-work-session-v1`
 {
   "schema": "codex-usage-tracker-work-session-v1",
   "record": {},
+  "context_epochs": [],
   "raw_context_included": false
 }
 ```
 
 Rows are materialized from aggregate usage counters only. They group adjacent calls in the same resolved thread and split at cold-cache resume boundaries inferred from idle gaps, uncached input, and cache ratio. They do not contain prompts, assistant messages, tool output, or raw JSONL fragments.
+
+Schema: `codex-usage-tracker-context-epochs-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-context-epochs-v1",
+  "row_count": 1,
+  "rows": [],
+  "work_session_id": "work-session-123",
+  "limit": 100,
+  "offset": 0,
+  "raw_context_included": false
+}
+```
+
+Context epoch rows are aggregate segments inside a work session. A new epoch starts at the first call in a session or at a call labeled `post_compaction`. The rows expose token/cache totals, first-call post-compaction uncached spike, context pressure, and a coarse compaction effectiveness label. They do not store replacement history or raw context.
 
 ## Recommendations
 

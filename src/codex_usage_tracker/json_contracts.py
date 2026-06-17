@@ -151,6 +151,17 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
     "codex-usage-tracker-work-session-v1": {
         "required": {
             "record": (dict, NoneType),
+            "context_epochs": list,
+            "raw_context_included": bool,
+        }
+    },
+    "codex-usage-tracker-context-epochs-v1": {
+        "required": {
+            "row_count": int,
+            "rows": list,
+            "work_session_id": (str, NoneType),
+            "limit": (int, NoneType),
+            "offset": int,
             "raw_context_included": bool,
         }
     },

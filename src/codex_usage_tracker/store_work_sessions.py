@@ -82,12 +82,17 @@ def sessions_payload(
     }
 
 
-def work_session_payload(row: dict[str, Any] | None) -> dict[str, Any]:
+def work_session_payload(
+    row: dict[str, Any] | None,
+    *,
+    context_epochs: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Return the stable aggregate-only payload for one work session."""
 
     return {
         "schema": WORK_SESSION_SCHEMA_ID,
         "record": row,
+        "context_epochs": context_epochs or [],
         "raw_context_included": False,
     }
 

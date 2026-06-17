@@ -645,6 +645,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         work_session_payload = _read_json(
             f"{base_url}/api/session?work_session_id={urllib.parse.quote(work_session_id)}"
         )
+        context_epochs_payload = _read_json(
+            f"{base_url}/api/context-epochs?work_session_id={urllib.parse.quote(work_session_id)}"
+        )
         summary_payload = _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
         recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
         invalid_sort = _http_error_json(f"{base_url}/api/calls?sort=not-a-sort")
@@ -695,7 +698,16 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert work_session_payload["schema"] == "codex-usage-tracker-work-session-v1"
     _assert_contract(work_session_payload)
     assert work_session_payload["record"]["work_session_id"] == work_session_id
+    assert isinstance(work_session_payload["context_epochs"], list)
+    assert work_session_payload["context_epochs"]
     assert work_session_payload["raw_context_included"] is False
+
+    assert context_epochs_payload["schema"] == "codex-usage-tracker-context-epochs-v1"
+    _assert_contract(context_epochs_payload)
+    assert context_epochs_payload["work_session_id"] == work_session_id
+    assert context_epochs_payload["row_count"] >= 1
+    assert context_epochs_payload["rows"][0]["work_session_id"] == work_session_id
+    assert context_epochs_payload["raw_context_included"] is False
 
     assert summary_payload["schema"] == "codex-usage-tracker-summary-v1"
     _assert_contract(summary_payload)
@@ -714,6 +726,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
             thread_calls_payload,
             sessions_payload,
             work_session_payload,
+            context_epochs_payload,
             summary_payload,
             recommendations_payload,
         ]

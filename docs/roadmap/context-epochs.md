@@ -78,7 +78,7 @@ Add `thread_context_epochs`:
 - [x] M0: Add context epochs checklist.
 - [x] M1: Add context epoch schema.
 - [x] M2: Build epochs from work sessions.
-- [ ] M3: Add epoch query/API payload support.
+- [x] M3: Add epoch query/API payload support.
 - [ ] M4: Add Sessions dashboard epoch expansion.
 - [ ] M5: Add compaction effectiveness heuristics.
 - [ ] M6: Add tests/docs and run validation.

@@ -68,6 +68,10 @@ from codex_usage_tracker.store import (
     refresh_metadata,
     refresh_usage_index,
 )
+from codex_usage_tracker.store_context_epochs import (
+    context_epochs_payload,
+    query_context_epochs,
+)
 from codex_usage_tracker.store_work_sessions import (
     query_thread_work_session,
     query_thread_work_sessions,
@@ -316,6 +320,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/session":
             self._handle_work_session(parsed.query)
+            return
+        if parsed.path == "/api/context-epochs":
+            self._handle_context_epochs(parsed.query)
             return
         if parsed.path == "/api/threads":
             self._handle_threads(parsed.query)
@@ -841,7 +848,56 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if row is None:
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "No thread work session found"})
             return
-        self._send_json(HTTPStatus.OK, work_session_payload(row))
+        try:
+            context_epochs = query_context_epochs(
+                db_path=self._db_path,
+                work_session_id=str(row.get("work_session_id") or ""),
+                limit=0,
+                sort="started",
+                direction="asc",
+            )
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading session context epochs: {exc}"},
+            )
+            return
+        self._send_json(HTTPStatus.OK, work_session_payload(row, context_epochs=context_epochs))
+
+    def _handle_context_epochs(self, query: str) -> None:
+        params = parse_qs(query)
+        try:
+            limit = _parse_api_limit(_first(params.get("limit")), 100)
+            offset = _parse_api_offset(_first(params.get("offset")))
+            work_session_id = _first(params.get("work_session_id")) or _first(params.get("session"))
+            thread_key = _first(params.get("thread_key")) or _first(params.get("thread"))
+            rows = query_context_epochs(
+                db_path=self._db_path,
+                work_session_id=work_session_id,
+                thread_key=thread_key,
+                limit=limit,
+                offset=offset,
+                sort=_first(params.get("sort")) or "started",
+                direction=_first(params.get("direction")) or "asc",
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading context epochs: {exc}"},
+            )
+            return
+        self._send_json(
+            HTTPStatus.OK,
+            context_epochs_payload(
+                rows,
+                work_session_id=work_session_id,
+                limit=limit,
+                offset=offset,
+            ),
+        )
 
     def _handle_threads(self, query: str) -> None:
         params = parse_qs(query)
