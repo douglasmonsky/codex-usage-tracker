@@ -344,11 +344,20 @@
                   ${callMetricCard(t('metric.uncached_input'), number.format(uncachedInputTokens(row)), t('call.exact_label'))}
                   ${callMetricCard(t('metric.output'), number.format(outputTokens(row)), t('metric.reasoning_output'))}
                   ${callMetricCard(t('table.initiated'), callInitiatorText(row), t('call.exact_label'))}
-                  ${callMetricCard(t('table.usage_impact'), usageImpactValue(row, 'secondary'), usageImpactSubtitle(row, 'secondary'))}
-                  ${callMetricCard('5h', usageImpactValue(row, 'primary'), usageImpactSubtitle(row, 'primary'))}
                   ${callMetricCard(t('metric.estimated_cost'), moneyText(row.estimated_cost_usd), pricingStatusText(row))}
                   ${callMetricCard(t('metric.codex_credits'), creditsText(usageCreditValue(row)), usageCreditStatusLabel(row), usageCreditsWithStatus(row))}
                 </div>
+              </section>
+              <section class="call-diagnostic-section usage-impact">
+                <div class="section-heading compact">
+                  <h3>${escapeHtml(t('detail.allowance_impact'))}</h3>
+                  <span class="evidence-chip derived">${escapeHtml(t('call.derived_label'))}</span>
+                </div>
+                <div class="call-metric-grid">
+                  ${callMetricCard(t('table.usage_impact'), usageImpactValue(row, 'secondary'), usageImpactSubtitle(row, 'secondary'))}
+                  ${callMetricCard('5h', usageImpactValue(row, 'primary'), usageImpactSubtitle(row, 'primary'))}
+                </div>
+                <p class="muted">${escapeHtml(t('allowance.observed_source_hint'))}</p>
               </section>
               ${renderAggregateMetadata(row)}
               <section class="call-diagnostic-section delta">
