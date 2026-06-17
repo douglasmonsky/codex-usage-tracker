@@ -57,6 +57,10 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
     reset_usage_database,
 )
+from codex_usage_tracker.store_task_receipts import (
+    query_task_receipts,
+    task_receipts_payload,
+)
 from codex_usage_tracker.store_work_sessions import (
     query_thread_work_sessions,
     sessions_payload,
@@ -407,6 +411,40 @@ def _run_usage_impact(args: argparse.Namespace) -> int:
         print(
             f"{row['record_id']} {label}: {estimate_text} "
             f"({row['status']}, {row['confidence']})"
+        )
+    return 0
+
+
+def _run_task_receipts(args: argparse.Namespace) -> int:
+    limit = None if args.limit <= 0 else args.limit
+    rows = query_task_receipts(
+        db_path=args.db,
+        record_id=args.record_id,
+        thread_key=args.thread_key,
+        work_session_id=args.work_session_id,
+        context_epoch_id=args.context_epoch_id,
+        category=args.category,
+        limit=limit,
+        offset=args.offset,
+        sort=args.sort,
+        direction=args.direction,
+    )
+    payload = task_receipts_payload(
+        rows,
+        record_id=args.record_id,
+        limit=limit,
+        offset=args.offset,
+    )
+    if args.as_json:
+        _print_json(payload)
+        return 0
+    if not rows:
+        print("No task receipt signal rows found.")
+        return 0
+    for row in rows:
+        print(
+            f"{row['record_id']} {row['receipt_category']} "
+            f"({row['receipt_confidence']}, {row['event_count']} events)"
         )
     return 0
 
@@ -889,6 +927,7 @@ _COMMAND_HANDLERS = {
     "summary": _run_summary,
     "query": _run_query,
     "usage-impact": _run_usage_impact,
+    "task-receipts": _run_task_receipts,
     "sessions": _run_sessions,
     "recommendations": _run_recommendations,
     "session": _run_session,

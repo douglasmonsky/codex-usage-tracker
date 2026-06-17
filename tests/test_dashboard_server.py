@@ -6,6 +6,7 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import replace
 from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -23,6 +24,7 @@ from store_dashboard_helpers import (
 )
 
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
+from codex_usage_tracker.models import TaskReceiptSignal
 from codex_usage_tracker.store import (
     connect,
     query_dashboard_events,
@@ -351,6 +353,79 @@ def test_dashboard_server_exposes_usage_impact_read_model(tmp_path: Path) -> Non
     assert "usage_impact" in call_payload
     assert call_payload["usage_impact"]["schema"] == "codex-usage-tracker-usage-impact-v1"
     assert "SECRET RAW PROMPT" not in json.dumps(impact_payload)
+
+
+def test_dashboard_server_exposes_task_receipt_read_model(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    db_path = tmp_path / "usage.sqlite3"
+    event = replace(
+        _usage_event(
+            record_id="receipt-target",
+            session_id=SESSION_ID,
+            thread_key="thread:Receipt API",
+            event_timestamp="2026-06-15T12:15:00Z",
+            cumulative_total_tokens=1000,
+        ),
+        task_receipt_signals=(
+            TaskReceiptSignal(
+                category="patch_applied",
+                confidence="high",
+                event_count=1,
+                first_event_timestamp="2026-06-15T12:14:00Z",
+                last_event_timestamp="2026-06-15T12:14:00Z",
+                first_source_line=10,
+                last_source_line=10,
+                evidence_scope="between_calls",
+                reason="patch_apply_end",
+            ),
+        ),
+    )
+    upsert_usage_events([event], db_path=db_path)
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        receipt_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/task-receipts?record_id=receipt-target"
+        )
+        call_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/call?record_id=receipt-target"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert receipt_payload["schema"] == "codex-usage-tracker-task-receipts-v1"
+    assert receipt_payload["record_id"] == "receipt-target"
+    assert receipt_payload["raw_context_included"] is False
+    assert receipt_payload["rows"][0]["receipt_category"] == "patch_applied"
+    assert "task_receipts" in call_payload
+    assert call_payload["task_receipts"]["schema"] == "codex-usage-tracker-task-receipts-v1"
+    assert call_payload["task_receipts"]["rows"][0]["receipt_confidence"] == "high"
+    assert "SECRET RAW PROMPT" not in json.dumps(receipt_payload)
+    _assert_contract(receipt_payload)
+    _assert_contract(call_payload["task_receipts"])
 
 
 def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Path) -> None:

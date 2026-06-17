@@ -33,10 +33,13 @@ V1 categories should be conservative and derived from stable event envelopes:
 
 - `patch_applied`: a patch/application event occurred.
 - `tool_activity`: one or more tool/MCP/function-call completion events occurred.
-- `user_confirmed`: a user message follows the work and may confirm next intent or completion.
 - `task_complete`: an explicit task completion event occurred if Codex emits one.
-- `no_receipt`: no durable-output-like signal is visible near the call.
 - `unknown`: event shape is known too weakly to classify.
+
+Deferred categories need more product design before they should appear in the read model:
+
+- `user_confirmed`: a user message follows the work and may confirm next intent or completion.
+- `no_receipt`: no durable-output-like signal is visible near the call.
 
 These categories are signals, not proof of correctness.
 
@@ -94,14 +97,14 @@ Indexes:
 ## Implementation Checklist
 
 - [x] M0: Add this roadmap/checklist before implementation.
-- [ ] M1: Audit available safe event envelopes and classify V1 receipt categories.
-- [ ] M2: Add task receipt schema, migration, indexes, and repair behavior.
-- [ ] M3: Add aggregate-only parser/store receipt collection.
-- [ ] M4: Materialize task receipts incrementally from affected refresh deltas.
-- [ ] M5: Expose CLI/API/JSON contracts.
-- [ ] M6: Add compact dashboard investigator/session/epoch receipt signals.
-- [ ] M7: Add parser, migration, refresh, JSON contract, dashboard, and privacy tests.
-- [ ] M8: Run validation and benchmarks.
+- [x] M1: Audit available safe event envelopes and classify V1 receipt categories.
+- [x] M2: Add task receipt schema, migration, indexes, and repair behavior.
+- [x] M3: Add aggregate-only parser/store receipt collection.
+- [x] M4: Materialize task receipts incrementally from affected refresh deltas.
+- [x] M5: Expose CLI/API/JSON contracts.
+- [x] M6: Add compact dashboard investigator receipt signals and session/epoch filter-ready API fields.
+- [x] M7: Add parser, migration, refresh, JSON contract, dashboard, and privacy tests.
+- [x] M8: Run validation and benchmarks.
 - [ ] M9: Commit, push, and open the branch PR without merging to `main`.
 
 ## Tests

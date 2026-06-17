@@ -1932,7 +1932,7 @@
       const normalizedRecordId = recordId || '';
       if (!liveRefreshSupported || !normalizedRecordId || !apiToken) return null;
       const existing = rowByRecordId.get(normalizedRecordId);
-      if (existing) return existing;
+      if (existing && Object.prototype.hasOwnProperty.call(existing, 'task_receipts')) return existing;
       if (callFetchInFlightByRecordId.has(normalizedRecordId)) return null;
       callFetchInFlightByRecordId.add(normalizedRecordId);
       try {
@@ -1947,6 +1947,7 @@
         if (!response.ok) return null;
         const payload = await response.json();
         if (!payload?.record?.record_id) return null;
+        payload.record.task_receipts = payload.task_receipts || { rows: [] };
         const adjacentRecords = Array.isArray(payload.adjacent_records) && payload.adjacent_records.length
           ? payload.adjacent_records
           : [payload.previous_record, payload.record, payload.next_record].filter(Boolean);

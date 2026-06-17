@@ -26,6 +26,7 @@ STABLE_CLI_COMMANDS = {
     "summary",
     "query",
     "usage-impact",
+    "task-receipts",
     "sessions",
     "recommendations",
     "session",

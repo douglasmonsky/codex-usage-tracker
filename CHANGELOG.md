@@ -8,6 +8,9 @@
 - Warm usage-impact estimates only for pending/stale affected records after live
   refreshes, and keep investigator allowance-impact estimates separate from
   exact token accounting.
+- Add aggregate-only task receipt signals, including parser-state carryover,
+  SQLite read-model materialization, CLI/API JSON surfaces, and compact call
+  investigator receipt chips without persisting raw transcript or tool content.
 
 ## 0.6.1 - 2026-06-13
 

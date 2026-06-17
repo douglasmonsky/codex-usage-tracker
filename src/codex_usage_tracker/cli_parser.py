@@ -70,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_summary_parser(subparsers)
     _add_query_parser(subparsers)
     _add_usage_impact_parser(subparsers)
+    _add_task_receipts_parser(subparsers)
     _add_sessions_parser(subparsers)
     _add_recommendations_parser(subparsers)
     _add_session_parser(subparsers)
@@ -296,6 +297,34 @@ def _add_usage_impact_parser(
         help="Read the current table without rebuilding estimates first.",
     )
     usage_impact.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_task_receipts_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    task_receipts = subparsers.add_parser(
+        "task-receipts",
+        help="Show aggregate-only durable-output receipt signal rows",
+    )
+    task_receipts.add_argument("--record-id", help="Only include one aggregate usage record")
+    task_receipts.add_argument("--thread-key", help="Only include one resolved thread key")
+    task_receipts.add_argument("--work-session-id", help="Only include one work session")
+    task_receipts.add_argument("--context-epoch-id", help="Only include one context epoch")
+    task_receipts.add_argument("--category", help="Only include one receipt category")
+    task_receipts.add_argument(
+        "--sort",
+        choices=("latest", "first", "category", "confidence", "count", "record"),
+        default="latest",
+    )
+    task_receipts.add_argument("--direction", choices=("asc", "desc"), default="desc")
+    task_receipts.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Maximum receipt rows to return; use 0 for all",
+    )
+    task_receipts.add_argument("--offset", type=int, default=0)
+    task_receipts.add_argument("--json", action="store_true", dest="as_json")
 
 
 def _add_sessions_parser(

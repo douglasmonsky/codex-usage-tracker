@@ -191,6 +191,61 @@ def test_parser_persists_source_byte_offsets_without_raw_text(tmp_path: Path) ->
     assert "SECRET RAW PROMPT" not in json.dumps(event.to_row())
 
 
+def test_parser_carries_task_receipt_signals_across_append_state_without_raw_text(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    prefix_rows = [
+        _entry("session_meta", {"id": SESSION_ID}),
+        _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+        _entry(
+            "event_msg",
+            {
+                "type": "patch_apply_end",
+                "diff": "SECRET PATCH CONTENT",
+            },
+        ),
+        _entry(
+            "response_item",
+            {
+                "type": "function_call_output",
+                "output": "SECRET TOOL OUTPUT",
+            },
+        ),
+    ]
+    _write_jsonl(log_path, prefix_rows)
+
+    prefix = parse_usage_events_from_file_with_state(log_path, {})
+    prefix_state_json = parser_state_to_json(prefix.state)
+    prefix_size = log_path.stat().st_size
+
+    assert prefix.events == []
+    assert "patch_applied" in prefix_state_json
+    assert "tool_activity" in prefix_state_json
+    assert "SECRET" not in prefix_state_json
+
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(_token_event(100, 100)) + "\n")
+
+    appended = parse_usage_events_from_file_with_state(
+        log_path,
+        {},
+        start_byte=prefix_size,
+        start_line=prefix.parsed_until_line,
+        initial_state=parser_state_from_json(prefix_state_json),
+    )
+
+    [event] = appended.events
+    assert [
+        (signal.category, signal.confidence, signal.event_count, signal.reason)
+        for signal in event.task_receipt_signals
+    ] == [
+        ("patch_applied", "high", 1, "patch_apply_end"),
+        ("tool_activity", "medium", 1, "function_call_output"),
+    ]
+    assert "SECRET" not in json.dumps(event.to_row())
+
+
 def test_parser_skips_corrupt_token_count_and_continues(tmp_path: Path) -> None:
     log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
     corrupt = _token_event(100, 100)

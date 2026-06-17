@@ -119,6 +119,16 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "raw_context_included": bool,
         }
     },
+    "codex-usage-tracker-task-receipts-v1": {
+        "required": {
+            "record_id": (str, NoneType),
+            "limit": (int, NoneType),
+            "offset": int,
+            "row_count": int,
+            "rows": list,
+            "raw_context_included": bool,
+        }
+    },
     "codex-usage-tracker-usage-impact-estimate-v1": {
         "required": {
             "label": (str, NoneType),

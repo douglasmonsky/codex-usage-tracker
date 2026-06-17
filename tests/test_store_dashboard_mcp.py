@@ -37,6 +37,7 @@ from codex_usage_tracker.store import (
     upsert_usage_events,
 )
 from codex_usage_tracker.store_query_sql import _thread_key_expression
+from codex_usage_tracker.store_task_receipts import query_task_receipts
 
 
 def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
@@ -81,10 +82,10 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == PARSER_ADAPTER_VERSION
-    assert meta["schema_version"] == "12"
+    assert meta["schema_version"] == "13"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 12
+    assert state["schema_version"] == 13
     assert state["checksum_matches"] is True
     assert [row["version"] for row in state["migrations"]] == [
         1,
@@ -99,6 +100,7 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
         10,
         11,
         12,
+        13,
     ]
     with connect(db_path) as conn:
         init_db(conn)
@@ -142,6 +144,7 @@ def test_noop_refresh_skips_parser_upsert_and_downstream_rebuilds(
     monkeypatch.setattr(store_module, "refresh_usage_event_links_for_threads", fail_if_called)
     monkeypatch.setattr(store_module, "rebuild_thread_summaries", fail_if_called)
     monkeypatch.setattr(store_module, "rebuild_thread_work_sessions", fail_if_called)
+    monkeypatch.setattr(store_module, "replace_task_receipts_for_events", fail_if_called)
     monkeypatch.setattr(store_module, "invalidate_usage_impact_for_delta", fail_if_called)
 
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
@@ -524,6 +527,7 @@ def test_full_reparse_invalidates_old_and_new_thread_summaries(tmp_path: Path) -
         [
             _entry("session_meta", {"id": session_id}),
             _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry("event_msg", {"type": "patch_apply_end", "diff": "SECRET PATCH"}),
             _token_event(100, 100),
         ],
     )
@@ -540,6 +544,14 @@ def test_full_reparse_invalidates_old_and_new_thread_summaries(tmp_path: Path) -
             }
         ],
     )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+        ],
+    )
     with connect(db_path) as conn:
         init_db(conn)
         conn.execute(
@@ -547,9 +559,12 @@ def test_full_reparse_invalidates_old_and_new_thread_summaries(tmp_path: Path) -
             ("codex-jsonl-v1", str(log_path)),
         )
 
+    assert query_task_receipts(db_path=db_path, limit=0)[0]["receipt_category"] == "patch_applied"
+
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     summaries = query_thread_summaries(db_path=db_path, limit=0)
     summary_keys = {row["thread_key"] for row in summaries}
+    receipts = query_task_receipts(db_path=db_path, limit=0)
 
     assert first.parsed_events == 1
     assert second.parsed_events == 1
@@ -562,6 +577,7 @@ def test_full_reparse_invalidates_old_and_new_thread_summaries(tmp_path: Path) -
     assert second.skipped_downstream_work is False
     assert "thread:Original thread" not in summary_keys
     assert "thread:Replacement thread" in summary_keys
+    assert receipts == []
 
 
 def test_append_cursor_preserves_pending_call_origin_between_refreshes(
@@ -631,6 +647,75 @@ def test_append_cursor_preserves_pending_call_origin_between_refreshes(
     assert "SECRET PENDING USER TEXT" not in source_rows_text
 
 
+def test_refresh_materializes_task_receipts_without_raw_content(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c003"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T19-10-00-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Task receipt thread",
+                "updated_at": "2026-05-17T19:10:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "event_msg",
+                {
+                    "type": "patch_apply_end",
+                    "diff": "SECRET PATCH CONTENT",
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "output": "SECRET TOOL OUTPUT",
+                },
+            ),
+            _token_event(100, 100),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    rows = query_session_usage(db_path=db_path, session_id=session_id)
+    receipts = query_task_receipts(
+        db_path=db_path,
+        record_id=rows[0]["record_id"],
+        limit=0,
+        sort="category",
+        direction="asc",
+    )
+
+    assert result.parsed_events == 1
+    assert [
+        (row["receipt_category"], row["receipt_confidence"], row["event_count"], row["reason"])
+        for row in receipts
+    ] == [
+        ("patch_applied", "high", 1, "patch_apply_end"),
+        ("tool_activity", "medium", 1, "function_call_output"),
+    ]
+    assert {row["thread_key"] for row in receipts} == {"thread:Task receipt thread"}
+    assert all(row["work_session_id"] for row in receipts)
+    assert all(row["context_epoch_id"] for row in receipts)
+    assert "SECRET" not in json.dumps(receipts)
+
+
 def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     with connect(db_path) as conn:
@@ -641,7 +726,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 12
+    assert user_version == 13
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -712,7 +797,7 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
     assert "idx_usage_observed_rate_limit_timestamp" in indexes
-    assert user_version == 12
+    assert user_version == 13
     assert [row["version"] for row in migrations] == [
         1,
         2,
@@ -726,6 +811,7 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
         10,
         11,
         12,
+        13,
     ]
 
 

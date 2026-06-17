@@ -48,6 +48,10 @@ from codex_usage_tracker.store_sources import (
     source_logs_requiring_parse,
     upsert_source_file_metadata,
 )
+from codex_usage_tracker.store_task_receipts import (
+    delete_task_receipts_for_record_ids,
+    replace_task_receipts_for_events,
+)
 from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
 from codex_usage_tracker.store_work_sessions import rebuild_thread_work_sessions
 from codex_usage_tracker.usage_impact_store import invalidate_usage_impact_for_delta
@@ -211,7 +215,9 @@ def rebuild_usage_index(
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM thread_work_sessions")
+        conn.execute("DELETE FROM thread_context_epochs")
         conn.execute("DELETE FROM usage_impact")
+        conn.execute("DELETE FROM task_receipts")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
     return refresh_usage_index(
@@ -231,7 +237,9 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM thread_work_sessions")
+        conn.execute("DELETE FROM thread_context_epochs")
         conn.execute("DELETE FROM usage_impact")
+        conn.execute("DELETE FROM task_receipts")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
@@ -419,7 +427,8 @@ def _upsert_usage_events_with_delta(
     refresh_links: bool = True,
     replace_source_files: Iterable[Path] | None = None,
 ) -> UpsertDelta:
-    rows = [event.to_row() for event in events]
+    event_list = list(events)
+    rows = [event.to_row() for event in event_list]
     source_files_to_replace = [str(path) for path in replace_source_files or []]
     delta = UpsertDelta(
         inserted_or_updated_count=len(rows),
@@ -445,6 +454,7 @@ def _upsert_usage_events_with_delta(
                 source_files_to_replace,
             ).fetchall()
             delta.deleted_record_ids.update(str(row["record_id"]) for row in old_rows)
+            delete_task_receipts_for_record_ids(conn, delta.deleted_record_ids)
             delta.affected_thread_keys.update(
                 key
                 for row in old_rows
@@ -493,6 +503,7 @@ def _upsert_usage_events_with_delta(
             rebuild_thread_summaries(conn, thread_keys=delta.affected_thread_keys)
             rebuild_thread_work_sessions(conn, thread_keys=delta.affected_thread_keys)
             rebuild_thread_context_epochs(conn, thread_keys=delta.affected_thread_keys)
+            replace_task_receipts_for_events(conn, event_list)
             invalidate_usage_impact_for_delta(
                 conn,
                 inserted_record_ids=delta.inserted_record_ids,
@@ -502,6 +513,7 @@ def _upsert_usage_events_with_delta(
             )
             delta.skipped_downstream_work = False
         else:
+            replace_task_receipts_for_events(conn, event_list)
             delta.skipped_downstream_work = True
         return delta
 

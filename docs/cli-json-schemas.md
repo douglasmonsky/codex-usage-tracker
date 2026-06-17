@@ -47,6 +47,7 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-usage-impact-v1` | CLI `usage-impact --json`, dashboard server `/api/usage-impact`, `/api/call` usage-impact payload |
+| `codex-usage-tracker-task-receipts-v1` | CLI `task-receipts --json`, dashboard server `/api/task-receipts`, `/api/call` task receipt payload |
 | `codex-usage-tracker-usage-impact-estimate-v1` | Nested dashboard row `usage_impact.primary` and `usage_impact.secondary` estimate objects |
 | `codex-usage-tracker-sessions-v1` | CLI `sessions --json`, dashboard server `/api/sessions` response |
 | `codex-usage-tracker-work-session-v1` | Dashboard server `/api/session` response |
@@ -194,6 +195,38 @@ Schema: `codex-usage-tracker-usage-impact-v1`
 ```
 
 Rows are derived from local observed Codex usage snapshots and the configured/local Codex credit estimate. They are useful for comparing likely per-call allowance movement, but they are not exact billing data and may exclude usage outside local Codex logs.
+
+## Task Receipts
+
+Command:
+
+```bash
+codex-usage-tracker task-receipts --record-id <record-id> --json
+```
+
+Dashboard API:
+
+- `/api/task-receipts?record_id=<record-id>`
+- `/api/call?record_id=<record-id>` includes a nested `task_receipts` payload
+
+Schema: `codex-usage-tracker-task-receipts-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-task-receipts-v1",
+  "record_id": "record-123",
+  "limit": 100,
+  "offset": 0,
+  "row_count": 0,
+  "rows": [],
+  "raw_context_included": false
+}
+```
+
+Rows contain aggregate-only durable-output receipt signals such as `patch_applied`,
+`tool_activity`, or `task_complete`. They do not include prompts, assistant messages,
+tool output, patch text, command text, raw JSONL fragments, or reconstructed transcript
+content.
 
 ## Thread Work Sessions
 

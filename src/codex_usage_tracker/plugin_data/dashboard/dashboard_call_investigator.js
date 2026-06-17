@@ -259,6 +259,49 @@
       `;
     }
 
+    function receiptRows(row) {
+      if (!row || !row.task_receipts) return [];
+      if (Array.isArray(row.task_receipts)) return row.task_receipts;
+      if (Array.isArray(row.task_receipts.rows)) return row.task_receipts.rows;
+      return [];
+    }
+
+    function receiptCategoryLabel(value) {
+      return String(value || 'unknown')
+        .split('_')
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ') || 'Unknown';
+    }
+
+    function renderTaskReceiptSignals(row) {
+      const receipts = receiptRows(row);
+      if (!receipts.length) return '';
+      return `
+        <section class="call-diagnostic-section receipts">
+          <div class="section-heading compact">
+            <h3>${escapeHtml('Task receipt signals')}</h3>
+            <span class="evidence-chip derived">${escapeHtml('Aggregate metadata')}</span>
+          </div>
+          <div class="call-metric-grid">
+            ${receipts.map(receipt => {
+              const count = Number(receipt.event_count || 0);
+              const subtitle = [
+                receipt.receipt_confidence ? `${receipt.receipt_confidence} confidence` : '',
+                receipt.reason || '',
+                receipt.evidence_scope || '',
+              ].filter(Boolean).join(' · ');
+              return callMetricCard(
+                receiptCategoryLabel(receipt.receipt_category),
+                `${number.format(Number.isFinite(count) ? count : 0)} events`,
+                subtitle || t('state.unknown'),
+              );
+            }).join('')}
+          </div>
+        </section>
+      `;
+    }
+
     function renderCallNavigation(row, previous, next) {
       const backUrl = tableUrlForRow(row);
       const previousRecordId = previous?.record_id || row.previous_record_id || '';
@@ -300,6 +343,13 @@
         return;
       }
       setSelectedRecordId(row.record_id || getSelectedRecordId());
+      if (
+        row?.record_id
+        && fetchCallRecord
+        && !Object.prototype.hasOwnProperty.call(row, 'task_receipts')
+      ) {
+        fetchCallRecord(row.record_id);
+      }
       const { calls, index, previous, next } = adjacentCalls(row);
       const diagnostic = cacheDiagnostic(row, previous);
       const threadLabel = rowThreadLabel(row);
@@ -359,6 +409,7 @@
                 </div>
                 <p class="muted">${escapeHtml(t('allowance.observed_source_hint'))}</p>
               </section>
+              ${renderTaskReceiptSignals(row)}
               ${renderAggregateMetadata(row)}
               <section class="call-diagnostic-section delta">
                 <div class="section-heading compact">

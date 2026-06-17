@@ -17,6 +17,21 @@ class SessionInfo:
 
 
 @dataclass(frozen=True)
+class TaskReceiptSignal:
+    """Aggregate-only signal that a call is near durable task activity."""
+
+    category: str
+    confidence: str
+    event_count: int
+    first_event_timestamp: str | None
+    last_event_timestamp: str | None
+    first_source_line: int | None
+    last_source_line: int | None
+    evidence_scope: str
+    reason: str | None
+
+
+@dataclass(frozen=True)
 class UsageEvent:
     """One aggregate token-count event from a Codex session log."""
 
@@ -72,6 +87,7 @@ class UsageEvent:
     source_byte_end: int | None = None
     turn_start_line: int | None = None
     turn_start_byte: int | None = None
+    task_receipt_signals: tuple[TaskReceiptSignal, ...] = ()
 
     @property
     def uncached_input_tokens(self) -> int:
