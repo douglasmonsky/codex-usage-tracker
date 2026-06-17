@@ -65,6 +65,10 @@ Threads view groups related calls so long chats, subagents, and auto-review pass
 
 ![Threads view with one expanded thread and its calls in chronological order.](docs/assets/dashboard-threads.png?v=readme-drilldown)
 
+Sessions view splits long threads into work windows so cold resumes, high-uncached periods, and handoff candidates are easier to spot before drilling into individual calls.
+
+![Sessions view showing cold-resume work sessions, cache misses, and session-level action cues.](docs/assets/dashboard-sessions.png?v=readme-070)
+
 Insights still gives a fast triage layer for costly threads, low cache reuse, context bloat, and pricing gaps.
 
 ![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=readme-drilldown)
@@ -137,12 +141,13 @@ codex-usage-tracker serve-dashboard --open
 Then:
 
 1. Leave `Live` enabled while working, or click `Refresh` after a Codex run finishes.
-2. Start in `Insights` and scan the `Needs Attention` cards.
+2. Start in `Calls` for newest-first model calls, or switch to `Insights` when you want a triage summary.
 3. Use `Time` presets or calendar fields to focus on today, this week, the last 7 days, this month, or a custom range.
 4. Use investigation presets for highest-cost threads, highest-credit calls, context bloat, cache misses, pricing gaps, or estimated-price review.
 5. Open `Threads` to see how a conversation grew and whether subagent or auto-review work attached to it.
-6. Hover or click rows to inspect aggregate fields in `Call Details`.
-7. Use `Show turn log evidence` only when aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
+6. Open `Sessions` to find cold resumes, high-uncached work windows, and handoff candidates.
+7. Hover or click rows to inspect aggregate fields in `Call Details`.
+8. Use `Show turn log evidence` only when aggregate fields are not enough; context is fetched on demand from the local source JSONL and is not saved into SQLite or the dashboard.
 
 Optional copied allowance fallback:
 
@@ -156,7 +161,7 @@ When Codex writes `token_count.rate_limits` snapshots to local JSONL logs, the d
 
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
-- `Insights`, `Calls`, and `Threads` dashboard views.
+- `Insights`, `Calls`, `Threads`, and `Sessions` dashboard views.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.

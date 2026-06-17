@@ -135,3 +135,5 @@ class RefreshResult:
     deleted_records: int = 0
     affected_threads: int = 0
     skipped_downstream_work: bool = False
+    refresh_workers: int = 1
+    parallel_parse_files: int = 0
