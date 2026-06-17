@@ -93,7 +93,7 @@ Recommendation copy must use "consider", "inspect", or "review"; never claim an 
 - [x] M5: Add call investigator lifecycle guidance UI.
 - [x] M6: Add tests for recommendation categories, scopes, contracts, dashboard payload, and privacy.
 - [x] M7: Run validation and benchmarks.
-- [ ] M8: Commit, push, and open the branch PR without merging to `main`.
+- [x] M8: Commit, push, and open the branch PR without merging to `main`.
 
 ## Tests
 
