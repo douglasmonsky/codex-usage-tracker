@@ -75,7 +75,7 @@ class UsageImpactCache:
             cached = self._cache.get(include_archived)
             if cached is not None and cached[0] == key:
                 return
-            if key in self._building:
+            if self._is_building_scope_locked(include_archived):
                 return
             self._building.add(key)
         thread = threading.Thread(
@@ -165,7 +165,7 @@ class UsageImpactCache:
             cached = self._cache.get(include_archived)
             if cached is not None and cached[0] == key:
                 return cached[1]
-            while key in self._building:
+            while self._is_building_scope_locked(include_archived):
                 if not block:
                     return None
                 self._condition.wait()
@@ -241,6 +241,9 @@ class UsageImpactCache:
             allowance=_file_signature(self._allowance_path),
             rate_card=_file_signature(self._rate_card_path),
         )
+
+    def _is_building_scope_locked(self, include_archived: bool) -> bool:
+        return any(key.include_archived == include_archived for key in self._building)
 
 
 def _file_signature(path: Path) -> _FileSignature:

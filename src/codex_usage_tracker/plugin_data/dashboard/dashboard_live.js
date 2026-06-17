@@ -40,6 +40,7 @@
     let refreshInFlight = false;
     let rowHydrationInFlight = false;
     let rowHydrationComplete = getData().length > 0;
+    let rowHydrationNextOffset = getData().length;
     let rowHydrationError = '';
     let rowHydrationGeneration = 0;
     let rowHydrationRestartRequested = false;
@@ -67,13 +68,13 @@
 
     function rowsNeedHydration() {
       const target = rowHydrationTarget();
-      return liveRefreshSupported && target > 0 && getData().length < target;
+      return liveRefreshSupported && !rowHydrationComplete && target > 0 && Math.max(getData().length, rowHydrationNextOffset) < target;
     }
 
     function updateRowLoadProgress() {
       if (!rowLoadProgressEl) return;
       const target = rowHydrationTarget();
-      const loaded = Math.min(getData().length, target || getData().length);
+      const loaded = Math.min(Math.max(getData().length, rowHydrationNextOffset), target || getData().length);
       const shouldShow = activeView() !== 'call' && liveRefreshSupported && (rowHydrationInFlight || rowsNeedHydration() || rowHydrationError);
       rowLoadProgressEl.hidden = !shouldShow;
       if (!shouldShow) return;
@@ -262,12 +263,14 @@
       const target = rowHydrationTarget();
       if (!target) {
         rowHydrationComplete = true;
+        rowHydrationNextOffset = 0;
         updateRowLoadProgress();
         return;
       }
       if (hydrateOptions.reset) {
         resetRowsForHydration();
         rowHydrationComplete = false;
+        rowHydrationNextOffset = 0;
         rowHydrationGeneration += 1;
         rebuildDashboardIndexes();
         rebuildFilterOptions();
@@ -275,6 +278,7 @@
       }
       if (getData().length >= target) {
         rowHydrationComplete = true;
+        rowHydrationNextOffset = Math.max(rowHydrationNextOffset, target);
         updateRowLoadProgress();
         return;
       }
@@ -282,12 +286,14 @@
       rowHydrationInFlight = true;
       rowHydrationError = '';
       let usageImpactPending = false;
+      let reachedEnd = false;
       updateLiveStatus('status.checking', t('live.loading_rows'));
       updateRowLoadProgress();
       try {
-        while (getData().length < target && generation === rowHydrationGeneration && activeView() !== 'call') {
-          const offset = getData().length;
+        while (Math.max(getData().length, rowHydrationNextOffset) < target && generation === rowHydrationGeneration && activeView() !== 'call') {
+          const offset = Math.max(0, rowHydrationNextOffset);
           const remaining = target - offset;
+          if (remaining <= 0) break;
           const chunkSize = Math.min(
             offset === 0 ? initialHydrationChunkSize : backgroundHydrationChunkSize,
             remaining,
@@ -296,12 +302,22 @@
           if (payload.usage_impact_pending) usageImpactPending = true;
           if (generation !== rowHydrationGeneration || activeView() === 'call') break;
           const rows = payloadRows(payload);
-          if (!rows.length) break;
+          if (!rows.length) {
+            reachedEnd = true;
+            break;
+          }
+          const nextOffset = Number(payload.next_offset);
+          rowHydrationNextOffset = Number.isFinite(nextOffset) && nextOffset > offset
+            ? nextOffset
+            : offset + rows.length;
           applyDashboardPayload(payload, { appendRows: true });
           updateRowLoadProgress();
-          if (!payload.has_more || rows.length < chunkSize) break;
+          if (!payload.has_more || rows.length < chunkSize) {
+            reachedEnd = true;
+            break;
+          }
         }
-        rowHydrationComplete = getData().length >= rowHydrationTarget();
+        rowHydrationComplete = reachedEnd || Math.max(getData().length, rowHydrationNextOffset) >= rowHydrationTarget();
         if (!usageImpactPending) usageImpactRetryAttempts = 0;
         updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
       } catch (error) {
@@ -405,6 +421,7 @@
           resetRowsForHydration();
           rowHydrationGeneration += 1;
           rowHydrationComplete = false;
+          rowHydrationNextOffset = 0;
         }
         applyDashboardPayload(nextPayload);
         if (activeView() !== 'call') hydrateDashboardRows({ reset: resetRows });

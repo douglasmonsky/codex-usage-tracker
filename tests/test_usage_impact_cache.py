@@ -151,6 +151,57 @@ def test_usage_impact_cache_can_return_pending_without_blocking(
     assert second[0]["usage_impact"]["primary"]["estimate_percent"] == 0.12
 
 
+def test_usage_impact_cache_warm_async_is_single_flight_per_history_scope(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from codex_usage_tracker import usage_impact_cache as cache_module
+
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    cache = UsageImpactCache(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+    )
+    signature = cache_module._FileSignature(path="missing", mtime_ns=None, size_bytes=None)
+    key_counter = 0
+
+    def changing_cache_key(*, include_archived: bool):
+        nonlocal key_counter
+        key_counter += 1
+        return cache_module._ImpactCacheKey(
+            include_archived=include_archived,
+            latest_refresh_at=f"refresh-{key_counter}",
+            scoped_rows=key_counter,
+            max_event_timestamp=f"2026-06-15T12:00:{key_counter:02d}Z",
+            pricing=signature,
+            allowance=signature,
+            rate_card=signature,
+        )
+
+    started_threads: list[object] = []
+
+    class FakeThread:
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+            started_threads.append(self)
+
+        def start(self) -> None:
+            return None
+
+    monkeypatch.setattr(cache, "_cache_key", changing_cache_key)
+    monkeypatch.setattr(cache_module.threading, "Thread", FakeThread)
+
+    cache.warm_async(include_archived=False)
+    cache.warm_async(include_archived=False)
+    cache.warm_async(include_archived=True)
+
+    assert len(started_threads) == 2
+
+
 def test_usage_impact_read_model_materializes_without_raw_content(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     replace_usage_impact_from_annotated_rows(
