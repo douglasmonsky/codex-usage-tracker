@@ -24,6 +24,7 @@
       rebuildDashboardIndexes,
       rebuildFilterOptions,
       refreshDashboardEl,
+      refreshSessions,
       render,
       resetRowsForHydration,
       rowLoadProgressBarEl,
@@ -75,7 +76,7 @@
       if (!rowLoadProgressEl) return;
       const target = rowHydrationTarget();
       const loaded = Math.min(Math.max(getData().length, rowHydrationNextOffset), target || getData().length);
-      const shouldShow = activeView() !== 'call' && liveRefreshSupported && (rowHydrationInFlight || rowsNeedHydration() || rowHydrationError);
+      const shouldShow = !['call', 'sessions'].includes(activeView()) && liveRefreshSupported && (rowHydrationInFlight || rowsNeedHydration() || rowHydrationError);
       rowLoadProgressEl.hidden = !shouldShow;
       if (!shouldShow) return;
       const totalText = number.format(target || getTotalAvailableRows() || loaded);
@@ -123,7 +124,7 @@
     }
 
     function scheduleUsageImpactRetry() {
-      if (usageImpactRetryTimer || activeView() === 'call') return;
+      if (usageImpactRetryTimer || ['call', 'sessions'].includes(activeView())) return;
       if (usageImpactRetryAttempts >= 6) return;
       usageImpactRetryTimer = window.setTimeout(() => {
         usageImpactRetryTimer = null;
@@ -204,7 +205,7 @@
     }
 
     async function refreshLoadedUsageImpactRows() {
-      if (!liveRefreshSupported || activeView() === 'call' || !getData().length) return;
+      if (!liveRefreshSupported || ['call', 'sessions'].includes(activeView()) || !getData().length) return;
       if (rowHydrationInFlight) {
         scheduleUsageImpactRetry();
         return;
@@ -226,7 +227,7 @@
     }
 
     async function refreshAppendedRows(refreshResult, scopedRows) {
-      if (!liveRefreshSupported || activeView() === 'call') return;
+      if (!liveRefreshSupported || ['call', 'sessions'].includes(activeView())) return;
       if (rowHydrationInFlight) {
         rowHydrationRestartRequested = true;
         return;
@@ -254,7 +255,7 @@
     }
 
     async function hydrateDashboardRows(options = null) {
-      if (!liveRefreshSupported || activeView() === 'call') return;
+      if (!liveRefreshSupported || ['call', 'sessions'].includes(activeView())) return;
       const hydrateOptions = options || {};
       if (rowHydrationInFlight) {
         if (hydrateOptions.reset) rowHydrationRestartRequested = true;
@@ -290,7 +291,7 @@
       updateLiveStatus('status.checking', t('live.loading_rows'));
       updateRowLoadProgress();
       try {
-        while (Math.max(getData().length, rowHydrationNextOffset) < target && generation === rowHydrationGeneration && activeView() !== 'call') {
+        while (Math.max(getData().length, rowHydrationNextOffset) < target && generation === rowHydrationGeneration && !['call', 'sessions'].includes(activeView())) {
           const offset = Math.max(0, rowHydrationNextOffset);
           const remaining = target - offset;
           if (remaining <= 0) break;
@@ -300,7 +301,7 @@
           );
           const payload = await fetchCallRows(chunkSize, offset);
           if (payload.usage_impact_pending) usageImpactPending = true;
-          if (generation !== rowHydrationGeneration || activeView() === 'call') break;
+          if (generation !== rowHydrationGeneration || ['call', 'sessions'].includes(activeView())) break;
           const rows = payloadRows(payload);
           if (!rows.length) {
             reachedEnd = true;
@@ -326,7 +327,7 @@
       } finally {
         rowHydrationInFlight = false;
         updateRowLoadProgress();
-        const shouldRestart = rowHydrationRestartRequested && activeView() !== 'call';
+        const shouldRestart = rowHydrationRestartRequested && !['call', 'sessions'].includes(activeView());
         rowHydrationRestartRequested = false;
         if (shouldRestart) {
           hydrateDashboardRows();
@@ -362,6 +363,12 @@
           setObservedUsage(payload.observed_usage);
         }
         const refreshResult = payload.refresh_result || {};
+        if (activeView() === 'sessions') {
+          if (!refreshResultIsNoOp(refreshResult) || (Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows())) {
+            refreshSessions();
+          }
+          return;
+        }
         if (refreshResultIsNoOp(refreshResult)) {
           if (rowsNeedHydration()) hydrateDashboardRows();
           return;
@@ -424,7 +431,11 @@
           rowHydrationNextOffset = 0;
         }
         applyDashboardPayload(nextPayload);
-        if (activeView() !== 'call') hydrateDashboardRows({ reset: resetRows });
+        if (activeView() === 'sessions') {
+          refreshSessions();
+        } else if (activeView() !== 'call') {
+          hydrateDashboardRows({ reset: resetRows });
+        }
         const result = nextPayload.refresh_result || {};
         const indexed = result.inserted_or_updated_events === undefined
           ? ''

@@ -162,8 +162,8 @@ Filters:
 - [x] M3: Add materializer and query helpers with synthetic unit tests.
 - [x] M4: Wire affected-thread refresh rebuilds without global session rebuilds on append/no-op.
 - [x] M5: Add CLI, API, and JSON contract coverage.
-- [ ] M6: Add Sessions dashboard tab with SQL-backed row loading.
-- [ ] M7: Update docs and run full branch validation.
+- [x] M6: Add Sessions dashboard tab with SQL-backed row loading.
+- [x] M7: Update docs and run full branch validation.
 - [ ] M8: Commit, push, and open the branch PR without merging to `main`.
 
 ## Tests

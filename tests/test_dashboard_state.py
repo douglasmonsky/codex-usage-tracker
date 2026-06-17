@@ -52,6 +52,7 @@ const expected = {{
   page: 3,
   record: 'record-123',
   thread: 'Thread Alpha',
+  sessionFilter: 'cold',
   expand: 'thread-123',
   expandedThreads: ['Thread Alpha', 'Subagent Child'],
 }};
@@ -87,6 +88,7 @@ console.log(JSON.stringify({{ actual, external, hash: parsed.hash }}));
         "page": 3,
         "record": "record-123",
         "thread": "Thread Alpha",
+        "sessionFilter": "cold",
         "expand": "thread-123",
         "expandedThreads": ["Thread Alpha", "Subagent Child"],
     }

@@ -261,6 +261,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "insightsView" in dashboard
     assert "callsView" in dashboard
     assert "threadsView" in dashboard
+    assert "sessionsView" in dashboard
+    assert "dashboard.view.sessions" in dashboard
+    assert 'id="tableColgroup"' in dashboard
+    assert 'id="tableHead"' in dashboard
     assert "Needs Attention" in dashboard
     assert "Investigation Presets" in dashboard
     assert "presetDefinitions" in dashboard_insights_js
@@ -268,6 +272,19 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "attentionScore" in dashboard_analysis_js
     assert "thread-row" in dashboard_surface
     assert "thread-call-table" in dashboard_surface
+    assert "renderSessions" in dashboard_tables_js
+    assert "loadSessions" in dashboard_js
+    assert "sessionsLoadedOnce" in dashboard_js
+    assert "/api/sessions?" in dashboard_js
+    assert "sessionFilterParams" in dashboard_js
+    assert "tableHeadEl.addEventListener('click'" in dashboard_events_js
+    assert "setSessionFilter" in dashboard_events_js
+    assert "refreshSessions" in dashboard_live_js
+    assert "codex-usage-work-sessions.csv" in dashboard_actions_js
+    assert ".session-filter-button" in dashboard_css
+    assert "rowsNeedHydration())" in dashboard_js
+    assert "hydrateDashboardRows();" in dashboard_js
+    assert "items: t('table.sessions')" in dashboard_js
     assert "--calls-table-min-width" in dashboard_css
     assert "min-width: var(--calls-table-min-width)" in dashboard_css
     assert "tr:hover { background" not in dashboard_css
@@ -403,6 +420,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["call.serialized_upper_bound"] == "Serialized local upper bound"
     assert en_trans["call.serialized_bucket_detail"] == "{count} fields · {chars} chars"
     assert en_trans["dashboard.view.call"] == "Call Investigator"
+    assert en_trans["dashboard.view.sessions"] == "Sessions"
+    assert en_trans["session.filter.cold"] == "Cold resumes"
     assert en_trans["button.show_tool_output"] == "Show tool output"
     assert en_trans["button.hide_tool_output"] == "Hide tool output"
     assert en_trans["button.full_serialized_analysis"] == "Run full serialized analysis"

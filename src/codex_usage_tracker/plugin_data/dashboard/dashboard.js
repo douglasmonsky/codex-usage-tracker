@@ -135,9 +135,12 @@
     const sortEl = document.getElementById('sort');
     const tableTitleEl = document.getElementById('tableTitle');
     const tableCaptionEl = document.getElementById('tableCaption');
+    const tableColgroupEl = document.getElementById('tableColgroup');
+    const tableHeadEl = document.getElementById('tableHead');
     const insightsViewEl = document.getElementById('insightsView');
     const callsViewEl = document.getElementById('callsView');
     const threadsViewEl = document.getElementById('threadsView');
+    const sessionsViewEl = document.getElementById('sessionsView');
     const insightsPanelEl = document.getElementById('insightsPanel');
     const insightCardsEl = document.getElementById('insightCards');
     const presetListEl = document.getElementById('presetList');
@@ -186,15 +189,27 @@
       custom: 'option.custom_range',
     };
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
-    let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : 'calls';
+    let activeView = ['calls', 'threads', 'insights', 'sessions', 'call'].includes(initialState.view) ? initialState.view : 'calls';
     document.body.dataset.activeView = activeView;
     let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'time';
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
+    const callSortKeys = new Set(['attention', 'cache', 'cached', 'context', 'cost', 'effort', 'initiator', 'model', 'output', 'reasoning', 'thread', 'time', 'total', 'uncached', 'usage', 'usage_impact']);
+    const sessionSortKeys = new Set(['action', 'cache', 'calls', 'context', 'duration', 'ended', 'idle', 'largest_miss', 'started', 'thread', 'tokens', 'uncached']);
     let threadCallSortKey = 'time';
     let threadCallSortDirection = 'desc';
     let activePreset = '';
     let selectedRecordId = initialState.record || '';
     let selectedThreadKey = initialState.thread || '';
+    const sessionPageSize = 500;
+    let sessionFilter = initialState.sessionFilter || '';
+    let sessionRows = [];
+    let sessionRowsTotal = 0;
+    let sessionsNextOffset = 0;
+    let sessionsHasMore = false;
+    let sessionsLoading = false;
+    let sessionsError = '';
+    let sessionsLoadedOnce = false;
+    let sessionLoadScheduled = false;
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
     let pendingFocusTarget = null;
@@ -352,11 +367,102 @@
     function directional(compareResult) {
       return sortDirection === 'asc' ? compareResult : -compareResult;
     }
+    function ensureSortOption(key) {
+      if (!sortEl || optionValueExists(sortEl, key)) return;
+      const option = document.createElement('option');
+      option.value = key;
+      option.dataset.dynamicSortOption = 'true';
+      option.textContent = sortLabelText(key);
+      sortEl.appendChild(option);
+    }
+    function normalizeSortForView(view = activeView) {
+      if (view === 'sessions') {
+        if (!sessionSortKeys.has(sortKey)) {
+          sortKey = 'uncached';
+          sortDirection = defaultSortDirection(sortKey);
+        }
+        ensureSortOption(sortKey);
+        sortEl.value = sortKey;
+        return;
+      }
+      if (view !== 'call' && !callSortKeys.has(sortKey)) {
+        sortKey = 'time';
+        sortDirection = defaultSortDirection(sortKey);
+      }
+      ensureSortOption(sortKey);
+      sortEl.value = sortKey;
+    }
+    function resetSessionRows() {
+      sessionRows = [];
+      sessionRowsTotal = 0;
+      sessionsNextOffset = 0;
+      sessionsHasMore = false;
+      sessionsError = '';
+      sessionsLoadedOnce = false;
+    }
+    function sessionFilterParams(params) {
+      if (sessionFilter === 'cold') params.set('cold_resumes_only', '1');
+      if (sessionFilter === 'high_uncached') params.set('high_uncached_only', '1');
+      if (sessionFilter === 'needs_handoff') params.set('needs_handoff_only', '1');
+      if (sessionFilter === 'recent') params.set('recent_only', '1');
+    }
+    async function loadSessions(options = null) {
+      if (!liveRefreshSupported || !apiToken || activeView !== 'sessions') return;
+      const loadOptions = options || {};
+      if (sessionsLoading) return;
+      sessionLoadScheduled = false;
+      if (loadOptions.reset) resetSessionRows();
+      sessionsLoading = true;
+      sessionsError = '';
+      render();
+      try {
+        const params = new URLSearchParams({
+          limit: String(sessionPageSize),
+          offset: String(sessionsNextOffset),
+          include_archived: includeArchived ? '1' : '0',
+          sort: sessionSortKeys.has(sortKey) ? sortKey : 'uncached',
+          direction: sortDirection,
+          lang: i18n.currentLanguage,
+          _: String(Date.now()),
+        });
+        const query = searchEl.value.trim();
+        if (query) params.set('q', query);
+        sessionFilterParams(params);
+        const response = await fetch(`/api/sessions?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken,
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (payload.error) throw new Error(payload.error);
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        sessionRows = loadOptions.reset ? rows : sessionRows.concat(rows);
+        sessionsNextOffset = Number(payload.offset || 0) + rows.length;
+        sessionsHasMore = rows.length >= Number(payload.limit || sessionPageSize);
+        sessionRowsTotal = sessionRows.length + (sessionsHasMore ? sessionPageSize : 0);
+        sessionsLoadedOnce = true;
+      } catch (error) {
+        sessionsError = error.message || String(error);
+      } finally {
+        sessionsLoading = false;
+        render();
+      }
+    }
     function setSort(key, direction = null) {
       sortKey = key;
       sortDirection = direction || defaultSortDirection(key);
-      sortEl.value = key;
       resetVisibleRows();
+      if (activeView === 'sessions') {
+        resetSessionRows();
+        normalizeSortForView();
+        render();
+        loadSessions({ reset: true });
+        return;
+      }
+      normalizeSortForView();
       render();
     }
     function handleHeaderSort(key) {
@@ -366,11 +472,19 @@
         sortKey = key;
         sortDirection = defaultSortDirection(key);
       }
-      sortEl.value = key;
       resetVisibleRows();
+      if (activeView === 'sessions') {
+        resetSessionRows();
+        normalizeSortForView();
+        render();
+        loadSessions({ reset: true });
+        return;
+      }
+      normalizeSortForView();
       render();
     }
     function updateSortControls() {
+      normalizeSortForView();
       sortEl.value = sortKey;
       document.querySelectorAll('[data-sort-header]').forEach(header => {
         const active = header.dataset.sortHeader === sortKey;
@@ -398,9 +512,17 @@
         uncached: t('table.uncached'),
         output: t('table.output'),
         reasoning: t('metric.reasoning_output'),
+        action: t('table.action'),
+        calls: t('detail.calls'),
+        duration: t('table.duration'),
+        ended: t('table.ended'),
+        idle: t('table.idle_before'),
+        largest_miss: t('table.largest_miss'),
+        started: t('table.started'),
         thread: t('table.thread'),
         time: t('table.time'),
         total: t('table.tokens'),
+        tokens: t('table.tokens'),
         usage_impact: translationOrFallback('table.usage_impact', 'Usage'),
         usage: t('metric.codex_credits'),
       }[key] || t('filter.sort');
@@ -533,6 +655,7 @@
       rebuildDashboardIndexes,
       rebuildFilterOptions,
       refreshDashboardEl,
+      refreshSessions,
       render,
       resetRowsForHydration: () => {
         data = [];
@@ -622,8 +745,9 @@
       } else if (initialDatePreset) {
         datePresetEl.value = initialDatePreset;
       }
-      if (optionValueExists(sortEl, initialState.sort)) {
+      if (initialState.sort) {
         sortKey = initialState.sort;
+        ensureSortOption(sortKey);
         sortEl.value = sortKey;
       }
       if (['asc', 'desc'].includes(initialState.direction)) sortDirection = initialState.direction;
@@ -850,6 +974,8 @@
       getIncludeArchived: () => includeArchived,
       getSelectedRecordId: () => selectedRecordId,
       getSelectedThreadKey: () => selectedThreadKey,
+      getSessionFilter: () => sessionFilter,
+      getSessionRows: () => sessionRows,
       getSortDirection: () => sortDirection,
       getSortKey: () => sortKey,
       liveRefreshSupported,
@@ -1056,6 +1182,9 @@
       getPricingConfigured: () => pricingConfigured,
       getSelectedRecordId: () => selectedRecordId,
       getSelectedThreadKey: () => selectedThreadKey,
+      getSessionFilter: () => sessionFilter,
+      getSortDirection: () => sortDirection,
+      getSortKey: () => sortKey,
       getThreadCallSortDirection: () => threadCallSortDirection,
       getThreadCallSortKey: () => threadCallSortKey,
       getThreadCallVisiblePages: () => threadCallVisiblePages,
@@ -1080,6 +1209,8 @@
       showThreadDetail,
       sortedThreadCalls,
       tableCaptionEl,
+      tableColgroupEl,
+      tableHeadEl,
       tableTitleEl,
       t,
       tf,
@@ -1121,6 +1252,7 @@
         insightsViewEl.setAttribute('aria-pressed', 'false');
         callsViewEl.setAttribute('aria-pressed', 'false');
         threadsViewEl.setAttribute('aria-pressed', 'false');
+        sessionsViewEl.setAttribute('aria-pressed', 'false');
         callInvestigator.renderCallInvestigator(Array.from(rowByRecordId.values()));
         fitModelPills();
         syncUrlState();
@@ -1146,9 +1278,31 @@
       insightsViewEl.setAttribute('aria-pressed', activeView === 'insights' ? 'true' : 'false');
       callsViewEl.setAttribute('aria-pressed', activeView === 'calls' ? 'true' : 'false');
       threadsViewEl.setAttribute('aria-pressed', activeView === 'threads' ? 'true' : 'false');
+      sessionsViewEl.setAttribute('aria-pressed', activeView === 'sessions' ? 'true' : 'false');
       renderInsightPanel(rows);
       if (activeView === 'call') {
         callInvestigator.renderCallInvestigator(rows);
+      } else if (activeView === 'sessions') {
+        const sessionTotal = sessionRowsTotal || sessionRows.length;
+        dashboardTables.renderSessions({
+          rows: sessionRows,
+          loading: sessionsLoading,
+          error: sessionsError,
+          total: sessionTotal,
+          loadedDescription: sessionRows.length
+            ? tf('table.visible_status', {
+                end: number.format(sessionRows.length),
+                total: number.format(sessionTotal),
+                items: t('table.sessions'),
+              })
+            : loadedRowsDescription(),
+        });
+        if (!sessionsLoading && !sessionsError && !sessionsLoadedOnce && !sessionRows.length) {
+          if (!sessionLoadScheduled) {
+            sessionLoadScheduled = true;
+            window.setTimeout(() => loadSessions({ reset: true }), 0);
+          }
+        }
       } else if (activeView === 'threads') {
         renderThreads(rows);
       } else if (activeView === 'insights') {
@@ -1225,17 +1379,49 @@
       showThreadDetail(group);
       syncUrlState();
     }
-    function setView(view) {
-      activeView = view;
+    function handleFiltersChanged() {
       resetVisibleRows();
+      if (activeView === 'sessions') {
+        resetSessionRows();
+        render();
+        loadSessions({ reset: true });
+        return;
+      }
       render();
     }
+    function setSessionFilter(value) {
+      const normalized = ['', 'cold', 'high_uncached', 'needs_handoff', 'recent'].includes(value) ? value : '';
+      if (sessionFilter === normalized) return;
+      sessionFilter = normalized;
+      resetVisibleRows();
+      resetSessionRows();
+      render();
+      if (activeView === 'sessions') loadSessions({ reset: true });
+    }
+    function refreshSessions() {
+      resetSessionRows();
+      render();
+      loadSessions({ reset: true });
+    }
+    function setView(view) {
+      activeView = ['calls', 'threads', 'insights', 'sessions', 'call'].includes(view) ? view : 'calls';
+      normalizeSortForView();
+      resetVisibleRows();
+      render();
+      if (!['call', 'sessions'].includes(activeView) && rowsNeedHydration()) {
+        hydrateDashboardRows();
+      }
+    }
     async function routeBackToDashboard(view = 'calls') {
-      activeView = ['calls', 'threads', 'insights'].includes(view) ? view : 'calls';
+      activeView = ['calls', 'threads', 'insights', 'sessions'].includes(view) ? view : 'calls';
+      normalizeSortForView();
       resetVisibleRows();
       if (liveRefreshSupported && !data.length) {
         autoRefreshEl.checked = true;
         await refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+      } else if (activeView === 'sessions' && !sessionRows.length) {
+        render();
+        await loadSessions({ reset: true });
       } else {
         render();
       }
@@ -1445,11 +1631,20 @@
       exportVisibleEl,
       getRowByRecordId: recordId => rowByRecordId.get(recordId),
       handleHeaderSort,
+      handleFiltersChanged,
       handleThreadCallHeaderSort,
       hideFastTooltip,
       historyRowsDescription,
       historyScopeEl,
       incrementCurrentPage: () => {
+        if (activeView === 'sessions') {
+          if (sessionsHasMore) {
+            loadSessions();
+          } else {
+            render();
+          }
+          return;
+        }
         currentPage += 1;
         render();
       },
@@ -1479,16 +1674,22 @@
       scheduleFastTooltip,
       searchEl,
       selectRow,
-      setIncludeArchived: value => { includeArchived = Boolean(value); },
+      setIncludeArchived: value => {
+        includeArchived = Boolean(value);
+        if (activeView === 'sessions') resetSessionRows();
+      },
       setLanguage,
+      setSessionFilter,
       setSort,
       setView,
       sortEl,
       syncDatePresetInputs,
       syncUrlState,
+      tableHeadEl,
       t,
       tf,
       threadsViewEl,
+      sessionsViewEl,
       toggleDetailPanel: () => setDetailPanelExpanded(!detailPanelExpanded),
       toTopEl,
       updateHistoryScopeControl,

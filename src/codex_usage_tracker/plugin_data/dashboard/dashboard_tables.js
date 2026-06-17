@@ -17,6 +17,9 @@
       getPricingConfigured,
       getSelectedRecordId,
       getSelectedThreadKey,
+      getSortDirection,
+      getSortKey,
+      getSessionFilter,
       getThreadCallSortDirection,
       getThreadCallSortKey,
       getThreadCallVisiblePages,
@@ -40,6 +43,8 @@
       showThreadDetail,
       sortedThreadCalls,
       tableCaptionEl,
+      tableColgroupEl,
+      tableHeadEl,
       tableTitleEl,
       t,
       tf,
@@ -57,6 +62,63 @@
       visibleSlice,
       groupThreads,
     } = deps;
+
+    let tableColumnCount = 13;
+
+    function topLevelHeader(key, label, numeric = false) {
+      const active = getSortKey() === key;
+      const indicator = active ? (getSortDirection() === 'asc' ? '▲' : '▼') : '';
+      const ariaSort = active ? (getSortDirection() === 'asc' ? 'ascending' : 'descending') : 'none';
+      return `
+        <th${numeric ? ' class="num"' : ''} data-sort-header="${escapeHtml(key)}" data-sort-active="${active ? 'true' : 'false'}" aria-sort="${ariaSort}">
+          <button class="sort-header" type="button" data-sort-key="${escapeHtml(key)}">
+            <span>${escapeHtml(label)}</span>
+            <span class="sort-indicator" data-sort-indicator="${escapeHtml(key)}">${escapeHtml(indicator)}</span>
+          </button>
+        </th>
+      `;
+    }
+
+    function configureMainTable(columns, headers) {
+      tableColumnCount = columns.length;
+      tableColgroupEl.innerHTML = columns.map(column => `<col class="${escapeHtml(column)}">`).join('');
+      tableHeadEl.innerHTML = `<tr>${headers.join('')}</tr>`;
+    }
+
+    function configureCallTable() {
+      configureMainTable(
+        [
+          'col-time',
+          'col-thread',
+          'col-initiated',
+          'col-model',
+          'col-effort',
+          'col-tokens',
+          'col-cached',
+          'col-uncached',
+          'col-output',
+          'col-reasoning',
+          'col-usage-impact',
+          'col-cost',
+          'col-cache',
+        ],
+        [
+          topLevelHeader('time', t('table.time')),
+          topLevelHeader('thread', t('table.thread')),
+          topLevelHeader('initiator', t('table.initiated')),
+          topLevelHeader('model', t('table.model')),
+          topLevelHeader('effort', t('table.effort')),
+          topLevelHeader('total', t('table.tokens'), true),
+          topLevelHeader('cached', t('table.cached'), true),
+          topLevelHeader('uncached', t('table.uncached'), true),
+          topLevelHeader('output', t('table.output'), true),
+          topLevelHeader('reasoning', t('context.token_reasoning'), true),
+          topLevelHeader('usage_impact', translationOrFallback('table.usage_impact', 'Usage'), true),
+          topLevelHeader('cost', t('table.cost'), true),
+          topLevelHeader('cache', t('table.cache'), true),
+        ],
+      );
+    }
 
     function threadCallHeader(key, label, numeric = false) {
       const active = getThreadCallSortKey() === key;
@@ -78,6 +140,7 @@
     }
 
     function renderCalls(rows) {
+      configureCallTable();
       ensurePendingFocusVisibleInRows(rows);
       const page = visibleSlice(rows);
       updateLoadMoreControl(page, 'table.calls');
@@ -124,11 +187,12 @@
         const message = rowsNeedHydration()
           ? t('caption.rows_loading_background')
           : t('state.no_calls');
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="13">${escapeHtml(message)}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="${tableColumnCount}">${escapeHtml(message)}</td></tr>`;
       }
     }
 
     function renderThreads(rows, mode = 'threads') {
+      configureCallTable();
       const groups = groupThreads(rows);
       ensurePendingFocusVisibleInGroups(groups);
       if (!getInitialThreadExpansionApplied() && (getActiveView() === 'threads' || getActiveView() === 'insights')) {
@@ -209,7 +273,7 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="13">${escapeHtml(t('state.no_threads'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="${tableColumnCount}">${escapeHtml(t('state.no_threads'))}</td></tr>`;
       }
       if (!getInitialDetailApplied() && getSelectedThreadKey()) {
         const selected = groups.find(group => group.key === getSelectedThreadKey());
@@ -260,7 +324,7 @@
           ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span></div>`
           : '';
       tr.innerHTML = `
-        <td class="child-cell" colspan="13">
+        <td class="child-cell" colspan="${tableColumnCount}">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
             <colgroup>
               <col class="col-time">
@@ -298,8 +362,140 @@
       return tr;
     }
 
+    function formatSessionMinutes(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return '-';
+      const rounded = Math.max(0, Math.round(numeric));
+      if (rounded < 60) return tf('session.minutes', { minutes: number.format(rounded) });
+      const hours = Math.floor(rounded / 60);
+      const minutes = rounded % 60;
+      return tf('session.hours_minutes', { hours: number.format(hours), minutes: number.format(minutes) });
+    }
+
+    function sessionActionLabel(value) {
+      return {
+        monitor: t('session.action.monitor'),
+        inspect_cold_resume: t('session.action.inspect_cold_resume'),
+        handoff_or_start_fresh: t('session.action.handoff_or_start_fresh'),
+      }[value] || short(value, t('state.unknown'));
+    }
+
+    function sessionReasonLabel(value) {
+      return {
+        thread_start: t('session.reason.thread_start'),
+        cold_resume: t('session.reason.cold_resume'),
+      }[value] || short(value, t('state.unknown'));
+    }
+
+    function sessionFilterButton(key, label) {
+      const active = getSessionFilter() === key;
+      return `<button class="session-filter-button" type="button" data-session-filter="${escapeHtml(key)}" aria-pressed="${active ? 'true' : 'false'}">${escapeHtml(label)}</button>`;
+    }
+
+    function renderSessionCaption(state) {
+      const filterButtons = [
+        sessionFilterButton('', t('session.filter.all')),
+        sessionFilterButton('cold', t('session.filter.cold')),
+        sessionFilterButton('high_uncached', t('session.filter.high_uncached')),
+        sessionFilterButton('needs_handoff', t('session.filter.needs_handoff')),
+        sessionFilterButton('recent', t('session.filter.recent')),
+      ].join('');
+      const caption = state.loading && !state.rows.length
+        ? t('session.loading')
+        : tf('session.caption', {
+          sort: tableCaptionEl.dataset.sortDescription,
+          loaded: state.loadedDescription,
+        });
+      tableCaptionEl.innerHTML = `
+        <div class="session-caption">
+          <span>${escapeHtml(caption)}</span>
+          <span class="session-filter-buttons">${filterButtons}</span>
+        </div>
+      `;
+    }
+
+    function configureSessionTable() {
+      configureMainTable(
+        [
+          'col-time',
+          'col-thread',
+          'col-ended',
+          'col-reason',
+          'col-idle',
+          'col-duration',
+          'col-calls',
+          'col-tokens',
+          'col-uncached',
+          'col-cache',
+          'col-largest-miss',
+          'col-context',
+          'col-action',
+        ],
+        [
+          topLevelHeader('started', t('table.started')),
+          topLevelHeader('thread', t('table.thread')),
+          topLevelHeader('ended', t('table.ended')),
+          topLevelHeader('reason', t('table.source')),
+          topLevelHeader('idle', t('table.idle_before'), true),
+          topLevelHeader('duration', t('table.duration'), true),
+          topLevelHeader('calls', t('detail.calls'), true),
+          topLevelHeader('tokens', t('table.tokens'), true),
+          topLevelHeader('uncached', t('table.uncached'), true),
+          topLevelHeader('cache', t('table.cache'), true),
+          topLevelHeader('largest_miss', t('table.largest_miss'), true),
+          topLevelHeader('context', t('table.context_peak'), true),
+          topLevelHeader('action', t('table.action')),
+        ],
+      );
+    }
+
+    function renderSessions(state) {
+      configureSessionTable();
+      const rows = Array.isArray(state.rows) ? state.rows : [];
+      tableTitleEl.textContent = t('dashboard.view.sessions');
+      renderSessionCaption(state);
+      updateLoadMoreControl({
+        end: rows.length,
+        total: state.total || rows.length,
+      }, 'table.sessions');
+      if (state.error) {
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="${tableColumnCount}">${escapeHtml(tf('session.error', { message: state.error }))}</td></tr>`;
+        return;
+      }
+      if (!rows.length) {
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="${tableColumnCount}">${escapeHtml(state.loading ? t('session.loading') : t('state.no_sessions'))}</td></tr>`;
+        return;
+      }
+      rowsEl.textContent = '';
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+        const threadLabel = short(row.thread_label, t('state.unknown'));
+        const actionLabel = sessionActionLabel(row.suggested_next_action);
+        const reasonLabel = sessionReasonLabel(row.start_reason);
+        tr.className = `work-session-row${row.start_reason === 'cold_resume' ? ' cold-resume-session' : ''}`;
+        tr.dataset.workSessionId = row.work_session_id || '';
+        tr.innerHTML = `
+          <td>${renderTimeCell(row.started_at)}</td>
+          <td><span class="thread-name" ${tooltipAttributes(threadLabel)}>${escapeHtml(threadLabel)}</span></td>
+          <td>${renderTimeCell(row.ended_at)}</td>
+          <td><span class="session-reason ${row.start_reason === 'cold_resume' ? 'cold' : ''}" ${tooltipAttributes(reasonLabel)}>${escapeHtml(reasonLabel)}</span></td>
+          <td class="num">${escapeHtml(formatSessionMinutes(row.idle_minutes_before))}</td>
+          <td class="num">${escapeHtml(formatSessionMinutes(row.duration_minutes))}</td>
+          <td class="num">${tokenNumberCell(row.call_count || 0, t('detail.calls'))}</td>
+          <td class="num token-cell">${tokenNumberCell(row.total_tokens || 0, t('metric.total_tokens'))}</td>
+          <td class="num token-cell">${tokenNumberCell(row.uncached_input_tokens || 0, t('metric.uncached_input'))}</td>
+          <td class="num">${pct(row.avg_cache_ratio || 0)}</td>
+          <td class="num token-cell">${tokenNumberCell(row.largest_uncached_input_tokens || 0, t('table.largest_miss'))}</td>
+          <td class="num">${pct(row.max_context_window_percent || 0)}</td>
+          <td><span class="session-action" ${tooltipAttributes(actionLabel)}>${escapeHtml(actionLabel)}</span></td>
+        `;
+        rowsEl.appendChild(tr);
+      }
+    }
+
     return {
       renderCalls,
+      renderSessions,
       renderThreads,
       renderThreadCalls,
       threadCallHeader,

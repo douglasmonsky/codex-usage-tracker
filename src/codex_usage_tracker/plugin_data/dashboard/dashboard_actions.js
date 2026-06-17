@@ -17,6 +17,8 @@
       getIncludeArchived,
       getSelectedRecordId,
       getSelectedThreadKey,
+      getSessionFilter,
+      getSessionRows,
       getSortDirection,
       getSortKey,
       liveRefreshSupported,
@@ -50,6 +52,7 @@
         page: currentPage(),
         record: getSelectedRecordId(),
         thread: getSelectedThreadKey(),
+        sessionFilter: getSessionFilter(),
         expandedThreads: Array.from(expandedThreads),
       };
     }
@@ -163,6 +166,31 @@
 
     function exportCurrentRows() {
       if (!stateManager) return;
+      if (getActiveView() === 'sessions') {
+        const rows = getSessionRows();
+        const columns = [
+          { label: 'started_at', field: 'started_at' },
+          { label: 'ended_at', field: 'ended_at' },
+          { label: 'thread', field: 'thread_label' },
+          { label: 'session_index', field: 'session_index' },
+          { label: 'start_reason', field: 'start_reason' },
+          { label: 'idle_minutes_before', field: 'idle_minutes_before' },
+          { label: 'duration_minutes', field: 'duration_minutes' },
+          { label: 'call_count', field: 'call_count' },
+          { label: 'total_tokens', field: 'total_tokens' },
+          { label: 'uncached_input_tokens', field: 'uncached_input_tokens' },
+          { label: 'avg_cache_ratio', field: 'avg_cache_ratio' },
+          { label: 'largest_uncached_input_tokens', field: 'largest_uncached_input_tokens' },
+          { label: 'max_context_window_percent', field: 'max_context_window_percent' },
+          { label: 'suggested_next_action', field: 'suggested_next_action' },
+          { label: 'recommendation_score', field: 'recommendation_score' },
+          { label: 'work_session_id', field: 'work_session_id' },
+        ];
+        const csv = stateManager.toCsv(rows, columns);
+        stateManager.downloadText('codex-usage-work-sessions.csv', csv, 'text/csv;charset=utf-8');
+        showActionStatus(tf('action.exported', { count: number.format(rows.length) }));
+        return;
+      }
       const rows = filtered();
       const columns = [
         { label: 'timestamp', field: 'event_timestamp' },

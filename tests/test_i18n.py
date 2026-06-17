@@ -58,6 +58,7 @@ EXPECTED_KEY_PREFIXES = (
     "language.",
     "effort.",
     "flag.",
+    "session.",
 )
 
 
@@ -206,6 +207,7 @@ def test_non_english_catalogs_translate_core_visible_labels(language: str) -> No
         "filter.search",
         "dashboard.view.calls",
         "dashboard.view.threads",
+        "dashboard.view.sessions",
         "call.readout.title",
         "call.readout.badge",
         "metric.total_tokens",

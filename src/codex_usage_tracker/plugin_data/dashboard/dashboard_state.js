@@ -1,5 +1,5 @@
 (function () {
-  const ALLOWED_VIEWS = new Set(['insights', 'calls', 'threads', 'call']);
+  const ALLOWED_VIEWS = new Set(['insights', 'calls', 'threads', 'sessions', 'call']);
   const ALLOWED_DIRECTIONS = new Set(['asc', 'desc']);
   const STATE_KEYS = [
     'view',
@@ -18,6 +18,7 @@
     'page',
     'record',
     'thread',
+    'session_filter',
     'expand',
     'threads',
   ];
@@ -44,6 +45,7 @@
       page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
       record: clean(params.get('record')),
       thread: clean(params.get('thread')),
+      sessionFilter: clean(params.get('session_filter')),
       expand: clean(params.get('expand')),
       expandedThreads: clean(params.get('threads')).split(',').filter(Boolean).slice(0, 30).map(decodePart),
     };
@@ -67,6 +69,7 @@
     set(params, 'page', state.page && Number(state.page) > 1 ? String(Math.floor(Number(state.page))) : '');
     set(params, 'record', state.record);
     set(params, 'thread', state.thread);
+    set(params, 'session_filter', state.sessionFilter);
     set(params, 'expand', state.expand);
     set(params, 'threads', Array.isArray(state.expandedThreads) ? state.expandedThreads.slice(0, 30).map(encodeURIComponent).join(',') : '');
     return params;

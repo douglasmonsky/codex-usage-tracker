@@ -67,7 +67,7 @@ The localhost server uses a random per-server token for refresh and context API 
 
 ![Insights view with ranked attention cards, investigation presets, and top threads by attention score.](assets/dashboard-insights.png)
 
-The dashboard opens in `Insights` view. This view is designed to answer "what needs attention?" before you start sorting tables.
+Use `Insights` view when you want a triage layer that answers "what needs attention?" before you start sorting tables.
 
 - `Needs Attention` cards rank costly threads, Codex allowance usage, low cache reuse, context bloat, unpriced usage, estimated pricing, and reasoning-output spikes from aggregate fields only.
 - `Investigation Presets` apply a view, derived filter, sort order, and explanatory caption together.
@@ -130,6 +130,21 @@ Use `Threads` view when you want to understand a work session as a group instead
 
 The same search, time range, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, and `Threads` views.
 
+## Sessions View
+
+Use `Sessions` view when one thread has multiple work windows and you want to find the resume boundaries that deserve inspection.
+
+- Sessions are materialized from aggregate `usage_events` rows in SQLite and loaded through `/api/sessions`; the generated dashboard HTML does not embed raw transcript content.
+- A session starts at the first call in a thread or at a detected cold-cache resume boundary.
+- Cold-resume boundaries use aggregate signals such as idle time, uncached input, cache ratio, and huge uncached misses. They do not inspect prompt or assistant text.
+- Session rows show started time, ended time, start reason, idle time before the session, duration, call count, total tokens, uncached input, average cache ratio, largest uncached miss, context peak, and suggested action.
+- Filters include all sessions, cold resumes, high uncached, needs handoff, recent, and the shared active/all-history history control.
+- Click headers such as `Started`, `Uncached`, `Largest miss`, `Cache`, or `Action` to sort server-backed session rows.
+- `Load more` fetches the next session page from the local server instead of forcing the dashboard to load every call first.
+- `Export CSV` exports the currently loaded aggregate session rows.
+
+Sessions are meant to complement Threads view, not replace it. Use Threads when you want call-level chronology inside one thread; use Sessions when you want to identify the cold starts, large uncached work windows, and handoff candidates first.
+
 ## Call Investigator
 
 ![Call investigator showing exact token accounting, cache/accounting deltas, context estimates, and runtime evidence.](assets/dashboard-call-investigator.png)
@@ -185,14 +200,15 @@ When served from localhost, the call investigator automatically fetches quick, r
 2. Leave `Live` enabled while you work, or click `Refresh` after a Codex run finishes.
 3. Leave `History` on `Active sessions only` for current work. Switch to `All history` when you intentionally want archived sessions included in the live refresh.
 4. Let observed usage snapshots populate from local Codex logs when available, or optionally run `parse-allowance` with copied values from Codex Usage or `/status` as a fallback.
-5. Start in `Insights` view and review the highest-severity attention cards.
+5. Start in `Calls` view for individual model calls, or use `Insights` when you want the highest-severity attention cards first.
 6. Narrow the `Time` filter when you are investigating a recent spike or a specific work window.
 7. Use a preset when the question is already clear: highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
 8. Use `Threads` view to find the active work thread and any spawned subagent calls.
-9. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
-10. Use `Copy link` when you want to return to the same filter/sort/selection state later.
-11. Use `Export CSV` when the current filtered aggregate calls need spreadsheet review.
-12. Open the call investigator when aggregate fields are not enough; the investigator loads redacted evidence automatically when the context API is enabled.
+9. Use `Sessions` view to find cold resumes, high-uncached work windows, and handoff candidates without loading raw context.
+10. Sort by `Cost`, `Highest Codex credits`, `Tokens`, `Cache`, or `Context` when you need manual comparison.
+11. Use `Copy link` when you want to return to the same filter/sort/selection state later.
+12. Use `Export CSV` when the current filtered aggregate calls or loaded aggregate sessions need spreadsheet review.
+13. Open the call investigator when aggregate fields are not enough; the investigator loads redacted evidence automatically when the context API is enabled.
 
 ## Investigating Long Chat Growth
 

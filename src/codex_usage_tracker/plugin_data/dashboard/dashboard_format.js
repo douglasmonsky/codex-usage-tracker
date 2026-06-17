@@ -94,6 +94,10 @@
       effort: 'asc',
       initiator: 'asc',
       model: 'asc',
+      action: 'asc',
+      ended: 'desc',
+      largest_miss: 'desc',
+      started: 'desc',
       thread: 'asc',
     }[key] || 'desc';
   }
@@ -121,9 +125,16 @@
       uncached: 'Uncached',
       output: 'Output',
       reasoning: 'Reasoning output',
+      action: 'Action',
+      calls: 'Calls',
+      duration: 'Duration',
+      ended: 'Ended',
+      largest_miss: 'Largest miss',
+      started: 'Started',
       thread: 'Thread',
       time: 'Time',
       total: 'Tokens',
+      tokens: 'Tokens',
       usage_impact: 'Usage',
       usage: 'Codex credits',
     }[key] || 'Sort';

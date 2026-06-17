@@ -22,6 +22,14 @@
     col.col-usage-impact { width: 102px; }
     col.col-cost { width: 92px; }
     col.col-cache { width: 82px; }
+    col.col-ended { width: 128px; }
+    col.col-reason { width: 132px; }
+    col.col-idle,
+    col.col-duration { width: 90px; }
+    col.col-calls { width: 78px; }
+    col.col-largest-miss { width: 124px; }
+    col.col-context { width: 104px; }
+    col.col-action { width: 160px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
     .grid > section:first-child > table > thead,
     .thread-call-table thead {
@@ -58,6 +66,7 @@
     }
     .grid > section:first-child > table > tbody > tr.call-row:hover > td,
     .grid > section:first-child > table > tbody > tr.thread-row:hover > td,
+    .grid > section:first-child > table > tbody > tr.work-session-row:hover > td,
     .thread-call-table > tbody > tr.thread-call-row:hover > td {
       background: #eff6ff;
     }
@@ -171,6 +180,35 @@
       font-weight: 680;
       line-height: 1.4;
       margin-top: 4px;
+    }
+    .session-caption {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+    .session-filter-buttons {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    .session-filter-button {
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      cursor: pointer;
+    }
+    .session-filter-button[aria-pressed="true"] {
+      border-color: #bfdbfe;
+      background: #eff6ff;
+      color: var(--blue);
     }
     .table-actions {
       grid-row: 1;
@@ -510,6 +548,31 @@
     }
     .thread-call-table tr:last-child td {
       border-bottom: 0;
+    }
+    .session-reason,
+    .session-action {
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+      white-space: nowrap;
+    }
+    .session-reason {
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+    }
+    .session-reason.cold {
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .session-action {
+      color: var(--ink);
+      font-weight: 720;
     }
     .child-load-more {
       display: flex;

@@ -101,6 +101,7 @@
             <button id="insightsView" type="button" aria-pressed="false" data-i18n="dashboard.view.insights">Insights</button>
             <button id="callsView" type="button" aria-pressed="true" data-i18n="dashboard.view.calls">Calls</button>
             <button id="threadsView" type="button" aria-pressed="false" data-i18n="dashboard.view.threads">Threads</button>
+            <button id="sessionsView" type="button" aria-pressed="false" data-i18n="dashboard.view.sessions">Sessions</button>
           </div>
           <div id="tableCaption" class="table-caption" data-i18n="caption.initial_calls">Showing individual model calls.</div>
           <div class="table-actions" aria-label="Current view actions" data-i18n-aria-label="aria.current_view_actions">
@@ -119,7 +120,7 @@
           </div>
         </div>
         <table class="dashboard-table">
-          <colgroup>
+          <colgroup id="tableColgroup">
             <col class="col-time">
             <col class="col-thread">
             <col class="col-initiated">
@@ -134,7 +135,7 @@
             <col class="col-cost">
             <col class="col-cache">
           </colgroup>
-          <thead>
+          <thead id="tableHead">
             <tr>
               <th data-sort-header="time"><button class="sort-header" type="button" data-sort-key="time"><span data-i18n="table.time">Time</span> <span class="sort-indicator" data-sort-indicator="time"></span></button></th>
               <th data-sort-header="thread"><button class="sort-header" type="button" data-sort-key="thread"><span data-i18n="table.thread">Thread</span> <span class="sort-indicator" data-sort-indicator="thread"></span></button></th>

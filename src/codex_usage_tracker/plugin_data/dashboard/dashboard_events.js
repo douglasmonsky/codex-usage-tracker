@@ -20,6 +20,7 @@
       exportVisibleEl,
       getRowByRecordId,
       handleHeaderSort,
+      handleFiltersChanged,
       handleThreadCallHeaderSort,
       hideFastTooltip,
       historyRowsDescription,
@@ -51,12 +52,15 @@
       selectRow,
       setIncludeArchived,
       setLanguage,
+      setSessionFilter,
       setSort,
       setView,
       sortEl,
       t,
+      tableHeadEl,
       tf,
       threadsViewEl,
+      sessionsViewEl,
       toggleDetailPanel,
       toTopEl,
       updateHistoryScopeControl,
@@ -69,6 +73,7 @@
     insightsViewEl.addEventListener('click', () => setView('insights'));
     callsViewEl.addEventListener('click', () => setView('calls'));
     threadsViewEl.addEventListener('click', () => setView('threads'));
+    sessionsViewEl.addEventListener('click', () => setView('sessions'));
     clearPresetEl.addEventListener('click', clearPreset);
     copyViewLinkEl.addEventListener('click', copyCurrentViewLink);
     exportVisibleEl.addEventListener('click', exportCurrentRows);
@@ -115,12 +120,21 @@
       if (event.key === '1') setView('insights');
       if (event.key === '2') setView('calls');
       if (event.key === '3') setView('threads');
+      if (event.key === '4') setView('sessions');
     });
     window.addEventListener('scroll', updateToTopVisibility, { passive: true });
     toTopEl.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
     loadMoreRowsEl.addEventListener('click', incrementCurrentPage);
-    document.querySelectorAll('[data-sort-key]').forEach(button => {
-      button.addEventListener('click', () => handleHeaderSort(button.dataset.sortKey));
+    document.addEventListener('click', event => {
+      const sessionFilterButton = event.target.closest('[data-session-filter]');
+      if (!sessionFilterButton || !document.body.contains(sessionFilterButton)) return;
+      event.preventDefault();
+      setSessionFilter(sessionFilterButton.dataset.sessionFilter || '');
+    });
+    tableHeadEl.addEventListener('click', event => {
+      const button = event.target.closest('[data-sort-key]');
+      if (!button || !tableHeadEl.contains(button)) return;
+      handleHeaderSort(button.dataset.sortKey);
     });
     rowsEl.addEventListener('mouseover', event => {
       const callRow = event.target.closest('.thread-call-row');
@@ -230,18 +244,15 @@
     window.addEventListener('resize', hideFastTooltip);
     datePresetEl.addEventListener('input', () => {
       syncDatePresetInputs();
-      resetVisibleRows();
-      render();
+      handleFiltersChanged();
     });
     [dateStartEl, dateEndEl].forEach(el => el.addEventListener('input', () => {
       if (datePresetEl.value !== 'custom') datePresetEl.value = 'custom';
       el.value = cleanDateInput(el.value) || el.value;
-      resetVisibleRows();
-      render();
+      handleFiltersChanged();
     }));
     [searchEl, modelEl, effortEl, pricingStatusEl].forEach(el => el.addEventListener('input', () => {
-      resetVisibleRows();
-      render();
+      handleFiltersChanged();
     }));
     sortEl.addEventListener('input', () => setSort(sortEl.value, defaultSortDirection(sortEl.value)));
   }
