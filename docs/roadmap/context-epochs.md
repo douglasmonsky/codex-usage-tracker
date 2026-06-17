@@ -82,4 +82,4 @@ Add `thread_context_epochs`:
 - [x] M4: Add Sessions dashboard epoch expansion.
 - [x] M5: Add compaction effectiveness heuristics.
 - [x] M6: Add tests/docs and run validation.
-- [ ] M7: Commit, push, and open the branch PR without merging to `main`.
+- [x] M7: Commit, push, and open the branch PR without merging to `main`.
