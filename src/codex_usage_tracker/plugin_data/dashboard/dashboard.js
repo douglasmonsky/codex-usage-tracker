@@ -210,6 +210,10 @@
     let sessionsError = '';
     let sessionsLoadedOnce = false;
     let sessionLoadScheduled = false;
+    const expandedSessionIds = new Set();
+    const sessionEpochs = new Map();
+    const sessionEpochErrors = new Map();
+    const sessionEpochLoading = new Set();
     let currentPage = 1;
     const threadCallVisiblePages = new Map();
     let pendingFocusTarget = null;
@@ -399,6 +403,10 @@
       sessionsHasMore = false;
       sessionsError = '';
       sessionsLoadedOnce = false;
+      expandedSessionIds.clear();
+      sessionEpochs.clear();
+      sessionEpochErrors.clear();
+      sessionEpochLoading.clear();
     }
     function sessionFilterParams(params) {
       if (sessionFilter === 'cold') params.set('cold_resumes_only', '1');
@@ -450,6 +458,49 @@
         sessionsLoading = false;
         render();
       }
+    }
+    async function loadSessionEpochs(workSessionId) {
+      if (!liveRefreshSupported || !apiToken || !workSessionId) return;
+      if (sessionEpochLoading.has(workSessionId) || sessionEpochs.has(workSessionId)) return;
+      sessionEpochLoading.add(workSessionId);
+      sessionEpochErrors.delete(workSessionId);
+      render();
+      try {
+        const params = new URLSearchParams({
+          work_session_id: workSessionId,
+          limit: '0',
+          sort: 'started',
+          direction: 'asc',
+          _: String(Date.now()),
+        });
+        const response = await fetch(`/api/context-epochs?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken,
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (payload.error) throw new Error(payload.error);
+        sessionEpochs.set(workSessionId, Array.isArray(payload.rows) ? payload.rows : []);
+      } catch (error) {
+        sessionEpochErrors.set(workSessionId, error.message || String(error));
+      } finally {
+        sessionEpochLoading.delete(workSessionId);
+        render();
+      }
+    }
+    function toggleSessionEpochs(workSessionId) {
+      if (!workSessionId) return;
+      if (expandedSessionIds.has(workSessionId)) {
+        expandedSessionIds.delete(workSessionId);
+        render();
+        return;
+      }
+      expandedSessionIds.add(workSessionId);
+      render();
+      loadSessionEpochs(workSessionId);
     }
     function setSort(key, direction = null) {
       sortKey = key;
@@ -1289,6 +1340,10 @@
           loading: sessionsLoading,
           error: sessionsError,
           total: sessionTotal,
+          expandedSessionIds,
+          sessionEpochErrors,
+          sessionEpochLoading,
+          sessionEpochs,
           loadedDescription: sessionRows.length
             ? tf('table.visible_status', {
                 end: number.format(sessionRows.length),
@@ -1691,6 +1746,7 @@
       threadsViewEl,
       sessionsViewEl,
       toggleDetailPanel: () => setDetailPanelExpanded(!detailPanelExpanded),
+      toggleSessionEpochs,
       toTopEl,
       updateHistoryScopeControl,
       updateLiveStatus,

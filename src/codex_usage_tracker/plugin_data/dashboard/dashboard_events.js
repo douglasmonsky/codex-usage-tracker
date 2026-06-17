@@ -62,6 +62,7 @@
       threadsViewEl,
       sessionsViewEl,
       toggleDetailPanel,
+      toggleSessionEpochs,
       toTopEl,
       updateHistoryScopeControl,
       updateLiveStatus,
@@ -197,6 +198,13 @@
         render();
         return;
       }
+      const sessionRow = event.target.closest('.work-session-row');
+      if (sessionRow && rowsEl.contains(sessionRow)) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (toggleSessionEpochs) toggleSessionEpochs(sessionRow.dataset.workSessionId || '');
+        return;
+      }
       const callRow = event.target.closest('.call-row, .thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
       event.preventDefault();
@@ -213,6 +221,12 @@
     rowsEl.addEventListener('keydown', event => {
       if (event.target.closest('a.row-investigator-link')) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
+      const sessionRow = event.target.closest('.work-session-row');
+      if (sessionRow && rowsEl.contains(sessionRow)) {
+        event.preventDefault();
+        if (toggleSessionEpochs) toggleSessionEpochs(sessionRow.dataset.workSessionId || '');
+        return;
+      }
       const callRow = event.target.closest('.call-row, .thread-call-row');
       if (!callRow || !rowsEl.contains(callRow)) return;
       event.preventDefault();

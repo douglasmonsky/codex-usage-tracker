@@ -26,6 +26,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
+from codex_usage_tracker.store_context_epochs import rebuild_thread_context_epochs
 from codex_usage_tracker.store_query_sql import (
     _group_expression,
     _normalize_limit,
@@ -42,7 +43,6 @@ from codex_usage_tracker.store_schema import (
     SchemaMigrationError,
     init_db,
 )
-from codex_usage_tracker.store_context_epochs import rebuild_thread_context_epochs
 from codex_usage_tracker.store_sources import (
     ParsedSourceFile,
     source_logs_requiring_parse,

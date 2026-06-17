@@ -274,9 +274,15 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "thread-call-table" in dashboard_surface
     assert "renderSessions" in dashboard_tables_js
     assert "loadSessions" in dashboard_js
+    assert "loadSessionEpochs" in dashboard_js
+    assert "toggleSessionEpochs" in dashboard_js
+    assert "toggleSessionEpochs" in dashboard_events_js
     assert "sessionsLoadedOnce" in dashboard_js
     assert "/api/sessions?" in dashboard_js
+    assert "/api/context-epochs?" in dashboard_js
     assert "sessionFilterParams" in dashboard_js
+    assert "session-epoch-table" in dashboard_tables_js
+    assert "session-epoch-child-row" in dashboard_surface
     assert "tableHeadEl.addEventListener('click'" in dashboard_events_js
     assert "setSessionFilter" in dashboard_events_js
     assert "refreshSessions" in dashboard_live_js
@@ -422,6 +428,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["dashboard.view.call"] == "Call Investigator"
     assert en_trans["dashboard.view.sessions"] == "Sessions"
     assert en_trans["session.filter.cold"] == "Cold resumes"
+    assert en_trans["session.context_segments"] == "Context segments"
+    assert en_trans["session.reason.post_compaction"] == "Post-compaction"
+    assert en_trans["session.effectiveness.effective"] == "Effective"
     assert en_trans["button.show_tool_output"] == "Show tool output"
     assert en_trans["button.hide_tool_output"] == "Hide tool output"
     assert en_trans["button.full_serialized_analysis"] == "Run full serialized analysis"

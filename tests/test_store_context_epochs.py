@@ -88,6 +88,62 @@ def test_post_compaction_call_starts_new_epoch_inside_session() -> None:
     assert sum(epoch["call_count"] for epoch in epochs) == 3
 
 
+def test_compaction_effectiveness_labels_post_compaction_epochs() -> None:
+    rows = [
+        _row(
+            "a",
+            "work-session-alpha",
+            "thread:Alpha",
+            1,
+            "2026-06-01T10:00:00+00:00",
+            input_tokens=40_000,
+            cached=38_000,
+        ),
+        _row(
+            "b",
+            "work-session-alpha",
+            "thread:Alpha",
+            2,
+            "2026-06-01T10:05:00+00:00",
+            input_tokens=60_000,
+            cached=45_000,
+            initiator_reason="post_compaction",
+            previous_record_id="a",
+        ),
+        _row(
+            "c",
+            "work-session-alpha",
+            "thread:Alpha",
+            3,
+            "2026-06-01T10:10:00+00:00",
+            input_tokens=100_000,
+            cached=50_000,
+            initiator_reason="post_compaction",
+            previous_record_id="b",
+        ),
+        _row(
+            "d",
+            "work-session-alpha",
+            "thread:Alpha",
+            4,
+            "2026-06-01T10:15:00+00:00",
+            input_tokens=100_000,
+            cached=5_000,
+            initiator_reason="post_compaction",
+            previous_record_id="c",
+        ),
+    ]
+
+    epochs = materialize_thread_context_epochs(rows, updated_at="2026-06-01T00:00:00+00:00")
+
+    assert [epoch["compaction_effectiveness"] for epoch in epochs] == [
+        "unknown",
+        "effective",
+        "mixed",
+        "ineffective",
+    ]
+
+
 def test_context_epoch_totals_sum_to_work_session_totals(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events(

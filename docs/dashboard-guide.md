@@ -138,6 +138,7 @@ Use `Sessions` view when one thread has multiple work windows and you want to fi
 - A session starts at the first call in a thread or at a detected cold-cache resume boundary.
 - Cold-resume boundaries use aggregate signals such as idle time, uncached input, cache ratio, and huge uncached misses. They do not inspect prompt or assistant text.
 - Session rows show started time, ended time, start reason, idle time before the session, duration, call count, total tokens, uncached input, average cache ratio, largest uncached miss, context peak, and suggested action.
+- Click a session row to expand its aggregate context segments. Segments split the session at detected post-compaction boundaries and show token/cache totals, context peak, first post-compaction uncached miss, and a coarse effectiveness label without loading raw transcript evidence.
 - Filters include all sessions, cold resumes, high uncached, needs handoff, recent, and the shared active/all-history history control.
 - Click headers such as `Started`, `Uncached`, `Largest miss`, `Cache`, or `Action` to sort server-backed session rows.
 - `Load more` fetches the next session page from the local server instead of forcing the dashboard to load every call first.

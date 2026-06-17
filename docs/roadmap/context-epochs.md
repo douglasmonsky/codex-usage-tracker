@@ -79,7 +79,7 @@ Add `thread_context_epochs`:
 - [x] M1: Add context epoch schema.
 - [x] M2: Build epochs from work sessions.
 - [x] M3: Add epoch query/API payload support.
-- [ ] M4: Add Sessions dashboard epoch expansion.
-- [ ] M5: Add compaction effectiveness heuristics.
-- [ ] M6: Add tests/docs and run validation.
+- [x] M4: Add Sessions dashboard epoch expansion.
+- [x] M5: Add compaction effectiveness heuristics.
+- [x] M6: Add tests/docs and run validation.
 - [ ] M7: Commit, push, and open the branch PR without merging to `main`.
