@@ -95,6 +95,7 @@ _matches_live_derived_filters = server_utils.matches_live_derived_filters
 _next_offset = server_utils.next_row_offset
 _optional_filter = server_utils.optional_choice_filter
 _parse_api_limit = server_utils.parse_api_limit
+_parse_api_limit_allow_zero = server_utils.parse_api_limit_allow_zero
 _parse_api_offset = server_utils.parse_api_offset
 _parse_bool = server_utils.parse_bool_query_value
 _parse_context_limit = server_utils.parse_context_limit
@@ -867,7 +868,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def _handle_context_epochs(self, query: str) -> None:
         params = parse_qs(query)
         try:
-            limit = _parse_api_limit(_first(params.get("limit")), 100)
+            limit = _parse_api_limit_allow_zero(_first(params.get("limit")), 100)
             offset = _parse_api_offset(_first(params.get("offset")))
             work_session_id = _first(params.get("work_session_id")) or _first(params.get("session"))
             thread_key = _first(params.get("thread_key")) or _first(params.get("thread"))

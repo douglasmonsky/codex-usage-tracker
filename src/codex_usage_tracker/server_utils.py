@@ -66,6 +66,24 @@ def parse_api_limit(value: str | None, default: int) -> int | None:
     return min(limit, 10_000)
 
 
+def parse_api_limit_allow_zero(value: str | None, default: int) -> int | None:
+    """Parse API limits where 0 is an explicit unbounded request."""
+
+    if value is None or value == "":
+        return default
+    if value.lower() == "all":
+        return None
+    try:
+        limit = int(value)
+    except ValueError as exc:
+        raise ValueError("limit must be a non-negative integer or all") from exc
+    if limit < 0:
+        raise ValueError("limit must be a non-negative integer or all")
+    if limit == 0:
+        return 0
+    return min(limit, 10_000)
+
+
 def parse_report_limit(value: str | None, default: int) -> int:
     limit = parse_api_limit(value, default)
     return 10_000 if limit is None else limit
