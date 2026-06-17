@@ -164,7 +164,7 @@ Filters:
 - [x] M5: Add CLI, API, and JSON contract coverage.
 - [x] M6: Add Sessions dashboard tab with SQL-backed row loading.
 - [x] M7: Update docs and run full branch validation.
-- [ ] M8: Commit, push, and open the branch PR without merging to `main`.
+- [x] M8: Commit, push, and open the branch PR without merging to `main`.
 
 ## Tests
 
