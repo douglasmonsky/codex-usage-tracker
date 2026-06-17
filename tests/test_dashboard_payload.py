@@ -10,6 +10,7 @@ from store_dashboard_helpers import (
     _write_pricing,
 )
 
+from codex_usage_tracker import dashboard as dashboard_module
 from codex_usage_tracker.dashboard import dashboard_payload, generate_dashboard
 from codex_usage_tracker.store import (
     EVENT_COLUMNS,
@@ -302,6 +303,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-thread-call-sort-key" in dashboard_tables_js
     assert "threadCallSortKey = 'time'" in dashboard_js
     assert "threadCallSortDirection = 'desc'" in dashboard_js
+    assert "function defaultSortForView" in dashboard_js
+    assert "resetSortForView(activeView)" in dashboard_js
     assert "detail.thread_attachment" in dashboard_details_js
     assert "detail.subagent_type" in dashboard_details_js
     assert "source.auto_review" in dashboard_cells_js
@@ -317,8 +320,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "openInvestigatorUrl(rowLink.href)" in dashboard_events_js
     assert "window.location.href = url" not in dashboard_surface
     assert "window.open(url, '_blank')" in dashboard_actions_js
-    assert dashboard_actions_js.index("/api/open-investigator") < dashboard_actions_js.index(
-        "window.open(url, '_blank')"
+    assert dashboard_actions_js.index("window.open(url, '_blank')") < dashboard_actions_js.index(
+        "/api/open-investigator"
     )
     assert "opened.opener = null" in dashboard_actions_js
     assert "selectRow(row);" not in render_calls_js
@@ -326,6 +329,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "renderCallInvestigator" in dashboard_js
     assert "fetchCallRecord" in dashboard_js
     assert "fetchCallRecord" in dashboard_call_js
+    assert "function renderMissingCallState" in dashboard_call_js
+    assert 'data-dashboard-route="calls"' in dashboard_call_js
     assert "renderTaskReceiptSignals" in dashboard_call_js
     assert "Task receipt signals" in dashboard_call_js
     assert "task_receipts" in dashboard_call_js
@@ -600,6 +605,35 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "project_key",
         "thread_attachment_label",
     } <= set(row)
+
+
+def test_limited_dashboard_payload_does_not_requery_all_rows_for_usage_impact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    original_query = dashboard_module.query_dashboard_events
+    limits: list[int | None] = []
+
+    def tracking_query_dashboard_events(*args: object, **kwargs: object) -> list[dict[str, object]]:
+        limits.append(kwargs.get("limit"))  # type: ignore[arg-type]
+        return original_query(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(
+        dashboard_module,
+        "query_dashboard_events",
+        tracking_query_dashboard_events,
+    )
+
+    payload = dashboard_payload(db_path=db_path, limit=1)
+
+    assert limits == [1]
+    assert payload["loaded_row_count"] == 1
+    assert payload["rows"][0]["usage_impact"]["primary"]["status"] == "pending"
+    assert payload["rows"][0]["usage_impact"]["secondary"]["status"] == "pending"
+    assert payload["rows"][0]["usage_impact_pending"] is True
 
 
 def test_dashboard_payload_uses_persisted_call_origin_without_source_scan(

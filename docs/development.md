@@ -228,7 +228,7 @@ Tracked timings:
 
 | Timing key | Path covered |
 | --- | --- |
-| `populate_seconds` | Synthetic aggregate indexing/upsert path |
+| `populate_seconds` | Synthetic aggregate indexing/upsert path, including adjacency, sessions, and context-epoch read models |
 | `active_dashboard_query_seconds` | Dashboard row query with archived sessions excluded |
 | `all_history_dashboard_query_seconds` | Dashboard row query with archived sessions included |
 | `since_until_query_seconds` | Date-window dashboard filtering |
@@ -246,7 +246,7 @@ Tracked timings:
 
 Source-log benchmark JSON also reports `source_logs_generated`, `source_log_bytes`, `context_loads`, `context_payload_json_bytes`, `source_scan_ms`, and `serialized_estimate_ms` for explicit context loading.
 
-The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the source-log run is the local gate for context/evidence work; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
+The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the source-log run is the local gate for context/evidence work; the 500k run is the release-sized gate and can take a few minutes on a modern laptop because initial synthetic population now materializes sessions/context epochs and recommendations/project summary intentionally scan all aggregate rows.
 
 ## Release Checklist
 

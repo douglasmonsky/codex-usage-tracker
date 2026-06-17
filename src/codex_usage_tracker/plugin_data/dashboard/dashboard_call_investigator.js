@@ -353,6 +353,17 @@
       `;
     }
 
+    function renderMissingCallState() {
+      return `
+        <tr>
+          <td class="empty-state call-missing-state" colspan="12">
+            <p>${escapeHtml(t('call.not_found'))}</p>
+            <a class="toolbar-button" href="${escapeHtml(viewUrl('calls'))}" data-dashboard-route="calls">${escapeHtml(t('button.back_to_dashboard'))}</a>
+          </td>
+        </tr>
+      `;
+    }
+
     function renderCallInvestigator(rows) {
       const rowByRecordId = getRowByRecordId();
       const row = rowByRecordId.get(getSelectedRecordId()) || rows.find(candidate => candidate.record_id === getSelectedRecordId());
@@ -370,12 +381,12 @@
           detailEl.textContent = t('dashboard.detail.empty');
           fetchCallRecord(selectedRecordId).then(fetchedRow => {
             if (!fetchedRow && getSelectedRecordId() === selectedRecordId) {
-              rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('call.not_found'))}</td></tr>`;
+              rowsEl.innerHTML = renderMissingCallState();
             }
           });
           return;
         }
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('call.not_found'))}</td></tr>`;
+        rowsEl.innerHTML = renderMissingCallState();
         detailEl.textContent = t('dashboard.detail.empty');
         return;
       }

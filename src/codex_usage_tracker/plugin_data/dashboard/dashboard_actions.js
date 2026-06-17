@@ -94,6 +94,11 @@
     }
 
     async function openInvestigatorUrl(url) {
+      const opened = window.open(url, '_blank');
+      if (opened) {
+        opened.opener = null;
+        return true;
+      }
       if (liveRefreshSupported) {
         if (apiToken()) {
           try {
@@ -110,11 +115,6 @@
             // Fall through to the normal browser path.
           }
         }
-      }
-      const opened = window.open(url, '_blank');
-      if (opened) {
-        opened.opener = null;
-        return true;
       }
       try {
         await stateManager.copyText(url);

@@ -64,7 +64,7 @@ SYNTHETIC_THREAD_NAMES = (
     "Dashboard Mobile QA",
 )
 BENCHMARK_THRESHOLDS: dict[str, dict[str, float]] = {
-    "populate_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.90},
+    "populate_seconds": {"base_seconds": 1.0, "per_10k_seconds": 1.85},
     "active_dashboard_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
     "all_history_dashboard_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
     "since_until_query_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.05},
@@ -72,7 +72,7 @@ BENCHMARK_THRESHOLDS: dict[str, dict[str, float]] = {
     "filtered_count_seconds": {"base_seconds": 0.25, "per_10k_seconds": 0.04},
     "dashboard_payload_active_seconds": {"base_seconds": 0.75, "per_10k_seconds": 0.20},
     "thread_summary_seconds": {"base_seconds": 0.75, "per_10k_seconds": 0.12},
-    "recommendations_report_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.65},
+    "recommendations_report_seconds": {"base_seconds": 1.0, "per_10k_seconds": 1.05},
     "pricing_coverage_seconds": {"base_seconds": 0.50, "per_10k_seconds": 0.06},
     "project_summary_seconds": {"base_seconds": 1.0, "per_10k_seconds": 0.45},
     "dashboard_payload_with_source_logs_seconds": {

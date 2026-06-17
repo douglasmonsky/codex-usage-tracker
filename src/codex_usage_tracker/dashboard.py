@@ -51,8 +51,8 @@ from codex_usage_tracker.store import (
 from codex_usage_tracker.threads import annotate_thread_attachments
 from codex_usage_tracker.usage_impact import (
     annotate_rows_with_usage_impact,
-    copy_usage_impact_from_context,
 )
+from codex_usage_tracker.usage_impact_store import query_usage_impact_map_for_records
 
 DASHBOARD_STYLESHEETS = (
     "dashboard.css",
@@ -150,26 +150,10 @@ def dashboard_payload(
     if not estimate_usage_impact:
         for row in annotated_rows:
             row["usage_impact"] = {"primary": None, "secondary": None}
-    elif include_rows and (normalized_limit is not None or normalized_offset):
-        impact_context_rows = annotate_rows_with_allowance(
-            annotate_rows_with_efficiency(
-                [
-                    ensure_call_origin(row)
-                    for row in query_dashboard_events(
-                        db_path=db_path,
-                        limit=None,
-                        offset=0,
-                        since=since,
-                        include_archived=include_archived,
-                    )
-                ],
-                pricing,
-            ),
-            allowance,
-        )
-        annotated_rows = copy_usage_impact_from_context(annotated_rows, impact_context_rows)
-    else:
+    elif include_rows and (normalized_limit is None and normalized_offset == 0):
         annotated_rows = annotate_rows_with_usage_impact(annotated_rows)
+    else:
+        annotated_rows = _copy_persisted_usage_impact(annotated_rows, db_path=db_path)
     annotated_rows = annotate_rows_with_recommendations(annotated_rows, thresholds)
     annotated_rows = annotate_rows_with_project_identity(annotated_rows, projects)
     annotated_rows = apply_project_privacy_to_rows(annotated_rows, privacy_mode=privacy_mode)
@@ -261,6 +245,32 @@ def dashboard_payload(
         "privacy_mode": privacy_mode,
         "project_metadata_privacy": project_privacy_metadata(privacy_mode),
     }
+
+
+def _copy_persisted_usage_impact(
+    rows: list[dict[str, Any]],
+    *,
+    db_path: Path,
+) -> list[dict[str, Any]]:
+    """Attach persisted usage-impact rows without rebuilding all-history context."""
+
+    if not rows:
+        return []
+    record_ids = [str(row.get("record_id") or "") for row in rows if row.get("record_id")]
+    impact_by_record_id, persisted_pending = query_usage_impact_map_for_records(
+        db_path=db_path,
+        record_ids=record_ids,
+    )
+    default_impact = {"primary": None, "secondary": None}
+    copied: list[dict[str, Any]] = []
+    for row in rows:
+        record_id = str(row.get("record_id") or "")
+        next_row = dict(row)
+        next_row["usage_impact"] = impact_by_record_id.get(record_id, default_impact)
+        if persisted_pending or record_id not in impact_by_record_id:
+            next_row["usage_impact_pending"] = True
+        copied.append(next_row)
+    return copied
 
 
 def generate_dashboard(

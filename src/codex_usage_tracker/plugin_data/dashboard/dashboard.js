@@ -397,19 +397,26 @@
       option.textContent = sortLabelText(key);
       sortEl.appendChild(option);
     }
+    function defaultSortForView(view = activeView) {
+      return view === 'sessions' ? 'uncached' : 'time';
+    }
+    function resetSortForView(view = activeView) {
+      sortKey = defaultSortForView(view);
+      sortDirection = defaultSortDirection(sortKey);
+      ensureSortOption(sortKey);
+      sortEl.value = sortKey;
+    }
     function normalizeSortForView(view = activeView) {
       if (view === 'sessions') {
         if (!sessionSortKeys.has(sortKey)) {
-          sortKey = 'uncached';
-          sortDirection = defaultSortDirection(sortKey);
+          resetSortForView(view);
         }
         ensureSortOption(sortKey);
         sortEl.value = sortKey;
         return;
       }
       if (view !== 'call' && !callSortKeys.has(sortKey)) {
-        sortKey = 'time';
-        sortDirection = defaultSortDirection(sortKey);
+        resetSortForView(view);
       }
       ensureSortOption(sortKey);
       sortEl.value = sortKey;
@@ -1774,7 +1781,9 @@
       }
     }
     function setView(view) {
+      const previousView = activeView;
       activeView = ['calls', 'threads', 'insights', 'sessions', 'call'].includes(view) ? view : 'calls';
+      if (activeView !== previousView && activeView !== 'call') resetSortForView(activeView);
       normalizeSortForView();
       resetVisibleRows();
       render();

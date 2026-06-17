@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
 from codex_usage_tracker.schema import USAGE_EVENT_COLUMN_NAMES
+
+_DERIVED_USAGE_EVENT_COLUMNS = {
+    "uncached_input_tokens",
+    "cache_ratio",
+    "reasoning_output_ratio",
+    "context_window_percent",
+}
+_BASE_USAGE_EVENT_COLUMN_NAMES = tuple(
+    column
+    for column in USAGE_EVENT_COLUMN_NAMES
+    if column not in _DERIVED_USAGE_EVENT_COLUMNS
+)
 
 
 @dataclass(frozen=True)
@@ -112,12 +124,12 @@ class UsageEvent:
         return self.input_tokens / self.model_context_window
 
     def to_row(self) -> dict[str, object]:
-        row = asdict(self)
-        row["uncached_input_tokens"] = self.uncached_input_tokens
-        row["cache_ratio"] = self.cache_ratio
-        row["reasoning_output_ratio"] = self.reasoning_output_ratio
-        row["context_window_percent"] = self.context_window_percent
-        return {column: row[column] for column in USAGE_EVENT_COLUMN_NAMES}
+        values = {column: getattr(self, column) for column in _BASE_USAGE_EVENT_COLUMN_NAMES}
+        values["uncached_input_tokens"] = self.uncached_input_tokens
+        values["cache_ratio"] = self.cache_ratio
+        values["reasoning_output_ratio"] = self.reasoning_output_ratio
+        values["context_window_percent"] = self.context_window_percent
+        return {column: values[column] for column in USAGE_EVENT_COLUMN_NAMES}
 
 
 @dataclass(frozen=True)
