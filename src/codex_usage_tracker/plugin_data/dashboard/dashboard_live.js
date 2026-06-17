@@ -41,14 +41,14 @@
     } = deps;
 
     let refreshInFlight = false;
+    let statusRefreshInFlight = false;
     let rowHydrationInFlight = false;
-    let rowHydrationComplete = getData().length > 0;
+    let requestedRowHydrationTarget = 0;
+    let rowHydrationComplete = false;
     let rowHydrationNextOffset = getData().length;
     let rowHydrationError = '';
     let rowHydrationGeneration = 0;
     let rowHydrationRestartRequested = false;
-    let usageImpactRetryTimer = null;
-    let usageImpactRetryAttempts = 0;
     let autoRefreshTimer = null;
 
     function loadedRowsDescription() {
@@ -56,17 +56,36 @@
       const loaded = number.format(data.length);
       const available = number.format(getTotalAvailableRows() || data.length);
       const loadedLimit = getLoadedLimit();
-      const capped = loadedLimit !== null && getTotalAvailableRows() > data.length;
+      const capped = getTotalAvailableRows() > data.length;
       return capped
         ? tf('caption.loaded_capped', { loaded, available })
         : tf('caption.loaded', { loaded });
     }
 
-    function rowHydrationTarget() {
+    function rowHydrationCeiling() {
       const available = Math.max(0, Number(getTotalAvailableRows() || 0));
       if (!available) return 0;
       const loadedLimit = getLoadedLimit();
       return loadedLimit === null ? available : Math.min(available, Number(loadedLimit || available));
+    }
+
+    function automaticRowHydrationTarget() {
+      const ceiling = rowHydrationCeiling();
+      if (!ceiling) return 0;
+      const loadedLimit = getLoadedLimit();
+      if (loadedLimit !== null) return ceiling;
+      const initialTarget = Math.max(1, Number(initialHydrationChunkSize || 500));
+      return Math.min(ceiling, Math.max(initialTarget, getData().length));
+    }
+
+    function rowHydrationTarget() {
+      const ceiling = rowHydrationCeiling();
+      if (!ceiling) return 0;
+      requestedRowHydrationTarget = Math.min(
+        ceiling,
+        Math.max(requestedRowHydrationTarget, automaticRowHydrationTarget(), getData().length),
+      );
+      return requestedRowHydrationTarget;
     }
 
     function shouldHydrateCallRows() {
@@ -77,6 +96,14 @@
     function rowsNeedHydration() {
       const target = rowHydrationTarget();
       return liveRefreshSupported && shouldHydrateCallRows() && !rowHydrationComplete && target > 0 && Math.max(getData().length, rowHydrationNextOffset) < target;
+    }
+
+    function rowsCanHydrateMore() {
+      const ceiling = rowHydrationCeiling();
+      return liveRefreshSupported
+        && shouldHydrateCallRows()
+        && ceiling > 0
+        && Math.max(getData().length, rowHydrationNextOffset) < ceiling;
     }
 
     function updateRowLoadProgress() {
@@ -128,16 +155,6 @@
         loadLimitEl.insertBefore(option, loadLimitEl.lastElementChild);
       }
       loadLimitEl.value = value;
-    }
-
-    function scheduleUsageImpactRetry() {
-      if (usageImpactRetryTimer || !shouldHydrateCallRows()) return;
-      if (usageImpactRetryAttempts >= 6) return;
-      usageImpactRetryTimer = window.setTimeout(() => {
-        usageImpactRetryTimer = null;
-        usageImpactRetryAttempts += 1;
-        refreshLoadedUsageImpactRows();
-      }, Math.min(5000, 1200 + (usageImpactRetryAttempts * 600)));
     }
 
     function refreshResultNumber(result, key) {
@@ -193,6 +210,7 @@
         sort: 'time',
         direction: 'desc',
         lang: i18n.currentLanguage,
+        compact: '1',
         _: String(Date.now()),
       });
       const response = await fetch(`/api/calls?${params.toString()}`, {
@@ -209,28 +227,6 @@
       const payload = await response.json();
       if (payload.error) throw new Error(payload.error);
       return payload;
-    }
-
-    async function refreshLoadedUsageImpactRows() {
-      if (!liveRefreshSupported || !shouldHydrateCallRows() || !getData().length) return;
-      if (rowHydrationInFlight) {
-        scheduleUsageImpactRetry();
-        return;
-      }
-      try {
-        const limit = Math.max(1, Math.min(getData().length, initialHydrationChunkSize || 500));
-        const payload = await fetchCallRows(limit, 0);
-        applyDashboardPayload(payload, { appendRows: true });
-        if (payload.usage_impact_pending) {
-          scheduleUsageImpactRetry();
-        } else {
-          usageImpactRetryAttempts = 0;
-        }
-        render();
-      } catch (_error) {
-        // Usage-impact estimates are supplemental. Row hydration and live
-        // refresh must stay usable even if this background update fails.
-      }
     }
 
     async function refreshAppendedRows(refreshResult, scopedRows) {
@@ -261,6 +257,33 @@
       updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
     }
 
+    async function hydrateMoreRows(minimumTarget = null) {
+      if (!liveRefreshSupported || !shouldHydrateCallRows()) return false;
+      const ceiling = rowHydrationCeiling();
+      if (!ceiling || Math.max(getData().length, rowHydrationNextOffset) >= ceiling) return false;
+      const currentTarget = rowHydrationTarget();
+      const chunk = Math.max(1, Number(backgroundHydrationChunkSize || initialHydrationChunkSize || 500));
+      const requestedMinimum = Number.isFinite(Number(minimumTarget))
+        ? Math.max(0, Number(minimumTarget))
+        : 0;
+      const nextTarget = requestedMinimum
+        ? Math.max(currentTarget, requestedMinimum)
+        : Math.max(currentTarget, Math.max(getData().length, rowHydrationNextOffset) + chunk);
+      requestedRowHydrationTarget = Math.min(
+        ceiling,
+        nextTarget,
+      );
+      rowHydrationComplete = false;
+      if (rowHydrationInFlight) {
+        rowHydrationRestartRequested = true;
+        updateRowLoadProgress();
+        return false;
+      }
+      const before = getData().length;
+      await hydrateDashboardRows();
+      return getData().length > before;
+    }
+
     async function hydrateDashboardRows(options = null) {
       if (!liveRefreshSupported || !shouldHydrateCallRows()) return;
       const hydrateOptions = options || {};
@@ -277,6 +300,7 @@
       }
       if (hydrateOptions.reset) {
         resetRowsForHydration();
+        requestedRowHydrationTarget = 0;
         rowHydrationComplete = false;
         rowHydrationNextOffset = 0;
         rowHydrationGeneration += 1;
@@ -293,7 +317,6 @@
       const generation = rowHydrationGeneration;
       rowHydrationInFlight = true;
       rowHydrationError = '';
-      let usageImpactPending = false;
       let reachedEnd = false;
       updateLiveStatus('status.checking', t('live.loading_rows'));
       updateRowLoadProgress();
@@ -307,7 +330,6 @@
             remaining,
           );
           const payload = await fetchCallRows(chunkSize, offset);
-          if (payload.usage_impact_pending) usageImpactPending = true;
           if (generation !== rowHydrationGeneration || !shouldHydrateCallRows()) break;
           const rows = payloadRows(payload);
           if (!rows.length) {
@@ -326,7 +348,6 @@
           }
         }
         rowHydrationComplete = reachedEnd || Math.max(getData().length, rowHydrationNextOffset) >= rowHydrationTarget();
-        if (!usageImpactPending) usageImpactRetryAttempts = 0;
         updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
       } catch (error) {
         rowHydrationError = error.message || String(error);
@@ -340,13 +361,14 @@
           hydrateDashboardRows();
         } else {
           render();
-          if (usageImpactPending) scheduleUsageImpactRetry();
         }
       }
     }
 
     async function refreshDashboardIfStale() {
       if (!liveRefreshSupported || !apiToken() || activeView() === 'call') return;
+      if (statusRefreshInFlight) return;
+      statusRefreshInFlight = true;
       try {
         const params = new URLSearchParams({
           include_archived: getIncludeArchived() ? '1' : '0',
@@ -400,6 +422,8 @@
         }
       } catch (_error) {
         // Background freshness checks must never interrupt the local dashboard.
+      } finally {
+        statusRefreshInFlight = false;
       }
     }
 
@@ -483,12 +507,14 @@
     }
 
     return {
+      hydrateMoreRows,
       historyRowsDescription,
       hydrateDashboardRows,
       loadedRowsDescription,
       refreshDashboardData,
       refreshDashboardIfStale,
       rowHydrationTarget,
+      rowsCanHydrateMore,
       rowsNeedHydration,
       scheduleAutoRefresh,
       updateHistoryScopeControl,

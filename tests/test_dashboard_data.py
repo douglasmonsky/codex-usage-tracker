@@ -574,16 +574,191 @@ console.log(JSON.stringify({
     assert payload["appliedPayloads"][0]["appendRows"] is True
 
 
-def test_live_usage_impact_retry_updates_loaded_rows_without_rehydrating_table() -> None:
+def test_live_refresh_skips_overlapping_status_checks() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let data = [{ record_id: 'a' }];
+let requestUrls = [];
+let resolveStatus;
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return new Promise(resolve => {
+    resolveStatus = () => resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        row_counts: { scoped_rows: 1 },
+        refresh_result: {
+          skipped_downstream_work: true,
+          inserted_records: 0,
+          inserted_or_updated_events: 0,
+          deleted_records: 0,
+          full_reparse_source_files: 0,
+        },
+      }),
+    });
+  });
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: () => {},
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => data,
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 1,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => { data = []; },
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+});
+const first = runtime.refreshDashboardIfStale();
+const second = runtime.refreshDashboardIfStale();
+await new Promise(resolve => setTimeout(resolve, 10));
+const requestCountBeforeResolve = requestUrls.length;
+resolveStatus();
+await Promise.all([first, second]);
+console.log(JSON.stringify({
+  requestCountBeforeResolve,
+  requestUrls,
+}));
+"""
+    )
+
+    assert payload["requestCountBeforeResolve"] == 1
+    assert len(payload["requestUrls"]) == 1
+    assert payload["requestUrls"][0].startswith("/api/status?")
+
+
+def test_live_row_hydration_all_calls_stops_after_initial_chunk() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let data = [];
+let requestUrls = [];
+let progressHidden = true;
+let progressText = '';
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      rows: [{ record_id: 'a' }, { record_id: 'b' }],
+      row_count: 2,
+      total_matched_rows: 6,
+      has_more: true,
+      next_offset: 2,
+      usage_impact_pending: false,
+    }),
+  };
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: (payload, options = {}) => {
+    if (!options.appendRows) {
+      data = payload.rows || [];
+      return;
+    }
+    data = data.concat(payload.rows || []);
+  },
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => data,
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 6,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => { data = []; },
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: {
+    get textContent() { return progressText; },
+    set textContent(value) { progressText = value; },
+  },
+  rowLoadProgressEl: {
+    get hidden() { return progressHidden; },
+    set hidden(value) { progressHidden = value; },
+  },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+});
+await runtime.hydrateDashboardRows();
+console.log(JSON.stringify({
+  requestCount: requestUrls.length,
+  requestUrls,
+  offsets: requestUrls.map(url => new URL(url, 'http://localhost').searchParams.get('offset')),
+  dataLength: data.length,
+  rowsNeedHydration: runtime.rowsNeedHydration(),
+  rowsCanHydrateMore: runtime.rowsCanHydrateMore(),
+  rowHydrationTarget: runtime.rowHydrationTarget(),
+  progressHidden,
+  progressText,
+}));
+"""
+    )
+
+    assert payload["requestCount"] == 1
+    assert payload["offsets"] == ["0"]
+    assert all("compact=1" in url for url in payload["requestUrls"])
+    assert payload["dataLength"] == 2
+    assert payload["rowsNeedHydration"] is False
+    assert payload["rowsCanHydrateMore"] is True
+    assert payload["rowHydrationTarget"] == 2
+    assert payload["progressHidden"] is True
+    assert '"loaded":"2"' in payload["progressText"]
+
+
+def test_live_row_hydration_does_not_poll_first_page_for_pending_usage_impact() -> None:
     payload = _run_dashboard_live_script(
         """
 let data = [];
 let requestUrls = [];
 let resetCalls = 0;
 let renderCount = 0;
-let fetchIndex = 0;
-const responses = [
-  {
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return {
     ok: true,
     status: 200,
     json: async () => ({
@@ -596,25 +771,7 @@ const responses = [
       has_more: false,
       usage_impact_pending: true,
     }),
-  },
-  {
-    ok: true,
-    status: 200,
-    json: async () => ({
-      rows: [
-        { record_id: 'a', usage_impact: { primary: null, secondary: { estimate_percent: 0.123 } } },
-        { record_id: 'b', usage_impact: { primary: null, secondary: { estimate_percent: 0.456 } } },
-      ],
-      row_count: 2,
-      total_matched_rows: 2,
-      has_more: false,
-      usage_impact_pending: false,
-    }),
-  },
-];
-context.fetch = async url => {
-  requestUrls.push(String(url));
-  return responses[fetchIndex++];
+  };
 };
 const runtime = helpers.create({
   activeView: () => 'calls',
@@ -679,10 +836,11 @@ console.log(JSON.stringify({
 
     assert payload["resetCalls"] == 0
     assert payload["renderCount"] >= 1
-    assert len(payload["requestUrls"]) == 2
+    assert len(payload["requestUrls"]) == 1
     assert all(url.startswith("/api/calls?") for url in payload["requestUrls"])
+    assert all("compact=1" in url for url in payload["requestUrls"])
     assert payload["data"][0]["record_id"] == "a"
-    assert payload["data"][0]["usage_impact"]["secondary"]["estimate_percent"] == 0.123
+    assert payload["data"][0]["usage_impact_pending"] is True
 
 
 def test_live_row_hydration_advances_by_api_offset_when_rows_are_merged() -> None:
@@ -781,7 +939,7 @@ const runtime = helpers.create({
   tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
   updateLiveStatus: () => {},
 });
-await runtime.hydrateDashboardRows();
+await runtime.hydrateMoreRows(6);
 console.log(JSON.stringify({
   offsets: requestUrls.map(url => new URL(url, 'http://localhost').searchParams.get('offset')),
   dataLength: data.length,
@@ -795,6 +953,188 @@ console.log(JSON.stringify({
     assert payload["dataLength"] == 5
     assert payload["progressHidden"] is True
     assert '"loaded":"6"' in payload["progressText"]
+
+
+def test_live_row_hydration_explicit_target_does_not_overfetch() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let data = [{ record_id: 'a' }, { record_id: 'b' }];
+let requestUrls = [];
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      rows: [{ record_id: 'c' }, { record_id: 'd' }],
+      row_count: 2,
+      total_matched_rows: 10,
+      has_more: true,
+      next_offset: 4,
+      usage_impact_pending: false,
+    }),
+  };
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: (payload, options = {}) => {
+    if (!options.appendRows) {
+      data = payload.rows || [];
+      return;
+    }
+    data = data.concat(payload.rows || []);
+  },
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => data,
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 10,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 5,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => { data = []; },
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+});
+await runtime.hydrateMoreRows(4);
+console.log(JSON.stringify({
+  limits: requestUrls.map(url => new URL(url, 'http://localhost').searchParams.get('limit')),
+  offsets: requestUrls.map(url => new URL(url, 'http://localhost').searchParams.get('offset')),
+  dataLength: data.length,
+  target: runtime.rowHydrationTarget(),
+}));
+"""
+    )
+
+    assert payload["limits"] == ["2"]
+    assert payload["offsets"] == ["2"]
+    assert payload["dataLength"] == 4
+    assert payload["target"] == 4
+
+
+def test_live_row_hydration_queues_target_increase_while_loading() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let data = [];
+let requestUrls = [];
+let firstResponseResolve;
+const responses = [
+  () => new Promise(resolve => {
+    firstResponseResolve = () => resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        rows: [{ record_id: 'a' }, { record_id: 'b' }],
+        row_count: 2,
+        total_matched_rows: 6,
+        has_more: true,
+        next_offset: 2,
+        usage_impact_pending: false,
+      }),
+    });
+  }),
+  () => Promise.resolve({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      rows: [{ record_id: 'c' }, { record_id: 'd' }],
+      row_count: 2,
+      total_matched_rows: 6,
+      has_more: true,
+      next_offset: 4,
+      usage_impact_pending: false,
+    }),
+  }),
+];
+let fetchIndex = 0;
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return responses[fetchIndex++]();
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: (payload, options = {}) => {
+    if (!options.appendRows) {
+      data = payload.rows || [];
+      return;
+    }
+    data = data.concat(payload.rows || []);
+  },
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => data,
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 6,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => { data = []; },
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+});
+const initialPromise = runtime.hydrateDashboardRows();
+await new Promise(resolve => setTimeout(resolve, 10));
+const queuedResult = await runtime.hydrateMoreRows(4);
+firstResponseResolve();
+await initialPromise;
+await new Promise(resolve => setTimeout(resolve, 50));
+console.log(JSON.stringify({
+  queuedResult,
+  offsets: requestUrls.map(url => new URL(url, 'http://localhost').searchParams.get('offset')),
+  dataLength: data.length,
+  target: runtime.rowHydrationTarget(),
+  rowsNeedHydration: runtime.rowsNeedHydration(),
+}));
+"""
+    )
+
+    assert payload["queuedResult"] is False
+    assert payload["offsets"] == ["0", "2"]
+    assert payload["dataLength"] == 4
+    assert payload["target"] == 4
+    assert payload["rowsNeedHydration"] is False
 
 
 def test_live_refresh_auth_failure_stops_polling_and_surfaces_error() -> None:

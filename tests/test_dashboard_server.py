@@ -593,6 +593,65 @@ def test_dashboard_server_thread_api_exposes_usage_impact_summary(tmp_path: Path
     assert threads_payload["raw_context_included"] is False
 
 
+def test_dashboard_server_thread_api_skips_usage_impact_for_default_sort(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from codex_usage_tracker import server as server_module
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    def fail_usage_impact_query(*args, **kwargs):
+        _ = args, kwargs
+        raise AssertionError("default thread loads must not aggregate usage impact")
+
+    monkeypatch.setattr(
+        server_module,
+        "query_thread_usage_impact_summaries",
+        fail_usage_impact_query,
+    )
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=codex_home,
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        threads_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/threads?sort=time&direction=desc&limit=2"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert threads_payload["schema"] == "codex-usage-tracker-threads-v1"
+    assert threads_payload["row_count"] >= 1
+    assert threads_payload["rows"][0]["model_summary"] == "gpt-5.5"
+    assert threads_payload["rows"][0]["effort_summary"] != "Unknown"
+    assert threads_payload["rows"][0]["estimated_cost_usd"] is not None
+    assert "usage_impact" not in threads_payload["rows"][0]
+
+
 def test_dashboard_server_exposes_lifecycle_recommendations(tmp_path: Path) -> None:
     from codex_usage_tracker.server import _UsageDashboardHandler
 
@@ -974,6 +1033,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         calls_payload = _read_json(
             f"{base_url}/api/calls?limit=2&sort=tokens&direction=desc&q=Codex"
         )
+        compact_calls_payload = _read_json(
+            f"{base_url}/api/calls?limit=2&sort=tokens&direction=desc&q=Codex&compact=1"
+        )
         offset_payload = _read_json(
             f"{base_url}/api/calls?limit=1&offset=1&sort=tokens&direction=desc&q=Codex"
         )
@@ -1023,6 +1085,18 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert calls_payload["has_more"] is True
     assert calls_payload["next_offset"] == 2
     assert calls_payload["rows"][0]["total_tokens"] >= calls_payload["rows"][1]["total_tokens"]
+    assert compact_calls_payload["schema"] == "codex-usage-tracker-calls-v1"
+    assert compact_calls_payload["row_count"] == 2
+    assert compact_calls_payload["filters"]["compact"] is True
+    compact_row = compact_calls_payload["rows"][0]
+    assert compact_row["record_id"] == calls_payload["rows"][0]["record_id"]
+    assert "total_tokens" in compact_row
+    assert "cached_input_tokens" in compact_row
+    assert "uncached_input_tokens" in compact_row
+    assert "action_recommendations" not in compact_row
+    assert "primary_recommendation" not in compact_row
+    assert "secondary_recommendations" not in compact_row
+    assert "flag_explanations" not in compact_row
     assert offset_payload["rows"][0]["record_id"] != calls_payload["rows"][0]["record_id"]
 
     assert call_payload["schema"] == "codex-usage-tracker-call-v1"

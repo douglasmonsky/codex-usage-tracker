@@ -1220,6 +1220,7 @@ def query_usage_api_events(
     include_archived: bool = False,
     sort: str = "time",
     direction: str = "desc",
+    include_parent_threads: bool = True,
 ) -> list[dict[str, Any]]:
     """Return a SQL-backed slice for live dashboard call APIs."""
 
@@ -1249,18 +1250,24 @@ def query_usage_api_events(
     elif normalized_offset:
         limit_clause = "LIMIT -1 OFFSET ?"
         query_params.append(normalized_offset)
-    parent_where_clause, parent_params = _usage_where_clause(include_archived=include_archived)
-    parent_thread_filter = (
-        f"{parent_where_clause} AND thread_name IS NOT NULL"
-        if parent_where_clause
-        else "WHERE thread_name IS NOT NULL"
-    )
     with connect(db_path) as conn:
         init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
+        parent_params: list[Any] = []
+        parent_join = ""
+        parent_select = """
+                usage_events.parent_thread_name AS resolved_parent_thread_name,
+                usage_events.parent_session_updated_at AS resolved_parent_session_updated_at
+        """
+        if include_parent_threads:
+            parent_where_clause, parent_params = _usage_where_clause(
+                include_archived=include_archived
+            )
+            parent_thread_filter = (
+                f"{parent_where_clause} AND thread_name IS NOT NULL"
+                if parent_where_clause
+                else "WHERE thread_name IS NOT NULL"
+            )
+            parent_select = """
                 coalesce(
                     usage_events.parent_thread_name,
                     parent_threads.thread_name
@@ -1269,7 +1276,8 @@ def query_usage_api_events(
                     usage_events.parent_session_updated_at,
                     parent_threads.session_updated_at
                 ) AS resolved_parent_session_updated_at
-            FROM usage_events
+            """
+            parent_join = f"""
             LEFT JOIN (
                 SELECT
                     session_id,
@@ -1280,6 +1288,14 @@ def query_usage_api_events(
                 GROUP BY session_id
             ) AS parent_threads
             ON usage_events.parent_session_id = parent_threads.session_id
+            """
+        rows = conn.execute(
+            f"""
+            SELECT
+                usage_events.*,
+                {parent_select}
+            FROM usage_events
+            {parent_join}
             {where_clause}
             ORDER BY {order_expr} {direction_sql},
                 usage_events.event_timestamp DESC,

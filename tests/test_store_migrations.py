@@ -177,6 +177,17 @@ def test_task_receipts_table_is_created(tmp_path: Path) -> None:
     assert "idx_task_receipts_category_confidence" in indexes
 
 
+def test_init_db_current_schema_is_read_only_safe(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+
+    with connect(db_path) as conn:
+        init_db(conn)
+
+    with connect(db_path) as conn:
+        conn.execute("PRAGMA query_only = ON")
+        init_db(conn)
+
+
 def test_thread_work_sessions_table_is_created(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
 

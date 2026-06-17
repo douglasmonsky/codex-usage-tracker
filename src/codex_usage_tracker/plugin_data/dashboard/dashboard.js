@@ -177,9 +177,9 @@
     if (liveRefreshSupported && initialState.historyScope === 'all') includeArchived = true;
     const needsInitialHistoryRefresh = liveRefreshSupported && includeArchived !== initialPayloadIncludeArchived;
     const liveRefreshIntervalMs = 10000;
-    const pageSize = 500;
-    const initialHydrationChunkSize = 500;
-    const backgroundHydrationChunkSize = 2000;
+    const pageSize = 250;
+    const initialHydrationChunkSize = 250;
+    const backgroundHydrationChunkSize = 500;
     const threadCallPageSize = 100;
     const defaultContextEntries = 80;
     const datePresetLabels = {
@@ -912,12 +912,14 @@
       updateLiveStatus,
     });
     const {
+      hydrateMoreRows,
       historyRowsDescription,
       hydrateDashboardRows,
       loadedRowsDescription,
       refreshDashboardData,
       refreshDashboardIfStale,
       rowHydrationTarget,
+      rowsCanHydrateMore,
       rowsNeedHydration,
       scheduleAutoRefresh,
       updateHistoryScopeControl,
@@ -1460,15 +1462,23 @@
     function updateLoadMoreControl(page, itemLabel = 'table.rows') {
       pagerEl.hidden = !page.total;
       loadMoreRowsEl.hidden = page.end >= page.total;
+      loadMoreRowsEl.disabled = false;
       if (!page.total) {
         pageStatusEl.textContent = t('state.no_rows');
         return;
+      }
+      if (activeView === 'calls' && rowsNeedHydration()) {
+        loadMoreRowsEl.disabled = true;
       }
       pageStatusEl.textContent = tf('table.visible_status', {
         end: number.format(page.end),
         total: number.format(page.total),
         items: t(itemLabel),
       });
+    }
+    function callsVisibleTotal(rows) {
+      if (activeView !== 'calls' || clientFiltersActive()) return rows.length;
+      return Math.max(rows.length, Number(totalAvailableRows || 0));
     }
     const dashboardTables = dashboardTablesFactory.create({
       activePresetDefinition,
@@ -1484,6 +1494,7 @@
       getActiveView: () => activeView,
       getInitialDetailApplied: () => initialDetailApplied,
       getInitialThreadExpansionApplied: () => initialThreadExpansionApplied,
+      getCallRowsVisibleTotal: callsVisibleTotal,
       getPricingConfigured: () => pricingConfigured,
       getSelectedRecordId: () => selectedRecordId,
       getSelectedThreadKey: () => selectedThreadKey,
@@ -2041,6 +2052,16 @@
           } else {
             render();
           }
+          return;
+        }
+        const nextPageEnd = (currentPage + 1) * pageSize;
+        if (activeView === 'calls' && rowsCanHydrateMore() && data.length < nextPageEnd) {
+          hydrateMoreRows(nextPageEnd).then(loaded => {
+            if (loaded !== false) currentPage += 1;
+            render();
+          }).catch(() => {
+            render();
+          });
           return;
         }
         currentPage += 1;

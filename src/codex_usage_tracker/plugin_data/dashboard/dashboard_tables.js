@@ -12,6 +12,7 @@
       escapeHtml,
       expandedThreads,
       getActiveView,
+      getCallRowsVisibleTotal = rows => rows.length,
       getInitialDetailApplied,
       getInitialThreadExpansionApplied,
       getPricingConfigured,
@@ -144,6 +145,7 @@
       configureCallTable();
       ensurePendingFocusVisibleInRows(rows);
       const page = visibleSlice(rows);
+      page.total = getCallRowsVisibleTotal(rows);
       updateLoadMoreControl(page, 'table.calls');
       tableTitleEl.textContent = t('dashboard.model_calls');
       const preset = activePresetDefinition();

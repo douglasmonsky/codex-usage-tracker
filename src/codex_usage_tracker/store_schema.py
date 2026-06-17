@@ -51,6 +51,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     """Create or repair the aggregate usage schema in-place."""
 
     user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if user_version == SCHEMA_VERSION and _schema_is_current(conn):
+        return
     _ensure_migrations_table(conn)
     if user_version < 1:
         _migrate_v1(conn)
@@ -132,6 +134,48 @@ def init_db(conn: sqlite3.Connection) -> None:
         _record_migration_if_missing(conn, 13)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+def _schema_is_current(conn: sqlite3.Connection) -> bool:
+    """Return whether the current schema can be used without repair writes."""
+
+    required_tables = {
+        "usage_events",
+        "refresh_meta",
+        "schema_migrations",
+        "source_files",
+        "thread_summaries",
+        "thread_work_sessions",
+        "thread_context_epochs",
+        "usage_impact",
+        "task_receipts",
+    }
+    try:
+        existing_tables = {
+            str(row["name"])
+            for row in conn.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'table'
+                """
+            ).fetchall()
+        }
+        if not required_tables <= existing_tables:
+            return False
+        existing_migrations = {
+            int(row["version"])
+            for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+        }
+    except (sqlite3.DatabaseError, KeyError, TypeError, ValueError):
+        return False
+    if not set(range(1, SCHEMA_VERSION + 1)) <= existing_migrations:
+        return False
+    try:
+        _validate_usage_events_schema(conn)
+    except (sqlite3.DatabaseError, SchemaMigrationError):
+        return False
+    return True
 
 
 def _ensure_migrations_table(conn: sqlite3.Connection) -> None:

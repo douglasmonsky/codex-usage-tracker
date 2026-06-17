@@ -118,6 +118,54 @@ _truthy = server_utils.truthy_query_value
 _url_host = server_utils.url_host
 _utc_now = server_utils.utc_now
 _validate_context_api_mode = server_utils.validate_context_api_mode
+
+COMPACT_USAGE_IMPACT_WINDOW_KEYS = {
+    "basis",
+    "calibration_limit_id",
+    "calibration_plan_type",
+    "calibration_sample_count",
+    "estimate_percent",
+    "interval_call_count",
+    "label",
+    "limit_id",
+    "lower_percent",
+    "source",
+    "source_note",
+    "upper_percent",
+}
+
+COMPACT_LIVE_ROW_KEYS = {
+    "cache_ratio",
+    "cached_input_tokens",
+    "call_initiator",
+    "call_initiator_confidence",
+    "call_initiator_reason",
+    "context_window_percent",
+    "effort",
+    "estimated_cost_usd",
+    "event_timestamp",
+    "input_tokens",
+    "model",
+    "output_tokens",
+    "pricing_estimated",
+    "pricing_model",
+    "rate_limit_limit_id",
+    "reasoning_output_tokens",
+    "record_id",
+    "session_id",
+    "thread_attachment_key",
+    "thread_attachment_label",
+    "thread_attachment_relation",
+    "thread_call_index",
+    "thread_key",
+    "thread_name",
+    "thread_source",
+    "total_tokens",
+    "uncached_input_tokens",
+    "usage_credit_confidence",
+    "usage_credits",
+    "usage_impact_pending",
+}
 _validate_loopback_host = server_utils.validate_loopback_host
 
 
@@ -133,6 +181,38 @@ def _refresh_result_invalidates_usage_impact(result: object) -> bool:
             "inserted_or_updated_events",
         )
     )
+
+
+def _compact_usage_impact(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    compact: dict[str, object] = {}
+    for window_name in ("primary", "secondary"):
+        window = value.get(window_name)
+        if not isinstance(window, dict) or window.get("estimate_percent") is None:
+            continue
+        compact_window = {
+            key: window[key]
+            for key in COMPACT_USAGE_IMPACT_WINDOW_KEYS
+            if key in window and window[key] is not None
+        }
+        if compact_window:
+            compact[window_name] = compact_window
+    if not compact:
+        return None
+    return compact
+
+
+def _compact_live_row(row: dict[str, Any]) -> dict[str, Any]:
+    compact = {
+        key: row[key]
+        for key in COMPACT_LIVE_ROW_KEYS
+        if key in row
+    }
+    usage_impact = _compact_usage_impact(row.get("usage_impact"))
+    if usage_impact is not None:
+        compact["usage_impact"] = usage_impact
+    return compact
 
 
 def _sum_optional_number(values: Any) -> float | None:
@@ -298,7 +378,6 @@ def serve_dashboard(
         allowance_path=allowance_path,
         rate_card_path=rate_card_path,
     )
-    usage_impact_cache.warm_async(include_archived=include_archived)
     output = generate_dashboard(
         db_path=db_path,
         output_path=output_path,
@@ -770,6 +849,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         params = parse_qs(query)
         try:
             query_params = self._live_query_params(params)
+            compact = _parse_bool(_first(params.get("compact")), False)
             pricing_status = _optional_filter(
                 _first(params.get("pricing_status")),
                 QUERY_PRICING_STATUS_CHOICES,
@@ -784,6 +864,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 query_params=query_params,
                 pricing_status=pricing_status,
                 credit_confidence=credit_confidence,
+                compact=compact,
             )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -810,6 +891,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                     **query_params["filters"],
                     "pricing_status": pricing_status,
                     "credit_confidence": credit_confidence,
+                    "compact": compact,
                 },
                 "raw_context_included": False,
             },
@@ -1148,6 +1230,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 search=search,
                 include_archived=include_archived,
             )
+            include_usage_impact = sort == "usage_impact"
             if sort in {"cost", "usage", "usage_impact"}:
                 sorted_rows = query_thread_summaries(
                     db_path=self._db_path,
@@ -1161,6 +1244,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 sorted_rows = self._annotate_thread_summary_rows(
                     sorted_rows,
                     include_archived=include_archived,
+                    include_usage_impact=include_usage_impact,
                 )
                 reverse = direction.lower() != "asc"
                 sorted_rows.sort(
@@ -1209,6 +1293,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         rows: list[dict[str, Any]],
         *,
         include_archived: bool,
+        include_usage_impact: bool = False,
     ) -> list[dict[str, Any]]:
         if not rows:
             return rows
@@ -1231,14 +1316,17 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             if not key:
                 continue
             buckets_by_thread.setdefault(key, []).append(bucket)
-        impact_summaries = query_thread_usage_impact_summaries(
-            db_path=self._db_path,
-            thread_keys=thread_keys,
-            include_archived=include_archived,
-        )
-        usage_impact_by_thread, pending_impact_by_thread = _thread_usage_impact_by_thread(
-            impact_summaries
-        )
+        usage_impact_by_thread: dict[str, dict[str, Any]] = {}
+        pending_impact_by_thread: dict[str, bool] = {}
+        if include_usage_impact:
+            impact_summaries = query_thread_usage_impact_summaries(
+                db_path=self._db_path,
+                thread_keys=thread_keys,
+                include_archived=include_archived,
+            )
+            usage_impact_by_thread, pending_impact_by_thread = _thread_usage_impact_by_thread(
+                impact_summaries
+            )
         annotated_rows: list[dict[str, Any]] = []
         for row in rows:
             copy = dict(row)
@@ -1408,6 +1496,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         query_params: dict[str, Any],
         pricing_status: str | None,
         credit_confidence: str | None,
+        compact: bool = False,
     ) -> tuple[list[dict[str, Any]], int]:
         derived_filter = bool(pricing_status or credit_confidence)
         rows = query_usage_api_events(
@@ -1424,10 +1513,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             include_archived=query_params["include_archived"],
             sort=query_params["sort"],
             direction=query_params["direction"],
+            include_parent_threads=not compact,
         )
         rows = self._annotate_live_rows(
             rows,
             include_archived=query_params["include_archived"],
+            compact=compact,
         )
         if derived_filter:
             rows = [
@@ -1462,6 +1553,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         rows: list[dict[str, Any]],
         *,
         include_archived: bool,
+        compact: bool = False,
     ) -> list[dict[str, Any]]:
         if not rows:
             return []
@@ -1471,7 +1563,6 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._allowance_path,
             rate_card_path=self._rate_card_path,
         )
-        thresholds = load_threshold_config(self._thresholds_path)
         projects = load_project_config(self._projects_path)
         rows = annotate_rows_with_allowance(
             annotate_rows_with_efficiency(rows, pricing),
@@ -1483,9 +1574,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             block=False,
             schedule_warm=False,
         )
-        rows = annotate_rows_with_recommendations(rows, thresholds)
+        if not compact:
+            thresholds = load_threshold_config(self._thresholds_path)
+            rows = annotate_rows_with_recommendations(rows, thresholds)
         rows = annotate_rows_with_project_identity(rows, projects)
-        return apply_project_privacy_to_rows(rows, privacy_mode=self._privacy_mode)
+        rows = apply_project_privacy_to_rows(rows, privacy_mode=self._privacy_mode)
+        if compact:
+            return [_compact_live_row(row) for row in rows]
+        return rows
 
     def _handle_usage(self, query: str) -> None:
         params = parse_qs(query)
