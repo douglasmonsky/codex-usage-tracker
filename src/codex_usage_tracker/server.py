@@ -166,6 +166,7 @@ COMPACT_LIVE_ROW_KEYS = {
     "usage_credits",
     "usage_impact_pending",
 }
+MAX_USAGE_IMPACT_RECORD_IDS = 500
 _validate_loopback_host = server_utils.validate_loopback_host
 
 
@@ -213,6 +214,16 @@ def _compact_live_row(row: dict[str, Any]) -> dict[str, Any]:
     if usage_impact is not None:
         compact["usage_impact"] = usage_impact
     return compact
+
+
+def _usage_impact_row_payload(row: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {"record_id": row.get("record_id")}
+    usage_impact = _compact_usage_impact(row.get("usage_impact"))
+    if usage_impact is not None:
+        payload["usage_impact"] = usage_impact
+    if row.get("usage_impact_pending"):
+        payload["usage_impact_pending"] = True
+    return payload
 
 
 def _sum_optional_number(values: Any) -> float | None:
@@ -983,6 +994,41 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
 
     def _handle_usage_impact(self, query: str) -> None:
         params = parse_qs(query)
+        record_ids = self._usage_impact_record_ids(params)
+        if record_ids:
+            include_archived = _parse_bool(
+                _first(params.get("include_archived")),
+                self._include_archived,
+            )
+            try:
+                rows = self._usage_impact_cache.copy_usage_impact(
+                    [{"record_id": record_id} for record_id in record_ids],
+                    include_archived=include_archived,
+                    block=False,
+                    schedule_warm=False,
+                )
+            except sqlite3.Error as exc:
+                self._send_json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"error": f"Database error while reading usage impact: {exc}"},
+                )
+                return
+            compact_rows = [_usage_impact_row_payload(row) for row in rows]
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "schema": "codex-usage-tracker-usage-impact-visible-v1",
+                    "rows": compact_rows,
+                    "row_count": len(compact_rows),
+                    "record_ids": record_ids,
+                    "usage_impact_pending": any(
+                        row.get("usage_impact_pending") for row in compact_rows
+                    ),
+                    "include_archived": include_archived,
+                    "raw_context_included": False,
+                },
+            )
+            return
         record_id = _first(params.get("record_id")) or _first(params.get("record"))
         limit = _parse_api_limit(_first(params.get("limit")), 100)
         offset = _parse_api_offset(_first(params.get("offset")))
@@ -1014,6 +1060,22 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 limit=limit,
             ),
         )
+
+    def _usage_impact_record_ids(self, params: dict[str, list[str]]) -> list[str]:
+        raw_values: list[str] = []
+        raw_values.extend(params.get("record_ids") or [])
+        record_ids: list[str] = []
+        seen: set[str] = set()
+        for raw_value in raw_values:
+            for candidate in str(raw_value or "").split(","):
+                record_id = candidate.strip()
+                if not record_id or record_id in seen:
+                    continue
+                seen.add(record_id)
+                record_ids.append(record_id)
+                if len(record_ids) >= MAX_USAGE_IMPACT_RECORD_IDS:
+                    return record_ids
+        return record_ids
 
     def _handle_task_receipts(self, query: str) -> None:
         params = parse_qs(query)

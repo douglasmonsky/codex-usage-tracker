@@ -843,6 +843,161 @@ console.log(JSON.stringify({
     assert payload["data"][0]["usage_impact_pending"] is True
 
 
+def test_visible_usage_impact_hydration_is_single_flight_and_scoped() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let requestUrls = [];
+let appliedPayloads = [];
+let resolveUsageImpact;
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return new Promise(resolve => {
+    resolveUsageImpact = () => resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        schema: 'codex-usage-tracker-usage-impact-visible-v1',
+        rows: [
+          { record_id: 'a', usage_impact: { primary: { estimate_percent: 0.25 }, secondary: null } },
+          { record_id: 'b', usage_impact_pending: true },
+        ],
+        row_count: 2,
+        usage_impact_pending: true,
+      }),
+    });
+  });
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: () => {},
+  applyUsageImpactPayload: payload => { appliedPayloads.push(payload); },
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => [{ record_id: 'a' }, { record_id: 'b' }],
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 2,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => {},
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+  visibleUsageRecordIds: () => ['a', 'b'],
+});
+const first = runtime.hydrateVisibleUsageImpactRows();
+const second = runtime.hydrateVisibleUsageImpactRows();
+await new Promise(resolve => setTimeout(resolve, 10));
+resolveUsageImpact();
+const results = await Promise.all([first, second]);
+await new Promise(resolve => setTimeout(resolve, 25));
+console.log(JSON.stringify({
+  requestUrls,
+  recordIds: new URL(requestUrls[0], 'http://localhost').searchParams.get('record_ids'),
+  results,
+  appliedCount: appliedPayloads.length,
+  appliedRows: appliedPayloads[0].rows,
+}));
+"""
+    )
+
+    assert len(payload["requestUrls"]) == 1
+    assert payload["requestUrls"][0].startswith("/api/usage-impact?")
+    assert payload["recordIds"] == "a,b"
+    assert payload["results"] == [True, False]
+    assert payload["appliedCount"] == 1
+    assert payload["appliedRows"][0]["record_id"] == "a"
+
+
+def test_visible_usage_impact_hydration_does_not_retry_pending_estimates() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let requestUrls = [];
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      schema: 'codex-usage-tracker-usage-impact-visible-v1',
+      rows: [{ record_id: 'a', usage_impact_pending: true }],
+      row_count: 1,
+      usage_impact_pending: true,
+    }),
+  };
+};
+const runtime = helpers.create({
+  activeView: () => 'calls',
+  apiToken: () => 'token',
+  applyDashboardPayload: () => {},
+  applyUsageImpactPayload: () => {},
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => [{ record_id: 'a' }],
+  getIncludeArchived: () => false,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 1,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'active', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => {},
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+  visibleUsageRecordIds: () => ['a'],
+});
+await runtime.hydrateVisibleUsageImpactRows();
+await new Promise(resolve => setTimeout(resolve, 2100));
+runtime.hydrateVisibleUsageImpactRows();
+await new Promise(resolve => setTimeout(resolve, 25));
+console.log(JSON.stringify({
+  requestUrls,
+}));
+"""
+    )
+
+    assert len(payload["requestUrls"]) == 1
+    assert payload["requestUrls"][0].startswith("/api/usage-impact?")
+
+
 def test_live_row_hydration_advances_by_api_offset_when_rows_are_merged() -> None:
     payload = _run_dashboard_live_script(
         """

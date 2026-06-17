@@ -652,6 +652,105 @@ def test_dashboard_server_thread_api_skips_usage_impact_for_default_sort(
     assert "usage_impact" not in threads_payload["rows"][0]
 
 
+def test_dashboard_server_usage_impact_visible_records_are_bounded_and_nonblocking(
+    tmp_path: Path,
+) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    class FakeUsageImpactCache:
+        def __init__(self) -> None:
+            self.copy_calls: list[dict[str, object]] = []
+
+        def copy_usage_impact(
+            self,
+            rows: list[dict[str, object]],
+            *,
+            include_archived: bool,
+            block: bool = True,
+            schedule_warm: bool = True,
+        ) -> list[dict[str, object]]:
+            self.copy_calls.append(
+                {
+                    "record_ids": [row["record_id"] for row in rows],
+                    "include_archived": include_archived,
+                    "block": block,
+                    "schedule_warm": schedule_warm,
+                }
+            )
+            enriched: list[dict[str, object]] = []
+            for row in rows:
+                record_id = str(row["record_id"])
+                copy = dict(row)
+                if record_id == "visible-1":
+                    copy["usage_impact"] = {
+                        "primary": {
+                            "label": "5h",
+                            "estimate_percent": 0.125,
+                            "lower_percent": 0.1,
+                            "upper_percent": 0.15,
+                            "basis": "codex_credits",
+                        },
+                        "secondary": None,
+                    }
+                else:
+                    copy["usage_impact"] = {"primary": None, "secondary": None}
+                    copy["usage_impact_pending"] = True
+                enriched.append(copy)
+            return enriched
+
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    usage_impact_cache = FakeUsageImpactCache()
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+        usage_impact_cache=usage_impact_cache,
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}"
+            "/api/usage-impact?record_ids=visible-1,visible-2,visible-1&include_archived=1"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert payload["schema"] == "codex-usage-tracker-usage-impact-visible-v1"
+    assert payload["record_ids"] == ["visible-1", "visible-2"]
+    assert payload["row_count"] == 2
+    assert payload["usage_impact_pending"] is True
+    assert payload["raw_context_included"] is False
+    assert payload["rows"][0]["usage_impact"]["primary"]["estimate_percent"] == 0.125
+    assert payload["rows"][1]["usage_impact_pending"] is True
+    assert usage_impact_cache.copy_calls == [
+        {
+            "record_ids": ["visible-1", "visible-2"],
+            "include_archived": True,
+            "block": False,
+            "schedule_warm": False,
+        }
+    ]
+    assert "SECRET RAW PROMPT" not in json.dumps(payload)
+
+
 def test_dashboard_server_exposes_lifecycle_recommendations(tmp_path: Path) -> None:
     from codex_usage_tracker.server import _UsageDashboardHandler
 

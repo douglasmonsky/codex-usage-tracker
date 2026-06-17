@@ -815,6 +815,52 @@
       }
       return merged;
     }
+    function rowHasUsageImpactEstimate(row) {
+      const impact = row?.usage_impact || {};
+      return ['primary', 'secondary'].some(windowName => {
+        const windowImpact = impact[windowName];
+        return windowImpact && Number.isFinite(Number(windowImpact.estimate_percent));
+      });
+    }
+    function visibleUsageRecordIds() {
+      if (activeView !== 'calls') return [];
+      const rows = filtered();
+      const page = visibleSlice(rows);
+      return page.items
+        .filter(row => row?.record_id && (row.usage_impact_pending || !rowHasUsageImpactEstimate(row)))
+        .map(row => row.record_id);
+    }
+    function applyUsageImpactPayload(payload) {
+      const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+      if (!rows.length) return;
+      let changed = false;
+      const mergeUsageImpact = row => {
+        if (!row?.record_id) return;
+        const applyToTarget = target => {
+          let targetChanged = false;
+          if (Object.prototype.hasOwnProperty.call(row, 'usage_impact')) {
+            target.usage_impact = row.usage_impact || null;
+            targetChanged = true;
+          }
+          if (Object.prototype.hasOwnProperty.call(row, 'usage_impact_pending')) {
+            target.usage_impact_pending = Boolean(row.usage_impact_pending);
+            targetChanged = true;
+          } else if (Object.prototype.hasOwnProperty.call(target, 'usage_impact_pending')) {
+            target.usage_impact_pending = false;
+            targetChanged = true;
+          }
+          changed = changed || targetChanged;
+        };
+        const dataRow = data.find(candidate => candidate?.record_id === row.record_id);
+        if (dataRow) applyToTarget(dataRow);
+        const supplementalRow = supplementalRowsByRecordId.get(row.record_id);
+        if (supplementalRow) applyToTarget(supplementalRow);
+      };
+      rows.forEach(mergeUsageImpact);
+      if (!changed) return;
+      rebuildDashboardIndexes();
+      render();
+    }
     function tooltipAttributes(text) {
       return tooltips.tooltipAttributes(text);
     }
@@ -866,6 +912,7 @@
       activeView: () => activeView,
       apiToken: () => apiToken,
       applyDashboardPayload,
+      applyUsageImpactPayload,
       autoRefreshEl,
       backgroundHydrationChunkSize,
       formatTimestamp,
@@ -910,14 +957,17 @@
       tf,
       threadsUseReadModel: () => activeView === 'threads' && threadReadModelEligible(),
       updateLiveStatus,
+      visibleUsageRecordIds,
     });
     const {
+      hydrateVisibleUsageImpactRows,
       hydrateMoreRows,
       historyRowsDescription,
       hydrateDashboardRows,
       loadedRowsDescription,
       refreshDashboardData,
       refreshDashboardIfStale,
+      resetVisibleUsageImpactHydration,
       rowHydrationTarget,
       rowsCanHydrateMore,
       rowsNeedHydration,
@@ -1641,6 +1691,7 @@
       updateRowLoadProgress();
       syncUrlState();
       scheduleFocusPendingTarget();
+      hydrateVisibleUsageImpactRows();
     }
     function renderCalls(rows) {
       dashboardTables.renderCalls(rows);
@@ -1842,6 +1893,7 @@
       }
       applyTranslations();
       const nextRows = payloadRows(nextPayload);
+      if (nextRows.length) resetVisibleUsageImpactHydration();
       if (appendRows) {
         data = mergedRows(data, nextRows);
       } else if (applyOptions.preserveRows) {

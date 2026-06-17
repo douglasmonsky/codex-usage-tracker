@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep usage-impact estimates off the live dashboard critical path by loading
+  exact call rows first, then enriching only visible record IDs through a
+  bounded `/api/usage-impact?record_ids=...` read-model request.
+
 ## 0.7.0 - 2026-06-17
 
 - Capture observed Codex usage snapshots from local token-count logs and show

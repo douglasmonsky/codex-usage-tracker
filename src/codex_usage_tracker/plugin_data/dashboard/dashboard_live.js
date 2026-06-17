@@ -4,6 +4,7 @@
       activeView,
       apiToken,
       applyDashboardPayload,
+      applyUsageImpactPayload = () => {},
       autoRefreshEl,
       formatTimestamp,
       getData,
@@ -38,6 +39,7 @@
       tf,
       threadsUseReadModel = () => false,
       updateLiveStatus,
+      visibleUsageRecordIds = () => [],
     } = deps;
 
     let refreshInFlight = false;
@@ -49,6 +51,9 @@
     let rowHydrationError = '';
     let rowHydrationGeneration = 0;
     let rowHydrationRestartRequested = false;
+    let usageImpactHydrationInFlight = false;
+    let usageImpactHydrationQueued = false;
+    let lastUsageImpactRequestKey = '';
     let autoRefreshTimer = null;
 
     function loadedRowsDescription() {
@@ -229,6 +234,64 @@
       return payload;
     }
 
+    async function fetchVisibleUsageImpact(recordIds) {
+      const params = new URLSearchParams({
+        record_ids: recordIds.join(','),
+        include_archived: getIncludeArchived() ? '1' : '0',
+        _: String(Date.now()),
+      });
+      const response = await fetch(`/api/usage-impact?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Codex-Usage-Token': apiToken(),
+        },
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        stopLiveRefreshForAuthFailure(response);
+        throw new Error(liveApiResponseMessage(response));
+      }
+      const payload = await response.json();
+      if (payload.error) throw new Error(payload.error);
+      return payload;
+    }
+
+    async function hydrateVisibleUsageImpactRows() {
+      if (!liveRefreshSupported || !apiToken() || activeView() !== 'calls') return false;
+      const recordIds = visibleUsageRecordIds()
+        .map(recordId => String(recordId || '').trim())
+        .filter(Boolean);
+      if (!recordIds.length) return false;
+      const requestKey = `${getIncludeArchived() ? 'all' : 'active'}:${recordIds.join(',')}`;
+      if (requestKey === lastUsageImpactRequestKey) return false;
+      if (usageImpactHydrationInFlight) {
+        usageImpactHydrationQueued = true;
+        return false;
+      }
+      usageImpactHydrationInFlight = true;
+      lastUsageImpactRequestKey = requestKey;
+      try {
+        const payload = await fetchVisibleUsageImpact(recordIds);
+        applyUsageImpactPayload(payload);
+        return true;
+      } catch (_error) {
+        // Usage-impact estimates are enrichment only. Exact row facts remain
+        // usable if this read-model request fails or is still pending.
+        return false;
+      } finally {
+        usageImpactHydrationInFlight = false;
+        if (usageImpactHydrationQueued) {
+          usageImpactHydrationQueued = false;
+          hydrateVisibleUsageImpactRows();
+        }
+      }
+    }
+
+    function resetVisibleUsageImpactHydration() {
+      lastUsageImpactRequestKey = '';
+      usageImpactHydrationQueued = false;
+    }
+
     async function refreshAppendedRows(refreshResult, scopedRows) {
       if (!liveRefreshSupported || !shouldHydrateCallRows()) return;
       if (rowHydrationInFlight) {
@@ -255,6 +318,7 @@
       rowHydrationComplete = getData().length >= rowHydrationTarget();
       updateRowLoadProgress();
       updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', `${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      hydrateVisibleUsageImpactRows();
     }
 
     async function hydrateMoreRows(minimumTarget = null) {
@@ -507,12 +571,14 @@
     }
 
     return {
+      hydrateVisibleUsageImpactRows,
       hydrateMoreRows,
       historyRowsDescription,
       hydrateDashboardRows,
       loadedRowsDescription,
       refreshDashboardData,
       refreshDashboardIfStale,
+      resetVisibleUsageImpactHydration,
       rowHydrationTarget,
       rowsCanHydrateMore,
       rowsNeedHydration,
