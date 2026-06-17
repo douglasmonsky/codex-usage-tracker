@@ -21,6 +21,8 @@ REFRESH_RESULT_FIELDS = {
     "deleted_records": int,
     "affected_threads": int,
     "skipped_downstream_work": bool,
+    "refresh_workers": int,
+    "parallel_parse_files": int,
     "db_path": str,
     "parser_diagnostics": dict,
 }
@@ -119,6 +121,16 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "raw_context_included": bool,
         }
     },
+    "codex-usage-tracker-task-receipts-v1": {
+        "required": {
+            "record_id": (str, NoneType),
+            "limit": (int, NoneType),
+            "offset": int,
+            "row_count": int,
+            "rows": list,
+            "raw_context_included": bool,
+        }
+    },
     "codex-usage-tracker-usage-impact-estimate-v1": {
         "required": {
             "label": (str, NoneType),
@@ -187,6 +199,18 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "privacy_mode": str,
             }
         },
+    },
+    "codex-usage-tracker-lifecycle-recommendations-v1": {
+        "required": {
+            "filters": dict,
+            "row_count": int,
+            "total_matched_rows": int,
+            "truncated": bool,
+            "limit": (int, NoneType),
+            "offset": int,
+            "rows": list,
+            "raw_context_included": bool,
+        }
     },
     "codex-usage-tracker-session-v1": {
         "required": {

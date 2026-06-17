@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -26,6 +26,7 @@ MIGRATION_NAMES = {
     10: "materialize usage-impact read model",
     11: "materialize thread work sessions",
     12: "materialize thread context epochs",
+    13: "materialize task receipt signals",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -123,6 +124,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v12(conn)
         _record_migration_if_missing(conn, 12)
+    if user_version < 13:
+        _migrate_v13(conn)
+        _record_migration(conn, 13)
+    else:
+        _migrate_v13(conn)
+        _record_migration_if_missing(conn, 13)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -421,6 +428,41 @@ def _migrate_v12(conn: sqlite3.Connection) -> None:
             ON thread_context_epochs(uncached_input_tokens);
         CREATE INDEX IF NOT EXISTS idx_thread_context_epochs_effectiveness
             ON thread_context_epochs(compaction_effectiveness);
+        """
+    )
+
+
+def _migrate_v13(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS task_receipts (
+            receipt_id TEXT PRIMARY KEY,
+            record_id TEXT NOT NULL,
+            thread_key TEXT,
+            work_session_id TEXT,
+            context_epoch_id TEXT,
+            receipt_category TEXT NOT NULL,
+            receipt_confidence TEXT NOT NULL,
+            event_count INTEGER NOT NULL DEFAULT 0,
+            first_event_timestamp TEXT,
+            last_event_timestamp TEXT,
+            first_source_line INTEGER,
+            last_source_line INTEGER,
+            evidence_scope TEXT NOT NULL,
+            reason TEXT,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_task_receipts_record
+            ON task_receipts(record_id);
+        CREATE INDEX IF NOT EXISTS idx_task_receipts_thread
+            ON task_receipts(thread_key);
+        CREATE INDEX IF NOT EXISTS idx_task_receipts_work_session
+            ON task_receipts(work_session_id);
+        CREATE INDEX IF NOT EXISTS idx_task_receipts_context_epoch
+            ON task_receipts(context_epoch_id);
+        CREATE INDEX IF NOT EXISTS idx_task_receipts_category_confidence
+            ON task_receipts(receipt_category, receipt_confidence);
         """
     )
 

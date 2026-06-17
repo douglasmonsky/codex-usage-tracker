@@ -326,6 +326,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "renderCallInvestigator" in dashboard_js
     assert "fetchCallRecord" in dashboard_js
     assert "fetchCallRecord" in dashboard_call_js
+    assert "renderTaskReceiptSignals" in dashboard_call_js
+    assert "Task receipt signals" in dashboard_call_js
+    assert "task_receipts" in dashboard_call_js
     assert "/api/call?" in dashboard_js
     assert "supplementalRowsByRecordId" in dashboard_js
     assert 'body[data-active-view="call"] .detail-section' in dashboard_css

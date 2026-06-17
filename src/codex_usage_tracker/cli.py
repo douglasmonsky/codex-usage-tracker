@@ -30,6 +30,10 @@ from codex_usage_tracker.formatting import (
     format_session,
 )
 from codex_usage_tracker.i18n import normalize_language
+from codex_usage_tracker.lifecycle_recommendations import (
+    lifecycle_recommendations_payload,
+    query_lifecycle_recommendations,
+)
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.plugin_installer import install_plugin, uninstall_plugin
 from codex_usage_tracker.pricing import (
@@ -56,6 +60,10 @@ from codex_usage_tracker.store import (
     rebuild_usage_index,
     refresh_usage_index,
     reset_usage_database,
+)
+from codex_usage_tracker.store_task_receipts import (
+    query_task_receipts,
+    task_receipts_payload,
 )
 from codex_usage_tracker.store_work_sessions import (
     query_thread_work_sessions,
@@ -137,6 +145,7 @@ def _run_setup(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        refresh_workers=args.refresh_workers,
     )
     lines.append(
         f"Refresh: scanned {refresh_result.scanned_files} files, parsed "
@@ -250,6 +259,7 @@ def _run_refresh(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        refresh_workers=args.refresh_workers,
     )
     if args.as_json:
         _print_json(refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1"))
@@ -297,6 +307,7 @@ def _run_rebuild_index(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        refresh_workers=args.refresh_workers,
     )
     if args.as_json:
         _print_json(refresh_result_payload(result, schema="codex-usage-tracker-rebuild-index-v1"))
@@ -411,6 +422,40 @@ def _run_usage_impact(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_task_receipts(args: argparse.Namespace) -> int:
+    limit = None if args.limit <= 0 else args.limit
+    rows = query_task_receipts(
+        db_path=args.db,
+        record_id=args.record_id,
+        thread_key=args.thread_key,
+        work_session_id=args.work_session_id,
+        context_epoch_id=args.context_epoch_id,
+        category=args.category,
+        limit=limit,
+        offset=args.offset,
+        sort=args.sort,
+        direction=args.direction,
+    )
+    payload = task_receipts_payload(
+        rows,
+        record_id=args.record_id,
+        limit=limit,
+        offset=args.offset,
+    )
+    if args.as_json:
+        _print_json(payload)
+        return 0
+    if not rows:
+        print("No task receipt signal rows found.")
+        return 0
+    for row in rows:
+        print(
+            f"{row['record_id']} {row['receipt_category']} "
+            f"({row['receipt_confidence']}, {row['event_count']} events)"
+        )
+    return 0
+
+
 def _run_sessions(args: argparse.Namespace) -> int:
     limit = None if args.limit <= 0 else args.limit
     rows = query_thread_work_sessions(
@@ -468,6 +513,45 @@ def _run_recommendations(args: argparse.Namespace) -> int:
         _print_json(report.payload)
         return 0
     print(report.render())
+    return 0
+
+
+def _run_lifecycle_recommendations(args: argparse.Namespace) -> int:
+    limit = None if args.limit <= 0 else args.limit
+    rows, total = query_lifecycle_recommendations(
+        db_path=args.db,
+        record_id=args.record_id,
+        thread_key=args.thread_key,
+        work_session_id=args.work_session_id,
+        context_epoch_id=args.context_epoch_id,
+        scope=args.scope,
+        limit=limit,
+        offset=args.offset,
+    )
+    payload = lifecycle_recommendations_payload(
+        rows,
+        filters={
+            "record_id": args.record_id,
+            "thread_key": args.thread_key,
+            "work_session_id": args.work_session_id,
+            "context_epoch_id": args.context_epoch_id,
+            "scope": args.scope,
+        },
+        limit=limit,
+        offset=args.offset,
+        total_matched_rows=total,
+    )
+    if args.as_json:
+        _print_json(payload)
+        return 0
+    if not rows:
+        print("No lifecycle recommendations found.")
+        return 0
+    for row in rows:
+        print(
+            f"{row['record_id']} {row['recommendation_key']} "
+            f"({row['confidence']}, {row['scope']}): {row['action']}"
+        )
     return 0
 
 
@@ -545,6 +629,7 @@ def _run_open_dashboard(args: argparse.Namespace) -> int:
                 codex_home=args.codex_home,
                 db_path=args.db,
                 include_archived=args.include_archived,
+                refresh_workers=args.refresh_workers,
             ),
             schema="codex-usage-tracker-refresh-v1",
         )
@@ -605,6 +690,7 @@ def _run_serve_dashboard(args: argparse.Namespace) -> int:
             codex_home=args.codex_home,
             db_path=args.db,
             include_archived=args.include_archived,
+            refresh_workers=args.refresh_workers,
         )
     serve_dashboard(
         db_path=args.db,
@@ -889,8 +975,10 @@ _COMMAND_HANDLERS = {
     "summary": _run_summary,
     "query": _run_query,
     "usage-impact": _run_usage_impact,
+    "task-receipts": _run_task_receipts,
     "sessions": _run_sessions,
     "recommendations": _run_recommendations,
+    "lifecycle-recommendations": _run_lifecycle_recommendations,
     "session": _run_session,
     "context": _run_context,
     "dashboard": _run_dashboard,

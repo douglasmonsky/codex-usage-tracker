@@ -47,11 +47,13 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-usage-impact-v1` | CLI `usage-impact --json`, dashboard server `/api/usage-impact`, `/api/call` usage-impact payload |
+| `codex-usage-tracker-task-receipts-v1` | CLI `task-receipts --json`, dashboard server `/api/task-receipts`, `/api/call` task receipt payload |
 | `codex-usage-tracker-usage-impact-estimate-v1` | Nested dashboard row `usage_impact.primary` and `usage_impact.secondary` estimate objects |
 | `codex-usage-tracker-sessions-v1` | CLI `sessions --json`, dashboard server `/api/sessions` response |
 | `codex-usage-tracker-work-session-v1` | Dashboard server `/api/session` response |
 | `codex-usage-tracker-context-epochs-v1` | Dashboard server `/api/context-epochs` response and nested `/api/session` context epochs |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
+| `codex-usage-tracker-lifecycle-recommendations-v1` | CLI `lifecycle-recommendations --json`, dashboard server `/api/lifecycle-recommendations`, `/api/call` lifecycle guidance payload |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -87,6 +89,45 @@ Error: [invalid_value] reset-db clears local aggregate usage rows. Re-run with -
 ```
 
 Known codes are `invalid_value`, `file_exists`, `file_not_found`, `permission_denied`, `runtime_error`, and `os_error`.
+
+## Refresh
+
+Commands:
+
+```bash
+codex-usage-tracker refresh --json
+codex-usage-tracker rebuild-index --refresh-workers 4 --json
+```
+
+Schemas:
+
+- `codex-usage-tracker-refresh-v1`
+- `codex-usage-tracker-rebuild-index-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-refresh-v1",
+  "scanned_files": 4,
+  "parsed_events": 12,
+  "skipped_events": 0,
+  "inserted_or_updated_events": 12,
+  "changed_source_files": 4,
+  "append_source_files": 0,
+  "full_reparse_source_files": 4,
+  "inserted_records": 12,
+  "deleted_records": 0,
+  "affected_threads": 3,
+  "skipped_downstream_work": false,
+  "refresh_workers": 4,
+  "parallel_parse_files": 4,
+  "db_path": "/home/user/.codex-usage-tracker/usage.sqlite3",
+  "parser_diagnostics": {}
+}
+```
+
+`refresh_workers` reports the parser worker count used for that refresh. `parallel_parse_files`
+is `0` when refresh used the sequential parser path. SQLite writes and read-model
+maintenance remain serialized after parsing.
 
 ## Summary
 
@@ -194,6 +235,79 @@ Schema: `codex-usage-tracker-usage-impact-v1`
 ```
 
 Rows are derived from local observed Codex usage snapshots and the configured/local Codex credit estimate. They are useful for comparing likely per-call allowance movement, but they are not exact billing data and may exclude usage outside local Codex logs.
+
+## Task Receipts
+
+Command:
+
+```bash
+codex-usage-tracker task-receipts --record-id <record-id> --json
+```
+
+Dashboard API:
+
+- `/api/task-receipts?record_id=<record-id>`
+- `/api/call?record_id=<record-id>` includes a nested `task_receipts` payload
+
+Schema: `codex-usage-tracker-task-receipts-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-task-receipts-v1",
+  "record_id": "record-123",
+  "limit": 100,
+  "offset": 0,
+  "row_count": 0,
+  "rows": [],
+  "raw_context_included": false
+}
+```
+
+Rows contain aggregate-only durable-output receipt signals such as `patch_applied`,
+`tool_activity`, or `task_complete`. They do not include prompts, assistant messages,
+tool output, patch text, command text, raw JSONL fragments, or reconstructed transcript
+content.
+
+## Lifecycle Recommendations
+
+Command:
+
+```bash
+codex-usage-tracker lifecycle-recommendations --record-id <record-id> --json
+```
+
+Dashboard API:
+
+- `/api/lifecycle-recommendations?record_id=<record-id>`
+- `/api/call?record_id=<record-id>` includes a nested `lifecycle_recommendations` payload
+
+Schema: `codex-usage-tracker-lifecycle-recommendations-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-lifecycle-recommendations-v1",
+  "filters": {
+    "record_id": "record-123",
+    "thread_key": null,
+    "work_session_id": null,
+    "context_epoch_id": null,
+    "scope": null
+  },
+  "limit": 100,
+  "offset": 0,
+  "row_count": 0,
+  "total_matched_rows": 0,
+  "truncated": false,
+  "rows": [],
+  "raw_context_included": false
+}
+```
+
+Rows are cautious derived guidance such as `continue_thread`, `start_fresh`,
+`summarize_or_compact`, `lower_reasoning`, `inspect_low_evidence`, or
+`inspect_delegated_work`. They combine aggregate counters, usage-impact estimates,
+work-session/context-epoch metadata, and task-receipt signals. They do not include
+raw prompts, assistant messages, tool output, JSONL fragments, or exact billing claims.
 
 ## Thread Work Sessions
 

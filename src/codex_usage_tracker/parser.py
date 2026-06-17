@@ -15,14 +15,19 @@ from codex_usage_tracker.call_origin import (
     classify_call_origin,
     event_flags_from_envelope,
 )
-from codex_usage_tracker.models import SessionInfo, UsageEvent
+from codex_usage_tracker.models import SessionInfo, TaskReceiptSignal, UsageEvent
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME
+from codex_usage_tracker.task_receipt_signals import (
+    task_receipt_signal_from_envelope,
+    task_receipt_signal_from_json,
+    task_receipt_signal_to_json,
+)
 
 SESSION_ID_RE = re.compile(
     r"rollout-[^-]+-[0-9T:-]+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
 )
 
-PARSER_ADAPTER_VERSION = "codex-jsonl-v3-source-offsets"
+PARSER_ADAPTER_VERSION = "codex-jsonl-v4-task-receipts"
 PARSER_DIAGNOSTIC_KEYS = (
     "invalid_json",
     "missing_payload",
@@ -106,6 +111,7 @@ class ParserState:
     current_turn: dict[str, Any] = field(default_factory=dict)
     last_cumulative_total: int = -1
     call_origin_segment: tuple[CallOriginFlags, ...] = ()
+    task_receipt_segment: tuple[TaskReceiptSignal, ...] = ()
     latest_record_id: str | None = None
     latest_event_timestamp: str | None = None
 
@@ -214,12 +220,20 @@ def parser_state_from_json(raw: str | None) -> ParserState | None:
     segment = payload.get("call_origin_segment")
     if not isinstance(segment, list):
         segment = []
+    receipt_segment = payload.get("task_receipt_segment")
+    if not isinstance(receipt_segment, list):
+        receipt_segment = []
     return ParserState(
         session_id=_optional_str(payload.get("session_id")),
         session_meta=_string_dict(payload.get("session_meta")),
         current_turn=_turn_state_dict(payload.get("current_turn")),
         last_cumulative_total=_json_int(payload.get("last_cumulative_total"), -1),
         call_origin_segment=tuple(_call_origin_flags_from_json(item) for item in segment),
+        task_receipt_segment=tuple(
+            signal
+            for item in receipt_segment
+            if (signal := task_receipt_signal_from_json(item)) is not None
+        ),
         latest_record_id=_optional_str(payload.get("latest_record_id")),
         latest_event_timestamp=_optional_str(payload.get("latest_event_timestamp")),
     )
@@ -243,6 +257,10 @@ def parser_state_to_json(state: ParserState) -> str:
                     "codex_activity": flags.codex_activity,
                 }
                 for flags in state.call_origin_segment
+            ],
+            "task_receipt_segment": [
+                task_receipt_signal_to_json(signal)
+                for signal in state.task_receipt_segment
             ],
             "latest_record_id": state.latest_record_id,
             "latest_event_timestamp": state.latest_event_timestamp,
@@ -338,6 +356,7 @@ def _parse_codex_jsonl_v1(
     last_cumulative_total = previous_state.last_cumulative_total
     events: list[UsageEvent] = []
     call_origin_segment: list[CallOriginFlags] = list(previous_state.call_origin_segment)
+    task_receipt_segment: list[TaskReceiptSignal] = list(previous_state.task_receipt_segment)
     latest_record_id = previous_state.latest_record_id
     latest_event_timestamp = previous_state.latest_event_timestamp
     parsed_until_line = start_line
@@ -395,12 +414,20 @@ def _parse_codex_jsonl_v1(
                 flags = event_flags_from_envelope(envelope)
                 if flags.has_signal:
                     call_origin_segment.append(flags)
+                receipt_signal = task_receipt_signal_from_envelope(
+                    envelope,
+                    line_number=line_number,
+                )
+                if receipt_signal is not None:
+                    task_receipt_segment.append(receipt_signal)
                 if entry_type == "event_msg" and payload_type not in KNOWN_NON_TOKEN_EVENT_MSG_TYPES:
                     _increment_stat(stats, "unknown_event_shape")
                 continue
 
             call_origin = classify_call_origin(call_origin_segment)
             call_origin_segment = []
+            task_receipts = tuple(task_receipt_segment)
+            task_receipt_segment = []
             info = payload.get("info")
             if not isinstance(info, dict):
                 _increment_stat(stats, "missing_info")
@@ -453,6 +480,7 @@ def _parse_codex_jsonl_v1(
                     last_usage=last_usage,
                     total_usage=total_usage,
                     rate_limits=payload.get("rate_limits"),
+                    task_receipt_signals=task_receipts,
                     stats=stats,
                 )
             except ValueError:
@@ -471,6 +499,7 @@ def _parse_codex_jsonl_v1(
             current_turn=current_turn,
             last_cumulative_total=last_cumulative_total,
             call_origin_segment=tuple(call_origin_segment),
+            task_receipt_segment=tuple(task_receipt_segment),
             latest_record_id=latest_record_id,
             latest_event_timestamp=latest_event_timestamp,
         ),
@@ -493,6 +522,7 @@ def _build_event(
     last_usage: dict[str, Any],
     total_usage: dict[str, Any],
     rate_limits: object = None,
+    task_receipt_signals: tuple[TaskReceiptSignal, ...] = (),
     stats: MutableMapping[str, int] | None = None,
 ) -> UsageEvent:
     input_tokens = _required_usage_int(last_usage, "input_tokens", stats=stats)
@@ -569,6 +599,7 @@ def _build_event(
             total_usage, "reasoning_output_tokens", stats=stats
         ),
         cumulative_total_tokens=cumulative_total_tokens,
+        task_receipt_signals=task_receipt_signals,
         **observed_usage,
     )
 
