@@ -203,6 +203,8 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
             thread_key TEXT NOT NULL,
             is_archived_scope TEXT NOT NULL,
             thread_label TEXT,
+            model_summary TEXT,
+            effort_summary TEXT,
             first_event_timestamp TEXT,
             latest_event_timestamp TEXT,
             call_count INTEGER NOT NULL DEFAULT 0,
@@ -230,6 +232,14 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_thread_summaries_scope_latest
             ON thread_summaries(is_archived_scope, latest_event_timestamp);
         """
+    )
+    _ensure_table_columns(
+        conn,
+        "thread_summaries",
+        {
+            "model_summary": "TEXT",
+            "effort_summary": "TEXT",
+        },
     )
 
 

@@ -1278,12 +1278,16 @@
       const key = String(row.thread_key || '');
       const childState = threadCallsByKey.get(key) || {};
       const calls = Array.isArray(childState.rows) ? childState.rows : [];
-      const modelSummary = calls.length ? threadModelSummary(calls) : t('state.unknown');
+      const modelSummary = calls.length
+        ? threadModelSummary(calls)
+        : (row.model_summary || t('state.unknown'));
       const effortValues = calls.map(call => call.effort);
       const effortSummary = calls.length
         ? compactListSummary(effortValues, t('table.more_efforts'))
-        : t('state.unknown');
-      const effortTooltip = calls.length ? effortTooltipText(effortValues) : t('state.unknown');
+        : (row.effort_summary || t('state.unknown'));
+      const effortTooltip = calls.length
+        ? effortTooltipText(effortValues)
+        : (row.effort_summary || t('state.unknown'));
       return {
         key,
         label: row.thread_label || key || t('state.unknown'),
@@ -1304,7 +1308,7 @@
         usage_impact: null,
         cacheRatio: Number(row.avg_cache_ratio || 0),
         maxContextUse: Number(row.max_context_window_percent || 0),
-        pricingStatus: t('state.unknown'),
+        pricingStatus: pricingConfigured ? t('state.configured') : t('state.not_configured'),
         creditStatus: t('state.unknown'),
         signalCount: 0,
         subagentCount: 0,

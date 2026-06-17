@@ -64,6 +64,7 @@ from codex_usage_tracker.reports import (
 )
 from codex_usage_tracker.store import (
     query_latest_observed_usage,
+    query_thread_model_buckets,
     query_thread_summaries,
     query_thread_summary_count,
     query_usage_api_event_count,
@@ -131,6 +132,42 @@ def _refresh_result_invalidates_usage_impact(result: object) -> bool:
             "inserted_or_updated_events",
         )
     )
+
+
+def _sum_optional_number(values: Any) -> float | None:
+    total = 0.0
+    found = False
+    for value in values:
+        if isinstance(value, int | float):
+            total += float(value)
+            found = True
+    return total if found else None
+
+
+def _thread_summary_label(
+    values: list[object],
+    noun: str,
+    *,
+    excluded_primary: set[str] | None = None,
+) -> str:
+    labels = sorted({str(value) for value in values if value})
+    if not labels:
+        return "Unknown"
+    if len(labels) == 1:
+        return labels[0]
+    excluded = excluded_primary or set()
+    primary_candidates = [label for label in labels if label not in excluded and label != "Unknown"]
+    primary = primary_candidates[0] if primary_candidates else labels[0]
+    return f"{primary} +{len(labels) - 1} {noun}"
+
+
+def _thread_summary_computed_sort_key(row: dict[str, Any], sort: str) -> tuple[float, str]:
+    numeric_value = {
+        "cost": row.get("estimated_cost_usd"),
+        "usage": row.get("usage_credits"),
+    }.get(sort)
+    sortable = float(numeric_value) if isinstance(numeric_value, int | float) else float("-inf")
+    return sortable, str(row.get("latest_event_timestamp") or "")
 
 
 class _ContextApiState:
@@ -1027,20 +1064,42 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             sort = _first(params.get("sort")) or "tokens"
             direction = _first(params.get("direction")) or "desc"
             search = _first(params.get("q")) or _first(params.get("search"))
-            rows = query_thread_summaries(
-                db_path=self._db_path,
-                limit=limit,
-                offset=offset,
-                search=search,
-                include_archived=include_archived,
-                sort=sort,
-                direction=direction,
-            )
             total_matched = query_thread_summary_count(
                 db_path=self._db_path,
                 search=search,
                 include_archived=include_archived,
             )
+            if sort in {"cost", "usage"}:
+                sorted_rows = query_thread_summaries(
+                    db_path=self._db_path,
+                    limit=None,
+                    offset=0,
+                    search=search,
+                    include_archived=include_archived,
+                    sort="time",
+                    direction="desc",
+                )
+                sorted_rows = self._annotate_thread_summary_rows(
+                    sorted_rows,
+                    include_archived=include_archived,
+                )
+                reverse = direction.lower() != "asc"
+                sorted_rows.sort(
+                    key=lambda row: _thread_summary_computed_sort_key(row, sort),
+                    reverse=reverse,
+                )
+                rows = sorted_rows[offset : offset + limit]
+            else:
+                rows = query_thread_summaries(
+                    db_path=self._db_path,
+                    limit=limit,
+                    offset=offset,
+                    search=search,
+                    include_archived=include_archived,
+                    sort=sort,
+                    direction=direction,
+                )
+                rows = self._annotate_thread_summary_rows(rows, include_archived=include_archived)
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
@@ -1065,6 +1124,57 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 "raw_context_included": False,
             },
         )
+
+    def _annotate_thread_summary_rows(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        include_archived: bool,
+    ) -> list[dict[str, Any]]:
+        if not rows:
+            return rows
+        thread_keys = [str(row.get("thread_key") or "") for row in rows]
+        buckets = query_thread_model_buckets(
+            db_path=self._db_path,
+            thread_keys=thread_keys,
+            include_archived=include_archived,
+        )
+        pricing = load_pricing_config(self._pricing_path)
+        allowance = load_allowance_config(self._allowance_path)
+        annotated_buckets = annotate_rows_with_allowance(
+            annotate_rows_with_efficiency(buckets, pricing, model_field="model"),
+            allowance,
+            model_field="model",
+        )
+        buckets_by_thread: dict[str, list[dict[str, Any]]] = {}
+        for bucket in annotated_buckets:
+            key = str(bucket.get("thread_key") or "")
+            if not key:
+                continue
+            buckets_by_thread.setdefault(key, []).append(bucket)
+        annotated_rows: list[dict[str, Any]] = []
+        for row in rows:
+            copy = dict(row)
+            key = str(copy.get("thread_key") or "")
+            thread_buckets = buckets_by_thread.get(key, [])
+            if thread_buckets:
+                copy["model_summary"] = _thread_summary_label(
+                    [bucket.get("model") for bucket in thread_buckets],
+                    "models",
+                    excluded_primary={"codex-auto-review"},
+                )
+                copy["effort_summary"] = _thread_summary_label(
+                    [bucket.get("effort") for bucket in thread_buckets],
+                    "efforts",
+                )
+                copy["estimated_cost_usd"] = _sum_optional_number(
+                    bucket.get("estimated_cost_usd") for bucket in thread_buckets
+                )
+                copy["usage_credits"] = _sum_optional_number(
+                    bucket.get("usage_credits") for bucket in thread_buckets
+                )
+            annotated_rows.append(copy)
+        return annotated_rows
 
     def _handle_thread_calls(self, query: str) -> None:
         params = parse_qs(query)

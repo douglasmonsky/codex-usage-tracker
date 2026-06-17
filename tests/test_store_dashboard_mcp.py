@@ -1123,6 +1123,8 @@ def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
     assert by_key["thread:Alpha"]["session_count"] == 1
     assert by_key["thread:Alpha"]["total_tokens"] == 220
     assert by_key["thread:Alpha"]["cached_input_tokens"] == 40
+    assert by_key["thread:Alpha"]["model_summary"] == "gpt-5.5"
+    assert by_key["thread:Alpha"]["effort_summary"] == "high"
     assert by_key["thread:Alpha"]["call_initiator_summary"] == "mostly_user"
     assert by_key["thread:Alpha"]["is_archived_scope"] == "active"
     assert by_key["thread:Alpha"]["estimated_cost_usd"] is None
@@ -1189,6 +1191,8 @@ def _thread_summary_snapshot(db_path: Path, thread_keys: set[str]) -> list[dict[
                 thread_key,
                 is_archived_scope,
                 thread_label,
+                model_summary,
+                effort_summary,
                 first_event_timestamp,
                 latest_event_timestamp,
                 call_count,

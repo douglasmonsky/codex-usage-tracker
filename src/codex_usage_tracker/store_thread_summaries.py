@@ -59,6 +59,16 @@ def _insert_thread_summary_scope(
 ) -> None:
     where_clause, params = _usage_where_clause(include_archived=include_archived)
     thread_key_expr = _thread_key_expression()
+    model_label_expr = "coalesce(nullif(model, ''), 'Unknown')"
+    effort_label_expr = "coalesce(nullif(effort, ''), 'Unknown')"
+    model_primary_expr = (
+        f"coalesce(min(CASE WHEN {model_label_expr} NOT IN ('Unknown', 'codex-auto-review') "
+        f"THEN {model_label_expr} END), min({model_label_expr}))"
+    )
+    effort_primary_expr = (
+        f"coalesce(min(CASE WHEN {effort_label_expr} != 'Unknown' "
+        f"THEN {effort_label_expr} END), min({effort_label_expr}))"
+    )
     clauses: list[str] = []
     if where_clause:
         clauses.append(where_clause.removeprefix("WHERE "))
@@ -75,6 +85,8 @@ def _insert_thread_summary_scope(
             thread_key,
             is_archived_scope,
             thread_label,
+            model_summary,
+            effort_summary,
             first_event_timestamp,
             latest_event_timestamp,
             call_count,
@@ -99,6 +111,16 @@ def _insert_thread_summary_scope(
             {thread_key_expr} AS thread_key,
             ? AS is_archived_scope,
             coalesce(max(thread_name), max(parent_thread_name), max(session_id)) AS thread_label,
+            CASE
+                WHEN COUNT(DISTINCT {model_label_expr}) = 1 THEN min({model_label_expr})
+                ELSE {model_primary_expr} || ' +' ||
+                    (COUNT(DISTINCT {model_label_expr}) - 1) || ' models'
+            END AS model_summary,
+            CASE
+                WHEN COUNT(DISTINCT {effort_label_expr}) = 1 THEN min({effort_label_expr})
+                ELSE {effort_primary_expr} || ' +' ||
+                    (COUNT(DISTINCT {effort_label_expr}) - 1) || ' efforts'
+            END AS effort_summary,
             MIN(event_timestamp) AS first_event_timestamp,
             MAX(event_timestamp) AS latest_event_timestamp,
             COUNT(*) AS call_count,

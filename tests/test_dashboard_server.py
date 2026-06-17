@@ -815,6 +815,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         record_id = calls_payload["rows"][0]["record_id"]
         call_payload = _read_json(f"{base_url}/api/call?record_id={record_id}")
         threads_payload = _read_json(f"{base_url}/api/threads?limit=2&sort=tokens")
+        threads_by_cost_payload = _read_json(
+            f"{base_url}/api/threads?limit=2&sort=cost&direction=desc"
+        )
         thread_key = threads_payload["rows"][0]["thread_key"]
         thread_calls_payload = _read_json(
             f"{base_url}/api/thread-calls?thread_key={urllib.parse.quote(thread_key)}&limit=2"
@@ -872,6 +875,18 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert "has_more" in threads_payload
     assert "next_offset" in threads_payload
     assert "total_tokens" in threads_payload["rows"][0]
+    assert threads_payload["rows"][0]["model_summary"] == "gpt-5.5"
+    assert threads_payload["rows"][0]["effort_summary"] != "Unknown"
+    assert threads_payload["rows"][0]["estimated_cost_usd"] > 0
+    cost_sorted_values = [
+        row["estimated_cost_usd"] for row in threads_by_cost_payload["rows"]
+    ]
+    assert cost_sorted_values[0] > 0
+    assert all(
+        value is None or cost_sorted_values[0] >= value
+        for value in cost_sorted_values[1:]
+    )
+    assert threads_by_cost_payload["rows"][0]["usage_credits"] >= 0
 
     assert thread_calls_payload["schema"] == "codex-usage-tracker-thread-calls-v1"
     _assert_contract(thread_calls_payload)

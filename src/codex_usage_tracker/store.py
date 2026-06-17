@@ -1373,6 +1373,51 @@ def query_thread_summaries(
         return [_row_to_dict(row) for row in rows]
 
 
+def query_thread_model_buckets(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    thread_keys: Iterable[str],
+    include_archived: bool = False,
+) -> list[dict[str, Any]]:
+    """Return per-thread, per-model token buckets for pricing thread summaries."""
+
+    normalized_thread_keys = sorted({key for key in thread_keys if key})
+    if not normalized_thread_keys:
+        return []
+    where_clause, params = _usage_where_clause(include_archived=include_archived)
+    thread_key_expr = _thread_key_expression()
+    clauses: list[str] = []
+    if where_clause:
+        clauses.append(where_clause.removeprefix("WHERE "))
+    placeholders = ", ".join("?" for _key in normalized_thread_keys)
+    clauses.append(f"{thread_key_expr} IN ({placeholders})")
+    query_params: list[Any] = [*params, *normalized_thread_keys]
+    scoped_where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                {thread_key_expr} AS thread_key,
+                coalesce(nullif(model, ''), 'Unknown') AS model,
+                coalesce(nullif(effort, ''), 'Unknown') AS effort,
+                COUNT(*) AS row_count,
+                coalesce(SUM(input_tokens), 0) AS input_tokens,
+                coalesce(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+                coalesce(SUM(uncached_input_tokens), 0) AS uncached_input_tokens,
+                coalesce(SUM(output_tokens), 0) AS output_tokens,
+                coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
+                coalesce(SUM(total_tokens), 0) AS total_tokens
+            FROM usage_events
+            {scoped_where_clause}
+            GROUP BY {thread_key_expr}, coalesce(nullif(model, ''), 'Unknown'),
+                coalesce(nullif(effort, ''), 'Unknown')
+            """,
+            query_params,
+        )
+        return [_row_to_dict(row) for row in rows]
+
+
 def query_thread_summary_count(
     db_path: Path = DEFAULT_DB_PATH,
     *,
@@ -1415,14 +1460,14 @@ def _thread_summary_sort_map() -> dict[str, str]:
         "cached": "cached_input_tokens",
         "context": "max_context_window_percent",
         "initiator": "call_initiator_summary",
-        "model": "thread_label",
+        "model": "model_summary",
         "tokens": "total_tokens",
         "total": "total_tokens",
         "time": "latest_event_timestamp",
         "calls": "call_count",
         "cache": "avg_cache_ratio",
         "cost": "estimated_cost_usd",
-        "effort": "thread_label",
+        "effort": "effort_summary",
         "output": "output_tokens",
         "reasoning": "reasoning_output_tokens",
         "thread": "thread_label",
