@@ -30,6 +30,10 @@ from codex_usage_tracker.formatting import (
     format_session,
 )
 from codex_usage_tracker.i18n import normalize_language
+from codex_usage_tracker.lifecycle_recommendations import (
+    lifecycle_recommendations_payload,
+    query_lifecycle_recommendations,
+)
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.plugin_installer import install_plugin, uninstall_plugin
 from codex_usage_tracker.pricing import (
@@ -509,6 +513,45 @@ def _run_recommendations(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_lifecycle_recommendations(args: argparse.Namespace) -> int:
+    limit = None if args.limit <= 0 else args.limit
+    rows, total = query_lifecycle_recommendations(
+        db_path=args.db,
+        record_id=args.record_id,
+        thread_key=args.thread_key,
+        work_session_id=args.work_session_id,
+        context_epoch_id=args.context_epoch_id,
+        scope=args.scope,
+        limit=limit,
+        offset=args.offset,
+    )
+    payload = lifecycle_recommendations_payload(
+        rows,
+        filters={
+            "record_id": args.record_id,
+            "thread_key": args.thread_key,
+            "work_session_id": args.work_session_id,
+            "context_epoch_id": args.context_epoch_id,
+            "scope": args.scope,
+        },
+        limit=limit,
+        offset=args.offset,
+        total_matched_rows=total,
+    )
+    if args.as_json:
+        _print_json(payload)
+        return 0
+    if not rows:
+        print("No lifecycle recommendations found.")
+        return 0
+    for row in rows:
+        print(
+            f"{row['record_id']} {row['recommendation_key']} "
+            f"({row['confidence']}, {row['scope']}): {row['action']}"
+        )
+    return 0
+
+
 def _run_session(args: argparse.Namespace) -> int:
     rows = query_session_usage(args.db, args.session_id, args.limit)
     rows = apply_project_privacy_to_rows(rows, privacy_mode=args.privacy_mode)
@@ -930,6 +973,7 @@ _COMMAND_HANDLERS = {
     "task-receipts": _run_task_receipts,
     "sessions": _run_sessions,
     "recommendations": _run_recommendations,
+    "lifecycle-recommendations": _run_lifecycle_recommendations,
     "session": _run_session,
     "context": _run_context,
     "dashboard": _run_dashboard,

@@ -86,13 +86,13 @@ Recommendation copy must use "consider", "inspect", or "review"; never claim an 
 ## Implementation Checklist
 
 - [x] M0: Add this roadmap/checklist before implementation.
-- [ ] M1: Audit current recommendation, session, epoch, usage-impact, and task-receipt fields.
-- [ ] M2: Add aggregate lifecycle recommendation model and scoring.
-- [ ] M3: Expose lifecycle recommendations through CLI/API/JSON contracts.
-- [ ] M4: Include compact lifecycle recommendations in `/api/call`.
-- [ ] M5: Add call investigator lifecycle guidance UI.
-- [ ] M6: Add tests for recommendation categories, scopes, contracts, dashboard payload, and privacy.
-- [ ] M7: Run validation and benchmarks.
+- [x] M1: Audit current recommendation, session, epoch, usage-impact, and task-receipt fields.
+- [x] M2: Add aggregate lifecycle recommendation model and scoring.
+- [x] M3: Expose lifecycle recommendations through CLI/API/JSON contracts.
+- [x] M4: Include compact lifecycle recommendations in `/api/call`.
+- [x] M5: Add call investigator lifecycle guidance UI.
+- [x] M6: Add tests for recommendation categories, scopes, contracts, dashboard payload, and privacy.
+- [x] M7: Run validation and benchmarks.
 - [ ] M8: Commit, push, and open the branch PR without merging to `main`.
 
 ## Tests

@@ -53,6 +53,7 @@ Tracked schema ids:
 | `codex-usage-tracker-work-session-v1` | Dashboard server `/api/session` response |
 | `codex-usage-tracker-context-epochs-v1` | Dashboard server `/api/context-epochs` response and nested `/api/session` context epochs |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
+| `codex-usage-tracker-lifecycle-recommendations-v1` | CLI `lifecycle-recommendations --json`, dashboard server `/api/lifecycle-recommendations`, `/api/call` lifecycle guidance payload |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -227,6 +228,47 @@ Rows contain aggregate-only durable-output receipt signals such as `patch_applie
 `tool_activity`, or `task_complete`. They do not include prompts, assistant messages,
 tool output, patch text, command text, raw JSONL fragments, or reconstructed transcript
 content.
+
+## Lifecycle Recommendations
+
+Command:
+
+```bash
+codex-usage-tracker lifecycle-recommendations --record-id <record-id> --json
+```
+
+Dashboard API:
+
+- `/api/lifecycle-recommendations?record_id=<record-id>`
+- `/api/call?record_id=<record-id>` includes a nested `lifecycle_recommendations` payload
+
+Schema: `codex-usage-tracker-lifecycle-recommendations-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-lifecycle-recommendations-v1",
+  "filters": {
+    "record_id": "record-123",
+    "thread_key": null,
+    "work_session_id": null,
+    "context_epoch_id": null,
+    "scope": null
+  },
+  "limit": 100,
+  "offset": 0,
+  "row_count": 0,
+  "total_matched_rows": 0,
+  "truncated": false,
+  "rows": [],
+  "raw_context_included": false
+}
+```
+
+Rows are cautious derived guidance such as `continue_thread`, `start_fresh`,
+`summarize_or_compact`, `lower_reasoning`, `inspect_low_evidence`, or
+`inspect_delegated_work`. They combine aggregate counters, usage-impact estimates,
+work-session/context-epoch metadata, and task-receipt signals. They do not include
+raw prompts, assistant messages, tool output, JSONL fragments, or exact billing claims.
 
 ## Thread Work Sessions
 

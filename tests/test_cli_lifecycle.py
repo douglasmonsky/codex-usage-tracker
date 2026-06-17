@@ -258,6 +258,15 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
         "1",
         "--json",
     )
+    lifecycle = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "lifecycle-recommendations",
+        "--limit",
+        "5",
+        "--json",
+    )
     session = _run_cli(
         tmp_path,
         "--db",
@@ -305,6 +314,7 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     summary_payload = json.loads(summary.stdout)
     query_payload = json.loads(query.stdout)
     recommendations_payload = json.loads(recommendations.stdout)
+    lifecycle_payload = json.loads(lifecycle.stdout)
     session_payload = json.loads(session.stdout)
     sessions_payload = json.loads(sessions.stdout)
     expensive_payload = json.loads(expensive.stdout)
@@ -312,6 +322,7 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     _assert_contract(summary_payload)
     _assert_contract(query_payload)
     _assert_contract(recommendations_payload)
+    _assert_contract(lifecycle_payload)
     _assert_contract(session_payload)
     _assert_contract(sessions_payload)
     _assert_contract(expensive_payload)
@@ -333,6 +344,9 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     assert recommendations_payload["rows"][0]["primary_signal"] == "pricing-gap"
     assert recommendations_payload["rows"][0]["recommendation_score"] > 0
     assert recommendations_payload["threads"][0]["primary_recommendation"]["key"] == "pricing-gap"
+    assert lifecycle_payload["schema"] == "codex-usage-tracker-lifecycle-recommendations-v1"
+    assert lifecycle_payload["raw_context_included"] is False
+    assert "SECRET RAW PROMPT" not in lifecycle.stdout
     assert session_payload["schema"] == "codex-usage-tracker-session-v1"
     assert session_payload["resolved_session_id"] == SESSION_ID
     assert sessions_payload["schema"] == "codex-usage-tracker-sessions-v1"

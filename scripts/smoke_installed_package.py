@@ -49,6 +49,7 @@ CLI_HELP_SUBCOMMANDS = [
     "task-receipts",
     "sessions",
     "recommendations",
+    "lifecycle-recommendations",
     "session",
     "context",
     "dashboard",

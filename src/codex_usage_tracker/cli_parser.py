@@ -73,6 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_task_receipts_parser(subparsers)
     _add_sessions_parser(subparsers)
     _add_recommendations_parser(subparsers)
+    _add_lifecycle_recommendations_parser(subparsers)
     _add_session_parser(subparsers)
     _add_context_parser(subparsers)
     _add_dashboard_parsers(subparsers)
@@ -380,6 +381,32 @@ def _add_recommendations_parser(
     recommendations.add_argument("--min-score", type=float)
     recommendations.add_argument("--limit", type=int, default=20, help="Maximum rows to return; use 0 for all")
     recommendations.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_lifecycle_recommendations_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    lifecycle = subparsers.add_parser(
+        "lifecycle-recommendations",
+        help="Show aggregate-only lifecycle guidance rows for calls, sessions, epochs, and threads",
+    )
+    lifecycle.add_argument("--record-id", help="Only include one aggregate usage record")
+    lifecycle.add_argument("--thread-key", help="Only include one resolved thread key")
+    lifecycle.add_argument("--work-session-id", help="Only include one work session")
+    lifecycle.add_argument("--context-epoch-id", help="Only include one context epoch")
+    lifecycle.add_argument(
+        "--scope",
+        choices=("call", "work_session", "context_epoch", "thread"),
+        help="Only include one lifecycle evidence scope.",
+    )
+    lifecycle.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Maximum lifecycle rows to return; use 0 for all",
+    )
+    lifecycle.add_argument("--offset", type=int, default=0)
+    lifecycle.add_argument("--json", action="store_true", dest="as_json")
 
 
 def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:

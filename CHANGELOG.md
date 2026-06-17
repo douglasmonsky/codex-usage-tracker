@@ -11,6 +11,9 @@
 - Add aggregate-only task receipt signals, including parser-state carryover,
   SQLite read-model materialization, CLI/API JSON surfaces, and compact call
   investigator receipt chips without persisting raw transcript or tool content.
+- Add aggregate-only lifecycle recommendations that combine exact token counters,
+  usage-impact estimates, work-session/context-epoch metadata, and task-receipt
+  signals into cautious continue/start-fresh/summarize/lower-reasoning guidance.
 
 ## 0.6.1 - 2026-06-13
 

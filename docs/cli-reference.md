@@ -100,6 +100,7 @@ codex-usage-tracker summary --preset expensive
 codex-usage-tracker summary --preset by-subagent-role
 codex-usage-tracker expensive --limit 10
 codex-usage-tracker recommendations --limit 10
+codex-usage-tracker lifecycle-recommendations --record-id <record-id> --json
 codex-usage-tracker pricing-coverage
 ```
 
@@ -112,6 +113,7 @@ Useful investigations:
 - Use `summary --preset by-subagent-role` to see whether delegated work is driving a large share of usage.
 - Use `expensive --limit 10` for a quick list of the highest-cost calls.
 - Use `recommendations --json` for ranked action rows and thread rollups with severity score, primary recommendation, and secondary signals.
+- Use `lifecycle-recommendations --json` for cautious lifecycle guidance such as continue thread, start fresh, summarize/compact, lower reasoning, inspect low-evidence work, or inspect delegated work.
 
 ## JSON Queries
 
@@ -121,6 +123,7 @@ codex-usage-tracker query --pricing-status unpriced --limit 0
 codex-usage-tracker recommendations --since 2026-06-01 --json
 codex-usage-tracker usage-impact --record-id <record-id> --json
 codex-usage-tracker task-receipts --record-id <record-id> --json
+codex-usage-tracker lifecycle-recommendations --record-id <record-id> --json
 codex-usage-tracker sessions --cold-resumes-only --json
 codex-usage-tracker summary --group-by model --json
 codex-usage-tracker session <session-id> --json
@@ -131,6 +134,8 @@ Use `query` when you need stable JSON for automation across project, model, effo
 Use `usage-impact` when you need the persisted, derived estimate of how a selected call likely moved observed Codex usage windows. By default it rebuilds the local read model first; add `--no-rebuild` to inspect the current table only. Use `--window-type primary` or `--window-type secondary` to isolate one observed window. These rows are estimates from local observed rate-limit snapshots and Codex credit weights, not exact billing impact.
 
 Use `task-receipts` when you need aggregate-only durable-output receipt signals, such as whether a call was followed by patch, tool, or explicit completion events. Receipt rows do not include prompt text, assistant text, tool output, patch text, command text, raw JSONL fragments, or reconstructed transcript content.
+
+Use `lifecycle-recommendations` when you need aggregate-only guidance about whether a call, work session, context epoch, or thread looks worth continuing or should be investigated. It combines exact token counters, usage-impact estimates, session/epoch metadata, and task-receipt signals. It is advisory only and does not claim exact productivity or billing impact.
 
 Use `sessions` when you need materialized aggregate work sessions within resolved threads. It groups adjacent calls and splits at inferred cold-cache resume boundaries using aggregate counters only; it does not read or return raw prompt, assistant, tool-output, or JSONL content.
 

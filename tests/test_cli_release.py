@@ -29,6 +29,7 @@ STABLE_CLI_COMMANDS = {
     "task-receipts",
     "sessions",
     "recommendations",
+    "lifecycle-recommendations",
     "session",
     "context",
     "dashboard",

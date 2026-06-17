@@ -302,6 +302,43 @@
       `;
     }
 
+    function lifecycleRecommendationRows(row) {
+      if (!row || !row.lifecycle_recommendations) return [];
+      if (Array.isArray(row.lifecycle_recommendations)) return row.lifecycle_recommendations;
+      if (Array.isArray(row.lifecycle_recommendations.rows)) return row.lifecycle_recommendations.rows;
+      return [];
+    }
+
+    function renderLifecycleGuidance(row) {
+      const recommendations = lifecycleRecommendationRows(row).slice(0, 3);
+      if (!recommendations.length) return '';
+      return `
+        <section class="call-diagnostic-section lifecycle-guidance">
+          <div class="section-heading compact">
+            <h3>${escapeHtml('Lifecycle guidance')}</h3>
+            <span class="evidence-chip derived">${escapeHtml('Aggregate guidance')}</span>
+          </div>
+          <div class="call-metric-grid">
+            ${recommendations.map(recommendation => {
+              const chips = Array.isArray(recommendation.source_chips)
+                ? recommendation.source_chips.join(' + ')
+                : 'aggregate metadata';
+              const subtitle = [
+                recommendation.confidence ? `${recommendation.confidence} confidence` : '',
+                recommendation.scope || '',
+                chips,
+              ].filter(Boolean).join(' · ');
+              return callMetricCard(
+                recommendation.title || recommendation.recommendation_key || 'Lifecycle recommendation',
+                recommendation.action || recommendation.reason || t('state.unknown'),
+                subtitle || t('state.unknown'),
+              );
+            }).join('')}
+          </div>
+        </section>
+      `;
+    }
+
     function renderCallNavigation(row, previous, next) {
       const backUrl = tableUrlForRow(row);
       const previousRecordId = previous?.record_id || row.previous_record_id || '';
@@ -346,7 +383,10 @@
       if (
         row?.record_id
         && fetchCallRecord
-        && !Object.prototype.hasOwnProperty.call(row, 'task_receipts')
+        && (
+          !Object.prototype.hasOwnProperty.call(row, 'task_receipts')
+          || !Object.prototype.hasOwnProperty.call(row, 'lifecycle_recommendations')
+        )
       ) {
         fetchCallRecord(row.record_id);
       }
@@ -383,6 +423,7 @@
                 ${renderCallNavigation(row, previous, next)}
               </header>
               ${renderInvestigationReadout(row, previous, diagnostic, callPosition, evidenceStats)}
+              ${renderLifecycleGuidance(row)}
               <section class="call-diagnostic-section exact">
                 <div class="section-heading compact">
                   <h3>${escapeHtml(t('call.exact_accounting'))}</h3>

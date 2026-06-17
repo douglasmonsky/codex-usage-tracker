@@ -198,6 +198,18 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    "codex-usage-tracker-lifecycle-recommendations-v1": {
+        "required": {
+            "filters": dict,
+            "row_count": int,
+            "total_matched_rows": int,
+            "truncated": bool,
+            "limit": (int, NoneType),
+            "offset": int,
+            "rows": list,
+            "raw_context_included": bool,
+        }
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),
