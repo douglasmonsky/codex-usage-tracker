@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.7.0 - 2026-06-18
+
+- Parse latest observed Codex usage snapshots from local rate-limit and token-count log events without persisting raw transcript text.
+- Store observed 5h and weekly usage snapshot fields in aggregate rows and expose a latest-observed usage summary for dashboard and API consumers.
+- Add a dashboard card for latest observed 5h and weekly usage with wording that distinguishes local observations from authoritative account limits.
+- Default the dashboard table experience to time-sorted Calls, replace the visible Signals column with Reasoning Output, and keep the Signals field out of the table for now.
+- Ignore known non-token parser events so refreshes stay focused on usage-bearing records.
+
 ## 0.6.1 - 2026-06-13
 
 - Polish the README landing screenshots with matched dashboard/investigator previews and an additional lower investigator evidence view.
