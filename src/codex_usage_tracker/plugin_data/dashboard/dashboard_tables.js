@@ -26,7 +26,7 @@
       number,
       outputTokenCell,
       pct,
-      renderSignalPucks,
+      reasoningTokenCell,
       renderTimeCell,
       renderWithState,
       rowInvestigatorLink,
@@ -81,7 +81,6 @@
       tableCaptionEl.textContent = `${prefix}${dateCaptionPrefix()}${tf('caption.calls', { sort: tableCaptionEl.dataset.sortDescription, loaded: loadedRowsDescription() })}`;
       for (const row of page.items) {
         const tr = document.createElement('tr');
-        const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         tr.className = `call-row${getSelectedRecordId() === row.record_id ? ' selected-row' : ''}`;
         tr.dataset.recordId = row.record_id || '';
         tr.innerHTML = `
@@ -94,9 +93,9 @@
           <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
+          <td class="num token-cell">${rowInvestigatorLink(row, reasoningTokenCell(row))}</td>
           <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
           <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
-          <td>${rowInvestigatorLink(row, `<div class="flags">${renderSignalPucks(row, flags, 3)}</div>`)}</td>
         `;
         tr.addEventListener('mouseenter', () => showDetail(row));
         rowsEl.appendChild(tr);
@@ -174,9 +173,9 @@
           <td class="num token-cell">${tokenNumberCell(group.cachedTokens, t('metric.cached_input'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.uncachedTokens, t('metric.uncached_input'))}</td>
           <td class="num token-cell">${tokenNumberCell(group.outputTokens, t('metric.output_tokens'))}</td>
+          <td class="num token-cell">${tokenNumberCell(group.reasoningOutputTokens, t('metric.reasoning_output'))}</td>
           <td class="num">${costUsageCell(getPricingConfigured() ? moneyText(group.estimatedCost) : t('state.not_configured'), group.usageCredits)}</td>
           <td class="num">${pct(group.cacheRatio)}</td>
-          <td class="num">${number.format(group.signalCount)}</td>
         `;
         tr.addEventListener('click', () => {
           if (expandedThreads.has(group.key)) {
@@ -222,7 +221,6 @@
       const visiblePages = Math.max(1, getThreadCallVisiblePages().get(group.key) || 1);
       const visibleCount = Math.min(sortedCalls.length, visiblePages * threadCallPageSize);
       const calls = sortedCalls.slice(0, visibleCount).map(row => {
-        const flags = Array.isArray(row.efficiency_flags) ? row.efficiency_flags : [];
         return `
           <tr class="thread-call-row${getSelectedRecordId() === row.record_id ? ' selected-row' : ''}" data-record-id="${escapeHtml(row.record_id || '')}">
             <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
@@ -233,9 +231,9 @@
             <td class="num token-cell">${rowInvestigatorLink(row, cachedTokenCell(row))}</td>
             <td class="num token-cell">${rowInvestigatorLink(row, uncachedTokenCell(row))}</td>
             <td class="num token-cell">${rowInvestigatorLink(row, outputTokenCell(row))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(row, reasoningTokenCell(row))}</td>
             <td class="num">${rowInvestigatorLink(row, costUsageCell(row.pricing_estimated ? `${moneyText(row.estimated_cost_usd)}*` : moneyText(row.estimated_cost_usd), usageCreditValue(row)))}</td>
             <td class="num">${rowInvestigatorLink(row, pct(row.cache_ratio))}</td>
-            <td>${rowInvestigatorLink(row, `<div class="flags compact-flags">${renderSignalPucks(row, flags, 3, t('state.none'))}</div>`)}</td>
           </tr>
         `;
       }).join('');
@@ -262,9 +260,9 @@
               ${threadCallHeader('cached', t('table.cached'), true)}
               ${threadCallHeader('uncached', t('table.uncached'), true)}
               ${threadCallHeader('output', t('table.output'), true)}
+              ${threadCallHeader('reasoning', t('metric.reasoning_output'), true)}
               ${threadCallHeader('cost', t('table.cost'), true)}
               ${threadCallHeader('cache', t('table.cache'), true)}
-              ${threadCallHeader('signals', t('table.signals'))}
             </tr></thead>
             <tbody>${calls}</tbody>
           </table>

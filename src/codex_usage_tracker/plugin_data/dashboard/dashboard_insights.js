@@ -198,7 +198,7 @@
           severity: severityForScore(rowAttentionScore(reasoningRows[0])),
           action: t('insight.inspect_selected_call'),
           view: 'calls',
-          sort: 'signals',
+          sort: 'reasoning',
           target: { recordId: reasoningRows[0].record_id },
         });
       }

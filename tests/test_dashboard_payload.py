@@ -280,11 +280,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "cachedTokenCell" in dashboard_cells_js
     assert "uncachedTokenCell" in dashboard_cells_js
     assert "outputTokenCell" in dashboard_cells_js
+    assert "reasoningTokenCell" in dashboard_cells_js
     assert "signalPuckAbbreviation" in dashboard_cells_js
     assert "signal-puck" in dashboard_css
     assert "data-thread-call-sort-key" in dashboard_tables_js
     assert "threadCallSortKey = 'time'" in dashboard_js
     assert "threadCallSortDirection = 'desc'" in dashboard_js
+    assert "state.view !== 'calls'" in dashboard_state_js
+    assert "state.sort !== 'time'" in dashboard_state_js
     assert "detail.thread_attachment" in dashboard_details_js
     assert "detail.subagent_type" in dashboard_details_js
     assert "source.auto_review" in dashboard_cells_js
@@ -502,9 +505,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.credit_model" in dashboard_details_js
     assert 'data-sort-key="time"' in dashboard
     assert 'data-sort-key="thread"' in dashboard
-    assert '<option value="attention" selected data-i18n="option.needs_attention">Needs attention</option>' in dashboard
+    assert 'data-sort-key="reasoning"' in dashboard
+    assert 'data-sort-header="signals"' not in dashboard
+    assert '<option value="signals"' not in dashboard
+    assert '<option value="time" selected data-i18n="option.newest_calls">Newest calls</option>' in dashboard
     assert '<option value="initiator" data-i18n="table.initiated">Initiated</option>' in dashboard
     assert '<option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option>' in dashboard
+    assert 'id="insightsView" type="button" aria-pressed="false"' in dashboard
+    assert 'id="callsView" type="button" aria-pressed="true"' in dashboard
 
     pricing_path.write_text(
         json.dumps(

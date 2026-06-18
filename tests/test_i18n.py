@@ -443,7 +443,7 @@ def test_dashboard_js_generates_language_options_and_preserves_runtime_state() -
     assert "rerenderSelectedDetail()" in set_language
 
 
-def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> None:
+def test_dashboard_js_thread_call_rows_include_cache_and_reasoning_columns() -> None:
     render_thread_calls = extract_js_function(dashboard_tables_js_text(), "renderThreadCalls")
 
     for label in [
@@ -455,16 +455,18 @@ def test_dashboard_js_thread_call_rows_include_cache_and_signals_columns() -> No
         "table.cached",
         "table.uncached",
         "table.output",
+        "metric.reasoning_output",
         "table.cost",
         "table.cache",
-        "table.signals",
     ]:
         assert label in render_thread_calls
+    assert "table.signals" not in render_thread_calls
     assert "row.cache_ratio" in render_thread_calls
     assert "cachedTokenCell(row)" in render_thread_calls
     assert "uncachedTokenCell(row)" in render_thread_calls
     assert "outputTokenCell(row)" in render_thread_calls
-    assert "renderSignalPucks(row, flags, 3" in render_thread_calls
+    assert "reasoningTokenCell(row)" in render_thread_calls
+    assert "renderSignalPucks(row, flags, 3" not in render_thread_calls
     assert "</tr>" in render_thread_calls
 
 
@@ -477,6 +479,9 @@ def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
     show_detail = extract_js_function(details_js, "showDetail")
 
     assert "'action.run': 'Run'" in i18n_js
+    assert "'action.set_limits': 'Set limits'" in i18n_js
+    assert "'metric.usage_observed': 'Usage observed'" in i18n_js
+    assert "'allowance.live_check_short': 'Verify live'" in i18n_js
     assert "'button.run': 'Run'" not in i18n_js
     assert "translatedField(recommendation.title_key, recommendation.title)" in recommendation_summary
     assert "translatedField(recommendation.why_key, recommendation.why)" in recommendation_summary

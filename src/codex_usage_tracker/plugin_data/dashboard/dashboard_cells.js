@@ -180,6 +180,10 @@
       return tokenNumberCell(outputTokens(row), t('metric.output_tokens'));
     }
 
+    function reasoningTokenCell(row) {
+      return tokenNumberCell(Number(row.reasoning_output_tokens || 0), t('metric.reasoning_output'));
+    }
+
     function effortTooltipText(values) {
       const unique = [...new Set(values.filter(Boolean).map(value => translateEffort(short(value))))].sort();
       return unique.length ? unique.join(' - ') : t('state.unknown');
@@ -251,6 +255,7 @@
       effortTooltipText,
       outputTokenCell,
       outputTokens,
+      reasoningTokenCell,
       renderSignalPucks,
       signalPuckAbbreviation,
       signalPuckLabel,
