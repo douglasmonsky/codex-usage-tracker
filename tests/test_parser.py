@@ -12,6 +12,7 @@ from codex_usage_tracker.parser import (
     inspect_log,
     load_session_index,
     parse_usage_events_from_file,
+    parse_usage_events_from_file_with_state,
 )
 
 SESSION_ID = "019e374d-c19f-7da3-a44f-8de043a7a64e"
@@ -288,6 +289,74 @@ def test_parser_persists_call_origin_from_metadata_segments(tmp_path: Path) -> N
         ("unknown", "no_signal", "low"),
     ]
     assert "SECRET" not in json.dumps([event.to_row() for event in events])
+
+
+def test_parser_collects_diagnostic_facts_between_token_counts(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "output": "SECRET TOOL OUTPUT",
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "output": "SECRET SECOND TOOL OUTPUT",
+                },
+            ),
+            _entry(
+                "event_msg",
+                {
+                    "type": "patch_apply_end",
+                    "patch": "SECRET PATCH TEXT",
+                },
+            ),
+            _token_event(100, 100),
+            _entry(
+                "event_msg",
+                {
+                    "type": "context_compacted",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {"type": "output_text", "text": "SECRET COMPACTION TEXT"}
+                            ],
+                        }
+                    ],
+                },
+            ),
+            _token_event(150, 50),
+        ],
+    )
+
+    parsed = parse_usage_events_from_file_with_state(log_path)
+
+    assert [event.cumulative_total_tokens for event in parsed.events] == [100, 150]
+    facts = {(fact.fact_type, fact.fact_name): fact for fact in parsed.diagnostic_facts}
+    assert set(facts) == {
+        ("compaction", "post_compaction"),
+        ("outcome", "patch_applied"),
+        ("tool", "function_call_output"),
+    }
+    assert facts[("tool", "function_call_output")].record_id == parsed.events[0].record_id
+    assert facts[("tool", "function_call_output")].event_count == 2
+    assert facts[("outcome", "patch_applied")].record_id == parsed.events[0].record_id
+    assert facts[("compaction", "post_compaction")].record_id == parsed.events[1].record_id
+    assert all(fact.raw_content_included == 0 for fact in parsed.diagnostic_facts)
+    assert "SECRET" not in json.dumps(
+        [fact.to_row() for fact in parsed.diagnostic_facts],
+        sort_keys=True,
+    )
 
 
 def test_parser_persists_dashboard_helper_metadata(tmp_path: Path) -> None:

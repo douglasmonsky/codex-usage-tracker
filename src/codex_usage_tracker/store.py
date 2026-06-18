@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker.models import RefreshResult, UsageEvent
+from codex_usage_tracker.models import DiagnosticFact, RefreshResult, UsageEvent
 from codex_usage_tracker.parser import (
     PARSER_DIAGNOSTIC_KEYS,
     compact_parser_diagnostics,
@@ -21,6 +21,7 @@ from codex_usage_tracker.parser import (
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
 from codex_usage_tracker.projects import apply_project_privacy_to_rows, validate_privacy_mode
 from codex_usage_tracker.schema import (
+    DIAGNOSTIC_FACT_COLUMN_NAMES,
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
@@ -47,6 +48,7 @@ from codex_usage_tracker.store_sources import (
 from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
+DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
 
@@ -65,6 +67,7 @@ def refresh_usage_index(
         parse_plans = source_logs_requiring_parse(conn, logs)
     stats: dict[str, int] = {}
     events: list[UsageEvent] = []
+    diagnostic_facts: list[DiagnosticFact] = []
     parsed_files: list[ParsedSourceFile] = []
     for plan in parse_plans:
         file_stats: dict[str, int] = {}
@@ -78,6 +81,7 @@ def refresh_usage_index(
         )
         file_events = parsed_file.events
         events.extend(file_events)
+        diagnostic_facts.extend(parsed_file.diagnostic_facts)
         parsed_files.append((plan.path, file_events, file_stats, parsed_file.state))
         for key, value in file_stats.items():
             stats[key] = stats.get(key, 0) + int(value)
@@ -85,6 +89,7 @@ def refresh_usage_index(
         events,
         db_path=db_path,
         replace_source_files=(plan.path for plan in parse_plans if plan.replace_existing),
+        diagnostic_facts=diagnostic_facts,
     )
     record_source_file_metadata(db_path=db_path, parsed_files=parsed_files)
     skipped_events = stats.get("skipped_events", 0)
@@ -118,6 +123,7 @@ def rebuild_usage_index(
 
     with connect(db_path) as conn:
         init_db(conn)
+        conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
@@ -136,6 +142,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         init_db(conn)
         row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
         deleted_rows = int(row["count"] if row is not None else 0)
+        conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
@@ -270,13 +277,26 @@ def upsert_usage_events(
     *,
     refresh_links: bool = True,
     replace_source_files: Iterable[Path] | None = None,
+    diagnostic_facts: Iterable[DiagnosticFact] | None = None,
 ) -> int:
     rows = [event.to_row() for event in events]
+    fact_rows = [fact.to_row() for fact in diagnostic_facts or []]
     source_files_to_replace = [str(path) for path in replace_source_files or []]
     with connect(db_path) as conn:
         init_db(conn)
         if source_files_to_replace:
             placeholders = ", ".join("?" for _source in source_files_to_replace)
+            conn.execute(
+                f"""
+                DELETE FROM call_diagnostic_facts
+                WHERE record_id IN (
+                    SELECT record_id
+                    FROM usage_events
+                    WHERE source_file IN ({placeholders})
+                )
+                """,
+                source_files_to_replace,
+            )
             conn.execute(
                 f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
                 source_files_to_replace,
@@ -297,11 +317,52 @@ def upsert_usage_events(
             f"VALUES ({placeholders}) "
             f"ON CONFLICT(record_id) DO UPDATE SET {update_clause}"
         )
+        _delete_diagnostic_facts_for_record_ids(
+            conn,
+            [str(row["record_id"]) for row in rows],
+        )
         conn.executemany(sql, [[row[column] for column in EVENT_COLUMNS] for row in rows])
+        _insert_diagnostic_facts(conn, fact_rows)
         if refresh_links:
             _refresh_usage_event_links(conn)
             rebuild_thread_summaries(conn)
         return len(rows)
+
+
+def _delete_diagnostic_facts_for_record_ids(
+    conn: sqlite3.Connection,
+    record_ids: list[str],
+) -> None:
+    if not record_ids:
+        return
+    placeholders = ", ".join("?" for _record_id in record_ids)
+    conn.execute(
+        f"DELETE FROM call_diagnostic_facts WHERE record_id IN ({placeholders})",
+        record_ids,
+    )
+
+
+def _insert_diagnostic_facts(
+    conn: sqlite3.Connection,
+    rows: list[dict[str, object]],
+) -> None:
+    if not rows:
+        return
+    placeholders = ", ".join("?" for _column in DIAGNOSTIC_FACT_COLUMNS)
+    update_clause = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in DIAGNOSTIC_FACT_COLUMNS
+        if column not in {"record_id", "fact_type", "fact_name"}
+    )
+    sql = (
+        f"INSERT INTO call_diagnostic_facts ({', '.join(DIAGNOSTIC_FACT_COLUMNS)}) "
+        f"VALUES ({placeholders}) "
+        f"ON CONFLICT(record_id, fact_type, fact_name) DO UPDATE SET {update_clause}"
+    )
+    conn.executemany(
+        sql,
+        [[row[column] for column in DIAGNOSTIC_FACT_COLUMNS] for row in rows],
+    )
 
 
 def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
@@ -467,6 +528,115 @@ def query_usage_record(
             (record_id,),
         ).fetchone()
         return _row_to_dict(row) if row is not None else None
+
+
+def query_diagnostic_facts(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    limit: int | None = 50,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    min_tokens: int | None = None,
+    include_archived: bool = False,
+    sort: str = "uncached",
+    direction: str = "desc",
+) -> list[dict[str, Any]]:
+    """Return aggregate diagnostic fact summaries joined to usage events."""
+
+    sort_map = {
+        "uncached": "associated_uncached_input_tokens",
+        "tokens": "associated_total_tokens",
+        "calls": "associated_calls",
+        "occurrences": "occurrences",
+        "time": "latest_event_timestamp",
+        "fact": "f.fact_name",
+    }
+    if sort not in sort_map:
+        allowed = ", ".join(sorted(sort_map))
+        raise ValueError(f"sort must be one of: {allowed}")
+    direction_sql = _normalize_sort_direction(direction)
+    where_clause, params = _usage_where_clause(
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        min_tokens=min_tokens,
+        table_alias="usage_events",
+        include_archived=include_archived,
+    )
+    sub_where_clause, sub_params = _usage_where_clause(
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        min_tokens=min_tokens,
+        table_alias="u2",
+        include_archived=include_archived,
+    )
+    sub_conditions = [
+        "f2.fact_type = f.fact_type",
+        "f2.fact_name = f.fact_name",
+    ]
+    if sub_where_clause:
+        sub_conditions.append(sub_where_clause.removeprefix("WHERE "))
+    sub_where_sql = "WHERE " + " AND ".join(f"({condition})" for condition in sub_conditions)
+    normalized_limit = _normalize_limit(limit)
+    limit_clause = ""
+    query_params: list[Any] = [*sub_params, *params]
+    if normalized_limit is not None:
+        limit_clause = "LIMIT ?"
+        query_params.append(normalized_limit)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                f.fact_type,
+                f.fact_name,
+                f.fact_category,
+                coalesce(SUM(f.event_count), 0) AS occurrences,
+                COUNT(DISTINCT usage_events.record_id) AS associated_calls,
+                coalesce(SUM(usage_events.input_tokens), 0) AS associated_input_tokens,
+                coalesce(SUM(usage_events.cached_input_tokens), 0)
+                    AS associated_cached_input_tokens,
+                coalesce(SUM(usage_events.uncached_input_tokens), 0)
+                    AS associated_uncached_input_tokens,
+                coalesce(SUM(usage_events.output_tokens), 0) AS associated_output_tokens,
+                coalesce(SUM(usage_events.reasoning_output_tokens), 0)
+                    AS associated_reasoning_output_tokens,
+                coalesce(SUM(usage_events.total_tokens), 0) AS associated_total_tokens,
+                AVG(usage_events.cache_ratio) AS avg_cache_ratio,
+                MAX(usage_events.total_tokens) AS largest_call_tokens,
+                MAX(usage_events.event_timestamp) AS latest_event_timestamp,
+                MIN(f.first_source_line) AS first_source_line,
+                MAX(f.last_source_line) AS last_source_line,
+                MAX(f.raw_content_included) AS raw_content_included,
+                (
+                    SELECT u2.record_id
+                    FROM call_diagnostic_facts AS f2
+                    JOIN usage_events AS u2 ON u2.record_id = f2.record_id
+                    {sub_where_sql}
+                    ORDER BY u2.total_tokens DESC, u2.event_timestamp DESC, u2.record_id
+                    LIMIT 1
+                ) AS largest_record_id
+            FROM call_diagnostic_facts AS f
+            JOIN usage_events ON usage_events.record_id = f.record_id
+            {where_clause}
+            GROUP BY f.fact_type, f.fact_name, f.fact_category
+            ORDER BY {sort_map[sort]} {direction_sql},
+                associated_total_tokens DESC,
+                f.fact_type,
+                f.fact_name
+            {limit_clause}
+            """,
+            query_params,
+        )
+        return [_row_to_dict(row) for row in rows]
 
 
 def query_dashboard_events(

@@ -15,6 +15,7 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - materialized thread-level aggregate summaries for active and all-history scopes
 - source-file refresh metadata such as path, path hash, size, mtime, indexed line/byte offsets, latest aggregate record id, parser diagnostics, and last indexed time
 - observed Codex rate-limit snapshot metadata from local token-count logs, such as plan type, limit id, 5-hour/weekly used percentages, window lengths, and reset times
+- diagnostic fact labels tied to aggregate call records, such as safe event categories, payload type labels, counts, timestamps, and line ranges
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
 
 ## Not Stored
@@ -31,6 +32,8 @@ The parser intentionally does not store:
 Those fields are not written to SQLite, CSV exports, generated dashboard HTML, or synthetic screenshots.
 
 Call-origin metadata is heuristic and confidence-labeled. It stores categories such as `user`, `codex`, or `unknown` plus a reason such as `user_message`, `tool_result`, `post_compaction`, or `agent_continuation`. It does not store the message text, tool output, compaction replacement text, or raw JSONL fragment that produced the category.
+
+Diagnostic facts follow the same aggregate-only rule. They can store safe structured labels such as `patch_applied`, `function_call_output`, or `post_compaction`, along with event counts and source line ranges. They do not store tool arguments, command text, command output, patch text, prompt or assistant text, file contents, raw JSONL fragments, or raw context evidence.
 
 ## On-Demand Context
 

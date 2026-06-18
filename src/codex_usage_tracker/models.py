@@ -99,6 +99,29 @@ class UsageEvent:
 
 
 @dataclass(frozen=True)
+class DiagnosticFact:
+    """One aggregate diagnostic fact associated with a usage-event record."""
+
+    record_id: str | None
+    fact_type: str
+    fact_name: str
+    fact_category: str | None
+    event_count: int = 1
+    confidence: str = "medium"
+    first_event_timestamp: str | None = None
+    last_event_timestamp: str | None = None
+    first_source_line: int | None = None
+    last_source_line: int | None = None
+    evidence_scope: str = "between_token_counts"
+    raw_content_included: int = 0
+
+    def to_row(self) -> dict[str, object]:
+        if not self.record_id:
+            raise ValueError("diagnostic facts must have a record_id before persistence")
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class RefreshResult:
     scanned_files: int
     parsed_events: int
