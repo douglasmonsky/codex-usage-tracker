@@ -5,6 +5,8 @@
 - Keep usage-impact estimates off the live dashboard critical path by loading
   exact call rows first, then enriching only visible record IDs through a
   bounded `/api/usage-impact?record_ids=...` read-model request.
+- Enrich visible Threads rows with summed usage impact in the background through
+  a bounded `/api/thread-usage-impact?thread_keys=...` read-model request.
 
 ## 0.7.0 - 2026-06-17
 

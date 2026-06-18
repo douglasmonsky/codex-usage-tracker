@@ -823,12 +823,29 @@
       });
     }
     function visibleUsageRecordIds() {
-      if (activeView !== 'calls') return [];
-      const rows = filtered();
-      const page = visibleSlice(rows);
-      return page.items
-        .filter(row => row?.record_id && (row.usage_impact_pending || !rowHasUsageImpactEstimate(row)))
-        .map(row => row.record_id);
+      let rows = [];
+      if (activeView === 'calls') {
+        rows = visibleSlice(filtered()).items;
+      } else if (activeView === 'threads') {
+        const records = [];
+        expandedThreads.forEach(threadKey => {
+          const childState = threadCallsByKey.get(threadKey);
+          if (!childState || !Array.isArray(childState.rows)) return;
+          records.push(...childState.rows);
+        });
+        rows = records;
+      } else {
+        return [];
+      }
+      const seen = new Set();
+      return rows
+        .filter(row => row?.record_id && !rowHasUsageImpactEstimate(row))
+        .map(row => row.record_id)
+        .filter(recordId => {
+          if (seen.has(recordId)) return false;
+          seen.add(recordId);
+          return true;
+        });
     }
     function applyUsageImpactPayload(payload) {
       const rows = Array.isArray(payload?.rows) ? payload.rows : [];
@@ -859,6 +876,45 @@
       rows.forEach(mergeUsageImpact);
       if (!changed) return;
       rebuildDashboardIndexes();
+      render();
+    }
+    function visibleThreadUsageKeys() {
+      if (activeView !== 'threads' || !threadReadModelEligible()) return [];
+      const seen = new Set();
+      return visibleSlice(threadRows).items
+        .filter(row => row?.thread_key && !row.usage_impact_checked && !rowHasUsageImpactEstimate(row))
+        .map(row => row.thread_key)
+        .filter(threadKey => {
+          if (seen.has(threadKey)) return false;
+          seen.add(threadKey);
+          return true;
+        });
+    }
+    function applyThreadUsageImpactPayload(payload) {
+      const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+      if (!rows.length) return;
+      const byThreadKey = new Map(rows.map(row => [row.thread_key, row]));
+      let changed = false;
+      threadRows = threadRows.map(row => {
+        const update = byThreadKey.get(row.thread_key);
+        if (!update) return row;
+        const next = { ...row };
+        next.usage_impact_checked = true;
+        changed = true;
+        if (Object.prototype.hasOwnProperty.call(update, 'usage_impact')) {
+          next.usage_impact = update.usage_impact || null;
+          changed = true;
+        }
+        if (Object.prototype.hasOwnProperty.call(update, 'usage_impact_pending')) {
+          next.usage_impact_pending = Boolean(update.usage_impact_pending);
+          changed = true;
+        } else if (Object.prototype.hasOwnProperty.call(next, 'usage_impact_pending')) {
+          next.usage_impact_pending = false;
+          changed = true;
+        }
+        return next;
+      });
+      if (!changed) return;
       render();
     }
     function tooltipAttributes(text) {
@@ -912,6 +968,7 @@
       activeView: () => activeView,
       apiToken: () => apiToken,
       applyDashboardPayload,
+      applyThreadUsageImpactPayload,
       applyUsageImpactPayload,
       autoRefreshEl,
       backgroundHydrationChunkSize,
@@ -957,9 +1014,11 @@
       tf,
       threadsUseReadModel: () => activeView === 'threads' && threadReadModelEligible(),
       updateLiveStatus,
+      visibleThreadUsageKeys,
       visibleUsageRecordIds,
     });
     const {
+      hydrateVisibleThreadUsageImpactRows,
       hydrateVisibleUsageImpactRows,
       hydrateMoreRows,
       historyRowsDescription,
@@ -1691,6 +1750,7 @@
       updateRowLoadProgress();
       syncUrlState();
       scheduleFocusPendingTarget();
+      hydrateVisibleThreadUsageImpactRows();
       hydrateVisibleUsageImpactRows();
     }
     function renderCalls(rows) {

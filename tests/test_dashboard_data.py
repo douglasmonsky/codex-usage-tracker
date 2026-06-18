@@ -998,6 +998,94 @@ console.log(JSON.stringify({
     assert payload["requestUrls"][0].startswith("/api/usage-impact?")
 
 
+def test_visible_thread_usage_impact_hydration_is_single_flight_and_scoped() -> None:
+    payload = _run_dashboard_live_script(
+        """
+let requestUrls = [];
+let appliedPayloads = [];
+let resolveThreadUsageImpact;
+context.fetch = async url => {
+  requestUrls.push(String(url));
+  return new Promise(resolve => {
+    resolveThreadUsageImpact = () => resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        schema: 'codex-usage-tracker-thread-usage-impact-v1',
+        rows: [
+          { thread_key: 'thread:a', usage_impact: { primary: { estimate_percent: 0.75 }, secondary: null } },
+          { thread_key: 'thread:b', usage_impact_pending: true },
+        ],
+        row_count: 2,
+        usage_impact_pending: true,
+      }),
+    });
+  });
+};
+const runtime = helpers.create({
+  activeView: () => 'threads',
+  apiToken: () => 'token',
+  applyDashboardPayload: () => {},
+  applyThreadUsageImpactPayload: payload => { appliedPayloads.push(payload); },
+  applyUsageImpactPayload: () => {},
+  autoRefreshEl: { checked: true },
+  formatTimestamp: value => String(value || ''),
+  getData: () => [],
+  getIncludeArchived: () => true,
+  getLoadedLimit: () => null,
+  getTotalAvailableRows: () => 2,
+  getArchivedAvailableRows: () => 0,
+  historyScopeEl: { value: 'all', parentElement: {} },
+  initialHydrationChunkSize: 2,
+  backgroundHydrationChunkSize: 2,
+  i18n: { currentLanguage: 'en' },
+  liveRefreshIntervalMs: 10000,
+  liveRefreshSupported: true,
+  loadLimitEl: { value: 'all', options: [], insertBefore: () => {}, lastElementChild: null },
+  limitValue: value => value === null ? 'all' : String(value),
+  number: { format: value => String(value) },
+  payloadRows: payload => payload.rows || [],
+  rebuildDashboardIndexes: () => {},
+  rebuildFilterOptions: () => {},
+  refreshDashboardEl: { disabled: false },
+  render: () => {},
+  resetRowsForHydration: () => {},
+  rowLoadProgressBarEl: { style: {} },
+  rowLoadProgressCountEl: { textContent: '' },
+  rowLoadProgressEl: { hidden: true },
+  rowLoadProgressLabelEl: { textContent: '' },
+  setFastTooltip: () => {},
+  setObservedUsage: () => {},
+  t: key => key,
+  tf: (key, values) => `${key}:${JSON.stringify(values || {})}`,
+  updateLiveStatus: () => {},
+  visibleThreadUsageKeys: () => ['thread:a', 'thread:b'],
+  visibleUsageRecordIds: () => [],
+});
+const first = runtime.hydrateVisibleThreadUsageImpactRows();
+const second = runtime.hydrateVisibleThreadUsageImpactRows();
+await new Promise(resolve => setTimeout(resolve, 10));
+resolveThreadUsageImpact();
+const results = await Promise.all([first, second]);
+await new Promise(resolve => setTimeout(resolve, 25));
+console.log(JSON.stringify({
+  requestUrls,
+  threadKeys: new URL(requestUrls[0], 'http://localhost').searchParams.get('thread_keys'),
+  results,
+  appliedCount: appliedPayloads.length,
+  appliedRows: appliedPayloads[0].rows,
+}));
+"""
+    )
+
+    assert len(payload["requestUrls"]) == 1
+    assert payload["requestUrls"][0].startswith("/api/thread-usage-impact?")
+    assert payload["threadKeys"] == "thread:a,thread:b"
+    assert payload["results"] == [True, False]
+    assert payload["appliedCount"] == 1
+    assert payload["appliedRows"][0]["thread_key"] == "thread:a"
+
+
 def test_live_row_hydration_advances_by_api_offset_when_rows_are_merged() -> None:
     payload = _run_dashboard_live_script(
         """

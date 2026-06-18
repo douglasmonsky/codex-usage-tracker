@@ -576,6 +576,12 @@ def test_dashboard_server_thread_api_exposes_usage_impact_summary(tmp_path: Path
             f"http://127.0.0.1:{server.server_port}"
             "/api/threads?sort=usage_impact&direction=desc&limit=2"
         )
+        visible_thread_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}"
+            "/api/thread-usage-impact"
+            "?thread_keys=thread%3AAlpha%20usage,thread%3ABeta%20usage,thread%3AAlpha%20usage"
+            "&include_archived=1"
+        )
     finally:
         server.shutdown()
         server.server_close()
@@ -591,6 +597,19 @@ def test_dashboard_server_thread_api_exposes_usage_impact_summary(tmp_path: Path
     assert usage_impact["secondary"]["basis"] == "codex_credits"
     assert usage_impact["secondary"]["interval_call_count"] == 2
     assert threads_payload["raw_context_included"] is False
+    assert visible_thread_payload["schema"] == "codex-usage-tracker-thread-usage-impact-v1"
+    assert visible_thread_payload["thread_keys"] == [
+        "thread:Alpha usage",
+        "thread:Beta usage",
+    ]
+    assert visible_thread_payload["row_count"] == 2
+    assert visible_thread_payload["include_archived"] is True
+    assert visible_thread_payload["raw_context_included"] is False
+    assert (
+        visible_thread_payload["rows"][0]["usage_impact"]["primary"]["estimate_percent"]
+        == usage_impact["primary"]["estimate_percent"]
+    )
+    assert "SECRET RAW PROMPT" not in json.dumps(visible_thread_payload)
 
 
 def test_dashboard_server_thread_api_skips_usage_impact_for_default_sort(

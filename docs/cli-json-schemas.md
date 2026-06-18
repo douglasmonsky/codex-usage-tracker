@@ -48,6 +48,7 @@ Tracked schema ids:
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-usage-impact-v1` | CLI `usage-impact --json`, dashboard server `/api/usage-impact?record_id=...`, `/api/call` usage-impact payload |
 | `codex-usage-tracker-usage-impact-visible-v1` | Dashboard server `/api/usage-impact?record_ids=...` compact visible-row enrichment payload |
+| `codex-usage-tracker-thread-usage-impact-v1` | Dashboard server `/api/thread-usage-impact?thread_keys=...` compact visible-thread enrichment payload |
 | `codex-usage-tracker-task-receipts-v1` | CLI `task-receipts --json`, dashboard server `/api/task-receipts`, `/api/call` task receipt payload |
 | `codex-usage-tracker-usage-impact-estimate-v1` | Nested dashboard row `usage_impact.primary` and `usage_impact.secondary` estimate objects |
 | `codex-usage-tracker-sessions-v1` | CLI `sessions --json`, dashboard server `/api/sessions` response |
@@ -224,6 +225,10 @@ Dashboard API:
   visible-row enrichment shape for already rendered dashboard rows. This mode is
   bounded to visible record IDs and reads only persisted usage-impact estimates;
   it does not synchronously rebuild estimates.
+- `/api/thread-usage-impact?thread_keys=<thread-key>,<thread-key>` returns the
+  compact visible-thread enrichment shape for already rendered Threads rows.
+  This mode is bounded to visible thread keys and reads only persisted
+  usage-impact estimates; it does not synchronously rebuild estimates.
 - `/api/call?record_id=<record-id>` includes a nested `usage_impact` payload
 
 Schema: `codex-usage-tracker-usage-impact-v1`

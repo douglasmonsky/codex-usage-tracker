@@ -167,6 +167,7 @@ COMPACT_LIVE_ROW_KEYS = {
     "usage_impact_pending",
 }
 MAX_USAGE_IMPACT_RECORD_IDS = 500
+MAX_THREAD_USAGE_IMPACT_KEYS = 500
 _validate_loopback_host = server_utils.validate_loopback_host
 
 
@@ -222,6 +223,19 @@ def _usage_impact_row_payload(row: dict[str, Any]) -> dict[str, Any]:
     if usage_impact is not None:
         payload["usage_impact"] = usage_impact
     if row.get("usage_impact_pending"):
+        payload["usage_impact_pending"] = True
+    return payload
+
+
+def _thread_usage_impact_row_payload(
+    thread_key: str,
+    usage_impact_by_thread: dict[str, dict[str, Any]],
+    pending_impact_by_thread: dict[str, bool],
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"thread_key": thread_key}
+    if thread_key in usage_impact_by_thread:
+        payload["usage_impact"] = usage_impact_by_thread[thread_key]
+    if pending_impact_by_thread.get(thread_key):
         payload["usage_impact_pending"] = True
     return payload
 
@@ -530,6 +544,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/usage-impact":
             self._handle_usage_impact(parsed.query)
+            return
+        if parsed.path == "/api/thread-usage-impact":
+            self._handle_thread_usage_impact(parsed.query)
             return
         if parsed.path == "/api/task-receipts":
             self._handle_task_receipts(parsed.query)
@@ -1076,6 +1093,81 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 if len(record_ids) >= MAX_USAGE_IMPACT_RECORD_IDS:
                     return record_ids
         return record_ids
+
+    def _handle_thread_usage_impact(self, query: str) -> None:
+        params = parse_qs(query)
+        thread_keys = self._thread_usage_impact_keys(params)
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        if not thread_keys:
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "schema": "codex-usage-tracker-thread-usage-impact-v1",
+                    "rows": [],
+                    "row_count": 0,
+                    "thread_keys": [],
+                    "usage_impact_pending": False,
+                    "include_archived": include_archived,
+                    "raw_context_included": False,
+                },
+            )
+            return
+        try:
+            impact_summaries = query_thread_usage_impact_summaries(
+                db_path=self._db_path,
+                thread_keys=thread_keys,
+                include_archived=include_archived,
+            )
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading thread usage impact: {exc}"},
+            )
+            return
+        usage_impact_by_thread, pending_impact_by_thread = _thread_usage_impact_by_thread(
+            impact_summaries
+        )
+        rows = [
+            _thread_usage_impact_row_payload(
+                thread_key,
+                usage_impact_by_thread,
+                pending_impact_by_thread,
+            )
+            for thread_key in thread_keys
+        ]
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "schema": "codex-usage-tracker-thread-usage-impact-v1",
+                "rows": rows,
+                "row_count": len(rows),
+                "thread_keys": thread_keys,
+                "usage_impact_pending": any(
+                    row.get("usage_impact_pending") for row in rows
+                ),
+                "include_archived": include_archived,
+                "raw_context_included": False,
+            },
+        )
+
+    def _thread_usage_impact_keys(self, params: dict[str, list[str]]) -> list[str]:
+        raw_values: list[str] = []
+        raw_values.extend(params.get("thread_keys") or [])
+        thread_keys: list[str] = []
+        seen: set[str] = set()
+        for raw_value in raw_values:
+            for candidate in str(raw_value or "").split(","):
+                thread_key = candidate.strip()
+                if not thread_key or thread_key in seen:
+                    continue
+                seen.add(thread_key)
+                thread_keys.append(thread_key)
+                if len(thread_keys) >= MAX_THREAD_USAGE_IMPACT_KEYS:
+                    return thread_keys
+        return thread_keys
 
     def _handle_task_receipts(self, query: str) -> None:
         params = parse_qs(query)

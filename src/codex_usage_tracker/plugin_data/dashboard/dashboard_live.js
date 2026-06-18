@@ -4,6 +4,7 @@
       activeView,
       apiToken,
       applyDashboardPayload,
+      applyThreadUsageImpactPayload = () => {},
       applyUsageImpactPayload = () => {},
       autoRefreshEl,
       formatTimestamp,
@@ -39,6 +40,7 @@
       tf,
       threadsUseReadModel = () => false,
       updateLiveStatus,
+      visibleThreadUsageKeys = () => [],
       visibleUsageRecordIds = () => [],
     } = deps;
 
@@ -54,6 +56,9 @@
     let usageImpactHydrationInFlight = false;
     let usageImpactHydrationQueued = false;
     let lastUsageImpactRequestKey = '';
+    let threadUsageImpactHydrationInFlight = false;
+    let threadUsageImpactHydrationQueued = false;
+    let lastThreadUsageImpactRequestKey = '';
     let autoRefreshTimer = null;
 
     function loadedRowsDescription() {
@@ -256,8 +261,30 @@
       return payload;
     }
 
+    async function fetchVisibleThreadUsageImpact(threadKeys) {
+      const params = new URLSearchParams({
+        thread_keys: threadKeys.join(','),
+        include_archived: getIncludeArchived() ? '1' : '0',
+        _: String(Date.now()),
+      });
+      const response = await fetch(`/api/thread-usage-impact?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Codex-Usage-Token': apiToken(),
+        },
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        stopLiveRefreshForAuthFailure(response);
+        throw new Error(liveApiResponseMessage(response));
+      }
+      const payload = await response.json();
+      if (payload.error) throw new Error(payload.error);
+      return payload;
+    }
+
     async function hydrateVisibleUsageImpactRows() {
-      if (!liveRefreshSupported || !apiToken() || activeView() !== 'calls') return false;
+      if (!liveRefreshSupported || !apiToken() || !['calls', 'threads'].includes(activeView())) return false;
       const recordIds = visibleUsageRecordIds()
         .map(recordId => String(recordId || '').trim())
         .filter(Boolean);
@@ -287,9 +314,40 @@
       }
     }
 
+    async function hydrateVisibleThreadUsageImpactRows() {
+      if (!liveRefreshSupported || !apiToken() || activeView() !== 'threads') return false;
+      const threadKeys = visibleThreadUsageKeys()
+        .map(threadKey => String(threadKey || '').trim())
+        .filter(Boolean);
+      if (!threadKeys.length) return false;
+      const requestKey = `${getIncludeArchived() ? 'all' : 'active'}:${threadKeys.join(',')}`;
+      if (requestKey === lastThreadUsageImpactRequestKey) return false;
+      if (threadUsageImpactHydrationInFlight) {
+        threadUsageImpactHydrationQueued = true;
+        return false;
+      }
+      threadUsageImpactHydrationInFlight = true;
+      lastThreadUsageImpactRequestKey = requestKey;
+      try {
+        const payload = await fetchVisibleThreadUsageImpact(threadKeys);
+        applyThreadUsageImpactPayload(payload);
+        return true;
+      } catch (_error) {
+        return false;
+      } finally {
+        threadUsageImpactHydrationInFlight = false;
+        if (threadUsageImpactHydrationQueued) {
+          threadUsageImpactHydrationQueued = false;
+          hydrateVisibleThreadUsageImpactRows();
+        }
+      }
+    }
+
     function resetVisibleUsageImpactHydration() {
       lastUsageImpactRequestKey = '';
       usageImpactHydrationQueued = false;
+      lastThreadUsageImpactRequestKey = '';
+      threadUsageImpactHydrationQueued = false;
     }
 
     async function refreshAppendedRows(refreshResult, scopedRows) {
@@ -571,6 +629,7 @@
     }
 
     return {
+      hydrateVisibleThreadUsageImpactRows,
       hydrateVisibleUsageImpactRows,
       hydrateMoreRows,
       historyRowsDescription,
