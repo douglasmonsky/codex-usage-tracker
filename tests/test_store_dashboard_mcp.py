@@ -24,6 +24,7 @@ from codex_usage_tracker.store import (
     init_db,
     query_dashboard_event_count,
     query_dashboard_events,
+    query_latest_observed_usage,
     query_most_expensive_calls,
     query_session_usage,
     query_summary,
@@ -78,12 +79,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "7"
+    assert meta["schema_version"] == "8"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 7
+    assert state["schema_version"] == 8
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8]
     with connect(db_path) as conn:
         init_db(conn)
         source_rows = [
@@ -267,7 +268,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 7
+    assert user_version == 8
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -337,8 +338,118 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "idx_usage_timestamp" in indexes
     assert "idx_usage_parent_thread" in indexes
     assert "idx_usage_total_tokens" in indexes
-    assert user_version == 7
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7]
+    assert "rate_limit_plan_type" in columns
+    assert "rate_limit_primary_used_percent" in columns
+    assert "idx_usage_observed_rate_limit_timestamp" in indexes
+    assert user_version == 8
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8]
+
+
+def test_latest_observed_usage_prefers_normal_codex_limit_pool(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="normal-codex",
+            session_id=SESSION_ID,
+            thread_key="thread:Main allowance",
+            event_timestamp="2026-06-16T10:00:00Z",
+            cumulative_total_tokens=1000,
+            rate_limit_plan_type="pro",
+            rate_limit_limit_id="codex",
+            rate_limit_primary_used_percent=3.0,
+            rate_limit_primary_window_minutes=300,
+            rate_limit_primary_resets_at=1781562696,
+            rate_limit_secondary_used_percent=29.0,
+            rate_limit_secondary_window_minutes=10080,
+            rate_limit_secondary_resets_at=1781887793,
+        ),
+        _usage_event(
+            record_id="separate-pool",
+            session_id=SESSION_ID,
+            thread_key="thread:Separate pool",
+            event_timestamp="2026-06-16T11:00:00Z",
+            cumulative_total_tokens=2000,
+            rate_limit_plan_type="pro",
+            rate_limit_limit_id="codex_bengalfox",
+            rate_limit_primary_used_percent=0.0,
+            rate_limit_primary_window_minutes=300,
+            rate_limit_primary_resets_at=1781566296,
+            rate_limit_secondary_used_percent=0.0,
+            rate_limit_secondary_window_minutes=10080,
+            rate_limit_secondary_resets_at=1781891393,
+        ),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+
+    observed = query_latest_observed_usage(db_path=db_path)
+
+    assert observed["record_id"] == "normal-codex"
+    assert observed["limit_id"] == "codex"
+    assert observed["source"] == "token_count.rate_limits"
+    assert observed["windows"][0]["label"] == "5h"
+    assert observed["windows"][0]["used_percent"] == 3.0
+    assert observed["windows"][1]["label"] == "Weekly"
+    assert observed["windows"][1]["used_percent"] == 29.0
+    assert observed["reconciliation"]["recommended"] is False
+    assert observed["reconciliation"]["consecutive_alternate_rows"] == 1
+
+
+def test_latest_observed_usage_recommends_live_check_after_consecutive_alternate_rows(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="normal-codex",
+            session_id=SESSION_ID,
+            thread_key="thread:Main allowance",
+            event_timestamp="2026-06-16T10:00:00Z",
+            cumulative_total_tokens=1000,
+            rate_limit_plan_type="pro",
+            rate_limit_limit_id="codex",
+            rate_limit_primary_used_percent=3.0,
+            rate_limit_primary_window_minutes=300,
+            rate_limit_primary_resets_at=1781562696,
+            rate_limit_secondary_used_percent=29.0,
+            rate_limit_secondary_window_minutes=10080,
+            rate_limit_secondary_resets_at=1781887793,
+        ),
+        *[
+            _usage_event(
+                record_id=f"alternate-{index}",
+                session_id=SESSION_ID,
+                thread_key="thread:Alternate allowance",
+                event_timestamp=f"2026-06-16T11:0{index}:00Z",
+                cumulative_total_tokens=2000 + index,
+                rate_limit_limit_id="codex_bengalfox",
+                rate_limit_primary_used_percent=0.0,
+                rate_limit_primary_window_minutes=300,
+                rate_limit_primary_resets_at=1781566296,
+                rate_limit_secondary_used_percent=0.0,
+                rate_limit_secondary_window_minutes=10080,
+                rate_limit_secondary_resets_at=1781891393,
+            )
+            for index in range(1, 4)
+        ],
+    ]
+    upsert_usage_events(events, db_path=db_path)
+
+    observed = query_latest_observed_usage(db_path=db_path)
+
+    assert observed["record_id"] == "normal-codex"
+    assert observed["limit_id"] == "codex"
+    assert observed["reconciliation"] == {
+        "recommended": True,
+        "reason": "latest_alternate_codex_limit_rows",
+        "suggested_action": "live_usage_check",
+        "consecutive_alternate_rows": 3,
+        "threshold": 3,
+        "latest_limit_id": "codex_bengalfox",
+        "latest_plan_type": None,
+        "latest_observed_at": "2026-06-16T11:03:00Z",
+        "selected_observed_at": "2026-06-16T10:00:00Z",
+        "selected_limit_id": "codex",
+    }
 
 
 def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> None:

@@ -222,6 +222,26 @@
     }
     .card span { display: block; color: var(--muted); font-size: 12px; font-weight: 680; }
     .card strong { display: block; margin-top: 7px; font-size: 22px; }
+    .usage-card {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .usage-reconcile {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      margin-top: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid #f2c66d;
+      background: #fff8e5;
+      color: #8a5b00;
+      font-size: 11px;
+      font-weight: 780;
+    }
+    .usage-reconcile[hidden] { display: none; }
+    #allowanceImpact { white-space: pre-line; line-height: 1.18; }
     .row-load-progress {
       display: grid;
       gap: 8px;
@@ -259,4 +279,3 @@
       background: linear-gradient(90deg, var(--blue), #74a3ff);
       transition: width 160ms ease;
     }
-    #allowanceImpact { white-space: pre-line; line-height: 1.18; }

@@ -4,7 +4,7 @@ Codex Usage Tracker has three related but different concepts:
 
 - `Estimated Cost`: optional USD estimates from a local pricing file.
 - `Codex Credits`: calculated usage credits from aggregate token counters and Codex credit rates.
-- `Usage Remaining`: optional user-provided 5-hour and weekly allowance snapshots.
+- `Usage observed`: optional latest local-log 5-hour and weekly allowance snapshots, falling back to copied allowance config when logs do not include rate-limit snapshots.
 
 ## Cost Estimates
 
@@ -58,11 +58,11 @@ codex-usage-tracker update-rate-card
 
 The local snapshot is written to `~/.codex-usage-tracker/rate-card.json`. Each bundled rate and alias includes source URL, fetched date, tier, confidence, and alias rationale where applicable. Use `--source-file` only when you have a reviewed replacement JSON snapshot you want the tracker to validate and use.
 
-## Usage Remaining
+## Usage Observed
 
-`Usage Remaining` is different from `Codex Credits`. The tracker cannot currently read your logged-in ChatGPT plan, live remaining credits, reset windows, or usage from other agentic surfaces automatically.
+`Usage observed` is different from `Codex Credits`. The tracker cannot currently read your logged-in ChatGPT plan, live remaining credits, reset windows, or usage from other agentic surfaces automatically.
 
-A plan name such as Free, Plus, Pro, Business, or Enterprise can provide context, but it is not enough to know the current remaining allowance. The dashboard shows remaining values only when you copy them into `~/.codex-usage-tracker/allowance.json`.
+A plan name such as Free, Plus, Pro, Business, or Enterprise can provide context, but it is not enough to know the current remaining allowance. When local Codex logs include `token_count.rate_limits`, the dashboard shows the latest observed 5-hour and weekly percentages from those logs. Otherwise, the dashboard shows remaining values only when you copy them into `~/.codex-usage-tracker/allowance.json`.
 
 Enable optional allowance context:
 
@@ -87,6 +87,7 @@ Configure the usage component:
 - Pricing and rate-card sources can change outside this project. Refresh or pin local files when reports need a known source snapshot.
 - Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
 - Live account allowance cannot be read automatically by this local tracker, and the dashboard does not infer live remaining allowance from the logged-in account plan.
+- Observed local-log snapshots may be stale until Codex records another model call, and may omit other agentic surfaces that share the same allowance.
 - Pricing can change after a report is generated. Use `pin-pricing` when you need reproducible historical cost estimates.
 - Rows with direct model/rate-card matches are more trustworthy than inferred aliases or local overrides.
 - Cost and credit calculations use aggregate counters; the tracker does not re-tokenize prompts or reconstruct usage from raw text.

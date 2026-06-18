@@ -104,6 +104,7 @@
     let allowanceSource = activeInitialPayload.allowance_source || {};
     let allowanceWindows = Array.isArray(activeInitialPayload.allowance_windows) ? activeInitialPayload.allowance_windows : [];
     let allowanceError = activeInitialPayload.allowance_error || '';
+    let observedUsage = activeInitialPayload.observed_usage || { available: false, windows: [] };
     let rateCardError = activeInitialPayload.rate_card_error || '';
     let projectMetadataPrivacy = activeInitialPayload.project_metadata_privacy || { mode: activeInitialPayload.privacy_mode || 'normal' };
     let parserDiagnostics = activeInitialPayload.parser_diagnostics || {};
@@ -461,6 +462,7 @@
     }
     dashboardStatus = dashboardStatusFactory.create({
       allowanceImpactElement: document.getElementById('allowanceImpact'),
+      allowanceReconcileElement: document.getElementById('allowanceReconcile'),
       allowanceSourceElement: document.getElementById('allowanceSource'),
       creditCoverageRatio,
       credits,
@@ -471,6 +473,7 @@
       getAllowanceSource: () => allowanceSource,
       getAllowanceWindows: () => allowanceWindows,
       getData: () => data,
+      getObservedUsage: () => observedUsage,
       getParserDiagnostics: () => parserDiagnostics,
       getPricingConfigured: () => pricingConfigured,
       getPricingSnapshotWarning: () => pricingSnapshotWarning,
@@ -1247,6 +1250,7 @@
       allowanceSource = nextPayload.allowance_source || {};
       allowanceWindows = Array.isArray(nextPayload.allowance_windows) ? nextPayload.allowance_windows : [];
       allowanceError = nextPayload.allowance_error || '';
+      observedUsage = nextPayload.observed_usage || { available: false, windows: [] };
       rateCardError = nextPayload.rate_card_error || '';
       parserDiagnostics = nextPayload.parser_diagnostics || {};
       projectMetadataPrivacy = nextPayload.project_metadata_privacy || { mode: nextPayload.privacy_mode || 'normal' };

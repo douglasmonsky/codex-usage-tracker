@@ -471,6 +471,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert "rows" not in status_payload
     assert status_payload["row_counts"]["scoped_rows"] == 4
     assert status_payload["max_event_timestamp"]
+    assert status_payload["observed_usage"]["available"] is True
+    assert status_payload["observed_usage"]["windows"][0]["label"] == "5h"
+    assert status_payload["observed_usage"]["windows"][1]["label"] == "Weekly"
 
     assert calls_payload["schema"] == "codex-usage-tracker-calls-v1"
     _assert_contract(calls_payload)

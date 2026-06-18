@@ -266,6 +266,14 @@ def _usage_event(
     thread_key: str,
     event_timestamp: str,
     cumulative_total_tokens: int,
+    rate_limit_plan_type: str | None = None,
+    rate_limit_limit_id: str | None = None,
+    rate_limit_primary_used_percent: float | None = None,
+    rate_limit_primary_window_minutes: int | None = None,
+    rate_limit_primary_resets_at: int | None = None,
+    rate_limit_secondary_used_percent: float | None = None,
+    rate_limit_secondary_window_minutes: int | None = None,
+    rate_limit_secondary_resets_at: int | None = None,
 ) -> UsageEvent:
     return UsageEvent(
         record_id=record_id,
@@ -308,6 +316,14 @@ def _usage_event(
         cumulative_output_tokens=10,
         cumulative_reasoning_output_tokens=5,
         cumulative_total_tokens=cumulative_total_tokens,
+        rate_limit_plan_type=rate_limit_plan_type,
+        rate_limit_limit_id=rate_limit_limit_id,
+        rate_limit_primary_used_percent=rate_limit_primary_used_percent,
+        rate_limit_primary_window_minutes=rate_limit_primary_window_minutes,
+        rate_limit_primary_resets_at=rate_limit_primary_resets_at,
+        rate_limit_secondary_used_percent=rate_limit_secondary_used_percent,
+        rate_limit_secondary_window_minutes=rate_limit_secondary_window_minutes,
+        rate_limit_secondary_resets_at=rate_limit_secondary_resets_at,
     )
 
 
@@ -388,6 +404,20 @@ def _token_event(cumulative_total: int, last_total: int) -> dict[str, object]:
                     "total_tokens": last_total,
                 },
                 "model_context_window": 258400,
+            },
+            "rate_limits": {
+                "plan_type": "pro",
+                "limit_id": "codex",
+                "primary": {
+                    "used_percent": round(cumulative_total / 100, 1),
+                    "window_minutes": 300,
+                    "resets_at": 1781562696,
+                },
+                "secondary": {
+                    "used_percent": 29.0,
+                    "window_minutes": 10080,
+                    "resets_at": 1781887793,
+                },
             },
         },
     )

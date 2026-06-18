@@ -14,6 +14,7 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - archived-session flag, conservative thread key, and adjacent aggregate record ids for dashboard navigation
 - materialized thread-level aggregate summaries for active and all-history scopes
 - source-file refresh metadata such as path, path hash, size, mtime, indexed line/byte offsets, latest aggregate record id, parser diagnostics, and last indexed time
+- observed Codex rate-limit snapshot metadata from local token-count logs, such as plan type, limit id, 5-hour/weekly used percentages, window lengths, and reset times
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
 
 ## Not Stored
@@ -104,7 +105,7 @@ Cost estimates are calculated only from aggregate token fields and your local pr
 
 Codex credit estimates are calculated only from aggregate token fields and bundled or locally configured rate-card values.
 
-The optional allowance config is local and stores only the remaining percentages, reset times, or credit totals you manually enter.
+The optional allowance config is local and stores only the remaining percentages, reset times, or credit totals you manually enter. Observed rate-limit snapshots, when present in Codex token-count logs, store only structured percentages, window lengths, reset times, plan type, and limit id.
 
 ## Sharing Checklist
 

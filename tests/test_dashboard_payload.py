@@ -211,11 +211,18 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Uncached Input" in dashboard
     assert "uncachedTokens" in dashboard
     assert "Codex Credits" in dashboard
-    assert "Usage Remaining" in dashboard
+    assert "Usage observed" in dashboard
     assert "Price Coverage" not in dashboard
     assert "priceCoverage" not in dashboard_surface
     assert "usageCredits" in dashboard
     assert "allowanceImpact" in dashboard
+    assert "allowanceReconcile" in dashboard
+    assert "observed_usage" in dashboard
+    assert "observedUsageText" in dashboard_status_js
+    assert "Read from the latest local Codex token-count log" in dashboard
+    assert "not a live account query" in dashboard
+    assert "usage_impact" not in dashboard_surface
+    assert "UsageImpact" not in dashboard_surface
     assert "usage_credits" in dashboard
     assert "parser_diagnostics" in dashboard
     assert "parserDiagnostics" in dashboard_js
@@ -414,6 +421,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["detail.thread_timeline"] == "Thread timeline"
     assert en_trans["detail.raw_identifiers"] == "Raw aggregate identifiers"
     assert en_trans["metric.codex_credits"] == "Codex credits"
+    assert en_trans["metric.usage_observed"] == "Usage observed"
+    assert "local Codex token-count log" in en_trans["allowance.observed_source_hint"]
+    assert "not a live account query" in en_trans["allowance.observed_source_hint"]
     assert en_trans["detail.allowance_impact"] == "Allowance impact"
     assert en_trans["detail.credit_model"] == "Credit model"
     assert "Live refresh every" in en_trans["live.every"]
@@ -556,6 +566,36 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "project_key",
         "thread_attachment_label",
     } <= set(row)
+
+
+def test_dashboard_payload_includes_latest_observed_usage_snapshot(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    payload = dashboard_payload(db_path=db_path, include_rows=False)
+
+    observed = payload["observed_usage"]
+    assert isinstance(observed, dict)
+    assert observed["available"] is True
+    assert observed["source"] == "token_count.rate_limits"
+    assert observed["limit_id"] == "codex"
+    assert observed["windows"] == [
+        {
+            "key": "primary",
+            "label": "5h",
+            "used_percent": 3.0,
+            "window_minutes": 300,
+            "resets_at": 1781562696,
+        },
+        {
+            "key": "secondary",
+            "label": "Weekly",
+            "used_percent": 29.0,
+            "window_minutes": 10080,
+            "resets_at": 1781887793,
+        },
+    ]
 
 
 def test_dashboard_payload_uses_persisted_call_origin_without_source_scan(

@@ -48,6 +48,7 @@ from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
+OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
 
 
 def refresh_usage_index(
@@ -670,6 +671,178 @@ def query_usage_status(
             max_row["max_event_timestamp"] if max_row is not None else None
         ),
     }
+
+
+def query_latest_observed_usage(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    include_archived: bool = False,
+) -> dict[str, Any]:
+    """Return the latest passive usage-limit snapshot from token-count rows."""
+
+    where_clause, params = _usage_where_clause(include_archived=include_archived)
+    observed_clause = (
+        "rate_limit_primary_used_percent IS NOT NULL "
+        "OR rate_limit_secondary_used_percent IS NOT NULL"
+    )
+    scoped_where = (
+        f"{where_clause} AND ({observed_clause})"
+        if where_clause
+        else f"WHERE {observed_clause}"
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            f"""
+            SELECT
+                record_id,
+                event_timestamp,
+                line_number,
+                rate_limit_plan_type,
+                rate_limit_limit_id,
+                rate_limit_primary_used_percent,
+                rate_limit_primary_window_minutes,
+                rate_limit_primary_resets_at,
+                rate_limit_secondary_used_percent,
+                rate_limit_secondary_window_minutes,
+                rate_limit_secondary_resets_at
+            FROM usage_events
+            {scoped_where}
+            ORDER BY
+                CASE WHEN rate_limit_limit_id = 'codex' THEN 0 ELSE 1 END,
+                event_timestamp DESC,
+                cumulative_total_tokens DESC
+            LIMIT 1
+            """,
+            params,
+        ).fetchone()
+        reconciliation = _observed_usage_reconciliation(
+            conn,
+            scoped_where=scoped_where,
+            params=params,
+            selected_row=row,
+        )
+    if row is None:
+        return {"available": False, "windows": [], "reconciliation": reconciliation}
+    data = _row_to_dict(row)
+    return {
+        "available": True,
+        "record_id": data.get("record_id"),
+        "observed_at": data.get("event_timestamp"),
+        "line_number": data.get("line_number"),
+        "plan_type": data.get("rate_limit_plan_type"),
+        "limit_id": data.get("rate_limit_limit_id"),
+        "source": "token_count.rate_limits",
+        "windows": [
+            window
+            for window in (
+                _observed_usage_window(data, "primary"),
+                _observed_usage_window(data, "secondary"),
+            )
+            if window is not None
+        ],
+        "reconciliation": reconciliation,
+    }
+
+
+def _observed_usage_reconciliation(
+    conn: sqlite3.Connection,
+    *,
+    scoped_where: str,
+    params: list[Any],
+    selected_row: sqlite3.Row | None,
+) -> dict[str, Any]:
+    recent_rows = [
+        _row_to_dict(row)
+        for row in conn.execute(
+            f"""
+            SELECT
+                record_id,
+                event_timestamp,
+                rate_limit_plan_type,
+                rate_limit_limit_id
+            FROM usage_events
+            {scoped_where}
+            ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
+            LIMIT ?
+            """,
+            [*params, OBSERVED_USAGE_RECONCILIATION_THRESHOLD],
+        ).fetchall()
+    ]
+    consecutive_alternate_rows = 0
+    latest_alternate: dict[str, Any] | None = None
+    for row in recent_rows:
+        limit_id = row.get("rate_limit_limit_id")
+        if not _is_alternate_codex_limit(limit_id):
+            break
+        consecutive_alternate_rows += 1
+        if latest_alternate is None:
+            latest_alternate = row
+    selected = _row_to_dict(selected_row) if selected_row is not None else {}
+    selected_record_id = selected.get("record_id")
+    latest_record_id = latest_alternate.get("record_id") if latest_alternate else None
+    recommended = (
+        consecutive_alternate_rows >= OBSERVED_USAGE_RECONCILIATION_THRESHOLD
+        and latest_alternate is not None
+        and latest_record_id != selected_record_id
+    )
+    return {
+        "recommended": recommended,
+        "reason": "latest_alternate_codex_limit_rows" if recommended else None,
+        "suggested_action": "live_usage_check" if recommended else None,
+        "consecutive_alternate_rows": consecutive_alternate_rows,
+        "threshold": OBSERVED_USAGE_RECONCILIATION_THRESHOLD,
+        "latest_limit_id": latest_alternate.get("rate_limit_limit_id")
+        if latest_alternate
+        else None,
+        "latest_plan_type": latest_alternate.get("rate_limit_plan_type")
+        if latest_alternate
+        else None,
+        "latest_observed_at": latest_alternate.get("event_timestamp")
+        if latest_alternate
+        else None,
+        "selected_observed_at": selected.get("event_timestamp"),
+        "selected_limit_id": selected.get("rate_limit_limit_id"),
+    }
+
+
+def _is_alternate_codex_limit(limit_id: object) -> bool:
+    if not isinstance(limit_id, str):
+        return False
+    return limit_id.startswith("codex_") and limit_id != "codex"
+
+
+def _observed_usage_window(row: dict[str, Any], key: str) -> dict[str, Any] | None:
+    used_percent = row.get(f"rate_limit_{key}_used_percent")
+    window_minutes = row.get(f"rate_limit_{key}_window_minutes")
+    resets_at = row.get(f"rate_limit_{key}_resets_at")
+    if used_percent is None and window_minutes is None and resets_at is None:
+        return None
+    return {
+        "key": key,
+        "label": _observed_usage_window_label(window_minutes),
+        "used_percent": used_percent,
+        "window_minutes": window_minutes,
+        "resets_at": resets_at,
+    }
+
+
+def _observed_usage_window_label(window_minutes: object) -> str:
+    if not isinstance(window_minutes, (int, float, str)):
+        return "Usage"
+    try:
+        minutes = int(window_minutes)
+    except (TypeError, ValueError):
+        return "Usage"
+    if minutes == 300:
+        return "5h"
+    if minutes == 10080:
+        return "Weekly"
+    if minutes % 1440 == 0:
+        return f"{minutes // 1440}d"
+    if minutes % 60 == 0:
+        return f"{minutes // 60}h"
+    return f"{minutes}m"
 
 
 def query_usage_api_events(
