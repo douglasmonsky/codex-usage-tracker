@@ -57,6 +57,7 @@ def query_lifecycle_recommendations(
     scope: str | None = None,
     limit: int | None = 100,
     offset: int = 0,
+    source_limit: int | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Return aggregate lifecycle recommendation rows and total matched count."""
 
@@ -65,6 +66,7 @@ def query_lifecycle_recommendations(
         raise ValueError(f"scope must be one of: {allowed}")
     normalized_limit = _normalize_limit(limit)
     normalized_offset = _normalize_offset(offset)
+    normalized_source_limit = _normalize_limit(source_limit)
     with connect(db_path) as conn:
         init_db(conn)
         rows = _query_lifecycle_source_rows(
@@ -73,6 +75,7 @@ def query_lifecycle_recommendations(
             thread_key=thread_key,
             work_session_id=work_session_id,
             context_epoch_id=context_epoch_id,
+            source_limit=normalized_source_limit,
         )
     recommendations = lifecycle_recommendations_for_rows(rows)
     if scope:
@@ -109,6 +112,7 @@ def _query_lifecycle_source_rows(
     thread_key: str | None,
     work_session_id: str | None,
     context_epoch_id: str | None,
+    source_limit: int | None,
 ) -> list[dict[str, Any]]:
     clauses: list[str] = []
     params: list[Any] = []
@@ -154,6 +158,11 @@ def _query_lifecycle_source_rows(
         )
         params.append(context_epoch_id)
     where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses) if clauses else ""
+    limit_clause = ""
+    query_params = list(params)
+    if source_limit is not None:
+        limit_clause = "LIMIT ?"
+        query_params.append(source_limit)
     rows = conn.execute(
         f"""
         WITH receipt_rollup AS (
@@ -229,8 +238,9 @@ def _query_lifecycle_source_rows(
            AND secondary_impact.window_type = 'secondary'
         {where_clause}
         ORDER BY ue.event_timestamp DESC, ue.cumulative_total_tokens DESC
+        {limit_clause}
         """,
-        params,
+        query_params,
     ).fetchall()
     return [_row_to_dict(row) for row in rows]
 

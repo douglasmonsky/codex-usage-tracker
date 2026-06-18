@@ -555,7 +555,7 @@
           const callsLoading = state.sessionCallLoading && state.sessionCallLoading.has(contextEpochId);
           const callsError = state.sessionCallErrors && state.sessionCallErrors.get(contextEpochId);
           return `
-            <tr class="session-epoch-row" data-context-epoch-id="${escapeHtml(contextEpochId)}" role="button" tabindex="0" aria-expanded="${expanded ? 'true' : 'false'}">
+            <tr class="session-epoch-row" data-context-epoch-id="${escapeHtml(contextEpochId)}" data-work-session-id="${escapeHtml(workSessionId)}" role="button" tabindex="0" aria-expanded="${expanded ? 'true' : 'false'}">
               <td>
                 <span class="thread-toggle" aria-hidden="true">${expanded ? '-' : '+'}</span>
                 <span class="session-epoch-index">${escapeHtml(`#${number.format(epoch.epoch_index || 0)}`)}</span>
@@ -633,7 +633,7 @@
           ? `
             <div class="child-load-more">
               <span>${escapeHtml(tf('table.visible_status', { end: number.format(callRows.length), total: number.format(totalCalls), items: t('table.calls') }))}</span>
-              <button class="pager-button" type="button" data-session-call-load-more="${escapeHtml(contextEpochId)}">${escapeHtml(t('button.load_more'))}</button>
+              <button class="pager-button" type="button" data-session-call-load-more="${escapeHtml(contextEpochId)}" data-work-session-id="${escapeHtml(sessionRow.work_session_id || '')}">${escapeHtml(t('button.load_more'))}</button>
             </div>
           `
           : `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(callRows.length), total: number.format(totalCalls), items: t('table.calls') }))}</span></div>`;

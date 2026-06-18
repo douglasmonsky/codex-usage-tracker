@@ -217,7 +217,7 @@
     const sessionEpochs = new Map();
     const sessionEpochErrors = new Map();
     const sessionEpochLoading = new Set();
-    const sessionCallPageSize = 100;
+    const sessionCallPageSize = 25;
     const sessionCallsById = new Map();
     const sessionCallErrors = new Map();
     const sessionCallLoading = new Set();
@@ -703,6 +703,7 @@
           lang: i18n.currentLanguage,
           _: String(Date.now()),
         });
+        if (loadOptions.workSessionId) params.set('work_session_id', String(loadOptions.workSessionId));
         const response = await fetch(`/api/calls?${params.toString()}`, {
           headers: {
             'Accept': 'application/json',
@@ -754,7 +755,13 @@
       }
       expandedSessionEpochIds.add(contextEpochId);
       render();
-      loadSessionCalls(contextEpochId, { reset: true });
+      const epoch = Array.from(sessionEpochs.values())
+        .flat()
+        .find(candidate => candidate && candidate.context_epoch_id === contextEpochId);
+      loadSessionCalls(contextEpochId, {
+        reset: true,
+        workSessionId: epoch && epoch.work_session_id,
+      });
     }
     function setSort(key, direction = null) {
       sortKey = key;
@@ -2280,7 +2287,7 @@
         }
         threadCallVisiblePages.set(key, Math.max(1, threadCallVisiblePages.get(key) || 1) + 1);
       },
-      loadMoreSessionCalls: contextEpochId => loadSessionCalls(contextEpochId),
+      loadMoreSessionCalls: (contextEpochId, workSessionId = '') => loadSessionCalls(contextEpochId, { workSessionId }),
       toggleSessionEpochCalls,
       insightsViewEl,
       languageSelectEl,

@@ -203,7 +203,12 @@
       if (sessionCallLoadMoreButton && rowsEl.contains(sessionCallLoadMoreButton)) {
         event.preventDefault();
         event.stopPropagation();
-        if (loadMoreSessionCalls) loadMoreSessionCalls(sessionCallLoadMoreButton.dataset.sessionCallLoadMore || '');
+        if (loadMoreSessionCalls) {
+          loadMoreSessionCalls(
+            sessionCallLoadMoreButton.dataset.sessionCallLoadMore || '',
+            sessionCallLoadMoreButton.dataset.workSessionId || '',
+          );
+        }
         return;
       }
       const sessionEpochRow = event.target.closest('.session-epoch-row');

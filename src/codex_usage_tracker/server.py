@@ -167,6 +167,8 @@ COMPACT_LIVE_ROW_KEYS = {
     "usage_impact_pending",
 }
 MAX_USAGE_IMPACT_RECORD_IDS = 500
+DEFAULT_UNSCOPED_LIFECYCLE_SOURCE_ROWS = 500
+MAX_UNSCOPED_LIFECYCLE_SOURCE_ROWS = 5_000
 MAX_THREAD_USAGE_IMPACT_KEYS = 500
 _validate_loopback_host = server_utils.validate_loopback_host
 
@@ -182,6 +184,26 @@ def _refresh_result_invalidates_usage_impact(result: object) -> bool:
             "full_reparse_source_files",
             "inserted_or_updated_events",
         )
+    )
+
+
+def _lifecycle_source_limit_for_request(
+    *,
+    record_id: str | None,
+    thread_key: str | None,
+    work_session_id: str | None,
+    context_epoch_id: str | None,
+    limit: int | None,
+    offset: int,
+) -> int | None:
+    """Bound broad lifecycle scans while keeping scoped investigator calls complete."""
+
+    if record_id or thread_key or work_session_id or context_epoch_id:
+        return None
+    requested_window = offset + (limit if limit is not None and limit > 0 else DEFAULT_UNSCOPED_LIFECYCLE_SOURCE_ROWS)
+    return min(
+        MAX_UNSCOPED_LIFECYCLE_SOURCE_ROWS,
+        max(DEFAULT_UNSCOPED_LIFECYCLE_SOURCE_ROWS, requested_window),
     )
 
 
@@ -1218,6 +1240,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             "context_epoch_id": _first(params.get("context_epoch_id")) or _first(params.get("epoch")),
             "scope": _first(params.get("scope")),
         }
+        source_limit = _lifecycle_source_limit_for_request(
+            record_id=record_id,
+            thread_key=filters["thread_key"],
+            work_session_id=filters["work_session_id"],
+            context_epoch_id=filters["context_epoch_id"],
+            limit=limit,
+            offset=offset,
+        )
         try:
             rows, total = query_lifecycle_recommendations(
                 db_path=self._db_path,
@@ -1228,6 +1258,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 scope=filters["scope"],
                 limit=limit,
                 offset=offset,
+                source_limit=source_limit,
             )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})

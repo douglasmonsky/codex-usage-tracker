@@ -33,6 +33,7 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
     upsert_usage_events,
 )
+from codex_usage_tracker.store_context_epochs import query_context_epochs
 from codex_usage_tracker.usage_impact_cache import UsageImpactCache
 from codex_usage_tracker.usage_impact_store import replace_usage_impact_from_annotated_rows
 
@@ -843,6 +844,166 @@ def test_dashboard_server_exposes_lifecycle_recommendations(tmp_path: Path) -> N
     assert "SECRET RAW PROMPT" not in json.dumps(lifecycle_payload)
     _assert_contract(lifecycle_payload)
     _assert_contract(call_payload["lifecycle_recommendations"])
+
+
+def test_dashboard_server_bounds_unscoped_lifecycle_recommendations(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from codex_usage_tracker import server as server_module
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    seen_source_limits: list[int | None] = []
+
+    def fake_query_lifecycle_recommendations(*args, **kwargs):
+        _ = args
+        seen_source_limits.append(kwargs.get("source_limit"))
+        return [], 0
+
+    monkeypatch.setattr(
+        server_module,
+        "query_lifecycle_recommendations",
+        fake_query_lifecycle_recommendations,
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        _read_json(f"{base_url}/api/lifecycle-recommendations?limit=10")
+        _read_json(f"{base_url}/api/lifecycle-recommendations?offset=4900&limit=1000")
+        _read_json(f"{base_url}/api/lifecycle-recommendations?record_id=record-1&limit=10")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert seen_source_limits == [500, 5_000, None]
+
+
+def test_dashboard_server_epoch_child_calls_are_scoped_to_context_epoch(tmp_path: Path) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    db_path = tmp_path / "usage.sqlite3"
+    thread_key = "thread:Epoch child scope"
+    upsert_usage_events(
+        [
+            replace(
+                _usage_event(
+                    record_id="epoch-a",
+                    session_id=SESSION_ID,
+                    thread_key=thread_key,
+                    event_timestamp="2026-06-15T12:00:00Z",
+                    cumulative_total_tokens=1_000,
+                ),
+                input_tokens=40_000,
+                cached_input_tokens=38_000,
+                total_tokens=40_010,
+                cumulative_input_tokens=40_000,
+                cumulative_cached_input_tokens=38_000,
+                cumulative_total_tokens=40_010,
+            ),
+            replace(
+                _usage_event(
+                    record_id="epoch-b",
+                    session_id=SESSION_ID,
+                    thread_key=thread_key,
+                    event_timestamp="2026-06-15T12:01:00Z",
+                    cumulative_total_tokens=2_000,
+                ),
+                call_initiator="codex",
+                call_initiator_reason="post_compaction",
+                input_tokens=50_000,
+                cached_input_tokens=10_000,
+                total_tokens=50_010,
+                cumulative_input_tokens=90_000,
+                cumulative_cached_input_tokens=48_000,
+                cumulative_total_tokens=90_020,
+            ),
+            replace(
+                _usage_event(
+                    record_id="epoch-c",
+                    session_id=SESSION_ID,
+                    thread_key=thread_key,
+                    event_timestamp="2026-06-15T12:02:00Z",
+                    cumulative_total_tokens=3_000,
+                ),
+                input_tokens=30_000,
+                cached_input_tokens=25_000,
+                total_tokens=30_010,
+                cumulative_input_tokens=120_000,
+                cumulative_cached_input_tokens=73_000,
+                cumulative_total_tokens=120_030,
+            ),
+        ],
+        db_path=db_path,
+    )
+    epochs = query_context_epochs(db_path=db_path, thread_key=thread_key, limit=0)
+    assert [epoch["call_count"] for epoch in epochs] == [1, 2]
+    first_epoch = epochs[0]
+    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=db_path,
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=True,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        session_payload = _read_json(
+            f"{base_url}/api/calls?work_session_id={urllib.parse.quote(str(first_epoch['work_session_id']))}"
+            "&limit=all&sort=time&direction=desc&compact=1&include_archived=1"
+        )
+        epoch_payload = _read_json(
+            f"{base_url}/api/calls?work_session_id={urllib.parse.quote(str(first_epoch['work_session_id']))}"
+            f"&context_epoch_id={urllib.parse.quote(str(first_epoch['context_epoch_id']))}"
+            "&limit=all&sort=time&direction=desc&compact=1&include_archived=1"
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert session_payload["row_count"] == 3
+    assert epoch_payload["filters"]["context_epoch_id"] == first_epoch["context_epoch_id"]
+    assert epoch_payload["filters"]["work_session_id"] == first_epoch["work_session_id"]
+    assert epoch_payload["row_count"] == first_epoch["call_count"]
+    assert [row["record_id"] for row in epoch_payload["rows"]] == ["epoch-a"]
 
 
 def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Path) -> None:

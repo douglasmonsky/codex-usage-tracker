@@ -240,6 +240,7 @@ def test_noop_refresh_skips_parser_upsert_and_downstream_rebuilds(
     monkeypatch.setattr(store_module, "refresh_usage_event_links_for_threads", fail_if_called)
     monkeypatch.setattr(store_module, "rebuild_thread_summaries", fail_if_called)
     monkeypatch.setattr(store_module, "rebuild_thread_work_sessions", fail_if_called)
+    monkeypatch.setattr(store_module, "rebuild_thread_context_epochs", fail_if_called)
     monkeypatch.setattr(store_module, "replace_task_receipts_for_events", fail_if_called)
     monkeypatch.setattr(store_module, "invalidate_usage_impact_for_delta", fail_if_called)
 
@@ -458,10 +459,12 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     link_calls: list[set[str]] = []
     summary_calls: list[set[str] | None] = []
     work_session_calls: list[set[str] | None] = []
+    context_epoch_calls: list[set[str] | None] = []
     usage_impact_invalidations: list[dict[str, object]] = []
     original_link_refresh = store_module.refresh_usage_event_links_for_threads
     original_summary_rebuild = store_module.rebuild_thread_summaries
     original_work_session_rebuild = store_module.rebuild_thread_work_sessions
+    original_context_epoch_rebuild = store_module.rebuild_thread_context_epochs
     original_usage_impact_invalidate = store_module.invalidate_usage_impact_for_delta
 
     def tracking_link_refresh(conn: sqlite3.Connection, thread_keys: object) -> int:
@@ -487,6 +490,20 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
         work_session_calls.append(normalized)
         return original_work_session_rebuild(conn, thread_keys=thread_keys)  # type: ignore[arg-type]
 
+    def tracking_context_epoch_rebuild(
+        conn: sqlite3.Connection,
+        *,
+        thread_keys: object = None,
+        work_session_ids: object = None,
+    ) -> int:
+        normalized = set(thread_keys) if thread_keys is not None else None
+        context_epoch_calls.append(normalized)
+        return original_context_epoch_rebuild(  # type: ignore[arg-type]
+            conn,
+            thread_keys=thread_keys,
+            work_session_ids=work_session_ids,
+        )
+
     def tracking_usage_impact_invalidate(
         conn: sqlite3.Connection,
         **kwargs: object,
@@ -497,18 +514,22 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     monkeypatch.setattr(store_module, "refresh_usage_event_links_for_threads", tracking_link_refresh)
     monkeypatch.setattr(store_module, "rebuild_thread_summaries", tracking_summary_rebuild)
     monkeypatch.setattr(store_module, "rebuild_thread_work_sessions", tracking_work_session_rebuild)
+    monkeypatch.setattr(store_module, "rebuild_thread_context_epochs", tracking_context_epoch_rebuild)
     monkeypatch.setattr(store_module, "invalidate_usage_impact_for_delta", tracking_usage_impact_invalidate)
 
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     partial_link_calls = list(link_calls)
     partial_summary_calls = list(summary_calls)
     partial_work_session_calls = list(work_session_calls)
+    partial_context_epoch_calls = list(context_epoch_calls)
     affected_keys = link_calls[0] if link_calls else set()
     before_full_repair_links = _thread_link_snapshot(db_path, affected_keys)
     before_full_repair_summaries = _thread_summary_snapshot(db_path, affected_keys)
+    before_full_repair_epochs = _thread_context_epoch_snapshot(db_path, affected_keys)
     store_module.refresh_usage_event_links(db_path)
     after_full_repair_links = _thread_link_snapshot(db_path, affected_keys)
     after_full_repair_summaries = _thread_summary_snapshot(db_path, affected_keys)
+    after_full_repair_epochs = _thread_context_epoch_snapshot(db_path, affected_keys)
     third = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     rows = query_session_usage(db_path=db_path, session_id=SESSION_ID)
     metadata = refresh_metadata(db_path)
@@ -534,10 +555,12 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert partial_link_calls == [{"thread:Add Codex token tracking"}]
     assert partial_summary_calls == [{"thread:Add Codex token tracking"}]
     assert partial_work_session_calls == [{"thread:Add Codex token tracking"}]
+    assert partial_context_epoch_calls == [{"thread:Add Codex token tracking"}]
     assert len(usage_impact_invalidations) == 1
     assert len(usage_impact_invalidations[0]["inserted_record_ids"]) == 1
     assert before_full_repair_links == after_full_repair_links
     assert before_full_repair_summaries == after_full_repair_summaries
+    assert before_full_repair_epochs == after_full_repair_epochs
     assert third.parsed_events == 0
     assert third.skipped_downstream_work is True
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
@@ -1212,6 +1235,53 @@ def _thread_summary_snapshot(db_path: Path, thread_keys: set[str]) -> list[dict[
             FROM thread_summaries
             WHERE thread_key IN ({placeholders})
             ORDER BY thread_key, is_archived_scope
+            """,
+            sorted(thread_keys),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _thread_context_epoch_snapshot(db_path: Path, thread_keys: set[str]) -> list[dict[str, object]]:
+    if not thread_keys:
+        return []
+    placeholders = ", ".join("?" for _key in thread_keys)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                context_epoch_id,
+                work_session_id,
+                thread_key,
+                epoch_index,
+                start_record_id,
+                end_record_id,
+                start_reason,
+                compaction_before_record_id,
+                compaction_detected_at,
+                started_at,
+                ended_at,
+                call_count,
+                input_tokens,
+                cached_input_tokens,
+                uncached_input_tokens,
+                output_tokens,
+                reasoning_output_tokens,
+                total_tokens,
+                avg_cache_ratio,
+                min_cache_ratio,
+                max_context_window_percent,
+                largest_uncached_record_id,
+                largest_uncached_input_tokens,
+                first_call_cache_ratio,
+                first_call_uncached_input_tokens,
+                post_compaction_uncached_spike,
+                subagent_call_count,
+                auto_review_call_count,
+                compaction_effectiveness
+            FROM thread_context_epochs
+            WHERE thread_key IN ({placeholders})
+            ORDER BY thread_key, epoch_index, context_epoch_id
             """,
             sorted(thread_keys),
         ).fetchall()
