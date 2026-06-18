@@ -59,7 +59,7 @@
       <label><span data-i18n="filter.time">Time</span><select id="datePreset"><option value="all" selected data-i18n="option.all_time">All time</option><option value="today" data-i18n="option.today">Today</option><option value="this-week" data-i18n="option.this_week">This week</option><option value="last-7-days" data-i18n="option.last_7_days">Last 7 days</option><option value="this-month" data-i18n="option.this_month">This month</option><option value="custom" data-i18n="option.custom_range">Custom range</option></select><span id="dateRangeStatus" class="filter-status" aria-live="polite" hidden></span></label>
       <label><span data-i18n="filter.start">Start</span><input id="dateStart" type="date"></label>
       <label><span data-i18n="filter.end">End</span><input id="dateEnd" type="date"></label>
-      <label><span data-i18n="filter.sort">Sort</span><select id="sort"><option value="attention" selected data-i18n="option.needs_attention">Needs attention</option><option value="time" data-i18n="option.newest_calls">Newest calls</option><option value="thread" data-i18n="option.thread_name">Thread name</option><option value="initiator" data-i18n="table.initiated">Initiated</option><option value="model" data-i18n="filter.model">Model</option><option value="effort" data-i18n="filter.reasoning">Reasoning</option><option value="total" data-i18n="option.most_tokens">Most tokens</option><option value="cached" data-i18n="table.cached">Cached</option><option value="uncached" data-i18n="table.uncached">Uncached</option><option value="output" data-i18n="table.output">Output</option><option value="cost" data-i18n="option.highest_estimated_cost">Highest estimated cost</option><option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option><option value="cache" data-i18n="option.lowest_cache_ratio">Lowest cache ratio</option><option value="signals" data-i18n="option.most_signals">Most signals</option><option value="context" data-i18n="option.highest_context_use">Highest context use</option></select></label>
+      <label><span data-i18n="filter.sort">Sort</span><select id="sort"><option value="time" selected data-i18n="option.newest_calls">Newest calls</option><option value="attention" data-i18n="option.needs_attention">Needs attention</option><option value="thread" data-i18n="option.thread_name">Thread name</option><option value="initiator" data-i18n="table.initiated">Initiated</option><option value="model" data-i18n="filter.model">Model</option><option value="effort" data-i18n="filter.reasoning">Reasoning</option><option value="total" data-i18n="option.most_tokens">Most tokens</option><option value="cached" data-i18n="table.cached">Cached</option><option value="uncached" data-i18n="table.uncached">Uncached</option><option value="output" data-i18n="table.output">Output</option><option value="reasoning" data-i18n="metric.reasoning_output">Reasoning output</option><option value="cost" data-i18n="option.highest_estimated_cost">Highest estimated cost</option><option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option><option value="cache" data-i18n="option.lowest_cache_ratio">Lowest cache ratio</option><option value="context" data-i18n="option.highest_context_use">Highest context use</option></select></label>
     </div>
     <div class="cards">
       <div class="card"><span data-i18n="metric.visible_calls">Visible Calls</span><strong id="visibleCalls">0</strong></div>
@@ -69,7 +69,7 @@
       <div class="card"><span data-i18n="metric.reasoning_output">Reasoning Output</span><strong id="reasoningTokens">0</strong></div>
       <div class="card"><span data-i18n="metric.estimated_cost">Estimated Cost</span><strong id="estimatedCost">$0.00</strong></div>
       <div class="card"><span data-i18n="metric.codex_credits">Codex Credits</span><strong id="usageCredits">0</strong></div>
-      <div class="card"><span data-i18n="metric.remaining_usage">Usage Remaining</span><strong id="allowanceImpact" data-i18n="action.set_limits">Set limits</strong></div>
+      <div class="card usage-card"><span data-i18n="metric.usage_observed">Usage observed</span><strong id="allowanceImpact" data-i18n="action.set_limits">Set limits</strong><span id="allowanceReconcile" class="usage-reconcile" hidden data-i18n="allowance.live_check_short">Verify live</span></div>
     </div>
     <section id="insightsPanel" class="insights-panel" aria-labelledby="insightsTitle">
       <div class="insights-layout">
@@ -98,8 +98,8 @@
         <h2 id="tableTitle" data-i18n="dashboard.model_calls">Model Calls</h2>
         <div class="table-tools">
           <div class="segmented" role="group" aria-label="Dashboard view" data-i18n-aria-label="aria.dashboard_view">
-            <button id="insightsView" type="button" aria-pressed="true" data-i18n="dashboard.view.insights">Insights</button>
-            <button id="callsView" type="button" aria-pressed="false" data-i18n="dashboard.view.calls">Calls</button>
+            <button id="insightsView" type="button" aria-pressed="false" data-i18n="dashboard.view.insights">Insights</button>
+            <button id="callsView" type="button" aria-pressed="true" data-i18n="dashboard.view.calls">Calls</button>
             <button id="threadsView" type="button" aria-pressed="false" data-i18n="dashboard.view.threads">Threads</button>
           </div>
           <div id="tableCaption" class="table-caption" data-i18n="caption.initial_calls">Showing individual model calls.</div>
@@ -130,9 +130,9 @@
               <th class="num" data-sort-header="cached"><button class="sort-header" type="button" data-sort-key="cached"><span data-i18n="table.cached">Cached</span> <span class="sort-indicator" data-sort-indicator="cached"></span></button></th>
               <th class="num" data-sort-header="uncached"><button class="sort-header" type="button" data-sort-key="uncached"><span data-i18n="table.uncached">Uncached</span> <span class="sort-indicator" data-sort-indicator="uncached"></span></button></th>
               <th class="num" data-sort-header="output"><button class="sort-header" type="button" data-sort-key="output"><span data-i18n="table.output">Output</span> <span class="sort-indicator" data-sort-indicator="output"></span></button></th>
+              <th class="num" data-sort-header="reasoning"><button class="sort-header" type="button" data-sort-key="reasoning"><span data-i18n="metric.reasoning_output">Reasoning Output</span> <span class="sort-indicator" data-sort-indicator="reasoning"></span></button></th>
               <th class="num" data-sort-header="cost"><button class="sort-header" type="button" data-sort-key="cost"><span data-i18n="table.cost">Cost</span> <span class="sort-indicator" data-sort-indicator="cost"></span></button></th>
               <th class="num" data-sort-header="cache"><button class="sort-header" type="button" data-sort-key="cache"><span data-i18n="table.cache">Cache</span> <span class="sort-indicator" data-sort-indicator="cache"></span></button></th>
-              <th class="num" data-sort-header="signals"><button class="sort-header" type="button" data-sort-key="signals"><span data-i18n="table.signals">Signals</span> <span class="sort-indicator" data-sort-indicator="signals"></span></button></th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>

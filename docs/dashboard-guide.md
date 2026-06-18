@@ -111,7 +111,7 @@ Useful interpretation notes:
 - `Cached input` and `Uncached input` are split so cache behavior is visible without storing transcript text.
 - A cost with `*` means the pricing row is marked as a best-guess estimate.
 - Codex credits are estimated from aggregate input, cached-input, and output token counters. Direct model matches use the bundled OpenAI Codex rate-card snapshot; inferred labels are marked estimated, and local credit-rate overrides are marked user-provided.
-- `Usage Remaining` is not read from the logged-in account plan. Configure `~/.codex-usage-tracker/allowance.json` with values copied from Codex Settings > Usage, the Codex Usage dashboard, or `/status` when you want current remaining allowance context.
+- `Usage observed` is not a live account query. It uses the latest local Codex `token_count.rate_limits` snapshot when present; otherwise configure `~/.codex-usage-tracker/allowance.json` with values copied from Codex Settings > Usage, the Codex Usage dashboard, or `/status` when you want current remaining allowance context.
 
 ## Threads View
 
@@ -212,7 +212,7 @@ The dashboard is designed to be shareable as an aggregate report, but only after
 
 It includes:
 
-- session ids, thread names, cwd values, source file paths, timestamps, model labels, reasoning effort, token counts, cost estimates, Codex credit estimates, optional manually entered allowance windows, and derived ratios
+- session ids, thread names, cwd values, source file paths, timestamps, model labels, reasoning effort, token counts, cost estimates, Codex credit estimates, optional observed/copied allowance windows, and derived ratios
 
 It does not include:
 
@@ -222,7 +222,7 @@ The screenshots in this guide are produced from synthetic fixture data used by t
 
 Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing generated dashboards, CSV exports, query JSON, or support bundles. Redacted mode removes raw cwd/source paths and hides unnamed project names behind stable hashes. Strict mode also hides project-relative cwd, branch, and tags. Configured project aliases are treated as explicit display opt-ins in both modes.
 
-Remaining 5-hour and weekly allowance is not read from Codex logs or inferred from the logged-in account plan automatically. Add `~/.codex-usage-tracker/allowance.json` only when you want the dashboard to show current copied allowance state. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.
+Remaining 5-hour and weekly allowance is not inferred from the logged-in account plan. When Codex writes local `token_count.rate_limits` snapshots, the dashboard can show the latest observed local-log percentages; otherwise add `~/.codex-usage-tracker/allowance.json` when you want copied allowance state. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.
 
 Archived sessions are excluded from dashboard payloads by default. The `All history` mode is an explicit opt-in because archived logs can make refreshes slower and can make current dashboards look inflated by older work.
 

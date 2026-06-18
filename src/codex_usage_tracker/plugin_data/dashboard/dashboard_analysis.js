@@ -69,6 +69,7 @@
       if (key === 'cached') return cachedInputTokens(row);
       if (key === 'uncached') return uncachedInputTokens(row);
       if (key === 'output') return outputTokens(row);
+      if (key === 'reasoning') return Number(row.reasoning_output_tokens || 0);
       if (key === 'signals') return signalCount(row);
       if (key === 'thread') return textValue(rowThreadLabel(row));
       if (key === 'time') return String(row.event_timestamp || '');
@@ -93,6 +94,7 @@
       if (key === 'cached') return cachedInputTokens(row);
       if (key === 'uncached') return uncachedInputTokens(row);
       if (key === 'output') return outputTokens(row);
+      if (key === 'reasoning') return Number(row.reasoning_output_tokens || 0);
       if (key === 'signals') return signalCount(row);
       if (key === 'source') return textValue(callInitiatorText(row));
       if (key === 'time') return String(row.event_timestamp || '');
@@ -125,6 +127,7 @@
       if (key === 'cached') return group.cachedTokens;
       if (key === 'uncached') return group.uncachedTokens;
       if (key === 'output') return group.outputTokens;
+      if (key === 'reasoning') return group.reasoningOutputTokens;
       if (key === 'signals') return group.signalCount;
       if (key === 'thread') return textValue(group.label);
       if (key === 'time') return String(group.latestActivity || '');
@@ -321,6 +324,7 @@
         const cachedTokens = calls.reduce((sum, row) => sum + Number(row.cached_input_tokens || 0), 0);
         const uncachedTokens = calls.reduce((sum, row) => sum + uncachedInputTokens(row), 0);
         const outputTokensTotal = calls.reduce((sum, row) => sum + outputTokens(row), 0);
+        const reasoningOutputTokens = calls.reduce((sum, row) => sum + Number(row.reasoning_output_tokens || 0), 0);
         const estimatedCost = calls.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
         const usageCredits = sumUsageCredits(calls);
         const signalTotal = calls.reduce((sum, row) => sum + signalCount(row), 0);
@@ -348,6 +352,7 @@
           cachedTokens,
           uncachedTokens,
           outputTokens: outputTokensTotal,
+          reasoningOutputTokens,
           estimatedCost,
           usageCredits,
           cacheRatio: inputTokens ? cachedTokens / inputTokens : 0,

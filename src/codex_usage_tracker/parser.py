@@ -438,6 +438,7 @@ def _parse_codex_jsonl_v1(
                     ),
                     last_usage=last_usage,
                     total_usage=total_usage,
+                    rate_limits=payload.get("rate_limits"),
                     stats=stats,
                 )
             except ValueError:
@@ -474,6 +475,7 @@ def _build_event(
     model_context_window: int | None,
     last_usage: dict[str, Any],
     total_usage: dict[str, Any],
+    rate_limits: object = None,
     stats: MutableMapping[str, int] | None = None,
 ) -> UsageEvent:
     input_tokens = _required_usage_int(last_usage, "input_tokens", stats=stats)
@@ -489,6 +491,7 @@ def _build_event(
         stats=stats,
         missing_key="missing_cumulative_total",
     )
+    observed_usage = _observed_usage_from_rate_limits(rate_limits, stats=stats)
     record_id = _record_id(
         session_id=session_id,
         turn_id=_optional_str(current_turn.get("turn_id")),
@@ -545,7 +548,49 @@ def _build_event(
             total_usage, "reasoning_output_tokens", stats=stats
         ),
         cumulative_total_tokens=cumulative_total_tokens,
+        **observed_usage,
     )
+
+
+def _observed_usage_from_rate_limits(
+    value: object,
+    *,
+    stats: MutableMapping[str, int] | None = None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    primary = _rate_limit_window(value.get("primary"), "primary", stats=stats)
+    secondary = _rate_limit_window(value.get("secondary"), "secondary", stats=stats)
+    return {
+        "rate_limit_plan_type": _optional_str(value.get("plan_type")),
+        "rate_limit_limit_id": _optional_str(value.get("limit_id")),
+        **primary,
+        **secondary,
+    }
+
+
+def _rate_limit_window(
+    value: object,
+    prefix: str,
+    *,
+    stats: MutableMapping[str, int] | None = None,
+) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        f"rate_limit_{prefix}_used_percent": _nullable_float(
+            value.get("used_percent"),
+            stats=stats,
+        ),
+        f"rate_limit_{prefix}_window_minutes": _nullable_int(
+            value.get("window_minutes"),
+            stats=stats,
+        ),
+        f"rate_limit_{prefix}_resets_at": _nullable_int(
+            value.get("resets_at"),
+            stats=stats,
+        ),
+    }
 
 
 def _session_metadata(
@@ -690,6 +735,23 @@ def _nullable_int(
         return None
 
 
+def _nullable_float(
+    value: object,
+    *,
+    stats: MutableMapping[str, int] | None = None,
+    invalid_key: str = "partial_field_count",
+) -> float | None:
+    if value is None:
+        return None
+    try:
+        return _strict_float(value)
+    except ValueError:
+        _increment_stat(stats, invalid_key)
+        if invalid_key != "partial_field_count":
+            _increment_stat(stats, "partial_field_count")
+        return None
+
+
 def _strict_int(value: object) -> int:
     if isinstance(value, bool):
         raise ValueError(f"invalid integer value: {value!r}")
@@ -703,6 +765,19 @@ def _strict_int(value: object) -> int:
         except ValueError as exc:
             raise ValueError(f"invalid integer value: {value!r}") from exc
     raise ValueError(f"invalid integer value: {value!r}")
+
+
+def _strict_float(value: object) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"invalid float value: {value!r}")
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return float(value)
+        except ValueError as exc:
+            raise ValueError(f"invalid float value: {value!r}") from exc
+    raise ValueError(f"invalid float value: {value!r}")
 
 
 def _required_usage_int(

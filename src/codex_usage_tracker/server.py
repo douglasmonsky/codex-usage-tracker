@@ -57,6 +57,7 @@ from codex_usage_tracker.reports import (
     build_summary_report,
 )
 from codex_usage_tracker.store import (
+    query_latest_observed_usage,
     query_thread_summaries,
     query_usage_api_event_count,
     query_usage_api_events,
@@ -538,6 +539,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 db_path=self._db_path,
                 include_archived=include_archived,
             )
+            observed_usage = query_latest_observed_usage(
+                db_path=self._db_path,
+                include_archived=include_archived,
+            )
             metadata = refresh_metadata(self._db_path)
         except sqlite3.Error as exc:
             self._send_json(
@@ -559,6 +564,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 "include_archived": include_archived,
                 "row_counts": counts,
                 "max_event_timestamp": counts.get("max_event_timestamp"),
+                "observed_usage": observed_usage,
                 "parser_adapter": metadata.get("parser_adapter"),
                 "parser_diagnostics": parser_diagnostics,
             },

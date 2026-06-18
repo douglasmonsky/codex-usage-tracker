@@ -58,6 +58,14 @@ class UsageEvent:
     cumulative_output_tokens: int
     cumulative_reasoning_output_tokens: int
     cumulative_total_tokens: int
+    rate_limit_plan_type: str | None = None
+    rate_limit_limit_id: str | None = None
+    rate_limit_primary_used_percent: float | None = None
+    rate_limit_primary_window_minutes: int | None = None
+    rate_limit_primary_resets_at: int | None = None
+    rate_limit_secondary_used_percent: float | None = None
+    rate_limit_secondary_window_minutes: int | None = None
+    rate_limit_secondary_resets_at: int | None = None
 
     @property
     def uncached_input_tokens(self) -> int:

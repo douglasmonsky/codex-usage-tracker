@@ -26,6 +26,16 @@
     return typeof value === 'string' ? value.trim() : '';
   }
 
+  function defaultSortDirection(key) {
+    return {
+      cache: 'asc',
+      effort: 'asc',
+      initiator: 'asc',
+      model: 'asc',
+      thread: 'asc',
+    }[key] || 'desc';
+  }
+
   function read(params = new URLSearchParams(window.location.search)) {
     const page = Number(params.get('page') || 1);
     return {
@@ -52,7 +62,7 @@
   function serialize(state) {
     const params = new URLSearchParams(window.location.search);
     STATE_KEYS.forEach(key => params.delete(key));
-    set(params, 'view', ALLOWED_VIEWS.has(state.view) && state.view !== 'insights' ? state.view : '');
+    set(params, 'view', ALLOWED_VIEWS.has(state.view) && state.view !== 'calls' ? state.view : '');
     set(params, 'q', state.search);
     set(params, 'model', state.model);
     set(params, 'effort', state.effort);
@@ -61,8 +71,10 @@
     set(params, 'from', state.dateStart);
     set(params, 'to', state.dateEnd);
     set(params, 'history', state.historyScope === 'all' ? 'all' : '');
-    set(params, 'sort', state.sort && state.sort !== 'attention' ? state.sort : '');
-    set(params, 'direction', ALLOWED_DIRECTIONS.has(state.direction) ? state.direction : '');
+    set(params, 'sort', state.sort && state.sort !== 'time' ? state.sort : '');
+    const direction = ALLOWED_DIRECTIONS.has(state.direction) ? state.direction : '';
+    const sort = state.sort || 'time';
+    set(params, 'direction', direction && !(sort === 'time' && direction === defaultSortDirection(sort)) ? direction : '');
     set(params, 'preset', state.preset);
     set(params, 'page', state.page && Number(state.page) > 1 ? String(Math.floor(Number(state.page))) : '');
     set(params, 'record', state.record);

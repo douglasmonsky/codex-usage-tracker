@@ -104,6 +104,7 @@
     let allowanceSource = activeInitialPayload.allowance_source || {};
     let allowanceWindows = Array.isArray(activeInitialPayload.allowance_windows) ? activeInitialPayload.allowance_windows : [];
     let allowanceError = activeInitialPayload.allowance_error || '';
+    let observedUsage = activeInitialPayload.observed_usage || { available: false, windows: [] };
     let rateCardError = activeInitialPayload.rate_card_error || '';
     let projectMetadataPrivacy = activeInitialPayload.project_metadata_privacy || { mode: activeInitialPayload.privacy_mode || 'normal' };
     let parserDiagnostics = activeInitialPayload.parser_diagnostics || {};
@@ -181,9 +182,11 @@
       custom: 'option.custom_range',
     };
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
-    let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : 'insights';
+    const defaultDashboardView = 'calls';
+    const defaultDashboardSort = 'time';
+    let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : defaultDashboardView;
     document.body.dataset.activeView = activeView;
-    let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'attention';
+    let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || defaultDashboardSort;
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
     let threadCallSortKey = 'time';
     let threadCallSortDirection = 'desc';
@@ -388,6 +391,7 @@
         cached: t('table.cached'),
         uncached: t('table.uncached'),
         output: t('table.output'),
+        reasoning: t('metric.reasoning_output'),
         signals: t('table.signals'),
         thread: t('table.thread'),
         time: t('table.time'),
@@ -461,6 +465,7 @@
     }
     dashboardStatus = dashboardStatusFactory.create({
       allowanceImpactElement: document.getElementById('allowanceImpact'),
+      allowanceReconcileElement: document.getElementById('allowanceReconcile'),
       allowanceSourceElement: document.getElementById('allowanceSource'),
       creditCoverageRatio,
       credits,
@@ -471,6 +476,7 @@
       getAllowanceSource: () => allowanceSource,
       getAllowanceWindows: () => allowanceWindows,
       getData: () => data,
+      getObservedUsage: () => observedUsage,
       getParserDiagnostics: () => parserDiagnostics,
       getPricingConfigured: () => pricingConfigured,
       getPricingSnapshotWarning: () => pricingSnapshotWarning,
@@ -741,7 +747,7 @@
     function clearPreset() {
       activePreset = '';
       pricingStatusEl.value = '';
-      sortKey = 'attention';
+      sortKey = defaultDashboardSort;
       sortDirection = defaultSortDirection(sortKey);
       sortEl.value = sortKey;
       resetVisibleRows();
@@ -780,7 +786,7 @@
       effortTooltipText,
       outputTokenCell,
       outputTokens,
-      renderSignalPucks,
+      reasoningTokenCell,
       sourceLabelText,
       threadInitiatorSummary,
       tokenNumberCell,
@@ -964,7 +970,7 @@
         threadCallSortDirection = threadCallSortDirection === 'asc' ? 'desc' : 'asc';
       } else {
         threadCallSortKey = key;
-        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'cost' || key === 'cache' || key === 'signals' ? 'desc' : 'asc';
+        threadCallSortDirection = key === 'time' || key === 'total' || key === 'cached' || key === 'uncached' || key === 'output' || key === 'reasoning' || key === 'cost' || key === 'cache' ? 'desc' : 'asc';
       }
       render();
     }
@@ -1039,7 +1045,7 @@
       number,
       outputTokenCell,
       pct,
-      renderSignalPucks,
+      reasoningTokenCell,
       renderTimeCell,
       renderWithState: () => render(),
       rowInvestigatorLink,
@@ -1247,6 +1253,7 @@
       allowanceSource = nextPayload.allowance_source || {};
       allowanceWindows = Array.isArray(nextPayload.allowance_windows) ? nextPayload.allowance_windows : [];
       allowanceError = nextPayload.allowance_error || '';
+      observedUsage = nextPayload.observed_usage || { available: false, windows: [] };
       rateCardError = nextPayload.rate_card_error || '';
       parserDiagnostics = nextPayload.parser_diagnostics || {};
       projectMetadataPrivacy = nextPayload.project_metadata_privacy || { mode: nextPayload.privacy_mode || 'normal' };

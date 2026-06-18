@@ -211,11 +211,18 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Uncached Input" in dashboard
     assert "uncachedTokens" in dashboard
     assert "Codex Credits" in dashboard
-    assert "Usage Remaining" in dashboard
+    assert "Usage observed" in dashboard
     assert "Price Coverage" not in dashboard
     assert "priceCoverage" not in dashboard_surface
     assert "usageCredits" in dashboard
     assert "allowanceImpact" in dashboard
+    assert "allowanceReconcile" in dashboard
+    assert "observed_usage" in dashboard
+    assert "observedUsageText" in dashboard_status_js
+    assert "Read from the latest local Codex token-count log" in dashboard
+    assert "not a live account query" in dashboard
+    assert "usage_impact" not in dashboard_surface
+    assert "UsageImpact" not in dashboard_surface
     assert "usage_credits" in dashboard
     assert "parser_diagnostics" in dashboard
     assert "parserDiagnostics" in dashboard_js
@@ -273,11 +280,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "cachedTokenCell" in dashboard_cells_js
     assert "uncachedTokenCell" in dashboard_cells_js
     assert "outputTokenCell" in dashboard_cells_js
+    assert "reasoningTokenCell" in dashboard_cells_js
     assert "signalPuckAbbreviation" in dashboard_cells_js
     assert "signal-puck" in dashboard_css
     assert "data-thread-call-sort-key" in dashboard_tables_js
     assert "threadCallSortKey = 'time'" in dashboard_js
     assert "threadCallSortDirection = 'desc'" in dashboard_js
+    assert "state.view !== 'calls'" in dashboard_state_js
+    assert "state.sort !== 'time'" in dashboard_state_js
     assert "detail.thread_attachment" in dashboard_details_js
     assert "detail.subagent_type" in dashboard_details_js
     assert "source.auto_review" in dashboard_cells_js
@@ -414,6 +424,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert en_trans["detail.thread_timeline"] == "Thread timeline"
     assert en_trans["detail.raw_identifiers"] == "Raw aggregate identifiers"
     assert en_trans["metric.codex_credits"] == "Codex credits"
+    assert en_trans["metric.usage_observed"] == "Usage observed"
+    assert "local Codex token-count log" in en_trans["allowance.observed_source_hint"]
+    assert "not a live account query" in en_trans["allowance.observed_source_hint"]
     assert en_trans["detail.allowance_impact"] == "Allowance impact"
     assert en_trans["detail.credit_model"] == "Credit model"
     assert "Live refresh every" in en_trans["live.every"]
@@ -492,9 +505,14 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "detail.credit_model" in dashboard_details_js
     assert 'data-sort-key="time"' in dashboard
     assert 'data-sort-key="thread"' in dashboard
-    assert '<option value="attention" selected data-i18n="option.needs_attention">Needs attention</option>' in dashboard
+    assert 'data-sort-key="reasoning"' in dashboard
+    assert 'data-sort-header="signals"' not in dashboard
+    assert '<option value="signals"' not in dashboard
+    assert '<option value="time" selected data-i18n="option.newest_calls">Newest calls</option>' in dashboard
     assert '<option value="initiator" data-i18n="table.initiated">Initiated</option>' in dashboard
     assert '<option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option>' in dashboard
+    assert 'id="insightsView" type="button" aria-pressed="false"' in dashboard
+    assert 'id="callsView" type="button" aria-pressed="true"' in dashboard
 
     pricing_path.write_text(
         json.dumps(
@@ -556,6 +574,36 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "project_key",
         "thread_attachment_label",
     } <= set(row)
+
+
+def test_dashboard_payload_includes_latest_observed_usage_snapshot(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    payload = dashboard_payload(db_path=db_path, include_rows=False)
+
+    observed = payload["observed_usage"]
+    assert isinstance(observed, dict)
+    assert observed["available"] is True
+    assert observed["source"] == "token_count.rate_limits"
+    assert observed["limit_id"] == "codex"
+    assert observed["windows"] == [
+        {
+            "key": "primary",
+            "label": "5h",
+            "used_percent": 3.0,
+            "window_minutes": 300,
+            "resets_at": 1781562696,
+        },
+        {
+            "key": "secondary",
+            "label": "Weekly",
+            "used_percent": 29.0,
+            "window_minutes": 10080,
+            "resets_at": 1781887793,
+        },
+    ]
 
 
 def test_dashboard_payload_uses_persisted_call_origin_without_source_scan(

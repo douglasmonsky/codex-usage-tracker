@@ -59,7 +59,27 @@ const url = manager.urlFor(expected);
 const parsed = new URL(url);
 const actual = manager.read(parsed.searchParams);
 const external = parsed.searchParams.get('external');
-console.log(JSON.stringify({{ actual, external, hash: parsed.hash }}));
+const defaultUrl = manager.urlFor({{
+  view: 'calls',
+  search: '',
+  model: '',
+  effort: '',
+  confidence: '',
+  datePreset: 'all',
+  dateStart: '',
+  dateEnd: '',
+  historyScope: 'active',
+  sort: 'time',
+  direction: 'desc',
+  preset: '',
+  page: 1,
+  record: '',
+  thread: '',
+  expand: '',
+  expandedThreads: [],
+}});
+const defaultParsed = new URL(defaultUrl);
+console.log(JSON.stringify({{ actual, external, hash: parsed.hash, defaultSearch: defaultParsed.search }}));
 """
     result = subprocess.run(
         [node, "-e", script],
@@ -71,6 +91,7 @@ console.log(JSON.stringify({{ actual, external, hash: parsed.hash }}));
     payload = json.loads(result.stdout)
     assert payload["external"] == "keep"
     assert payload["hash"] == "#details"
+    assert payload["defaultSearch"] == "?external=keep"
     assert payload["actual"] == {
         "view": "threads",
         "search": "Thread Alpha",

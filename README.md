@@ -150,7 +150,7 @@ Optional allowance context:
 codex-usage-tracker parse-allowance "5h 79% 6:50 PM Weekly 33% Jun 7"
 ```
 
-The tracker cannot read your logged-in ChatGPT plan or live remaining usage automatically. Allowance values are only as accurate as the values you manually copy from Codex Settings, `/status`, or another trusted usage display. Details: [Pricing, Credits, And Allowance](docs/pricing-and-credits.md).
+The tracker cannot read your logged-in ChatGPT plan or live remaining usage automatically. When local Codex logs include `token_count.rate_limits`, the dashboard can show the latest observed 5-hour and weekly remaining percentages from those logs. Otherwise, allowance values are only as accurate as the values you manually copy from Codex Settings, `/status`, or another trusted usage display. Details: [Pricing, Credits, And Allowance](docs/pricing-and-credits.md).
 
 ## What It Includes
 
@@ -258,7 +258,7 @@ This is optional. The normal shell install above is the fastest trusted path for
 - Token counts come from Codex's logged counters; the tracker does not re-tokenize prompts.
 - Pricing and rate-card sources can change outside this project.
 - Pricing and Codex credit estimates depend on local rate data and confidence labels and are not guaranteed to match exact billing.
-- Live account allowance cannot be read automatically by this local tracker; remaining 5-hour and weekly allowance is only available when you configure copied values.
+- Live account allowance cannot be read automatically by this local tracker; remaining 5-hour and weekly allowance is shown only from local Codex `token_count.rate_limits` snapshots when present, or from copied values you configure.
 - Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
 - Plugin discovery limitations are separate from core Python CLI/dashboard support.
 - Parent-child thread relationships are only as good as the metadata Codex logs; inferred auto-review attachments are labeled as inferred.

@@ -120,6 +120,7 @@
       cached: 'Cached',
       uncached: 'Uncached',
       output: 'Output',
+      reasoning: 'Reasoning output',
       signals: 'Signals',
       thread: 'Thread',
       time: 'Time',

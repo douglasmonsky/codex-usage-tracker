@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -21,6 +21,7 @@ MIGRATION_NAMES = {
     5: "materialize thread summaries",
     6: "track source file refresh metadata",
     7: "persist source file parser cursors",
+    8: "persist observed Codex usage snapshots",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -88,6 +89,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v7(conn)
         _record_migration_if_missing(conn, 7)
+    if user_version < 8:
+        _migrate_v8(conn)
+        _record_migration(conn, 8)
+    else:
+        _migrate_v8(conn)
+        _record_migration_if_missing(conn, 8)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -223,6 +230,18 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
         conn,
         "source_files",
         {"parser_state_json": "TEXT NOT NULL DEFAULT ''"},
+    )
+
+
+def _migrate_v8(conn: sqlite3.Connection) -> None:
+    _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_usage_observed_rate_limit_timestamp
+            ON usage_events(event_timestamp)
+            WHERE rate_limit_primary_used_percent IS NOT NULL
+               OR rate_limit_secondary_used_percent IS NOT NULL;
+        """
     )
 
 
