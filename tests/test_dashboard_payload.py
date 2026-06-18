@@ -278,13 +278,18 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "loadSessionCalls" in dashboard_js
     assert "loadSessionEpochs" in dashboard_js
     assert "toggleSessionEpochs" in dashboard_js
+    assert "toggleSessionEpochCalls" in dashboard_js
     assert "toggleSessionEpochs" in dashboard_events_js
+    assert "toggleSessionEpochCalls" in dashboard_events_js
     assert "sessionsLoadedOnce" in dashboard_js
     assert "/api/sessions?" in dashboard_js
     assert "/api/calls?" in dashboard_js
     assert "work_session_id" in dashboard_js
+    assert "context_epoch_id" in dashboard_js
     assert "data-session-call-load-more" in dashboard_tables_js
     assert "data-session-call-load-more" in dashboard_events_js
+    assert "data-context-epoch-id" in dashboard_tables_js
+    assert "session-epoch-call-child-row" in dashboard_tables_js
     assert "/api/context-epochs?" in dashboard_js
     assert "sessionFilterParams" in dashboard_js
     assert "session-epoch-table" in dashboard_tables_js

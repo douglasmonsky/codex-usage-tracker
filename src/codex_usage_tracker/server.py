@@ -1628,6 +1628,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             "thread": _first(params.get("thread")) if thread_key is None else None,
             "thread_key": thread_key,
             "work_session_id": _first(params.get("work_session_id")) or _first(params.get("session")),
+            "context_epoch_id": _first(params.get("context_epoch_id")) or _first(params.get("epoch")),
             "include_archived": include_archived,
             "sort": _first(params.get("sort")) or "time",
             "direction": _first(params.get("direction")) or "desc",
@@ -1640,6 +1641,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 "thread": _first(params.get("thread")) if thread_key is None else None,
                 "thread_key": thread_key,
                 "work_session_id": _first(params.get("work_session_id")) or _first(params.get("session")),
+                "context_epoch_id": _first(params.get("context_epoch_id")) or _first(params.get("epoch")),
                 "include_archived": include_archived,
                 "sort": _first(params.get("sort")) or "time",
                 "direction": _first(params.get("direction")) or "desc",
@@ -1667,6 +1669,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             thread=query_params["thread"],
             thread_key=query_params["thread_key"],
             work_session_id=query_params["work_session_id"],
+            context_epoch_id=query_params["context_epoch_id"],
             include_archived=query_params["include_archived"],
             sort=query_params["sort"],
             direction=query_params["direction"],
@@ -1702,6 +1705,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             thread=query_params["thread"],
             thread_key=query_params["thread_key"],
             work_session_id=query_params["work_session_id"],
+            context_epoch_id=query_params["context_epoch_id"],
             include_archived=query_params["include_archived"],
         )
         return rows, total_matched

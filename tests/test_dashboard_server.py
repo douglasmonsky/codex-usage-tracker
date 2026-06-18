@@ -28,8 +28,8 @@ from codex_usage_tracker.models import TaskReceiptSignal
 from codex_usage_tracker.store import (
     connect,
     query_dashboard_events,
-    query_usage_api_events,
     query_session_usage,
+    query_usage_api_events,
     refresh_usage_index,
     upsert_usage_events,
 )
@@ -1184,6 +1184,11 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
             f"{base_url}/api/context-epochs?work_session_id={urllib.parse.quote(work_session_id)}"
             "&limit=0&sort=started&direction=asc"
         )
+        context_epoch_id = context_epochs_unbounded_payload["rows"][0]["context_epoch_id"]
+        context_epoch_calls_payload = _read_json(
+            f"{base_url}/api/calls?context_epoch_id={urllib.parse.quote(context_epoch_id)}"
+            "&limit=all&sort=time&direction=desc&compact=1"
+        )
         summary_payload = _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
         recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
         invalid_sort = _http_error_json(f"{base_url}/api/calls?sort=not-a-sort")
@@ -1297,6 +1302,23 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert context_epochs_unbounded_payload["limit"] == 0
     assert context_epochs_unbounded_payload["row_count"] >= 1
     assert context_epochs_unbounded_payload["rows"][0]["work_session_id"] == work_session_id
+    assert context_epoch_calls_payload["schema"] == "codex-usage-tracker-calls-v1"
+    _assert_contract(context_epoch_calls_payload)
+    assert context_epoch_calls_payload["filters"]["context_epoch_id"] == context_epoch_id
+    assert context_epoch_calls_payload["raw_context_included"] is False
+    expected_context_epoch_rows = query_usage_api_events(
+        db_path=db_path,
+        context_epoch_id=context_epoch_id,
+        include_archived=True,
+        limit=None,
+        sort="time",
+        direction="desc",
+    )
+    assert [
+        row["record_id"] for row in context_epoch_calls_payload["rows"]
+    ] == [
+        row["record_id"] for row in expected_context_epoch_rows
+    ]
 
     assert summary_payload["schema"] == "codex-usage-tracker-summary-v1"
     _assert_contract(summary_payload)

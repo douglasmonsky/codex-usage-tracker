@@ -213,6 +213,7 @@
     let sessionsLoadedOnce = false;
     let sessionLoadScheduled = false;
     const expandedSessionIds = new Set();
+    const expandedSessionEpochIds = new Set();
     const sessionEpochs = new Map();
     const sessionEpochErrors = new Map();
     const sessionEpochLoading = new Set();
@@ -425,20 +426,25 @@
       ensureSortOption(sortKey);
       sortEl.value = sortKey;
     }
-    function resetSessionRows() {
-      sessionRows = [];
-      sessionRowsTotal = 0;
-      sessionsNextOffset = 0;
-      sessionsHasMore = false;
-      sessionsError = '';
-      sessionsLoadedOnce = false;
+    function resetSessionExpansionState() {
       expandedSessionIds.clear();
+      expandedSessionEpochIds.clear();
       sessionEpochs.clear();
       sessionEpochErrors.clear();
       sessionEpochLoading.clear();
       sessionCallsById.clear();
       sessionCallErrors.clear();
       sessionCallLoading.clear();
+    }
+    function resetSessionRows(options = null) {
+      const resetOptions = options || {};
+      sessionRows = [];
+      sessionRowsTotal = 0;
+      sessionsNextOffset = 0;
+      sessionsHasMore = false;
+      sessionsError = '';
+      sessionsLoadedOnce = false;
+      if (!resetOptions.preserveExpansion) resetSessionExpansionState();
     }
     function resetThreadRows() {
       threadRows = [];
@@ -494,14 +500,24 @@
       const loadOptions = options || {};
       if (sessionsLoading) return;
       sessionLoadScheduled = false;
-      if (loadOptions.reset) resetSessionRows();
+      if (loadOptions.reset) {
+        if (loadOptions.preserveRows) {
+          sessionsNextOffset = 0;
+          sessionsHasMore = false;
+          sessionsError = '';
+          sessionsLoadedOnce = false;
+          if (!loadOptions.preserveExpansion) resetSessionExpansionState();
+        } else {
+          resetSessionRows({ preserveExpansion: Boolean(loadOptions.preserveExpansion) });
+        }
+      }
       sessionsLoading = true;
       sessionsError = '';
       render();
       try {
         const params = new URLSearchParams({
           limit: String(sessionPageSize),
-          offset: String(sessionsNextOffset),
+          offset: String(loadOptions.reset ? 0 : sessionsNextOffset),
           include_archived: includeArchived ? '1' : '0',
           sort: sessionSortKeys.has(sortKey) ? sortKey : 'started',
           direction: sortDirection,
@@ -664,19 +680,20 @@
         render();
       }
     }
-    async function loadSessionCalls(workSessionId, options = null) {
-      if (!liveRefreshSupported || !apiToken || !workSessionId) return;
-      const existing = sessionCallsById.get(workSessionId) || { rows: [], nextOffset: 0, hasMore: true, total: 0 };
+    async function loadSessionCalls(contextEpochIdValue, options = null) {
+      const contextEpochId = String(contextEpochIdValue || '');
+      if (!liveRefreshSupported || !apiToken || !contextEpochId) return;
+      const existing = sessionCallsById.get(contextEpochId) || { rows: [], nextOffset: 0, hasMore: true, total: 0 };
       const loadOptions = options || {};
-      if (sessionCallLoading.has(workSessionId)) return;
+      if (sessionCallLoading.has(contextEpochId)) return;
       if (!loadOptions.reset && existing.rows.length && !existing.hasMore) return;
       const nextOffset = loadOptions.reset ? 0 : Number(existing.nextOffset || existing.rows.length || 0);
-      sessionCallLoading.add(workSessionId);
-      sessionCallErrors.delete(workSessionId);
+      sessionCallLoading.add(contextEpochId);
+      sessionCallErrors.delete(contextEpochId);
       render();
       try {
         const params = new URLSearchParams({
-          work_session_id: workSessionId,
+          context_epoch_id: contextEpochId,
           limit: String(sessionCallPageSize),
           offset: String(nextOffset),
           include_archived: includeArchived ? '1' : '0',
@@ -698,7 +715,7 @@
         if (payload.error) throw new Error(payload.error);
         const rows = Array.isArray(payload.rows) ? payload.rows : [];
         const previousRows = loadOptions.reset ? [] : existing.rows || [];
-        sessionCallsById.set(workSessionId, {
+        sessionCallsById.set(contextEpochId, {
           rows: mergedRows(previousRows, rows),
           nextOffset: Number.isFinite(Number(payload.next_offset))
             ? Number(payload.next_offset)
@@ -711,9 +728,9 @@
         });
         rebuildDashboardIndexes();
       } catch (error) {
-        sessionCallErrors.set(workSessionId, error.message || String(error));
+        sessionCallErrors.set(contextEpochId, error.message || String(error));
       } finally {
-        sessionCallLoading.delete(workSessionId);
+        sessionCallLoading.delete(contextEpochId);
         render();
       }
     }
@@ -726,8 +743,18 @@
       }
       expandedSessionIds.add(workSessionId);
       render();
-      loadSessionCalls(workSessionId, { reset: true });
       loadSessionEpochs(workSessionId);
+    }
+    function toggleSessionEpochCalls(contextEpochId) {
+      if (!contextEpochId) return;
+      if (expandedSessionEpochIds.has(contextEpochId)) {
+        expandedSessionEpochIds.delete(contextEpochId);
+        render();
+        return;
+      }
+      expandedSessionEpochIds.add(contextEpochId);
+      render();
+      loadSessionCalls(contextEpochId, { reset: true });
     }
     function setSort(key, direction = null) {
       sortKey = key;
@@ -1780,6 +1807,7 @@
           error: sessionsError,
           total: sessionTotal,
           expandedSessionIds,
+          expandedSessionEpochIds,
           sessionEpochErrors,
           sessionEpochLoading,
           sessionEpochs,
@@ -1938,9 +1966,7 @@
       if (activeView === 'sessions') loadSessions({ reset: true });
     }
     function refreshSessions() {
-      resetSessionRows();
-      render();
-      loadSessions({ reset: true });
+      loadSessions({ reset: true, preserveExpansion: true, preserveRows: true });
     }
     function refreshThreads() {
       resetThreadRows();
@@ -2254,7 +2280,8 @@
         }
         threadCallVisiblePages.set(key, Math.max(1, threadCallVisiblePages.get(key) || 1) + 1);
       },
-      loadMoreSessionCalls: workSessionId => loadSessionCalls(workSessionId),
+      loadMoreSessionCalls: contextEpochId => loadSessionCalls(contextEpochId),
+      toggleSessionEpochCalls,
       insightsViewEl,
       languageSelectEl,
       liveRefreshIntervalMs,

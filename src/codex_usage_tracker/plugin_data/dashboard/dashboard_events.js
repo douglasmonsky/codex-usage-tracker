@@ -64,6 +64,7 @@
       sessionsViewEl,
       toggleDetailPanel,
       toggleSessionEpochs,
+      toggleSessionEpochCalls,
       toTopEl,
       updateHistoryScopeControl,
       updateLiveStatus,
@@ -205,6 +206,13 @@
         if (loadMoreSessionCalls) loadMoreSessionCalls(sessionCallLoadMoreButton.dataset.sessionCallLoadMore || '');
         return;
       }
+      const sessionEpochRow = event.target.closest('.session-epoch-row');
+      if (sessionEpochRow && rowsEl.contains(sessionEpochRow)) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (toggleSessionEpochCalls) toggleSessionEpochCalls(sessionEpochRow.dataset.contextEpochId || '');
+        return;
+      }
       const sessionRow = event.target.closest('.work-session-row');
       if (sessionRow && rowsEl.contains(sessionRow)) {
         event.preventDefault();
@@ -232,6 +240,12 @@
       if (sessionRow && rowsEl.contains(sessionRow)) {
         event.preventDefault();
         if (toggleSessionEpochs) toggleSessionEpochs(sessionRow.dataset.workSessionId || '');
+        return;
+      }
+      const sessionEpochRow = event.target.closest('.session-epoch-row');
+      if (sessionEpochRow && rowsEl.contains(sessionEpochRow)) {
+        event.preventDefault();
+        if (toggleSessionEpochCalls) toggleSessionEpochCalls(sessionEpochRow.dataset.contextEpochId || '');
         return;
       }
       const callRow = event.target.closest('.call-row, .thread-call-row');
