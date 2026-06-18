@@ -193,10 +193,10 @@
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
     let activeView = ['calls', 'threads', 'insights', 'sessions', 'call'].includes(initialState.view) ? initialState.view : 'calls';
     document.body.dataset.activeView = activeView;
-    let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || 'time';
+    let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : defaultSortForView(activeView);
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
     const callSortKeys = new Set(['attention', 'cache', 'cached', 'context', 'cost', 'effort', 'initiator', 'model', 'output', 'reasoning', 'thread', 'time', 'total', 'uncached', 'usage', 'usage_impact']);
-    const sessionSortKeys = new Set(['action', 'cache', 'calls', 'context', 'duration', 'ended', 'idle', 'largest_miss', 'started', 'thread', 'tokens', 'uncached']);
+    const sessionSortKeys = new Set(['cache', 'calls', 'context', 'duration', 'ended', 'idle', 'largest_miss', 'reason', 'started', 'thread', 'tokens', 'uncached']);
     let threadCallSortKey = 'time';
     let threadCallSortDirection = 'desc';
     let activePreset = '';
@@ -216,6 +216,10 @@
     const sessionEpochs = new Map();
     const sessionEpochErrors = new Map();
     const sessionEpochLoading = new Set();
+    const sessionCallPageSize = 100;
+    const sessionCallsById = new Map();
+    const sessionCallErrors = new Map();
+    const sessionCallLoading = new Set();
     const threadPageSize = 500;
     let threadRows = [];
     let threadRowsTotal = 0;
@@ -398,7 +402,7 @@
       sortEl.appendChild(option);
     }
     function defaultSortForView(view = activeView) {
-      return view === 'sessions' ? 'uncached' : 'time';
+      return view === 'sessions' ? 'started' : 'time';
     }
     function resetSortForView(view = activeView) {
       sortKey = defaultSortForView(view);
@@ -432,6 +436,9 @@
       sessionEpochs.clear();
       sessionEpochErrors.clear();
       sessionEpochLoading.clear();
+      sessionCallsById.clear();
+      sessionCallErrors.clear();
+      sessionCallLoading.clear();
     }
     function resetThreadRows() {
       threadRows = [];
@@ -496,7 +503,7 @@
           limit: String(sessionPageSize),
           offset: String(sessionsNextOffset),
           include_archived: includeArchived ? '1' : '0',
-          sort: sessionSortKeys.has(sortKey) ? sortKey : 'uncached',
+          sort: sessionSortKeys.has(sortKey) ? sortKey : 'started',
           direction: sortDirection,
           lang: i18n.currentLanguage,
           _: String(Date.now()),
@@ -657,6 +664,59 @@
         render();
       }
     }
+    async function loadSessionCalls(workSessionId, options = null) {
+      if (!liveRefreshSupported || !apiToken || !workSessionId) return;
+      const existing = sessionCallsById.get(workSessionId) || { rows: [], nextOffset: 0, hasMore: true, total: 0 };
+      const loadOptions = options || {};
+      if (sessionCallLoading.has(workSessionId)) return;
+      if (!loadOptions.reset && existing.rows.length && !existing.hasMore) return;
+      const nextOffset = loadOptions.reset ? 0 : Number(existing.nextOffset || existing.rows.length || 0);
+      sessionCallLoading.add(workSessionId);
+      sessionCallErrors.delete(workSessionId);
+      render();
+      try {
+        const params = new URLSearchParams({
+          work_session_id: workSessionId,
+          limit: String(sessionCallPageSize),
+          offset: String(nextOffset),
+          include_archived: includeArchived ? '1' : '0',
+          compact: '1',
+          sort: 'time',
+          direction: 'desc',
+          lang: i18n.currentLanguage,
+          _: String(Date.now()),
+        });
+        const response = await fetch(`/api/calls?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken,
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (payload.error) throw new Error(payload.error);
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        const previousRows = loadOptions.reset ? [] : existing.rows || [];
+        sessionCallsById.set(workSessionId, {
+          rows: mergedRows(previousRows, rows),
+          nextOffset: Number.isFinite(Number(payload.next_offset))
+            ? Number(payload.next_offset)
+            : nextOffset + rows.length,
+          hasMore: Boolean(payload.has_more),
+          total: Number(payload.total_matched_rows ?? previousRows.length + rows.length),
+        });
+        rows.forEach(row => {
+          if (row?.record_id) supplementalRowsByRecordId.set(row.record_id, row);
+        });
+        rebuildDashboardIndexes();
+      } catch (error) {
+        sessionCallErrors.set(workSessionId, error.message || String(error));
+      } finally {
+        sessionCallLoading.delete(workSessionId);
+        render();
+      }
+    }
     function toggleSessionEpochs(workSessionId) {
       if (!workSessionId) return;
       if (expandedSessionIds.has(workSessionId)) {
@@ -666,6 +726,7 @@
       }
       expandedSessionIds.add(workSessionId);
       render();
+      loadSessionCalls(workSessionId, { reset: true });
       loadSessionEpochs(workSessionId);
     }
     function setSort(key, direction = null) {
@@ -749,6 +810,7 @@
         ended: t('table.ended'),
         idle: t('table.idle_before'),
         largest_miss: t('table.largest_miss'),
+        reason: t('table.source'),
         started: t('table.started'),
         thread: t('table.thread'),
         time: t('table.time'),
@@ -1721,6 +1783,9 @@
           sessionEpochErrors,
           sessionEpochLoading,
           sessionEpochs,
+          sessionCallErrors,
+          sessionCallLoading,
+          sessionCallsById,
           loadedDescription: sessionRows.length
             ? tf('table.visible_status', {
                 end: number.format(sessionRows.length),
@@ -2189,6 +2254,7 @@
         }
         threadCallVisiblePages.set(key, Math.max(1, threadCallVisiblePages.get(key) || 1) + 1);
       },
+      loadMoreSessionCalls: workSessionId => loadSessionCalls(workSessionId),
       insightsViewEl,
       languageSelectEl,
       liveRefreshIntervalMs,

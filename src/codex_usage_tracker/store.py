@@ -1217,6 +1217,7 @@ def query_usage_api_events(
     effort: str | None = None,
     thread: str | None = None,
     thread_key: str | None = None,
+    work_session_id: str | None = None,
     include_archived: bool = False,
     sort: str = "time",
     direction: str = "desc",
@@ -1289,6 +1290,43 @@ def query_usage_api_events(
             ) AS parent_threads
             ON usage_events.parent_session_id = parent_threads.session_id
             """
+        work_session_join = ""
+        work_session_where = ""
+        work_session_params: list[Any] = []
+        if work_session_id:
+            work_session_params.append(work_session_id)
+            work_session_join = """
+            JOIN thread_work_sessions AS selected_session
+              ON selected_session.work_session_id = ?
+            JOIN usage_events AS session_start
+              ON session_start.record_id = selected_session.start_record_id
+            JOIN usage_events AS session_end
+              ON session_end.record_id = selected_session.end_record_id
+            """
+            thread_key_expr = _thread_key_expression("usage_events.")
+            work_session_where = f"""
+              AND {thread_key_expr} = selected_session.thread_key
+              AND (
+                (
+                  usage_events.thread_call_index IS NOT NULL
+                  AND session_start.thread_call_index IS NOT NULL
+                  AND session_end.thread_call_index IS NOT NULL
+                  AND usage_events.thread_call_index BETWEEN session_start.thread_call_index AND session_end.thread_call_index
+                )
+                OR (
+                  (session_start.thread_call_index IS NULL OR session_end.thread_call_index IS NULL)
+                  AND usage_events.event_timestamp >= session_start.event_timestamp
+                  AND usage_events.event_timestamp <= session_end.event_timestamp
+                )
+              )
+            """
+        effective_where = where_clause
+        if work_session_where:
+            effective_where = (
+                f"{where_clause} {work_session_where}"
+                if where_clause
+                else f"WHERE 1 = 1 {work_session_where}"
+            )
         rows = conn.execute(
             f"""
             SELECT
@@ -1296,13 +1334,14 @@ def query_usage_api_events(
                 {parent_select}
             FROM usage_events
             {parent_join}
-            {where_clause}
+            {work_session_join}
+            {effective_where}
             ORDER BY {order_expr} {direction_sql},
                 usage_events.event_timestamp DESC,
                 usage_events.cumulative_total_tokens DESC
             {limit_clause}
             """,
-            [*parent_params, *query_params],
+            [*parent_params, *work_session_params, *query_params],
         )
         return [_row_to_dict(row) for row in rows]
 
@@ -1317,6 +1356,7 @@ def query_usage_api_event_count(
     effort: str | None = None,
     thread: str | None = None,
     thread_key: str | None = None,
+    work_session_id: str | None = None,
     include_archived: bool = False,
 ) -> int:
     """Return count for SQL-backed live dashboard call APIs."""
@@ -1330,12 +1370,55 @@ def query_usage_api_event_count(
         thread=thread,
         thread_key=thread_key,
         include_archived=include_archived,
+        table_alias="usage_events",
     )
     with connect(db_path) as conn:
         init_db(conn)
+        work_session_join = ""
+        work_session_where = ""
+        work_session_params: list[Any] = []
+        if work_session_id:
+            work_session_params.append(work_session_id)
+            work_session_join = """
+            JOIN thread_work_sessions AS selected_session
+              ON selected_session.work_session_id = ?
+            JOIN usage_events AS session_start
+              ON session_start.record_id = selected_session.start_record_id
+            JOIN usage_events AS session_end
+              ON session_end.record_id = selected_session.end_record_id
+            """
+            thread_key_expr = _thread_key_expression("usage_events.")
+            work_session_where = f"""
+              AND {thread_key_expr} = selected_session.thread_key
+              AND (
+                (
+                  usage_events.thread_call_index IS NOT NULL
+                  AND session_start.thread_call_index IS NOT NULL
+                  AND session_end.thread_call_index IS NOT NULL
+                  AND usage_events.thread_call_index BETWEEN session_start.thread_call_index AND session_end.thread_call_index
+                )
+                OR (
+                  (session_start.thread_call_index IS NULL OR session_end.thread_call_index IS NULL)
+                  AND usage_events.event_timestamp >= session_start.event_timestamp
+                  AND usage_events.event_timestamp <= session_end.event_timestamp
+                )
+              )
+            """
+        effective_where = where_clause
+        if work_session_where:
+            effective_where = (
+                f"{where_clause} {work_session_where}"
+                if where_clause
+                else f"WHERE 1 = 1 {work_session_where}"
+            )
         row = conn.execute(
-            f"SELECT COUNT(*) AS row_count FROM usage_events {where_clause}",
-            params,
+            f"""
+            SELECT COUNT(*) AS row_count
+            FROM usage_events
+            {work_session_join}
+            {effective_where}
+            """,
+            [*work_session_params, *params],
         ).fetchone()
         return int(row["row_count"] if row is not None else 0)
 

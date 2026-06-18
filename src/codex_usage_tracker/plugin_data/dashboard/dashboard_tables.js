@@ -407,29 +407,12 @@
       return tf('session.hours_minutes', { hours: number.format(hours), minutes: number.format(minutes) });
     }
 
-    function sessionActionLabel(value) {
-      return {
-        monitor: t('session.action.monitor'),
-        inspect_cold_resume: t('session.action.inspect_cold_resume'),
-        handoff_or_start_fresh: t('session.action.handoff_or_start_fresh'),
-      }[value] || short(value, t('state.unknown'));
-    }
-
     function sessionReasonLabel(value) {
       return {
         session_start: t('session.reason.session_start'),
         thread_start: t('session.reason.thread_start'),
         cold_resume: t('session.reason.cold_resume'),
         post_compaction: t('session.reason.post_compaction'),
-      }[value] || short(value, t('state.unknown'));
-    }
-
-    function epochEffectivenessLabel(value) {
-      return {
-        effective: t('session.effectiveness.effective'),
-        mixed: t('session.effectiveness.mixed'),
-        ineffective: t('session.effectiveness.ineffective'),
-        unknown: t('session.effectiveness.unknown'),
       }[value] || short(value, t('state.unknown'));
     }
 
@@ -475,7 +458,6 @@
           'col-cache',
           'col-largest-miss',
           'col-context',
-          'col-action',
         ],
         [
           topLevelHeader('started', t('table.started')),
@@ -490,7 +472,6 @@
           topLevelHeader('cache', t('table.cache'), true),
           topLevelHeader('largest_miss', t('table.largest_miss'), true),
           topLevelHeader('context', t('table.context_peak'), true),
-          topLevelHeader('action', t('table.action')),
         ],
       );
     }
@@ -517,7 +498,6 @@
       for (const row of rows) {
         const tr = document.createElement('tr');
         const threadLabel = short(row.thread_label, t('state.unknown'));
-        const actionLabel = sessionActionLabel(row.suggested_next_action);
         const reasonLabel = sessionReasonLabel(row.start_reason);
         const workSessionId = row.work_session_id || '';
         const expanded = expandedSessionIds.has(workSessionId);
@@ -543,31 +523,102 @@
           <td class="num">${pct(row.avg_cache_ratio || 0)}</td>
           <td class="num token-cell">${tokenNumberCell(row.largest_uncached_input_tokens || 0, t('table.largest_miss'))}</td>
           <td class="num">${pct(row.max_context_window_percent || 0)}</td>
-          <td><span class="session-action" ${tooltipAttributes(actionLabel)}>${escapeHtml(actionLabel)}</span></td>
         `;
         rowsEl.appendChild(tr);
-        if (expanded) rowsEl.appendChild(renderSessionEpochs(row, state));
+        if (expanded) rowsEl.appendChild(renderSessionExpansion(row, state));
       }
     }
 
-    function renderSessionEpochs(row, state) {
+    function renderSessionExpansion(row, state) {
       const workSessionId = row.work_session_id || '';
       const tr = document.createElement('tr');
       tr.className = 'session-epoch-child-row';
+      const callState = state.sessionCallsById && state.sessionCallsById.get(workSessionId);
+      const callRows = callState && Array.isArray(callState.rows) ? callState.rows : [];
+      const callsLoading = state.sessionCallLoading && state.sessionCallLoading.has(workSessionId);
+      const callsError = state.sessionCallErrors && state.sessionCallErrors.get(workSessionId);
       const loading = state.sessionEpochLoading && state.sessionEpochLoading.has(workSessionId);
       const error = state.sessionEpochErrors && state.sessionEpochErrors.get(workSessionId);
       const epochs = state.sessionEpochs && state.sessionEpochs.get(workSessionId);
-      let body = '';
+      let callsBody = '';
+      if (callsLoading && !callRows.length) {
+        callsBody = `<div class="session-epoch-state">${escapeHtml(t('state.loading_rows'))}</div>`;
+      } else if (callsError) {
+        callsBody = `<div class="session-epoch-state error">${escapeHtml(callsError)}</div>`;
+      } else if (!callRows.length) {
+        callsBody = `<div class="session-epoch-state">${escapeHtml(t('state.no_calls'))}</div>`;
+      } else {
+        const rows = callRows.map(call => `
+          <tr class="thread-call-row${getSelectedRecordId() === call.record_id ? ' selected-row' : ''}" data-record-id="${escapeHtml(call.record_id || '')}">
+            <td>${rowInvestigatorLink(call, renderTimeCell(call.event_timestamp), true)}</td>
+            <td>${rowInvestigatorLink(call, callInitiatorCell(call))}</td>
+            <td>${rowInvestigatorLink(call, `<span class="pill model-pill" data-full-label="${escapeHtml(short(call.model))}">${escapeHtml(short(call.model))}</span>`)}</td>
+            <td>${rowInvestigatorLink(call, effortCell(translateEffort(short(call.effort)), translateEffort(short(call.effort))))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(call, totalTokenCell(call))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(call, cachedTokenCell(call))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(call, uncachedTokenCell(call))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(call, outputTokenCell(call))}</td>
+            <td class="num token-cell">${rowInvestigatorLink(call, tokenNumberCell(call.reasoning_output_tokens || 0, t('metric.reasoning_output')))}</td>
+            <td class="num usage-impact-column">${rowInvestigatorLink(call, usageImpactCell(call))}</td>
+            <td class="num">${rowInvestigatorLink(call, costUsageCell(call.pricing_estimated ? `${moneyText(call.estimated_cost_usd)}*` : moneyText(call.estimated_cost_usd), usageCreditValue(call)))}</td>
+            <td class="num">${rowInvestigatorLink(call, pct(call.cache_ratio))}</td>
+          </tr>
+        `).join('');
+        const totalCalls = Number.isFinite(Number(callState.total)) ? Number(callState.total) : callRows.length;
+        const canLoadMore = Boolean(callState.hasMore);
+        const loadMore = canLoadMore
+          ? `
+            <div class="child-load-more">
+              <span>${escapeHtml(tf('table.visible_status', { end: number.format(callRows.length), total: number.format(totalCalls), items: t('table.calls') }))}</span>
+              <button class="pager-button" type="button" data-session-call-load-more="${escapeHtml(workSessionId)}">${escapeHtml(t('button.load_more'))}</button>
+            </div>
+          `
+          : `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(callRows.length), total: number.format(totalCalls), items: t('table.calls') }))}</span></div>`;
+        callsBody = `
+          <table class="thread-call-table session-call-table" aria-label="${escapeHtml(`${row.thread_label || t('state.unknown')} ${t('table.calls')}`)}">
+            <colgroup>
+              <col class="col-time">
+              <col class="col-initiated">
+              <col class="col-model">
+              <col class="col-effort">
+              <col class="col-tokens">
+              <col class="col-cached">
+              <col class="col-uncached">
+              <col class="col-output">
+              <col class="col-reasoning">
+              <col class="col-usage-impact">
+              <col class="col-cost">
+              <col class="col-cache">
+            </colgroup>
+            <thead><tr>
+              <th>${escapeHtml(t('table.time'))}</th>
+              <th>${escapeHtml(t('table.initiated'))}</th>
+              <th>${escapeHtml(t('table.model'))}</th>
+              <th>${escapeHtml(t('table.effort'))}</th>
+              <th class="num">${escapeHtml(t('table.tokens'))}</th>
+              <th class="num">${escapeHtml(t('table.cached'))}</th>
+              <th class="num">${escapeHtml(t('table.uncached'))}</th>
+              <th class="num">${escapeHtml(t('table.output'))}</th>
+              <th class="num">${escapeHtml(t('context.token_reasoning'))}</th>
+              <th class="num">${escapeHtml(translationOrFallback('table.usage_impact', 'Usage'))}</th>
+              <th class="num">${escapeHtml(t('table.cost'))}</th>
+              <th class="num">${escapeHtml(t('table.cache'))}</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          ${loadMore}
+        `;
+      }
+      let epochBody = '';
       if (loading && !epochs) {
-        body = `<div class="session-epoch-state">${escapeHtml(t('session.epoch.loading'))}</div>`;
+        epochBody = `<div class="session-epoch-state">${escapeHtml(t('session.epoch.loading'))}</div>`;
       } else if (error) {
-        body = `<div class="session-epoch-state error">${escapeHtml(tf('session.epoch.error', { message: error }))}</div>`;
+        epochBody = `<div class="session-epoch-state error">${escapeHtml(tf('session.epoch.error', { message: error }))}</div>`;
       } else if (!epochs || !epochs.length) {
-        body = `<div class="session-epoch-state">${escapeHtml(t('session.epoch.none'))}</div>`;
+        epochBody = `<div class="session-epoch-state">${escapeHtml(t('session.epoch.none'))}</div>`;
       } else {
         const rows = epochs.map(epoch => {
           const reasonLabel = sessionReasonLabel(epoch.start_reason);
-          const effectivenessLabel = epochEffectivenessLabel(epoch.compaction_effectiveness);
           const firstMiss = epoch.post_compaction_uncached_spike || epoch.first_call_uncached_input_tokens || 0;
           return `
             <tr>
@@ -582,11 +633,10 @@
               <td class="num">${pct(epoch.avg_cache_ratio || 0)}</td>
               <td class="num">${pct(epoch.max_context_window_percent || 0)}</td>
               <td class="num token-cell">${tokenNumberCell(firstMiss, t('session.epoch.first_miss'))}</td>
-              <td><span class="session-effectiveness" ${tooltipAttributes(effectivenessLabel)}>${escapeHtml(effectivenessLabel)}</span></td>
             </tr>
           `;
         }).join('');
-        body = `
+        epochBody = `
           <table class="session-epoch-table" aria-label="${escapeHtml(`${row.thread_label || t('state.unknown')} ${t('session.context_segments')}`)}">
             <thead><tr>
               <th>${escapeHtml(t('session.epoch.segment'))}</th>
@@ -597,7 +647,6 @@
               <th class="num">${escapeHtml(t('table.cache'))}</th>
               <th class="num">${escapeHtml(t('table.context_peak'))}</th>
               <th class="num">${escapeHtml(t('session.epoch.first_miss'))}</th>
-              <th>${escapeHtml(t('session.epoch.effectiveness'))}</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -607,10 +656,15 @@
         <td class="child-cell session-epoch-cell" colspan="${tableColumnCount}">
           <div class="session-epoch-panel">
             <div class="session-epoch-heading">
+              <strong>${escapeHtml(t('table.calls'))}</strong>
+              <span>${escapeHtml(tf('table.visible_status', { end: number.format(callRows.length), total: number.format((callState && callState.total) || callRows.length), items: t('table.calls') }))}</span>
+            </div>
+            ${callsBody}
+            <div class="session-epoch-heading session-epoch-heading-secondary">
               <strong>${escapeHtml(t('session.context_segments'))}</strong>
               <span>${escapeHtml(t('session.context_segments_hint'))}</span>
             </div>
-            ${body}
+            ${epochBody}
           </div>
         </td>
       `;

@@ -7,6 +7,9 @@
   bounded `/api/usage-impact?record_ids=...` read-model request.
 - Enrich visible Threads rows with summed usage impact in the background through
   a bounded `/api/thread-usage-impact?thread_keys=...` read-model request.
+- Default dashboard tables to newest-time sorting, let Sessions expand into
+  session-scoped call rows, and keep experimental session action/effectiveness
+  signals out of the visible tables.
 
 ## 0.7.0 - 2026-06-17
 

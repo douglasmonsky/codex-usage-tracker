@@ -254,6 +254,8 @@ def query_thread_work_sessions(
         "largest_miss": "largest_uncached_input_tokens",
         "context": "max_context_window_percent",
         "thread": "thread_label",
+        "idle": "idle_minutes_before",
+        "reason": "start_reason",
         "action": "suggested_next_action",
     }
     if sort not in sort_map:

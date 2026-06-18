@@ -28,6 +28,7 @@ from codex_usage_tracker.models import TaskReceiptSignal
 from codex_usage_tracker.store import (
     connect,
     query_dashboard_events,
+    query_usage_api_events,
     query_session_usage,
     refresh_usage_index,
     upsert_usage_events,
@@ -1172,6 +1173,10 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         work_session_payload = _read_json(
             f"{base_url}/api/session?work_session_id={urllib.parse.quote(work_session_id)}"
         )
+        session_calls_payload = _read_json(
+            f"{base_url}/api/calls?work_session_id={urllib.parse.quote(work_session_id)}"
+            "&limit=25&sort=time&direction=desc&compact=1"
+        )
         context_epochs_payload = _read_json(
             f"{base_url}/api/context-epochs?work_session_id={urllib.parse.quote(work_session_id)}"
         )
@@ -1262,6 +1267,24 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert isinstance(work_session_payload["context_epochs"], list)
     assert work_session_payload["context_epochs"]
     assert work_session_payload["raw_context_included"] is False
+    assert session_calls_payload["schema"] == "codex-usage-tracker-calls-v1"
+    _assert_contract(session_calls_payload)
+    assert session_calls_payload["row_count"] >= 1
+    assert session_calls_payload["raw_context_included"] is False
+    assert {
+        row["record_id"]
+        for row in session_calls_payload["rows"]
+    }.issubset(
+        {
+            row["record_id"]
+            for row in query_usage_api_events(
+                db_path=db_path,
+                thread_key=work_session_payload["record"]["thread_key"],
+                include_archived=True,
+                limit=0,
+            )
+        }
+    )
 
     assert context_epochs_payload["schema"] == "codex-usage-tracker-context-epochs-v1"
     _assert_contract(context_epochs_payload)

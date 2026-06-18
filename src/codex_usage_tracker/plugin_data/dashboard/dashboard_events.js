@@ -32,6 +32,7 @@
       liveRefreshIntervalMs,
       liveRefreshSupported,
       loadLimitEl,
+      loadMoreSessionCalls,
       loadedRowsDescription,
       loadMoreRowsEl,
       modelEl,
@@ -195,6 +196,13 @@
         event.preventDefault();
         event.stopPropagation();
         incrementThreadCallVisiblePage(loadMoreButton.dataset.threadLoadMore);
+        return;
+      }
+      const sessionCallLoadMoreButton = event.target.closest('[data-session-call-load-more]');
+      if (sessionCallLoadMoreButton && rowsEl.contains(sessionCallLoadMoreButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (loadMoreSessionCalls) loadMoreSessionCalls(sessionCallLoadMoreButton.dataset.sessionCallLoadMore || '');
         return;
       }
       const sessionRow = event.target.closest('.work-session-row');

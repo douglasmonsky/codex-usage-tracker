@@ -275,14 +275,23 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "thread-call-table" in dashboard_surface
     assert "renderSessions" in dashboard_tables_js
     assert "loadSessions" in dashboard_js
+    assert "loadSessionCalls" in dashboard_js
     assert "loadSessionEpochs" in dashboard_js
     assert "toggleSessionEpochs" in dashboard_js
     assert "toggleSessionEpochs" in dashboard_events_js
     assert "sessionsLoadedOnce" in dashboard_js
     assert "/api/sessions?" in dashboard_js
+    assert "/api/calls?" in dashboard_js
+    assert "work_session_id" in dashboard_js
+    assert "data-session-call-load-more" in dashboard_tables_js
+    assert "data-session-call-load-more" in dashboard_events_js
     assert "/api/context-epochs?" in dashboard_js
     assert "sessionFilterParams" in dashboard_js
     assert "session-epoch-table" in dashboard_tables_js
+    assert "topLevelHeader('action'" not in dashboard_tables_js
+    assert "sessionActionLabel" not in dashboard_tables_js
+    assert "session.epoch.effectiveness" not in dashboard_tables_js
+    assert "epochEffectivenessLabel" not in dashboard_tables_js
     assert "session-epoch-child-row" in dashboard_surface
     assert "tableHeadEl.addEventListener('click'" in dashboard_events_js
     assert "setSessionFilter" in dashboard_events_js

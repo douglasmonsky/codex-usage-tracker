@@ -374,7 +374,7 @@ Schema: `codex-usage-tracker-context-epochs-v1`
 }
 ```
 
-Context epoch rows are aggregate segments inside a work session. A new epoch starts at the first call in a session or at a call labeled `post_compaction`. The rows expose token/cache totals, first-call post-compaction uncached spike, context pressure, and a coarse compaction effectiveness label. They do not store replacement history or raw context.
+Context epoch rows are aggregate segments inside a work session. A new epoch starts at the first call in a session or at a call labeled `post_compaction`. The rows expose token/cache totals, first-call post-compaction uncached spike, and context pressure. They do not store replacement history or raw context. The API may include a coarse compaction-effectiveness field for downstream analysis, but the dashboard does not surface it in the main table while the signal remains experimental.
 
 ## Recommendations
 
