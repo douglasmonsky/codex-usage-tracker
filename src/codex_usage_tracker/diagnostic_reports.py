@@ -41,6 +41,15 @@ DIAGNOSTIC_CALL_SORT_CHOICES = (
     "thread",
 )
 DIAGNOSTIC_DIRECTION_CHOICES = ("asc", "desc")
+DIAGNOSTIC_TOOL_FACT_TYPES = {
+    "activity",
+    "command_family",
+    "function",
+    "mcp_server",
+    "mcp_tool",
+    "skill",
+    "tool",
+}
 
 
 @dataclass(frozen=True)
@@ -120,6 +129,7 @@ def build_diagnostics_summary_report(
                 fact_type=fact_type,
                 fact_name=fact_name,
                 fact_category=fact_category,
+                fact_group=None,
                 include_archived=include_archived,
                 sort=sort,
                 direction=direction,
@@ -146,12 +156,14 @@ def build_diagnostics_facts_report(
     include_archived: bool = False,
     sort: str = "uncached",
     direction: str = "desc",
+    fact_group: str | None = None,
     view: str = "facts",
 ) -> DiagnosticsReport:
     """Build diagnostic fact rows with associated token totals."""
 
     _validate_fact_sort(sort)
     _validate_direction(direction)
+    _validate_fact_group(fact_group)
     normalized_limit = _normalize_limit(limit)
     all_rows = query_diagnostic_facts(
         db_path=db_path,
@@ -169,7 +181,8 @@ def build_diagnostics_facts_report(
         sort=sort,
         direction=direction,
     )
-    rows = _limit_rows(all_rows, normalized_limit)
+    grouped_rows = _filter_fact_group(all_rows, fact_group)
+    rows = _limit_rows(grouped_rows, normalized_limit)
     for row in rows:
         row["action_hint"] = _action_hint(
             fact_type=str(row.get("fact_type") or ""),
@@ -179,7 +192,7 @@ def build_diagnostics_facts_report(
         _diagnostics_payload(
             view=view,
             rows=rows,
-            total_matched_rows=len(all_rows),
+            total_matched_rows=len(grouped_rows),
             filters=_filters(
                 since=since,
                 until=until,
@@ -190,6 +203,7 @@ def build_diagnostics_facts_report(
                 fact_type=fact_type,
                 fact_name=fact_name,
                 fact_category=fact_category,
+                fact_group=fact_group,
                 include_archived=include_archived,
                 sort=sort,
                 direction=direction,
@@ -274,6 +288,7 @@ def build_diagnostics_fact_calls_report(
                 fact_type=fact_type,
                 fact_name=fact_name,
                 fact_category=None,
+                fact_group=None,
                 include_archived=include_archived,
                 sort=sort,
                 direction=direction,
@@ -322,6 +337,7 @@ def _filters(
     fact_type: str | None,
     fact_name: str | None,
     fact_category: str | None,
+    fact_group: str | None,
     include_archived: bool,
     sort: str,
     direction: str,
@@ -339,6 +355,7 @@ def _filters(
         "fact_type": fact_type,
         "fact_name": fact_name,
         "fact_category": fact_category,
+        "fact_group": fact_group,
         "include_archived": include_archived,
         "sort": sort,
         "direction": direction,
@@ -351,8 +368,22 @@ def _filters(
 def _action_hint(*, fact_type: str, fact_name: str) -> str:
     if fact_type == "compaction" or fact_name == "post_compaction":
         return "Review associated calls to see whether compaction reduced context or a fresh handoff would be cleaner."
+    if fact_type == "command_family":
+        if fact_name == "unknown_command":
+            return "Open associated calls when shell activity is high; command text is intentionally not stored."
+        return "Review repeated validation or command loops when associated uncached input is high."
+    if fact_type in {"mcp_server", "mcp_tool"}:
+        return "Inspect repeated MCP activity and narrow tool result scope when associated costs are high."
+    if fact_type == "skill":
+        return "Skill use is detected only from structured events; inspect associated calls for repeated workflow cost."
+    if fact_name in {"search_read_command", "search_read_loop"}:
+        return "Inspect repeated search/read loops or narrow the task before loading more source context."
+    if fact_name == "retry_or_abort_loop":
+        return "Inspect associated calls for interrupted work, rollback, or retry loops."
     if fact_name == "function_call_output":
         return "Inspect repeated large tool results when associated uncached input is high."
+    if fact_type == "function":
+        return "Check whether repeated function calls are carrying more context forward than needed."
     if fact_type == "tool":
         return "Check whether repeated tool activity is carrying forward more context than needed."
     if fact_name == "patch_applied":
@@ -432,6 +463,26 @@ def _normalize_limit(limit: int) -> int | None:
 
 def _limit_rows(rows: list[dict[str, Any]], limit: int | None) -> list[dict[str, Any]]:
     return rows if limit is None else rows[:limit]
+
+
+def _filter_fact_group(
+    rows: list[dict[str, Any]],
+    fact_group: str | None,
+) -> list[dict[str, Any]]:
+    if fact_group is None:
+        return rows
+    if fact_group == "tools":
+        return [
+            row
+            for row in rows
+            if str(row.get("fact_type") or "") in DIAGNOSTIC_TOOL_FACT_TYPES
+        ]
+    raise ValueError(f"unknown diagnostic fact group: {fact_group}")
+
+
+def _validate_fact_group(fact_group: str | None) -> None:
+    if fact_group not in {None, "tools"}:
+        raise ValueError("fact_group must be one of: tools")
 
 
 def _validate_fact_sort(sort: str) -> None:

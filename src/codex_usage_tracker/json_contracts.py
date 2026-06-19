@@ -148,6 +148,7 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "fact_type": (str, NoneType),
                 "fact_name": (str, NoneType),
                 "fact_category": (str, NoneType),
+                "fact_group": (str, NoneType),
                 "include_archived": bool,
                 "sort": str,
                 "direction": str,

@@ -426,7 +426,8 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     }
     assert compactions_payload["filters"]["fact_type"] == "compaction"
     assert {row["fact_type"] for row in compactions_payload["rows"]} == {"compaction"}
-    assert tools_payload["filters"]["fact_type"] == "tool"
+    assert tools_payload["filters"]["fact_type"] is None
+    assert tools_payload["filters"]["fact_group"] == "tools"
     assert {row["fact_type"] for row in tools_payload["rows"]} == {"tool"}
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"

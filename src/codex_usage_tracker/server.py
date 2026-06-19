@@ -302,7 +302,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._handle_diagnostics_facts(parsed.query, fact_type="compaction")
             return
         if parsed.path == "/api/diagnostics/tools":
-            self._handle_diagnostics_facts(parsed.query, fact_type="tool")
+            self._handle_diagnostics_facts(parsed.query, fact_group="tools")
             return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
@@ -865,6 +865,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         query: str,
         *,
         fact_type: str | None = None,
+        fact_group: str | None = None,
     ) -> None:
         params = parse_qs(query)
         try:
@@ -886,6 +887,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 ),
                 sort=_first(params.get("sort")) or "uncached",
                 direction=_first(params.get("direction")) or "desc",
+                fact_group=fact_group,
                 view=urlparse(self.path).path.rsplit("/", 1)[-1],
             ).payload
         except ValueError as exc:

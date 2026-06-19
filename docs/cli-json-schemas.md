@@ -260,6 +260,7 @@ Schema: `codex-usage-tracker-diagnostics-v1`
     "fact_type": null,
     "fact_name": null,
     "fact_category": null,
+    "fact_group": null,
     "include_archived": false,
     "sort": "uncached",
     "direction": "desc",
@@ -278,7 +279,7 @@ Schema: `codex-usage-tracker-diagnostics-v1`
 }
 ```
 
-Diagnostics payloads report aggregate structured facts such as compaction, tool/function activity, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
+Diagnostics payloads report aggregate structured facts such as compaction, tool/function/MCP activity, command families, structured skill labels, search/read loops, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, command arguments, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
 
 ## Pricing Coverage
 

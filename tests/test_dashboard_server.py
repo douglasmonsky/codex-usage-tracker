@@ -531,7 +531,8 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert {row["fact_type"] for row in diagnostics_compactions_payload["rows"]} == {
         "compaction"
     }
-    assert diagnostics_tools_payload["filters"]["fact_type"] == "tool"
+    assert diagnostics_tools_payload["filters"]["fact_type"] is None
+    assert diagnostics_tools_payload["filters"]["fact_group"] == "tools"
     _assert_contract(diagnostics_tools_payload)
     assert diagnostics_fact_calls_payload["view"] == "fact-calls"
     _assert_contract(diagnostics_fact_calls_payload)

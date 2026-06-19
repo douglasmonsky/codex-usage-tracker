@@ -131,7 +131,8 @@ Use `Threads` view when you want to understand a work session as a group instead
 Use `Diagnostics` view when you want to see what structured event patterns are happening and what token totals are associated with those patterns.
 
 - The tab consumes the localhost `/api/diagnostics/*` endpoints; static file dashboards show a live-API unavailable state.
-- The first table shows top diagnostic facts by associated uncached input tokens. Tool/function and compaction sections expose narrower slices of the same fact data.
+- The first table shows top diagnostic facts by associated uncached input tokens. Tool/function/MCP/command-family and compaction sections expose narrower slices of the same fact data.
+- Command diagnostics store only a command family such as `pytest`, `git`, or `unknown_command`. Skill and MCP labels are detected only when they are present as structured event metadata.
 - Click `Calls` on a fact row to load associated model calls. Call links and largest-call links open the Call Investigator, where raw context remains explicit and on demand.
 - Associated token totals are not causal allocations and are not additive when one call has multiple diagnostic facts.
 

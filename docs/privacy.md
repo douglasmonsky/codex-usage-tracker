@@ -33,7 +33,7 @@ Those fields are not written to SQLite, CSV exports, generated dashboard HTML, o
 
 Call-origin metadata is heuristic and confidence-labeled. It stores categories such as `user`, `codex`, or `unknown` plus a reason such as `user_message`, `tool_result`, `post_compaction`, or `agent_continuation`. It does not store the message text, tool output, compaction replacement text, or raw JSONL fragment that produced the category.
 
-Diagnostic facts follow the same aggregate-only rule. They can store safe structured labels such as `patch_applied`, `function_call_output`, or `post_compaction`, along with event counts and source line ranges. They do not store tool arguments, command text, command output, patch text, prompt or assistant text, file contents, raw JSONL fragments, or raw context evidence.
+Diagnostic facts follow the same aggregate-only rule. They can store safe structured labels such as `patch_applied`, `function_call_output`, `post_compaction`, MCP tool/server labels, structured skill labels, and command families such as `pytest`, `git`, or `unknown_command`, along with event counts and source line ranges. Command text may be classified in memory during parsing, but it is not persisted. Diagnostic facts do not store tool arguments, command text, command output, patch text, prompt or assistant text, file contents, raw JSONL fragments, or raw context evidence.
 
 ## On-Demand Context
 

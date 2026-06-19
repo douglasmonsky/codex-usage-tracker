@@ -427,6 +427,7 @@ def _run_diagnostics(args: argparse.Namespace) -> int:
             include_archived=args.include_archived,
             sort=args.sort,
             direction=args.direction,
+            fact_group="tools" if command == "tools" else None,
             view=command,
         )
     elif command == "fact-calls":
@@ -461,8 +462,6 @@ def _diagnostic_fact_type_filter(args: argparse.Namespace) -> str | None:
     command = args.diagnostics_command
     if command == "compactions":
         return "compaction"
-    if command == "tools":
-        return "tool"
     return getattr(args, "fact_type", None)
 
 

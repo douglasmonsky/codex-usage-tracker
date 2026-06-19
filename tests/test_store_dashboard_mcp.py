@@ -18,6 +18,7 @@ from store_dashboard_helpers import (
 )
 
 from codex_usage_tracker import store as store_module
+from codex_usage_tracker.diagnostic_reports import build_diagnostics_facts_report
 from codex_usage_tracker.models import UsageEvent
 from codex_usage_tracker.store import (
     connect,
@@ -404,6 +405,85 @@ def test_refresh_persists_diagnostic_facts_without_raw_content(tmp_path: Path) -
     assert all(row["raw_content_included"] == 0 for row in persisted)
     assert "SECRET" not in json.dumps(persisted, sort_keys=True)
     assert "SECRET" not in json.dumps(facts, sort_keys=True)
+
+
+def test_refresh_persists_richer_diagnostic_detectors_without_command_text(
+    tmp_path: Path,
+) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c005"
+    codex_home = tmp_path / ".codex"
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Diagnostic detectors",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "name": "functions.exec_command",
+                    "arguments": json.dumps(
+                        {"cmd": "python -m pytest tests/test_secret_customer.py"}
+                    ),
+                },
+            ),
+            _entry(
+                "event_msg",
+                {
+                    "type": "mcp_tool_call_end",
+                    "tool_name": "mcp__calendar__search_events",
+                    "server_name": "google-calendar",
+                    "arguments": {"calendar": "SECRET CALENDAR"},
+                },
+            ),
+            _entry("event_msg", {"type": "skill_started", "skill_name": "brooks-test"}),
+            _token_event(120, 120),
+        ],
+    )
+
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    facts = query_diagnostic_facts(db_path=db_path, limit=0, sort="fact", direction="asc")
+    tools_payload = build_diagnostics_facts_report(
+        db_path=db_path,
+        fact_group="tools",
+        view="tools",
+    ).payload
+
+    by_key = {(row["fact_type"], row["fact_name"]): row for row in facts}
+    tool_types = {row["fact_type"] for row in tools_payload["rows"]}
+    assert result.parsed_events == 1
+    assert {"command_family", "function", "mcp_server", "mcp_tool", "skill", "tool"} <= tool_types
+    assert tools_payload["filters"]["fact_group"] == "tools"
+    assert by_key[("command_family", "pytest")]["associated_total_tokens"] == 120
+    assert by_key[("function", "functions.exec_command")]["associated_total_tokens"] == 120
+    assert by_key[("mcp_tool", "mcp__calendar__search_events")][
+        "associated_total_tokens"
+    ] == 120
+    assert by_key[("mcp_server", "google-calendar")]["associated_total_tokens"] == 120
+    assert by_key[("skill", "brooks-test")]["associated_total_tokens"] == 120
+    serialized = json.dumps(facts, sort_keys=True)
+    assert "SECRET" not in serialized
+    assert "test_secret_customer" not in serialized
+    assert "python -m pytest" not in serialized
 
 
 def test_full_reparse_replaces_stale_diagnostic_facts(tmp_path: Path) -> None:
