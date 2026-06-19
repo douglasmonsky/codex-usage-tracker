@@ -15,6 +15,7 @@
       dateStartEl,
       defaultSortDirection,
       detailToggleEl,
+      diagnosticsViewEl,
       effortEl,
       exportCurrentRows,
       exportVisibleEl,
@@ -69,6 +70,7 @@
     insightsViewEl.addEventListener('click', () => setView('insights'));
     callsViewEl.addEventListener('click', () => setView('calls'));
     threadsViewEl.addEventListener('click', () => setView('threads'));
+    diagnosticsViewEl.addEventListener('click', () => setView('diagnostics'));
     clearPresetEl.addEventListener('click', clearPreset);
     copyViewLinkEl.addEventListener('click', copyCurrentViewLink);
     exportVisibleEl.addEventListener('click', exportCurrentRows);
@@ -115,6 +117,7 @@
       if (event.key === '1') setView('insights');
       if (event.key === '2') setView('calls');
       if (event.key === '3') setView('threads');
+      if (event.key === '4') setView('diagnostics');
     });
     window.addEventListener('scroll', updateToTopVisibility, { passive: true });
     toTopEl.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));

@@ -76,6 +76,7 @@ DASHBOARD_SCRIPT_ASSETS = (
     ("actions_script_src", "__ACTIONS_SCRIPT_SRC__", "dashboard_actions.js"),
     ("live_script_src", "__LIVE_SCRIPT_SRC__", "dashboard_live.js"),
     ("events_script_src", "__EVENTS_SCRIPT_SRC__", "dashboard_events.js"),
+    ("diagnostics_script_src", "__DIAGNOSTICS_SCRIPT_SRC__", "dashboard_diagnostics.js"),
     (
         "call_diagnostics_script_src",
         "__CALL_DIAGNOSTICS_SCRIPT_SRC__",
@@ -319,6 +320,7 @@ def render_dashboard_html(
     actions_script_src: str | None = None,
     live_script_src: str | None = None,
     events_script_src: str | None = None,
+    diagnostics_script_src: str | None = None,
     call_diagnostics_script_src: str | None = None,
     call_investigator_script_src: str | None = None,
     script_src: str | None = None,
@@ -345,6 +347,7 @@ def render_dashboard_html(
         "actions_script_src": actions_script_src,
         "live_script_src": live_script_src,
         "events_script_src": events_script_src,
+        "diagnostics_script_src": diagnostics_script_src,
         "call_diagnostics_script_src": call_diagnostics_script_src,
         "call_investigator_script_src": call_investigator_script_src,
         "script_src": script_src,

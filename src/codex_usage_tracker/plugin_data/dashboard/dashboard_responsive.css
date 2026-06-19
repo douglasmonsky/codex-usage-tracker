@@ -30,6 +30,8 @@
       .pager { width: auto; }
       .action-status { min-width: 0; }
       .preset-card { grid-template-columns: 1fr; }
+      .diagnostics-section-header { display: grid; }
+      .diagnostics-readout .diagnostics-note { grid-column: auto; }
       body[data-active-view="call"] .call-investigator {
         grid-template-columns: 1fr;
       }

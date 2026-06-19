@@ -87,6 +87,7 @@ RESOURCE_PATHS = [
     "dashboard/dashboard_events.js",
     "dashboard/dashboard_actions.js",
     "dashboard/dashboard_live.js",
+    "dashboard/dashboard_diagnostics.js",
     "dashboard/dashboard_call_diagnostics.js",
     "dashboard/dashboard.js",
     "dashboard/dashboard_state.js",

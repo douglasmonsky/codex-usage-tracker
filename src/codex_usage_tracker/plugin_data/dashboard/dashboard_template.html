@@ -101,6 +101,7 @@
             <button id="insightsView" type="button" aria-pressed="false" data-i18n="dashboard.view.insights">Insights</button>
             <button id="callsView" type="button" aria-pressed="true" data-i18n="dashboard.view.calls">Calls</button>
             <button id="threadsView" type="button" aria-pressed="false" data-i18n="dashboard.view.threads">Threads</button>
+            <button id="diagnosticsView" type="button" aria-pressed="false" data-i18n="dashboard.view.diagnostics">Diagnostics</button>
           </div>
           <div id="tableCaption" class="table-caption" data-i18n="caption.initial_calls">Showing individual model calls.</div>
           <div class="table-actions" aria-label="Current view actions" data-i18n-aria-label="aria.current_view_actions">
@@ -118,7 +119,8 @@
             <span id="rowLoadProgressBar"></span>
           </div>
         </div>
-        <table>
+        <div id="diagnosticsPanel" class="diagnostics-panel" hidden></div>
+        <table id="usageTable">
           <thead>
             <tr>
               <th data-sort-header="time"><button class="sort-header" type="button" data-sort-key="time"><span data-i18n="table.time">Time</span> <span class="sort-indicator" data-sort-indicator="time"></span></button></th>
@@ -169,6 +171,7 @@
   <script src="__ACTIONS_SCRIPT_SRC__"></script>
   <script src="__LIVE_SCRIPT_SRC__"></script>
   <script src="__EVENTS_SCRIPT_SRC__"></script>
+  <script src="__DIAGNOSTICS_SCRIPT_SRC__"></script>
   <script src="__CALL_DIAGNOSTICS_SCRIPT_SRC__"></script>
   <script src="__CALL_INVESTIGATOR_SCRIPT_SRC__"></script>
   <script src="__SCRIPT_SRC__"></script>

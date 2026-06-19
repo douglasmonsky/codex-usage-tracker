@@ -6,6 +6,7 @@
     'dashboard.view.insights': 'Insights',
     'dashboard.view.calls': 'Calls',
     'dashboard.view.threads': 'Threads',
+    'dashboard.view.diagnostics': 'Diagnostics',
     'dashboard.view.call': 'Call Investigator',
     'dashboard.model_calls': 'Model Calls',
     'dashboard.call_details': 'Call Details',
