@@ -46,6 +46,7 @@ CLI_HELP_SUBCOMMANDS = [
     "summary",
     "query",
     "recommendations",
+    "diagnostics",
     "session",
     "context",
     "dashboard",

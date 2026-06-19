@@ -46,6 +46,7 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
+| `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -224,6 +225,60 @@ Schema: `codex-usage-tracker-session-v1`
   "rows": []
 }
 ```
+
+## Diagnostics
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics summary --json
+codex-usage-tracker diagnostics facts --sort uncached --json
+codex-usage-tracker diagnostics fact-calls --fact-type compaction --fact-name post_compaction --json
+```
+
+Dashboard server API:
+
+- `/api/diagnostics/summary`
+- `/api/diagnostics/facts`
+- `/api/diagnostics/fact-calls?fact_type=compaction&fact_name=post_compaction`
+- `/api/diagnostics/compactions`
+- `/api/diagnostics/tools`
+
+Schema: `codex-usage-tracker-diagnostics-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostics-v1",
+  "view": "facts",
+  "filters": {
+    "since": null,
+    "until": null,
+    "model": null,
+    "effort": null,
+    "thread": null,
+    "min_tokens": null,
+    "fact_type": null,
+    "fact_name": null,
+    "fact_category": null,
+    "include_archived": false,
+    "sort": "uncached",
+    "direction": "desc",
+    "limit": 50,
+    "offset": 0,
+    "privacy_mode": "normal"
+  },
+  "row_count": 1,
+  "total_matched_rows": 1,
+  "truncated": false,
+  "raw_context_included": false,
+  "rows": [],
+  "notes": [
+    "Associated token totals are not additive when one call has multiple diagnostic facts."
+  ]
+}
+```
+
+Diagnostics payloads report aggregate structured facts such as compaction, tool/function activity, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
 
 ## Pricing Coverage
 

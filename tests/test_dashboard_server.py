@@ -460,6 +460,18 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         )
         summary_payload = _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
         recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
+        diagnostics_summary_payload = _read_json(f"{base_url}/api/diagnostics/summary?limit=5")
+        diagnostics_facts_payload = _read_json(f"{base_url}/api/diagnostics/facts?limit=5")
+        diagnostics_compactions_payload = _read_json(
+            f"{base_url}/api/diagnostics/compactions?limit=5"
+        )
+        diagnostics_tools_payload = _read_json(f"{base_url}/api/diagnostics/tools?limit=5")
+        diagnostics_fact_calls_payload = _read_json(
+            f"{base_url}/api/diagnostics/fact-calls"
+            "?fact_type=compaction&fact_name=post_compaction&limit=5"
+        )
+        invalid_diagnostics = _http_error_json(f"{base_url}/api/diagnostics/facts?sort=bad")
+        missing_fact_calls = _http_error_json(f"{base_url}/api/diagnostics/fact-calls")
         invalid_sort = _http_error_json(f"{base_url}/api/calls?sort=not-a-sort")
     finally:
         server.shutdown()
@@ -504,6 +516,29 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert summary_payload["group_by"] == "model"
     assert recommendations_payload["schema"] == "codex-usage-tracker-recommendations-v1"
     _assert_contract(recommendations_payload)
+    assert diagnostics_summary_payload["schema"] == "codex-usage-tracker-diagnostics-v1"
+    _assert_contract(diagnostics_summary_payload)
+    assert diagnostics_summary_payload["view"] == "summary"
+    assert diagnostics_summary_payload["raw_context_included"] is False
+    assert diagnostics_facts_payload["schema"] == "codex-usage-tracker-diagnostics-v1"
+    _assert_contract(diagnostics_facts_payload)
+    assert diagnostics_facts_payload["view"] == "facts"
+    assert {row["fact_name"] for row in diagnostics_facts_payload["rows"]} >= {
+        "post_compaction"
+    }
+    assert diagnostics_compactions_payload["filters"]["fact_type"] == "compaction"
+    _assert_contract(diagnostics_compactions_payload)
+    assert {row["fact_type"] for row in diagnostics_compactions_payload["rows"]} == {
+        "compaction"
+    }
+    assert diagnostics_tools_payload["filters"]["fact_type"] == "tool"
+    _assert_contract(diagnostics_tools_payload)
+    assert diagnostics_fact_calls_payload["view"] == "fact-calls"
+    _assert_contract(diagnostics_fact_calls_payload)
+    assert diagnostics_fact_calls_payload["filters"]["fact_name"] == "post_compaction"
+    assert diagnostics_fact_calls_payload["rows"][0]["fact_name"] == "post_compaction"
+    assert invalid_diagnostics["status"] == 400
+    assert missing_fact_calls["status"] == 400
     assert invalid_sort["status"] == 400
     assert "sort must be one of" in invalid_sort["payload"]["error"]
 
@@ -516,6 +551,11 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
             thread_calls_payload,
             summary_payload,
             recommendations_payload,
+            diagnostics_summary_payload,
+            diagnostics_facts_payload,
+            diagnostics_compactions_payload,
+            diagnostics_tools_payload,
+            diagnostics_fact_calls_payload,
         ]
     )
     assert "SECRET RAW PROMPT" not in combined_payload
