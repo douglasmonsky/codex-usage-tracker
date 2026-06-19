@@ -234,9 +234,11 @@
         window.location.reload();
         return;
       }
-      if (['call', 'diagnostics'].includes(activeView()) && !manual) return;
-      if (refreshInFlight) return;
       const refreshOptions = options || {};
+      const allowDiagnosticsBootstrap = Boolean(refreshOptions.allowDiagnosticsBootstrap);
+      if (activeView() === 'call' && !manual) return;
+      if (activeView() === 'diagnostics' && !manual && !allowDiagnosticsBootstrap) return;
+      if (refreshInFlight) return;
       const refreshLogs = refreshOptions.refreshLogs === undefined ? manual : Boolean(refreshOptions.refreshLogs);
       const resetRows = refreshOptions.resetRows !== undefined
         ? Boolean(refreshOptions.resetRows)

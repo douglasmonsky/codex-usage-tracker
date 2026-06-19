@@ -1523,6 +1523,11 @@
       updateLiveStatus('badge.live', `${t('dashboard.view.call')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
     } else if (activeView === 'diagnostics') {
       updateLiveStatus('badge.live', `${t('dashboard.view.diagnostics')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      refreshDashboardData(false, {
+        refreshLogs: false,
+        resetRows: true,
+        allowDiagnosticsBootstrap: true,
+      });
     } else {
       updateLiveStatus('badge.live', `${tf('live.every', { seconds: liveRefreshIntervalMs / 1000 })}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       scheduleAutoRefresh();
