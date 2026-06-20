@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.8.0 - 2026-06-20
+
+- Add an aggregate Diagnostics dashboard for inspecting diagnostic facts, associated calls, token totals, and on-demand evidence without persisting raw transcript text.
+- Add diagnostic fact extraction, reporting APIs, dashboard drilldowns, sortable associated-call tables, and load-more controls for larger diagnostic result sets.
+- Add source byte offsets and context seek diagnostics so on-demand evidence loading can seek when offsets are valid and fall back safely when they are missing or stale.
+- Harden dashboard startup so visiting Diagnostics before other views load no longer prevents Calls, Threads, or Insights from hydrating.
+- Make Live refresh use the cached/indexed append path and fetch only newly visible leading rows instead of running the full manual refresh reset cycle.
+
 ## 0.7.0 - 2026-06-18
 
 - Parse latest observed Codex usage snapshots from local rate-limit and token-count log events without persisting raw transcript text.
