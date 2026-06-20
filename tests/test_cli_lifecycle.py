@@ -418,6 +418,24 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "--refresh",
         "--json",
     )
+    file_reads_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "file-reads",
+        "--refresh",
+        "--json",
+    )
+    read_productivity_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "read-productivity",
+        "--refresh",
+        "--json",
+    )
     fact_calls = _run_cli(
         tmp_path,
         "--db",
@@ -442,6 +460,8 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     overview_refresh_payload = json.loads(overview_refresh.stdout)
     tool_output_refresh_payload = json.loads(tool_output_refresh.stdout)
     commands_refresh_payload = json.loads(commands_refresh.stdout)
+    file_reads_refresh_payload = json.loads(file_reads_refresh.stdout)
+    read_productivity_refresh_payload = json.loads(read_productivity_refresh.stdout)
     fact_calls_payload = json.loads(fact_calls.stdout)
     for payload in (
         summary_payload,
@@ -452,6 +472,8 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         overview_refresh_payload,
         tool_output_refresh_payload,
         commands_refresh_payload,
+        file_reads_refresh_payload,
+        read_productivity_refresh_payload,
         fact_calls_payload,
     ):
         _assert_contract(payload)
@@ -499,6 +521,16 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "child": "status",
         "count": 1,
     }
+    assert (
+        file_reads_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-file-reads-v1"
+    )
+    assert file_reads_refresh_payload["summary"]["read_events"] == 0
+    assert (
+        read_productivity_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-read-productivity-v1"
+    )
+    assert read_productivity_refresh_payload["summary"]["read_events_modified_later"] == 0
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
     assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")

@@ -50,6 +50,8 @@ Tracked schema ids:
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
 | `codex-usage-tracker-diagnostic-commands-v1` | CLI `diagnostics commands --json`, dashboard server `/api/diagnostics/commands` |
+| `codex-usage-tracker-diagnostic-file-reads-v1` | CLI `diagnostics file-reads --json`, dashboard server `/api/diagnostics/file-reads` |
+| `codex-usage-tracker-diagnostic-read-productivity-v1` | CLI `diagnostics read-productivity --json`, dashboard server `/api/diagnostics/read-productivity` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -408,6 +410,90 @@ Schema: `codex-usage-tracker-diagnostic-commands-v1`
 ```
 
 The commands snapshot keeps only command roots and safe one-level child labels such as `status`, `diff`, or `-m:pytest`.
+
+## Diagnostic File Reads Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics file-reads --json
+codex-usage-tracker diagnostics file-reads --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/file-reads`
+- `POST /api/diagnostics/file-reads/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-file-reads-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-file-reads-v1",
+  "section": "file-reads",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "read_commands": 1,
+    "read_events": 1,
+    "unique_paths_read": 1,
+    "read_events_with_output_count": 1,
+    "read_events_missing_output_count": 0,
+    "allocated_output_token_sum": 42
+  },
+  "by_reader": [],
+  "top_paths": [],
+  "largest_read_commands": [],
+  "path_privacy": {},
+  "notes": []
+}
+```
+
+The file-reads snapshot classifies common shell readers such as `cat`, `sed`, `nl`, `rg`, and `find`. Path labels are basename-only with a short irreversible hash; raw commands, command arguments, absolute paths, file contents, and tool output are not stored.
+
+## Diagnostic Read Productivity Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics read-productivity --json
+codex-usage-tracker diagnostics read-productivity --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/read-productivity`
+- `POST /api/diagnostics/read-productivity/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-read-productivity-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-read-productivity-v1",
+  "section": "read-productivity",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "read_events": 1,
+    "read_events_modified_later": 1,
+    "read_events_modified_later_pct": 1.0,
+    "unique_paths_read": 1,
+    "unique_paths_modified_later": 1,
+    "unique_path_modified_later_pct": 1.0,
+    "correlation_note": "Read-to-modify counts are temporal correlations."
+  },
+  "by_reader": [],
+  "top_modified_paths": [],
+  "path_privacy": {},
+  "notes": []
+}
+```
+
+Read productivity is a temporal correlation, not causation. A read is counted as modified later only when the same privacy-preserving path key appears in a later structured patch event in the same source log.
 
 ## Pricing Coverage
 

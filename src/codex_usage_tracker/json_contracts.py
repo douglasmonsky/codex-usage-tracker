@@ -195,6 +195,35 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "notes": list,
         }
     },
+    "codex-usage-tracker-diagnostic-file-reads-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "by_reader": list,
+            "top_paths": list,
+            "largest_read_commands": list,
+            "path_privacy": dict,
+            "notes": list,
+        }
+    },
+    "codex-usage-tracker-diagnostic-read-productivity-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "by_reader": list,
+            "top_modified_paths": list,
+            "path_privacy": dict,
+            "notes": list,
+        }
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),

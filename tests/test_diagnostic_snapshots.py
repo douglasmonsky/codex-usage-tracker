@@ -15,7 +15,9 @@ from store_dashboard_helpers import (
 from codex_usage_tracker.diagnostic_snapshots import (
     DIAGNOSTIC_OVERVIEW_SECTION,
     build_diagnostic_commands_report,
+    build_diagnostic_file_reads_report,
     build_diagnostic_overview_report,
+    build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
 )
 from codex_usage_tracker.store import (
@@ -219,6 +221,136 @@ def test_tool_output_and_command_snapshots_use_safe_aggregate_labels(
     assert "SECRET" not in serialized
     assert "test_private.py" not in serialized
     assert "/tmp/private-diagnostics" not in serialized
+
+
+def test_file_read_snapshots_allocate_tokens_and_correlate_later_modifications(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry(
+                "turn_context",
+                {
+                    "turn_id": "turn-a",
+                    "model": "gpt-5.5",
+                    "cwd": "/tmp/private-diagnostics",
+                },
+            ),
+            _function_call("call-cat", "cat src/app.py /tmp/private/readme.md"),
+            _function_output("call-cat", _terminal_output(90)),
+            _function_call("call-sed", "sed -n '1,120p' src/app.py"),
+            _function_output("call-sed", _terminal_output(30)),
+            _function_call("call-nl", "nl -ba src/app.py"),
+            _function_output("call-nl", _terminal_output(10)),
+            _function_call("call-rg", "rg -n SECRET_PATTERN src tests"),
+            _function_output("call-rg", _terminal_output(80)),
+            _function_call("call-find", "find src -name '*.py'"),
+            _function_output("call-find", _terminal_output(20)),
+            _function_call("call-missing", "cat docs/notes.md"),
+            _function_output("call-missing", "plain read output SECRET_OUTPUT"),
+            _entry(
+                "event_msg",
+                {
+                    "type": "patch_apply_end",
+                    "changed_paths": ["src/app.py", "/tmp/private/readme.md"],
+                    "patch": "SECRET PATCH TEXT",
+                },
+            ),
+            _token_event(100, 100),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    missing = build_diagnostic_file_reads_report(db_path=db_path).payload
+    file_reads = build_diagnostic_file_reads_report(db_path=db_path, refresh=True).payload
+    read_productivity = build_diagnostic_read_productivity_report(
+        db_path=db_path,
+        refresh=True,
+    ).payload
+
+    _assert_contract(missing)
+    _assert_contract(file_reads)
+    _assert_contract(read_productivity)
+    assert missing["status"] == "missing"
+    assert file_reads["status"] == "ready"
+    assert file_reads["summary"]["read_commands"] == 6
+    assert file_reads["summary"]["read_events"] == 8
+    assert file_reads["summary"]["unique_paths_read"] == 5
+    assert file_reads["summary"]["read_events_with_output_count"] == 7
+    assert file_reads["summary"]["read_events_missing_output_count"] == 1
+    assert file_reads["summary"]["allocated_output_token_sum"] == 230
+
+    by_reader = {row["reader"]: row for row in file_reads["by_reader"]}
+    assert by_reader["direct_file_read:cat"]["read_events"] == 3
+    assert by_reader["direct_file_read:cat"]["events_missing_output_count"] == 1
+    assert by_reader["direct_file_read:cat"]["allocated_output_token_sum"] == 90
+    assert by_reader["search_path_scan:rg"]["allocated_output_token_sum"] == 80
+    assert by_reader["search_path_scan:find"]["allocated_output_token_sum"] == 20
+
+    paths = {row["path_label"]: row for row in file_reads["top_paths"]}
+    assert paths["app.py"]["read_events"] == 3
+    assert paths["app.py"]["allocated_output_token_sum"] == 85
+    assert paths["readme.md"]["allocated_output_token_sum"] == 45
+    assert paths["src"]["allocated_output_token_sum"] == 60
+    assert paths["tests"]["allocated_output_token_sum"] == 40
+
+    assert file_reads["largest_read_commands"][0]["root"] == "cat"
+    assert file_reads["largest_read_commands"][0]["original_token_count"] == 90
+
+    assert read_productivity["summary"]["read_events"] == 8
+    assert read_productivity["summary"]["read_events_modified_later"] == 4
+    assert read_productivity["summary"]["read_events_modified_later_pct"] == 0.5
+    assert read_productivity["summary"]["unique_paths_modified_later"] == 2
+    productivity_by_reader = {row["reader"]: row for row in read_productivity["by_reader"]}
+    assert productivity_by_reader["direct_file_read:cat"]["read_events_modified_later"] == 2
+    assert productivity_by_reader["direct_file_read:sed"]["read_events_modified_later"] == 1
+    assert productivity_by_reader["direct_file_read:nl"]["read_events_modified_later"] == 1
+    modified_paths = {row["path_label"]: row for row in read_productivity["top_modified_paths"]}
+    assert modified_paths["app.py"]["read_events_modified_later"] == 3
+    assert modified_paths["readme.md"]["read_events_modified_later"] == 1
+    assert "temporal correlations" in read_productivity["summary"]["correlation_note"]
+
+    serialized = json.dumps([file_reads, read_productivity], sort_keys=True)
+    assert "SECRET" not in serialized
+    assert "src/app.py" not in serialized
+    assert "/tmp/private" not in serialized
+    assert "1,120p" not in serialized
+    assert "SECRET PATCH TEXT" not in serialized
+
+
+def _function_call(call_id: str, command: str) -> dict[str, object]:
+    return _entry(
+        "response_item",
+        {
+            "type": "function_call",
+            "call_id": call_id,
+            "name": "exec_command",
+            "arguments": json.dumps({"cmd": command}),
+        },
+    )
+
+
+def _function_output(call_id: str, output: str) -> dict[str, object]:
+    return _entry(
+        "response_item",
+        {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": output,
+        },
+    )
 
 
 def _terminal_output(count: int) -> str:

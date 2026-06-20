@@ -363,6 +363,30 @@ def _add_diagnostics_parser(
     )
     commands.add_argument("--json", action="store_true", dest="as_json")
 
+    file_reads = diagnostic_subparsers.add_parser(
+        "file-reads",
+        help="Show the on-demand aggregate file-read snapshot",
+    )
+    file_reads.add_argument("--include-archived", action="store_true")
+    file_reads.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the file-read snapshot before reading it.",
+    )
+    file_reads.add_argument("--json", action="store_true", dest="as_json")
+
+    read_productivity = diagnostic_subparsers.add_parser(
+        "read-productivity",
+        help="Show temporal read-to-modify diagnostic correlations",
+    )
+    read_productivity.add_argument("--include-archived", action="store_true")
+    read_productivity.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the read-productivity snapshot before reading it.",
+    )
+    read_productivity.add_argument("--json", action="store_true", dest="as_json")
+
     fact_calls = diagnostic_subparsers.add_parser(
         "fact-calls",
         help="List calls associated with one diagnostic fact",

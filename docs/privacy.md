@@ -35,6 +35,8 @@ Call-origin metadata is heuristic and confidence-labeled. It stores categories s
 
 Diagnostic facts follow the same aggregate-only rule. They can store safe structured labels such as `patch_applied`, `function_call_output`, `post_compaction`, MCP tool/server labels, structured skill labels, and command families such as `pytest`, `git`, or `unknown_command`, along with event counts and source line ranges. Command text may be classified in memory during parsing, but it is not persisted. Diagnostic facts do not store tool arguments, command text, command output, patch text, prompt or assistant text, file contents, raw JSONL fragments, or raw context evidence.
 
+On-demand diagnostic snapshots follow the same boundary. File-read snapshots classify common read commands and path scans, but persist only counters, reader families, basename-only path labels, and short irreversible path hashes. They do not persist raw absolute paths, raw command strings, command arguments, file contents, tool output, or patch text. Read-productivity snapshots report only temporal read-to-modify correlations for matching path keys in the same source log; they do not claim causation.
+
 ## On-Demand Context
 
 `usage_call_context`, `codex-usage-tracker context`, and the `serve-dashboard` context endpoint read a single source JSONL file only when explicitly requested. Returned context is redacted for common secret patterns and capped in size by default for CLI/MCP requests. The call investigator uses the same endpoint at runtime and requests quick redacted evidence for the selected call when the local context API is enabled; that still does not persist raw context into SQLite, CSV, support bundles, or generated dashboard HTML.
