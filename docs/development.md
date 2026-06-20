@@ -182,6 +182,13 @@ codex-usage-tracker summary --preset by-subagent-role
 codex-usage-tracker expensive --limit 5
 ```
 
+For browser-level dashboard smoke after starting a live dashboard server:
+
+```bash
+npm install
+DASHBOARD_BASE_URL=http://127.0.0.1:8898 npm run smoke:dashboard:diagnostics
+```
+
 ## Dashboard Screenshots
 
 Dashboard screenshots in `docs/assets/` and `src/codex_usage_tracker/plugin_data/docs/assets/` must be generated from synthetic aggregate fixture data only.

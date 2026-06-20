@@ -230,6 +230,32 @@
       display: grid;
       gap: 14px;
     }
+    .diagnostics-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .diagnostics-toolbar > div {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+    .diagnostics-toolbar strong {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 780;
+    }
+    .diagnostics-toolbar span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 680;
+      line-height: 1.35;
+    }
     .diagnostics-readout {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -257,6 +283,14 @@
     .diagnostics-readout .diagnostics-note {
       grid-column: span 2;
       color: #475569;
+    }
+    .diagnostics-snapshot-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .diagnostics-snapshot-panel {
+      align-content: start;
     }
     .diagnostics-section,
     .diagnostics-drilldown {
@@ -322,6 +356,12 @@
     .diagnostics-table {
       min-width: 1120px;
       table-layout: fixed;
+    }
+    .diagnostics-mini-table {
+      min-width: 520px;
+    }
+    .diagnostics-mini-table-wrap + .diagnostics-mini-table-wrap {
+      margin-top: 10px;
     }
     .diagnostics-facts-table {
       min-width: 1320px;

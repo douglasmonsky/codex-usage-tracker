@@ -55,6 +55,12 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_diagnostics_js = (asset_dir / "dashboard_diagnostics.js").read_text(
         encoding="utf-8"
     )
+    dashboard_diagnostics_facts_js = (
+        asset_dir / "dashboard_diagnostics_facts.js"
+    ).read_text(encoding="utf-8")
+    dashboard_diagnostics_snapshots_js = (
+        asset_dir / "dashboard_diagnostics_snapshots.js"
+    ).read_text(encoding="utf-8")
     dashboard_call_diagnostics_js = (
         asset_dir / "dashboard_call_diagnostics.js"
     ).read_text(encoding="utf-8")
@@ -94,6 +100,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         dashboard_live_js,
         dashboard_events_js,
         dashboard_diagnostics_js,
+        dashboard_diagnostics_facts_js,
+        dashboard_diagnostics_snapshots_js,
         dashboard_call_diagnostics_js,
         dashboard_call_js,
         dashboard_js,
@@ -119,6 +127,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in dashboard_live_js
     assert "SECRET RAW PROMPT" not in dashboard_events_js
     assert "SECRET RAW PROMPT" not in dashboard_diagnostics_js
+    assert "SECRET RAW PROMPT" not in dashboard_diagnostics_facts_js
+    assert "SECRET RAW PROMPT" not in dashboard_diagnostics_snapshots_js
     assert "SECRET RAW PROMPT" not in dashboard_call_diagnostics_js
     assert "SECRET RAW PROMPT" not in dashboard_call_js
     assert "SECRET RAW PROMPT" not in dashboard_css
@@ -139,6 +149,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_live_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_events_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_diagnostics_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_diagnostics_facts_js
+    assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_diagnostics_snapshots_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_diagnostics_js
     assert "COMPACTED REPLACEMENT SUMMARY" not in dashboard_call_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard
@@ -157,6 +169,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_live_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_events_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_diagnostics_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_diagnostics_facts_js
+    assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_diagnostics_snapshots_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_diagnostics_js
     assert "EVENT MSG COMPACTION SUMMARY" not in dashboard_call_js
     for stylesheet in dashboard_stylesheets:
@@ -177,6 +191,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'src="codex-usage-tracker-assets/dashboard_actions.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_live.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_events.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_diagnostics_snapshots.js?v=' in dashboard
+    assert 'src="codex-usage-tracker-assets/dashboard_diagnostics_facts.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_diagnostics.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_call_diagnostics.js?v=' in dashboard
     assert 'src="codex-usage-tracker-assets/dashboard_call_investigator.js?v=' in dashboard
@@ -197,6 +213,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "CodexUsageDashboardActions" in dashboard_actions_js
     assert "CodexUsageDashboardLive" in dashboard_live_js
     assert "CodexUsageDashboardEvents" in dashboard_events_js
+    assert "CodexUsageDashboardDiagnosticSnapshots" in dashboard_diagnostics_snapshots_js
+    assert "CodexUsageDashboardDiagnosticFacts" in dashboard_diagnostics_facts_js
     assert "CodexUsageDashboardDiagnostics" in dashboard_diagnostics_js
     assert "CodexUsageCallDiagnostics" in dashboard_call_diagnostics_js
     assert "CodexUsageCallInvestigator" in dashboard_call_js
@@ -282,22 +300,41 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/diagnostics/tools" in dashboard_diagnostics_js
     assert "/api/diagnostics/compactions" in dashboard_diagnostics_js
     assert "/api/diagnostics/fact-calls" in dashboard_diagnostics_js
+    assert "dashboard_diagnostics_snapshots.js" in dashboard
+    assert "dashboard_diagnostics_facts.js" in dashboard
+    assert "/api/diagnostics/overview" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/tool-output/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/commands/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/file-reads/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/read-productivity/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/concentration/refresh" in dashboard_diagnostics_snapshots_js
+    assert "Refresh diagnostics" in dashboard_diagnostics_snapshots_js
+    assert "data-diagnostics-refresh" in dashboard_diagnostics_js
+    assert "Live API required for diagnostics refresh" in dashboard_diagnostics_js
+    assert "Overview" in dashboard_diagnostics_snapshots_js
+    assert "Tool Output" in dashboard_diagnostics_snapshots_js
+    assert "File Reads" in dashboard_diagnostics_snapshots_js
+    assert "Read Productivity" in dashboard_diagnostics_snapshots_js
+    assert "Concentration" in dashboard_diagnostics_snapshots_js
     assert "Associated token totals" in dashboard_diagnostics_js
     assert "Raw context remains on-demand" in dashboard_diagnostics_js
     assert "rowInvestigatorLink" in dashboard_diagnostics_js
-    assert "diagnostics-drilldown-row" in dashboard_diagnostics_js
-    assert 'td colspan="11"' in dashboard_diagnostics_js
-    assert "associated_cached_input_tokens" in dashboard_diagnostics_js
-    assert "row.cached_input_tokens" in dashboard_diagnostics_js
-    assert "Occurrences: count of matching diagnostic fact events" in dashboard_diagnostics_js
-    assert "Associated total tokens for those calls" in dashboard_diagnostics_js
-    assert "Average cache ratio across associated calls" in dashboard_diagnostics_js
-    assert "data-diagnostics-fact-sort-key" in dashboard_diagnostics_js
-    assert "data-diagnostics-fact-sort-active" in dashboard_diagnostics_js
+    assert "diagnostics-drilldown-row" in dashboard_diagnostics_facts_js
+    assert 'td colspan="11"' in dashboard_diagnostics_facts_js
+    assert "associated_cached_input_tokens" in dashboard_diagnostics_facts_js
+    assert "row.cached_input_tokens" in dashboard_diagnostics_facts_js
+    assert "Occurrences: count of matching diagnostic fact events" in dashboard_diagnostics_facts_js
+    assert "Associated total tokens for those calls" in dashboard_diagnostics_facts_js
+    assert "Average cache ratio across associated calls" in dashboard_diagnostics_facts_js
+    assert "data-diagnostics-fact-sort-key" in dashboard_diagnostics_facts_js
+    assert "data-diagnostics-fact-sort-active" in dashboard_diagnostics_facts_js
     assert "sortFactRows" in dashboard_diagnostics_js
-    assert "diagnosticFactHeader" in dashboard_diagnostics_js
+    assert "diagnosticFactHeader" in dashboard_diagnostics_facts_js
     assert "diagnostics-facts-table" in dashboard_surface
     assert "diagnostics-fact-cell" in dashboard_surface
+    assert "diagnostics-snapshot-grid" in dashboard_css
+    assert "diagnostics-toolbar" in dashboard_css
+    assert "diagnostics-mini-table" in dashboard_css
     assert "diagnostics-facts-table th:first-child" in dashboard_css
     assert "td.diagnostics-fact-cell" in dashboard_css
     assert "captureScrollAnchor" in dashboard_diagnostics_js
@@ -306,7 +343,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "offset: String(offset)" in dashboard_diagnostics_js
     assert "mergeFactCallPayload" in dashboard_diagnostics_js
     assert "data-diagnostics-call-sort-key" in dashboard_diagnostics_js
-    assert "data-diagnostics-call-sort-active" in dashboard_diagnostics_js
+    assert "data-diagnostics-call-sort-active" in dashboard_diagnostics_facts_js
     assert "sortFactCalls" in dashboard_diagnostics_js
     assert "defaultFactCallSortDirection" in dashboard_diagnostics_js
     assert "sort: sortState.sort" in dashboard_diagnostics_js
@@ -501,6 +538,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert (asset_dir / "dashboard_details.js").exists()
     assert (asset_dir / "dashboard_insights.js").exists()
     assert (asset_dir / "dashboard_tables.js").exists()
+    assert (asset_dir / "dashboard_diagnostics_snapshots.js").exists()
     assert (asset_dir / "dashboard_filters.js").exists()
     assert (asset_dir / "dashboard_state.js").exists()
     assert (asset_dir / "dashboard_payload_cache.js").exists()

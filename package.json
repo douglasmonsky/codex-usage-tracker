@@ -1,0 +1,11 @@
+{
+  "name": "codex-usage-tracker-dashboard-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke:dashboard:diagnostics": "playwright test tests/playwright/dashboard-diagnostics.spec.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0"
+  }
+}

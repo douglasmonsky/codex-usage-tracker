@@ -1,0 +1,399 @@
+"""Safe event parsing helpers for diagnostic snapshot reports."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import shlex
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+SAFE_LABEL_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")
+SAFE_PATH_LABEL_RE = re.compile(r"^[A-Za-z0-9_.:@*+-]{1,80}$")
+SENSITIVE_LABEL_PREFIXES = ("sk-", "sk_", "ghp_", "github_pat_", "xox")
+SHELL_TOOL_NAMES = {
+    "bash",
+    "exec_command",
+    "functions.exec_command",
+    "run_command",
+    "shell",
+    "terminal",
+    "write_stdin",
+}
+READ_COMMAND_ROOTS = {"cat", "find", "grep", "head", "nl", "rg", "sed", "strings", "tail", "wc"}
+SEARCH_READ_ROOTS = {"find", "rg"}
+READ_PRODUCTIVITY_NOTE = (
+    "Read-to-modify counts are temporal correlations: a read is counted when the same "
+    "privacy-preserving path key is modified later in the same source log."
+)
+ORIGINAL_OUTPUT_RE = re.compile(
+    r"^Chunk ID: (?P<chunk>[^\n]+)\n"
+    r"Wall time: (?P<wall>[^\n]+)\n"
+    r"(?:(?P<status>Process exited with code -?\d+|Process running with session ID \d+)\n)?"
+    r"Original token count: (?P<count>\d+)\n",
+    re.S,
+)
+
+
+def shell_command_from_payload(payload: dict[str, Any], *, function_name: str) -> str | None:
+    if not is_shell_tool(function_name):
+        return None
+    arguments = payload.get("arguments")
+    if isinstance(arguments, str):
+        try:
+            loaded = json.loads(arguments)
+        except json.JSONDecodeError:
+            loaded = {}
+        if isinstance(loaded, dict):
+            command = loaded.get("cmd") or loaded.get("command")
+            if isinstance(command, str):
+                return command
+    if isinstance(arguments, dict):
+        command = arguments.get("cmd") or arguments.get("command")
+        if isinstance(command, str):
+            return command
+    command = payload.get("cmd") or payload.get("command")
+    return command if isinstance(command, str) else None
+
+
+def is_shell_tool(function_name: str) -> bool:
+    lowered = function_name.lower()
+    suffix = lowered.rsplit(".", 1)[-1].rsplit("__", 1)[-1]
+    return lowered in SHELL_TOOL_NAMES or suffix in SHELL_TOOL_NAMES
+
+
+def command_root_and_child(command: str) -> tuple[str, str]:
+    tokens = _strip_command_wrappers(_command_tokens(command))
+    if not tokens:
+        return "unknown_command", "unknown"
+    root = _command_root(tokens)
+    return root, _command_child(root, tokens)
+
+
+def read_path_refs_from_command(command: str, *, root: str) -> list[dict[str, str]]:
+    if root not in READ_COMMAND_ROOTS:
+        return []
+    tokens = _strip_command_wrappers(_command_tokens(command))
+    if not tokens:
+        return []
+    path_tokens = _read_path_tokens(root=root, tokens=tokens)
+    refs: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for token in path_tokens:
+        path_ref = _path_ref_from_token(token)
+        if path_ref is None or path_ref["path_key"] in seen:
+            continue
+        seen.add(path_ref["path_key"])
+        refs.append(path_ref)
+    return refs
+
+
+def read_reader(root: str) -> str:
+    if root in SEARCH_READ_ROOTS:
+        return f"search_path_scan:{root}"
+    return f"direct_file_read:{root}"
+
+
+def modified_path_refs(payload: dict[str, Any]) -> list[dict[str, str]]:
+    if payload.get("type") != "patch_apply_end":
+        return []
+    paths: list[str] = []
+    for key in ("changed_paths", "paths", "files", "modified_paths"):
+        paths.extend(_path_values(payload.get(key)))
+    paths.extend(_path_values(payload.get("changes")))
+    refs: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for path in paths:
+        path_ref = _path_ref_from_token(path)
+        if path_ref is None or path_ref["path_key"] in seen:
+            continue
+        seen.add(path_ref["path_key"])
+        refs.append(path_ref)
+    return refs
+
+
+def path_privacy_metadata() -> dict[str, str]:
+    return {
+        "label_policy": "basename_only",
+        "hash_policy": "sha256_12",
+        "normal": "basename_only_with_hash",
+        "redacted": "basename_only_with_hash",
+        "strict": "hash_available_for_hiding_labels",
+    }
+
+
+def original_output_count(output: object) -> int | None:
+    if not isinstance(output, str):
+        return None
+    match = ORIGINAL_OUTPUT_RE.match(output)
+    if not match:
+        return None
+    return int(match.group("count"))
+
+
+def optional_str(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def safe_label(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    lowered = stripped.lower()
+    if lowered.startswith(SENSITIVE_LABEL_PREFIXES):
+        return None
+    if "/" in stripped or "\\" in stripped:
+        return None
+    return lowered if SAFE_LABEL_RE.fullmatch(stripped) else None
+
+
+def simple_rows(
+    counter: Counter[str],
+    *,
+    key_name: str = "name",
+) -> list[dict[str, Any]]:
+    return [
+        {key_name: name, "count": int(count)}
+        for name, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+
+def unique_path_rows(paths: list[dict[str, str]]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for path in paths:
+        path_hash = path["path_hash"]
+        if path_hash in seen:
+            continue
+        seen.add(path_hash)
+        rows.append({"path_label": path["path_label"], "path_hash": path_hash})
+    return rows[:25]
+
+
+def allocate_token_count(count: int, bucket_count: int) -> list[int]:
+    if bucket_count <= 0:
+        return []
+    base = count // bucket_count
+    remainder = count % bucket_count
+    return [base + (1 if index < remainder else 0) for index in range(bucket_count)]
+
+
+def int_value(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str) and value:
+        return int(value)
+    return 0
+
+
+def ratio(numerator: int, denominator: int) -> float:
+    return numerator / denominator if denominator else 0.0
+
+
+def _read_path_tokens(*, root: str, tokens: list[str]) -> list[str]:
+    args = tokens[1:]
+    if root == "find":
+        return _find_path_tokens(args)
+    if root == "rg":
+        return _ripgrep_path_tokens(args)
+    if root == "grep":
+        operands = _non_option_operands(args, root=root)
+        return operands[1:] if len(operands) > 1 else []
+    if root == "sed":
+        operands = _non_option_operands(args, root=root)
+        return operands[1:] if len(operands) > 1 else []
+    return _non_option_operands(args, root=root)
+
+
+def _find_path_tokens(args: list[str]) -> list[str]:
+    paths: list[str] = []
+    for token in args:
+        if _is_shell_separator(token):
+            break
+        if token == "--":
+            continue
+        if token.startswith("-") or token in {"!", "(", ")"}:
+            break
+        paths.append(token)
+    return paths or ["."]
+
+
+def _ripgrep_path_tokens(args: list[str]) -> list[str]:
+    operands = _non_option_operands(args, root="rg")
+    if any(token == "--files" or token.startswith("--files=") for token in args):
+        return operands or ["."]
+    return operands[1:] if len(operands) > 1 else []
+
+
+def _non_option_operands(args: list[str], *, root: str) -> list[str]:
+    option_args = _option_args_for_root(root)
+    operands: list[str] = []
+    skip_next = False
+    passthrough = False
+    for token in args:
+        if skip_next:
+            skip_next = False
+            continue
+        if _is_shell_separator(token):
+            break
+        if token in {">", ">>", "<", "2>", "2>>"}:
+            break
+        if passthrough:
+            operands.append(token)
+            continue
+        if token == "--":
+            passthrough = True
+            continue
+        if token.startswith("-"):
+            option_name = token.split("=", 1)[0]
+            if option_name in option_args and "=" not in token:
+                skip_next = True
+            continue
+        operands.append(token)
+    return operands
+
+
+def _option_args_for_root(root: str) -> set[str]:
+    return {
+        "grep": {
+            "-A",
+            "-B",
+            "-C",
+            "-e",
+            "-f",
+            "-m",
+            "--after-context",
+            "--before-context",
+            "--context",
+            "--file",
+            "--max-count",
+            "--regexp",
+        },
+        "head": {"-c", "-n", "--bytes", "--lines"},
+        "rg": {
+            "-A",
+            "-B",
+            "-C",
+            "-e",
+            "-f",
+            "-g",
+            "-m",
+            "-t",
+            "-T",
+            "--after-context",
+            "--before-context",
+            "--context",
+            "--file",
+            "--glob",
+            "--max-count",
+            "--max-depth",
+            "--type",
+            "--type-not",
+        },
+        "sed": {"-e", "-f", "--expression", "--file"},
+        "tail": {"-c", "-n", "--bytes", "--lines"},
+    }.get(root, set())
+
+
+def _path_values(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list | tuple):
+        paths: list[str] = []
+        for item in value:
+            paths.extend(_path_values(item))
+        return paths
+    if isinstance(value, dict):
+        paths = []
+        for key in ("path", "file", "filename", "new_path", "old_path"):
+            paths.extend(_path_values(value.get(key)))
+        return paths
+    return []
+
+
+def _path_ref_from_token(token: str) -> dict[str, str] | None:
+    raw = token.strip()
+    if not raw or raw == "-" or _is_shell_separator(raw) or _looks_like_assignment(raw):
+        return None
+    if raw.startswith(("$", "`")) or "://" in raw:
+        return None
+    label = _safe_path_label(raw)
+    if label is None:
+        return None
+    path_hash = _stable_hash(raw)
+    return {"path_key": path_hash, "path_label": label, "path_hash": path_hash}
+
+
+def _safe_path_label(token: str) -> str | None:
+    normalized = token.rstrip("/")
+    label = normalized if normalized in {".", ".."} else Path(normalized).name
+    if not label:
+        return None
+    lowered = label.lower()
+    if lowered.startswith(SENSITIVE_LABEL_PREFIXES):
+        return "path"
+    return label if SAFE_PATH_LABEL_RE.fullmatch(label) else "path"
+
+
+def _stable_hash(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
+
+def _command_tokens(command: str) -> list[str]:
+    try:
+        return shlex.split(command, posix=True)
+    except ValueError:
+        return []
+
+
+def _strip_command_wrappers(tokens: list[str]) -> list[str]:
+    remaining = list(tokens)
+    while remaining:
+        while remaining and _looks_like_assignment(remaining[0]):
+            remaining.pop(0)
+        if not remaining:
+            break
+        base = _basename(remaining[0])
+        if base in {"command", "env", "sudo"}:
+            remaining.pop(0)
+            continue
+        break
+    return remaining
+
+
+def _command_root(tokens: list[str]) -> str:
+    base = _basename(tokens[0])
+    if base in {"py.test", "pytest"}:
+        return "pytest"
+    if base == "py" or base == "python" or base.startswith("python"):
+        return "python"
+    return safe_label(base) or "unknown_command"
+
+
+def _command_child(root: str, tokens: list[str]) -> str:
+    if root == "python":
+        for index, token in enumerate(tokens[:-1]):
+            if token == "-m":
+                module = safe_label(_basename(tokens[index + 1]).split(".", 1)[0])
+                return f"-m:{module}" if module else "-m:unknown"
+        return tokens[1] if len(tokens) > 1 and tokens[1].startswith("-") else "<script>"
+    if len(tokens) <= 1:
+        return "<none>"
+    child = safe_label(_basename(tokens[1]))
+    return child or "<arg>"
+
+
+def _is_shell_separator(token: str) -> bool:
+    return token in {"&&", "||", ";", "|"}
+
+
+def _looks_like_assignment(token: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", token))
+
+
+def _basename(token: str) -> str:
+    return re.split(r"[\\/]", token)[-1].lower()
