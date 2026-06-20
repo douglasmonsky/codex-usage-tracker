@@ -22,6 +22,10 @@ DIAGNOSTICS_NOTES = [
 DIAGNOSTIC_FACT_SORT_CHOICES = (
     "uncached",
     "tokens",
+    "cached",
+    "output",
+    "cache",
+    "largest",
     "calls",
     "occurrences",
     "time",

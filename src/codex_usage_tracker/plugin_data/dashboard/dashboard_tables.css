@@ -323,11 +323,45 @@
       min-width: 1120px;
       table-layout: fixed;
     }
+    .diagnostics-facts-table {
+      min-width: 1320px;
+    }
+    .diagnostics-facts-table .diagnostics-fact-col { width: 26%; }
+    .diagnostics-facts-table .diagnostics-count-col { width: 5.5%; }
+    .diagnostics-facts-table .diagnostics-token-col { width: 7.5%; }
+    .diagnostics-facts-table .diagnostics-ratio-col { width: 5%; }
+    .diagnostics-facts-table .diagnostics-latest-col { width: 14.5%; }
+    .diagnostics-facts-table .diagnostics-action-col { width: 6%; }
     .diagnostics-call-table {
       min-width: 1060px;
     }
     .diagnostics-table th {
       position: static;
+    }
+    .diagnostics-facts-table th {
+      position: sticky;
+      top: 0;
+      z-index: 12;
+      background: #fbfcfe;
+    }
+    .diagnostics-facts-table th:first-child,
+    .diagnostics-facts-table td.diagnostics-fact-cell {
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      background: #ffffff;
+      box-shadow: 1px 0 0 var(--line);
+    }
+    .diagnostics-facts-table th:first-child {
+      z-index: 15;
+      background: #fbfcfe;
+    }
+    .diagnostics-facts-table tr.selected-row td.diagnostics-fact-cell {
+      background: #eff6ff;
+    }
+    .diagnostics-facts-table tbody tr:not(.diagnostics-drilldown-row):hover td,
+    .diagnostics-facts-table tbody tr:not(.diagnostics-drilldown-row):hover td.diagnostics-fact-cell {
+      background: #eff6ff;
     }
     .diagnostics-table td,
     .diagnostics-table th {
@@ -342,9 +376,10 @@
       min-width: 0;
     }
     .diagnostic-fact strong {
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
       font-size: 12px;
       line-height: 1.25;
+      word-break: normal;
     }
     .diagnostic-fact span {
       color: var(--muted);

@@ -34,6 +34,7 @@
     const factCallPageSize = 25;
     const factCallPayloads = new Map();
     const factCallSorts = new Map();
+    const factSorts = new Map();
 
     function setActive(active) {
       diagnosticsPanelEl.hidden = !active;
@@ -52,6 +53,7 @@
       payloads = emptyPayloads();
       factCallPayloads.clear();
       factCallSorts.clear();
+      factSorts.clear();
     }
 
     function renderDiagnostics(dateRange) {
@@ -86,10 +88,13 @@
       const generation = requestGeneration + 1;
       requestGeneration = generation;
       try {
+        const factsSort = factSortState('facts');
+        const toolsSort = factSortState('tools');
+        const compactionsSort = factSortState('compactions');
         const [facts, tools, compactions] = await Promise.all([
-          fetchPayload('/api/diagnostics/facts', { ...filters, limit: '50', sort: 'uncached', direction: 'desc' }),
-          fetchPayload('/api/diagnostics/tools', { ...filters, limit: '25', sort: 'uncached', direction: 'desc' }),
-          fetchPayload('/api/diagnostics/compactions', { ...filters, limit: '25', sort: 'uncached', direction: 'desc' }),
+          fetchPayload('/api/diagnostics/facts', { ...filters, limit: '50', sort: factsSort.sort, direction: factsSort.direction }),
+          fetchPayload('/api/diagnostics/tools', { ...filters, limit: '25', sort: toolsSort.sort, direction: toolsSort.direction }),
+          fetchPayload('/api/diagnostics/compactions', { ...filters, limit: '25', sort: compactionsSort.sort, direction: compactionsSort.direction }),
         ]);
         if (generation !== requestGeneration || signature !== activeSignature) return;
         payloads = { facts, tools, compactions };
@@ -164,6 +169,20 @@
       renderIfActive();
     }
 
+    function sortFactRows(sectionKey, sortKey) {
+      if (!diagnosticFactSortLabels()[sortKey]) return;
+      const current = factSortState(sectionKey);
+      const next = current.sort === sortKey
+        ? { sort: sortKey, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { sort: sortKey, direction: defaultFactSortDirection(sortKey) };
+      factSorts.set(sectionKey, next);
+      status = 'loading';
+      errorMessage = '';
+      const filters = getDiagnosticFilters();
+      void fetchDiagnostics(activeSignature, filters);
+      renderIfActive();
+    }
+
     function sortFactCalls(sortKey) {
       if (!selectedFactKey || !diagnosticCallSortLabels()[sortKey]) return;
       const current = factCallSortState(selectedFactKey);
@@ -206,30 +225,30 @@
             ${readoutMetric('Compaction rows', payloads.compactions)}
             <span class="diagnostics-note">Structured labels only. Raw context remains on-demand in the call investigator.</span>
           </div>
-          ${renderFactSection('Top Diagnostic Facts', 'Ranked by associated uncached input tokens.', payloads.facts, loading)}
-          ${renderFactSection('Tool and Function Activity', 'Tool/function facts associated with model calls.', payloads.tools, loading)}
-          ${renderFactSection('Compaction Activity', 'Compaction facts and post-compaction associated costs.', payloads.compactions, loading)}
+          ${renderFactSection('facts', 'Top Diagnostic Facts', 'Structured facts associated with model calls.', payloads.facts, loading)}
+          ${renderFactSection('tools', 'Tool and Function Activity', 'Tool/function facts associated with model calls.', payloads.tools, loading)}
+          ${renderFactSection('compactions', 'Compaction Activity', 'Compaction facts and post-compaction associated costs.', payloads.compactions, loading)}
         </div>
       `;
     }
 
-    function renderFactSection(title, caption, payload, loading) {
+    function renderFactSection(sectionKey, title, caption, payload, loading) {
       const rows = Array.isArray(payload?.rows) ? payload.rows : [];
       return `
         <div class="diagnostics-section">
           <div class="diagnostics-section-header">
             <div>
               <h3>${escapeHtml(title)}</h3>
-              <p>${escapeHtml(caption)}</p>
+              <p>${escapeHtml(`${caption} Sorted by ${diagnosticFactSortDescription(sectionKey)}.`)}</p>
             </div>
             <span>${escapeHtml(payload ? `${number.format(payload.total_matched_rows || rows.length)} matched` : loading ? 'Loading' : 'No payload')}</span>
           </div>
-          ${renderFactTable(rows, loading)}
+          ${renderFactTable(sectionKey, rows, loading)}
         </div>
       `;
     }
 
-    function renderFactTable(rows, loading) {
+    function renderFactTable(sectionKey, rows, loading) {
       if (loading && !rows.length) return renderState('Loading diagnostics...');
       if (!rows.length) return renderState('No diagnostic facts matched the current filters.');
       const body = rows.map(row => {
@@ -240,7 +259,7 @@
           : tokenText(row.largest_call_tokens);
         return `
           <tr class="${selected ? 'selected-row' : ''}">
-            <td>
+            <td class="diagnostics-fact-cell">
               <div class="diagnostic-fact">
                 <strong>${escapeHtml(row.fact_type || 'unknown')}/${escapeHtml(row.fact_name || 'unknown')}</strong>
                 <span>${escapeHtml(row.fact_category || 'uncategorized')}</span>
@@ -266,18 +285,31 @@
       }).join('');
       return `
         <div class="diagnostics-table-wrap">
-          <table class="diagnostics-table">
+          <table class="diagnostics-table diagnostics-facts-table">
+            <colgroup>
+              <col class="diagnostics-fact-col">
+              <col class="diagnostics-count-col">
+              <col class="diagnostics-count-col">
+              <col class="diagnostics-token-col">
+              <col class="diagnostics-token-col">
+              <col class="diagnostics-token-col">
+              <col class="diagnostics-token-col">
+              <col class="diagnostics-ratio-col">
+              <col class="diagnostics-token-col">
+              <col class="diagnostics-latest-col">
+              <col class="diagnostics-action-col">
+            </colgroup>
             <thead><tr>
-              ${columnHeader('Fact', 'Diagnostic fact type and name derived from structured local log metadata. Raw prompts, assistant text, and tool output are not persisted.')}
-              ${columnHeader('Occ', 'Occurrences: count of matching diagnostic fact events. One model call can contribute more than one occurrence.', 'num')}
-              ${columnHeader('Calls', 'Distinct model calls associated with this diagnostic fact.', 'num')}
-              ${columnHeader('Assoc total', 'Associated total tokens for those calls. Totals are not additive across facts because one call can have multiple facts.', 'num')}
-              ${columnHeader('Cached', 'Associated cached input tokens for those calls.', 'num')}
-              ${columnHeader('Uncached', 'Associated uncached input tokens for those calls.', 'num')}
-              ${columnHeader('Output', 'Associated output tokens for those calls.', 'num')}
-              ${columnHeader('Cache %', 'Average cache ratio across associated calls.', 'num')}
-              ${columnHeader('Largest', 'Largest associated call by total tokens.', 'num')}
-              ${columnHeader('Latest', 'Latest associated call timestamp.')}
+              ${diagnosticFactHeader(sectionKey, 'fact', 'Fact', false, 'Diagnostic fact type and name derived from structured local log metadata. Raw prompts, assistant text, and tool output are not persisted.')}
+              ${diagnosticFactHeader(sectionKey, 'occurrences', 'Occ', true, 'Occurrences: count of matching diagnostic fact events. One model call can contribute more than one occurrence.')}
+              ${diagnosticFactHeader(sectionKey, 'calls', 'Calls', true, 'Distinct model calls associated with this diagnostic fact.')}
+              ${diagnosticFactHeader(sectionKey, 'tokens', 'Assoc total', true, 'Associated total tokens for those calls. Totals are not additive across facts because one call can have multiple facts.')}
+              ${diagnosticFactHeader(sectionKey, 'cached', 'Cached', true, 'Associated cached input tokens for those calls.')}
+              ${diagnosticFactHeader(sectionKey, 'uncached', 'Uncached', true, 'Associated uncached input tokens for those calls.')}
+              ${diagnosticFactHeader(sectionKey, 'output', 'Output', true, 'Associated output tokens for those calls.')}
+              ${diagnosticFactHeader(sectionKey, 'cache', 'Cache %', true, 'Average cache ratio across associated calls.')}
+              ${diagnosticFactHeader(sectionKey, 'largest', 'Largest', true, 'Largest associated call by total tokens.')}
+              ${diagnosticFactHeader(sectionKey, 'time', 'Latest', false, 'Latest associated call timestamp.')}
               ${columnHeader('Action', 'Expand or collapse the associated calls.')}
             </tr></thead>
             <tbody>${body}</tbody>
@@ -380,6 +412,22 @@
       return `<th${classAttr}${tooltipAttr ? ` ${tooltipAttr}` : ''}>${escapeHtml(label)}</th>`;
     }
 
+    function diagnosticFactHeader(sectionKey, sortKey, label, numeric = false, tooltip = '') {
+      const state = factSortState(sectionKey);
+      const active = state.sort === sortKey;
+      const indicator = active ? (state.direction === 'asc' ? '▲' : '▼') : '';
+      const ariaSort = active ? (state.direction === 'asc' ? 'ascending' : 'descending') : 'none';
+      const tooltipAttr = tooltipAttributes(tooltip);
+      return `
+        <th${numeric ? ' class="num"' : ''} data-diagnostics-fact-sort-active="${active ? 'true' : 'false'}" aria-sort="${ariaSort}"${tooltipAttr ? ` ${tooltipAttr}` : ''}>
+          <button class="sort-header child-sort-header" type="button" data-diagnostics-fact-section="${escapeHtml(sectionKey)}" data-diagnostics-fact-sort-key="${escapeHtml(sortKey)}">
+            <span>${escapeHtml(label)}</span>
+            <span class="sort-indicator">${escapeHtml(indicator)}</span>
+          </button>
+        </th>
+      `;
+    }
+
     function diagnosticCallHeader(sortKey, label, numeric = false, tooltip = '') {
       const state = factCallSortState(selectedFactKey);
       const active = state.sort === sortKey;
@@ -394,6 +442,28 @@
           </button>
         </th>
       `;
+    }
+
+    function diagnosticFactSortDescription(sectionKey) {
+      const state = factSortState(sectionKey);
+      const labels = diagnosticFactSortLabels();
+      const label = labels[state.sort] || state.sort;
+      return `${label} ${state.direction === 'asc' ? 'ascending' : 'descending'}`;
+    }
+
+    function diagnosticFactSortLabels() {
+      return {
+        cache: 'cache ratio',
+        cached: 'cached input tokens',
+        calls: 'associated calls',
+        fact: 'fact name',
+        largest: 'largest call',
+        occurrences: 'occurrences',
+        output: 'output tokens',
+        time: 'latest call time',
+        tokens: 'total tokens',
+        uncached: 'uncached input tokens',
+      };
     }
 
     function diagnosticCallSortDescription() {
@@ -417,6 +487,14 @@
         tokens: 'total tokens',
         uncached: 'uncached input tokens',
       };
+    }
+
+    function factSortState(sectionKey) {
+      return factSorts.get(sectionKey) || { sort: 'uncached', direction: 'desc' };
+    }
+
+    function defaultFactSortDirection(sortKey) {
+      return sortKey === 'fact' ? 'asc' : 'desc';
     }
 
     function factCallSortState(key) {
@@ -483,10 +561,25 @@
       };
     }
 
+    function captureScrollPosition() {
+      pendingScrollAnchor = {
+        key: '',
+        type: 'scroll',
+        top: 0,
+        scrollY: window.scrollY,
+      };
+    }
+
     function restoreScrollAnchor() {
       if (!pendingScrollAnchor) return;
       const anchor = pendingScrollAnchor;
       pendingScrollAnchor = null;
+      if (anchor.type === 'scroll') {
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: anchor.scrollY, behavior: 'auto' });
+        });
+        return;
+      }
       window.requestAnimationFrame(() => {
         const target = anchor.type === 'load-more'
           ? diagnosticsPanelEl.querySelector('[data-diagnostics-call-load-more]')
@@ -537,6 +630,17 @@
         captureScrollAnchor(loadMoreButton, selectedFactKey, 'load-more');
         const [factType, factName] = splitFactKey(selectedFactKey);
         void fetchFactCalls(factType, factName, { append: true });
+        return;
+      }
+      const factSortButton = target.closest('[data-diagnostics-fact-sort-key]');
+      if (factSortButton && diagnosticsPanelEl.contains(factSortButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        captureScrollPosition();
+        sortFactRows(
+          factSortButton.dataset.diagnosticsFactSection || 'facts',
+          factSortButton.dataset.diagnosticsFactSortKey || '',
+        );
         return;
       }
       const sortButton = target.closest('[data-diagnostics-call-sort-key]');
