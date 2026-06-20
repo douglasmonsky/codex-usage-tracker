@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.8.1 - 2026-06-20
+
+- Make Diagnostics fact tables easier to scan by widening and pinning the Fact column while horizontally scrolling.
+- Add API-backed sortable headers to top-level Diagnostics fact tables, including cached input, output, cache ratio, largest call, latest call time, occurrence, call-count, and fact-name sorts.
+
 ## 0.8.0 - 2026-06-20
 
 - Add an aggregate Diagnostics dashboard for inspecting diagnostic facts, associated calls, token totals, and on-demand evidence without persisting raw transcript text.
