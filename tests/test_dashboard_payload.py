@@ -292,6 +292,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Occurrences: count of matching diagnostic fact events" in dashboard_diagnostics_js
     assert "Associated total tokens for those calls" in dashboard_diagnostics_js
     assert "Average cache ratio across associated calls" in dashboard_diagnostics_js
+    assert "captureScrollAnchor" in dashboard_diagnostics_js
+    assert "restoreScrollAnchor" in dashboard_diagnostics_js
+    assert "data-diagnostics-call-load-more" in dashboard_diagnostics_js
+    assert "offset: String(offset)" in dashboard_diagnostics_js
+    assert "mergeFactCallPayload" in dashboard_diagnostics_js
     assert "diagnostics-expand-button" in dashboard_surface
     assert "selectedFactKey === key" in dashboard_diagnostics_js
     assert "Needs Attention" in dashboard

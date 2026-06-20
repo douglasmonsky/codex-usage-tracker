@@ -353,6 +353,15 @@
       border-radius: 8px;
       background: #ffffff;
     }
+    .diagnostics-inline-error {
+      padding: 8px 10px;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      background: #fef2f2;
+      color: #991b1b;
+      font-size: 12px;
+      font-weight: 720;
+    }
     .pager-button:disabled {
       cursor: not-allowed;
       color: var(--muted);

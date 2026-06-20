@@ -30,6 +30,8 @@
     let requestGeneration = 0;
     let payloads = emptyPayloads();
     let selectedFactKey = '';
+    let pendingScrollAnchor = null;
+    const factCallPageSize = 25;
     const factCallPayloads = new Map();
 
     function setActive(active) {
@@ -75,6 +77,7 @@
         void fetchDiagnostics(signature, filters);
       }
       diagnosticsPanelEl.innerHTML = renderPanel();
+      restoreScrollAnchor();
     }
 
     async function fetchDiagnostics(signature, filters) {
@@ -97,21 +100,31 @@
       renderIfActive();
     }
 
-    async function fetchFactCalls(factType, factName) {
+    async function fetchFactCalls(factType, factName, options = {}) {
       const key = factKey(factType, factName);
+      const append = Boolean(options.append);
       const signature = activeSignature;
-      if (selectedFactKey === key) {
+      if (!append && selectedFactKey === key) {
         selectedFactKey = '';
         renderIfActive();
         return;
       }
       selectedFactKey = key;
       const cached = factCallPayloads.get(key);
-      if (cached && cached.status === 'ready') {
+      if (!append && cached && cached.status === 'ready') {
         renderIfActive();
         return;
       }
-      factCallPayloads.set(key, { status: 'loading', payload: null, error: '' });
+      if (append && (!cached || cached.status === 'appending' || !factCallsHasMore(cached.payload))) {
+        return;
+      }
+      const previousPayload = cached && cached.payload ? cached.payload : null;
+      const offset = append ? factCallRows(previousPayload).length : 0;
+      factCallPayloads.set(key, {
+        status: append ? 'appending' : 'loading',
+        payload: previousPayload,
+        error: '',
+      });
       renderIfActive();
       try {
         const filters = getDiagnosticFilters();
@@ -119,15 +132,24 @@
           ...filters,
           fact_type: factType,
           fact_name: factName,
-          limit: '25',
+          limit: String(factCallPageSize),
+          offset: String(offset),
           sort: 'tokens',
           direction: 'desc',
         });
         if (signature !== activeSignature) return;
-        factCallPayloads.set(key, { status: 'ready', payload, error: '' });
+        factCallPayloads.set(key, {
+          status: 'ready',
+          payload: append ? mergeFactCallPayload(previousPayload, payload) : payload,
+          error: '',
+        });
       } catch (error) {
         if (signature !== activeSignature) return;
-        factCallPayloads.set(key, { status: 'error', payload: null, error: error.message || String(error) });
+        factCallPayloads.set(key, {
+          status: append && previousPayload ? 'ready' : 'error',
+          payload: append ? previousPayload : null,
+          error: error.message || String(error),
+        });
       }
       renderIfActive();
     }
@@ -246,16 +268,18 @@
     function renderFactCallsPanel() {
       const entry = factCallPayloads.get(selectedFactKey);
       const label = selectedFactKey.replace('\u0000', '/');
-      if (!entry || entry.status === 'loading') {
+      if (!entry || (entry.status === 'loading' && !entry.payload)) {
         return `<div class="diagnostics-drilldown">${renderState(`Loading calls for ${label}...`)}</div>`;
       }
-      if (entry.status === 'error') {
+      if (entry.status === 'error' && !entry.payload) {
         return `<div class="diagnostics-drilldown">${renderState(`Could not load calls for ${label}: ${entry.error}`)}</div>`;
       }
-      const rows = Array.isArray(entry.payload?.rows) ? entry.payload.rows : [];
+      const rows = factCallRows(entry.payload);
       if (!rows.length) {
         return `<div class="diagnostics-drilldown">${renderState(`No calls found for ${label}.`)}</div>`;
       }
+      const total = Number(entry.payload?.total_matched_rows || rows.length);
+      const loadingMore = entry.status === 'appending';
       const body = rows.map(row => `
         <tr class="thread-call-row" data-record-id="${escapeHtml(row.record_id || '')}">
           <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
@@ -277,7 +301,7 @@
               <h3>Associated Calls</h3>
               <p>${escapeHtml(label)} sorted by associated call tokens.</p>
             </div>
-            <span>${escapeHtml(`${number.format(entry.payload.total_matched_rows || rows.length)} matched`)}</span>
+            <span>${escapeHtml(`${number.format(total)} matched`)}</span>
           </div>
           <div class="diagnostics-table-wrap">
             <table class="diagnostics-table diagnostics-call-table">
@@ -295,7 +319,23 @@
               </tr></thead>
               <tbody>${body}</tbody>
             </table>
+            ${renderFactCallPager(entry, rows.length, total, loadingMore)}
           </div>
+          ${entry.error ? `<div class="diagnostics-inline-error">${escapeHtml(`Could not load more calls: ${entry.error}`)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    function renderFactCallPager(entry, loaded, total, loadingMore) {
+      const canLoadMore = loadingMore || factCallsHasMore(entry.payload);
+      const statusText = `Showing ${number.format(loaded)} of ${number.format(total)} calls`;
+      if (!canLoadMore) {
+        return `<div class="child-load-more diagnostics-call-load-more"><span>${escapeHtml(statusText)}</span></div>`;
+      }
+      return `
+        <div class="child-load-more diagnostics-call-load-more">
+          <span>${escapeHtml(statusText)}</span>
+          <button class="pager-button" type="button" data-diagnostics-call-load-more ${loadingMore ? 'disabled' : ''}>${escapeHtml(loadingMore ? 'Loading...' : t('button.load_more'))}</button>
         </div>
       `;
     }
@@ -319,8 +359,88 @@
       return `<th${classAttr}${tooltipAttr ? ` ${tooltipAttr}` : ''}>${escapeHtml(label)}</th>`;
     }
 
+    function factCallRows(payload) {
+      return Array.isArray(payload?.rows) ? payload.rows : [];
+    }
+
+    function factCallsHasMore(payload) {
+      if (!payload) return false;
+      const loaded = factCallRows(payload).length;
+      const total = Number(payload.total_matched_rows || loaded);
+      return Boolean(payload.truncated) && loaded < total;
+    }
+
+    function mergeFactCallPayload(previousPayload, nextPayload) {
+      const previousRows = factCallRows(previousPayload);
+      const mergedRows = previousRows.slice();
+      const seenRecordIds = new Set(previousRows.map(row => row.record_id).filter(Boolean));
+      factCallRows(nextPayload).forEach(row => {
+        const recordId = row.record_id || '';
+        if (recordId && seenRecordIds.has(recordId)) return;
+        if (recordId) seenRecordIds.add(recordId);
+        mergedRows.push(row);
+      });
+      const total = Number(nextPayload.total_matched_rows || previousPayload?.total_matched_rows || mergedRows.length);
+      const madeProgress = mergedRows.length > previousRows.length;
+      return {
+        ...nextPayload,
+        rows: mergedRows,
+        row_count: mergedRows.length,
+        total_matched_rows: total,
+        truncated: madeProgress && mergedRows.length < total,
+        filters: {
+          ...(nextPayload.filters || {}),
+          offset: 0,
+        },
+      };
+    }
+
     function factKey(factType, factName) {
       return `${factType || ''}\u0000${factName || ''}`;
+    }
+
+    function splitFactKey(key) {
+      const delimiter = key.indexOf('\u0000');
+      if (delimiter < 0) return [key, ''];
+      return [key.slice(0, delimiter), key.slice(delimiter + 1)];
+    }
+
+    function captureScrollAnchor(element, key, type = 'fact') {
+      if (!element || !element.getBoundingClientRect) return;
+      pendingScrollAnchor = {
+        key,
+        type,
+        top: element.getBoundingClientRect().top,
+        scrollY: window.scrollY,
+      };
+    }
+
+    function restoreScrollAnchor() {
+      if (!pendingScrollAnchor) return;
+      const anchor = pendingScrollAnchor;
+      pendingScrollAnchor = null;
+      window.requestAnimationFrame(() => {
+        const target = anchor.type === 'load-more'
+          ? diagnosticsPanelEl.querySelector('[data-diagnostics-call-load-more]')
+          : findFactButton(anchor.key);
+        const fallback = findFactButton(anchor.key);
+        const element = target || fallback;
+        if (!element || !element.getBoundingClientRect) {
+          window.scrollTo({ top: anchor.scrollY, behavior: 'auto' });
+          return;
+        }
+        const delta = element.getBoundingClientRect().top - anchor.top;
+        if (Math.abs(delta) > 1) {
+          window.scrollBy({ top: delta, behavior: 'auto' });
+        }
+      });
+    }
+
+    function findFactButton(key) {
+      const [factType, factName] = splitFactKey(key);
+      return Array.from(diagnosticsPanelEl.querySelectorAll('[data-diagnostics-fact-type][data-diagnostics-fact-name]')).find(button => {
+        return button.dataset.diagnosticsFactType === factType && button.dataset.diagnosticsFactName === factName;
+      }) || null;
     }
 
     function emptyPayloads() {
@@ -341,10 +461,22 @@
         void openInvestigatorUrl(link.href);
         return;
       }
+      const loadMoreButton = target.closest('[data-diagnostics-call-load-more]');
+      if (loadMoreButton && diagnosticsPanelEl.contains(loadMoreButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!selectedFactKey) return;
+        captureScrollAnchor(loadMoreButton, selectedFactKey, 'load-more');
+        const [factType, factName] = splitFactKey(selectedFactKey);
+        void fetchFactCalls(factType, factName, { append: true });
+        return;
+      }
       const button = target.closest('[data-diagnostics-fact-type][data-diagnostics-fact-name]');
       if (!button || !diagnosticsPanelEl.contains(button)) return;
       event.preventDefault();
       event.stopPropagation();
+      const key = factKey(button.dataset.diagnosticsFactType || '', button.dataset.diagnosticsFactName || '');
+      captureScrollAnchor(button, key);
       void fetchFactCalls(button.dataset.diagnosticsFactType || '', button.dataset.diagnosticsFactName || '');
     });
 
