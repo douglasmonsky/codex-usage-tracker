@@ -37,6 +37,7 @@ from codex_usage_tracker.diagnostic_reports import (
 )
 from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_commands_report,
+    build_diagnostic_concentration_report,
     build_diagnostic_file_reads_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
@@ -326,6 +327,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/diagnostics/read-productivity":
             self._handle_diagnostics_read_productivity(parsed.query)
             return
+        if parsed.path == "/api/diagnostics/concentration":
+            self._handle_diagnostics_concentration(parsed.query)
+            return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
             return
@@ -356,6 +360,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/diagnostics/read-productivity/refresh":
             self._handle_diagnostics_read_productivity_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/concentration/refresh":
+            self._handle_diagnostics_concentration_refresh(parsed.query)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
 
@@ -1065,6 +1072,22 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             build_report=build_diagnostic_read_productivity_report,
             refresh=True,
             label="diagnostic read productivity",
+        )
+
+    def _handle_diagnostics_concentration(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_concentration_report,
+            refresh=False,
+            label="diagnostic concentration",
+        )
+
+    def _handle_diagnostics_concentration_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_concentration_report,
+            refresh=True,
+            label="diagnostic concentration",
         )
 
     def _handle_diagnostic_snapshot(

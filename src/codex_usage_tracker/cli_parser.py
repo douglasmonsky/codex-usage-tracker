@@ -387,6 +387,18 @@ def _add_diagnostics_parser(
     )
     read_productivity.add_argument("--json", action="store_true", dest="as_json")
 
+    concentration = diagnostic_subparsers.add_parser(
+        "concentration",
+        help="Show concentration of token impact by source log, cwd, and day",
+    )
+    concentration.add_argument("--include-archived", action="store_true")
+    concentration.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the concentration snapshot before reading it.",
+    )
+    concentration.add_argument("--json", action="store_true", dest="as_json")
+
     fact_calls = diagnostic_subparsers.add_parser(
         "fact-calls",
         help="List calls associated with one diagnostic fact",

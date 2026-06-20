@@ -224,6 +224,21 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "notes": list,
         }
     },
+    "codex-usage-tracker-diagnostic-concentration-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "metrics": list,
+            "dimensions": list,
+            "largest_impact_rows": list,
+            "privacy": dict,
+            "notes": list,
+        }
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),

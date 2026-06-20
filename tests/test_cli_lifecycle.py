@@ -436,6 +436,15 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "--refresh",
         "--json",
     )
+    concentration_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "concentration",
+        "--refresh",
+        "--json",
+    )
     fact_calls = _run_cli(
         tmp_path,
         "--db",
@@ -462,6 +471,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     commands_refresh_payload = json.loads(commands_refresh.stdout)
     file_reads_refresh_payload = json.loads(file_reads_refresh.stdout)
     read_productivity_refresh_payload = json.loads(read_productivity_refresh.stdout)
+    concentration_refresh_payload = json.loads(concentration_refresh.stdout)
     fact_calls_payload = json.loads(fact_calls.stdout)
     for payload in (
         summary_payload,
@@ -474,6 +484,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         commands_refresh_payload,
         file_reads_refresh_payload,
         read_productivity_refresh_payload,
+        concentration_refresh_payload,
         fact_calls_payload,
     ):
         _assert_contract(payload)
@@ -531,6 +542,12 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         == "codex-usage-tracker-diagnostic-read-productivity-v1"
     )
     assert read_productivity_refresh_payload["summary"]["read_events_modified_later"] == 0
+    assert (
+        concentration_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-concentration-v1"
+    )
+    assert concentration_refresh_payload["summary"]["usage_rows"] == 2
+    assert concentration_refresh_payload["metrics"]
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
     assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")

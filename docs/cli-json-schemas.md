@@ -52,6 +52,7 @@ Tracked schema ids:
 | `codex-usage-tracker-diagnostic-commands-v1` | CLI `diagnostics commands --json`, dashboard server `/api/diagnostics/commands` |
 | `codex-usage-tracker-diagnostic-file-reads-v1` | CLI `diagnostics file-reads --json`, dashboard server `/api/diagnostics/file-reads` |
 | `codex-usage-tracker-diagnostic-read-productivity-v1` | CLI `diagnostics read-productivity --json`, dashboard server `/api/diagnostics/read-productivity` |
+| `codex-usage-tracker-diagnostic-concentration-v1` | CLI `diagnostics concentration --json`, dashboard server `/api/diagnostics/concentration` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -494,6 +495,48 @@ Schema: `codex-usage-tracker-diagnostic-read-productivity-v1`
 ```
 
 Read productivity is a temporal correlation, not causation. A read is counted as modified later only when the same privacy-preserving path key appears in a later structured patch event in the same source log.
+
+## Diagnostic Concentration Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics concentration --json
+codex-usage-tracker diagnostics concentration --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/concentration`
+- `POST /api/diagnostics/concentration/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-concentration-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-concentration-v1",
+  "section": "concentration",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "usage_rows": 4,
+    "total_tokens": 100,
+    "dimension_count": 3,
+    "history_scope": "active"
+  },
+  "metrics": [
+    {"metric": "top_1_source_log_share", "dimension": "source_log", "top_n": 1, "share": 0.5}
+  ],
+  "dimensions": [],
+  "largest_impact_rows": [],
+  "privacy": {},
+  "notes": []
+}
+```
+
+The concentration snapshot computes top-1/top-3/top-5 share and effective group count by source log/session, cwd/project label, and day. Source log labels use session-id prefixes or source hashes, cwd labels use basename-only labels, and raw source paths/cwd paths are not included.
 
 ## Pricing Coverage
 

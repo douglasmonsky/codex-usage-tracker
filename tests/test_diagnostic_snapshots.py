@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from store_dashboard_helpers import (
@@ -9,12 +10,14 @@ from store_dashboard_helpers import (
     _entry,
     _make_codex_home,
     _token_event,
+    _usage_event,
     _write_jsonl,
 )
 
 from codex_usage_tracker.diagnostic_snapshots import (
     DIAGNOSTIC_OVERVIEW_SECTION,
     build_diagnostic_commands_report,
+    build_diagnostic_concentration_report,
     build_diagnostic_file_reads_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
@@ -24,6 +27,7 @@ from codex_usage_tracker.store import (
     query_diagnostic_snapshot,
     refresh_usage_index,
     upsert_diagnostic_snapshot,
+    upsert_usage_events,
 )
 
 
@@ -328,6 +332,111 @@ def test_file_read_snapshots_allocate_tokens_and_correlate_later_modifications(
     assert "/tmp/private" not in serialized
     assert "1,120p" not in serialized
     assert "SECRET PATCH TEXT" not in serialized
+
+
+def test_concentration_snapshot_reports_top_shares_without_raw_paths(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _concentration_event(
+                record_id="r1",
+                session_id=SESSION_ID,
+                event_timestamp="2026-05-17T10:00:00Z",
+                source_file="/tmp/private/session-a.jsonl",
+                cwd="/tmp/private/project-a",
+                total_tokens=30,
+            ),
+            _concentration_event(
+                record_id="r2",
+                session_id=SESSION_ID,
+                event_timestamp="2026-05-17T11:00:00Z",
+                source_file="/tmp/private/session-a.jsonl",
+                cwd="/tmp/private/project-a",
+                total_tokens=20,
+            ),
+            _concentration_event(
+                record_id="r3",
+                session_id="019e37d4-c1f1-71aa-b154-2d5d837af92c",
+                event_timestamp="2026-05-18T10:00:00Z",
+                source_file="/tmp/private/session-b.jsonl",
+                cwd="/tmp/private/project-b",
+                total_tokens=30,
+            ),
+            _concentration_event(
+                record_id="r4",
+                session_id="019e37d5-01fd-71df-87f4-ae3e8d60df7a",
+                event_timestamp="2026-05-19T10:00:00Z",
+                source_file="/tmp/private/session-c.jsonl",
+                cwd="/tmp/private/project-b",
+                total_tokens=20,
+            ),
+        ],
+        db_path=db_path,
+    )
+
+    missing = build_diagnostic_concentration_report(db_path=db_path).payload
+    refreshed = build_diagnostic_concentration_report(db_path=db_path, refresh=True).payload
+    stored = build_diagnostic_concentration_report(db_path=db_path).payload
+
+    _assert_contract(missing)
+    _assert_contract(refreshed)
+    _assert_contract(stored)
+    assert missing["status"] == "missing"
+    assert refreshed["status"] == "ready"
+    assert stored["refreshed"] is False
+    assert refreshed["snapshot"]["source_logs_scanned"] == 3
+    assert refreshed["summary"]["usage_rows"] == 4
+    assert refreshed["summary"]["total_tokens"] == 100
+    metrics = {row["metric"]: row["share"] for row in refreshed["metrics"]}
+    assert metrics["top_1_source_log_share"] == 0.5
+    assert metrics["top_3_source_log_share"] == 1.0
+    assert metrics["top_5_source_log_share"] == 1.0
+    assert metrics["top_1_cwd_share"] == 0.5
+    assert metrics["top_3_day_share"] == 1.0
+
+    dimensions = {row["dimension"]: row for row in refreshed["dimensions"]}
+    assert dimensions["source_log"]["group_count"] == 3
+    assert dimensions["source_log"]["effective_group_count"] == 2.631579
+    assert dimensions["cwd"]["group_count"] == 2
+    assert dimensions["cwd"]["effective_group_count"] == 2.0
+    assert dimensions["day"]["top_rows"][0]["label"] == "2026-05-17"
+    assert dimensions["day"]["top_rows"][0]["largest_record_id"] == "r1"
+    assert refreshed["largest_impact_rows"][0]["largest_record_id"] == "r1"
+    assert refreshed["largest_impact_rows"][0]["session_id"] == SESSION_ID
+
+    serialized = json.dumps(refreshed, sort_keys=True)
+    assert "/tmp/private" not in serialized
+    assert "session-a.jsonl" not in serialized
+    assert "project-a" in serialized
+    assert "source_log_label_policy" in serialized
+
+
+def _concentration_event(
+    *,
+    record_id: str,
+    session_id: str,
+    event_timestamp: str,
+    source_file: str,
+    cwd: str,
+    total_tokens: int,
+):
+    base = _usage_event(
+        record_id=record_id,
+        session_id=session_id,
+        thread_key=f"thread:{record_id}",
+        event_timestamp=event_timestamp,
+        cumulative_total_tokens=total_tokens,
+    )
+    return replace(
+        base,
+        source_file=source_file,
+        cwd=cwd,
+        total_tokens=total_tokens,
+        input_tokens=total_tokens,
+        cached_input_tokens=0,
+        output_tokens=0,
+        reasoning_output_tokens=0,
+    )
 
 
 def _function_call(call_id: str, command: str) -> dict[str, object]:
