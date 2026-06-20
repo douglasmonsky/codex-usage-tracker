@@ -23,6 +23,37 @@ _OUTPUT_OMITTED = (
     "Tool output hidden for this request. Reload with include_tool_output=true to inspect "
     "redacted, size-limited output."
 )
+_SAFE_STRUCTURED_EVENT_TYPES = frozenset(
+    {
+        "image_generation_end",
+        "mcp_tool_call_end",
+        "patch_apply_end",
+        "skill_completed",
+        "skill_invoked",
+        "skill_selected",
+        "skill_started",
+        "skill_used",
+        "task_complete",
+        "thread_rolled_back",
+        "turn_aborted",
+        "web_search_end",
+    }
+)
+_SAFE_STRUCTURED_EVENT_FIELDS = (
+    "type",
+    "call_id",
+    "turn_id",
+    "phase",
+    "status",
+    "duration_ms",
+    "num_turns",
+    "started_at",
+    "completed_at",
+    "time_to_first_token_ms",
+    "tool_name",
+    "server_name",
+    "skill_name",
+)
 
 
 def load_call_context(
@@ -166,6 +197,7 @@ def _read_context_entries(
     current_turn_id: str | None = None
     collecting = target_turn_id is None
     pending_compactions: list[dict[str, Any]] = []
+    pending_diagnostic_events: list[dict[str, Any]] = []
     full_serialized_analysis = context_mode == CONTEXT_MODE_FULL
     encoding, estimator = (
         _context_encoding(model or "")
@@ -225,8 +257,10 @@ def _read_context_entries(
                         )
                     )
                     candidates.extend(pending_compactions)
+                    candidates.extend(pending_diagnostic_events)
                     candidates.extend(carried_compactions)
                 pending_compactions = []
+                pending_diagnostic_events = []
                 continue
 
             if collecting:
@@ -259,6 +293,22 @@ def _read_context_entries(
                         summarized,
                     )
                 ]
+                continue
+
+            if (
+                not collecting
+                and summarized is not None
+                and summarized.get("carry_into_next_turn") is True
+            ):
+                pending_diagnostic_events = [
+                    *pending_diagnostic_events,
+                    _summarized_context_entry(
+                        line_number,
+                        timestamp,
+                        entry_type,
+                        summarized,
+                    ),
+                ][-8:]
                 continue
 
             if not collecting:
@@ -590,6 +640,10 @@ def _summarize_event_msg(
             "token_usage": token_usage,
         }
 
+    safe_structured = _summarize_safe_structured_event(event_type, payload)
+    if safe_structured is not None:
+        return safe_structured
+
     if "message" in payload:
         return {"label": event_type, "text": _optional_str(payload.get("message")) or ""}
 
@@ -606,6 +660,30 @@ def _summarize_event_msg(
         if key in payload
     }
     return {"label": event_type, "text": _jsonish(compact)} if compact else None
+
+
+def _summarize_safe_structured_event(
+    event_type: str,
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    if event_type not in _SAFE_STRUCTURED_EVENT_TYPES:
+        return None
+    compact: dict[str, Any] = {"type": event_type}
+    for key in _SAFE_STRUCTURED_EVENT_FIELDS:
+        if key == "type" or key not in payload:
+            continue
+        value = payload.get(key)
+        if _is_safe_structured_scalar(value):
+            compact[key] = value
+    return {
+        "label": event_type,
+        "text": _jsonish(compact),
+        "carry_into_next_turn": True,
+    }
+
+
+def _is_safe_structured_scalar(value: object) -> bool:
+    return value is None or isinstance(value, (str, int, float, bool))
 
 
 def _token_count_summary(info: dict[str, Any]) -> dict[str, Any]:
