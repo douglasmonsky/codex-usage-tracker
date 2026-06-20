@@ -120,6 +120,9 @@ codex-usage-tracker diagnostics summary
 codex-usage-tracker diagnostics facts --sort uncached
 codex-usage-tracker diagnostics compactions
 codex-usage-tracker diagnostics tools
+codex-usage-tracker diagnostics overview --refresh
+codex-usage-tracker diagnostics tool-output --refresh
+codex-usage-tracker diagnostics commands --refresh
 codex-usage-tracker diagnostics file-reads --refresh
 codex-usage-tracker diagnostics read-productivity --refresh
 codex-usage-tracker diagnostics concentration --refresh
@@ -127,6 +130,10 @@ codex-usage-tracker diagnostics fact-calls --fact-type compaction --fact-name po
 ```
 
 Diagnostics expose structured event patterns and their associated token totals. They can show compactions, tool/function/MCP activity, safe command families, structured skill labels, patch outcomes, task completion, search/read loops, and aborted or rolled-back turns. Associated totals are not causal allocations and are not additive when one model call has multiple diagnostic facts.
+
+Snapshot diagnostics are persisted aggregate reports. Without `--refresh`, snapshot commands return the latest stored payload or a `missing` status. With `--refresh`, they recompute from indexed source logs and replace the stored section snapshot. Ordinary `refresh`, `open-dashboard`, and dashboard `Refresh` update usage rows only; they do not recompute diagnostic snapshots.
+
+The snapshot sections answer different questions: `overview` summarizes usage rows and aggregate token totals, `tool-output` counts functions and terminal `Original token count` coverage, `commands` keeps command roots plus one safe child label, `file-reads` counts reader/path activity and allocated read-output tokens, `read-productivity` reports later-edit correlations for matching path keys, and `concentration` shows top-N token share by source/session, cwd/project, and day.
 
 Diagnostic payloads are aggregate-only. They do not include prompts, assistant text, tool arguments, tool output, patch text, raw commands, command arguments, file contents, raw absolute paths, or JSONL fragments. File-read diagnostics use basename-only path labels plus short irreversible hashes, read-productivity percentages are temporal correlations rather than proof that a read caused a later edit, and concentration reports use safe source/session, cwd, and day labels only.
 
