@@ -553,6 +553,10 @@ def query_diagnostic_facts(
     sort_map = {
         "uncached": "associated_uncached_input_tokens",
         "tokens": "associated_total_tokens",
+        "cached": "associated_cached_input_tokens",
+        "output": "associated_output_tokens",
+        "cache": "avg_cache_ratio",
+        "largest": "largest_call_tokens",
         "calls": "associated_calls",
         "occurrences": "occurrences",
         "time": "latest_event_timestamp",
@@ -681,6 +685,10 @@ def query_diagnostic_summary(
     sort_map = {
         "uncached": "associated_uncached_input_tokens",
         "tokens": "associated_total_tokens",
+        "cached": "associated_cached_input_tokens",
+        "output": "associated_output_tokens",
+        "cache": "avg_cache_ratio",
+        "largest": "largest_call_tokens",
         "calls": "associated_calls",
         "occurrences": "occurrences",
         "time": "latest_event_timestamp",

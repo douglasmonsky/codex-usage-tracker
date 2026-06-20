@@ -462,6 +462,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
         diagnostics_summary_payload = _read_json(f"{base_url}/api/diagnostics/summary?limit=5")
         diagnostics_facts_payload = _read_json(f"{base_url}/api/diagnostics/facts?limit=5")
+        diagnostics_sorted_facts_payload = _read_json(
+            f"{base_url}/api/diagnostics/facts?limit=5&sort=cached&direction=desc"
+        )
         diagnostics_compactions_payload = _read_json(
             f"{base_url}/api/diagnostics/compactions?limit=5"
         )
@@ -526,6 +529,9 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert {row["fact_name"] for row in diagnostics_facts_payload["rows"]} >= {
         "post_compaction"
     }
+    assert diagnostics_sorted_facts_payload["filters"]["sort"] == "cached"
+    assert diagnostics_sorted_facts_payload["filters"]["direction"] == "desc"
+    _assert_contract(diagnostics_sorted_facts_payload)
     assert diagnostics_compactions_payload["filters"]["fact_type"] == "compaction"
     _assert_contract(diagnostics_compactions_payload)
     assert {row["fact_type"] for row in diagnostics_compactions_payload["rows"]} == {
