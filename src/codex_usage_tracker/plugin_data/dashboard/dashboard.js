@@ -544,6 +544,7 @@
       loadedRowsDescription,
       refreshDashboardData,
       refreshDashboardIfStale,
+      refreshDashboardLive,
       rowHydrationTarget,
       rowsNeedHydration,
       scheduleAutoRefresh,
@@ -1253,6 +1254,15 @@
       activeView = view;
       resetVisibleRows();
       render();
+      if (!liveRefreshSupported) return;
+      scheduleAutoRefresh();
+      if (['calls', 'threads', 'insights'].includes(activeView)) {
+        if (rowsNeedHydration()) {
+          hydrateDashboardRows();
+        } else if (autoRefreshEl.checked) {
+          refreshDashboardLive();
+        }
+      }
     }
     async function routeBackToDashboard(view = 'calls') {
       activeView = ['calls', 'threads', 'insights'].includes(view) ? view : 'calls';
@@ -1286,10 +1296,16 @@
       const nextRows = payloadRows(nextPayload);
       if (applyOptions.appendRows) {
         data = mergedRows(data, nextRows);
+      } else if (applyOptions.prependRows) {
+        data = mergedRows(nextRows, data);
       } else if (applyOptions.preserveRows) {
         data = data.length ? data : nextRows;
       } else {
         data = nextRows;
+      }
+      if (applyOptions.trimRowsToTarget) {
+        const target = rowHydrationTarget();
+        if (target > 0 && data.length > target) data = data.slice(0, target);
       }
       summaryData = nextPayload.summary || summaryData;
       pricingConfigured = Boolean(nextPayload.pricing_configured);
@@ -1312,10 +1328,10 @@
       allHistoryAvailableRows = Number(nextPayload.all_history_available_rows || totalAvailableRows);
       archivedAvailableRows = Number(nextPayload.archived_available_rows || Math.max(allHistoryAvailableRows - activeAvailableRows, 0));
       includeArchived = Boolean(nextPayload.include_archived);
-      if (!applyOptions.appendRows) loadedLimit = payloadLimit(nextPayload);
-      if (!applyOptions.appendRows) supplementalRowsByRecordId = new Map();
+      if (!applyOptions.appendRows && !applyOptions.prependRows) loadedLimit = payloadLimit(nextPayload);
+      if (!applyOptions.appendRows && !applyOptions.prependRows && !applyOptions.preserveRows) supplementalRowsByRecordId = new Map();
       restoredAggregatePayloadFromCache = false;
-      if (!nextPayload.shell_boot && !applyOptions.appendRows) {
+      if (!nextPayload.shell_boot && !applyOptions.appendRows && !applyOptions.prependRows) {
         dashboardPayloadCache.writeAggregatePayloadCache({ ...nextPayload, api_token: apiToken });
       }
       rebuildDashboardIndexes();
@@ -1477,6 +1493,7 @@
       refreshDashboardData,
       refreshDashboardEl,
       refreshDashboardIfStale,
+      refreshDashboardLive,
       render,
       resetVisibleRows,
       routeBackToDashboard,

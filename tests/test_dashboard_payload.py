@@ -305,6 +305,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "direction: sortState.direction" in dashboard_diagnostics_js
     assert "diagnostics-expand-button" in dashboard_surface
     assert "selectedFactKey === key" in dashboard_diagnostics_js
+    assert "if (rowsNeedHydration())" in dashboard_js
+    assert "hydrateDashboardRows();" in dashboard_js
+    assert "refreshDashboardIfStale();" in dashboard_js
     assert "Needs Attention" in dashboard
     assert "Investigation Presets" in dashboard
     assert "presetDefinitions" in dashboard_insights_js

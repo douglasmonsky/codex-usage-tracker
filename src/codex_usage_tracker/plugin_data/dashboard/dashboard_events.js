@@ -42,6 +42,7 @@
       refreshDashboardData,
       refreshDashboardEl,
       refreshDashboardIfStale,
+      refreshDashboardLive,
       render,
       resetVisibleRows,
       routeBackToDashboard,
@@ -100,10 +101,10 @@
     autoRefreshEl.addEventListener('change', () => {
       scheduleAutoRefresh();
       updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.paused', `${autoRefreshEl.checked ? tf('live.every', { seconds: liveRefreshIntervalMs / 1000 }) : t('live.paused')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
-      if (autoRefreshEl.checked) refreshDashboardIfStale();
+      if (autoRefreshEl.checked) refreshDashboardLive();
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && autoRefreshEl.checked) refreshDashboardIfStale();
+      if (document.visibilityState === 'visible' && autoRefreshEl.checked) refreshDashboardLive();
     });
     document.addEventListener('keydown', event => {
       const target = event.target;

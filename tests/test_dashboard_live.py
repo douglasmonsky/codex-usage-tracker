@@ -128,6 +128,109 @@ def test_dashboard_live_allows_diagnostics_bootstrap_refresh() -> None:
     assert payload["statusKeys"] == ["status.checking", "status.updated"]
 
 
+def test_dashboard_live_prepends_new_rows_after_cached_index_refresh() -> None:
+    payload = _run_dashboard_live_script(
+        """
+(async () => {
+  const calls = [];
+  const appliedPayloads = [];
+  let totalRows = 4;
+  let data = [
+    { record_id: 'old-1' },
+    { record_id: 'old-2' },
+    { record_id: 'old-3' },
+    { record_id: 'old-4' },
+  ];
+  globalThis.__fetch = async (url, options) => {
+    calls.push({ url, headers: options.headers });
+    const isRefresh = url.includes('refresh=1');
+    return {
+      ok: true,
+      json: async () => ({
+        rows: isRefresh ? [] : [{ record_id: 'new-1' }],
+        refreshed_at: '2026-06-19T00:00:00Z',
+        refresh_result: {
+          inserted_or_updated_events: 1,
+          scanned_files: 1,
+          skipped_events: 0,
+        },
+        total_available_rows: 5,
+      }),
+    };
+  };
+  const runtime = factory.create({
+    activeView: () => 'calls',
+    apiToken: () => 'test-token',
+    applyDashboardPayload: (payload, options = {}) => {
+      appliedPayloads.push({
+        rows: (payload.rows || []).map(row => row.record_id),
+        options,
+      });
+      totalRows = payload.total_available_rows || totalRows;
+      if (options.prependRows) {
+        const incoming = payload.rows || [];
+        const incomingIds = new Set(incoming.map(row => row.record_id));
+        data = [...incoming, ...data.filter(row => !incomingIds.has(row.record_id))];
+      }
+    },
+    autoRefreshEl: { checked: true },
+    backgroundHydrationChunkSize: 2000,
+    formatTimestamp: value => value,
+    getArchivedAvailableRows: () => 0,
+    getData: () => data,
+    getIncludeArchived: () => false,
+    getLoadedLimit: () => 5000,
+    getTotalAvailableRows: () => totalRows,
+    historyScopeEl: { value: 'active', parentElement: {} },
+    i18n: { currentLanguage: 'en' },
+    initialHydrationChunkSize: 500,
+    latestRefreshAt: () => '',
+    limitValue: value => value === null ? 'all' : String(value),
+    liveRefreshIntervalMs: 10000,
+    liveRefreshSupported: true,
+    loadLimitEl: { value: '5000', options: [], lastElementChild: null, insertBefore: () => {} },
+    number: new Intl.NumberFormat('en-US'),
+    payloadRows: payload => payload.rows || [],
+    rebuildDashboardIndexes: () => {},
+    rebuildFilterOptions: () => {},
+    refreshDashboardEl: { disabled: false },
+    render: () => {},
+    resetRowsForHydration: () => {},
+    rowLoadProgressBarEl: { style: {} },
+    rowLoadProgressCountEl: { textContent: '' },
+    rowLoadProgressEl: { hidden: true },
+    rowLoadProgressLabelEl: { textContent: '' },
+    setFastTooltip: () => {},
+    t: key => key,
+    tf: (key, values = {}) => `${key}:${JSON.stringify(values)}`,
+    updateLiveStatus: () => {},
+  });
+  await runtime.refreshDashboardLive();
+  console.log(JSON.stringify({
+    urls: calls.map(call => call.url.replace(/_=[0-9]+/, '_=<ts>')),
+    tokens: calls.map(call => call.headers['X-Codex-Usage-Token']),
+    appliedPayloads,
+    data: data.map(row => row.record_id),
+  }));
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
+
+    assert payload["urls"] == [
+        "/api/usage?limit=5000&include_archived=0&lang=en&shell=1&_=<ts>&refresh=1",
+        "/api/usage?limit=1&offset=0&include_archived=0&lang=en&_=<ts>",
+    ]
+    assert payload["tokens"] == ["test-token", "test-token"]
+    assert payload["appliedPayloads"] == [
+        {"rows": [], "options": {"preserveRows": True}},
+        {"rows": ["new-1"], "options": {"prependRows": True, "trimRowsToTarget": True}},
+    ]
+    assert payload["data"] == ["new-1", "old-1", "old-2", "old-3", "old-4"]
+
+
 def test_dashboard_bootstraps_direct_diagnostics_view() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     dashboard_js = (
