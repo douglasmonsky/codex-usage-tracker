@@ -339,6 +339,30 @@ def _add_diagnostics_parser(
     )
     overview.add_argument("--json", action="store_true", dest="as_json")
 
+    tool_output = diagnostic_subparsers.add_parser(
+        "tool-output",
+        help="Show the on-demand aggregate tool-output snapshot",
+    )
+    tool_output.add_argument("--include-archived", action="store_true")
+    tool_output.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the tool-output snapshot before reading it.",
+    )
+    tool_output.add_argument("--json", action="store_true", dest="as_json")
+
+    commands = diagnostic_subparsers.add_parser(
+        "commands",
+        help="Show the on-demand aggregate command root snapshot",
+    )
+    commands.add_argument("--include-archived", action="store_true")
+    commands.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the command snapshot before reading it.",
+    )
+    commands.add_argument("--json", action="store_true", dest="as_json")
+
     fact_calls = diagnostic_subparsers.add_parser(
         "fact-calls",
         help="List calls associated with one diagnostic fact",

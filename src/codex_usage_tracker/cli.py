@@ -29,7 +29,11 @@ from codex_usage_tracker.diagnostic_reports import (
     build_diagnostics_facts_report,
     build_diagnostics_summary_report,
 )
-from codex_usage_tracker.diagnostic_snapshots import build_diagnostic_overview_report
+from codex_usage_tracker.diagnostic_snapshots import (
+    build_diagnostic_commands_report,
+    build_diagnostic_overview_report,
+    build_diagnostic_tool_output_report,
+)
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
     format_doctor,
@@ -452,6 +456,18 @@ def _run_diagnostics(args: argparse.Namespace) -> int:
         )
     elif command == "overview":
         report = build_diagnostic_overview_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "tool-output":
+        report = build_diagnostic_tool_output_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "commands":
+        report = build_diagnostic_commands_report(
             db_path=args.db,
             include_archived=args.include_archived,
             refresh=args.refresh,

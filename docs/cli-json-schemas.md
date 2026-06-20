@@ -48,6 +48,8 @@ Tracked schema ids:
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
+| `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
+| `codex-usage-tracker-diagnostic-commands-v1` | CLI `diagnostics commands --json`, dashboard server `/api/diagnostics/commands` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -324,6 +326,88 @@ Schema: `codex-usage-tracker-diagnostic-overview-v1`
 ```
 
 The overview snapshot is recomputed only when explicitly refreshed. Ordinary dashboard usage refreshes do not update diagnostic snapshots.
+
+## Diagnostic Tool Output Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics tool-output --json
+codex-usage-tracker diagnostics tool-output --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/tool-output`
+- `POST /api/diagnostics/tool-output/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-tool-output-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-tool-output-v1",
+  "section": "tool-output",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "function_calls": 1,
+    "function_outputs": 1,
+    "outputs_with_original_token_count": 1,
+    "outputs_missing_original_token_count": 0,
+    "original_token_sum": 42
+  },
+  "functions": [],
+  "command_roots": [],
+  "missing_reasons": [],
+  "notes": []
+}
+```
+
+The tool-output snapshot stores function names, conservative command roots, numeric counts, and terminal `Original token count` totals. It does not store raw tool output or command text.
+
+## Diagnostic Commands Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics commands --json
+codex-usage-tracker diagnostics commands --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/commands`
+- `POST /api/diagnostics/commands/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-commands-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-commands-v1",
+  "section": "commands",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "shell_function_calls": 1,
+    "command_root_count": 1,
+    "missing_command": 0
+  },
+  "commands": [
+    {
+      "root": "git",
+      "total": 1,
+      "children": [{"child": "status", "count": 1}]
+    }
+  ],
+  "notes": []
+}
+```
+
+The commands snapshot keeps only command roots and safe one-level child labels such as `status`, `diff`, or `-m:pytest`.
 
 ## Pricing Coverage
 
