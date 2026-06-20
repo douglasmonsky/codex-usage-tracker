@@ -29,7 +29,7 @@ SESSION_ID_RE = re.compile(
     r"rollout-[^-]+-[0-9T:-]+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
 )
 
-PARSER_ADAPTER_VERSION = "codex-jsonl-v1"
+PARSER_ADAPTER_VERSION = "codex-jsonl-v2"
 PARSER_DIAGNOSTIC_KEYS = (
     "invalid_json",
     "missing_payload",

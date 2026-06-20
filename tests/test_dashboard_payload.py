@@ -285,6 +285,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Associated token totals" in dashboard_diagnostics_js
     assert "Raw context remains on-demand" in dashboard_diagnostics_js
     assert "rowInvestigatorLink" in dashboard_diagnostics_js
+    assert "diagnostics-drilldown-row" in dashboard_diagnostics_js
+    assert 'td colspan="10"' in dashboard_diagnostics_js
+    assert "diagnostics-expand-button" in dashboard_surface
+    assert "selectedFactKey === key" in dashboard_diagnostics_js
     assert "Needs Attention" in dashboard
     assert "Investigation Presets" in dashboard
     assert "presetDefinitions" in dashboard_insights_js

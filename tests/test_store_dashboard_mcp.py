@@ -80,7 +80,7 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["inserted_or_updated_events"] == "0"
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
-    assert meta["parser_adapter"] == "codex-jsonl-v1"
+    assert meta["parser_adapter"] == "codex-jsonl-v2"
     assert meta["schema_version"] == "9"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
@@ -191,6 +191,96 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
     assert metadata["parsed_source_files"] == "0"
     assert metadata["skipped_source_files"] == "3"
+
+
+def test_refresh_reparses_source_when_parser_adapter_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c000"
+    codex_home = tmp_path / ".codex"
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Parser adapter diagnostics",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry("event_msg", {"type": "patch_apply_end", "patch": "SECRET PATCH"}),
+            _token_event(100, 100),
+        ],
+    )
+    first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        source_before = conn.execute(
+            """
+            SELECT parsed_until_byte, parser_adapter
+            FROM source_files
+            WHERE source_file = ?
+            """,
+            (str(log_path),),
+        ).fetchone()
+        conn.execute("DELETE FROM call_diagnostic_facts")
+        conn.execute(
+            "UPDATE source_files SET parser_adapter = ? WHERE source_file = ?",
+            ("codex-jsonl-v0", str(log_path)),
+        )
+    parse_calls: list[dict[str, Any]] = []
+    original_parse = store_module.parse_usage_events_from_file_with_state
+
+    def tracking_parse(*args: Any, **kwargs: Any):
+        parse_calls.append(
+            {
+                "path": args[0],
+                "start_byte": kwargs.get("start_byte"),
+                "start_line": kwargs.get("start_line"),
+                "initial_state": kwargs.get("initial_state"),
+            }
+        )
+        return original_parse(*args, **kwargs)
+
+    monkeypatch.setattr(
+        store_module,
+        "parse_usage_events_from_file_with_state",
+        tracking_parse,
+    )
+
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    facts = query_diagnostic_facts(db_path=db_path, limit=0)
+
+    assert first.parsed_events == 1
+    assert source_before is not None
+    assert source_before["parsed_until_byte"] > 0
+    assert source_before["parser_adapter"] == "codex-jsonl-v2"
+    assert len(parse_calls) == 1
+    assert parse_calls[0] == {
+        "path": log_path,
+        "start_byte": 0,
+        "start_line": 0,
+        "initial_state": None,
+    }
+    assert second.parsed_events == 1
+    assert second.inserted_or_updated_events == 1
+    assert [row["fact_name"] for row in facts] == ["patch_applied"]
+    assert "SECRET PATCH" not in json.dumps(facts)
 
 
 def test_append_cursor_preserves_pending_call_origin_between_refreshes(

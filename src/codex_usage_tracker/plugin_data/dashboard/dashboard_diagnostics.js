@@ -99,6 +99,11 @@
     async function fetchFactCalls(factType, factName) {
       const key = factKey(factType, factName);
       const signature = activeSignature;
+      if (selectedFactKey === key) {
+        selectedFactKey = '';
+        renderIfActive();
+        return;
+      }
       selectedFactKey = key;
       const cached = factCallPayloads.get(key);
       if (cached && cached.status === 'ready') {
@@ -166,7 +171,6 @@
 
     function renderFactSection(title, caption, payload, loading) {
       const rows = Array.isArray(payload?.rows) ? payload.rows : [];
-      const hasSelectedFact = rows.some(row => factKey(row.fact_type, row.fact_name) === selectedFactKey);
       return `
         <div class="diagnostics-section">
           <div class="diagnostics-section-header">
@@ -177,7 +181,6 @@
             <span>${escapeHtml(payload ? `${number.format(payload.total_matched_rows || rows.length)} matched` : loading ? 'Loading' : 'No payload')}</span>
           </div>
           ${renderFactTable(rows, loading)}
-          ${hasSelectedFact ? renderFactCallsPanel() : ''}
         </div>
       `;
     }
@@ -207,8 +210,13 @@
             <td class="num">${pct(row.avg_cache_ratio)}</td>
             <td class="num">${largest}</td>
             <td>${escapeHtml(formatTimestamp(row.latest_event_timestamp || ''))}</td>
-            <td><button class="toolbar-button" type="button" data-diagnostics-fact-type="${escapeHtml(row.fact_type || '')}" data-diagnostics-fact-name="${escapeHtml(row.fact_name || '')}">Calls</button></td>
+            <td><button class="toolbar-button diagnostics-expand-button" type="button" aria-expanded="${selected ? 'true' : 'false'}" aria-label="${selected ? 'Hide associated calls' : 'Show associated calls'}" data-diagnostics-fact-type="${escapeHtml(row.fact_type || '')}" data-diagnostics-fact-name="${escapeHtml(row.fact_name || '')}">${selected ? '-' : '+'}</button></td>
           </tr>
+          ${selected ? `
+            <tr class="diagnostics-drilldown-row">
+              <td colspan="10">${renderFactCallsPanel()}</td>
+            </tr>
+          ` : ''}
         `;
       }).join('');
       return `

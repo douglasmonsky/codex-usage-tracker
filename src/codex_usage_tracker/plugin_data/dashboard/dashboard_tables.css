@@ -269,6 +269,18 @@
       border-color: #bfdbfe;
       background: #eff6ff;
     }
+    .diagnostics-drilldown-row > td {
+      padding: 0 10px 12px 10px;
+      background: #f8fbff;
+    }
+    .diagnostics-drilldown-row .diagnostics-drilldown {
+      margin-top: 2px;
+    }
+    .diagnostics-expand-button {
+      min-width: 32px;
+      font-size: 16px;
+      line-height: 1;
+    }
     .diagnostics-section-header {
       display: flex;
       align-items: flex-start;

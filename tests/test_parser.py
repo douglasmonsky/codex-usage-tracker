@@ -489,7 +489,7 @@ def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: P
 
     payload = inspect_log(log_path)
 
-    assert payload["adapter"] == "codex-jsonl-v1"
+    assert payload["adapter"] == "codex-jsonl-v2"
     assert payload["file_session_id"] is None
     assert payload["event_count"] == 1
     assert payload["session_ids"] == [SESSION_ID]
@@ -514,7 +514,7 @@ def test_cli_inspect_log_outputs_parser_summary(tmp_path: Path) -> None:
         env=_subprocess_env(),
     )
 
-    assert "Adapter: codex-jsonl-v1" in result.stdout
+    assert "Adapter: codex-jsonl-v2" in result.stdout
     assert "Parsed events: 1" in result.stdout
     assert "Diagnostics: none" in result.stdout
 
