@@ -37,7 +37,7 @@ vm.runInContext(code, context);
 
 const manager = context.window.CodexUsageDashboardState;
 const expected = {{
-  view: 'threads',
+  view: 'diagnostics',
   search: 'Thread Alpha',
   model: 'gpt-5.5',
   effort: 'high',
@@ -93,7 +93,7 @@ console.log(JSON.stringify({{ actual, external, hash: parsed.hash, defaultSearch
     assert payload["hash"] == "#details"
     assert payload["defaultSearch"] == "?external=keep"
     assert payload["actual"] == {
-        "view": "threads",
+        "view": "diagnostics",
         "search": "Thread Alpha",
         "model": "gpt-5.5",
         "effort": "high",

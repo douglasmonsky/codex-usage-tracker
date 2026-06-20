@@ -20,6 +20,7 @@ from codex_usage_tracker.reports import build_query_report
 from codex_usage_tracker.store import (
     export_usage_csv,
     query_dashboard_events,
+    query_diagnostic_facts,
     query_session_usage,
     refresh_usage_index,
 )
@@ -53,6 +54,7 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
 
     refresh_usage_index(codex_home=fixture.codex_home, db_path=db_path)
     raw_rows = query_dashboard_events(db_path=db_path, limit=0)
+    diagnostic_facts = query_diagnostic_facts(db_path=db_path, limit=0)
     strict_payload = dashboard_payload(
         db_path=db_path,
         limit=0,
@@ -78,6 +80,7 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
     aggregate_outputs = [
         db_path.read_bytes().decode("utf-8", errors="ignore"),
         json.dumps(raw_rows),
+        json.dumps(diagnostic_facts),
         json.dumps(strict_payload),
         dashboard_path.read_text(encoding="utf-8"),
         csv_path.read_text(encoding="utf-8"),
@@ -113,6 +116,7 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
     assert PRIVATE_TAG not in json.dumps(strict_payload)
     assert PRIVATE_BRANCH not in csv_path.read_text(encoding="utf-8")
     assert PRIVATE_TAG not in csv_path.read_text(encoding="utf-8")
+    assert all(row["raw_content_included"] == 0 for row in diagnostic_facts)
 
 
 def test_privacy_modes_cover_dashboard_query_session_and_csv(tmp_path: Path) -> None:

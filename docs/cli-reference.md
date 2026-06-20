@@ -113,6 +113,20 @@ Useful investigations:
 - Use `expensive --limit 10` for a quick list of the highest-cost calls.
 - Use `recommendations --json` for ranked action rows and thread rollups with severity score, primary recommendation, and secondary signals.
 
+## Diagnostics
+
+```bash
+codex-usage-tracker diagnostics summary
+codex-usage-tracker diagnostics facts --sort uncached
+codex-usage-tracker diagnostics compactions
+codex-usage-tracker diagnostics tools
+codex-usage-tracker diagnostics fact-calls --fact-type compaction --fact-name post_compaction
+```
+
+Diagnostics expose structured event patterns and their associated token totals. They can show compactions, tool/function/MCP activity, safe command families, structured skill labels, patch outcomes, task completion, search/read loops, and aborted or rolled-back turns. Associated totals are not causal allocations and are not additive when one model call has multiple diagnostic facts.
+
+Diagnostic payloads are aggregate-only. They do not include prompts, assistant text, tool arguments, tool output, patch text, raw commands, command arguments, file contents, or JSONL fragments.
+
 ## JSON Queries
 
 ```bash

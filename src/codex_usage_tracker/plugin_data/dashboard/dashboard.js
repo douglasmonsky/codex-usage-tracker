@@ -12,6 +12,7 @@
     const dashboardActionsFactory = window.CodexUsageDashboardActions;
     const dashboardEventsFactory = window.CodexUsageDashboardEvents;
     const dashboardLiveFactory = window.CodexUsageDashboardLive;
+    const dashboardDiagnosticsFactory = window.CodexUsageDashboardDiagnostics;
     const {
       number,
       money,
@@ -134,6 +135,7 @@
     const insightsViewEl = document.getElementById('insightsView');
     const callsViewEl = document.getElementById('callsView');
     const threadsViewEl = document.getElementById('threadsView');
+    const diagnosticsViewEl = document.getElementById('diagnosticsView');
     const insightsPanelEl = document.getElementById('insightsPanel');
     const insightCardsEl = document.getElementById('insightCards');
     const presetListEl = document.getElementById('presetList');
@@ -155,6 +157,8 @@
     const rowLoadProgressLabelEl = document.getElementById('rowLoadProgressLabel');
     const rowLoadProgressCountEl = document.getElementById('rowLoadProgressCount');
     const rowLoadProgressBarEl = document.getElementById('rowLoadProgressBar');
+    const diagnosticsPanelEl = document.getElementById('diagnosticsPanel');
+    const usageTableEl = document.getElementById('usageTable');
     const toTopEl = document.getElementById('toTop');
     let rowByRecordId = new Map();
     let threadAttachmentByRecordId = new Map();
@@ -184,7 +188,7 @@
     const allowedDatePresets = new Set(Object.keys(datePresetLabels));
     const defaultDashboardView = 'calls';
     const defaultDashboardSort = 'time';
-    let activeView = ['calls', 'threads', 'insights', 'call'].includes(initialState.view) ? initialState.view : defaultDashboardView;
+    let activeView = ['calls', 'threads', 'insights', 'diagnostics', 'call'].includes(initialState.view) ? initialState.view : defaultDashboardView;
     document.body.dataset.activeView = activeView;
     let sortKey = optionValueExists(sortEl, initialState.sort) ? initialState.sort : sortEl.value || defaultDashboardSort;
     let sortDirection = ['asc', 'desc'].includes(initialState.direction) ? initialState.direction : defaultSortDirection(sortKey);
@@ -684,6 +688,19 @@
     function dateCaptionPrefix(range = currentDateRange()) {
       return range.active || range.invalid ? `${range.label}. ` : '';
     }
+    function diagnosticApiFilters(dateRange = currentDateRange()) {
+      const range = dateRange || currentDateRange();
+      const filters = {
+        include_archived: includeArchived ? '1' : '0',
+      };
+      if (modelEl.value) filters.model = modelEl.value;
+      if (effortEl.value) filters.effort = effortEl.value;
+      if (range.active && !range.invalid) {
+        if (range.start) filters.since = localDateKey(range.start);
+        if (range.endExclusive) filters.until = localDateKey(addDays(range.endExclusive, -1));
+      }
+      return filters;
+    }
     function filtered(dateRange = currentDateRange()) {
       const term = searchEl.value.trim().toLowerCase();
       const model = modelEl.value;
@@ -854,6 +871,29 @@
       syncUrlState,
       tableUrlForRow,
     } = dashboardActions;
+    const dashboardDiagnostics = dashboardDiagnosticsFactory.create({
+      apiToken: () => apiToken,
+      diagnosticsPanelEl,
+      escapeHtml,
+      formatTimestamp,
+      getDiagnosticFilters: diagnosticApiFilters,
+      isActive: () => activeView === 'diagnostics',
+      liveRefreshSupported,
+      number,
+      openInvestigatorUrl,
+      pagerEl,
+      pct,
+      renderDashboard: () => render(),
+      renderTimeCell,
+      rowInvestigatorLink,
+      rowLoadProgressEl,
+      rowsEl,
+      tableCaptionEl,
+      tableTitleEl,
+      t,
+      tooltipAttributes,
+      usageTableEl,
+    });
     const dashboardAnalysis = dashboardAnalysisFactory.create({
       cachedInputTokens,
       callInitiatorText,
@@ -1094,11 +1134,14 @@
     function render() {
       rowsEl.textContent = '';
       document.body.dataset.activeView = activeView;
+      dashboardDiagnostics.setActive(activeView === 'diagnostics');
+      exportVisibleEl.hidden = activeView === 'diagnostics';
       updateSortControls();
       if (activeView === 'call') {
         insightsViewEl.setAttribute('aria-pressed', 'false');
         callsViewEl.setAttribute('aria-pressed', 'false');
         threadsViewEl.setAttribute('aria-pressed', 'false');
+        diagnosticsViewEl.setAttribute('aria-pressed', 'false');
         callInvestigator.renderCallInvestigator(Array.from(rowByRecordId.values()));
         fitModelPills();
         syncUrlState();
@@ -1124,9 +1167,12 @@
       insightsViewEl.setAttribute('aria-pressed', activeView === 'insights' ? 'true' : 'false');
       callsViewEl.setAttribute('aria-pressed', activeView === 'calls' ? 'true' : 'false');
       threadsViewEl.setAttribute('aria-pressed', activeView === 'threads' ? 'true' : 'false');
+      diagnosticsViewEl.setAttribute('aria-pressed', activeView === 'diagnostics' ? 'true' : 'false');
       renderInsightPanel(rows);
       if (activeView === 'call') {
         callInvestigator.renderCallInvestigator(rows);
+      } else if (activeView === 'diagnostics') {
+        dashboardDiagnostics.renderDiagnostics(dateRange);
       } else if (activeView === 'threads') {
         renderThreads(rows);
       } else if (activeView === 'insights') {
@@ -1274,6 +1320,7 @@
       }
       rebuildDashboardIndexes();
       rebuildFilterOptions();
+      dashboardDiagnostics.invalidate();
       updatePricingSourceLine();
       updateAllowanceSourceLine();
       updatePrivacyModeLine();
@@ -1398,6 +1445,7 @@
       dateStartEl,
       defaultSortDirection,
       detailToggleEl,
+      diagnosticsViewEl,
       effortEl,
       exportCurrentRows,
       exportVisibleEl,
@@ -1474,6 +1522,13 @@
     } else if (activeView === 'call') {
       autoRefreshEl.checked = false;
       updateLiveStatus('badge.live', `${t('dashboard.view.call')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+    } else if (activeView === 'diagnostics') {
+      updateLiveStatus('badge.live', `${t('dashboard.view.diagnostics')}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
+      refreshDashboardData(false, {
+        refreshLogs: false,
+        resetRows: true,
+        allowDiagnosticsBootstrap: true,
+      });
     } else {
       updateLiveStatus('badge.live', `${tf('live.every', { seconds: liveRefreshIntervalMs / 1000 })}. ${loadedRowsDescription()}. ${historyRowsDescription()}`);
       scheduleAutoRefresh();

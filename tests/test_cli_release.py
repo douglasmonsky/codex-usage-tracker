@@ -26,6 +26,7 @@ STABLE_CLI_COMMANDS = {
     "summary",
     "query",
     "recommendations",
+    "diagnostics",
     "session",
     "context",
     "dashboard",

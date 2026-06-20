@@ -24,6 +24,12 @@
         overflow-y: clip;
       }
     }
+    body[data-active-view="diagnostics"] .grid {
+      display: block;
+    }
+    body[data-active-view="diagnostics"] .detail-section {
+      display: none;
+    }
     .detail-section {
       position: sticky;
       top: 14px;

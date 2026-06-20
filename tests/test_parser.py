@@ -12,6 +12,7 @@ from codex_usage_tracker.parser import (
     inspect_log,
     load_session_index,
     parse_usage_events_from_file,
+    parse_usage_events_from_file_with_state,
 )
 
 SESSION_ID = "019e374d-c19f-7da3-a44f-8de043a7a64e"
@@ -290,6 +291,153 @@ def test_parser_persists_call_origin_from_metadata_segments(tmp_path: Path) -> N
     assert "SECRET" not in json.dumps([event.to_row() for event in events])
 
 
+def test_parser_collects_diagnostic_facts_between_token_counts(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "output": "SECRET TOOL OUTPUT",
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "output": "SECRET SECOND TOOL OUTPUT",
+                },
+            ),
+            _entry(
+                "event_msg",
+                {
+                    "type": "patch_apply_end",
+                    "patch": "SECRET PATCH TEXT",
+                },
+            ),
+            _token_event(100, 100),
+            _entry(
+                "event_msg",
+                {
+                    "type": "context_compacted",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {"type": "output_text", "text": "SECRET COMPACTION TEXT"}
+                            ],
+                        }
+                    ],
+                },
+            ),
+            _token_event(150, 50),
+        ],
+    )
+
+    parsed = parse_usage_events_from_file_with_state(log_path)
+
+    assert [event.cumulative_total_tokens for event in parsed.events] == [100, 150]
+    facts = {(fact.fact_type, fact.fact_name): fact for fact in parsed.diagnostic_facts}
+    assert set(facts) == {
+        ("compaction", "post_compaction"),
+        ("outcome", "patch_applied"),
+        ("tool", "function_call_output"),
+    }
+    assert facts[("tool", "function_call_output")].record_id == parsed.events[0].record_id
+    assert facts[("tool", "function_call_output")].event_count == 2
+    assert facts[("outcome", "patch_applied")].record_id == parsed.events[0].record_id
+    assert facts[("compaction", "post_compaction")].record_id == parsed.events[1].record_id
+    assert all(fact.raw_content_included == 0 for fact in parsed.diagnostic_facts)
+    assert "SECRET" not in json.dumps(
+        [fact.to_row() for fact in parsed.diagnostic_facts],
+        sort_keys=True,
+    )
+
+
+def test_parser_classifies_richer_diagnostic_detectors_without_raw_content(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "name": "functions.exec_command",
+                    "arguments": json.dumps(
+                        {"cmd": "pytest tests/test_private_customer.py -k SECRET_CUSTOMER"}
+                    ),
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "name": "functions.exec_command",
+                    "arguments": json.dumps({"cmd": "rg -n SECRET_CUSTOMER private"}),
+                },
+            ),
+            _entry("response_item", {"type": "tool_search_call"}),
+            _entry("response_item", {"type": "tool_search_output", "output": "SECRET SEARCH"}),
+            _entry("event_msg", {"type": "web_search_end", "query": "SECRET SEARCH"}),
+            _entry(
+                "event_msg",
+                {
+                    "type": "mcp_tool_call_end",
+                    "tool_name": "mcp__github__search_issues",
+                    "server_name": "github",
+                    "arguments": {"query": "SECRET MCP ARGUMENT"},
+                },
+            ),
+            _entry(
+                "event_msg",
+                {"type": "skill_started", "skill_name": "codex-usage-tracker"},
+            ),
+            _entry("event_msg", {"type": "turn_aborted", "reason": "SECRET ABORT"}),
+            _entry("event_msg", {"type": "thread_rolled_back", "reason": "SECRET ROLLBACK"}),
+            _token_event(100, 100),
+        ],
+    )
+
+    parsed = parse_usage_events_from_file_with_state(log_path)
+
+    assert len(parsed.events) == 1
+    facts = {(fact.fact_type, fact.fact_name): fact for fact in parsed.diagnostic_facts}
+    assert {
+        ("activity", "search_read_command"),
+        ("command_family", "pytest"),
+        ("command_family", "unknown_command"),
+        ("function", "functions.exec_command"),
+        ("loop", "retry_or_abort_loop"),
+        ("loop", "search_read_loop"),
+        ("mcp_server", "github"),
+        ("mcp_tool", "mcp__github__search_issues"),
+        ("outcome", "thread_rolled_back"),
+        ("outcome", "turn_aborted"),
+        ("skill", "codex-usage-tracker"),
+    } <= set(facts)
+    assert facts[("function", "functions.exec_command")].event_count == 2
+    assert facts[("loop", "search_read_loop")].event_count >= 3
+    assert facts[("loop", "retry_or_abort_loop")].event_count == 2
+    serialized = json.dumps(
+        [fact.to_row() for fact in parsed.diagnostic_facts],
+        sort_keys=True,
+    )
+    assert "SECRET" not in serialized
+    assert "test_private_customer" not in serialized
+    assert "rg -n" not in serialized
+    assert all(fact.raw_content_included == 0 for fact in parsed.diagnostic_facts)
+
+
 def test_parser_persists_dashboard_helper_metadata(tmp_path: Path) -> None:
     log_path = (
         tmp_path
@@ -341,7 +489,7 @@ def test_inspect_log_reports_aggregate_diagnostics_without_db_writes(tmp_path: P
 
     payload = inspect_log(log_path)
 
-    assert payload["adapter"] == "codex-jsonl-v1"
+    assert payload["adapter"] == "codex-jsonl-v2"
     assert payload["file_session_id"] is None
     assert payload["event_count"] == 1
     assert payload["session_ids"] == [SESSION_ID]
@@ -366,7 +514,7 @@ def test_cli_inspect_log_outputs_parser_summary(tmp_path: Path) -> None:
         env=_subprocess_env(),
     )
 
-    assert "Adapter: codex-jsonl-v1" in result.stdout
+    assert "Adapter: codex-jsonl-v2" in result.stdout
     assert "Parsed events: 1" in result.stdout
     assert "Diagnostics: none" in result.stdout
 

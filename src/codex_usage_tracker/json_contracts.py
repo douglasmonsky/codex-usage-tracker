@@ -126,6 +126,38 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    "codex-usage-tracker-diagnostics-v1": {
+        "required": {
+            "view": str,
+            "filters": dict,
+            "row_count": int,
+            "total_matched_rows": int,
+            "truncated": bool,
+            "raw_context_included": bool,
+            "rows": list,
+            "notes": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "model": (str, NoneType),
+                "effort": (str, NoneType),
+                "thread": (str, NoneType),
+                "min_tokens": (int, NoneType),
+                "fact_type": (str, NoneType),
+                "fact_name": (str, NoneType),
+                "fact_category": (str, NoneType),
+                "fact_group": (str, NoneType),
+                "include_archived": bool,
+                "sort": str,
+                "direction": str,
+                "limit": (int, NoneType),
+                "offset": int,
+                "privacy_mode": str,
+            }
+        },
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),

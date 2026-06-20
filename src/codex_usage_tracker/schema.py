@@ -90,3 +90,18 @@ USAGE_EVENT_REPAIR_COLUMNS = {
     for column in USAGE_EVENT_COLUMNS
     if column.repairable
 }
+
+DIAGNOSTIC_FACT_COLUMN_NAMES = (
+    "record_id",
+    "fact_type",
+    "fact_name",
+    "fact_category",
+    "event_count",
+    "confidence",
+    "first_event_timestamp",
+    "last_event_timestamp",
+    "first_source_line",
+    "last_source_line",
+    "evidence_scope",
+    "raw_content_included",
+)

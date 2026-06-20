@@ -71,7 +71,7 @@
       if (!rowLoadProgressEl) return;
       const target = rowHydrationTarget();
       const loaded = Math.min(getData().length, target || getData().length);
-      const shouldShow = activeView() !== 'call' && liveRefreshSupported && (rowHydrationInFlight || rowsNeedHydration() || rowHydrationError);
+      const shouldShow = !['call', 'diagnostics'].includes(activeView()) && liveRefreshSupported && (rowHydrationInFlight || rowsNeedHydration() || rowHydrationError);
       rowLoadProgressEl.hidden = !shouldShow;
       if (!shouldShow) return;
       const totalText = number.format(target || getTotalAvailableRows() || loaded);
@@ -119,7 +119,7 @@
     }
 
     async function hydrateDashboardRows(options = null) {
-      if (!liveRefreshSupported || activeView() === 'call') return;
+      if (!liveRefreshSupported || ['call', 'diagnostics'].includes(activeView())) return;
       const hydrateOptions = options || {};
       if (rowHydrationInFlight) {
         if (hydrateOptions.reset) rowHydrationRestartRequested = true;
@@ -150,7 +150,7 @@
       updateLiveStatus('status.checking', t('live.loading_rows'));
       updateRowLoadProgress();
       try {
-        while (getData().length < target && generation === rowHydrationGeneration && activeView() !== 'call') {
+        while (getData().length < target && generation === rowHydrationGeneration && !['call', 'diagnostics'].includes(activeView())) {
           const offset = getData().length;
           const remaining = target - offset;
           const chunkSize = Math.min(
@@ -174,7 +174,7 @@
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const payload = await response.json();
           if (payload.error) throw new Error(payload.error);
-          if (generation !== rowHydrationGeneration || activeView() === 'call') break;
+          if (generation !== rowHydrationGeneration || ['call', 'diagnostics'].includes(activeView())) break;
           const rows = payloadRows(payload);
           if (!rows.length) break;
           applyDashboardPayload(payload, { appendRows: true });
@@ -189,7 +189,7 @@
       } finally {
         rowHydrationInFlight = false;
         updateRowLoadProgress();
-        const shouldRestart = rowHydrationRestartRequested && activeView() !== 'call';
+        const shouldRestart = rowHydrationRestartRequested && !['call', 'diagnostics'].includes(activeView());
         rowHydrationRestartRequested = false;
         if (shouldRestart) {
           hydrateDashboardRows();
@@ -200,7 +200,7 @@
     }
 
     async function refreshDashboardIfStale() {
-      if (!liveRefreshSupported || !apiToken() || activeView() === 'call') return;
+      if (!liveRefreshSupported || !apiToken() || ['call', 'diagnostics'].includes(activeView())) return;
       try {
         const params = new URLSearchParams({
           include_archived: getIncludeArchived() ? '1' : '0',
@@ -234,9 +234,11 @@
         window.location.reload();
         return;
       }
-      if (activeView() === 'call' && !manual) return;
-      if (refreshInFlight) return;
       const refreshOptions = options || {};
+      const allowDiagnosticsBootstrap = Boolean(refreshOptions.allowDiagnosticsBootstrap);
+      if (activeView() === 'call' && !manual) return;
+      if (activeView() === 'diagnostics' && !manual && !allowDiagnosticsBootstrap) return;
+      if (refreshInFlight) return;
       const refreshLogs = refreshOptions.refreshLogs === undefined ? manual : Boolean(refreshOptions.refreshLogs);
       const resetRows = refreshOptions.resetRows !== undefined
         ? Boolean(refreshOptions.resetRows)
@@ -271,7 +273,7 @@
           rowHydrationComplete = false;
         }
         applyDashboardPayload(nextPayload);
-        if (activeView() !== 'call') hydrateDashboardRows({ reset: resetRows });
+        if (!['call', 'diagnostics'].includes(activeView())) hydrateDashboardRows({ reset: resetRows });
         const result = nextPayload.refresh_result || {};
         const indexed = result.inserted_or_updated_events === undefined
           ? ''
@@ -293,7 +295,7 @@
     function scheduleAutoRefresh() {
       if (autoRefreshTimer) window.clearInterval(autoRefreshTimer);
       autoRefreshTimer = null;
-      if (!autoRefreshEl.checked || !liveRefreshSupported || activeView() === 'call') return;
+      if (!autoRefreshEl.checked || !liveRefreshSupported || ['call', 'diagnostics'].includes(activeView())) return;
       autoRefreshTimer = window.setInterval(() => {
         if (document.visibilityState === 'visible') refreshDashboardIfStale();
       }, liveRefreshIntervalMs);

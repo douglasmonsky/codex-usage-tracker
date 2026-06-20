@@ -13,6 +13,7 @@ from typing import Any
 
 from codex_usage_tracker.models import UsageEvent
 from codex_usage_tracker.parser import (
+    PARSER_ADAPTER_VERSION,
     ParserState,
     compact_parser_diagnostics,
     parser_state_from_json,
@@ -47,7 +48,7 @@ def source_logs_requiring_parse(
         row = conn.execute(
             """
             SELECT size_bytes, mtime_ns, parsed_until_line
-                , parsed_until_byte, parser_state_json
+                , parsed_until_byte, parser_adapter, parser_state_json
             FROM source_files
             WHERE source_file = ?
             """,
@@ -61,6 +62,10 @@ def source_logs_requiring_parse(
         previous_byte = int(row["parsed_until_byte"])
         previous_line = int(row["parsed_until_line"])
         previous_state = parser_state_from_json(row["parser_state_json"])
+        previous_adapter = str(row["parser_adapter"] or "")
+        if previous_adapter != PARSER_ADAPTER_VERSION:
+            changed.append(SourceParsePlan(path=path))
+            continue
         if previous_state is None:
             changed.append(SourceParsePlan(path=path))
             continue
@@ -130,7 +135,7 @@ def upsert_source_file_metadata(
                     if latest_event
                     else parser_state.latest_event_timestamp
                 ),
-                "parser_adapter": "codex-jsonl-v1",
+                "parser_adapter": PARSER_ADAPTER_VERSION,
                 "parser_diagnostics_json": json.dumps(
                     compact_parser_diagnostics(diagnostics),
                     sort_keys=True,

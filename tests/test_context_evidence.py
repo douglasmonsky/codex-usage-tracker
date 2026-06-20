@@ -14,6 +14,7 @@ from store_dashboard_helpers import (
 
 from codex_usage_tracker.context import load_call_context
 from codex_usage_tracker.store import (
+    query_diagnostic_fact_calls,
     query_session_usage,
     refresh_usage_index,
 )
@@ -249,6 +250,72 @@ def test_context_carries_incoming_compaction_history_into_selected_turn(tmp_path
     assert "INCOMING REPLACEMENT HISTORY" in context_text
     assert "sk-proj-boundarysecret" not in context_text
     assert "[REDACTED_OPENAI_KEY]" in context_text
+
+
+def test_context_carries_safe_diagnostic_events_into_selected_turn(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-508941431112"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "06"
+        / "11"
+        / f"rollout-2026-06-11T22-25-00-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Diagnostic boundary",
+                "updated_at": "2026-06-11T22:35:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "before-diagnostic", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+            _entry(
+                "event_msg",
+                {
+                    "type": "thread_rolled_back",
+                    "num_turns": 1,
+                    "reason": "SECRET ROLLBACK",
+                },
+            ),
+            _entry("event_msg", {"type": "turn_aborted", "reason": "SECRET ABORT"}),
+            _entry("turn_context", {"turn_id": "after-diagnostic", "model": "gpt-5.5"}),
+            _token_event(300, 200),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    fact_calls = query_diagnostic_fact_calls(
+        db_path=db_path,
+        fact_type="outcome",
+        fact_name="thread_rolled_back",
+        limit=0,
+    )
+    target = next(
+        row
+        for row in query_session_usage(db_path=db_path, session_id=session_id)
+        if row["turn_id"] == "after-diagnostic"
+    )
+
+    context = load_call_context(target["record_id"], db_path=db_path)
+    entries_by_label = {entry["label"]: entry for entry in context["entries"]}
+    context_text = json.dumps(context)
+
+    assert [row["record_id"] for row in fact_calls] == [target["record_id"]]
+    assert entries_by_label["thread_rolled_back"]["line_number"] == 4
+    assert '"num_turns": 1' in entries_by_label["thread_rolled_back"]["text"]
+    assert entries_by_label["turn_aborted"]["line_number"] == 5
+    assert "SECRET ROLLBACK" not in context_text
+    assert "SECRET ABORT" not in context_text
 
 
 def test_context_dedupes_adjacent_chat_message_echoes(tmp_path: Path) -> None:

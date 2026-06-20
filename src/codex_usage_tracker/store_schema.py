@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -22,6 +22,7 @@ MIGRATION_NAMES = {
     6: "track source file refresh metadata",
     7: "persist source file parser cursors",
     8: "persist observed Codex usage snapshots",
+    9: "persist aggregate diagnostic facts",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -95,6 +96,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v8(conn)
         _record_migration_if_missing(conn, 8)
+    if user_version < 9:
+        _migrate_v9(conn)
+        _record_migration(conn, 9)
+    else:
+        _migrate_v9(conn)
+        _record_migration_if_missing(conn, 9)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -241,6 +248,34 @@ def _migrate_v8(conn: sqlite3.Connection) -> None:
             ON usage_events(event_timestamp)
             WHERE rate_limit_primary_used_percent IS NOT NULL
                OR rate_limit_secondary_used_percent IS NOT NULL;
+        """
+    )
+
+
+def _migrate_v9(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS call_diagnostic_facts (
+            record_id TEXT NOT NULL,
+            fact_type TEXT NOT NULL,
+            fact_name TEXT NOT NULL,
+            fact_category TEXT,
+            event_count INTEGER NOT NULL DEFAULT 1,
+            confidence TEXT NOT NULL DEFAULT 'medium',
+            first_event_timestamp TEXT,
+            last_event_timestamp TEXT,
+            first_source_line INTEGER,
+            last_source_line INTEGER,
+            evidence_scope TEXT NOT NULL DEFAULT 'between_token_counts',
+            raw_content_included INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (record_id, fact_type, fact_name),
+            FOREIGN KEY (record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_call_diagnostic_facts_type_name
+            ON call_diagnostic_facts(fact_type, fact_name);
+        CREATE INDEX IF NOT EXISTS idx_call_diagnostic_facts_record
+            ON call_diagnostic_facts(record_id);
         """
     )
 

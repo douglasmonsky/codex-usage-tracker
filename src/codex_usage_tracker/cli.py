@@ -24,6 +24,11 @@ from codex_usage_tracker.api_payloads import (
 from codex_usage_tracker.cli_parser import build_parser
 from codex_usage_tracker.context import load_call_context
 from codex_usage_tracker.dashboard import generate_dashboard
+from codex_usage_tracker.diagnostic_reports import (
+    build_diagnostics_fact_calls_report,
+    build_diagnostics_facts_report,
+    build_diagnostics_summary_report,
+)
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
     format_doctor,
@@ -385,6 +390,79 @@ def _run_recommendations(args: argparse.Namespace) -> int:
         return 0
     print(report.render())
     return 0
+
+
+def _run_diagnostics(args: argparse.Namespace) -> int:
+    command = args.diagnostics_command
+    if command == "summary":
+        report = build_diagnostics_summary_report(
+            db_path=args.db,
+            limit=args.limit,
+            since=args.since,
+            until=args.until,
+            model=args.model,
+            effort=args.effort,
+            thread=args.thread,
+            min_tokens=args.min_tokens,
+            fact_type=args.fact_type,
+            fact_name=args.fact_name,
+            fact_category=args.fact_category,
+            include_archived=args.include_archived,
+            sort=args.sort,
+            direction=args.direction,
+        )
+    elif command in {"facts", "compactions", "tools"}:
+        report = build_diagnostics_facts_report(
+            db_path=args.db,
+            limit=args.limit,
+            since=args.since,
+            until=args.until,
+            model=args.model,
+            effort=args.effort,
+            thread=args.thread,
+            min_tokens=args.min_tokens,
+            fact_type=_diagnostic_fact_type_filter(args),
+            fact_name=getattr(args, "fact_name", None),
+            fact_category=getattr(args, "fact_category", None),
+            include_archived=args.include_archived,
+            sort=args.sort,
+            direction=args.direction,
+            fact_group="tools" if command == "tools" else None,
+            view=command,
+        )
+    elif command == "fact-calls":
+        report = build_diagnostics_fact_calls_report(
+            db_path=args.db,
+            fact_type=args.fact_type,
+            fact_name=args.fact_name,
+            limit=args.limit,
+            offset=args.offset,
+            since=args.since,
+            until=args.until,
+            model=args.model,
+            effort=args.effort,
+            thread=args.thread,
+            min_tokens=args.min_tokens,
+            include_archived=args.include_archived,
+            sort=args.sort,
+            direction=args.direction,
+            privacy_mode=args.privacy_mode,
+        )
+    else:
+        raise ValueError(f"unknown diagnostics command: {command}")
+
+    if args.as_json:
+        _print_json(report.payload)
+        return 0
+    print(report.render())
+    return 0
+
+
+def _diagnostic_fact_type_filter(args: argparse.Namespace) -> str | None:
+    command = args.diagnostics_command
+    if command == "compactions":
+        return "compaction"
+    return getattr(args, "fact_type", None)
 
 
 def _run_session(args: argparse.Namespace) -> int:
@@ -805,6 +883,7 @@ _COMMAND_HANDLERS = {
     "summary": _run_summary,
     "query": _run_query,
     "recommendations": _run_recommendations,
+    "diagnostics": _run_diagnostics,
     "session": _run_session,
     "context": _run_context,
     "dashboard": _run_dashboard,

@@ -18,12 +18,14 @@ from store_dashboard_helpers import (
 )
 
 from codex_usage_tracker import store as store_module
+from codex_usage_tracker.diagnostic_reports import build_diagnostics_facts_report
 from codex_usage_tracker.models import UsageEvent
 from codex_usage_tracker.store import (
     connect,
     init_db,
     query_dashboard_event_count,
     query_dashboard_events,
+    query_diagnostic_facts,
     query_latest_observed_usage,
     query_most_expensive_calls,
     query_session_usage,
@@ -78,13 +80,13 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["inserted_or_updated_events"] == "0"
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
-    assert meta["parser_adapter"] == "codex-jsonl-v1"
-    assert meta["schema_version"] == "8"
+    assert meta["parser_adapter"] == "codex-jsonl-v2"
+    assert meta["schema_version"] == "9"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 8
+    assert state["schema_version"] == 9
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     with connect(db_path) as conn:
         init_db(conn)
         source_rows = [
@@ -191,6 +193,96 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert metadata["skipped_source_files"] == "3"
 
 
+def test_refresh_reparses_source_when_parser_adapter_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c000"
+    codex_home = tmp_path / ".codex"
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Parser adapter diagnostics",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry("event_msg", {"type": "patch_apply_end", "patch": "SECRET PATCH"}),
+            _token_event(100, 100),
+        ],
+    )
+    first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        source_before = conn.execute(
+            """
+            SELECT parsed_until_byte, parser_adapter
+            FROM source_files
+            WHERE source_file = ?
+            """,
+            (str(log_path),),
+        ).fetchone()
+        conn.execute("DELETE FROM call_diagnostic_facts")
+        conn.execute(
+            "UPDATE source_files SET parser_adapter = ? WHERE source_file = ?",
+            ("codex-jsonl-v0", str(log_path)),
+        )
+    parse_calls: list[dict[str, Any]] = []
+    original_parse = store_module.parse_usage_events_from_file_with_state
+
+    def tracking_parse(*args: Any, **kwargs: Any):
+        parse_calls.append(
+            {
+                "path": args[0],
+                "start_byte": kwargs.get("start_byte"),
+                "start_line": kwargs.get("start_line"),
+                "initial_state": kwargs.get("initial_state"),
+            }
+        )
+        return original_parse(*args, **kwargs)
+
+    monkeypatch.setattr(
+        store_module,
+        "parse_usage_events_from_file_with_state",
+        tracking_parse,
+    )
+
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    facts = query_diagnostic_facts(db_path=db_path, limit=0)
+
+    assert first.parsed_events == 1
+    assert source_before is not None
+    assert source_before["parsed_until_byte"] > 0
+    assert source_before["parser_adapter"] == "codex-jsonl-v2"
+    assert len(parse_calls) == 1
+    assert parse_calls[0] == {
+        "path": log_path,
+        "start_byte": 0,
+        "start_line": 0,
+        "initial_state": None,
+    }
+    assert second.parsed_events == 1
+    assert second.inserted_or_updated_events == 1
+    assert [row["fact_name"] for row in facts] == ["patch_applied"]
+    assert "SECRET PATCH" not in json.dumps(facts)
+
+
 def test_append_cursor_preserves_pending_call_origin_between_refreshes(
     tmp_path: Path,
 ) -> None:
@@ -258,6 +350,300 @@ def test_append_cursor_preserves_pending_call_origin_between_refreshes(
     assert "SECRET PENDING USER TEXT" not in source_rows_text
 
 
+def test_append_cursor_preserves_pending_diagnostic_facts_between_refreshes(
+    tmp_path: Path,
+) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c002"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Append cursor diagnostics",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "output": "SECRET PENDING TOOL OUTPUT",
+                },
+            ),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+
+    first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(_token_event(150, 50)) + "\n")
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    rows = query_session_usage(db_path=db_path, session_id=session_id)
+    facts = query_diagnostic_facts(db_path=db_path, limit=0)
+    with connect(db_path) as conn:
+        init_db(conn)
+        source_rows_text = json.dumps(
+            [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT parser_state_json FROM source_files WHERE source_file = ?",
+                    (str(log_path),),
+                ).fetchall()
+            ]
+        )
+
+    assert first.parsed_events == 1
+    assert second.parsed_events == 1
+    assert [row["cumulative_total_tokens"] for row in rows] == [100, 150]
+    assert len(facts) == 1
+    assert facts[0]["fact_name"] == "function_call_output"
+    assert facts[0]["associated_total_tokens"] == 50
+    assert facts[0]["largest_record_id"] == rows[-1]["record_id"]
+    assert facts[0]["raw_content_included"] == 0
+    assert "SECRET PENDING TOOL OUTPUT" not in source_rows_text
+    assert "SECRET PENDING TOOL OUTPUT" not in json.dumps(facts)
+
+
+def test_refresh_persists_diagnostic_facts_without_raw_content(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c003"
+    codex_home = tmp_path / ".codex"
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Diagnostic facts",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {"type": "function_call_output", "output": "SECRET TOOL OUTPUT"},
+            ),
+            _entry(
+                "event_msg",
+                {"type": "patch_apply_end", "patch": "SECRET PATCH TEXT"},
+            ),
+            _token_event(120, 120),
+            _entry(
+                "event_msg",
+                {
+                    "type": "context_compacted",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {"type": "output_text", "text": "SECRET COMPACTION TEXT"}
+                            ],
+                        }
+                    ],
+                },
+            ),
+            _token_event(200, 80),
+        ],
+    )
+
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    facts = query_diagnostic_facts(db_path=db_path, limit=0, sort="fact", direction="asc")
+    with connect(db_path) as conn:
+        init_db(conn)
+        persisted = [
+            dict(row)
+            for row in conn.execute(
+                "SELECT * FROM call_diagnostic_facts ORDER BY fact_type, fact_name"
+            ).fetchall()
+        ]
+
+    by_name = {row["fact_name"]: row for row in facts}
+    assert result.parsed_events == 2
+    assert set(by_name) == {"function_call_output", "patch_applied", "post_compaction"}
+    assert by_name["function_call_output"]["associated_total_tokens"] == 120
+    assert by_name["patch_applied"]["associated_total_tokens"] == 120
+    assert by_name["post_compaction"]["associated_total_tokens"] == 80
+    assert all(row["raw_content_included"] == 0 for row in persisted)
+    assert "SECRET" not in json.dumps(persisted, sort_keys=True)
+    assert "SECRET" not in json.dumps(facts, sort_keys=True)
+
+
+def test_refresh_persists_richer_diagnostic_detectors_without_command_text(
+    tmp_path: Path,
+) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c005"
+    codex_home = tmp_path / ".codex"
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Diagnostic detectors",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "name": "functions.exec_command",
+                    "arguments": json.dumps(
+                        {"cmd": "python -m pytest tests/test_secret_customer.py"}
+                    ),
+                },
+            ),
+            _entry(
+                "event_msg",
+                {
+                    "type": "mcp_tool_call_end",
+                    "tool_name": "mcp__calendar__search_events",
+                    "server_name": "google-calendar",
+                    "arguments": {"calendar": "SECRET CALENDAR"},
+                },
+            ),
+            _entry("event_msg", {"type": "skill_started", "skill_name": "brooks-test"}),
+            _token_event(120, 120),
+        ],
+    )
+
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    facts = query_diagnostic_facts(db_path=db_path, limit=0, sort="fact", direction="asc")
+    tools_payload = build_diagnostics_facts_report(
+        db_path=db_path,
+        fact_group="tools",
+        view="tools",
+    ).payload
+
+    by_key = {(row["fact_type"], row["fact_name"]): row for row in facts}
+    tool_types = {row["fact_type"] for row in tools_payload["rows"]}
+    assert result.parsed_events == 1
+    assert {"command_family", "function", "mcp_server", "mcp_tool", "skill", "tool"} <= tool_types
+    assert tools_payload["filters"]["fact_group"] == "tools"
+    assert by_key[("command_family", "pytest")]["associated_total_tokens"] == 120
+    assert by_key[("function", "functions.exec_command")]["associated_total_tokens"] == 120
+    assert by_key[("mcp_tool", "mcp__calendar__search_events")][
+        "associated_total_tokens"
+    ] == 120
+    assert by_key[("mcp_server", "google-calendar")]["associated_total_tokens"] == 120
+    assert by_key[("skill", "brooks-test")]["associated_total_tokens"] == 120
+    serialized = json.dumps(facts, sort_keys=True)
+    assert "SECRET" not in serialized
+    assert "test_secret_customer" not in serialized
+    assert "python -m pytest" not in serialized
+
+
+def test_full_reparse_replaces_stale_diagnostic_facts(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-50894143c004"
+    codex_home = tmp_path / ".codex"
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T18-58-27-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Diagnostic facts replace",
+                "updated_at": "2026-05-17T19:00:00Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _entry("event_msg", {"type": "patch_apply_end", "patch": "SECRET PATCH"}),
+            _token_event(100, 100),
+        ],
+    )
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    assert [row["fact_name"] for row in query_diagnostic_facts(db_path=db_path)] == [
+        "patch_applied"
+    ]
+
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-a", "model": "gpt-5.5"}),
+            _token_event(100, 100),
+        ],
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute(
+            """
+            UPDATE source_files
+            SET size_bytes = ?, mtime_ns = 0
+            WHERE source_file = ?
+            """,
+            (999_999, str(log_path)),
+        )
+
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        persisted_count = conn.execute(
+            "SELECT COUNT(*) AS count FROM call_diagnostic_facts"
+        ).fetchone()
+
+    assert second.parsed_events == 1
+    assert query_diagnostic_facts(db_path=db_path) == []
+    assert persisted_count is not None
+    assert persisted_count["count"] == 0
+
+
 def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     with connect(db_path) as conn:
@@ -268,7 +654,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 8
+    assert user_version == 9
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -341,8 +727,8 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "rate_limit_plan_type" in columns
     assert "rate_limit_primary_used_percent" in columns
     assert "idx_usage_observed_rate_limit_timestamp" in indexes
-    assert user_version == 8
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert user_version == 9
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
 def test_latest_observed_usage_prefers_normal_codex_limit_pool(tmp_path: Path) -> None:

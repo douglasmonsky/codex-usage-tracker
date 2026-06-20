@@ -7,6 +7,11 @@ from pathlib import Path
 
 from codex_usage_tracker import __version__
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS, DEFAULT_CONTEXT_ENTRIES
+from codex_usage_tracker.diagnostic_reports import (
+    DIAGNOSTIC_CALL_SORT_CHOICES,
+    DIAGNOSTIC_DIRECTION_CHOICES,
+    DIAGNOSTIC_FACT_SORT_CHOICES,
+)
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
@@ -70,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_summary_parser(subparsers)
     _add_query_parser(subparsers)
     _add_recommendations_parser(subparsers)
+    _add_diagnostics_parser(subparsers)
     _add_session_parser(subparsers)
     _add_context_parser(subparsers)
     _add_dashboard_parsers(subparsers)
@@ -279,6 +285,88 @@ def _add_recommendations_parser(
     recommendations.add_argument("--min-score", type=float)
     recommendations.add_argument("--limit", type=int, default=20, help="Maximum rows to return; use 0 for all")
     recommendations.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_diagnostics_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    diagnostics = subparsers.add_parser(
+        "diagnostics",
+        help="Inspect aggregate diagnostic facts and their associated token costs",
+    )
+    diagnostic_subparsers = diagnostics.add_subparsers(
+        dest="diagnostics_command",
+        required=True,
+    )
+
+    summary = diagnostic_subparsers.add_parser(
+        "summary",
+        help="Summarize diagnostic facts by fact type",
+    )
+    _add_diagnostics_fact_filters(summary)
+    _add_diagnostics_fact_sort(summary, default_limit=20)
+
+    facts = diagnostic_subparsers.add_parser(
+        "facts",
+        help="List diagnostic facts with associated token totals",
+    )
+    _add_diagnostics_fact_filters(facts)
+    _add_diagnostics_fact_sort(facts, default_limit=50)
+
+    compactions = diagnostic_subparsers.add_parser(
+        "compactions",
+        help="List compaction diagnostic facts",
+    )
+    _add_diagnostics_base_filters(compactions)
+    _add_diagnostics_fact_sort(compactions, default_limit=50)
+
+    tools = diagnostic_subparsers.add_parser(
+        "tools",
+        help="List tool/function diagnostic facts",
+    )
+    _add_diagnostics_base_filters(tools)
+    _add_diagnostics_fact_sort(tools, default_limit=50)
+
+    fact_calls = diagnostic_subparsers.add_parser(
+        "fact-calls",
+        help="List calls associated with one diagnostic fact",
+    )
+    fact_calls.add_argument("--fact-type", required=True)
+    fact_calls.add_argument("--fact-name", required=True)
+    _add_diagnostics_base_filters(fact_calls)
+    fact_calls.add_argument("--offset", type=int, default=0)
+    fact_calls.add_argument("--limit", type=int, default=50, help="Maximum rows; use 0 for all")
+    fact_calls.add_argument("--sort", choices=DIAGNOSTIC_CALL_SORT_CHOICES, default="tokens")
+    fact_calls.add_argument("--direction", choices=DIAGNOSTIC_DIRECTION_CHOICES, default="desc")
+    fact_calls.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_diagnostics_base_filters(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    parser.add_argument("--until", help="Only include calls at or before this ISO date/time")
+    parser.add_argument("--model")
+    parser.add_argument("--effort")
+    parser.add_argument("--thread")
+    parser.add_argument("--min-tokens", type=int)
+    parser.add_argument("--include-archived", action="store_true")
+
+
+def _add_diagnostics_fact_filters(parser: argparse.ArgumentParser) -> None:
+    _add_diagnostics_base_filters(parser)
+    parser.add_argument("--fact-type")
+    parser.add_argument("--fact-name")
+    parser.add_argument("--fact-category")
+
+
+def _add_diagnostics_fact_sort(
+    parser: argparse.ArgumentParser,
+    *,
+    default_limit: int,
+) -> None:
+    parser.add_argument("--limit", type=int, default=default_limit, help="Maximum rows; use 0 for all")
+    parser.add_argument("--sort", choices=DIAGNOSTIC_FACT_SORT_CHOICES, default="uncached")
+    parser.add_argument("--direction", choices=DIAGNOSTIC_DIRECTION_CHOICES, default="desc")
+    parser.add_argument("--json", action="store_true", dest="as_json")
 
 
 def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:

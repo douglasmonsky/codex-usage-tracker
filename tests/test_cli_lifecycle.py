@@ -336,6 +336,115 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     assert "[redacted cwd:" in csv_text
 
 
+def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
+    codex_home = _make_diagnostics_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "refresh",
+        "--codex-home",
+        str(codex_home),
+        "--json",
+    )
+    summary = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "summary",
+        "--json",
+    )
+    facts = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "facts",
+        "--limit",
+        "0",
+        "--json",
+    )
+    compactions = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "compactions",
+        "--json",
+    )
+    tools = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "tools",
+        "--json",
+    )
+    fact_calls = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "--privacy-mode",
+        "strict",
+        "diagnostics",
+        "fact-calls",
+        "--fact-type",
+        "compaction",
+        "--fact-name",
+        "post_compaction",
+        "--json",
+    )
+
+    assert refresh.returncode == 0
+    summary_payload = json.loads(summary.stdout)
+    facts_payload = json.loads(facts.stdout)
+    compactions_payload = json.loads(compactions.stdout)
+    tools_payload = json.loads(tools.stdout)
+    fact_calls_payload = json.loads(fact_calls.stdout)
+    for payload in (
+        summary_payload,
+        facts_payload,
+        compactions_payload,
+        tools_payload,
+        fact_calls_payload,
+    ):
+        _assert_contract(payload)
+        assert payload["schema"] == "codex-usage-tracker-diagnostics-v1"
+        assert payload["raw_context_included"] is False
+        assert "Associated token totals are not additive" in payload["notes"][0]
+
+    fact_names = {row["fact_name"] for row in facts_payload["rows"]}
+    assert {"function_call_output", "patch_applied", "post_compaction"} <= fact_names
+    assert summary_payload["view"] == "summary"
+    assert {row["fact_type"] for row in summary_payload["rows"]} >= {
+        "compaction",
+        "outcome",
+        "tool",
+    }
+    assert compactions_payload["filters"]["fact_type"] == "compaction"
+    assert {row["fact_type"] for row in compactions_payload["rows"]} == {"compaction"}
+    assert tools_payload["filters"]["fact_type"] is None
+    assert tools_payload["filters"]["fact_group"] == "tools"
+    assert {row["fact_type"] for row in tools_payload["rows"]} == {"tool"}
+    assert fact_calls_payload["view"] == "fact-calls"
+    assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
+    assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")
+    combined = json.dumps(
+        [
+            summary_payload,
+            facts_payload,
+            compactions_payload,
+            tools_payload,
+            fact_calls_payload,
+        ]
+    )
+    assert "SECRET" not in combined
+    assert "/tmp/private-diagnostics" not in json.dumps(fact_calls_payload)
+
+
 def _assert_contract(payload: object) -> None:
     assert validate_json_payload_contract(payload) == []
 
@@ -378,6 +487,62 @@ def _make_codex_home(tmp_path: Path) -> Path:
                 },
             ),
             _token_event(100, 100),
+        ],
+    )
+    return codex_home
+
+
+def _make_diagnostics_codex_home(tmp_path: Path) -> Path:
+    codex_home = tmp_path / ".codex"
+    log_dir = codex_home / "sessions" / "2026" / "05" / "17"
+    log_path = log_dir / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": SESSION_ID,
+                "thread_name": "Synthetic diagnostics test",
+                "updated_at": "2026-05-17T18:58:27Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry(
+                "turn_context",
+                {
+                    "turn_id": "turn-a",
+                    "model": "gpt-5.5",
+                    "cwd": "/tmp/private-diagnostics",
+                },
+            ),
+            _entry(
+                "response_item",
+                {"type": "function_call_output", "output": "SECRET TOOL OUTPUT"},
+            ),
+            _entry(
+                "event_msg",
+                {"type": "patch_apply_end", "patch": "SECRET PATCH TEXT"},
+            ),
+            _token_event(120, 120),
+            _entry(
+                "event_msg",
+                {
+                    "type": "context_compacted",
+                    "replacement_history": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [
+                                {"type": "output_text", "text": "SECRET COMPACTION TEXT"}
+                            ],
+                        }
+                    ],
+                },
+            ),
+            _token_event(220, 100),
         ],
     )
     return codex_home

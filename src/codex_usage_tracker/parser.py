@@ -15,14 +15,21 @@ from codex_usage_tracker.call_origin import (
     classify_call_origin,
     event_flags_from_envelope,
 )
-from codex_usage_tracker.models import SessionInfo, UsageEvent
+from codex_usage_tracker.diagnostic_facts import (
+    add_diagnostic_fact,
+    assign_record_id_to_diagnostic_facts,
+    diagnostic_fact_from_json,
+    diagnostic_fact_to_json,
+    diagnostic_facts_from_envelope,
+)
+from codex_usage_tracker.models import DiagnosticFact, SessionInfo, UsageEvent
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME
 
 SESSION_ID_RE = re.compile(
     r"rollout-[^-]+-[0-9T:-]+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
 )
 
-PARSER_ADAPTER_VERSION = "codex-jsonl-v1"
+PARSER_ADAPTER_VERSION = "codex-jsonl-v2"
 PARSER_DIAGNOSTIC_KEYS = (
     "invalid_json",
     "missing_payload",
@@ -44,8 +51,14 @@ KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset({
     "context_compacted",
     "image_generation_end",
     "item_completed",
+    "mcp_tool_call_begin",
     "mcp_tool_call_end",
     "patch_apply_end",
+    "skill_completed",
+    "skill_invoked",
+    "skill_selected",
+    "skill_started",
+    "skill_used",
     "task_complete",
     "task_started",
     "thread_goal_updated",
@@ -106,6 +119,7 @@ class ParserState:
     current_turn: dict[str, Any] = field(default_factory=dict)
     last_cumulative_total: int = -1
     call_origin_segment: tuple[CallOriginFlags, ...] = ()
+    diagnostic_facts_segment: tuple[DiagnosticFact, ...] = ()
     latest_record_id: str | None = None
     latest_event_timestamp: str | None = None
 
@@ -115,6 +129,7 @@ class ParsedUsageFile:
     """Parsed aggregate usage events plus the final parser cursor."""
 
     events: list[UsageEvent]
+    diagnostic_facts: list[DiagnosticFact]
     state: ParserState
 
 
@@ -213,12 +228,22 @@ def parser_state_from_json(raw: str | None) -> ParserState | None:
     segment = payload.get("call_origin_segment")
     if not isinstance(segment, list):
         segment = []
+    diagnostic_segment = payload.get("diagnostic_facts_segment")
+    if not isinstance(diagnostic_segment, list):
+        diagnostic_segment = []
     return ParserState(
         session_id=_optional_str(payload.get("session_id")),
         session_meta=_string_dict(payload.get("session_meta")),
         current_turn=_string_dict(payload.get("current_turn")),
         last_cumulative_total=_json_int(payload.get("last_cumulative_total"), -1),
         call_origin_segment=tuple(_call_origin_flags_from_json(item) for item in segment),
+        diagnostic_facts_segment=tuple(
+            fact
+            for fact in (
+                diagnostic_fact_from_json(item) for item in diagnostic_segment
+            )
+            if fact is not None
+        ),
         latest_record_id=_optional_str(payload.get("latest_record_id")),
         latest_event_timestamp=_optional_str(payload.get("latest_event_timestamp")),
     )
@@ -242,6 +267,9 @@ def parser_state_to_json(state: ParserState) -> str:
                     "codex_activity": flags.codex_activity,
                 }
                 for flags in state.call_origin_segment
+            ],
+            "diagnostic_facts_segment": [
+                diagnostic_fact_to_json(fact) for fact in state.diagnostic_facts_segment
             ],
             "latest_record_id": state.latest_record_id,
             "latest_event_timestamp": state.latest_event_timestamp,
@@ -336,7 +364,9 @@ def _parse_codex_jsonl_v1(
     )
     last_cumulative_total = previous_state.last_cumulative_total
     events: list[UsageEvent] = []
+    diagnostic_facts: list[DiagnosticFact] = []
     call_origin_segment: list[CallOriginFlags] = list(previous_state.call_origin_segment)
+    diagnostic_facts_segment = previous_state.diagnostic_facts_segment
     latest_record_id = previous_state.latest_record_id
     latest_event_timestamp = previous_state.latest_event_timestamp
 
@@ -383,6 +413,14 @@ def _parse_codex_jsonl_v1(
                 flags = event_flags_from_envelope(envelope)
                 if flags.has_signal:
                     call_origin_segment.append(flags)
+                for fact in diagnostic_facts_from_envelope(
+                    envelope,
+                    line_number=line_number,
+                ):
+                    diagnostic_facts_segment = add_diagnostic_fact(
+                        diagnostic_facts_segment,
+                        fact,
+                    )
                 if entry_type == "event_msg" and payload_type not in KNOWN_NON_TOKEN_EVENT_MSG_TYPES:
                     _increment_stat(stats, "unknown_event_shape")
                 continue
@@ -448,15 +486,24 @@ def _parse_codex_jsonl_v1(
             latest_record_id = event.record_id
             latest_event_timestamp = event.event_timestamp
             events.append(event)
+            diagnostic_facts.extend(
+                assign_record_id_to_diagnostic_facts(
+                    diagnostic_facts_segment,
+                    record_id=event.record_id,
+                )
+            )
+            diagnostic_facts_segment = ()
 
     return ParsedUsageFile(
         events=events,
+        diagnostic_facts=diagnostic_facts,
         state=ParserState(
             session_id=session_id,
             session_meta=session_meta,
             current_turn=current_turn,
             last_cumulative_total=last_cumulative_total,
             call_origin_segment=tuple(call_origin_segment),
+            diagnostic_facts_segment=diagnostic_facts_segment,
             latest_record_id=latest_record_id,
             latest_event_timestamp=latest_event_timestamp,
         ),

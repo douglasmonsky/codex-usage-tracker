@@ -65,7 +65,7 @@ The localhost server uses a random per-server token for refresh and context API 
 
 ![Insights view with ranked attention cards, investigation presets, and top threads by attention score.](assets/dashboard-insights.png)
 
-The dashboard opens in `Insights` view. This view is designed to answer "what needs attention?" before you start sorting tables.
+Open the `Insights` view when you want to answer "what needs attention?" before you start sorting tables.
 
 - `Needs Attention` cards rank costly threads, Codex allowance usage, low cache reuse, context bloat, unpriced usage, estimated pricing, and reasoning-output spikes from aggregate fields only.
 - `Investigation Presets` apply a view, derived filter, sort order, and explanatory caption together.
@@ -126,7 +126,17 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Expanded calls default to newest first. Click an expanded-call header such as `Time`, `Tokens`, `Cost`, or `Cache` to sort that thread's visible calls without changing the top-level Threads ranking.
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
 
-The same search, time range, confidence status, load limit, cards, and sort controls apply in `Insights`, `Calls`, and `Threads` views.
+## Diagnostics View
+
+Use `Diagnostics` view when you want to see what structured event patterns are happening and what token totals are associated with those patterns.
+
+- The tab consumes the localhost `/api/diagnostics/*` endpoints; static file dashboards show a live-API unavailable state.
+- The first table shows top diagnostic facts by associated uncached input tokens. Tool/function/MCP/command-family and compaction sections expose narrower slices of the same fact data.
+- Command diagnostics store only a command family such as `pytest`, `git`, or `unknown_command`. Skill and MCP labels are detected only when they are present as structured event metadata.
+- Click `Calls` on a fact row to load associated model calls. Call links and largest-call links open the Call Investigator, where raw context remains explicit and on demand.
+- Associated token totals are not causal allocations and are not additive when one call has multiple diagnostic facts.
+
+The same time range, model, reasoning, history scope, cards, and load controls apply in `Insights`, `Calls`, `Threads`, and `Diagnostics` views. Search, confidence, and sort controls currently scope the call/thread tables, not Diagnostics fact totals.
 
 ## Call Investigator
 
