@@ -297,6 +297,12 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "data-diagnostics-call-load-more" in dashboard_diagnostics_js
     assert "offset: String(offset)" in dashboard_diagnostics_js
     assert "mergeFactCallPayload" in dashboard_diagnostics_js
+    assert "data-diagnostics-call-sort-key" in dashboard_diagnostics_js
+    assert "data-diagnostics-call-sort-active" in dashboard_diagnostics_js
+    assert "sortFactCalls" in dashboard_diagnostics_js
+    assert "defaultFactCallSortDirection" in dashboard_diagnostics_js
+    assert "sort: sortState.sort" in dashboard_diagnostics_js
+    assert "direction: sortState.direction" in dashboard_diagnostics_js
     assert "diagnostics-expand-button" in dashboard_surface
     assert "selectedFactKey === key" in dashboard_diagnostics_js
     assert "Needs Attention" in dashboard

@@ -108,6 +108,9 @@
     th[data-thread-call-sort-active="true"] .sort-header {
       color: var(--ink);
     }
+    th[data-diagnostics-call-sort-active="true"] .sort-header {
+      color: var(--ink);
+    }
     .sort-indicator {
       display: inline-block;
       min-width: 12px;

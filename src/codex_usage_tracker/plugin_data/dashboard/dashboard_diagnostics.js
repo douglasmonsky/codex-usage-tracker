@@ -33,6 +33,7 @@
     let pendingScrollAnchor = null;
     const factCallPageSize = 25;
     const factCallPayloads = new Map();
+    const factCallSorts = new Map();
 
     function setActive(active) {
       diagnosticsPanelEl.hidden = !active;
@@ -50,6 +51,7 @@
       selectedFactKey = '';
       payloads = emptyPayloads();
       factCallPayloads.clear();
+      factCallSorts.clear();
     }
 
     function renderDiagnostics(dateRange) {
@@ -103,15 +105,17 @@
     async function fetchFactCalls(factType, factName, options = {}) {
       const key = factKey(factType, factName);
       const append = Boolean(options.append);
+      const force = Boolean(options.force);
       const signature = activeSignature;
-      if (!append && selectedFactKey === key) {
+      if (!append && !force && selectedFactKey === key) {
         selectedFactKey = '';
         renderIfActive();
         return;
       }
       selectedFactKey = key;
       const cached = factCallPayloads.get(key);
-      if (!append && cached && cached.status === 'ready') {
+      const sortState = factCallSortState(key);
+      if (!append && !force && cached && cached.status === 'ready' && cached.sort === sortState.sort && cached.direction === sortState.direction) {
         renderIfActive();
         return;
       }
@@ -124,6 +128,8 @@
         status: append ? 'appending' : 'loading',
         payload: previousPayload,
         error: '',
+        sort: sortState.sort,
+        direction: sortState.direction,
       });
       renderIfActive();
       try {
@@ -134,14 +140,16 @@
           fact_name: factName,
           limit: String(factCallPageSize),
           offset: String(offset),
-          sort: 'tokens',
-          direction: 'desc',
+          sort: sortState.sort,
+          direction: sortState.direction,
         });
         if (signature !== activeSignature) return;
         factCallPayloads.set(key, {
           status: 'ready',
           payload: append ? mergeFactCallPayload(previousPayload, payload) : payload,
           error: '',
+          sort: sortState.sort,
+          direction: sortState.direction,
         });
       } catch (error) {
         if (signature !== activeSignature) return;
@@ -149,9 +157,22 @@
           status: append && previousPayload ? 'ready' : 'error',
           payload: append ? previousPayload : null,
           error: error.message || String(error),
+          sort: sortState.sort,
+          direction: sortState.direction,
         });
       }
       renderIfActive();
+    }
+
+    function sortFactCalls(sortKey) {
+      if (!selectedFactKey || !diagnosticCallSortLabels()[sortKey]) return;
+      const current = factCallSortState(selectedFactKey);
+      const next = current.sort === sortKey
+        ? { sort: sortKey, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { sort: sortKey, direction: defaultFactCallSortDirection(sortKey) };
+      factCallSorts.set(selectedFactKey, next);
+      const [factType, factName] = splitFactKey(selectedFactKey);
+      void fetchFactCalls(factType, factName, { force: true });
     }
 
     async function fetchPayload(path, params) {
@@ -299,23 +320,23 @@
           <div class="diagnostics-section-header">
             <div>
               <h3>Associated Calls</h3>
-              <p>${escapeHtml(label)} sorted by associated call tokens.</p>
+              <p>${escapeHtml(`${label} sorted by ${diagnosticCallSortDescription()}.`)}</p>
             </div>
             <span>${escapeHtml(`${number.format(total)} matched`)}</span>
           </div>
           <div class="diagnostics-table-wrap">
             <table class="diagnostics-table diagnostics-call-table">
               <thead><tr>
-                <th>Time</th>
-                <th>Thread</th>
-                <th>Model</th>
-                <th>Effort</th>
-                ${columnHeader('Tokens', 'Total tokens for this associated model call.', 'num')}
-                ${columnHeader('Cached', 'Cached input tokens for this associated model call.', 'num')}
-                ${columnHeader('Uncached', 'Uncached input tokens for this associated model call.', 'num')}
-                ${columnHeader('Output', 'Output tokens for this associated model call.', 'num')}
-                ${columnHeader('Reasoning', 'Reasoning output tokens for this associated model call.', 'num')}
-                ${columnHeader('Cache %', 'Cache ratio for this associated model call.', 'num')}
+                ${diagnosticCallHeader('time', 'Time', false, 'Call timestamp.')}
+                ${diagnosticCallHeader('thread', 'Thread', false, 'Resolved thread, parent thread, or session label.')}
+                ${diagnosticCallHeader('model', 'Model', false, 'Model label for this associated call.')}
+                ${diagnosticCallHeader('effort', 'Effort', false, 'Reasoning effort label for this associated call.')}
+                ${diagnosticCallHeader('tokens', 'Tokens', true, 'Total tokens for this associated model call.')}
+                ${diagnosticCallHeader('cached', 'Cached', true, 'Cached input tokens for this associated model call.')}
+                ${diagnosticCallHeader('uncached', 'Uncached', true, 'Uncached input tokens for this associated model call.')}
+                ${diagnosticCallHeader('output', 'Output', true, 'Output tokens for this associated model call.')}
+                ${diagnosticCallHeader('reasoning', 'Reasoning', true, 'Reasoning output tokens for this associated model call.')}
+                ${diagnosticCallHeader('cache', 'Cache %', true, 'Cache ratio for this associated model call.')}
               </tr></thead>
               <tbody>${body}</tbody>
             </table>
@@ -357,6 +378,53 @@
       const classAttr = className ? ` class="${escapeHtml(className)}"` : '';
       const tooltipAttr = tooltipAttributes(tooltip);
       return `<th${classAttr}${tooltipAttr ? ` ${tooltipAttr}` : ''}>${escapeHtml(label)}</th>`;
+    }
+
+    function diagnosticCallHeader(sortKey, label, numeric = false, tooltip = '') {
+      const state = factCallSortState(selectedFactKey);
+      const active = state.sort === sortKey;
+      const indicator = active ? (state.direction === 'asc' ? '▲' : '▼') : '';
+      const ariaSort = active ? (state.direction === 'asc' ? 'ascending' : 'descending') : 'none';
+      const tooltipAttr = tooltipAttributes(tooltip);
+      return `
+        <th${numeric ? ' class="num"' : ''} data-diagnostics-call-sort-active="${active ? 'true' : 'false'}" aria-sort="${ariaSort}"${tooltipAttr ? ` ${tooltipAttr}` : ''}>
+          <button class="sort-header child-sort-header" type="button" data-diagnostics-call-sort-key="${escapeHtml(sortKey)}">
+            <span>${escapeHtml(label)}</span>
+            <span class="sort-indicator">${escapeHtml(indicator)}</span>
+          </button>
+        </th>
+      `;
+    }
+
+    function diagnosticCallSortDescription() {
+      const state = factCallSortState(selectedFactKey);
+      const labels = diagnosticCallSortLabels();
+      const label = labels[state.sort] || state.sort;
+      return `${label} ${state.direction === 'asc' ? 'ascending' : 'descending'}`;
+    }
+
+    function diagnosticCallSortLabels() {
+      return {
+        cache: 'cache ratio',
+        cached: 'cached input tokens',
+        effort: 'effort',
+        input: 'input tokens',
+        model: 'model',
+        output: 'output tokens',
+        reasoning: 'reasoning output tokens',
+        thread: 'thread',
+        time: 'time',
+        tokens: 'total tokens',
+        uncached: 'uncached input tokens',
+      };
+    }
+
+    function factCallSortState(key) {
+      return factCallSorts.get(key) || { sort: 'tokens', direction: 'desc' };
+    }
+
+    function defaultFactCallSortDirection(sortKey) {
+      return ['effort', 'model', 'thread'].includes(sortKey) ? 'asc' : 'desc';
     }
 
     function factCallRows(payload) {
@@ -469,6 +537,15 @@
         captureScrollAnchor(loadMoreButton, selectedFactKey, 'load-more');
         const [factType, factName] = splitFactKey(selectedFactKey);
         void fetchFactCalls(factType, factName, { append: true });
+        return;
+      }
+      const sortButton = target.closest('[data-diagnostics-call-sort-key]');
+      if (sortButton && diagnosticsPanelEl.contains(sortButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!selectedFactKey) return;
+        captureScrollAnchor(sortButton, selectedFactKey, 'fact');
+        sortFactCalls(sortButton.dataset.diagnosticsCallSortKey || '');
         return;
       }
       const button = target.closest('[data-diagnostics-fact-type][data-diagnostics-fact-name]');
