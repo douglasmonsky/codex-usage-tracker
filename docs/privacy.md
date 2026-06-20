@@ -37,7 +37,7 @@ Diagnostic facts follow the same aggregate-only rule. They can store safe struct
 
 On-demand diagnostic snapshots follow the same boundary. Tool-output snapshots use terminal wrapper metadata such as `Original token count` when present and persist only counts, coverage gaps, and safe function/command labels. Command snapshots keep command roots plus one conservative child label. File-read snapshots classify common read commands and path scans, but persist only counters, reader families, basename-only path labels, and short irreversible path hashes. They do not persist raw absolute paths, raw command strings, command arguments, file contents, tool output, or patch text. Read-productivity snapshots report only temporal read-to-modify correlations for matching path keys in the same source log; they do not claim causation. Concentration snapshots group by safe source/session, cwd, and day labels and do not expose raw source-log or cwd paths.
 
-Diagnostic snapshots are not live recomputed during ordinary dashboard or usage refresh. Stored snapshots can be displayed without rescanning source logs, and recomputation requires an explicit diagnostics `--refresh` command or a localhost `/api/diagnostics/<section>/refresh` request.
+Diagnostic snapshots are not live recomputed during ordinary dashboard or usage refresh. Stored snapshots can be displayed without rescanning source logs, and recomputation requires an explicit diagnostics `--refresh` command, the batched localhost `/api/diagnostics/refresh` request, or a targeted `/api/diagnostics/<section>/refresh` request.
 
 ## On-Demand Context
 

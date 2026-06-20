@@ -14,6 +14,7 @@ from store_dashboard_helpers import (
     _write_jsonl,
 )
 
+from codex_usage_tracker import diagnostic_snapshots as diagnostic_snapshot_module
 from codex_usage_tracker.diagnostic_snapshots import (
     DIAGNOSTIC_OVERVIEW_SECTION,
     build_diagnostic_commands_report,
@@ -22,6 +23,7 @@ from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
+    refresh_diagnostic_snapshots,
 )
 from codex_usage_tracker.store import (
     query_diagnostic_snapshot,
@@ -109,6 +111,46 @@ def test_usage_refresh_does_not_recompute_diagnostic_overview_snapshot(
     assert stored is not None
     assert stored["computed_at"] == "2000-01-01T00:00:00+00:00"
     assert stored["payload"]["overview"]["total_tokens"] == 7
+
+
+def test_batch_diagnostic_refresh_shares_source_log_analysis_pass(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    calls = 0
+    original = diagnostic_snapshot_module.analyze_indexed_source_logs
+
+    def counting_analyzer(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        diagnostic_snapshot_module,
+        "analyze_indexed_source_logs",
+        counting_analyzer,
+    )
+
+    refreshed = refresh_diagnostic_snapshots(db_path=db_path)
+    stored_file_reads = build_diagnostic_file_reads_report(db_path=db_path).payload
+    stored_read_productivity = build_diagnostic_read_productivity_report(db_path=db_path).payload
+
+    assert calls == 1
+    assert refreshed["schema"] == "codex-usage-tracker-diagnostic-snapshot-refresh-v1"
+    assert refreshed["meta"]["source_log_analysis_passes"] == 1
+    assert refreshed["sections"]["overview"]["status"] == "ready"
+    assert refreshed["sections"]["toolOutput"]["status"] == "ready"
+    assert refreshed["sections"]["commands"]["status"] == "ready"
+    assert refreshed["sections"]["fileReads"]["status"] == "ready"
+    assert refreshed["sections"]["readProductivity"]["status"] == "ready"
+    assert refreshed["sections"]["concentration"]["status"] == "ready"
+    assert stored_file_reads["status"] == "ready"
+    assert stored_file_reads["refreshed"] is False
+    assert stored_read_productivity["status"] == "ready"
+    assert stored_read_productivity["refreshed"] is False
 
 
 def test_tool_output_and_command_snapshots_use_safe_aggregate_labels(

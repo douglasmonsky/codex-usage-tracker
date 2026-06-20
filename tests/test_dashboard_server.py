@@ -93,36 +93,21 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             data=b"",
             method="POST",
         )
-        diagnostic_tool_output_refresh_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/tool-output/refresh",
+        diagnostic_batch_refresh_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/refresh",
             headers={"X-Codex-Usage-Token": "test-token"},
             data=b"",
             method="POST",
         )
-        diagnostic_commands_refresh_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/commands/refresh",
-            headers={"X-Codex-Usage-Token": "test-token"},
-            data=b"",
-            method="POST",
-        )
-        diagnostic_file_reads_refresh_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/file-reads/refresh",
-            headers={"X-Codex-Usage-Token": "test-token"},
-            data=b"",
-            method="POST",
-        )
-        diagnostic_read_productivity_refresh_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/read-productivity/refresh",
-            headers={"X-Codex-Usage-Token": "test-token"},
-            data=b"",
-            method="POST",
-        )
-        diagnostic_concentration_refresh_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/concentration/refresh",
-            headers={"X-Codex-Usage-Token": "test-token"},
-            data=b"",
-            method="POST",
-        )
+        diagnostic_tool_output_refresh_payload = diagnostic_batch_refresh_payload["sections"]["toolOutput"]
+        diagnostic_commands_refresh_payload = diagnostic_batch_refresh_payload["sections"]["commands"]
+        diagnostic_file_reads_refresh_payload = diagnostic_batch_refresh_payload["sections"]["fileReads"]
+        diagnostic_read_productivity_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "readProductivity"
+        ]
+        diagnostic_concentration_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "concentration"
+        ]
         diagnostic_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview"
         )
@@ -197,6 +182,11 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_refresh_payload["refreshed"] is True
     assert diagnostic_refresh_payload["overview"]["usage_rows"] == 4
     assert diagnostic_refresh_payload["overview"]["total_tokens"] == 400
+    assert diagnostic_batch_refresh_payload["schema"] == (
+        "codex-usage-tracker-diagnostic-snapshot-refresh-v1"
+    )
+    assert diagnostic_batch_refresh_payload["status"] == "ready"
+    assert diagnostic_batch_refresh_payload["meta"]["source_log_analysis_passes"] == 1
     assert (
         diagnostic_tool_output_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-tool-output-v1"

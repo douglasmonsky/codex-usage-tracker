@@ -15,6 +15,7 @@ from codex_usage_tracker.diagnostic_snapshot_concentration import (
     concentration_privacy_metadata,
 )
 from codex_usage_tracker.diagnostic_snapshot_constants import (
+    DIAGNOSTIC_BATCH_REFRESH_SCHEMA,
     DIAGNOSTIC_COMMANDS_SCHEMA,
     DIAGNOSTIC_COMMANDS_SECTION,
     DIAGNOSTIC_CONCENTRATION_SCHEMA,
@@ -196,6 +197,67 @@ def refresh_diagnostic_overview_snapshot(
     return payload
 
 
+def refresh_diagnostic_snapshots(
+    *,
+    db_path: Path = DEFAULT_DB_PATH,
+    include_archived: bool = False,
+) -> dict[str, Any]:
+    """Recompute and persist all dashboard diagnostic snapshots.
+
+    Source-log-derived sections share one analyzer pass so the dashboard refresh
+    button does not rescan the same logs once per panel.
+    """
+
+    history_scope = _history_scope(include_archived)
+    overview_payload = refresh_diagnostic_overview_snapshot(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    computed_at = _utc_now()
+    analysis = analyze_indexed_source_logs(db_path=db_path, include_archived=include_archived)
+    sections = {
+        DIAGNOSTIC_TOOL_OUTPUT_SECTION: DIAGNOSTIC_TOOL_OUTPUT_SCHEMA,
+        DIAGNOSTIC_COMMANDS_SECTION: DIAGNOSTIC_COMMANDS_SCHEMA,
+        DIAGNOSTIC_FILE_READS_SECTION: DIAGNOSTIC_FILE_READS_SCHEMA,
+        DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: DIAGNOSTIC_READ_PRODUCTIVITY_SCHEMA,
+    }
+    source_payloads = {
+        section: _persist_source_log_snapshot(
+            db_path=db_path,
+            section=section,
+            schema=schema,
+            history_scope=history_scope,
+            computed_at=computed_at,
+            analysis=analysis,
+        )
+        for section, schema in sections.items()
+    }
+    concentration_payload = _refresh_concentration_snapshot(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    return {
+        "schema": DIAGNOSTIC_BATCH_REFRESH_SCHEMA,
+        "status": "ready",
+        "refreshed": True,
+        "raw_context_included": False,
+        "history_scope": history_scope,
+        "sections": {
+            "overview": overview_payload,
+            "toolOutput": source_payloads[DIAGNOSTIC_TOOL_OUTPUT_SECTION],
+            "commands": source_payloads[DIAGNOSTIC_COMMANDS_SECTION],
+            "fileReads": source_payloads[DIAGNOSTIC_FILE_READS_SECTION],
+            "readProductivity": source_payloads[DIAGNOSTIC_READ_PRODUCTIVITY_SECTION],
+            "concentration": concentration_payload,
+        },
+        "meta": {
+            "source_log_analysis_passes": 1,
+            "source_logs_scanned": analysis["meta"]["source_logs_scanned"],
+            "usage_rows_scanned": analysis["meta"]["usage_rows_scanned"],
+        },
+    }
+
+
 def _build_source_log_snapshot_report(
     *,
     db_path: Path,
@@ -233,6 +295,25 @@ def _refresh_source_log_snapshot(
     history_scope = _history_scope(include_archived)
     computed_at = _utc_now()
     analysis = analyze_indexed_source_logs(db_path=db_path, include_archived=include_archived)
+    return _persist_source_log_snapshot(
+        db_path=db_path,
+        section=section,
+        schema=schema,
+        history_scope=history_scope,
+        computed_at=computed_at,
+        analysis=analysis,
+    )
+
+
+def _persist_source_log_snapshot(
+    *,
+    db_path: Path,
+    section: str,
+    schema: str,
+    history_scope: str,
+    computed_at: str,
+    analysis: dict[str, Any],
+) -> dict[str, Any]:
     snapshot = _snapshot_metadata(
         computed_at=computed_at,
         history_scope=history_scope,

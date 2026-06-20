@@ -111,43 +111,46 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
     source_read_events: list[int] = []
     modified_orders_by_path: dict[str, list[int]] = defaultdict(list)
     try:
-        lines = source_log.read_text(encoding="utf-8").splitlines()
+        lines = source_log.open(encoding="utf-8")
     except OSError:
         meta["read_errors"] += 1
         return
 
-    for order, line in enumerate(lines):
-        envelope = _json_envelope(line, meta=meta)
-        if envelope is None:
-            continue
-        payload = envelope.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        if envelope.get("type") == "event_msg":
-            for path_ref in modified_path_refs(payload):
-                modified_orders_by_path[path_ref["path_key"]].append(order)
-            continue
-        if envelope.get("type") != "response_item":
-            continue
-        if payload.get("type") == "function_call":
-            _record_function_call(
-                payload,
-                order=order,
-                counters=counters,
-                meta=meta,
-                call_names=call_names,
-                call_roots=call_roots,
-                call_read_events=call_read_events,
-                source_read_events=source_read_events,
-            )
-        elif payload.get("type") == "function_call_output":
-            _record_function_output(
-                payload,
-                counters=counters,
-                call_names=call_names,
-                call_roots=call_roots,
-                call_read_events=call_read_events,
-            )
+    with lines:
+        for order, line in enumerate(lines):
+            if '"response_item"' not in line and '"patch_apply_end"' not in line:
+                continue
+            envelope = _json_envelope(line, meta=meta)
+            if envelope is None:
+                continue
+            payload = envelope.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            if envelope.get("type") == "event_msg":
+                for path_ref in modified_path_refs(payload):
+                    modified_orders_by_path[path_ref["path_key"]].append(order)
+                continue
+            if envelope.get("type") != "response_item":
+                continue
+            if payload.get("type") == "function_call":
+                _record_function_call(
+                    payload,
+                    order=order,
+                    counters=counters,
+                    meta=meta,
+                    call_names=call_names,
+                    call_roots=call_roots,
+                    call_read_events=call_read_events,
+                    source_read_events=source_read_events,
+                )
+            elif payload.get("type") == "function_call_output":
+                _record_function_output(
+                    payload,
+                    counters=counters,
+                    call_names=call_names,
+                    call_roots=call_roots,
+                    call_read_events=call_read_events,
+                )
 
     _mark_later_modifications(
         counters=counters,

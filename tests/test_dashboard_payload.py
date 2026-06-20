@@ -300,6 +300,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/diagnostics/tools" in dashboard_diagnostics_js
     assert "/api/diagnostics/compactions" in dashboard_diagnostics_js
     assert "/api/diagnostics/fact-calls" in dashboard_diagnostics_js
+    assert "/api/diagnostics/refresh" in dashboard_diagnostics_js
     assert "dashboard_diagnostics_snapshots.js" in dashboard
     assert "dashboard_diagnostics_facts.js" in dashboard
     assert "/api/diagnostics/overview" in dashboard_diagnostics_snapshots_js

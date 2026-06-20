@@ -42,6 +42,7 @@ from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
+    refresh_diagnostic_snapshots,
 )
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
@@ -345,6 +346,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if not self._request_origin_allowed():
             self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
+            return
+        if parsed.path == "/api/diagnostics/refresh":
+            self._handle_diagnostics_refresh(parsed.query)
             return
         if parsed.path == "/api/diagnostics/overview/refresh":
             self._handle_diagnostics_overview_refresh(parsed.query)
@@ -1001,6 +1005,32 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             refresh=False,
             label="diagnostic overview",
         )
+
+    def _handle_diagnostics_refresh(self, query: str) -> None:
+        params = parse_qs(query)
+        if not self._has_valid_api_token(params):
+            self._send_json(
+                HTTPStatus.FORBIDDEN,
+                {"error": "Valid API token is required for diagnostic refresh"},
+            )
+            return
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        try:
+            with self._refresh_lock:
+                payload = refresh_diagnostic_snapshots(
+                    db_path=self._db_path,
+                    include_archived=include_archived,
+                )
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while refreshing diagnostics: {exc}"},
+            )
+            return
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_diagnostics_overview_refresh(self, query: str) -> None:
         self._handle_diagnostic_snapshot(

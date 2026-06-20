@@ -162,7 +162,13 @@
       renderIfActive();
       try {
         const filters = getDiagnosticFilters();
-        const snapshots = await fetchSnapshotPayloads(filters, true);
+        const snapshotFilters = { include_archived: filters?.include_archived || '0' };
+        const refreshPayload = await fetchPayload(
+          '/api/diagnostics/refresh',
+          snapshotFilters,
+          { method: 'POST' },
+        );
+        const snapshots = refreshPayload.sections || {};
         if (signature !== activeSignature) return;
         payloads = { ...payloads, ...snapshots };
         snapshotRefreshStatus = 'ready';

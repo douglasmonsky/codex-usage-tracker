@@ -287,7 +287,7 @@ Schema: `codex-usage-tracker-diagnostics-v1`
 
 Diagnostics payloads report aggregate structured facts such as compaction, tool/function/MCP activity, command families, structured skill labels, search/read loops, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, command arguments, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
 
-Diagnostic snapshots use separate section endpoints instead of one large payload. `GET` returns the latest stored section snapshot or `status: "missing"`; `POST /api/diagnostics/<section>/refresh` recomputes and replaces only that section. This keeps ordinary dashboard refresh fast and prevents source-log rescans unless a diagnostics refresh is explicit.
+Diagnostic snapshots use separate section endpoints instead of one large read payload. `GET` returns the latest stored section snapshot or `status: "missing"`; `POST /api/diagnostics/<section>/refresh` recomputes and replaces only that section. The dashboard button calls `POST /api/diagnostics/refresh`, which returns a small wrapper with `sections` and recomputes source-log-derived sections with one shared analyzer pass. This keeps ordinary dashboard refresh fast and prevents source-log rescans unless a diagnostics refresh is explicit.
 
 ## Diagnostic Overview Snapshot
 
