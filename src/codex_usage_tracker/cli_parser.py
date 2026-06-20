@@ -327,6 +327,18 @@ def _add_diagnostics_parser(
     _add_diagnostics_base_filters(tools)
     _add_diagnostics_fact_sort(tools, default_limit=50)
 
+    overview = diagnostic_subparsers.add_parser(
+        "overview",
+        help="Show the on-demand aggregate diagnostic overview snapshot",
+    )
+    overview.add_argument("--include-archived", action="store_true")
+    overview.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the overview snapshot before reading it.",
+    )
+    overview.add_argument("--json", action="store_true", dest="as_json")
+
     fact_calls = diagnostic_subparsers.add_parser(
         "fact-calls",
         help="List calls associated with one diagnostic fact",

@@ -47,6 +47,7 @@ Tracked schema ids:
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
+| `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -280,6 +281,49 @@ Schema: `codex-usage-tracker-diagnostics-v1`
 ```
 
 Diagnostics payloads report aggregate structured facts such as compaction, tool/function/MCP activity, command families, structured skill labels, search/read loops, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, command arguments, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
+
+## Diagnostic Overview Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics overview --json
+codex-usage-tracker diagnostics overview --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/overview`
+- `POST /api/diagnostics/overview/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-overview-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-overview-v1",
+  "section": "overview",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {
+    "computed_at": "2026-06-20T18:00:00+00:00",
+    "history_scope": "active",
+    "source_logs_scanned": 3,
+    "usage_rows_scanned": 10,
+    "raw_content_included": false
+  },
+  "overview": {
+    "usage_rows": 10,
+    "total_tokens": 12345,
+    "cached_input_tokens": 9000,
+    "uncached_input_tokens": 2000,
+    "cache_ratio": 0.75
+  },
+  "notes": []
+}
+```
+
+The overview snapshot is recomputed only when explicitly refreshed. Ordinary dashboard usage refreshes do not update diagnostic snapshots.
 
 ## Pricing Coverage
 

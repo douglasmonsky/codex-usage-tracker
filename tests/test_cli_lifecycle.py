@@ -383,6 +383,23 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "tools",
         "--json",
     )
+    overview_missing = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "overview",
+        "--json",
+    )
+    overview_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "overview",
+        "--refresh",
+        "--json",
+    )
     fact_calls = _run_cli(
         tmp_path,
         "--db",
@@ -403,7 +420,20 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     facts_payload = json.loads(facts.stdout)
     compactions_payload = json.loads(compactions.stdout)
     tools_payload = json.loads(tools.stdout)
+    overview_missing_payload = json.loads(overview_missing.stdout)
+    overview_refresh_payload = json.loads(overview_refresh.stdout)
     fact_calls_payload = json.loads(fact_calls.stdout)
+    for payload in (
+        summary_payload,
+        facts_payload,
+        compactions_payload,
+        tools_payload,
+        overview_missing_payload,
+        overview_refresh_payload,
+        fact_calls_payload,
+    ):
+        _assert_contract(payload)
+        assert payload["raw_context_included"] is False
     for payload in (
         summary_payload,
         facts_payload,
@@ -411,9 +441,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         tools_payload,
         fact_calls_payload,
     ):
-        _assert_contract(payload)
         assert payload["schema"] == "codex-usage-tracker-diagnostics-v1"
-        assert payload["raw_context_included"] is False
         assert "Associated token totals are not additive" in payload["notes"][0]
 
     fact_names = {row["fact_name"] for row in facts_payload["rows"]}
@@ -429,6 +457,12 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     assert tools_payload["filters"]["fact_type"] is None
     assert tools_payload["filters"]["fact_group"] == "tools"
     assert {row["fact_type"] for row in tools_payload["rows"]} == {"tool"}
+    assert overview_missing_payload["schema"] == "codex-usage-tracker-diagnostic-overview-v1"
+    assert overview_missing_payload["status"] == "missing"
+    assert overview_refresh_payload["schema"] == "codex-usage-tracker-diagnostic-overview-v1"
+    assert overview_refresh_payload["status"] == "ready"
+    assert overview_refresh_payload["overview"]["usage_rows"] == 2
+    assert overview_refresh_payload["refreshed"] is True
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
     assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")

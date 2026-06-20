@@ -158,6 +158,17 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    "codex-usage-tracker-diagnostic-overview-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "overview": (dict, NoneType),
+            "notes": list,
+        }
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),

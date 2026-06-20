@@ -79,6 +79,35 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             content_security_policy = response.headers.get("Content-Security-Policy")
             referrer_policy = response.headers.get("Referrer-Policy")
             limited_payload = json.loads(response.read().decode("utf-8"))
+        diagnostic_overview_after_usage_refresh = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview"
+        )
+        diagnostic_refresh_without_token = _http_error_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview/refresh",
+            data=b"",
+            method="POST",
+        )
+        diagnostic_refresh_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview/refresh",
+            headers={"X-Codex-Usage-Token": "test-token"},
+            data=b"",
+            method="POST",
+        )
+        diagnostic_stored_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview"
+        )
+        diagnostic_computed_at = diagnostic_stored_payload["snapshot"]["computed_at"]
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/api/usage?refresh=1&limit=2",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            ),
+            timeout=5,
+        ) as response:
+            second_usage_refresh_payload = json.loads(response.read().decode("utf-8"))
+        diagnostic_after_second_usage_refresh = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview"
+        )
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"http://127.0.0.1:{server.server_port}/api/usage?limit=all",
             timeout=5,
@@ -104,6 +133,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         thread.join(timeout=5)
 
     assert refresh_without_token["status"] == 403
+    assert diagnostic_refresh_without_token["status"] == 403
     assert dashboard_cache_control == "no-store"
     shell_raw_payload = dashboard_html.split(
         '<script id="usage-data" type="application/json">',
@@ -117,6 +147,15 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}
+    assert diagnostic_overview_after_usage_refresh["status"] == "missing"
+    assert diagnostic_refresh_payload["status"] == "ready"
+    assert diagnostic_refresh_payload["refreshed"] is True
+    assert diagnostic_refresh_payload["overview"]["usage_rows"] == 4
+    assert diagnostic_refresh_payload["overview"]["total_tokens"] == 400
+    assert diagnostic_stored_payload["status"] == "ready"
+    assert diagnostic_stored_payload["refreshed"] is False
+    assert second_usage_refresh_payload["refresh_result"]["parsed_events"] == 0
+    assert diagnostic_after_second_usage_refresh["snapshot"]["computed_at"] == diagnostic_computed_at
     assert len(limited_payload["rows"]) == 2
     assert limited_payload["loaded_row_count"] == 2
     assert limited_payload["total_available_rows"] == 4

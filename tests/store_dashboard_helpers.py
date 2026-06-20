@@ -349,14 +349,24 @@ def _assert_contract(payload: object) -> None:
     assert validate_json_payload_contract(payload) == []
 
 
-def _read_json(url: str, headers: dict[str, str] | None = None) -> dict[str, object]:
-    request = urllib.request.Request(url, headers=headers or {})
+def _read_json(
+    url: str,
+    headers: dict[str, str] | None = None,
+    data: bytes | None = None,
+    method: str | None = None,
+) -> dict[str, object]:
+    request = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
     with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310 - local test server only
         return json.loads(response.read().decode("utf-8"))
 
 
-def _http_error_json(url: str, headers: dict[str, str] | None = None) -> dict[str, object]:
-    request = urllib.request.Request(url, headers=headers or {})
+def _http_error_json(
+    url: str,
+    headers: dict[str, str] | None = None,
+    data: bytes | None = None,
+    method: str | None = None,
+) -> dict[str, object]:
+    request = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
     try:
         urllib.request.urlopen(request, timeout=5)  # noqa: S310 - local test server only
     except urllib.error.HTTPError as exc:

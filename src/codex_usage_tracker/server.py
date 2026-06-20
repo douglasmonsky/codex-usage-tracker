@@ -35,6 +35,7 @@ from codex_usage_tracker.diagnostic_reports import (
     build_diagnostics_facts_report,
     build_diagnostics_summary_report,
 )
+from codex_usage_tracker.diagnostic_snapshots import build_diagnostic_overview_report
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -304,6 +305,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/diagnostics/tools":
             self._handle_diagnostics_facts(parsed.query, fact_group="tools")
             return
+        if parsed.path == "/api/diagnostics/overview":
+            self._handle_diagnostics_overview(parsed.query)
+            return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
             return
@@ -314,6 +318,16 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._handle_dashboard_shell(parsed.query)
             return
         super().do_GET()
+
+    def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
+        parsed = urlparse(self.path)
+        if not self._request_origin_allowed():
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
+            return
+        if parsed.path == "/api/diagnostics/overview/refresh":
+            self._handle_diagnostics_overview_refresh(parsed.query)
+            return
+        self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
 
     def end_headers(self) -> None:
         if self._is_dashboard_html_request():
@@ -939,6 +953,53 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"error": f"Database error while reading diagnostic calls: {exc}"},
+            )
+            return
+        self._send_json(HTTPStatus.OK, payload)
+
+    def _handle_diagnostics_overview(self, query: str) -> None:
+        params = parse_qs(query)
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        try:
+            payload = build_diagnostic_overview_report(
+                db_path=self._db_path,
+                include_archived=include_archived,
+                refresh=False,
+            ).payload
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading diagnostic overview: {exc}"},
+            )
+            return
+        self._send_json(HTTPStatus.OK, payload)
+
+    def _handle_diagnostics_overview_refresh(self, query: str) -> None:
+        params = parse_qs(query)
+        if not self._has_valid_api_token(params):
+            self._send_json(
+                HTTPStatus.FORBIDDEN,
+                {"error": "Valid API token is required for diagnostic refresh"},
+            )
+            return
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        try:
+            with self._refresh_lock:
+                payload = build_diagnostic_overview_report(
+                    db_path=self._db_path,
+                    include_archived=include_archived,
+                    refresh=True,
+                ).payload
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while refreshing diagnostic overview: {exc}"},
             )
             return
         self._send_json(HTTPStatus.OK, payload)

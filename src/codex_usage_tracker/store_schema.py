@@ -12,7 +12,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -23,6 +23,7 @@ MIGRATION_NAMES = {
     7: "persist source file parser cursors",
     8: "persist observed Codex usage snapshots",
     9: "persist aggregate diagnostic facts",
+    10: "persist on-demand diagnostic report snapshots",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -102,6 +103,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     else:
         _migrate_v9(conn)
         _record_migration_if_missing(conn, 9)
+    if user_version < 10:
+        _migrate_v10(conn)
+        _record_migration(conn, 10)
+    else:
+        _migrate_v10(conn)
+        _record_migration_if_missing(conn, 10)
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -276,6 +283,26 @@ def _migrate_v9(conn: sqlite3.Connection) -> None:
             ON call_diagnostic_facts(fact_type, fact_name);
         CREATE INDEX IF NOT EXISTS idx_call_diagnostic_facts_record
             ON call_diagnostic_facts(record_id);
+        """
+    )
+
+
+def _migrate_v10(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS diagnostic_snapshots (
+            section TEXT NOT NULL,
+            history_scope TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            computed_at TEXT NOT NULL,
+            source_logs_scanned INTEGER NOT NULL DEFAULT 0,
+            usage_rows_scanned INTEGER NOT NULL DEFAULT 0,
+            raw_content_included INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (section, history_scope)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_diagnostic_snapshots_computed_at
+            ON diagnostic_snapshots(computed_at);
         """
     )
 
