@@ -219,12 +219,90 @@
         const rowCountChanged = Number.isFinite(scopedRows) && scopedRows !== getTotalAvailableRows();
         const refreshChanged = statusRefreshAt && statusRefreshAt !== deps.latestRefreshAt();
         if (rowCountChanged || refreshChanged) {
-          refreshDashboardData(false, { refreshLogs: false, resetRows: true });
+          refreshDashboardLive();
         } else if (rowsNeedHydration()) {
           hydrateDashboardRows();
         }
       } catch (_error) {
         // Background freshness checks must never interrupt the local dashboard.
+      }
+    }
+
+    async function refreshDashboardLive() {
+      if (!liveRefreshSupported || !apiToken() || activeView() === 'call') return;
+      if (refreshInFlight) return;
+      const previousTotal = Number(getTotalAvailableRows() || getData().length || 0);
+      refreshInFlight = true;
+      refreshDashboardEl.disabled = true;
+      updateLiveStatus('status.refreshing', t('live.refreshing_index'));
+      try {
+        const shellParams = new URLSearchParams({
+          limit: loadLimitEl.value,
+          include_archived: getIncludeArchived() ? '1' : '0',
+          lang: i18n.currentLanguage,
+          shell: '1',
+          _: String(Date.now()),
+          refresh: '1',
+        });
+        const shellResponse = await fetch(`/api/usage?${shellParams.toString()}`, {
+          headers: {
+            'Accept': 'application/json',
+            'X-Codex-Usage-Token': apiToken(),
+          },
+          cache: 'no-store',
+        });
+        if (!shellResponse.ok) throw new Error(`HTTP ${shellResponse.status}`);
+        const shellPayload = await shellResponse.json();
+        if (shellPayload.error) throw new Error(shellPayload.error);
+
+        const nextTotal = Number(shellPayload.total_available_rows || previousTotal);
+        const newRows = Math.max(0, nextTotal - previousTotal);
+        applyDashboardPayload(shellPayload, { preserveRows: true });
+
+        if (activeView() !== 'diagnostics' && newRows > 0) {
+          const loadedLimit = getLoadedLimit();
+          const visibleTarget = loadedLimit === null ? nextTotal : Math.min(nextTotal, Number(loadedLimit || nextTotal));
+          const rowsToFetch = Math.max(0, Math.min(newRows, visibleTarget || newRows));
+          if (rowsToFetch > 0) {
+            const rowParams = new URLSearchParams({
+              limit: String(rowsToFetch),
+              offset: '0',
+              include_archived: getIncludeArchived() ? '1' : '0',
+              lang: i18n.currentLanguage,
+              _: String(Date.now()),
+            });
+            const rowResponse = await fetch(`/api/usage?${rowParams.toString()}`, {
+              headers: {
+                'Accept': 'application/json',
+                'X-Codex-Usage-Token': apiToken(),
+              },
+              cache: 'no-store',
+            });
+            if (!rowResponse.ok) throw new Error(`HTTP ${rowResponse.status}`);
+            const rowPayload = await rowResponse.json();
+            if (rowPayload.error) throw new Error(rowPayload.error);
+            applyDashboardPayload(rowPayload, { prependRows: true, trimRowsToTarget: true });
+          }
+          rowHydrationComplete = getData().length >= rowHydrationTarget();
+          updateRowLoadProgress();
+        } else if (activeView() !== 'diagnostics' && rowsNeedHydration()) {
+          hydrateDashboardRows();
+        }
+
+        const result = shellPayload.refresh_result || {};
+        const indexed = result.inserted_or_updated_events === undefined
+          ? ''
+          : tf('live.indexed', { rows: number.format(result.inserted_or_updated_events), files: number.format(result.scanned_files || 0) });
+        const skipped = result.skipped_events
+          ? tf('live.skipped', { count: number.format(result.skipped_events) })
+          : '';
+        updateLiveStatus(autoRefreshEl.checked ? 'badge.live' : 'status.updated', tf('live.updated_detail', { time: formatTimestamp(shellPayload.refreshed_at), loaded: loadedRowsDescription(), history: historyRowsDescription(), indexed, skipped }));
+      } catch (error) {
+        const message = error.message || String(error);
+        updateLiveStatus('status.refresh_error', tf('live.refresh_unavailable', { message, suffix: '' }));
+      } finally {
+        refreshInFlight = false;
+        refreshDashboardEl.disabled = false;
       }
     }
 
@@ -295,9 +373,9 @@
     function scheduleAutoRefresh() {
       if (autoRefreshTimer) window.clearInterval(autoRefreshTimer);
       autoRefreshTimer = null;
-      if (!autoRefreshEl.checked || !liveRefreshSupported || ['call', 'diagnostics'].includes(activeView())) return;
+      if (!autoRefreshEl.checked || !liveRefreshSupported || activeView() === 'call') return;
       autoRefreshTimer = window.setInterval(() => {
-        if (document.visibilityState === 'visible') refreshDashboardIfStale();
+        if (document.visibilityState === 'visible') refreshDashboardLive();
       }, liveRefreshIntervalMs);
     }
 
@@ -307,6 +385,7 @@
       loadedRowsDescription,
       refreshDashboardData,
       refreshDashboardIfStale,
+      refreshDashboardLive,
       rowHydrationTarget,
       rowsNeedHydration,
       scheduleAutoRefresh,
