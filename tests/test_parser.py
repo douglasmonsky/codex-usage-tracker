@@ -167,6 +167,38 @@ def test_parser_ignores_known_non_token_context_compaction_event(tmp_path: Path)
     assert "SECRET COMPACTION TEXT" not in json.dumps([event.to_row() for event in events])
 
 
+def test_parser_ignores_known_non_token_event_messages(tmp_path: Path) -> None:
+    log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    known_event_types = [
+        "agent_message",
+        "image_generation_end",
+        "item_completed",
+        "mcp_tool_call_end",
+        "patch_apply_end",
+        "task_complete",
+        "task_started",
+        "thread_goal_updated",
+        "thread_rolled_back",
+        "turn_aborted",
+        "user_message",
+        "web_search_end",
+    ]
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            *[_entry("event_msg", {"type": event_type}) for event_type in known_event_types],
+            _token_event(100, 100),
+        ],
+    )
+
+    stats: dict[str, int] = {}
+    events = parse_usage_events_from_file(log_path, stats=stats)
+
+    assert len(events) == 1
+    assert stats.get("unknown_event_shape", 0) == 0
+
+
 def test_parser_persists_call_origin_from_metadata_segments(tmp_path: Path) -> None:
     log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
     _write_jsonl(

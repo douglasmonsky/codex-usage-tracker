@@ -40,7 +40,19 @@ PARSER_DIAGNOSTIC_KEYS = (
 )
 
 KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset({
+    "agent_message",
     "context_compacted",
+    "image_generation_end",
+    "item_completed",
+    "mcp_tool_call_end",
+    "patch_apply_end",
+    "task_complete",
+    "task_started",
+    "thread_goal_updated",
+    "thread_rolled_back",
+    "turn_aborted",
+    "user_message",
+    "web_search_end",
 })
 
 
