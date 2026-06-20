@@ -317,11 +317,11 @@
       background: #ffffff;
     }
     .diagnostics-table {
-      min-width: 1040px;
+      min-width: 1120px;
       table-layout: fixed;
     }
     .diagnostics-call-table {
-      min-width: 980px;
+      min-width: 1060px;
     }
     .diagnostics-table th {
       position: static;

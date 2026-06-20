@@ -891,6 +891,7 @@
       tableCaptionEl,
       tableTitleEl,
       t,
+      tooltipAttributes,
       usageTableEl,
     });
     const dashboardAnalysis = dashboardAnalysisFactory.create({

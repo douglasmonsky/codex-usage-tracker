@@ -20,6 +20,7 @@
       tableCaptionEl,
       tableTitleEl,
       t,
+      tooltipAttributes = () => '',
       usageTableEl,
     } = deps;
 
@@ -205,6 +206,7 @@
             <td class="num">${number.format(Number(row.occurrences || 0))}</td>
             <td class="num">${number.format(Number(row.associated_calls || 0))}</td>
             <td class="num token-cell">${tokenText(row.associated_total_tokens)}</td>
+            <td class="num token-cell">${tokenText(row.associated_cached_input_tokens)}</td>
             <td class="num token-cell">${tokenText(row.associated_uncached_input_tokens)}</td>
             <td class="num token-cell">${tokenText(row.associated_output_tokens)}</td>
             <td class="num">${pct(row.avg_cache_ratio)}</td>
@@ -214,7 +216,7 @@
           </tr>
           ${selected ? `
             <tr class="diagnostics-drilldown-row">
-              <td colspan="10">${renderFactCallsPanel()}</td>
+              <td colspan="11">${renderFactCallsPanel()}</td>
             </tr>
           ` : ''}
         `;
@@ -223,16 +225,17 @@
         <div class="diagnostics-table-wrap">
           <table class="diagnostics-table">
             <thead><tr>
-              <th>Fact</th>
-              <th class="num">Occ</th>
-              <th class="num">Calls</th>
-              <th class="num">Assoc total</th>
-              <th class="num">Uncached</th>
-              <th class="num">Output</th>
-              <th class="num">Cache</th>
-              <th class="num">Largest</th>
-              <th>Latest</th>
-              <th>Action</th>
+              ${columnHeader('Fact', 'Diagnostic fact type and name derived from structured local log metadata. Raw prompts, assistant text, and tool output are not persisted.')}
+              ${columnHeader('Occ', 'Occurrences: count of matching diagnostic fact events. One model call can contribute more than one occurrence.', 'num')}
+              ${columnHeader('Calls', 'Distinct model calls associated with this diagnostic fact.', 'num')}
+              ${columnHeader('Assoc total', 'Associated total tokens for those calls. Totals are not additive across facts because one call can have multiple facts.', 'num')}
+              ${columnHeader('Cached', 'Associated cached input tokens for those calls.', 'num')}
+              ${columnHeader('Uncached', 'Associated uncached input tokens for those calls.', 'num')}
+              ${columnHeader('Output', 'Associated output tokens for those calls.', 'num')}
+              ${columnHeader('Cache %', 'Average cache ratio across associated calls.', 'num')}
+              ${columnHeader('Largest', 'Largest associated call by total tokens.', 'num')}
+              ${columnHeader('Latest', 'Latest associated call timestamp.')}
+              ${columnHeader('Action', 'Expand or collapse the associated calls.')}
             </tr></thead>
             <tbody>${body}</tbody>
           </table>
@@ -260,6 +263,7 @@
           <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(row.model || 'Unknown')}">${escapeHtml(row.model || 'Unknown')}</span>`)}</td>
           <td>${rowInvestigatorLink(row, escapeHtml(row.effort || 'unknown'))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, tokenText(row.total_tokens))}</td>
+          <td class="num token-cell">${rowInvestigatorLink(row, tokenText(row.cached_input_tokens))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, tokenText(row.uncached_input_tokens))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, tokenText(row.output_tokens))}</td>
           <td class="num token-cell">${rowInvestigatorLink(row, tokenText(row.reasoning_output_tokens))}</td>
@@ -282,11 +286,12 @@
                 <th>Thread</th>
                 <th>Model</th>
                 <th>Effort</th>
-                <th class="num">Tokens</th>
-                <th class="num">Uncached</th>
-                <th class="num">Output</th>
-                <th class="num">Reasoning</th>
-                <th class="num">Cache</th>
+                ${columnHeader('Tokens', 'Total tokens for this associated model call.', 'num')}
+                ${columnHeader('Cached', 'Cached input tokens for this associated model call.', 'num')}
+                ${columnHeader('Uncached', 'Uncached input tokens for this associated model call.', 'num')}
+                ${columnHeader('Output', 'Output tokens for this associated model call.', 'num')}
+                ${columnHeader('Reasoning', 'Reasoning output tokens for this associated model call.', 'num')}
+                ${columnHeader('Cache %', 'Cache ratio for this associated model call.', 'num')}
               </tr></thead>
               <tbody>${body}</tbody>
             </table>
@@ -306,6 +311,12 @@
 
     function tokenText(value) {
       return number.format(Math.round(Number(value || 0)));
+    }
+
+    function columnHeader(label, tooltip, className = '') {
+      const classAttr = className ? ` class="${escapeHtml(className)}"` : '';
+      const tooltipAttr = tooltipAttributes(tooltip);
+      return `<th${classAttr}${tooltipAttr ? ` ${tooltipAttr}` : ''}>${escapeHtml(label)}</th>`;
     }
 
     function factKey(factType, factName) {

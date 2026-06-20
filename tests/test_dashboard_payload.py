@@ -286,7 +286,12 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Raw context remains on-demand" in dashboard_diagnostics_js
     assert "rowInvestigatorLink" in dashboard_diagnostics_js
     assert "diagnostics-drilldown-row" in dashboard_diagnostics_js
-    assert 'td colspan="10"' in dashboard_diagnostics_js
+    assert 'td colspan="11"' in dashboard_diagnostics_js
+    assert "associated_cached_input_tokens" in dashboard_diagnostics_js
+    assert "row.cached_input_tokens" in dashboard_diagnostics_js
+    assert "Occurrences: count of matching diagnostic fact events" in dashboard_diagnostics_js
+    assert "Associated total tokens for those calls" in dashboard_diagnostics_js
+    assert "Average cache ratio across associated calls" in dashboard_diagnostics_js
     assert "diagnostics-expand-button" in dashboard_surface
     assert "selectedFactKey === key" in dashboard_diagnostics_js
     assert "Needs Attention" in dashboard
