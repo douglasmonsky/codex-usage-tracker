@@ -23,6 +23,31 @@ API_USAGE_SORTS = {
     "effort": "usage_events.effort",
     "thread": "coalesce(usage_events.thread_name, usage_events.parent_thread_name, usage_events.session_id)",
     "initiator": "coalesce(usage_events.call_initiator, 'unknown')",
+    "duration": """
+        coalesce(
+            (
+                julianday(usage_events.event_timestamp)
+                - julianday(
+                    CASE
+                        WHEN previous_usage.record_id IS NOT NULL
+                            AND previous_usage.session_id = usage_events.session_id
+                            AND coalesce(previous_usage.turn_id, '') = coalesce(usage_events.turn_id, '')
+                            AND coalesce(usage_events.turn_id, '') != ''
+                        THEN previous_usage.event_timestamp
+                        ELSE usage_events.turn_timestamp
+                    END
+                )
+            ) * 86400.0,
+            -1
+        )
+    """,
+    "gap": """
+        coalesce(
+            (julianday(usage_events.event_timestamp) - julianday(previous_usage.event_timestamp))
+                * 86400.0,
+            -1
+        )
+    """,
 }
 
 

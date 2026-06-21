@@ -170,6 +170,8 @@ Supported filters:
 
 Privacy mode affects returned metadata after matching rows. `redacted` hides raw cwd/source paths, hides Git remote labels, and hashes unnamed project names. `strict` also hides project-relative cwd, Git branch, and tags. Configured project aliases are treated as explicit display opt-ins.
 
+Per-call rows include derived timing fields when returned through dashboard/live call APIs: `call_started_at`, `call_duration_seconds`, `previous_call_event_timestamp`, and `previous_call_delta_seconds`. These values are derived from aggregate timestamps and thread adjacency; they do not read or store transcript content.
+
 ## Recommendations
 
 Command:

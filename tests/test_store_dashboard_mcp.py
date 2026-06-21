@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,7 @@ from codex_usage_tracker.store import (
     query_session_usage,
     query_summary,
     query_thread_summaries,
+    query_usage_api_events,
     rebuild_usage_index,
     refresh_metadata,
     refresh_usage_index,
@@ -1013,6 +1015,96 @@ def test_upsert_refreshes_thread_adjacency_fields(tmp_path: Path) -> None:
     assert by_id["b1"]["thread_call_index"] == 1
     assert by_id["b1"]["previous_record_id"] is None
     assert by_id["b1"]["next_record_id"] is None
+
+
+def test_dashboard_rows_include_call_timing_from_thread_adjacency(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        replace(
+            _usage_event(
+                record_id="a1",
+                session_id="session-a",
+                thread_key="thread:Alpha",
+                event_timestamp="2026-05-17T12:00:10Z",
+                cumulative_total_tokens=100,
+            ),
+            turn_id="turn-alpha",
+            turn_timestamp="2026-05-17T12:00:00Z",
+        ),
+        replace(
+            _usage_event(
+                record_id="a2",
+                session_id="session-a",
+                thread_key="thread:Alpha",
+                event_timestamp="2026-05-17T12:00:45Z",
+                cumulative_total_tokens=200,
+            ),
+            turn_id="turn-alpha",
+            turn_timestamp="2026-05-17T12:00:00Z",
+        ),
+        replace(
+            _usage_event(
+                record_id="a3",
+                session_id="session-a",
+                thread_key="thread:Alpha",
+                event_timestamp="2026-05-17T12:05:05Z",
+                cumulative_total_tokens=300,
+            ),
+            turn_id="turn-beta",
+            turn_timestamp="2026-05-17T12:05:00Z",
+        ),
+        replace(
+            _usage_event(
+                record_id="b1",
+                session_id="session-b",
+                thread_key="thread:Beta",
+                event_timestamp="2026-05-17T12:00:30Z",
+                cumulative_total_tokens=50,
+            ),
+            turn_id="turn-beta-thread",
+            turn_timestamp="2026-05-17T12:00:20Z",
+        ),
+    ]
+
+    upsert_usage_events(events, db_path=db_path)
+    rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=True)
+    by_id = {row["record_id"]: row for row in rows}
+
+    assert by_id["a1"]["previous_call_event_timestamp"] is None
+    assert by_id["a1"]["call_started_at"] == "2026-05-17T12:00:00Z"
+    assert by_id["a1"]["call_duration_seconds"] == 10.0
+    assert by_id["a1"]["previous_call_delta_seconds"] is None
+
+    assert by_id["a2"]["previous_call_event_timestamp"] == "2026-05-17T12:00:10Z"
+    assert by_id["a2"]["call_started_at"] == "2026-05-17T12:00:10Z"
+    assert by_id["a2"]["call_duration_seconds"] == 35.0
+    assert by_id["a2"]["previous_call_delta_seconds"] == 35.0
+
+    assert by_id["a3"]["previous_call_event_timestamp"] == "2026-05-17T12:00:45Z"
+    assert by_id["a3"]["call_started_at"] == "2026-05-17T12:05:00Z"
+    assert by_id["a3"]["call_duration_seconds"] == 5.0
+    assert by_id["a3"]["previous_call_delta_seconds"] == 260.0
+
+    assert by_id["b1"]["call_started_at"] == "2026-05-17T12:00:20Z"
+    assert by_id["b1"]["call_duration_seconds"] == 10.0
+    assert by_id["b1"]["previous_call_delta_seconds"] is None
+
+    by_duration = query_usage_api_events(
+        db_path=db_path,
+        limit=1,
+        include_archived=True,
+        sort="duration",
+        direction="desc",
+    )
+    by_gap = query_usage_api_events(
+        db_path=db_path,
+        limit=1,
+        include_archived=True,
+        sort="gap",
+        direction="desc",
+    )
+    assert by_duration[0]["record_id"] == "a2"
+    assert by_gap[0]["record_id"] == "a3"
 
 
 def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:

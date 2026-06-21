@@ -553,6 +553,12 @@
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }
+    .duration-cell {
+      display: inline-block;
+      min-width: 48px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
     .time-cell {
       display: grid;
       gap: 2px;
