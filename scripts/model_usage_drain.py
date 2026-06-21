@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Build a local aggregate-only usage-drain modeling report."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
+from codex_usage_tracker.paths import DEFAULT_ALLOWANCE_PATH, DEFAULT_DB_PATH
+from codex_usage_tracker.store import query_dashboard_events
+from codex_usage_tracker.usage_drain_model import (
+    build_usage_delta_spans,
+    load_fast_proxy_annotations,
+    summarize_usage_drain_model,
+    write_usage_drain_spans_csv,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Model observed usage-drain deltas against aggregate token credits."
+    )
+    parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
+    parser.add_argument("--allowance", type=Path, default=DEFAULT_ALLOWANCE_PATH)
+    parser.add_argument("--since")
+    parser.add_argument("--until")
+    parser.add_argument("--model")
+    parser.add_argument("--effort")
+    parser.add_argument("--thread")
+    parser.add_argument("--include-archived", action="store_true")
+    parser.add_argument(
+        "--fast-proxy-csv",
+        type=Path,
+        help="Optional CSV with record_id, fast_proxy_label, and timing_confidence columns.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("/tmp/codex-usage-drain-model"),
+    )
+    parser.add_argument("--json", action="store_true", help="Print the summary JSON.")
+    args = parser.parse_args()
+
+    rows = query_dashboard_events(
+        args.db,
+        limit=0,
+        since=args.since,
+        until=args.until,
+        model=args.model,
+        effort=args.effort,
+        thread=args.thread,
+        include_archived=args.include_archived,
+    )
+    allowance = load_allowance_config(args.allowance)
+    rows = annotate_rows_with_allowance(rows, allowance)
+    annotations = load_fast_proxy_annotations(args.fast_proxy_csv)
+    summary = summarize_usage_drain_model(rows, fast_proxy_annotations=annotations)
+    spans, _stats = build_usage_delta_spans(rows, fast_proxy_annotations=annotations)
+
+    output_dir = args.output_dir.expanduser()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "usage_drain_model_summary.json"
+    spans_path = output_dir / "usage_drain_spans.csv"
+    summary["artifacts"] = {
+        "summary_json": str(summary_path),
+        "spans_csv": str(spans_path),
+        "fast_proxy_csv": str(args.fast_proxy_csv) if args.fast_proxy_csv else None,
+    }
+    summary_path.write_text(json.dumps(_json_safe(summary), indent=2, sort_keys=True) + "\n")
+    write_usage_drain_spans_csv(spans, spans_path)
+
+    if args.json:
+        print(json.dumps(_json_safe(summary), indent=2, sort_keys=True))
+    else:
+        print(f"Wrote {summary_path}")
+        print(f"Wrote {spans_path}")
+        for result in summary["results"]:
+            print(
+                "{proxy}: spans={spans} candidate_spans={candidate_spans} "
+                "implied={implied_candidate_multiplier} best_grid={best_grid_multiplier_by_r2} "
+                "documented={documented_weighted_candidate_multiplier} r2={two_feature_r2}".format(
+                    **result
+                )
+            )
+    return 0
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

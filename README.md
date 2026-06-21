@@ -243,6 +243,7 @@ Full model: [Privacy Guide](docs/privacy.md).
 - [Privacy Guide](docs/privacy.md)
 - [Architecture](docs/architecture.md)
 - [CLI And MCP JSON Schemas](docs/cli-json-schemas.md)
+- [Usage Drain Modeling](docs/usage-drain-modeling.md)
 - [Development And Release](docs/development.md)
 
 ## Codex-Assisted Install

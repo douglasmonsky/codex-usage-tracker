@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+import csv
+from pathlib import Path
+
+from codex_usage_tracker.usage_drain_model import (
+    FastProxyAnnotation,
+    build_usage_delta_spans,
+    documented_fast_credit_multiplier,
+    fit_usage_drain_proxy,
+    load_fast_proxy_annotations,
+)
+
+
+def _row(
+    record_id: str,
+    timestamp: str,
+    used: float | None,
+    credits: float,
+    *,
+    model: str = "gpt-5.5",
+    resets_at: int = 1000,
+) -> dict[str, object]:
+    return {
+        "record_id": record_id,
+        "event_timestamp": timestamp,
+        "rate_limit_plan_type": "plus",
+        "rate_limit_limit_id": "codex",
+        "rate_limit_primary_used_percent": used,
+        "rate_limit_primary_window_minutes": 300,
+        "rate_limit_primary_resets_at": resets_at,
+        "usage_credits": credits,
+        "model": model,
+    }
+
+
+def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets() -> None:
+    rows = [
+        _row("a", "2026-06-01T00:00:00Z", 10.0, 99.0),
+        _row("b", "2026-06-01T00:01:00Z", 10.0, 2.0),
+        _row("c", "2026-06-01T00:02:00Z", 12.0, 3.0),
+        _row("d", "2026-06-01T00:03:00Z", 12.0, 1.0),
+        _row("e", "2026-06-01T00:04:00Z", 5.0, 1.0),
+        _row("f", "2026-06-01T00:05:00Z", 6.0, 4.0),
+        _row("g", "2026-06-01T00:06:00Z", 7.0, 4.0, resets_at=2000),
+    ]
+    proxies = {
+        "b": FastProxyAnnotation(label="strong_proxy", timing_confidence="medium"),
+        "c": FastProxyAnnotation(label="strong_proxy", timing_confidence="medium"),
+        "f": FastProxyAnnotation(label="not_fast_proxy", timing_confidence="low"),
+    }
+
+    spans, stats = build_usage_delta_spans(rows, fast_proxy_annotations=proxies)
+
+    assert stats["positive_usage_spans"] == 2
+    assert stats["censored_or_reset_pending_segments"] == 1
+    assert [span.row_count for span in spans] == [2, 1]
+    assert spans[0].delta_usage_percent == 2.0
+    assert spans[0].candidate_standard_credits["strong_only"] == 5.0
+    assert spans[0].documented_fast_weighted_credits["strong_only"] == 12.5
+    assert spans[1].non_candidate_standard_credits["strong_only"] == 4.0
+
+
+def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:
+    rows = [
+        _row("baseline", "2026-06-01T00:00:00Z", 0.0, 0.0),
+        _row("normal", "2026-06-01T00:01:00Z", 10.0, 10.0),
+        _row("base2", "2026-06-01T00:02:00Z", 10.0, 0.0),
+        _row("fast", "2026-06-01T00:03:00Z", 35.0, 10.0),
+        _row("base3", "2026-06-01T00:04:00Z", 35.0, 0.0),
+        _row("mixed-normal", "2026-06-01T00:05:00Z", 35.0, 10.0),
+        _row("mixed-fast", "2026-06-01T00:06:00Z", 70.0, 10.0),
+    ]
+    proxies = {
+        "fast": FastProxyAnnotation(label="strong_proxy", timing_confidence="medium"),
+        "mixed-fast": FastProxyAnnotation(label="strong_proxy", timing_confidence="medium"),
+    }
+    spans, _stats = build_usage_delta_spans(rows, fast_proxy_annotations=proxies)
+
+    result = fit_usage_drain_proxy(spans, "strong_only")
+
+    assert result.implied_candidate_multiplier == 2.5
+    assert result.documented_weighted_candidate_multiplier == 2.5
+    assert result.best_grid_multiplier_by_r2 == 2.5
+
+
+def test_load_fast_proxy_annotations_and_documented_model_multipliers(tmp_path: Path) -> None:
+    proxy_path = tmp_path / "proxy.csv"
+    with proxy_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["record_id", "fast_proxy_label", "timing_confidence", "fast_proxy_score"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "record_id": "abc",
+                "fast_proxy_label": "possible_proxy",
+                "timing_confidence": "medium",
+                "fast_proxy_score": "4",
+            }
+        )
+
+    annotations = load_fast_proxy_annotations(proxy_path)
+
+    assert annotations["abc"].is_candidate
+    assert annotations["abc"].is_high_or_medium
+    assert annotations["abc"].score == 4.0
+    assert documented_fast_credit_multiplier("gpt-5.5") == 2.5
+    assert documented_fast_credit_multiplier("gpt-5.4") == 2.0
+    assert documented_fast_credit_multiplier("gpt-5.3-codex") is None
