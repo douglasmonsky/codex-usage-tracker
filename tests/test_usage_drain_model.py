@@ -256,14 +256,20 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     assert "explanatory_same_span" in kinds
     model_names = {model["name"] for model in capacity["models"]}
     assert "capacity_history_state_buckets__time_ordered_80_20" in model_names
+    assert "capacity_history_state_interactions__time_ordered_80_20" in model_names
     assert "capacity_same_span_shape_buckets__time_ordered_80_20" in model_names
+    assert "capacity_same_span_shape_interactions__time_ordered_80_20" in model_names
     shape_bucket_model = next(
         model
         for model in capacity["models"]
-        if model["name"] == "capacity_same_span_shape_buckets__time_ordered_80_20"
+        if model["name"]
+        == "capacity_same_span_shape_interactions__time_ordered_80_20"
     )
     assert "row_count_bucket" in shape_bucket_model["categorical_features"]
     assert "span_wall_time_bucket" in shape_bucket_model["categorical_features"]
+    assert "row_count_x_call_duration_bucket" in shape_bucket_model[
+        "categorical_features"
+    ]
     component_regression = capacity["token_component_regression"]["variants"][
         "unweighted"
     ]["capacity_credits"]["no_intercept"]["all"]

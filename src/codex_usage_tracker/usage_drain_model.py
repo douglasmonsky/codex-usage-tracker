@@ -1010,6 +1010,12 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         "window_elapsed_bucket",
         "reset_remaining_bucket",
     )
+    state_interaction_categories = (
+        *state_bucket_categories,
+        "baseline_used_x_window_elapsed_bucket",
+        "hour_x_window_elapsed_bucket",
+        "day_x_hour_bucket",
+    )
     same_span_shape = (
         *history_context,
         "row_count",
@@ -1025,6 +1031,14 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         "row_count_bucket",
         "call_duration_bucket",
         "span_wall_time_bucket",
+    )
+    same_span_shape_interaction_categories = (
+        *same_span_shape_categories,
+        "row_count_x_call_duration_bucket",
+        "row_count_x_span_wall_time_bucket",
+        "call_duration_x_span_wall_time_bucket",
+        "hour_x_row_count_bucket",
+        "baseline_used_x_row_count_bucket",
     )
     same_span_tokens = (
         *same_span_shape,
@@ -1081,6 +1095,14 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         ),
         (
             PredictiveModelSpec(
+                "capacity_history_state_interactions",
+                history_context,
+                state_interaction_categories,
+            ),
+            "causal_history_context",
+        ),
+        (
+            PredictiveModelSpec(
                 "capacity_same_span_shape",
                 same_span_shape,
                 time_categories,
@@ -1092,6 +1114,14 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
                 "capacity_same_span_shape_buckets",
                 same_span_shape,
                 same_span_shape_categories,
+            ),
+            "explanatory_same_span",
+        ),
+        (
+            PredictiveModelSpec(
+                "capacity_same_span_shape_interactions",
+                same_span_shape,
+                same_span_shape_interaction_categories,
             ),
             "explanatory_same_span",
         ),
@@ -2362,6 +2392,17 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         if window_minutes > 0
         else 0.0
     )
+    day_of_week = str(day_index) if day_index >= 0 else "missing"
+    baseline_used_bucket = _numeric_bucket(
+        span.baseline_used_percent, width=5.0, max_value=100.0, suffix="pct"
+    )
+    window_elapsed_bucket = _reset_phase_bucket(window_elapsed_fraction)
+    reset_remaining_bucket = _minute_bucket(reset_minutes)
+    row_count_bucket = _numeric_bucket(
+        float(span.row_count), width=5.0, max_value=50.0, suffix="calls"
+    )
+    call_duration_bucket = _second_bucket(duration)
+    span_wall_time_bucket = _second_bucket(span_wall_time_seconds)
     return {
         "target": span.delta_usage_percent,
         "start_event_timestamp": span.start_event_timestamp,
@@ -2390,11 +2431,14 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "reset_remaining_minutes": reset_minutes,
         "window_elapsed_minutes": window_elapsed_minutes,
         "window_elapsed_fraction": window_elapsed_fraction,
-        "baseline_used_bucket": _numeric_bucket(
-            span.baseline_used_percent, width=5.0, max_value=100.0, suffix="pct"
+        "baseline_used_bucket": baseline_used_bucket,
+        "window_elapsed_bucket": window_elapsed_bucket,
+        "reset_remaining_bucket": reset_remaining_bucket,
+        "baseline_used_x_window_elapsed_bucket": (
+            f"{baseline_used_bucket}__{window_elapsed_bucket}"
         ),
-        "window_elapsed_bucket": _reset_phase_bucket(window_elapsed_fraction),
-        "reset_remaining_bucket": _minute_bucket(reset_minutes),
+        "hour_x_window_elapsed_bucket": f"{hour_bucket}__{window_elapsed_bucket}",
+        "day_x_hour_bucket": f"{day_of_week}__{hour_bucket}",
         "days_since_first_span": 0.0,
         "hour_sin": math.sin(2 * math.pi * hour_value / 24.0),
         "hour_cos": math.cos(2 * math.pi * hour_value / 24.0),
@@ -2409,13 +2453,24 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "mean_span_wall_time_seconds_per_call": (
             span_wall_time_seconds / span.row_count if span.row_count else 0.0
         ),
-        "row_count_bucket": _numeric_bucket(
-            float(span.row_count), width=5.0, max_value=50.0, suffix="calls"
+        "row_count_bucket": row_count_bucket,
+        "call_duration_bucket": call_duration_bucket,
+        "span_wall_time_bucket": span_wall_time_bucket,
+        "row_count_x_call_duration_bucket": (
+            f"{row_count_bucket}__{call_duration_bucket}"
         ),
-        "call_duration_bucket": _second_bucket(duration),
-        "span_wall_time_bucket": _second_bucket(span_wall_time_seconds),
+        "row_count_x_span_wall_time_bucket": (
+            f"{row_count_bucket}__{span_wall_time_bucket}"
+        ),
+        "call_duration_x_span_wall_time_bucket": (
+            f"{call_duration_bucket}__{span_wall_time_bucket}"
+        ),
+        "hour_x_row_count_bucket": f"{hour_bucket}__{row_count_bucket}",
+        "baseline_used_x_row_count_bucket": (
+            f"{baseline_used_bucket}__{row_count_bucket}"
+        ),
         "date": date_label,
-        "day_of_week": str(day_index) if day_index >= 0 else "missing",
+        "day_of_week": day_of_week,
         "hour_bucket": hour_bucket,
         "rate_limit_plan_type": span.rate_limit_plan_type or "missing",
         "rate_limit_limit_id": span.rate_limit_limit_id or "missing",
