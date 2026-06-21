@@ -114,13 +114,36 @@
     function renderCommands(payload) {
       const commands = Array.isArray(payload?.commands) ? payload.commands.slice(0, 10) : [];
       return renderSimpleTable(
-        ['Root', 'Total', 'Top child'],
-        commands.map(row => {
-          const child = Array.isArray(row.children) && row.children[0] ? row.children[0] : null;
-          return [row.root, tokenText(row.total), child ? `${child.child} (${tokenText(child.count)})` : '<none>'];
-        }),
+        ['Root', 'Total', 'Children'],
+        commands.map(row => [
+          row.root,
+          tokenText(row.total),
+          { html: renderCommandChildren(row.children), numeric: false },
+        ]),
         'No command rows in this snapshot.',
       );
+    }
+
+    function renderCommandChildren(children) {
+      const rows = Array.isArray(children) ? children : [];
+      if (!rows.length) {
+        return `<span class="diagnostics-muted">${escapeHtml('<none>')}</span>`;
+      }
+      const childCount = rows.length;
+      const label = `${tokenText(childCount)} ${childCount === 1 ? 'child' : 'children'}`;
+      return `
+        <details class="diagnostics-command-children">
+          <summary>${escapeHtml(label)}</summary>
+          <ul>
+            ${rows.map(child => `
+              <li>
+                <span>${escapeHtml(child.child || '<child>')}</span>
+                <b>${tokenText(child.count)}</b>
+              </li>
+            `).join('')}
+          </ul>
+        </details>
+      `;
     }
 
     function renderFileReads(payload) {
@@ -173,13 +196,13 @@
         ${renderSimpleTable(
           ['Metric', 'Share'],
           metrics.filter(row => row.top_n === 1 || row.top_n === 3 || row.top_n === 5)
-            .map(row => [row.metric, pct(row.share)]),
+            .map(row => [concentrationMetricLabel(row), pct(row.share)]),
           'No concentration metrics in this snapshot.',
         )}
         ${renderSimpleTable(
           ['Dimension', 'Label', 'Share', 'Largest'],
           impacts.map(row => [
-            row.dimension,
+            concentrationDimensionLabel(row.dimension),
             row.label,
             pct(row.share),
             row.largest_record_id ? { html: rowInvestigatorLink({ record_id: row.largest_record_id }, tokenText(row.largest_call_tokens), true) } : tokenText(row.largest_call_tokens),
@@ -248,7 +271,7 @@
       if (!rows.length) return renderState(emptyMessage);
       const head = headers.map(header => `<th>${escapeHtml(header)}</th>`).join('');
       const body = rows.map(row => `
-        <tr>${row.map((cell, index) => `<td${index > 0 ? ' class="num"' : ''}>${cellHtml(cell)}</td>`).join('')}</tr>
+        <tr>${row.map((cell, index) => `<td${cellNumeric(cell, index) ? ' class="num"' : ''}>${cellHtml(cell)}</td>`).join('')}</tr>
       `).join('');
       return `
         <div class="diagnostics-table-wrap diagnostics-mini-table-wrap">
@@ -266,10 +289,39 @@
       return escapeHtml(String(value));
     }
 
+    function cellNumeric(value, index) {
+      if (index === 0) return false;
+      if (typeof value === 'object' && value && value.numeric === false) return false;
+      return true;
+    }
+
     function pathLabel(row) {
       const label = row.path_label || 'path';
       const hash = row.path_hash ? ` · ${String(row.path_hash).slice(0, 6)}` : '';
       return `${label}${hash}`;
+    }
+
+    function concentrationMetricLabel(row) {
+      const topN = Number(row?.top_n || 0);
+      const dimension = concentrationDimensionLabel(row?.dimension);
+      if (topN > 0 && dimension) return `Top ${topN} ${dimension.toLowerCase()} share`;
+      return humanizeMetric(row?.metric || 'metric');
+    }
+
+    function concentrationDimensionLabel(value) {
+      return {
+        source_log: 'Source/session',
+        cwd: 'Project/cwd',
+        day: 'Day',
+      }[value] || humanizeMetric(value || '');
+    }
+
+    function humanizeMetric(value) {
+      return String(value || '')
+        .split('_')
+        .filter(Boolean)
+        .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
+        .join(' ');
     }
 
     return {

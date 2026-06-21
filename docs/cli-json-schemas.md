@@ -412,7 +412,7 @@ Schema: `codex-usage-tracker-diagnostic-commands-v1`
 }
 ```
 
-The commands snapshot keeps only command roots and safe one-level child labels such as `status`, `diff`, or `-m:pytest`.
+The commands snapshot keeps only command roots and a bounded list of safe one-level child labels such as `status`, `diff`, or `-m:pytest`.
 
 ## Diagnostic File Reads Snapshot
 
@@ -538,7 +538,7 @@ Schema: `codex-usage-tracker-diagnostic-concentration-v1`
 }
 ```
 
-The concentration snapshot computes top-1/top-3/top-5 share and effective group count by source log/session, cwd/project label, and day. Source log labels use session-id prefixes or source hashes, cwd labels use basename-only labels, and raw source paths/cwd paths are not included.
+The concentration snapshot computes top-1/top-3/top-5 share and effective group count by source log/session, cwd/project label, and day. Metric ids such as `top_1_source_log_share` are stable JSON contract fields; dashboard views should render them as reader-facing labels. Source log labels use session-id prefixes or source hashes, cwd labels use basename-only labels, and raw source paths/cwd paths are not included.
 
 ## Pricing Coverage
 

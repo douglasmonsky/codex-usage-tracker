@@ -363,6 +363,53 @@
     .diagnostics-mini-table-wrap + .diagnostics-mini-table-wrap {
       margin-top: 10px;
     }
+    .diagnostics-muted {
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .diagnostics-command-children {
+      text-align: left;
+    }
+    .diagnostics-command-children summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      color: var(--ink);
+      font-weight: 760;
+      cursor: pointer;
+    }
+    .diagnostics-command-children summary:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .diagnostics-command-children ul {
+      display: grid;
+      gap: 4px;
+      margin: 6px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .diagnostics-command-children li {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .diagnostics-command-children li span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      text-align: left;
+    }
+    .diagnostics-command-children li b {
+      flex: 0 0 auto;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
     .diagnostics-facts-table {
       min-width: 1320px;
     }
