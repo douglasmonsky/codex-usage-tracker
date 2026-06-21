@@ -63,7 +63,9 @@
       if (key === 'cache') return Number(row.cache_ratio || 0);
       if (key === 'context') return Number(row.context_window_percent || 0);
       if (key === 'cost') return Number(row.estimated_cost_usd || 0);
+      if (key === 'duration') return Number(row.call_duration_seconds || 0);
       if (key === 'effort') return textValue(row.effort);
+      if (key === 'gap') return Number(row.previous_call_delta_seconds || 0);
       if (key === 'initiator') return textValue(callInitiatorText(row));
       if (key === 'model') return textValue(row.model);
       if (key === 'cached') return cachedInputTokens(row);
@@ -88,7 +90,9 @@
     function threadCallSortValue(row, key) {
       if (key === 'cache') return Number(row.cache_ratio || 0);
       if (key === 'cost') return Number(row.estimated_cost_usd || 0);
+      if (key === 'duration') return Number(row.call_duration_seconds || 0);
       if (key === 'effort') return textValue(row.effort);
+      if (key === 'gap') return Number(row.previous_call_delta_seconds || 0);
       if (key === 'initiator') return textValue(callInitiatorText(row));
       if (key === 'model') return textValue(row.model);
       if (key === 'cached') return cachedInputTokens(row);
@@ -122,7 +126,9 @@
       if (key === 'cache') return group.cacheRatio;
       if (key === 'context') return group.maxContextUse;
       if (key === 'cost') return group.estimatedCost;
+      if (key === 'duration') return group.totalDurationSeconds;
       if (key === 'effort') return textValue(group.effortSummary);
+      if (key === 'gap') return Number(group.averageGapSeconds || 0);
       if (key === 'model') return textValue(group.modelSummary);
       if (key === 'cached') return group.cachedTokens;
       if (key === 'uncached') return group.uncachedTokens;
@@ -328,6 +334,16 @@
         const estimatedCost = calls.reduce((sum, row) => sum + Number(row.estimated_cost_usd || 0), 0);
         const usageCredits = sumUsageCredits(calls);
         const signalTotal = calls.reduce((sum, row) => sum + signalCount(row), 0);
+        const durationValues = calls
+          .map(row => Number(row.call_duration_seconds))
+          .filter(value => Number.isFinite(value) && value >= 0);
+        const gapValues = calls
+          .map(row => Number(row.previous_call_delta_seconds))
+          .filter(value => Number.isFinite(value) && value >= 0);
+        const totalDurationSeconds = durationValues.reduce((sum, value) => sum + value, 0);
+        const averageGapSeconds = gapValues.length
+          ? gapValues.reduce((sum, value) => sum + value, 0) / gapValues.length
+          : null;
         const latestActivity = calls.reduce((latest, row) => String(row.event_timestamp || '') > latest ? String(row.event_timestamp || '') : latest, '');
         const maxContextUse = calls.reduce((max, row) => Math.max(max, Number(row.context_window_percent || 0)), 0);
         const subagentCount = calls.filter(isSubagent).length;
@@ -355,6 +371,8 @@
           reasoningOutputTokens,
           estimatedCost,
           usageCredits,
+          totalDurationSeconds,
+          averageGapSeconds,
           cacheRatio: inputTokens ? cachedTokens / inputTokens : 0,
           maxContextUse,
           pricingStatusCode: pricingStatusCodeFor(calls),

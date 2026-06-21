@@ -85,7 +85,7 @@ Dashboards default to active sessions only. Use `--include-archived` for an all-
 
 Use global `--lang <code>` before the dashboard command, or set `CODEX_USAGE_TRACKER_LANG`, to choose the dashboard's initial UI language. The dashboard language selector can then override that default in the browser. Localization applies to dashboard UI text, not JSON fields, CSV columns, model names, thread names, paths, or full CLI output.
 
-The localhost `/api/usage` endpoint accepts `limit` and `offset` query parameters, so automation can page aggregate rows without asking the server to load an entire large history at once.
+The localhost `/api/usage` endpoint accepts `limit` and `offset` query parameters, so automation can page aggregate rows without asking the server to load an entire large history at once. Call rows include derived `call_duration_seconds` and `previous_call_delta_seconds`, and live API sorting accepts `duration` and `gap` sort keys.
 
 ## Summaries
 

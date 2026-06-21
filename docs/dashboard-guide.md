@@ -92,6 +92,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.
 - The cards summarize only the currently visible filtered rows.
 - Time values are shown in your browser's local date/time format while sorting and time filtering still use the logged timestamp.
+- Calls include `Duration`, derived from turn start for a new turn or the previous same-turn call end for continuations, and `Prev gap`, the elapsed time since the previous call in the resolved thread.
 - Calls view token columns separate total tokens, cached input, uncached input, and output so the accounting can be scanned without expanding a row.
 - Source pucks are call-level estimates derived from local event metadata. `User` means the token-count segment included a user message, `Codex` means it followed tool output, compaction, or agent-continuation metadata, and `Unknown` means the source event metadata was unavailable or ambiguous.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
@@ -108,6 +109,7 @@ Useful interpretation notes:
 
 - `Last call total` is the token usage for the selected model call.
 - `Session cumulative` is the running total Codex logged for that session at the time of that call.
+- `Duration` is a best-effort elapsed time for the selected call segment. `Prev gap` can include waiting time between separate user turns because it measures from the previous resolved-thread call.
 - `Cached input` and `Uncached input` are split so cache behavior is visible without storing transcript text.
 - A cost with `*` means the pricing row is marked as a best-guess estimate.
 - Codex credits are estimated from aggregate input, cached-input, and output token counters. Direct model matches use the bundled OpenAI Codex rate-card snapshot; inferred labels are marked estimated, and local credit-rate overrides are marked user-provided.

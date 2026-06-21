@@ -217,16 +217,16 @@
       if (!row) {
         const selectedRecordId = getSelectedRecordId();
         if (selectedRecordId && fetchCallRecord) {
-          rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('context.loading'))}</td></tr>`;
+          rowsEl.innerHTML = `<tr><td class="empty-state" colspan="14">${escapeHtml(t('context.loading'))}</td></tr>`;
           detailEl.textContent = t('dashboard.detail.empty');
           fetchCallRecord(selectedRecordId).then(fetchedRow => {
             if (!fetchedRow && getSelectedRecordId() === selectedRecordId) {
-              rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('call.not_found'))}</td></tr>`;
+              rowsEl.innerHTML = `<tr><td class="empty-state" colspan="14">${escapeHtml(t('call.not_found'))}</td></tr>`;
             }
           });
           return;
         }
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('call.not_found'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="14">${escapeHtml(t('call.not_found'))}</td></tr>`;
         detailEl.textContent = t('dashboard.detail.empty');
         return;
       }
@@ -253,7 +253,7 @@
         : 'Not loaded yet';
       rowsEl.innerHTML = `
         <tr class="call-investigator-row">
-          <td colspan="12">
+          <td colspan="14">
             <article class="call-investigator" data-record-id="${escapeHtml(row.record_id || '')}">
               <header class="call-investigator-header">
                 <div>

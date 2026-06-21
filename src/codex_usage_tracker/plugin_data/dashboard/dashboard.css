@@ -13,7 +13,7 @@
       --shadow: 0 12px 32px rgba(23, 32, 51, 0.09);
       --sticky-time-width: 132px;
       --sticky-thread-width: 250px;
-      --calls-table-min-width: 1320px;
+      --calls-table-min-width: 1500px;
     }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }

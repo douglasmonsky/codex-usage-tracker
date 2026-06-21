@@ -559,6 +559,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "applyDetailPanelState()" in dashboard_js
     assert "time-cell" in dashboard_surface
     assert "formatTimestamp" in dashboard_js
+    assert "formatDuration" in dashboard_js
+    assert 'data-sort-key="duration"' in dashboard
+    assert 'data-sort-key="gap"' in dashboard
+    assert '<option value="duration" data-i18n="option.longest_duration">Longest duration</option>' in dashboard
+    assert '<option value="gap" data-i18n="option.longest_gap">Longest gap</option>' in dashboard
     assert "scrollbar-gutter: stable" in dashboard_css
     assert "overflow-y: scroll" in dashboard_css
     assert "pricingSource.fetched_at" in dashboard_status_js
@@ -656,6 +661,10 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "cache_ratio",
         "pricing_model",
         "usage_credits",
+        "call_started_at",
+        "call_duration_seconds",
+        "previous_call_event_timestamp",
+        "previous_call_delta_seconds",
         "recommended_action",
         "call_initiator",
         "call_initiator_reason",

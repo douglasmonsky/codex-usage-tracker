@@ -11,6 +11,7 @@
       ensurePendingFocusVisibleInRows,
       escapeHtml,
       expandedThreads,
+      formatDuration,
       getActiveView,
       getInitialDetailApplied,
       getInitialThreadExpansionApplied,
@@ -46,6 +47,7 @@
       tf,
       threadCallPageSize,
       threadInitiatorSummary,
+      tooltipAttributes,
       tokenNumberCell,
       totalTokenCell,
       translateEffort,
@@ -56,6 +58,11 @@
       visibleSlice,
       groupThreads,
     } = deps;
+
+    function timingCell(value, label) {
+      const text = formatDuration(value);
+      return `<span class="duration-cell" ${tooltipAttributes(`${label}: ${text}`)}>${escapeHtml(text)}</span>`;
+    }
 
     function threadCallHeader(key, label, numeric = false) {
       const active = getThreadCallSortKey() === key;
@@ -86,6 +93,8 @@
         tr.innerHTML = `
           <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
           <td title="${escapeHtml(short(row.session_id))}">${rowInvestigatorLink(row, `<span class="thread-name">${escapeHtml(truncate(rowThreadLabel(row)))}</span>`)}</td>
+          <td class="num">${rowInvestigatorLink(row, timingCell(row.call_duration_seconds, t('table.duration')))}</td>
+          <td class="num">${rowInvestigatorLink(row, timingCell(row.previous_call_delta_seconds, t('table.previous_gap')))}</td>
           <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
           <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
           <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
@@ -115,7 +124,7 @@
         const message = rowsNeedHydration()
           ? t('caption.rows_loading_background')
           : t('state.no_calls');
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(message)}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="14">${escapeHtml(message)}</td></tr>`;
       }
     }
 
@@ -166,6 +175,8 @@
               </span>
             </div>
           </td>
+          <td class="num">${timingCell(group.totalDurationSeconds, t('table.duration'))}</td>
+          <td class="num">${timingCell(group.averageGapSeconds, t('table.previous_gap'))}</td>
           <td>${threadInitiatorSummary(group)}</td>
           <td><span class="pill model-pill" data-full-label="${escapeHtml(short(group.modelSummary))}">${escapeHtml(short(group.modelSummary))}</span></td>
           <td>${effortCell(truncate(group.effortSummary, 28), group.effortTooltip)}</td>
@@ -199,7 +210,7 @@
         }
       }
       if (!groups.length) {
-        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="12">${escapeHtml(t('state.no_threads'))}</td></tr>`;
+        rowsEl.innerHTML = `<tr><td class="empty-state" colspan="14">${escapeHtml(t('state.no_threads'))}</td></tr>`;
       }
       if (!getInitialDetailApplied() && getSelectedThreadKey()) {
         const selected = groups.find(group => group.key === getSelectedThreadKey());
@@ -224,6 +235,8 @@
         return `
           <tr class="thread-call-row${getSelectedRecordId() === row.record_id ? ' selected-row' : ''}" data-record-id="${escapeHtml(row.record_id || '')}">
             <td>${rowInvestigatorLink(row, renderTimeCell(row.event_timestamp), true)}</td>
+            <td class="num">${rowInvestigatorLink(row, timingCell(row.call_duration_seconds, t('table.duration')))}</td>
+            <td class="num">${rowInvestigatorLink(row, timingCell(row.previous_call_delta_seconds, t('table.previous_gap')))}</td>
             <td>${rowInvestigatorLink(row, callInitiatorCell(row))}</td>
             <td>${rowInvestigatorLink(row, `<span class="pill model-pill" data-full-label="${escapeHtml(short(row.model))}">${escapeHtml(short(row.model))}</span>`)}</td>
             <td>${rowInvestigatorLink(row, effortCell(translateEffort(short(row.effort)), translateEffort(short(row.effort))))}</td>
@@ -249,10 +262,12 @@
           ? `<div class="child-load-more"><span>${escapeHtml(tf('table.visible_status', { end: number.format(visibleCount), total: number.format(sortedCalls.length), items: t('table.calls') }))}</span></div>`
           : '';
       tr.innerHTML = `
-        <td class="child-cell" colspan="12">
+        <td class="child-cell" colspan="14">
           <table class="thread-call-table" aria-label="${escapeHtml(`${group.label} ${t('table.calls')}`)}">
             <thead><tr>
               ${threadCallHeader('time', t('table.time'))}
+              ${threadCallHeader('duration', t('table.duration'), true)}
+              ${threadCallHeader('gap', t('table.previous_gap'), true)}
               ${threadCallHeader('initiator', t('table.initiated'))}
               ${threadCallHeader('model', t('table.model'))}
               ${threadCallHeader('effort', t('table.effort'))}
