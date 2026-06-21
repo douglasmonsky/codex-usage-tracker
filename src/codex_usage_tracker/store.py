@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, suppress
@@ -125,6 +126,7 @@ def rebuild_usage_index(
     with connect(db_path) as conn:
         init_db(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
+        conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
@@ -144,6 +146,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
         deleted_rows = int(row["count"] if row is not None else 0)
         conn.execute("DELETE FROM call_diagnostic_facts")
+        conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
@@ -220,6 +223,94 @@ def refresh_metadata(db_path: Path = DEFAULT_DB_PATH) -> dict[str, str]:
         init_db(conn)
         rows = conn.execute("SELECT key, value FROM refresh_meta").fetchall()
     return {str(row["key"]): str(row["value"]) for row in rows}
+
+
+def upsert_diagnostic_snapshot(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    section: str,
+    history_scope: str,
+    payload: dict[str, Any],
+    computed_at: str,
+    source_logs_scanned: int,
+    usage_rows_scanned: int,
+    raw_content_included: bool = False,
+) -> None:
+    """Persist one aggregate diagnostic report snapshot."""
+
+    payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute(
+            """
+            INSERT INTO diagnostic_snapshots (
+                section,
+                history_scope,
+                payload_json,
+                computed_at,
+                source_logs_scanned,
+                usage_rows_scanned,
+                raw_content_included
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(section, history_scope) DO UPDATE SET
+                payload_json = excluded.payload_json,
+                computed_at = excluded.computed_at,
+                source_logs_scanned = excluded.source_logs_scanned,
+                usage_rows_scanned = excluded.usage_rows_scanned,
+                raw_content_included = excluded.raw_content_included
+            """,
+            (
+                section,
+                history_scope,
+                payload_json,
+                computed_at,
+                int(source_logs_scanned),
+                int(usage_rows_scanned),
+                1 if raw_content_included else 0,
+            ),
+        )
+
+
+def query_diagnostic_snapshot(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    section: str,
+    history_scope: str,
+) -> dict[str, Any] | None:
+    """Return one persisted aggregate diagnostic report snapshot."""
+
+    if not db_path.exists():
+        return None
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            """
+            SELECT
+                section,
+                history_scope,
+                payload_json,
+                computed_at,
+                source_logs_scanned,
+                usage_rows_scanned,
+                raw_content_included
+            FROM diagnostic_snapshots
+            WHERE section = ? AND history_scope = ?
+            """,
+            (section, history_scope),
+        ).fetchone()
+    if row is None:
+        return None
+    payload = json.loads(str(row["payload_json"]))
+    return {
+        "section": str(row["section"]),
+        "history_scope": str(row["history_scope"]),
+        "payload": payload if isinstance(payload, dict) else {},
+        "computed_at": str(row["computed_at"]),
+        "source_logs_scanned": int(row["source_logs_scanned"]),
+        "usage_rows_scanned": int(row["usage_rows_scanned"]),
+        "raw_content_included": bool(row["raw_content_included"]),
+    }
 
 
 def schema_state(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:

@@ -81,12 +81,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == "codex-jsonl-v2"
-    assert meta["schema_version"] == "9"
+    assert meta["schema_version"] == "10"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 9
+    assert state["schema_version"] == 10
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert [row["version"] for row in state["migrations"]] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     with connect(db_path) as conn:
         init_db(conn)
         source_rows = [
@@ -654,7 +654,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 9
+    assert user_version == 10
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -727,8 +727,8 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "rate_limit_plan_type" in columns
     assert "rate_limit_primary_used_percent" in columns
     assert "idx_usage_observed_rate_limit_timestamp" in indexes
-    assert user_version == 9
-    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert user_version == 10
+    assert [row["version"] for row in migrations] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
 def test_latest_observed_usage_prefers_normal_codex_limit_pool(tmp_path: Path) -> None:

@@ -29,6 +29,14 @@ from codex_usage_tracker.diagnostic_reports import (
     build_diagnostics_facts_report,
     build_diagnostics_summary_report,
 )
+from codex_usage_tracker.diagnostic_snapshots import (
+    build_diagnostic_commands_report,
+    build_diagnostic_concentration_report,
+    build_diagnostic_file_reads_report,
+    build_diagnostic_overview_report,
+    build_diagnostic_read_productivity_report,
+    build_diagnostic_tool_output_report,
+)
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
     format_doctor,
@@ -394,6 +402,7 @@ def _run_recommendations(args: argparse.Namespace) -> int:
 
 def _run_diagnostics(args: argparse.Namespace) -> int:
     command = args.diagnostics_command
+    report: Any
     if command == "summary":
         report = build_diagnostics_summary_report(
             db_path=args.db,
@@ -447,6 +456,42 @@ def _run_diagnostics(args: argparse.Namespace) -> int:
             sort=args.sort,
             direction=args.direction,
             privacy_mode=args.privacy_mode,
+        )
+    elif command == "overview":
+        report = build_diagnostic_overview_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "tool-output":
+        report = build_diagnostic_tool_output_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "commands":
+        report = build_diagnostic_commands_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "file-reads":
+        report = build_diagnostic_file_reads_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "read-productivity":
+        report = build_diagnostic_read_productivity_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "concentration":
+        report = build_diagnostic_concentration_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
         )
     else:
         raise ValueError(f"unknown diagnostics command: {command}")

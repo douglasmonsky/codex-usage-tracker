@@ -1,0 +1,32 @@
+import { defineConfig, devices } from '@playwright/test';
+
+const baseURL = process.env.DASHBOARD_BASE_URL || 'http://127.0.0.1:8898';
+
+export default defineConfig({
+  testDir: './tests/playwright',
+  timeout: 30_000,
+  expect: {
+    timeout: 10_000,
+  },
+  use: {
+    baseURL,
+    trace: 'retain-on-failure',
+  },
+  reporter: [['list']],
+  projects: [
+    {
+      name: 'chromium-desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 1000 },
+      },
+    },
+    {
+      name: 'chromium-mobile',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 393, height: 851 },
+      },
+    },
+  ],
+});

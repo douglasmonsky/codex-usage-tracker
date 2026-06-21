@@ -383,6 +383,68 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "tools",
         "--json",
     )
+    overview_missing = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "overview",
+        "--json",
+    )
+    overview_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "overview",
+        "--refresh",
+        "--json",
+    )
+    tool_output_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "tool-output",
+        "--refresh",
+        "--json",
+    )
+    commands_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "commands",
+        "--refresh",
+        "--json",
+    )
+    file_reads_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "file-reads",
+        "--refresh",
+        "--json",
+    )
+    read_productivity_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "read-productivity",
+        "--refresh",
+        "--json",
+    )
+    concentration_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "concentration",
+        "--refresh",
+        "--json",
+    )
     fact_calls = _run_cli(
         tmp_path,
         "--db",
@@ -403,7 +465,30 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     facts_payload = json.loads(facts.stdout)
     compactions_payload = json.loads(compactions.stdout)
     tools_payload = json.loads(tools.stdout)
+    overview_missing_payload = json.loads(overview_missing.stdout)
+    overview_refresh_payload = json.loads(overview_refresh.stdout)
+    tool_output_refresh_payload = json.loads(tool_output_refresh.stdout)
+    commands_refresh_payload = json.loads(commands_refresh.stdout)
+    file_reads_refresh_payload = json.loads(file_reads_refresh.stdout)
+    read_productivity_refresh_payload = json.loads(read_productivity_refresh.stdout)
+    concentration_refresh_payload = json.loads(concentration_refresh.stdout)
     fact_calls_payload = json.loads(fact_calls.stdout)
+    for payload in (
+        summary_payload,
+        facts_payload,
+        compactions_payload,
+        tools_payload,
+        overview_missing_payload,
+        overview_refresh_payload,
+        tool_output_refresh_payload,
+        commands_refresh_payload,
+        file_reads_refresh_payload,
+        read_productivity_refresh_payload,
+        concentration_refresh_payload,
+        fact_calls_payload,
+    ):
+        _assert_contract(payload)
+        assert payload["raw_context_included"] is False
     for payload in (
         summary_payload,
         facts_payload,
@@ -411,9 +496,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         tools_payload,
         fact_calls_payload,
     ):
-        _assert_contract(payload)
         assert payload["schema"] == "codex-usage-tracker-diagnostics-v1"
-        assert payload["raw_context_included"] is False
         assert "Associated token totals are not additive" in payload["notes"][0]
 
     fact_names = {row["fact_name"] for row in facts_payload["rows"]}
@@ -428,7 +511,43 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     assert {row["fact_type"] for row in compactions_payload["rows"]} == {"compaction"}
     assert tools_payload["filters"]["fact_type"] is None
     assert tools_payload["filters"]["fact_group"] == "tools"
-    assert {row["fact_type"] for row in tools_payload["rows"]} == {"tool"}
+    assert "tool" in {row["fact_type"] for row in tools_payload["rows"]}
+    assert overview_missing_payload["schema"] == "codex-usage-tracker-diagnostic-overview-v1"
+    assert overview_missing_payload["status"] == "missing"
+    assert overview_refresh_payload["schema"] == "codex-usage-tracker-diagnostic-overview-v1"
+    assert overview_refresh_payload["status"] == "ready"
+    assert overview_refresh_payload["overview"]["usage_rows"] == 2
+    assert overview_refresh_payload["refreshed"] is True
+    assert (
+        tool_output_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-tool-output-v1"
+    )
+    assert tool_output_refresh_payload["summary"]["original_token_sum"] == 9
+    assert (
+        commands_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-commands-v1"
+    )
+    assert commands_refresh_payload["commands"][0]["root"] == "git"
+    assert commands_refresh_payload["commands"][0]["children"][0] == {
+        "child": "status",
+        "count": 1,
+    }
+    assert (
+        file_reads_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-file-reads-v1"
+    )
+    assert file_reads_refresh_payload["summary"]["read_events"] == 0
+    assert (
+        read_productivity_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-read-productivity-v1"
+    )
+    assert read_productivity_refresh_payload["summary"]["read_events_modified_later"] == 0
+    assert (
+        concentration_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-concentration-v1"
+    )
+    assert concentration_refresh_payload["summary"]["usage_rows"] == 2
+    assert concentration_refresh_payload["metrics"]
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
     assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")
@@ -520,7 +639,27 @@ def _make_diagnostics_codex_home(tmp_path: Path) -> Path:
             ),
             _entry(
                 "response_item",
-                {"type": "function_call_output", "output": "SECRET TOOL OUTPUT"},
+                {
+                    "type": "function_call",
+                    "call_id": "call-git",
+                    "name": "exec_command",
+                    "arguments": json.dumps({"cmd": "git status SECRET_ARG"}),
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "call_id": "call-git",
+                    "output": (
+                        "Chunk ID: abc123\n"
+                        "Wall time: 0.0000 seconds\n"
+                        "Process exited with code 0\n"
+                        "Original token count: 9\n"
+                        "Output:\n"
+                        "SECRET TOOL OUTPUT"
+                    ),
+                },
             ),
             _entry(
                 "event_msg",

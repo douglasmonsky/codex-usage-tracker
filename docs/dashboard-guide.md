@@ -133,6 +133,12 @@ Use `Diagnostics` view when you want to see what structured event patterns are h
 - The tab consumes the localhost `/api/diagnostics/*` endpoints; static file dashboards show a live-API unavailable state.
 - The first table shows top diagnostic facts by associated uncached input tokens. Tool/function/MCP/command-family and compaction sections expose narrower slices of the same fact data.
 - Command diagnostics store only a command family such as `pytest`, `git`, or `unknown_command`. Skill and MCP labels are detected only when they are present as structured event metadata.
+- Newer on-demand diagnostic snapshot endpoints are section-specific (`overview`, `tool-output`, `commands`, `file-reads`, `read-productivity`, and `concentration`). Heavy recomputation happens only through explicit diagnostic refresh endpoints. The dashboard's `Refresh diagnostics` button uses one batched refresh so source-log sections share one scan.
+- Click `Refresh diagnostics` when you want to recompute stored diagnostic snapshots. The normal dashboard `Refresh` action updates usage rows only.
+- Snapshot panels show their stored status, last computed time, history scope, and logs scanned count. Missing or stale panels still render without forcing a source-log scan.
+- `Tool Output` totals come from terminal wrapper metadata such as `Original token count`; missing-count rows show coverage gaps where that header was absent.
+- File-read snapshots use basename-only path labels and short hashes. Read-productivity rates are temporal correlations between earlier reads and later structured patch events, not causation.
+- Concentration snapshots show top-N share and effective group count by source log/session, cwd/project label, and day without exposing raw source-log or cwd paths.
 - Click `Calls` on a fact row to load associated model calls. Call links and largest-call links open the Call Investigator, where raw context remains explicit and on demand.
 - Associated token totals are not causal allocations and are not additive when one call has multiple diagnostic facts.
 

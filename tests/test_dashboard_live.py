@@ -128,6 +128,95 @@ def test_dashboard_live_allows_diagnostics_bootstrap_refresh() -> None:
     assert payload["statusKeys"] == ["status.checking", "status.updated"]
 
 
+def test_dashboard_live_skips_diagnostics_auto_refresh_cycle() -> None:
+    payload = _run_dashboard_live_script(
+        """
+(async () => {
+  const calls = [];
+  const statusUpdates = [];
+  const appliedPayloads = [];
+  let scheduledIntervals = 0;
+  context.window.setInterval = () => {
+    scheduledIntervals += 1;
+    return 1;
+  };
+  context.window.clearInterval = () => {};
+  globalThis.__fetch = async (url, options) => {
+    calls.push({ url, headers: options.headers });
+    return {
+      ok: true,
+      json: async () => ({
+        rows: [],
+        refreshed_at: '2026-06-19T00:00:00Z',
+        refresh_result: {
+          inserted_or_updated_events: 1,
+          scanned_files: 1,
+          skipped_events: 0,
+        },
+        total_available_rows: 1,
+      }),
+    };
+  };
+  const refreshDashboardEl = { disabled: false };
+  const runtime = factory.create({
+    activeView: () => 'diagnostics',
+    apiToken: () => 'test-token',
+    applyDashboardPayload: payload => appliedPayloads.push(payload),
+    autoRefreshEl: { checked: true },
+    backgroundHydrationChunkSize: 2000,
+    formatTimestamp: value => value,
+    getArchivedAvailableRows: () => 0,
+    getData: () => [],
+    getIncludeArchived: () => false,
+    getLoadedLimit: () => null,
+    getTotalAvailableRows: () => 1,
+    historyScopeEl: { value: 'active', parentElement: {} },
+    i18n: { currentLanguage: 'en' },
+    initialHydrationChunkSize: 500,
+    latestRefreshAt: () => '',
+    limitValue: value => value === null ? 'all' : String(value),
+    liveRefreshIntervalMs: 10000,
+    liveRefreshSupported: true,
+    loadLimitEl: { value: '5000', options: [], lastElementChild: null, insertBefore: () => {} },
+    number: new Intl.NumberFormat('en-US'),
+    payloadRows: payload => payload.rows || [],
+    rebuildDashboardIndexes: () => {},
+    rebuildFilterOptions: () => {},
+    refreshDashboardEl,
+    render: () => {},
+    resetRowsForHydration: () => {},
+    rowLoadProgressBarEl: { style: {} },
+    rowLoadProgressCountEl: { textContent: '' },
+    rowLoadProgressEl: { hidden: true },
+    rowLoadProgressLabelEl: { textContent: '' },
+    setFastTooltip: () => {},
+    t: key => key,
+    tf: (key, values = {}) => `${key}:${JSON.stringify(values)}`,
+    updateLiveStatus: (key, detail) => statusUpdates.push({ key, detail }),
+  });
+  runtime.scheduleAutoRefresh();
+  await runtime.refreshDashboardLive();
+  console.log(JSON.stringify({
+    fetchCount: calls.length,
+    appliedCount: appliedPayloads.length,
+    statusKeys: statusUpdates.map(entry => entry.key),
+    scheduledIntervals,
+    refreshDisabled: refreshDashboardEl.disabled,
+  }));
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
+
+    assert payload["fetchCount"] == 0
+    assert payload["appliedCount"] == 0
+    assert payload["statusKeys"] == []
+    assert payload["scheduledIntervals"] == 0
+    assert payload["refreshDisabled"] is False
+
+
 def test_dashboard_live_prepends_new_rows_after_cached_index_refresh() -> None:
     payload = _run_dashboard_live_script(
         """

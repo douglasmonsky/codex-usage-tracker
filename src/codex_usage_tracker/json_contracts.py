@@ -158,6 +158,87 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    "codex-usage-tracker-diagnostic-overview-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "overview": (dict, NoneType),
+            "notes": list,
+        }
+    },
+    "codex-usage-tracker-diagnostic-tool-output-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "functions": list,
+            "command_roots": list,
+            "missing_reasons": list,
+            "notes": list,
+        }
+    },
+    "codex-usage-tracker-diagnostic-commands-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "commands": list,
+            "notes": list,
+        }
+    },
+    "codex-usage-tracker-diagnostic-file-reads-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "by_reader": list,
+            "top_paths": list,
+            "largest_read_commands": list,
+            "path_privacy": dict,
+            "notes": list,
+        }
+    },
+    "codex-usage-tracker-diagnostic-read-productivity-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "by_reader": list,
+            "top_modified_paths": list,
+            "path_privacy": dict,
+            "notes": list,
+        }
+    },
+    "codex-usage-tracker-diagnostic-concentration-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "metrics": list,
+            "dimensions": list,
+            "largest_impact_rows": list,
+            "privacy": dict,
+            "notes": list,
+        }
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),

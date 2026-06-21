@@ -35,6 +35,15 @@ from codex_usage_tracker.diagnostic_reports import (
     build_diagnostics_facts_report,
     build_diagnostics_summary_report,
 )
+from codex_usage_tracker.diagnostic_snapshots import (
+    build_diagnostic_commands_report,
+    build_diagnostic_concentration_report,
+    build_diagnostic_file_reads_report,
+    build_diagnostic_overview_report,
+    build_diagnostic_read_productivity_report,
+    build_diagnostic_tool_output_report,
+    refresh_diagnostic_snapshots,
+)
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -304,6 +313,24 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/diagnostics/tools":
             self._handle_diagnostics_facts(parsed.query, fact_group="tools")
             return
+        if parsed.path == "/api/diagnostics/overview":
+            self._handle_diagnostics_overview(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/tool-output":
+            self._handle_diagnostics_tool_output(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/commands":
+            self._handle_diagnostics_commands(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/file-reads":
+            self._handle_diagnostics_file_reads(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/read-productivity":
+            self._handle_diagnostics_read_productivity(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/concentration":
+            self._handle_diagnostics_concentration(parsed.query)
+            return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
             return
@@ -314,6 +341,34 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._handle_dashboard_shell(parsed.query)
             return
         super().do_GET()
+
+    def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
+        parsed = urlparse(self.path)
+        if not self._request_origin_allowed():
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
+            return
+        if parsed.path == "/api/diagnostics/refresh":
+            self._handle_diagnostics_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/overview/refresh":
+            self._handle_diagnostics_overview_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/tool-output/refresh":
+            self._handle_diagnostics_tool_output_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/commands/refresh":
+            self._handle_diagnostics_commands_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/file-reads/refresh":
+            self._handle_diagnostics_file_reads_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/read-productivity/refresh":
+            self._handle_diagnostics_read_productivity_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/concentration/refresh":
+            self._handle_diagnostics_concentration_refresh(parsed.query)
+            return
+        self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
 
     def end_headers(self) -> None:
         if self._is_dashboard_html_request():
@@ -939,6 +994,169 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"error": f"Database error while reading diagnostic calls: {exc}"},
+            )
+            return
+        self._send_json(HTTPStatus.OK, payload)
+
+    def _handle_diagnostics_overview(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_overview_report,
+            refresh=False,
+            label="diagnostic overview",
+        )
+
+    def _handle_diagnostics_refresh(self, query: str) -> None:
+        params = parse_qs(query)
+        if not self._has_valid_api_token(params):
+            self._send_json(
+                HTTPStatus.FORBIDDEN,
+                {"error": "Valid API token is required for diagnostic refresh"},
+            )
+            return
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        try:
+            with self._refresh_lock:
+                payload = refresh_diagnostic_snapshots(
+                    db_path=self._db_path,
+                    include_archived=include_archived,
+                )
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while refreshing diagnostics: {exc}"},
+            )
+            return
+        self._send_json(HTTPStatus.OK, payload)
+
+    def _handle_diagnostics_overview_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_overview_report,
+            refresh=True,
+            label="diagnostic overview",
+        )
+
+    def _handle_diagnostics_tool_output(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_tool_output_report,
+            refresh=False,
+            label="diagnostic tool output",
+        )
+
+    def _handle_diagnostics_tool_output_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_tool_output_report,
+            refresh=True,
+            label="diagnostic tool output",
+        )
+
+    def _handle_diagnostics_commands(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_commands_report,
+            refresh=False,
+            label="diagnostic commands",
+        )
+
+    def _handle_diagnostics_commands_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_commands_report,
+            refresh=True,
+            label="diagnostic commands",
+        )
+
+    def _handle_diagnostics_file_reads(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_file_reads_report,
+            refresh=False,
+            label="diagnostic file reads",
+        )
+
+    def _handle_diagnostics_file_reads_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_file_reads_report,
+            refresh=True,
+            label="diagnostic file reads",
+        )
+
+    def _handle_diagnostics_read_productivity(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_read_productivity_report,
+            refresh=False,
+            label="diagnostic read productivity",
+        )
+
+    def _handle_diagnostics_read_productivity_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_read_productivity_report,
+            refresh=True,
+            label="diagnostic read productivity",
+        )
+
+    def _handle_diagnostics_concentration(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_concentration_report,
+            refresh=False,
+            label="diagnostic concentration",
+        )
+
+    def _handle_diagnostics_concentration_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_concentration_report,
+            refresh=True,
+            label="diagnostic concentration",
+        )
+
+    def _handle_diagnostic_snapshot(
+        self,
+        query: str,
+        *,
+        build_report: Any,
+        refresh: bool,
+        label: str,
+    ) -> None:
+        params = parse_qs(query)
+        if refresh and not self._has_valid_api_token(params):
+            self._send_json(
+                HTTPStatus.FORBIDDEN,
+                {"error": "Valid API token is required for diagnostic refresh"},
+            )
+            return
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        try:
+            if refresh:
+                with self._refresh_lock:
+                    payload = build_report(
+                        db_path=self._db_path,
+                        include_archived=include_archived,
+                        refresh=True,
+                    ).payload
+            else:
+                payload = build_report(
+                    db_path=self._db_path,
+                    include_archived=include_archived,
+                    refresh=False,
+                ).payload
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading {label}: {exc}"},
             )
             return
         self._send_json(HTTPStatus.OK, payload)

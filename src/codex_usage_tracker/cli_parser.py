@@ -327,6 +327,78 @@ def _add_diagnostics_parser(
     _add_diagnostics_base_filters(tools)
     _add_diagnostics_fact_sort(tools, default_limit=50)
 
+    overview = diagnostic_subparsers.add_parser(
+        "overview",
+        help="Show the on-demand aggregate diagnostic overview snapshot",
+    )
+    overview.add_argument("--include-archived", action="store_true")
+    overview.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the overview snapshot before reading it.",
+    )
+    overview.add_argument("--json", action="store_true", dest="as_json")
+
+    tool_output = diagnostic_subparsers.add_parser(
+        "tool-output",
+        help="Show the on-demand aggregate tool-output snapshot",
+    )
+    tool_output.add_argument("--include-archived", action="store_true")
+    tool_output.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the tool-output snapshot before reading it.",
+    )
+    tool_output.add_argument("--json", action="store_true", dest="as_json")
+
+    commands = diagnostic_subparsers.add_parser(
+        "commands",
+        help="Show the on-demand aggregate command root snapshot",
+    )
+    commands.add_argument("--include-archived", action="store_true")
+    commands.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the command snapshot before reading it.",
+    )
+    commands.add_argument("--json", action="store_true", dest="as_json")
+
+    file_reads = diagnostic_subparsers.add_parser(
+        "file-reads",
+        help="Show the on-demand aggregate file-read snapshot",
+    )
+    file_reads.add_argument("--include-archived", action="store_true")
+    file_reads.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the file-read snapshot before reading it.",
+    )
+    file_reads.add_argument("--json", action="store_true", dest="as_json")
+
+    read_productivity = diagnostic_subparsers.add_parser(
+        "read-productivity",
+        help="Show temporal read-to-modify diagnostic correlations",
+    )
+    read_productivity.add_argument("--include-archived", action="store_true")
+    read_productivity.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the read-productivity snapshot before reading it.",
+    )
+    read_productivity.add_argument("--json", action="store_true", dest="as_json")
+
+    concentration = diagnostic_subparsers.add_parser(
+        "concentration",
+        help="Show concentration of token impact by source log, cwd, and day",
+    )
+    concentration.add_argument("--include-archived", action="store_true")
+    concentration.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the concentration snapshot before reading it.",
+    )
+    concentration.add_argument("--json", action="store_true", dest="as_json")
+
     fact_calls = diagnostic_subparsers.add_parser(
         "fact-calls",
         help="List calls associated with one diagnostic fact",

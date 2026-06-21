@@ -47,6 +47,12 @@ Tracked schema ids:
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
+| `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
+| `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
+| `codex-usage-tracker-diagnostic-commands-v1` | CLI `diagnostics commands --json`, dashboard server `/api/diagnostics/commands` |
+| `codex-usage-tracker-diagnostic-file-reads-v1` | CLI `diagnostics file-reads --json`, dashboard server `/api/diagnostics/file-reads` |
+| `codex-usage-tracker-diagnostic-read-productivity-v1` | CLI `diagnostics read-productivity --json`, dashboard server `/api/diagnostics/read-productivity` |
+| `codex-usage-tracker-diagnostic-concentration-v1` | CLI `diagnostics concentration --json`, dashboard server `/api/diagnostics/concentration` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -280,6 +286,259 @@ Schema: `codex-usage-tracker-diagnostics-v1`
 ```
 
 Diagnostics payloads report aggregate structured facts such as compaction, tool/function/MCP activity, command families, structured skill labels, search/read loops, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, command arguments, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
+
+Diagnostic snapshots use separate section endpoints instead of one large read payload. `GET` returns the latest stored section snapshot or `status: "missing"`; `POST /api/diagnostics/<section>/refresh` recomputes and replaces only that section. The dashboard button calls `POST /api/diagnostics/refresh`, which returns a small wrapper with `sections` and recomputes source-log-derived sections with one shared analyzer pass. This keeps ordinary dashboard refresh fast and prevents source-log rescans unless a diagnostics refresh is explicit.
+
+## Diagnostic Overview Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics overview --json
+codex-usage-tracker diagnostics overview --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/overview`
+- `POST /api/diagnostics/overview/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-overview-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-overview-v1",
+  "section": "overview",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {
+    "computed_at": "2026-06-20T18:00:00+00:00",
+    "history_scope": "active",
+    "source_logs_scanned": 3,
+    "usage_rows_scanned": 10,
+    "raw_content_included": false
+  },
+  "overview": {
+    "usage_rows": 10,
+    "total_tokens": 12345,
+    "cached_input_tokens": 9000,
+    "uncached_input_tokens": 2000,
+    "cache_ratio": 0.75
+  },
+  "notes": []
+}
+```
+
+The overview snapshot is recomputed only when explicitly refreshed. Ordinary dashboard usage refreshes do not update diagnostic snapshots.
+
+## Diagnostic Tool Output Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics tool-output --json
+codex-usage-tracker diagnostics tool-output --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/tool-output`
+- `POST /api/diagnostics/tool-output/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-tool-output-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-tool-output-v1",
+  "section": "tool-output",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "function_calls": 1,
+    "function_outputs": 1,
+    "outputs_with_original_token_count": 1,
+    "outputs_missing_original_token_count": 0,
+    "original_token_sum": 42
+  },
+  "functions": [],
+  "command_roots": [],
+  "missing_reasons": [],
+  "notes": []
+}
+```
+
+The tool-output snapshot stores function names, conservative command roots, numeric counts, and terminal `Original token count` totals. It does not store raw tool output or command text.
+
+## Diagnostic Commands Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics commands --json
+codex-usage-tracker diagnostics commands --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/commands`
+- `POST /api/diagnostics/commands/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-commands-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-commands-v1",
+  "section": "commands",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "shell_function_calls": 1,
+    "command_root_count": 1,
+    "missing_command": 0
+  },
+  "commands": [
+    {
+      "root": "git",
+      "total": 1,
+      "children": [{"child": "status", "count": 1}]
+    }
+  ],
+  "notes": []
+}
+```
+
+The commands snapshot keeps only command roots and a bounded list of safe one-level child labels such as `status`, `diff`, or `-m:pytest`.
+
+## Diagnostic File Reads Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics file-reads --json
+codex-usage-tracker diagnostics file-reads --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/file-reads`
+- `POST /api/diagnostics/file-reads/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-file-reads-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-file-reads-v1",
+  "section": "file-reads",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "read_commands": 1,
+    "read_events": 1,
+    "unique_paths_read": 1,
+    "read_events_with_output_count": 1,
+    "read_events_missing_output_count": 0,
+    "allocated_output_token_sum": 42
+  },
+  "by_reader": [],
+  "top_paths": [],
+  "largest_read_commands": [],
+  "path_privacy": {},
+  "notes": []
+}
+```
+
+The file-reads snapshot classifies common shell readers such as `cat`, `sed`, `nl`, `rg`, and `find`. Path labels are basename-only with a short irreversible hash; raw commands, command arguments, absolute paths, file contents, and tool output are not stored.
+
+## Diagnostic Read Productivity Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics read-productivity --json
+codex-usage-tracker diagnostics read-productivity --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/read-productivity`
+- `POST /api/diagnostics/read-productivity/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-read-productivity-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-read-productivity-v1",
+  "section": "read-productivity",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "read_events": 1,
+    "read_events_modified_later": 1,
+    "read_events_modified_later_pct": 1.0,
+    "unique_paths_read": 1,
+    "unique_paths_modified_later": 1,
+    "unique_path_modified_later_pct": 1.0,
+    "correlation_note": "Read-to-modify counts are temporal correlations."
+  },
+  "by_reader": [],
+  "top_modified_paths": [],
+  "path_privacy": {},
+  "notes": []
+}
+```
+
+Read productivity is a temporal correlation, not causation. A read is counted as modified later only when the same privacy-preserving path key appears in a later structured patch event in the same source log.
+
+## Diagnostic Concentration Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics concentration --json
+codex-usage-tracker diagnostics concentration --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/concentration`
+- `POST /api/diagnostics/concentration/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-concentration-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-concentration-v1",
+  "section": "concentration",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "usage_rows": 4,
+    "total_tokens": 100,
+    "dimension_count": 3,
+    "history_scope": "active"
+  },
+  "metrics": [
+    {"metric": "top_1_source_log_share", "dimension": "source_log", "top_n": 1, "share": 0.5}
+  ],
+  "dimensions": [],
+  "largest_impact_rows": [],
+  "privacy": {},
+  "notes": []
+}
+```
+
+The concentration snapshot computes top-1/top-3/top-5 share and effective group count by source log/session, cwd/project label, and day. Metric ids such as `top_1_source_log_share` are stable JSON contract fields; dashboard views should render them as reader-facing labels. Source log labels use session-id prefixes or source hashes, cwd labels use basename-only labels, and raw source paths/cwd paths are not included.
 
 ## Pricing Coverage
 
