@@ -142,6 +142,106 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     assert len(unlimited_context["entries"]) > len(limited_context["entries"])
 
 
+def test_context_evidence_includes_lightweight_action_timing(tmp_path: Path) -> None:
+    session_id = "019e37d5-f19f-7e4d-84cb-508941431113"
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "06"
+        / "11"
+        / f"rollout-2026-06-11T22-40-00-{session_id}.jsonl"
+    )
+
+    def stamped(entry: dict[str, object], timestamp: str) -> dict[str, object]:
+        row = dict(entry)
+        row["timestamp"] = timestamp
+        return row
+
+    _write_jsonl(
+        codex_home / "session_index.jsonl",
+        [
+            {
+                "id": session_id,
+                "thread_name": "Evidence timing",
+                "updated_at": "2026-06-11T22:40:08Z",
+            }
+        ],
+    )
+    _write_jsonl(
+        log_path,
+        [
+            stamped(_entry("session_meta", {"id": session_id}), "2026-06-11T22:40:00.000Z"),
+            stamped(
+                _entry("turn_context", {"turn_id": "timing-turn", "model": "gpt-5.5"}),
+                "2026-06-11T22:40:00.000Z",
+            ),
+            stamped(
+                _entry(
+                    "response_item",
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": "Run focused evidence timing."}],
+                    },
+                ),
+                "2026-06-11T22:40:02.500Z",
+            ),
+            stamped(
+                _entry(
+                    "event_msg",
+                    {
+                        "type": "mcp_tool_call_end",
+                        "call_id": "call-timing",
+                        "turn_id": "timing-turn",
+                        "server_name": "local",
+                        "tool_name": "fixture",
+                        "duration_ms": 1200,
+                        "status": "success",
+                    },
+                ),
+                "2026-06-11T22:40:05.000Z",
+            ),
+            stamped(_token_event(250, 250), "2026-06-11T22:40:07.250Z"),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    target = query_session_usage(db_path=db_path, session_id=session_id)[0]
+
+    context = load_call_context(
+        target["record_id"],
+        db_path=db_path,
+        max_chars=0,
+        max_entries=0,
+    )
+    entries_by_label = {entry["label"]: entry for entry in context["entries"]}
+    action_timing_text = json.dumps(context["action_timing"])
+
+    assert context["action_timing"] == {
+        "available": True,
+        "scope": "selected_turn_evidence_entries",
+        "source": "entry_timestamps",
+        "timed_entry_count": 4,
+        "total_elapsed_ms": 7250,
+        "slowest_gap_ms": 2500,
+    }
+    assert entries_by_label["Turn context"]["action_timing"]["since_turn_start_ms"] == 0
+    assert entries_by_label["message / user"]["action_timing"]["since_previous_entry_ms"] == 2500
+    assert entries_by_label["mcp_tool_call_end"]["action_timing"] == {
+        "reported_duration_ms": 1200,
+        "duration_source": "event.duration_ms",
+        "since_turn_start_ms": 5000,
+        "since_previous_entry_ms": 2500,
+        "timestamp_source": "entry.timestamp",
+    }
+    assert entries_by_label["Token count"]["action_timing"]["since_turn_start_ms"] == 7250
+    assert entries_by_label["Token count"]["action_timing"]["since_previous_entry_ms"] == 2250
+    assert ".jsonl" not in action_timing_text
+    assert "Run focused evidence timing" not in action_timing_text
+
+
 def test_context_loading_uses_one_source_scan_for_evidence_and_serialized_estimate(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
