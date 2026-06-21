@@ -160,6 +160,48 @@ def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
     assert "error_by_one_percent_streak" in walk_forward["error_diagnostics"][
         "hybrid_streak_regime"
     ]
+    assert "one_percent_regime_grace" in walk_forward["models"]
+    assert summary["span_correlations"]["delta_usage_percent"]["n"] == 6
+    assert (
+        summary["span_correlations"]["one_percent_span_capacity"][
+            "standard_usage_credits"
+        ]["n"]
+        == 5
+    )
+    calibration = summary["walk_forward_prediction"]["one_percent_grace_calibration"]
+    assert calibration["default_config"] == {
+        "streak_threshold": 10,
+        "grace_spans": 1,
+        "max_break_delta_percent": 2.0,
+    }
+
+
+def test_one_percent_regime_grace_ignores_one_small_break() -> None:
+    rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    used = 0.0
+    for index in range(11):
+        used += 1.0
+        rows.append(
+            _row(
+                f"one-{index}",
+                f"2026-06-01T00:{index + 1:02d}:00Z",
+                used,
+                1.0,
+            )
+        )
+    used += 2.0
+    rows.append(_row("break", "2026-06-01T00:12:00Z", used, 2.0))
+    used += 1.0
+    rows.append(_row("resume", "2026-06-01T00:13:00Z", used, 1.0))
+
+    summary = summarize_usage_drain_model(rows)
+
+    walk_forward = summary["walk_forward_prediction"]["scopes"]["all_after_first"]
+    previous = walk_forward["models"]["previous_delta"]
+    grace = walk_forward["models"]["one_percent_regime_grace"]
+    assert grace["mae"] < previous["mae"]
+    calibration = summary["walk_forward_prediction"]["one_percent_grace_calibration"]
+    assert calibration["scopes"]["all_after_first"]["best_by_mae"]["mae"] <= grace["mae"]
 
 
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:

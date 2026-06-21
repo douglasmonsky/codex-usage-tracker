@@ -40,6 +40,11 @@ TIMING_TOTAL_FIELDS = (
     "call_duration_seconds",
     "previous_call_delta_seconds",
 )
+REGIME_GRACE_STREAK_THRESHOLD = 10
+REGIME_GRACE_SPANS = 1
+REGIME_GRACE_MAX_BREAK_DELTA = 2.0
+REGIME_GRACE_THRESHOLD_GRID = (3, 5, 10, 25, 50, 100, 200)
+REGIME_GRACE_SPAN_GRID = (1, 2, 3)
 
 
 @dataclass(frozen=True)
@@ -319,6 +324,7 @@ def summarize_usage_drain_model(
         "rate_limit_limit_id_mix": _count_values(rows, "rate_limit_limit_id"),
         "delta_regimes": _delta_regime_summary(spans),
         "regime_streaks": _regime_streak_summary(spans),
+        "span_correlations": _span_correlation_summary(spans),
         "walk_forward_prediction": _walk_forward_prediction_summary(spans),
         "documented_fast_multipliers": dict(DOCUMENTED_FAST_CREDIT_MULTIPLIERS),
         "available_signals": {
@@ -348,6 +354,7 @@ def summarize_usage_drain_model(
                 "call_started_at",
                 "call_duration_seconds",
                 "previous_call_delta_seconds",
+                "span_wall_time_seconds",
             ],
             "controls": [
                 "model",
@@ -365,6 +372,7 @@ def summarize_usage_drain_model(
                 "one_percent_streak",
                 "low_delta_streak",
                 "same_delta_streak",
+                "one_percent_regime_grace",
             ],
         },
         "limitations": [
@@ -477,6 +485,145 @@ def _run_break_record(
     }
 
 
+def _span_correlation_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    rows = [_span_correlation_row(span) for span in spans]
+    one_percent_rows = [
+        row for row in rows if _is_one_percent_delta(row["delta_usage_percent"])
+    ]
+    latest_rows = rows[-500:]
+    return {
+        "delta_usage_percent": _correlation_report(
+            rows,
+            target="delta_usage_percent",
+            feature_names=SPAN_RAW_CORRELATION_FEATURES,
+        ),
+        "delta_usage_percent_latest_500": _correlation_report(
+            latest_rows,
+            target="delta_usage_percent",
+            feature_names=SPAN_RAW_CORRELATION_FEATURES,
+        ),
+        "one_percent_span_capacity": {
+            "note": (
+                "For exact 1% spans, these describe how much aggregate work fits "
+                "inside one visible counter tick."
+            ),
+            "standard_usage_credits": _correlation_report(
+                one_percent_rows,
+                target="standard_usage_credits",
+                feature_names=SPAN_CAPACITY_CORRELATION_FEATURES,
+            ),
+            "total_tokens": _correlation_report(
+                one_percent_rows,
+                target="total_tokens",
+                feature_names=SPAN_CAPACITY_CORRELATION_FEATURES,
+            ),
+            "row_count": _correlation_report(
+                one_percent_rows,
+                target="row_count",
+                feature_names=SPAN_CAPACITY_CORRELATION_FEATURES,
+            ),
+        },
+    }
+
+
+SPAN_RAW_CORRELATION_FEATURES = (
+    "row_count",
+    "standard_usage_credits",
+    "input_tokens",
+    "cached_input_tokens",
+    "uncached_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+    "call_duration_seconds",
+    "previous_call_delta_seconds",
+    "span_wall_time_seconds",
+    "baseline_used_percent",
+)
+SPAN_CAPACITY_CORRELATION_FEATURES = (
+    "row_count",
+    "input_tokens",
+    "cached_input_tokens",
+    "uncached_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+    "call_duration_seconds",
+    "previous_call_delta_seconds",
+    "span_wall_time_seconds",
+    "baseline_used_percent",
+)
+
+
+def _span_correlation_row(span: UsageDeltaSpan) -> dict[str, float]:
+    row = {
+        "delta_usage_percent": span.delta_usage_percent,
+        "row_count": float(span.row_count),
+        "standard_usage_credits": span.standard_usage_credits,
+        "call_duration_seconds": span.timing_totals.get("call_duration_seconds", 0.0),
+        "previous_call_delta_seconds": span.timing_totals.get(
+            "previous_call_delta_seconds", 0.0
+        ),
+        "span_wall_time_seconds": _span_wall_time_seconds(span),
+        "baseline_used_percent": span.baseline_used_percent,
+    }
+    for field_name in TOKEN_TOTAL_FIELDS:
+        row[field_name] = span.token_totals.get(field_name, 0.0)
+    return row
+
+
+def _span_wall_time_seconds(span: UsageDeltaSpan) -> float:
+    start_dt = _parse_timestamp(span.start_event_timestamp)
+    end_dt = _parse_timestamp(span.end_event_timestamp)
+    if start_dt is None or end_dt is None:
+        return 0.0
+    return max((end_dt - start_dt).total_seconds(), 0.0)
+
+
+def _correlation_report(
+    rows: list[dict[str, float]], *, target: str, feature_names: tuple[str, ...]
+) -> dict[str, Any]:
+    if not rows:
+        return {
+            "n": 0,
+            "target": target,
+            "target_mean": None,
+            "target_stddev": None,
+            "top_abs_pearson": [],
+            "top_abs_spearman": [],
+        }
+    target_values = [row[target] for row in rows]
+    correlations = [
+        {
+            "feature": feature_name,
+            "pearson": _rounded(
+                _pearson([row[feature_name] for row in rows], target_values)
+            ),
+            "spearman": _rounded(
+                _spearman([row[feature_name] for row in rows], target_values)
+            ),
+        }
+        for feature_name in feature_names
+        if feature_name != target
+    ]
+    return {
+        "n": len(rows),
+        "target": target,
+        "target_mean": _rounded(sum(target_values) / len(target_values)),
+        "target_stddev": _rounded(_value_stddev(target_values)),
+        "top_abs_pearson": sorted(
+            correlations,
+            key=lambda row: abs(_number(row["pearson"])),
+            reverse=True,
+        )[:10],
+        "top_abs_spearman": sorted(
+            correlations,
+            key=lambda row: abs(_number(row["spearman"])),
+            reverse=True,
+        )[:10],
+    }
+
+
 def _delta_distribution(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
     values = [span.delta_usage_percent for span in spans]
     if not values:
@@ -546,6 +693,10 @@ def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
                 "uses previous delta after a repeated same-delta streak; "
                 "otherwise uses rolling3 mean."
             ),
+            "one_percent_regime_grace": (
+                "Predicts 1% during a long 1% regime and for one small break "
+                "after the regime; otherwise uses previous delta."
+            ),
             "adaptive_low_delta_mode": (
                 "Uses rolling10 mode when at least 80% of the previous 10 deltas "
                 "are <=1%; otherwise uses previous delta."
@@ -559,6 +710,7 @@ def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
             name: _walk_forward_scope_metrics(rows, start_index=start_index)
             for name, start_index in scopes.items()
         },
+        "one_percent_grace_calibration": _one_percent_grace_calibration(spans, scopes),
     }
 
 
@@ -589,6 +741,12 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 if same_delta_streak >= 2
                 else sum(recent3) / len(recent3)
             )
+            one_percent_grace = _one_percent_regime_grace_prediction(
+                previous_deltas,
+                streak_threshold=REGIME_GRACE_STREAK_THRESHOLD,
+                grace_spans=REGIME_GRACE_SPANS,
+                max_break_delta=REGIME_GRACE_MAX_BREAK_DELTA,
+            )
             predictions = {
                 "constant_one_percent": 1.0,
                 "previous_delta": previous_deltas[-1],
@@ -597,6 +755,7 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 "rolling10_median_delta": float(median(recent10)),
                 "rolling10_mode_delta": rolling10_mode,
                 "hybrid_streak_regime": hybrid_streak,
+                "one_percent_regime_grace": one_percent_grace,
                 "adaptive_low_delta_mode": rolling10_mode
                 if rolling10_low_share >= 0.8
                 else previous_deltas[-1],
@@ -651,11 +810,174 @@ def _walk_forward_scope_metrics(
                 "rolling3_mean_delta",
                 "rolling10_mode_delta",
                 "hybrid_streak_regime",
+                "one_percent_regime_grace",
                 "adaptive_low_delta_mode",
             )
             if model_name in model_names
         },
     }
+
+
+def _one_percent_grace_calibration(
+    spans: list[UsageDeltaSpan], scopes: dict[str, int]
+) -> dict[str, Any]:
+    values = [span.delta_usage_percent for span in spans]
+    if len(values) < 2:
+        return {
+            "default_config": _one_percent_grace_config(
+                REGIME_GRACE_STREAK_THRESHOLD, REGIME_GRACE_SPANS
+            ),
+            "scopes": {},
+        }
+    scope_results: dict[str, Any] = {}
+    for scope_name, start_index in scopes.items():
+        rows = []
+        for threshold in REGIME_GRACE_THRESHOLD_GRID:
+            for grace_spans in REGIME_GRACE_SPAN_GRID:
+                rows.append(
+                    _one_percent_grace_calibration_row(
+                        values,
+                        start_index=max(1, start_index),
+                        streak_threshold=threshold,
+                        grace_spans=grace_spans,
+                    )
+                )
+        rows.sort(
+            key=lambda row: (
+                _number(row["mae"]),
+                _number(row["rmse"]),
+                int(row["streak_threshold"]),
+                int(row["grace_spans"]),
+            )
+        )
+        default_row = _one_percent_grace_calibration_row(
+            values,
+            start_index=max(1, start_index),
+            streak_threshold=REGIME_GRACE_STREAK_THRESHOLD,
+            grace_spans=REGIME_GRACE_SPANS,
+        )
+        by_rmse = sorted(
+            rows,
+            key=lambda row: (
+                _number(row["rmse"]),
+                _number(row["mae"]),
+                int(row["streak_threshold"]),
+                int(row["grace_spans"]),
+            ),
+        )
+        scope_results[scope_name] = {
+            "default": default_row,
+            "best_by_mae": rows[0] if rows else None,
+            "best_by_rmse": by_rmse[0] if by_rmse else None,
+            "top_by_mae": rows[:5],
+        }
+    return {
+        "default_config": _one_percent_grace_config(
+            REGIME_GRACE_STREAK_THRESHOLD, REGIME_GRACE_SPANS
+        ),
+        "scopes": scope_results,
+    }
+
+
+def _one_percent_grace_calibration_row(
+    values: list[float],
+    *,
+    start_index: int,
+    streak_threshold: int,
+    grace_spans: int,
+) -> dict[str, Any]:
+    actual: list[float] = []
+    predictions: list[float] = []
+    for index in range(max(1, start_index), len(values)):
+        previous = values[:index]
+        actual.append(values[index])
+        predictions.append(
+            _one_percent_regime_grace_prediction(
+                previous,
+                streak_threshold=streak_threshold,
+                grace_spans=grace_spans,
+                max_break_delta=REGIME_GRACE_MAX_BREAK_DELTA,
+            )
+        )
+    metrics = _regression_metrics(actual, predictions)
+    return {
+        **_one_percent_grace_config(streak_threshold, grace_spans),
+        "n": len(actual),
+        "mae": metrics["mae"],
+        "rmse": metrics["rmse"],
+        "r2": metrics["r2"],
+        "exact_match_share": _rounded(
+            sum(
+                1
+                for actual_value, predicted_value in zip(
+                    actual, predictions, strict=True
+                )
+                if round(actual_value, 6) == round(predicted_value, 6)
+            )
+            / len(actual)
+            if actual
+            else None
+        ),
+    }
+
+
+def _one_percent_grace_config(
+    streak_threshold: int, grace_spans: int
+) -> dict[str, Any]:
+    return {
+        "streak_threshold": streak_threshold,
+        "grace_spans": grace_spans,
+        "max_break_delta_percent": REGIME_GRACE_MAX_BREAK_DELTA,
+    }
+
+
+def _one_percent_regime_grace_prediction(
+    previous_deltas: list[float],
+    *,
+    streak_threshold: int,
+    grace_spans: int,
+    max_break_delta: float,
+) -> float:
+    if not previous_deltas:
+        return 0.0
+    one_percent_streak = _tail_streak(
+        previous_deltas, predicate=_is_one_percent_delta
+    )
+    if one_percent_streak >= streak_threshold:
+        return 1.0
+    break_age = _small_break_age_after_one_percent_run(
+        previous_deltas,
+        streak_threshold=streak_threshold,
+        max_break_delta=max_break_delta,
+    )
+    if break_age is not None and break_age <= grace_spans:
+        return 1.0
+    return previous_deltas[-1]
+
+
+def _small_break_age_after_one_percent_run(
+    values: list[float], *, streak_threshold: int, max_break_delta: float
+) -> int | None:
+    if not values or _is_one_percent_delta(values[-1]):
+        return None
+    index = len(values) - 1
+    break_age = 0
+    while (
+        index >= 0
+        and not _is_one_percent_delta(values[index])
+        and values[index] <= max_break_delta
+    ):
+        break_age += 1
+        index -= 1
+    if break_age == 0:
+        return None
+    preceding_streak = 0
+    while index >= 0 and _is_one_percent_delta(values[index]):
+        preceding_streak += 1
+        index -= 1
+    if preceding_streak >= streak_threshold:
+        return break_age
+    return None
 
 
 def _span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
@@ -1208,6 +1530,9 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "call_duration_seconds",
         "mean_call_duration_seconds",
         "previous_call_delta_seconds",
+        "span_wall_time_seconds",
+        "span_wall_time_minutes",
+        "mean_span_wall_time_seconds_per_call",
     )
     lag_regime = (
         *usage_state,
@@ -1260,6 +1585,9 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "call_duration_seconds",
         "mean_call_duration_seconds",
         "previous_call_delta_seconds",
+        "span_wall_time_seconds",
+        "span_wall_time_minutes",
+        "mean_span_wall_time_seconds_per_call",
     )
     return [
         PredictiveModelSpec("baseline_train_mean", ()),
@@ -1355,6 +1683,7 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
     reasoning_tokens = span.token_totals.get("reasoning_output_tokens", 0.0)
     total_tokens = span.token_totals.get("total_tokens", 0.0)
     duration = span.timing_totals.get("call_duration_seconds", 0.0)
+    span_wall_time_seconds = _span_wall_time_seconds(span)
     window_minutes = (
         span.usage_window_minutes
         if span.usage_window_minutes is not None
@@ -1411,6 +1740,11 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "call_duration_seconds": duration,
         "mean_call_duration_seconds": duration / span.row_count if span.row_count else 0.0,
         "previous_call_delta_seconds": span.timing_totals.get("previous_call_delta_seconds", 0.0),
+        "span_wall_time_seconds": span_wall_time_seconds,
+        "span_wall_time_minutes": span_wall_time_seconds / 60.0,
+        "mean_span_wall_time_seconds_per_call": (
+            span_wall_time_seconds / span.row_count if span.row_count else 0.0
+        ),
         "date": date_label,
         "day_of_week": str(day_index) if day_index >= 0 else "missing",
         "hour_bucket": hour_bucket,
@@ -1978,6 +2312,30 @@ def _pearson(x_values: list[float], y_values: list[float]) -> float | None:
     if denominator <= 0:
         return None
     return covariance / denominator
+
+
+def _spearman(x_values: list[float], y_values: list[float]) -> float | None:
+    if len(x_values) < 2 or len(x_values) != len(y_values):
+        return None
+    return _pearson(_rank_values(x_values), _rank_values(y_values))
+
+
+def _rank_values(values: list[float]) -> list[float]:
+    ordered = sorted((value, index) for index, value in enumerate(values))
+    ranks = [0.0 for _value in values]
+    index = 0
+    while index < len(ordered):
+        end_index = index
+        while (
+            end_index + 1 < len(ordered)
+            and ordered[end_index + 1][0] == ordered[index][0]
+        ):
+            end_index += 1
+        rank = ((index + 1) + (end_index + 1)) / 2.0
+        for rank_index in range(index, end_index + 1):
+            ranks[ordered[rank_index][1]] = rank
+        index = end_index + 1
+    return ranks
 
 
 def _usage_bucket(row: dict[str, Any]) -> tuple[Any, ...]:

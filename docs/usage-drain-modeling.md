@@ -238,10 +238,10 @@ The strict walk-forward check reinforces that split:
 
 | scope | best MAE model | MAE | best RMSE model | RMSE | interpretation |
 | --- | --- | ---: | --- | ---: | --- |
-| all spans after first | previous delta | 0.936 pct points | rolling3 mean delta | 2.604 pct points | persistence predicts typical deltas best, but smoothing helps large misses |
-| all spans after 50 | previous delta | 0.934 pct points | rolling3 mean delta | 2.636 pct points | same pattern after warmup |
-| newest 20% holdout | constant / rolling10 mode / adaptive rules | 0.003 pct points | constant / rolling10 mode / adaptive rules | 0.059 pct points | the future holdout is almost all 1% |
-| latest 500 spans | constant / rolling10 mode / adaptive rules | 0.002 pct points | constant / rolling10 mode / adaptive rules | 0.045 pct points | recent visible deltas are nearly flat |
+| all spans after first | one-percent grace | 0.936 pct points | hybrid streak regime | 2.574 pct points | grace slightly improves typical deltas; hybrid reduces large misses |
+| all spans after 50 | one-percent grace | 0.933 pct points | hybrid streak regime | 2.606 pct points | same pattern after warmup |
+| newest 20% holdout | constant / grace / rolling10 mode | 0.003 pct points | constant / grace / rolling10 mode | 0.059 pct points | the future holdout is almost all 1% |
+| latest 500 spans | constant / grace / rolling10 mode | 0.002 pct points | constant / grace / rolling10 mode | 0.045 pct points | recent visible deltas are nearly flat |
 | latest 100 spans | all simple rules | 0.000 pct points | all simple rules | 0.000 pct points | every observed delta is exactly 1% |
 
 The new `hybrid_streak_regime` rule predicts `1%` after at least three prior
@@ -284,6 +284,37 @@ dates are June 4-5, 2026, and reset-window phase also matters: first-quarter
 spans have a higher mean absolute error than later phases. For the newest
 holdout, the only meaningful error is a `2%` span on June 12, 2026 around hour
 `21`, followed by the expected return to `1%`.
+
+## Span Correlation Caveat
+
+A span is defined as the calls between two visible usage-counter observations
+where the selected 5-hour counter increases. That makes `delta_usage_percent` a
+coarse displayed-counter target, not a direct measure of hidden per-call cost.
+When the counter is in the current 1% regime, asking what predicts the next span
+delta mostly asks what predicts another quantized `1%` tick.
+
+The report now includes `span_correlations` to separate two questions:
+
+| question | current read |
+| --- | --- |
+| What correlates with bigger visible deltas? | Weakly: `baseline_used_percent` is the largest full-history raw-feature Pearson correlation with `delta_usage_percent` at `0.254`; token and call totals are weak and negative. In the latest 500 spans, the target mean is `1.002%`, stddev is `0.045`, and all raw-feature correlations are near zero. |
+| What correlates with work packed into one 1% tick? | Strongly: among exact `1%` spans, standard credits correlate with total tokens (`0.958` Pearson), input tokens (`0.957`), cached input tokens (`0.945`), row count (`0.928`), and call duration (`0.819`). |
+
+So the next modeling target should probably be two-part:
+
+1. Predict the counter regime: stable `1%`, transition/blip, or older
+   high-variance behavior.
+2. Inside stable `1%` regimes, model capacity per tick: calls, tokens, credits,
+   duration, and wall-clock span time per visible percentage point.
+
+The new `one_percent_regime_grace` walk-forward rule is a small step in that
+direction. It keeps predicting `1%` for one small break after a long `1%` run.
+On the current data, the calibrated default (`10` prior `1%` spans, one-span
+grace, max `2%` break) slightly improves full-history MAE over plain previous
+delta (`0.936251` -> `0.935562`) and matches the
+best newest-holdout MAE (`0.003436`). The gain is small, but it captures the
+right operational idea: a single `2%` tick after a long stable regime should be
+treated as a possible blip, not automatic proof that the regime changed.
 
 ## Run It
 
