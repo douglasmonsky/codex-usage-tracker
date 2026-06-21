@@ -127,6 +127,41 @@ def test_build_usage_delta_spans_prefers_five_hour_window_when_secondary() -> No
     assert spans[0].delta_usage_percent == 2.0
 
 
+def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
+    rows = [
+        _row("base", "2026-06-01T00:00:00Z", 0.0, 0.0),
+        _row("a", "2026-06-01T00:01:00Z", 1.0, 1.0),
+        _row("b", "2026-06-01T00:02:00Z", 2.0, 1.0),
+        _row("c", "2026-06-01T00:03:00Z", 3.0, 1.0),
+        _row("d", "2026-06-01T00:04:00Z", 4.0, 1.0),
+        _row("e", "2026-06-01T00:05:00Z", 6.0, 2.0),
+        _row("f", "2026-06-01T00:06:00Z", 7.0, 1.0),
+    ]
+
+    summary = summarize_usage_drain_model(rows)
+
+    streaks = summary["regime_streaks"]
+    one_percent_runs = streaks["one_percent_runs"]
+    assert one_percent_runs["count"] == 2
+    assert one_percent_runs["max_span_count"] == 4
+    assert one_percent_runs["current_streak"] == 1
+    assert one_percent_runs["top_runs"][0]["span_count"] == 4
+    assert streaks["breaks_after_long_one_percent_runs"][0] == {
+        "preceding_start_index": 0,
+        "preceding_end_index": 3,
+        "preceding_span_count": 4,
+        "break_index": 4,
+        "break_delta_percent": 2.0,
+        "break_timestamp": "2026-06-01T00:05:00Z",
+        "break_date": "2026-06-01",
+    }
+    walk_forward = summary["walk_forward_prediction"]["scopes"]["all_after_first"]
+    assert walk_forward["models"]["hybrid_streak_regime"]["mae"] < 0.5
+    assert "error_by_one_percent_streak" in walk_forward["error_diagnostics"][
+        "hybrid_streak_regime"
+    ]
+
+
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:
     rows = [
         _row("baseline", "2026-06-01T00:00:00Z", 0.0, 0.0),
@@ -245,11 +280,13 @@ def test_causal_baselines_capture_low_delta_regime_shift() -> None:
 
     persistence = by_name["persistence_previous_delta__time_ordered_80_20"]["holdout"]
     rolling_mode = by_name["rolling10_mode_delta__time_ordered_80_20"]["holdout"]
+    hybrid = by_name["hybrid_streak_regime__time_ordered_80_20"]["holdout"]
     same_bucket_mode = by_name[
         "same_bucket_rolling10_mode_delta__time_ordered_80_20"
     ]["holdout"]
     train_mean = by_name["baseline_train_mean__time_ordered_80_20"]["holdout"]
     assert persistence["mae"] == 0.0
     assert rolling_mode["mae"] == 0.0
+    assert hybrid["mae"] == 0.0
     assert same_bucket_mode["mae"] == 0.0
     assert persistence["mae"] < train_mean["mae"]

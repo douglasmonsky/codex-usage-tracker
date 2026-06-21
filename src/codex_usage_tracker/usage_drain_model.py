@@ -318,6 +318,7 @@ def summarize_usage_drain_model(
         "rate_limit_plan_type_mix": _count_values(rows, "rate_limit_plan_type"),
         "rate_limit_limit_id_mix": _count_values(rows, "rate_limit_limit_id"),
         "delta_regimes": _delta_regime_summary(spans),
+        "regime_streaks": _regime_streak_summary(spans),
         "walk_forward_prediction": _walk_forward_prediction_summary(spans),
         "documented_fast_multipliers": dict(DOCUMENTED_FAST_CREDIT_MULTIPLIERS),
         "available_signals": {
@@ -361,6 +362,9 @@ def summarize_usage_drain_model(
                 "rate_limit_limit_id",
                 "rate_limit_primary_window_minutes",
                 "rate_limit_primary_resets_at",
+                "one_percent_streak",
+                "low_delta_streak",
+                "same_delta_streak",
             ],
         },
         "limitations": [
@@ -393,6 +397,83 @@ def _delta_regime_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
         "time_ordered_holdout_20": _delta_distribution(spans[train_size:]),
         "latest_100": _delta_distribution(spans[-100:]),
         "latest_25": _delta_distribution(spans[-25:]),
+    }
+
+
+def _regime_streak_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    one_percent_runs = _one_percent_runs(spans)
+    top_runs = sorted(one_percent_runs, key=lambda run: -run["span_count"])[:10]
+    breaks = [
+        _run_break_record(spans, run)
+        for run in one_percent_runs
+        if run["span_count"] >= 3 and run["end_index"] + 1 < len(spans)
+    ]
+    breaks.sort(key=lambda item: (-int(item["preceding_span_count"]), item["break_index"]))
+    latest_run = one_percent_runs[-1] if one_percent_runs else None
+    current_run = one_percent_runs[-1] if one_percent_runs and spans else None
+    if current_run and current_run["end_index"] != len(spans) - 1:
+        current_run = None
+    return {
+        "one_percent_runs": {
+            "count": len(one_percent_runs),
+            "long_run_min_length": 3,
+            "long_run_count": sum(1 for run in one_percent_runs if run["span_count"] >= 3),
+            "max_span_count": max(
+                (int(run["span_count"]) for run in one_percent_runs), default=0
+            ),
+            "current_streak": int(current_run["span_count"]) if current_run else 0,
+            "latest_run": latest_run,
+            "top_runs": top_runs,
+        },
+        "breaks_after_long_one_percent_runs": breaks[:10],
+    }
+
+
+def _one_percent_runs(spans: list[UsageDeltaSpan]) -> list[dict[str, Any]]:
+    runs: list[dict[str, Any]] = []
+    run_start: int | None = None
+    for index, span in enumerate(spans):
+        if _is_one_percent_delta(span.delta_usage_percent):
+            if run_start is None:
+                run_start = index
+            continue
+        if run_start is not None:
+            runs.append(_run_record(spans, run_start, index - 1))
+            run_start = None
+    if run_start is not None:
+        runs.append(_run_record(spans, run_start, len(spans) - 1))
+    return runs
+
+
+def _run_record(
+    spans: list[UsageDeltaSpan], start_index: int, end_index: int
+) -> dict[str, Any]:
+    start_span = spans[start_index]
+    end_span = spans[end_index]
+    return {
+        "start_index": start_index,
+        "end_index": end_index,
+        "span_count": end_index - start_index + 1,
+        "start_timestamp": start_span.start_event_timestamp,
+        "end_timestamp": end_span.start_event_timestamp,
+        "start_date": _date_label(start_span.start_event_timestamp),
+        "end_date": _date_label(end_span.start_event_timestamp),
+    }
+
+
+def _run_break_record(
+    spans: list[UsageDeltaSpan], run: dict[str, Any]
+) -> dict[str, Any]:
+    break_index = int(run["end_index"]) + 1
+    break_span = spans[break_index]
+    return {
+        "preceding_start_index": run["start_index"],
+        "preceding_end_index": run["end_index"],
+        "preceding_span_count": run["span_count"],
+        "break_index": break_index,
+        "break_delta_percent": _rounded(break_span.delta_usage_percent),
+        "break_timestamp": break_span.start_event_timestamp,
+        "break_date": _date_label(break_span.start_event_timestamp),
     }
 
 
@@ -460,6 +541,11 @@ def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
             "rolling10_mean_delta": "Predicts the mean of the previous 10 deltas.",
             "rolling10_median_delta": "Predicts the median of the previous 10 deltas.",
             "rolling10_mode_delta": "Predicts the most common previous 10-delta value.",
+            "hybrid_streak_regime": (
+                "Predicts 1% after at least three prior 1% deltas; otherwise "
+                "uses previous delta after a repeated same-delta streak; "
+                "otherwise uses rolling3 mean."
+            ),
             "adaptive_low_delta_mode": (
                 "Uses rolling10 mode when at least 80% of the previous 10 deltas "
                 "are <=1%; otherwise uses previous delta."
@@ -489,6 +575,20 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
             rolling10_low_share = sum(1 for value in recent10 if value <= 1.0) / len(
                 recent10
             )
+            one_percent_streak = _tail_streak(
+                previous_deltas, predicate=_is_one_percent_delta
+            )
+            low_delta_streak = _tail_streak(
+                previous_deltas, predicate=lambda value: value <= 1.0
+            )
+            same_delta_streak = _same_value_tail_streak(previous_deltas)
+            hybrid_streak = (
+                1.0
+                if one_percent_streak >= 3
+                else previous_deltas[-1]
+                if same_delta_streak >= 2
+                else sum(recent3) / len(recent3)
+            )
             predictions = {
                 "constant_one_percent": 1.0,
                 "previous_delta": previous_deltas[-1],
@@ -496,6 +596,7 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 "rolling10_mean_delta": sum(recent10) / len(recent10),
                 "rolling10_median_delta": float(median(recent10)),
                 "rolling10_mode_delta": rolling10_mode,
+                "hybrid_streak_regime": hybrid_streak,
                 "adaptive_low_delta_mode": rolling10_mode
                 if rolling10_low_share >= 0.8
                 else previous_deltas[-1],
@@ -508,7 +609,14 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                     "index": index,
                     "actual": actual,
                     "previous_actual": previous_deltas[-1],
-                    "metadata": _span_error_metadata(span),
+                    "metadata": {
+                        **_span_error_metadata(span),
+                        "one_percent_streak_bucket": _streak_bucket(
+                            one_percent_streak
+                        ),
+                        "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
+                        "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
+                    },
                     "predictions": predictions,
                 }
             )
@@ -542,6 +650,7 @@ def _walk_forward_scope_metrics(
                 "previous_delta",
                 "rolling3_mean_delta",
                 "rolling10_mode_delta",
+                "hybrid_streak_regime",
                 "adaptive_low_delta_mode",
             )
             if model_name in model_names
@@ -623,6 +732,8 @@ def _prediction_error_diagnostics(
             "error_by_day_of_week": [],
             "error_by_hour": [],
             "error_by_reset_phase": [],
+            "error_by_one_percent_streak": [],
+            "error_by_same_delta_streak": [],
             "largest_errors": [],
         }
     return {
@@ -644,6 +755,12 @@ def _prediction_error_diagnostics(
         "error_by_day_of_week": _top_error_groups(errors, "day_of_week"),
         "error_by_hour": _top_error_groups(errors, "hour_bucket"),
         "error_by_reset_phase": _top_error_groups(errors, "reset_phase"),
+        "error_by_one_percent_streak": _top_error_groups(
+            errors, "one_percent_streak_bucket"
+        ),
+        "error_by_same_delta_streak": _top_error_groups(
+            errors, "same_delta_streak_bucket"
+        ),
         "largest_errors": _largest_prediction_errors(errors),
     }
 
@@ -903,6 +1020,7 @@ def _fit_causal_baseline_models(
         ("rolling50_delta", "rolling50_delta_percent", None),
         ("rolling10_median_delta", "rolling10_median_delta_percent", None),
         ("rolling10_mode_delta", "rolling10_mode_delta_percent", None),
+        ("hybrid_streak_regime", "hybrid_streak_delta_percent", None),
         ("same_bucket_rolling10_delta", "same_bucket_rolling10_delta_percent", None),
         (
             "same_bucket_rolling10_mode_delta",
@@ -1102,6 +1220,11 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "rolling10_mode_delta_percent",
         "rolling10_delta_stddev",
         "rolling50_delta_stddev",
+        "one_percent_streak",
+        "low_delta_streak",
+        "same_delta_streak",
+        "high_delta_streak",
+        "hybrid_streak_delta_percent",
         "rolling3_drain_per_credit",
         "rolling10_drain_per_credit",
         "rolling50_drain_per_credit",
@@ -1346,6 +1469,32 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
         row["rolling10_mode_delta_percent"] = _rolling_mode(previous_rows, "target", 10)
         row["rolling10_delta_stddev"] = _rolling_stddev(previous_rows, "target", 10)
         row["rolling50_delta_stddev"] = _rolling_stddev(previous_rows, "target", 50)
+        one_percent_streak = _row_tail_streak(
+            previous_rows,
+            predicate=lambda previous: _is_one_percent_delta(
+                _number(previous.get("target"))
+            ),
+        )
+        low_delta_streak = _row_tail_streak(
+            previous_rows,
+            predicate=lambda previous: _number(previous.get("target")) <= 1.0,
+        )
+        same_delta_streak = _same_target_tail_streak(previous_rows)
+        high_delta_streak = _row_tail_streak(
+            previous_rows,
+            predicate=lambda previous: _number(previous.get("target")) > 1.0,
+        )
+        row["one_percent_streak"] = float(one_percent_streak)
+        row["low_delta_streak"] = float(low_delta_streak)
+        row["same_delta_streak"] = float(same_delta_streak)
+        row["high_delta_streak"] = float(high_delta_streak)
+        row["hybrid_streak_delta_percent"] = (
+            1.0
+            if one_percent_streak >= 3
+            else _number(row["previous_delta_percent"])
+            if same_delta_streak >= 2
+            else _number(row["rolling3_delta_percent"])
+        )
         row["rolling3_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 3)
         row["rolling10_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 10)
         row["rolling50_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 50)
@@ -1460,6 +1609,65 @@ def _rolling_low_delta_share(rows: list[dict[str, Any]], window: int) -> float:
         return 0.0
     low_count = sum(1 for row in selected if _number(row.get("target")) <= 1.0)
     return low_count / len(selected)
+
+
+def _row_tail_streak(
+    rows: list[dict[str, Any]], *, predicate: Any
+) -> int:
+    count = 0
+    for row in reversed(rows):
+        if not predicate(row):
+            break
+        count += 1
+    return count
+
+
+def _tail_streak(values: list[float], *, predicate: Any) -> int:
+    count = 0
+    for value in reversed(values):
+        if not predicate(value):
+            break
+        count += 1
+    return count
+
+
+def _same_target_tail_streak(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    return _tail_streak(
+        [_number(row.get("target")) for row in rows],
+        predicate=lambda value: round(value, 6) == round(_number(rows[-1].get("target")), 6),
+    )
+
+
+def _same_value_tail_streak(values: list[float]) -> int:
+    if not values:
+        return 0
+    target = round(values[-1], 6)
+    return _tail_streak(values, predicate=lambda value: round(value, 6) == target)
+
+
+def _is_one_percent_delta(value: float) -> bool:
+    return round(value, 6) == 1.0
+
+
+def _streak_bucket(value: int) -> str:
+    if value <= 0:
+        return "0"
+    if value <= 2:
+        return str(value)
+    if value <= 9:
+        return "3_9"
+    if value <= 49:
+        return "10_49"
+    if value <= 199:
+        return "50_199"
+    return "200_plus"
+
+
+def _date_label(timestamp: str) -> str:
+    parsed = _parse_timestamp(timestamp)
+    return parsed.date().isoformat() if parsed else "missing"
 
 
 def _drain_per_credit(row: dict[str, Any]) -> float:

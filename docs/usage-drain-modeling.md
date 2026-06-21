@@ -134,6 +134,7 @@ The script also reports simple causal baselines:
 - `same_day_of_week_rolling10_delta`
 - `same_day_of_week_rolling10_mode_delta`
 - `ewma_delta`
+- `hybrid_streak_regime`
 
 Two validation splits are reported:
 
@@ -242,6 +243,23 @@ The strict walk-forward check reinforces that split:
 | newest 20% holdout | constant / rolling10 mode / adaptive rules | 0.003 pct points | constant / rolling10 mode / adaptive rules | 0.059 pct points | the future holdout is almost all 1% |
 | latest 500 spans | constant / rolling10 mode / adaptive rules | 0.002 pct points | constant / rolling10 mode / adaptive rules | 0.045 pct points | recent visible deltas are nearly flat |
 | latest 100 spans | all simple rules | 0.000 pct points | all simple rules | 0.000 pct points | every observed delta is exactly 1% |
+
+The new `hybrid_streak_regime` rule predicts `1%` after at least three prior
+`1%` spans, falls back to previous delta after a repeated same-delta streak, and
+otherwise uses a rolling-three mean. It does not beat previous-delta persistence
+on full-history MAE (`0.972` vs `0.936` pct points), but it does produce the
+best full-history RMSE (`2.574` pct points). That means it is useful as a
+large-miss reducer and regime signal, not as the best simple point predictor.
+
+The report now includes `regime_streaks`, which makes the current shape explicit:
+
+| streak diagnostic | value | interpretation |
+| --- | ---: | --- |
+| one-percent runs | 70 | separate stretches where every closed positive span moved by exactly `1%` |
+| long one-percent runs | 28 | runs with at least three consecutive `1%` spans |
+| longest run | 271 spans | June 9-12, 2026 |
+| current streak | 243 spans | started June 12, 2026 and continued through the latest local data |
+| largest break after a long run | `2%` after 271 spans | the notable June 12 blip |
 
 That is useful for operating against the visible counter, but it is not evidence
 that tokens, fast mode, date, or wall time perfectly explain underlying cost.
