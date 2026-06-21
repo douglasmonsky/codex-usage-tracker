@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.10.1 - 2026-06-21
+
+- Add lightweight action timing metadata to context evidence so call investigations can show elapsed time for parsed tool and command actions without persisting raw command text or outputs.
+- Add synthetic README diagnostics coverage for the Git Interactions panel and package the screenshot with installed plugin docs.
+
 ## 0.10.0 - 2026-06-21
 
 - Add Git/GitHub CLI diagnostic snapshots with safe operation labels, coarse categories, mutability buckets, and terminal token-count coverage.
