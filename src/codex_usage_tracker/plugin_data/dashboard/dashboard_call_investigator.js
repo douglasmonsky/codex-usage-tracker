@@ -6,6 +6,7 @@
       escapeHtml,
       short,
       formatTimestamp,
+      formatDuration,
       t,
       tf,
       moneyText,
@@ -753,6 +754,31 @@
       `;
     }
 
+    function formatTimingValue(milliseconds) {
+      const value = Number(milliseconds);
+      if (!Number.isFinite(value) || value < 0) return '';
+      return formatDuration(value / 1000, '');
+    }
+
+    function renderContextTimingMeta(entry) {
+      const timing = entry?.action_timing || {};
+      if (!timing || typeof timing !== 'object') return '';
+      const chips = [];
+      const sinceStart = formatTimingValue(timing.since_turn_start_ms);
+      const sincePrevious = formatTimingValue(timing.since_previous_entry_ms);
+      const reportedDuration = formatTimingValue(timing.reported_duration_ms);
+      if (sinceStart) {
+        chips.push(`<span class="context-entry-timing" title="Elapsed from selected turn start">T+${escapeHtml(sinceStart)}</span>`);
+      }
+      if (sincePrevious) {
+        chips.push(`<span class="context-entry-timing" title="Gap since previous evidence entry">+${escapeHtml(sincePrevious)}</span>`);
+      }
+      if (reportedDuration) {
+        chips.push(`<span class="context-entry-timing duration" title="Duration reported by this event">${escapeHtml(t('table.duration'))} ${escapeHtml(reportedDuration)}</span>`);
+      }
+      return chips.join('');
+    }
+
     function contextEntryWindow(entries, payload) {
       const sourceLine = Number(payload?.source?.line_number || 0);
       const selectedIndex = entries.findIndex(entry => sourceLine && Number(entry.line_number || 0) === sourceLine);
@@ -795,7 +821,11 @@
       const entryWindow = contextEntryWindow(entries, payload);
       const body = entries.map((entry, index) => {
         const entryKey = contextEntryKey(entry, index);
-        const meta = [formatTimestamp(entry.timestamp, ''), entry.line_number ? tf('context.line', { line: entry.line_number }) : ''].filter(Boolean).join(' - ');
+        const metaParts = [
+          formatTimestamp(entry.timestamp, ''),
+          entry.line_number ? tf('context.line', { line: entry.line_number }) : '',
+        ].filter(Boolean);
+        const timingMeta = renderContextTimingMeta(entry);
         const outputAction = entry.tool_output_omitted && !payload.include_tool_output
           ? `<button class="context-entry-action" type="button" data-context-entry-load-output>${escapeHtml(t('button.show_tool_output'))}</button>`
           : '';
@@ -806,7 +836,8 @@
           <div class="context-entry-header">
             <span class="context-entry-title">${escapeHtml(entry.label || entry.type || 'entry')}</span>
             <span class="context-entry-meta">
-              ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
+              ${metaParts.length ? `<span>${escapeHtml(metaParts.join(' - '))}</span>` : ''}
+              ${timingMeta}
               ${outputAction}
             </span>
           </div>
@@ -821,7 +852,10 @@
             <details class="context-entry context-entry-collapsed" data-context-entry-key="${escapeHtml(entryKey)}">
               <summary class="context-entry-summary">
                 <span class="context-entry-title">${escapeHtml(entry.label || entry.type || 'entry')}</span>
-                <span class="context-entry-meta">${meta ? escapeHtml(meta) : ''}</span>
+                <span class="context-entry-meta">
+                  ${metaParts.length ? `<span>${escapeHtml(metaParts.join(' - '))}</span>` : ''}
+                  ${timingMeta}
+                </span>
               </summary>
               ${bodyHtml}
             </details>

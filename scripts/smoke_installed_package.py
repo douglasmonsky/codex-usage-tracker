@@ -110,6 +110,7 @@ RESOURCE_PATHS = [
     "docs/assets/dashboard-calls-preview.png",
     "docs/assets/dashboard-threads.png",
     "docs/assets/dashboard-diagnostics.png",
+    "docs/assets/dashboard-diagnostics-git-expanded.png",
     "docs/assets/dashboard-details.png",
     "docs/assets/dashboard-call-investigator.png",
     "docs/assets/dashboard-call-investigator-preview.png",

@@ -69,6 +69,10 @@ Diagnostics surfaces on-demand snapshot reports for tool output, commands, Git i
 
 ![Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file modifications, and concentration.](docs/assets/dashboard-diagnostics.png?v=readme-drilldown)
 
+The Git Interactions panel expands the safe Git and GitHub CLI operation families without storing command text, branch names, release notes, or patch content.
+
+![Diagnostics Git Interactions panel showing aggregate Git and GitHub CLI operation counts.](docs/assets/dashboard-diagnostics-git-expanded.png?v=readme-diagnostics-git)
+
 Insights still gives a fast triage layer for costly threads, low cache reuse, context bloat, and pricing gaps.
 
 ![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=readme-drilldown)

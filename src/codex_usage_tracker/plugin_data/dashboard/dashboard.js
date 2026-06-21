@@ -1357,6 +1357,7 @@
       escapeHtml,
       short,
       formatTimestamp,
+      formatDuration,
       t,
       tf,
       moneyText,

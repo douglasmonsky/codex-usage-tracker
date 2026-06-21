@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from functools import lru_cache
 from math import ceil
 from pathlib import Path
@@ -92,7 +93,14 @@ def load_call_context(
 
     target_turn_id = _optional_str(row.get("turn_id"))
     source_scan_started = perf_counter()
-    entries, omitted, estimate_entries, serialized_estimate, serialized_estimate_ms = (
+    (
+        entries,
+        omitted,
+        estimate_entries,
+        serialized_estimate,
+        serialized_estimate_ms,
+        action_timing,
+    ) = (
         _read_context_entries(
             path=source_file,
             token_line=line_number,
@@ -126,6 +134,7 @@ def load_call_context(
         "visible_token_estimate": visible_estimate["visible_token_estimate"],
         "visible_token_estimator": visible_estimate["visible_token_estimator"],
         "serialized_evidence": serialized_estimate,
+        "action_timing": action_timing,
         "record": {
             "record_id": row.get("record_id"),
             "session_id": row.get("session_id"),
@@ -187,7 +196,14 @@ def _read_context_entries(
     include_compaction_history: bool,
     model: str | None,
     context_mode: str,
-) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]], dict[str, Any], float]:
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, Any],
+    list[dict[str, Any]],
+    dict[str, Any],
+    float,
+    dict[str, Any],
+]:
     candidates: list[dict[str, Any]] = []
     raw_entries: list[dict[str, Any]] = []
     field_buckets: dict[str, dict[str, Any]] = {}
@@ -341,11 +357,12 @@ def _read_context_entries(
         )
     serialized_estimate_ms = _elapsed_ms(serialized_started)
     candidates = _dedupe_chat_message_echoes(candidates)
+    action_timing = _annotate_action_timing(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
     omitted["parse_errors"] = omitted_parse_errors
     omitted["target_turn_id"] = target_turn_id
     omitted["total_entries"] = len(candidates)
-    return limited, omitted, candidates, serialized_estimate, serialized_estimate_ms
+    return limited, omitted, candidates, serialized_estimate, serialized_estimate_ms, action_timing
 
 
 def _collect_serialized_envelope(
@@ -438,6 +455,7 @@ def _summarized_context_entry(
         compaction=summarized.get("compaction")
         if isinstance(summarized.get("compaction"), dict)
         else None,
+        action_duration_ms=_nonnegative_float(summarized.get("action_duration_ms")),
     )
 
 
@@ -675,11 +693,15 @@ def _summarize_safe_structured_event(
         value = payload.get(key)
         if _is_safe_structured_scalar(value):
             compact[key] = value
-    return {
+    summary: dict[str, Any] = {
         "label": event_type,
         "text": _jsonish(compact),
         "carry_into_next_turn": True,
     }
+    duration_ms = _nonnegative_float(payload.get("duration_ms"))
+    if duration_ms is not None:
+        summary["action_duration_ms"] = duration_ms
+    return summary
 
 
 def _is_safe_structured_scalar(value: object) -> bool:
@@ -715,6 +737,7 @@ def _context_entry(
     tool_output_omitted: bool = False,
     token_usage: dict[str, Any] | None = None,
     compaction: dict[str, Any] | None = None,
+    action_duration_ms: float | None = None,
 ) -> dict[str, Any]:
     entry = {
         "line_number": line_number,
@@ -730,7 +753,77 @@ def _context_entry(
         entry["token_usage"] = token_usage
     if compaction:
         entry["compaction"] = compaction
+    if action_duration_ms is not None:
+        entry["action_timing"] = {
+            "reported_duration_ms": _normalize_millisecond_value(action_duration_ms),
+            "duration_source": "event.duration_ms",
+        }
     return entry
+
+
+def _annotate_action_timing(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    first_ms: float | None = None
+    previous_ms: float | None = None
+    last_ms: float | None = None
+    timed_entries = 0
+    slowest_gap_ms = 0.0
+
+    for entry in entries:
+        timestamp_ms = _timestamp_epoch_ms(entry.get("timestamp"))
+        if timestamp_ms is None:
+            continue
+        if first_ms is None:
+            first_ms = timestamp_ms
+        existing_timing = entry.get("action_timing")
+        action_timing = dict(existing_timing) if isinstance(existing_timing, dict) else {}
+        action_timing["since_turn_start_ms"] = _duration_between_ms(first_ms, timestamp_ms)
+        if previous_ms is not None:
+            gap_ms = _duration_between_ms(previous_ms, timestamp_ms)
+            action_timing["since_previous_entry_ms"] = gap_ms
+            slowest_gap_ms = max(slowest_gap_ms, float(gap_ms))
+        action_timing["timestamp_source"] = "entry.timestamp"
+        entry["action_timing"] = action_timing
+        previous_ms = timestamp_ms
+        last_ms = timestamp_ms
+        timed_entries += 1
+
+    total_elapsed_ms = (
+        _duration_between_ms(first_ms, last_ms)
+        if first_ms is not None and last_ms is not None
+        else 0
+    )
+    return {
+        "available": timed_entries > 1,
+        "scope": "selected_turn_evidence_entries",
+        "source": "entry_timestamps",
+        "timed_entry_count": timed_entries,
+        "total_elapsed_ms": total_elapsed_ms,
+        "slowest_gap_ms": _normalize_millisecond_value(slowest_gap_ms),
+    }
+
+
+def _timestamp_epoch_ms(value: object) -> float | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp() * 1000
+
+
+def _duration_between_ms(start_ms: float, end_ms: float) -> int | float:
+    return _normalize_millisecond_value(max(0.0, end_ms - start_ms))
+
+
+def _normalize_millisecond_value(value: float) -> int | float:
+    rounded = round(value, 3)
+    return int(rounded) if rounded.is_integer() else rounded
 
 
 def _limit_entries(
@@ -972,6 +1065,14 @@ def _positive_int(value: object) -> int | None:
 def _nonnegative_int(value: object) -> int | None:
     try:
         number = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _nonnegative_float(value: object) -> float | None:
+    try:
+        number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
     return number if number >= 0 else None
