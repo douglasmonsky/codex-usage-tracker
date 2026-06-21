@@ -68,6 +68,29 @@ separate fits for:
 - `high_medium_candidates`
 - `high_confidence_only`
 
+The script also fits exploratory predictive control families on closed spans:
+
+- `baseline_train_mean`: train-period mean only
+- `credits_only`: standard Codex credit estimate and log credit estimate
+- `token_shape`: credits plus row count, input/cache/output/reasoning token mix,
+  cache ratio, and per-call credit density
+- `fast_proxy`: token shape plus fast-proxy candidate credit share and documented
+  fast-weighted credits
+- `usage_state`: fast proxy plus baseline observed usage percent, limit-window
+  length, reset timing, plan type, and limit id
+- `time_controls`: usage state plus day-of-week, weekend, hour sine/cosine, and
+  days since first span
+- `date_day_hour_controls`: time controls plus date/day/hour categorical controls
+- `full_controls`: date/day/hour controls plus call duration and previous-call gap
+
+Two validation splits are reported:
+
+- `time_ordered_80_20`: train on earlier spans, hold out the newest spans. This
+  is the stricter future-prediction test.
+- `interleaved_every_5th`: hold out every fifth span. This is a distributional
+  explanation test that keeps dates and usage regimes mixed across train and
+  holdout.
+
 ## Current Finding From Local Analysis
 
 The original ad hoc report using the all-call fast-mode proxy found:
@@ -94,6 +117,24 @@ The broad proxy is still directionally compatible with fast mode costing more
 credits, but the span-level fit is weak: candidate-share correlation with usage
 drain is near zero or negative and the overall fit is poor. Treat this as a
 modeling hypothesis, not a confirmed classifier.
+
+After adding richer control families and refreshing the local aggregate index,
+the predictive model comparison produced:
+
+| validation split | best model | holdout R2 | holdout MAE | interpretation |
+| --- | --- | ---: | ---: | --- |
+| interleaved every fifth | full controls | 0.50 | 2.74 pct points | date/day/hour/window controls explain some historical variation |
+| interleaved every fifth | date/day/hour controls | 0.50 | 2.75 pct points | duration adds almost nothing beyond date/time/window controls |
+| interleaved every fifth | usage state | 0.31 | 3.12 pct points | observed usage state and bucket controls help materially |
+| interleaved every fifth | credits only | 0.07 | 3.65 pct points | token-derived credits alone explain little |
+| time ordered 80/20 | usage state | very negative | 1.94 pct points | newest spans are a different lower-drain regime; MAE improves but R2 is unstable because holdout variance is tiny |
+| time ordered 80/20 | full controls | very negative | 6.71 pct points | date/hour fixed effects overfit old regimes and predict the newest period badly |
+
+Current read: better variables move the model from “barely explanatory” to
+“partly explanatory” on a mixed historical holdout, but not near perfect. The
+largest remaining issue is regime drift: the newest spans average roughly 1%
+usage deltas, while earlier training spans average roughly 5%. More prediction
+work should focus on regime/window detection before adding more raw features.
 
 ## Run It
 

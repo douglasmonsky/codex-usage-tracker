@@ -85,6 +85,24 @@ def main() -> int:
                     **result
                 )
             )
+        predictive = summary.get("predictive_modeling") or {}
+        if predictive.get("models"):
+            print(
+                "predictive: best_r2={best_r2} best_mae={best_mae}".format(
+                    best_r2=predictive.get("best_by_holdout_r2"),
+                    best_mae=predictive.get("best_by_holdout_mae"),
+                )
+            )
+            for result in predictive["models"]:
+                holdout = result.get("holdout") or {}
+                print(
+                    "  {name}: r2={r2} mae={mae} pearson={pearson}".format(
+                        name=result.get("name"),
+                        r2=holdout.get("r2"),
+                        mae=holdout.get("mae"),
+                        pearson=holdout.get("pearson"),
+                    )
+                )
     return 0
 
 

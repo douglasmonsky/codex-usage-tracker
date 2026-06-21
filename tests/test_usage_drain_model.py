@@ -5,8 +5,10 @@ from pathlib import Path
 
 from codex_usage_tracker.usage_drain_model import (
     FastProxyAnnotation,
+    UsageDeltaSpan,
     build_usage_delta_spans,
     documented_fast_credit_multiplier,
+    fit_predictive_usage_drain_models,
     fit_usage_drain_proxy,
     load_fast_proxy_annotations,
 )
@@ -109,3 +111,44 @@ def test_load_fast_proxy_annotations_and_documented_model_multipliers(tmp_path: 
     assert documented_fast_credit_multiplier("gpt-5.5") == 2.5
     assert documented_fast_credit_multiplier("gpt-5.4") == 2.0
     assert documented_fast_credit_multiplier("gpt-5.3-codex") is None
+
+
+def test_predictive_models_compare_control_families_on_holdout() -> None:
+    spans: list[UsageDeltaSpan] = []
+    for index in range(70):
+        credit = float(1 + (index % 7))
+        day_index = index % 7
+        weekend_boost = 2.0 if day_index in {5, 6} else 0.0
+        delta = 0.75 * credit + weekend_boost
+        spans.append(
+            UsageDeltaSpan(
+                start_event_timestamp=f"2026-06-{1 + (index % 14):02d}T{index % 24:02d}:00:00Z",
+                end_event_timestamp=f"2026-06-{1 + (index % 14):02d}T{index % 24:02d}:01:00Z",
+                baseline_used_percent=10.0,
+                end_used_percent=10.0 + delta,
+                delta_usage_percent=delta,
+                row_count=1,
+                standard_usage_credits=credit,
+                non_candidate_standard_credits={"all_candidates": credit},
+                candidate_standard_credits={"all_candidates": 0.0},
+                documented_fast_weighted_credits={"all_candidates": credit},
+                candidate_row_counts={"all_candidates": 0},
+                token_totals={
+                    "input_tokens": credit * 100,
+                    "cached_input_tokens": credit * 20,
+                    "uncached_input_tokens": credit * 80,
+                    "output_tokens": credit * 10,
+                    "reasoning_output_tokens": credit * 2,
+                    "total_tokens": credit * 110,
+                },
+                rate_limit_plan_type="pro",
+                rate_limit_limit_id="codex",
+            )
+        )
+
+    results = fit_predictive_usage_drain_models(spans)
+    by_name = {result["name"]: result for result in results}
+
+    assert by_name["baseline_train_mean__interleaved_every_5th"]["holdout"]["r2"] < 0.1
+    assert by_name["time_controls__interleaved_every_5th"]["holdout"]["r2"] > 0.9
+    assert by_name["time_controls__interleaved_every_5th"]["holdout"]["mae"] < 0.2

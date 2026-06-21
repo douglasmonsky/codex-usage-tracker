@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import math
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -25,6 +26,18 @@ DEFAULT_PROXY_NAMES = (
     "strong_only",
     "high_medium_candidates",
     "high_confidence_only",
+)
+TOKEN_TOTAL_FIELDS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "uncached_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+)
+TIMING_TOTAL_FIELDS = (
+    "call_duration_seconds",
+    "previous_call_delta_seconds",
 )
 
 
@@ -69,6 +82,12 @@ class UsageDeltaSpan:
     documented_fast_weighted_credits: dict[str, float]
     candidate_row_counts: dict[str, int]
     models: dict[str, int] = field(default_factory=dict)
+    token_totals: dict[str, float] = field(default_factory=dict)
+    timing_totals: dict[str, float] = field(default_factory=dict)
+    rate_limit_plan_type: str | None = None
+    rate_limit_limit_id: str | None = None
+    rate_limit_primary_window_minutes: float | None = None
+    rate_limit_primary_resets_at: float | None = None
 
     def to_row(self) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -80,7 +99,17 @@ class UsageDeltaSpan:
             "row_count": self.row_count,
             "standard_usage_credits": round(self.standard_usage_credits, 6),
             "models": "|".join(f"{model}:{count}" for model, count in sorted(self.models.items())),
+            "rate_limit_plan_type": self.rate_limit_plan_type,
+            "rate_limit_limit_id": self.rate_limit_limit_id,
+            "rate_limit_primary_window_minutes": _rounded(
+                self.rate_limit_primary_window_minutes
+            ),
+            "rate_limit_primary_resets_at": _rounded(self.rate_limit_primary_resets_at),
         }
+        for field_name in TOKEN_TOTAL_FIELDS:
+            row[field_name] = round(self.token_totals.get(field_name, 0.0), 6)
+        for field_name in TIMING_TOTAL_FIELDS:
+            row[field_name] = round(self.timing_totals.get(field_name, 0.0), 6)
         for proxy in DEFAULT_PROXY_NAMES:
             candidate = self.candidate_standard_credits.get(proxy, 0.0)
             documented = self.documented_fast_weighted_credits.get(proxy, 0.0)
@@ -115,6 +144,15 @@ class UsageDrainModelResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class PredictiveModelSpec:
+    """One exploratory usage-drain prediction feature family."""
+
+    name: str
+    numeric_features: tuple[str, ...]
+    categorical_features: tuple[str, ...] = ()
 
 
 def documented_fast_credit_multiplier(model: object) -> float | None:
@@ -245,6 +283,19 @@ def summarize_usage_drain_model(
         fast_proxy_annotations=fast_proxy_annotations,
     )
     results = [fit_usage_drain_proxy(spans, proxy).to_dict() for proxy in DEFAULT_PROXY_NAMES]
+    predictive_models = fit_predictive_usage_drain_models(spans, proxy="all_candidates")
+    best_predictive_r2_model = max(
+        predictive_models,
+        key=lambda result: _number(result.get("holdout", {}).get("r2")),
+        default=None,
+    )
+    best_predictive_mae_model = min(
+        predictive_models,
+        key=lambda result: _number(result.get("holdout", {}).get("mae"))
+        if result.get("holdout", {}).get("mae") is not None
+        else math.inf,
+        default=None,
+    )
     return {
         "schema": USAGE_DRAIN_MODEL_SCHEMA,
         "source_rows": len(rows),
@@ -280,7 +331,20 @@ def summarize_usage_drain_model(
                 "call_duration_seconds",
                 "previous_call_delta_seconds",
             ],
-            "controls": ["model", "effort", "thread_key", "session_id", "cwd"],
+            "controls": [
+                "model",
+                "effort",
+                "thread_key",
+                "session_id",
+                "cwd",
+                "date",
+                "day_of_week",
+                "hour_of_day",
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "rate_limit_primary_window_minutes",
+                "rate_limit_primary_resets_at",
+            ],
         },
         "limitations": [
             "Visible usage percentages are coarse snapshots, not exact per-call credit debits.",
@@ -290,6 +354,17 @@ def summarize_usage_drain_model(
             "Local logs can omit usage from other agentic surfaces sharing the same allowance.",
         ],
         "results": results,
+        "predictive_modeling": {
+            "proxy": "all_candidates",
+            "splits": ["time_ordered_80_20", "interleaved_every_5th"],
+            "best_by_holdout_r2": best_predictive_r2_model["name"]
+            if best_predictive_r2_model
+            else None,
+            "best_by_holdout_mae": best_predictive_mae_model["name"]
+            if best_predictive_mae_model
+            else None,
+            "models": predictive_models,
+        },
     }
 
 
@@ -394,6 +469,45 @@ def write_usage_drain_spans_csv(spans: list[UsageDeltaSpan], path: Path) -> Path
     return path
 
 
+def fit_predictive_usage_drain_models(
+    spans: list[UsageDeltaSpan],
+    *,
+    proxy: str = "all_candidates",
+    train_fraction: float = 0.8,
+) -> list[dict[str, Any]]:
+    """Fit exploratory train/holdout models for richer control variables."""
+
+    feature_rows = [_span_feature_row(span, proxy=proxy) for span in spans]
+    if len(feature_rows) < 10:
+        return []
+    _add_days_since_first_span(feature_rows)
+    results: list[dict[str, Any]] = []
+    for split_name, train_rows, holdout_rows in _split_feature_rows(
+        feature_rows, train_fraction=train_fraction
+    ):
+        for spec in _predictive_model_specs():
+            fitted = _fit_predictive_model(train_rows, holdout_rows, spec)
+            if fitted is not None:
+                fitted["validation"] = split_name
+                fitted["name"] = f"{spec.name}__{split_name}"
+                results.append(fitted)
+    return results
+
+
+def _split_feature_rows(
+    rows: list[dict[str, Any]], *, train_fraction: float
+) -> list[tuple[str, list[dict[str, Any]], list[dict[str, Any]]]]:
+    train_size = max(1, min(len(rows) - 1, int(len(rows) * train_fraction)))
+    time_train = rows[:train_size]
+    time_holdout = rows[train_size:]
+    interleaved_holdout = [row for index, row in enumerate(rows) if index % 5 == 4]
+    interleaved_train = [row for index, row in enumerate(rows) if index % 5 != 4]
+    return [
+        ("time_ordered_80_20", time_train, time_holdout),
+        ("interleaved_every_5th", interleaved_train, interleaved_holdout),
+    ]
+
+
 def _span_from_rows(
     rows: list[dict[str, Any]],
     *,
@@ -407,11 +521,17 @@ def _span_from_rows(
     documented_weighted = dict.fromkeys(DEFAULT_PROXY_NAMES, 0.0)
     candidate_counts = dict.fromkeys(DEFAULT_PROXY_NAMES, 0)
     model_counts: dict[str, int] = {}
+    token_totals = dict.fromkeys(TOKEN_TOTAL_FIELDS, 0.0)
+    timing_totals = dict.fromkeys(TIMING_TOTAL_FIELDS, 0.0)
     for row in rows:
         credits = max(_number(row.get("usage_credits")), 0.0)
         standard += credits
         model = str(row.get("model") or "unknown")
         model_counts[model] = model_counts.get(model, 0) + 1
+        for field_name in TOKEN_TOTAL_FIELDS:
+            token_totals[field_name] += _number(row.get(field_name))
+        for field_name in TIMING_TOTAL_FIELDS:
+            timing_totals[field_name] += _number(row.get(field_name))
         annotation = proxies.get(str(row.get("record_id") or ""), FastProxyAnnotation())
         proxy_flags = {
             "all_candidates": annotation.is_candidate,
@@ -442,7 +562,363 @@ def _span_from_rows(
         documented_fast_weighted_credits=documented_weighted,
         candidate_row_counts=candidate_counts,
         models=model_counts,
+        token_totals=token_totals,
+        timing_totals=timing_totals,
+        rate_limit_plan_type=_optional_text(rows[-1].get("rate_limit_plan_type")),
+        rate_limit_limit_id=_optional_text(rows[-1].get("rate_limit_limit_id")),
+        rate_limit_primary_window_minutes=_optional_number(
+            rows[-1].get("rate_limit_primary_window_minutes")
+        ),
+        rate_limit_primary_resets_at=_optional_number(
+            rows[-1].get("rate_limit_primary_resets_at")
+        ),
     )
+
+
+def _predictive_model_specs() -> list[PredictiveModelSpec]:
+    base = (
+        "standard_usage_credits",
+        "log_standard_usage_credits",
+    )
+    token_shape = (
+        *base,
+        "row_count",
+        "input_tokens",
+        "cached_input_tokens",
+        "uncached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "total_tokens",
+        "cache_ratio",
+        "output_token_share",
+        "reasoning_output_share",
+        "mean_usage_credits_per_call",
+    )
+    fast_proxy = (
+        *token_shape,
+        "candidate_standard_credits",
+        "non_candidate_standard_credits",
+        "candidate_credit_share",
+        "documented_fast_weighted_credits",
+        "documented_fast_extra_credits",
+    )
+    usage_state = (
+        *fast_proxy,
+        "baseline_used_percent",
+        "rate_limit_primary_window_minutes",
+        "reset_remaining_minutes",
+    )
+    time_controls = (
+        *usage_state,
+        "days_since_first_span",
+        "hour_sin",
+        "hour_cos",
+        "day_of_week_sin",
+        "day_of_week_cos",
+        "is_weekend",
+    )
+    duration_controls = (
+        *time_controls,
+        "call_duration_seconds",
+        "mean_call_duration_seconds",
+        "previous_call_delta_seconds",
+    )
+    return [
+        PredictiveModelSpec("baseline_train_mean", ()),
+        PredictiveModelSpec("credits_only", base),
+        PredictiveModelSpec("token_shape", token_shape),
+        PredictiveModelSpec("fast_proxy", fast_proxy),
+        PredictiveModelSpec(
+            "usage_state",
+            usage_state,
+            ("rate_limit_plan_type", "rate_limit_limit_id"),
+        ),
+        PredictiveModelSpec(
+            "time_controls",
+            time_controls,
+            ("rate_limit_plan_type", "rate_limit_limit_id", "day_of_week"),
+        ),
+        PredictiveModelSpec(
+            "date_day_hour_controls",
+            time_controls,
+            (
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "date",
+                "day_of_week",
+                "hour_bucket",
+            ),
+        ),
+        PredictiveModelSpec(
+            "full_controls",
+            duration_controls,
+            (
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "date",
+                "day_of_week",
+                "hour_bucket",
+            ),
+        ),
+    ]
+
+
+def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
+    start_dt = _parse_timestamp(span.start_event_timestamp)
+    reset_remaining_minutes = _reset_remaining_minutes(
+        start_dt, span.rate_limit_primary_resets_at
+    )
+    date_label = start_dt.date().isoformat() if start_dt else "missing"
+    day_index = start_dt.weekday() if start_dt else -1
+    hour_value = (
+        start_dt.hour + (start_dt.minute / 60.0) + (start_dt.second / 3600.0)
+        if start_dt
+        else 0.0
+    )
+    hour_bucket = f"{start_dt.hour:02d}" if start_dt else "missing"
+    standard = span.standard_usage_credits
+    candidate = span.candidate_standard_credits.get(proxy, 0.0)
+    non_candidate = span.non_candidate_standard_credits.get(proxy, 0.0)
+    documented = span.documented_fast_weighted_credits.get(proxy, standard)
+    input_tokens = span.token_totals.get("input_tokens", 0.0)
+    cached_tokens = span.token_totals.get("cached_input_tokens", 0.0)
+    output_tokens = span.token_totals.get("output_tokens", 0.0)
+    reasoning_tokens = span.token_totals.get("reasoning_output_tokens", 0.0)
+    total_tokens = span.token_totals.get("total_tokens", 0.0)
+    duration = span.timing_totals.get("call_duration_seconds", 0.0)
+    return {
+        "target": span.delta_usage_percent,
+        "start_event_timestamp": span.start_event_timestamp,
+        "standard_usage_credits": standard,
+        "log_standard_usage_credits": math.log1p(max(standard, 0.0)),
+        "row_count": float(span.row_count),
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_tokens,
+        "uncached_input_tokens": span.token_totals.get("uncached_input_tokens", 0.0),
+        "output_tokens": output_tokens,
+        "reasoning_output_tokens": reasoning_tokens,
+        "total_tokens": total_tokens,
+        "cache_ratio": cached_tokens / input_tokens if input_tokens else 0.0,
+        "output_token_share": output_tokens / total_tokens if total_tokens else 0.0,
+        "reasoning_output_share": reasoning_tokens / output_tokens if output_tokens else 0.0,
+        "mean_usage_credits_per_call": standard / span.row_count if span.row_count else 0.0,
+        "candidate_standard_credits": candidate,
+        "non_candidate_standard_credits": non_candidate,
+        "candidate_credit_share": candidate / standard if standard else 0.0,
+        "documented_fast_weighted_credits": documented,
+        "documented_fast_extra_credits": max(documented - standard, 0.0),
+        "baseline_used_percent": span.baseline_used_percent,
+        "rate_limit_primary_window_minutes": span.rate_limit_primary_window_minutes or 0.0,
+        "reset_remaining_minutes": reset_remaining_minutes or 0.0,
+        "days_since_first_span": 0.0,
+        "hour_sin": math.sin(2 * math.pi * hour_value / 24.0),
+        "hour_cos": math.cos(2 * math.pi * hour_value / 24.0),
+        "day_of_week_sin": math.sin(2 * math.pi * day_index / 7.0) if day_index >= 0 else 0.0,
+        "day_of_week_cos": math.cos(2 * math.pi * day_index / 7.0) if day_index >= 0 else 0.0,
+        "is_weekend": 1.0 if day_index in {5, 6} else 0.0,
+        "call_duration_seconds": duration,
+        "mean_call_duration_seconds": duration / span.row_count if span.row_count else 0.0,
+        "previous_call_delta_seconds": span.timing_totals.get("previous_call_delta_seconds", 0.0),
+        "date": date_label,
+        "day_of_week": str(day_index) if day_index >= 0 else "missing",
+        "hour_bucket": hour_bucket,
+        "rate_limit_plan_type": span.rate_limit_plan_type or "missing",
+        "rate_limit_limit_id": span.rate_limit_limit_id or "missing",
+    }
+
+
+def _add_days_since_first_span(rows: list[dict[str, Any]]) -> None:
+    first_date: datetime | None = None
+    for row in rows:
+        parsed = _parse_timestamp(str(row.get("date") or ""))
+        if parsed is None:
+            parsed = _parse_timestamp(str(row.get("start_event_timestamp") or ""))
+        if parsed is not None and first_date is None:
+            first_date = parsed
+        if parsed is None or first_date is None:
+            row["days_since_first_span"] = 0.0
+        else:
+            row["days_since_first_span"] = max(
+                (parsed.date() - first_date.date()).days, 0
+            )
+
+
+def _fit_predictive_model(
+    train_rows: list[dict[str, Any]],
+    holdout_rows: list[dict[str, Any]],
+    spec: PredictiveModelSpec,
+) -> dict[str, Any] | None:
+    prepared = _prepare_design(train_rows, spec)
+    if prepared is None:
+        return None
+    feature_names, means, stddevs, category_levels = prepared
+    train_x = _design_matrix(
+        train_rows,
+        spec,
+        feature_names=feature_names,
+        means=means,
+        stddevs=stddevs,
+        category_levels=category_levels,
+    )
+    train_y = [_number(row.get("target")) for row in train_rows]
+    coefficients = _fit_ridge(train_x, train_y, alpha=1.0)
+    if coefficients is None:
+        return None
+    holdout_x = _design_matrix(
+        holdout_rows,
+        spec,
+        feature_names=feature_names,
+        means=means,
+        stddevs=stddevs,
+        category_levels=category_levels,
+    )
+    holdout_y = [_number(row.get("target")) for row in holdout_rows]
+    train_predictions = _predict(train_x, coefficients)
+    holdout_predictions = _predict(holdout_x, coefficients)
+    coefficient_rows = [
+        {"feature": feature, "coefficient": _rounded(value)}
+        for feature, value in zip(feature_names, coefficients[1:], strict=True)
+    ]
+    coefficient_rows.sort(key=lambda row: abs(_number(row["coefficient"])), reverse=True)
+    return {
+        "name": spec.name,
+        "feature_count": len(feature_names),
+        "numeric_features": list(spec.numeric_features),
+        "categorical_features": list(spec.categorical_features),
+        "train": _regression_metrics(train_y, train_predictions),
+        "holdout": _regression_metrics(holdout_y, holdout_predictions),
+        "top_coefficients": coefficient_rows[:12],
+    }
+
+
+def _prepare_design(
+    rows: list[dict[str, Any]], spec: PredictiveModelSpec
+) -> tuple[list[str], dict[str, float], dict[str, float], dict[str, list[str]]] | None:
+    if not rows:
+        return None
+    means: dict[str, float] = {}
+    stddevs: dict[str, float] = {}
+    feature_names: list[str] = []
+    for feature in spec.numeric_features:
+        values = [_number(row.get(feature)) for row in rows]
+        mean = sum(values) / len(values)
+        variance = sum((value - mean) ** 2 for value in values) / len(values)
+        stddev = math.sqrt(variance) or 1.0
+        means[feature] = mean
+        stddevs[feature] = stddev
+        feature_names.append(feature)
+    category_levels: dict[str, list[str]] = {}
+    for feature in spec.categorical_features:
+        counts: dict[str, int] = {}
+        for row in rows:
+            value = str(row.get(feature) or "missing")
+            counts[value] = counts.get(value, 0) + 1
+        levels = [value for value, count in sorted(counts.items()) if count >= 2]
+        category_levels[feature] = levels
+        feature_names.extend(f"{feature}={value}" for value in levels)
+    return feature_names, means, stddevs, category_levels
+
+
+def _design_matrix(
+    rows: list[dict[str, Any]],
+    spec: PredictiveModelSpec,
+    *,
+    feature_names: list[str],
+    means: dict[str, float],
+    stddevs: dict[str, float],
+    category_levels: dict[str, list[str]],
+) -> list[list[float]]:
+    matrix: list[list[float]] = []
+    feature_index = {feature: index for index, feature in enumerate(feature_names)}
+    for row in rows:
+        values = [0.0] * len(feature_names)
+        for feature in spec.numeric_features:
+            index = feature_index[feature]
+            values[index] = (_number(row.get(feature)) - means[feature]) / stddevs[feature]
+        for feature in spec.categorical_features:
+            value = str(row.get(feature) or "missing")
+            encoded_name = f"{feature}={value}"
+            if encoded_name in feature_index:
+                values[feature_index[encoded_name]] = 1.0
+        matrix.append(values)
+    return matrix
+
+
+def _fit_ridge(
+    x_rows: list[list[float]], y_values: list[float], *, alpha: float
+) -> list[float] | None:
+    if not x_rows or not y_values:
+        return None
+    width = len(x_rows[0]) + 1
+    lhs = [[0.0 for _ in range(width)] for _ in range(width)]
+    rhs = [0.0 for _ in range(width)]
+    for row, y_value in zip(x_rows, y_values, strict=True):
+        expanded = [1.0, *row]
+        for i, x_i in enumerate(expanded):
+            rhs[i] += x_i * y_value
+            for j, x_j in enumerate(expanded):
+                lhs[i][j] += x_i * x_j
+    for index in range(1, width):
+        lhs[index][index] += alpha
+    return _solve_linear_system(lhs, rhs)
+
+
+def _solve_linear_system(lhs: list[list[float]], rhs: list[float]) -> list[float] | None:
+    size = len(rhs)
+    matrix = [row[:] + [rhs_value] for row, rhs_value in zip(lhs, rhs, strict=True)]
+    for column in range(size):
+        pivot = max(range(column, size), key=lambda row: abs(matrix[row][column]))
+        if abs(matrix[pivot][column]) < 1e-12:
+            return None
+        matrix[column], matrix[pivot] = matrix[pivot], matrix[column]
+        pivot_value = matrix[column][column]
+        matrix[column] = [value / pivot_value for value in matrix[column]]
+        for row_index in range(size):
+            if row_index == column:
+                continue
+            factor = matrix[row_index][column]
+            if factor == 0:
+                continue
+            matrix[row_index] = [
+                value - factor * pivot_component
+                for value, pivot_component in zip(
+                    matrix[row_index], matrix[column], strict=True
+                )
+            ]
+    return [matrix[row][size] for row in range(size)]
+
+
+def _predict(x_rows: list[list[float]], coefficients: list[float]) -> list[float]:
+    return [
+        coefficients[0]
+        + sum(value * coefficient for value, coefficient in zip(row, coefficients[1:], strict=True))
+        for row in x_rows
+    ]
+
+
+def _regression_metrics(
+    actual: list[float], predicted: list[float]
+) -> dict[str, float | int | None]:
+    if not actual or len(actual) != len(predicted):
+        return {
+            "n": len(actual),
+            "r2": None,
+            "mae": None,
+            "rmse": None,
+            "pearson": None,
+            "mean_actual": None,
+            "mean_predicted": None,
+        }
+    errors = [prediction - value for value, prediction in zip(actual, predicted, strict=True)]
+    return {
+        "n": len(actual),
+        "r2": _rounded(_r2(actual, predicted)),
+        "mae": _rounded(sum(abs(error) for error in errors) / len(errors)),
+        "rmse": _rounded(math.sqrt(sum(error * error for error in errors) / len(errors))),
+        "pearson": _rounded(_pearson(actual, predicted)),
+        "mean_actual": _rounded(sum(actual) / len(actual)),
+        "mean_predicted": _rounded(sum(predicted) / len(predicted)),
+    }
 
 
 def _fit_two_feature_no_intercept(
@@ -569,6 +1045,40 @@ def _usage_bucket(row: dict[str, Any]) -> tuple[Any, ...]:
         row.get("rate_limit_primary_window_minutes"),
         row.get("rate_limit_primary_resets_at"),
     )
+
+
+def _parse_timestamp(value: str) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if len(text) == 10 and text[4] == "-" and text[7] == "-":
+        text = f"{text}T00:00:00+00:00"
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _reset_remaining_minutes(
+    event_timestamp: datetime | None, reset_at: float | None
+) -> float | None:
+    if event_timestamp is None or reset_at is None:
+        return None
+    return max((reset_at - event_timestamp.timestamp()) / 60.0, 0.0)
+
+
+def _optional_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _count_values(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
