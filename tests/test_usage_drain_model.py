@@ -70,6 +70,10 @@ def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets(
         "count": 1,
         "share": 0.5,
     }
+    walk_forward = summary["walk_forward_prediction"]["scopes"]["all_after_first"]
+    assert walk_forward["actual"]["n"] == 1
+    assert walk_forward["models"]["constant_one_percent"]["mae"] == 0.0
+    assert walk_forward["models"]["previous_delta"]["mae"] == 1.0
 
 
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:

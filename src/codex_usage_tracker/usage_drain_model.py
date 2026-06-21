@@ -304,6 +304,7 @@ def summarize_usage_drain_model(
         "rate_limit_plan_type_mix": _count_values(rows, "rate_limit_plan_type"),
         "rate_limit_limit_id_mix": _count_values(rows, "rate_limit_limit_id"),
         "delta_regimes": _delta_regime_summary(spans),
+        "walk_forward_prediction": _walk_forward_prediction_summary(spans),
         "documented_fast_multipliers": dict(DOCUMENTED_FAST_CREDIT_MULTIPLIERS),
         "available_signals": {
             "direct_fast_mode_flag": False,
@@ -422,6 +423,136 @@ def _delta_distribution(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
         ),
         "top_delta_values": top_values,
     }
+
+
+def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    rows = _walk_forward_prediction_rows(spans)
+    scopes = {
+        "all_after_first": 1,
+        "all_after_10": 10,
+        "all_after_50": 50,
+        "time_ordered_holdout_20": max(1, min(len(spans) - 1, int(len(spans) * 0.8)))
+        if spans
+        else 0,
+        "latest_500": max(len(spans) - 500, 1),
+        "latest_100": max(len(spans) - 100, 1),
+    }
+    return {
+        "model_descriptions": {
+            "constant_one_percent": "Always predicts a 1% visible counter increase.",
+            "previous_delta": "Predicts the previous closed positive usage delta.",
+            "rolling3_mean_delta": "Predicts the mean of the previous 3 deltas.",
+            "rolling10_mean_delta": "Predicts the mean of the previous 10 deltas.",
+            "rolling10_median_delta": "Predicts the median of the previous 10 deltas.",
+            "rolling10_mode_delta": "Predicts the most common previous 10-delta value.",
+            "adaptive_low_delta_mode": (
+                "Uses rolling10 mode when at least 80% of the previous 10 deltas "
+                "are <=1%; otherwise uses previous delta."
+            ),
+            "adaptive_stable_mode": (
+                "Uses rolling10 mode when rolling10 standard deviation is <=1%; "
+                "otherwise uses previous delta."
+            ),
+        },
+        "scopes": {
+            name: _walk_forward_scope_metrics(rows, start_index=start_index)
+            for name, start_index in scopes.items()
+        },
+    }
+
+
+def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    previous_deltas: list[float] = []
+    for index, span in enumerate(spans):
+        actual = span.delta_usage_percent
+        if previous_deltas:
+            recent3 = previous_deltas[-3:]
+            recent10 = previous_deltas[-10:]
+            rolling10_mode = _value_mode(recent10)
+            rolling10_stddev = _value_stddev(recent10)
+            rolling10_low_share = sum(1 for value in recent10 if value <= 1.0) / len(
+                recent10
+            )
+            predictions = {
+                "constant_one_percent": 1.0,
+                "previous_delta": previous_deltas[-1],
+                "rolling3_mean_delta": sum(recent3) / len(recent3),
+                "rolling10_mean_delta": sum(recent10) / len(recent10),
+                "rolling10_median_delta": float(median(recent10)),
+                "rolling10_mode_delta": rolling10_mode,
+                "adaptive_low_delta_mode": rolling10_mode
+                if rolling10_low_share >= 0.8
+                else previous_deltas[-1],
+                "adaptive_stable_mode": rolling10_mode
+                if rolling10_stddev <= 1.0
+                else previous_deltas[-1],
+            }
+            rows.append({"index": index, "actual": actual, "predictions": predictions})
+        previous_deltas.append(actual)
+    return rows
+
+
+def _walk_forward_scope_metrics(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> dict[str, Any]:
+    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
+    actual = [_number(row.get("actual")) for row in scope_rows]
+    model_names = list(scope_rows[0]["predictions"].keys()) if scope_rows else []
+    return {
+        "start_index": start_index,
+        "actual": _value_distribution(actual),
+        "models": {
+            model_name: _regression_metrics(
+                actual,
+                [
+                    _number(row.get("predictions", {}).get(model_name))
+                    for row in scope_rows
+                ],
+            )
+            for model_name in model_names
+        },
+    }
+
+
+def _value_distribution(values: list[float]) -> dict[str, Any]:
+    if not values:
+        return {
+            "n": 0,
+            "mean": None,
+            "stddev": None,
+            "min": None,
+            "max": None,
+        }
+    mean = sum(values) / len(values)
+    return {
+        "n": len(values),
+        "mean": _rounded(mean),
+        "stddev": _rounded(_value_stddev(values)),
+        "min": _rounded(min(values)),
+        "max": _rounded(max(values)),
+    }
+
+
+def _value_mode(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    counts: dict[float, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    max_count = max(counts.values())
+    candidates = {value for value, count in counts.items() if count == max_count}
+    for value in reversed(values):
+        if value in candidates:
+            return value
+    return values[-1]
+
+
+def _value_stddev(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    mean = sum(values) / len(values)
+    return math.sqrt(sum((value - mean) ** 2 for value in values) / len(values))
 
 
 def fit_usage_drain_proxy(
@@ -1086,25 +1217,14 @@ def _rolling_mode(rows: list[dict[str, Any]], field: str, window: int) -> float:
     selected = rows[-window:]
     if not selected:
         return 0.0
-    counts: dict[float, int] = {}
-    values = [_number(row.get(field)) for row in selected]
-    for value in values:
-        counts[value] = counts.get(value, 0) + 1
-    max_count = max(counts.values())
-    candidates = {value for value, count in counts.items() if count == max_count}
-    for value in reversed(values):
-        if value in candidates:
-            return value
-    return values[-1]
+    return _value_mode([_number(row.get(field)) for row in selected])
 
 
 def _rolling_stddev(rows: list[dict[str, Any]], field: str, window: int) -> float:
     selected = rows[-window:]
     if not selected:
         return 0.0
-    values = [_number(row.get(field)) for row in selected]
-    mean = sum(values) / len(values)
-    return math.sqrt(sum((value - mean) ** 2 for value in values) / len(values))
+    return _value_stddev([_number(row.get(field)) for row in selected])
 
 
 def _rolling_drain_per_credit(rows: list[dict[str, Any]], window: int) -> float:

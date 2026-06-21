@@ -135,6 +135,11 @@ Two validation splits are reported:
   explanation test that keeps dates and usage regimes mixed across train and
   holdout.
 
+The report also includes `walk_forward_prediction`, which is stricter than the
+interleaved split for simple rules. Each span is predicted using only earlier
+closed spans. This avoids mistaking mixed-history explanatory power for true
+future predictability.
+
 ## Current Finding From Local Analysis
 
 The original ad hoc report using the all-call fast-mode proxy found:
@@ -219,6 +224,22 @@ index, there are 1,452 closed positive spans. Across all spans, `1%` deltas are
 291 spans, or 99.7%. The latest 100 closed spans are all `1%`. That makes the
 visible counter highly predictable right now, but mostly because the displayed
 counter is quantized and currently moving in a very stable regime.
+
+The strict walk-forward check reinforces that split:
+
+| scope | best MAE model | MAE | best RMSE model | RMSE | interpretation |
+| --- | --- | ---: | --- | ---: | --- |
+| all spans after first | previous delta | 0.936 pct points | rolling3 mean delta | 2.604 pct points | persistence predicts typical deltas best, but smoothing helps large misses |
+| all spans after 50 | previous delta | 0.934 pct points | rolling3 mean delta | 2.636 pct points | same pattern after warmup |
+| newest 20% holdout | constant / rolling10 mode / adaptive rules | 0.003 pct points | constant / rolling10 mode / adaptive rules | 0.059 pct points | the future holdout is almost all 1% |
+| latest 500 spans | constant / rolling10 mode / adaptive rules | 0.002 pct points | constant / rolling10 mode / adaptive rules | 0.045 pct points | recent visible deltas are nearly flat |
+| latest 100 spans | all simple rules | 0.000 pct points | all simple rules | 0.000 pct points | every observed delta is exactly 1% |
+
+That is useful for operating against the visible counter, but it is not evidence
+that tokens, fast mode, date, or wall time perfectly explain underlying cost.
+The practical next step is probably to model regime changes explicitly: detect
+when the visible allowance counter leaves the current 1% mode, then use token
+and timing controls only inside comparable regimes.
 
 ## Run It
 

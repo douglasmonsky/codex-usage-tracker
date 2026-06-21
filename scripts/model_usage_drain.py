@@ -103,7 +103,41 @@ def main() -> int:
                         pearson=holdout.get("pearson"),
                     )
                 )
+        walk_forward = summary.get("walk_forward_prediction") or {}
+        scopes = walk_forward.get("scopes") or {}
+        if scopes:
+            for scope_name in (
+                "all_after_first",
+                "time_ordered_holdout_20",
+                "latest_100",
+            ):
+                scope = scopes.get(scope_name) or {}
+                actual = scope.get("actual") or {}
+                models = scope.get("models") or {}
+                best_mae = _best_metric_model(models, "mae")
+                best_rmse = _best_metric_model(models, "rmse")
+                print(
+                    "walk-forward {scope}: n={n} best_mae={best_mae} "
+                    "best_rmse={best_rmse}".format(
+                        scope=scope_name,
+                        n=actual.get("n"),
+                        best_mae=best_mae,
+                        best_rmse=best_rmse,
+                    )
+                )
     return 0
+
+
+def _best_metric_model(models: dict[str, Any], metric: str) -> str | None:
+    candidates = [
+        (name, values.get(metric))
+        for name, values in models.items()
+        if isinstance(values, dict) and values.get(metric) is not None
+    ]
+    if not candidates:
+        return None
+    name, value = min(candidates, key=lambda item: float(item[1]))
+    return f"{name}:{value}"
 
 
 def _json_safe(value: Any) -> Any:
