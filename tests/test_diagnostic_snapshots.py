@@ -20,6 +20,7 @@ from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_commands_report,
     build_diagnostic_concentration_report,
     build_diagnostic_file_reads_report,
+    build_diagnostic_git_interactions_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
@@ -144,6 +145,7 @@ def test_batch_diagnostic_refresh_shares_source_log_analysis_pass(
     assert refreshed["sections"]["overview"]["status"] == "ready"
     assert refreshed["sections"]["toolOutput"]["status"] == "ready"
     assert refreshed["sections"]["commands"]["status"] == "ready"
+    assert refreshed["sections"]["gitInteractions"]["status"] == "ready"
     assert refreshed["sections"]["fileReads"]["status"] == "ready"
     assert refreshed["sections"]["readProductivity"]["status"] == "ready"
     assert refreshed["sections"]["concentration"]["status"] == "ready"
@@ -267,6 +269,96 @@ def test_tool_output_and_command_snapshots_use_safe_aggregate_labels(
     assert "SECRET" not in serialized
     assert "test_private.py" not in serialized
     assert "/tmp/private-diagnostics" not in serialized
+
+
+def test_git_interaction_snapshot_uses_safe_aggregate_operations(tmp_path: Path) -> None:
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry(
+                "turn_context",
+                {
+                    "turn_id": "turn-a",
+                    "model": "gpt-5.5",
+                    "cwd": "/tmp/private-diagnostics",
+                },
+            ),
+            _function_call("call-status", "git -C /tmp/private/repo status --short --branch"),
+            _function_output("call-status", _terminal_output(11)),
+            _function_call("call-diff", "git diff --stat SECRET_RAW_ARGUMENT"),
+            _function_output("call-diff", _terminal_output(42)),
+            _function_call("call-add", "git add src/private.py"),
+            _function_output("call-add", _terminal_output(7)),
+            _function_call("call-commit", "git commit -m SECRET_COMMIT_MESSAGE"),
+            _function_output("call-commit", "plain output without wrapper SECRET_OUTPUT"),
+            _function_call("call-push", "git push origin feature/secret-branch"),
+            _function_output("call-push", _terminal_output(9)),
+            _function_call("call-gh-pr", "gh pr create --title SECRET_TITLE"),
+            _function_output("call-gh-pr", _terminal_output(13)),
+            _function_call("call-gh-release", "gh release create v0.9.0 --notes SECRET_NOTES"),
+            _function_output("call-gh-release", _terminal_output(17)),
+            _function_call("call-gh-run", "gh run watch 123456"),
+            _function_output("call-gh-run", _terminal_output(19)),
+            _token_event(100, 100),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    missing = build_diagnostic_git_interactions_report(db_path=db_path).payload
+    git_interactions = build_diagnostic_git_interactions_report(
+        db_path=db_path,
+        refresh=True,
+    ).payload
+
+    _assert_contract(missing)
+    _assert_contract(git_interactions)
+    assert missing["status"] == "missing"
+    assert git_interactions["status"] == "ready"
+    assert git_interactions["summary"]["git_shell_calls"] == 8
+    assert git_interactions["summary"]["git_command_calls"] == 5
+    assert git_interactions["summary"]["github_cli_calls"] == 3
+    assert git_interactions["summary"]["interactions_with_original_token_count"] == 7
+    assert git_interactions["summary"]["interactions_missing_original_token_count"] == 1
+    assert git_interactions["summary"]["original_token_sum"] == 118
+
+    rows = {
+        (row["root"], row["operation"]): row
+        for row in git_interactions["interactions"]
+    }
+    assert rows[("git", "status")]["category"] == "read_only"
+    assert rows[("git", "status")]["mutability"] == "read_only"
+    assert rows[("git", "diff")]["original_token_sum"] == 42
+    assert rows[("git", "commit")]["missing_original_token_count"] == 1
+    assert rows[("git", "push")]["category"] == "remote_ref"
+    assert rows[("gh", "pr")]["category"] == "pull_request"
+    assert rows[("gh", "release")]["category"] == "release"
+    assert rows[("gh", "run")]["category"] == "workflow"
+
+    categories = {row["category"]: row["count"] for row in git_interactions["categories"]}
+    assert categories["read_only"] == 2
+    assert categories["local_mutation"] == 2
+    assert categories["remote_ref"] == 1
+    assert categories["pull_request"] == 1
+    assert categories["release"] == 1
+    assert categories["workflow"] == 1
+
+    serialized = json.dumps(git_interactions, sort_keys=True)
+    assert "SECRET" not in serialized
+    assert "/tmp/private" not in serialized
+    assert "src/private.py" not in serialized
+    assert "feature/secret-branch" not in serialized
+    assert "v0.9.0" not in serialized
 
 
 def test_file_read_snapshots_allocate_tokens_and_correlate_later_modifications(

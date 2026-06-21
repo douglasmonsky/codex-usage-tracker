@@ -14,6 +14,7 @@
       { key: 'overview', title: 'Overview', path: '/api/diagnostics/overview', refreshPath: '/api/diagnostics/overview/refresh' },
       { key: 'toolOutput', title: 'Tool Output', path: '/api/diagnostics/tool-output', refreshPath: '/api/diagnostics/tool-output/refresh' },
       { key: 'commands', title: 'Commands', path: '/api/diagnostics/commands', refreshPath: '/api/diagnostics/commands/refresh' },
+      { key: 'gitInteractions', title: 'Git Interactions', path: '/api/diagnostics/git-interactions', refreshPath: '/api/diagnostics/git-interactions/refresh' },
       { key: 'fileReads', title: 'File Reads', path: '/api/diagnostics/file-reads', refreshPath: '/api/diagnostics/file-reads/refresh' },
       { key: 'readProductivity', title: 'Read Productivity', path: '/api/diagnostics/read-productivity', refreshPath: '/api/diagnostics/read-productivity/refresh' },
       { key: 'concentration', title: 'Concentration', path: '/api/diagnostics/concentration', refreshPath: '/api/diagnostics/concentration/refresh' },
@@ -74,6 +75,7 @@
       if (key === 'overview') return renderOverview(payload);
       if (key === 'toolOutput') return renderToolOutput(payload);
       if (key === 'commands') return renderCommands(payload);
+      if (key === 'gitInteractions') return renderGitInteractions(payload);
       if (key === 'fileReads') return renderFileReads(payload);
       if (key === 'readProductivity') return renderReadProductivity(payload);
       if (key === 'concentration') return renderConcentration(payload);
@@ -147,6 +149,38 @@
             `).join('')}
           </ul>
         </details>
+      `;
+    }
+
+    function renderGitInteractions(payload) {
+      const summary = payload?.summary || {};
+      const interactions = Array.isArray(payload?.interactions) ? payload.interactions.slice(0, 10) : [];
+      const categories = Array.isArray(payload?.categories) ? payload.categories.slice(0, 8) : [];
+      return `
+        ${renderKeyValueTable([
+          ['Git/GitHub calls', tokenText(summary.git_shell_calls)],
+          ['Git commands', tokenText(summary.git_command_calls)],
+          ['GitHub CLI commands', tokenText(summary.github_cli_calls)],
+          ['With token count', tokenText(summary.interactions_with_original_token_count)],
+          ['Missing token count', tokenText(summary.interactions_missing_original_token_count)],
+          ['Original tokens', tokenText(summary.original_token_sum)],
+        ])}
+        ${renderSimpleTable(
+          ['Tool', 'Operation', 'Category', 'Calls', 'Original tokens'],
+          interactions.map(row => [
+            row.root,
+            row.operation,
+            humanizeMetric(row.category),
+            tokenText(row.calls),
+            tokenText(row.original_token_sum),
+          ]),
+          'No Git interaction rows in this snapshot.',
+        )}
+        ${renderSimpleTable(
+          ['Category', 'Count'],
+          categories.map(row => [humanizeMetric(row.category), tokenText(row.count)]),
+          'No Git interaction categories in this snapshot.',
+        )}
       `;
     }
 

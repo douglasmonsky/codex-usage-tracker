@@ -39,6 +39,7 @@ from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_commands_report,
     build_diagnostic_concentration_report,
     build_diagnostic_file_reads_report,
+    build_diagnostic_git_interactions_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
@@ -322,6 +323,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/diagnostics/commands":
             self._handle_diagnostics_commands(parsed.query)
             return
+        if parsed.path == "/api/diagnostics/git-interactions":
+            self._handle_diagnostics_git_interactions(parsed.query)
+            return
         if parsed.path == "/api/diagnostics/file-reads":
             self._handle_diagnostics_file_reads(parsed.query)
             return
@@ -358,6 +362,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/diagnostics/commands/refresh":
             self._handle_diagnostics_commands_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/git-interactions/refresh":
+            self._handle_diagnostics_git_interactions_refresh(parsed.query)
             return
         if parsed.path == "/api/diagnostics/file-reads/refresh":
             self._handle_diagnostics_file_reads_refresh(parsed.query)
@@ -1070,6 +1077,22 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             build_report=build_diagnostic_commands_report,
             refresh=True,
             label="diagnostic commands",
+        )
+
+    def _handle_diagnostics_git_interactions(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_git_interactions_report,
+            refresh=False,
+            label="diagnostic git interactions",
+        )
+
+    def _handle_diagnostics_git_interactions_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_git_interactions_report,
+            refresh=True,
+            label="diagnostic git interactions",
         )
 
     def _handle_diagnostics_file_reads(self, query: str) -> None:

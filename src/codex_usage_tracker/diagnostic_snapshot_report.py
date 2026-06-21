@@ -9,6 +9,7 @@ from codex_usage_tracker.diagnostic_snapshot_constants import (
     DIAGNOSTIC_COMMANDS_SECTION,
     DIAGNOSTIC_CONCENTRATION_SECTION,
     DIAGNOSTIC_FILE_READS_SECTION,
+    DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
     DIAGNOSTIC_READ_PRODUCTIVITY_SECTION,
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
 )
@@ -30,6 +31,8 @@ class DiagnosticSnapshotReport:
             return self._render_tool_output()
         if section == DIAGNOSTIC_COMMANDS_SECTION:
             return self._render_commands()
+        if section == DIAGNOSTIC_GIT_INTERACTIONS_SECTION:
+            return self._render_git_interactions()
         if section == DIAGNOSTIC_FILE_READS_SECTION:
             return self._render_file_reads()
         if section == DIAGNOSTIC_READ_PRODUCTIVITY_SECTION:
@@ -80,6 +83,22 @@ class DiagnosticSnapshotReport:
                 f"Shell calls: {_int_text(summary.get('shell_function_calls'))}",
                 f"Command roots: {_int_text(summary.get('command_root_count'))}",
                 f"Missing command text: {_int_text(summary.get('missing_command'))}",
+            ]
+        )
+
+    def _render_git_interactions(self) -> str:
+        snapshot = self.payload.get("snapshot") or {}
+        summary = self.payload.get("summary") or {}
+        return "\n".join(
+            [
+                "Diagnostic git-interactions snapshot",
+                f"Computed: {snapshot.get('computed_at')}",
+                f"History scope: {snapshot.get('history_scope')}",
+                f"Git/GitHub shell calls: {_int_text(summary.get('git_shell_calls'))}",
+                f"Git commands: {_int_text(summary.get('git_command_calls'))}",
+                f"GitHub CLI commands: {_int_text(summary.get('github_cli_calls'))}",
+                f"Interactions with Original token count: {_int_text(summary.get('interactions_with_original_token_count'))}",
+                f"Terminal output tokens: {_int_text(summary.get('original_token_sum'))}",
             ]
         )
 

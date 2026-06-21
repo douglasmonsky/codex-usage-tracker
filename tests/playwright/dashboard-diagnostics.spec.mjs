@@ -18,6 +18,7 @@ test.describe('diagnostics dashboard smoke', () => {
       'Overview',
       'Tool Output',
       'Commands',
+      'Git Interactions',
       'File Reads',
       'Read Productivity',
       'Concentration',

@@ -363,6 +363,18 @@ def _add_diagnostics_parser(
     )
     commands.add_argument("--json", action="store_true", dest="as_json")
 
+    git_interactions = diagnostic_subparsers.add_parser(
+        "git-interactions",
+        help="Show on-demand aggregate Git and GitHub CLI interactions",
+    )
+    git_interactions.add_argument("--include-archived", action="store_true")
+    git_interactions.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the Git interaction snapshot before reading it.",
+    )
+    git_interactions.add_argument("--json", action="store_true", dest="as_json")
+
     file_reads = diagnostic_subparsers.add_parser(
         "file-reads",
         help="Show the on-demand aggregate file-read snapshot",
