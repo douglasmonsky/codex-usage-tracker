@@ -85,7 +85,7 @@ Dashboards default to active sessions only. Use `--include-archived` for an all-
 
 Use global `--lang <code>` before the dashboard command, or set `CODEX_USAGE_TRACKER_LANG`, to choose the dashboard's initial UI language. The dashboard language selector can then override that default in the browser. Localization applies to dashboard UI text, not JSON fields, CSV columns, model names, thread names, paths, or full CLI output.
 
-The localhost `/api/usage` endpoint accepts `limit` and `offset` query parameters, so automation can page aggregate rows without asking the server to load an entire large history at once.
+The localhost `/api/usage` endpoint accepts `limit` and `offset` query parameters, so automation can page aggregate rows without asking the server to load an entire large history at once. Call rows include derived `call_duration_seconds` and `previous_call_delta_seconds`, and live API sorting accepts `duration` and `gap` sort keys.
 
 ## Summaries
 
@@ -123,7 +123,9 @@ codex-usage-tracker diagnostics tools
 codex-usage-tracker diagnostics overview --refresh
 codex-usage-tracker diagnostics tool-output --refresh
 codex-usage-tracker diagnostics commands --refresh
+codex-usage-tracker diagnostics git-interactions --refresh
 codex-usage-tracker diagnostics file-reads --refresh
+codex-usage-tracker diagnostics file-modifications --refresh
 codex-usage-tracker diagnostics read-productivity --refresh
 codex-usage-tracker diagnostics concentration --refresh
 codex-usage-tracker diagnostics fact-calls --fact-type compaction --fact-name post_compaction
@@ -133,9 +135,9 @@ Diagnostics expose structured event patterns and their associated token totals. 
 
 Snapshot diagnostics are persisted aggregate reports. Without `--refresh`, snapshot commands return the latest stored payload or a `missing` status. With `--refresh`, they recompute from indexed source logs and replace the stored section snapshot. Ordinary `refresh`, `open-dashboard`, and dashboard `Refresh` update usage rows only; they do not recompute diagnostic snapshots.
 
-The snapshot sections answer different questions: `overview` summarizes usage rows and aggregate token totals, `tool-output` counts functions and terminal `Original token count` coverage, `commands` keeps command roots plus bounded safe child labels, `file-reads` counts reader/path activity and allocated read-output tokens, `read-productivity` reports later-edit correlations for matching path keys, and `concentration` shows top-N token share by source/session, cwd/project, and day.
+The snapshot sections answer different questions: `overview` summarizes usage rows and aggregate token totals, `tool-output` counts functions and terminal `Original token count` coverage, `commands` keeps command roots plus bounded safe child labels, `git-interactions` counts safe Git/GitHub CLI operations and token-count coverage, `file-reads` counts reader/path activity and allocated read-output tokens, `file-modifications` counts patch modification events and safe modified-path aggregates, `read-productivity` reports later-edit correlations for matching path keys, and `concentration` shows top-N token share by source/session, cwd/project, and day.
 
-Diagnostic payloads are aggregate-only. They do not include prompts, assistant text, tool arguments, tool output, patch text, raw commands, command arguments, file contents, raw absolute paths, or JSONL fragments. File-read diagnostics use basename-only path labels plus short irreversible hashes, read-productivity percentages are temporal correlations rather than proof that a read caused a later edit, and concentration reports use safe source/session, cwd, and day labels only.
+Diagnostic payloads are aggregate-only. They do not include prompts, assistant text, tool arguments, tool output, patch text, raw commands, command arguments, file contents, raw absolute paths, or JSONL fragments. Git interaction diagnostics persist only root and operation labels such as `git/status` or `gh/pr`, category counts, and token coverage; they do not persist branch names, remotes, file paths, tags, commit messages, PR titles, or release notes. File-read and file-modification diagnostics use basename-only path labels plus short irreversible hashes, read-productivity percentages are temporal correlations rather than proof that a read caused a later edit, and concentration reports use safe source/session, cwd, and day labels only.
 
 ## JSON Queries
 

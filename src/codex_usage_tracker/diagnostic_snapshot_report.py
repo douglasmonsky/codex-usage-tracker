@@ -8,7 +8,9 @@ from typing import Any
 from codex_usage_tracker.diagnostic_snapshot_constants import (
     DIAGNOSTIC_COMMANDS_SECTION,
     DIAGNOSTIC_CONCENTRATION_SECTION,
+    DIAGNOSTIC_FILE_MODIFICATIONS_SECTION,
     DIAGNOSTIC_FILE_READS_SECTION,
+    DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
     DIAGNOSTIC_READ_PRODUCTIVITY_SECTION,
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
 )
@@ -30,8 +32,12 @@ class DiagnosticSnapshotReport:
             return self._render_tool_output()
         if section == DIAGNOSTIC_COMMANDS_SECTION:
             return self._render_commands()
+        if section == DIAGNOSTIC_GIT_INTERACTIONS_SECTION:
+            return self._render_git_interactions()
         if section == DIAGNOSTIC_FILE_READS_SECTION:
             return self._render_file_reads()
+        if section == DIAGNOSTIC_FILE_MODIFICATIONS_SECTION:
+            return self._render_file_modifications()
         if section == DIAGNOSTIC_READ_PRODUCTIVITY_SECTION:
             return self._render_read_productivity()
         if section == DIAGNOSTIC_CONCENTRATION_SECTION:
@@ -83,6 +89,22 @@ class DiagnosticSnapshotReport:
             ]
         )
 
+    def _render_git_interactions(self) -> str:
+        snapshot = self.payload.get("snapshot") or {}
+        summary = self.payload.get("summary") or {}
+        return "\n".join(
+            [
+                "Diagnostic git-interactions snapshot",
+                f"Computed: {snapshot.get('computed_at')}",
+                f"History scope: {snapshot.get('history_scope')}",
+                f"Git/GitHub shell calls: {_int_text(summary.get('git_shell_calls'))}",
+                f"Git commands: {_int_text(summary.get('git_command_calls'))}",
+                f"GitHub CLI commands: {_int_text(summary.get('github_cli_calls'))}",
+                f"Interactions with Original token count: {_int_text(summary.get('interactions_with_original_token_count'))}",
+                f"Terminal output tokens: {_int_text(summary.get('original_token_sum'))}",
+            ]
+        )
+
     def _render_file_reads(self) -> str:
         snapshot = self.payload.get("snapshot") or {}
         summary = self.payload.get("summary") or {}
@@ -95,6 +117,21 @@ class DiagnosticSnapshotReport:
                 f"Read events: {_int_text(summary.get('read_events'))}",
                 f"Allocated output tokens: {_int_text(summary.get('allocated_output_token_sum'))}",
                 f"Missing output counts: {_int_text(summary.get('read_events_missing_output_count'))}",
+            ]
+        )
+
+    def _render_file_modifications(self) -> str:
+        snapshot = self.payload.get("snapshot") or {}
+        summary = self.payload.get("summary") or {}
+        return "\n".join(
+            [
+                "Diagnostic file-modifications snapshot",
+                f"Computed: {snapshot.get('computed_at')}",
+                f"History scope: {snapshot.get('history_scope')}",
+                f"Modification events: {_int_text(summary.get('modification_events'))}",
+                f"Modified path events: {_int_text(summary.get('modified_path_events'))}",
+                f"Unique paths modified: {_int_text(summary.get('unique_paths_modified'))}",
+                f"Largest event path count: {_int_text(summary.get('largest_event_path_count'))}",
             ]
         )
 

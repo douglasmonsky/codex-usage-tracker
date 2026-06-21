@@ -9,6 +9,7 @@
       credits,
       detailEl,
       escapeHtml,
+      formatDuration,
       formatTimestamp,
       getActiveView,
       getCallInvestigator,
@@ -146,6 +147,8 @@
               [t('table.source'), callInitiatorText(row)],
               [t('detail.parent_thread'), resolvedParentThreadName(row) || t('state.none')],
               [t('detail.timestamp'), formatTimestamp(row.event_timestamp)],
+              [t('table.duration'), formatDuration(row.call_duration_seconds)],
+              [t('table.previous_gap'), formatDuration(row.previous_call_delta_seconds)],
             ])}
           </div>
           <div class="detail-card">

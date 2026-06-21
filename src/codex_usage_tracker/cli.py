@@ -32,7 +32,9 @@ from codex_usage_tracker.diagnostic_reports import (
 from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_commands_report,
     build_diagnostic_concentration_report,
+    build_diagnostic_file_modifications_report,
     build_diagnostic_file_reads_report,
+    build_diagnostic_git_interactions_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
@@ -475,8 +477,20 @@ def _run_diagnostics(args: argparse.Namespace) -> int:
             include_archived=args.include_archived,
             refresh=args.refresh,
         )
+    elif command == "git-interactions":
+        report = build_diagnostic_git_interactions_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
     elif command == "file-reads":
         report = build_diagnostic_file_reads_report(
+            db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "file-modifications":
+        report = build_diagnostic_file_modifications_report(
             db_path=args.db,
             include_archived=args.include_archived,
             refresh=args.refresh,

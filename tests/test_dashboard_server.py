@@ -101,7 +101,13 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         )
         diagnostic_tool_output_refresh_payload = diagnostic_batch_refresh_payload["sections"]["toolOutput"]
         diagnostic_commands_refresh_payload = diagnostic_batch_refresh_payload["sections"]["commands"]
+        diagnostic_git_interactions_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "gitInteractions"
+        ]
         diagnostic_file_reads_refresh_payload = diagnostic_batch_refresh_payload["sections"]["fileReads"]
+        diagnostic_file_modifications_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "fileModifications"
+        ]
         diagnostic_read_productivity_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "readProductivity"
         ]
@@ -117,8 +123,14 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         diagnostic_commands_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/commands"
         )
+        diagnostic_git_interactions_stored_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/git-interactions"
+        )
         diagnostic_file_reads_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/file-reads"
+        )
+        diagnostic_file_modifications_stored_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/file-modifications"
         )
         diagnostic_read_productivity_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/read-productivity"
@@ -200,11 +212,23 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_commands_refresh_payload["status"] == "ready"
     assert diagnostic_commands_refresh_payload["summary"]["shell_function_calls"] == 0
     assert (
+        diagnostic_git_interactions_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-git-interactions-v1"
+    )
+    assert diagnostic_git_interactions_refresh_payload["status"] == "ready"
+    assert diagnostic_git_interactions_refresh_payload["summary"]["git_shell_calls"] == 0
+    assert (
         diagnostic_file_reads_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-file-reads-v1"
     )
     assert diagnostic_file_reads_refresh_payload["status"] == "ready"
     assert diagnostic_file_reads_refresh_payload["summary"]["read_events"] == 0
+    assert (
+        diagnostic_file_modifications_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-file-modifications-v1"
+    )
+    assert diagnostic_file_modifications_refresh_payload["status"] == "ready"
+    assert diagnostic_file_modifications_refresh_payload["summary"]["modification_events"] == 0
     assert (
         diagnostic_read_productivity_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-read-productivity-v1"
@@ -223,8 +247,12 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_tool_output_stored_payload["refreshed"] is False
     assert diagnostic_commands_stored_payload["status"] == "ready"
     assert diagnostic_commands_stored_payload["refreshed"] is False
+    assert diagnostic_git_interactions_stored_payload["status"] == "ready"
+    assert diagnostic_git_interactions_stored_payload["refreshed"] is False
     assert diagnostic_file_reads_stored_payload["status"] == "ready"
     assert diagnostic_file_reads_stored_payload["refreshed"] is False
+    assert diagnostic_file_modifications_stored_payload["status"] == "ready"
+    assert diagnostic_file_modifications_stored_payload["refreshed"] is False
     assert diagnostic_read_productivity_stored_payload["status"] == "ready"
     assert diagnostic_read_productivity_stored_payload["refreshed"] is False
     assert diagnostic_concentration_stored_payload["status"] == "ready"

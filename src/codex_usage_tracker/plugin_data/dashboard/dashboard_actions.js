@@ -158,6 +158,10 @@
       const columns = [
         { label: 'timestamp', field: 'event_timestamp' },
         { label: 'thread', field: row => rowThreadLabel(row) },
+        { label: 'call_started_at', field: 'call_started_at' },
+        { label: 'call_duration_seconds', field: 'call_duration_seconds' },
+        { label: 'previous_call_event_timestamp', field: 'previous_call_event_timestamp' },
+        { label: 'previous_call_delta_seconds', field: 'previous_call_delta_seconds' },
         { label: 'initiated', field: row => callInitiator(row).label },
         { label: 'initiated_reason', field: row => callInitiator(row).source },
         { label: 'project', field: 'project_name' },

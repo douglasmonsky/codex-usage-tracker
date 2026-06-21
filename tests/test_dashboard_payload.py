@@ -306,7 +306,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/diagnostics/overview" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/tool-output/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/commands/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/git-interactions/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/file-reads/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/file-modifications/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/read-productivity/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/concentration/refresh" in dashboard_diagnostics_snapshots_js
     assert "Refresh diagnostics" in dashboard_diagnostics_snapshots_js
@@ -314,7 +316,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Live API required for diagnostics refresh" in dashboard_diagnostics_js
     assert "Overview" in dashboard_diagnostics_snapshots_js
     assert "Tool Output" in dashboard_diagnostics_snapshots_js
+    assert "Git Interactions" in dashboard_diagnostics_snapshots_js
     assert "File Reads" in dashboard_diagnostics_snapshots_js
+    assert "File Modifications" in dashboard_diagnostics_snapshots_js
     assert "Read Productivity" in dashboard_diagnostics_snapshots_js
     assert "Concentration" in dashboard_diagnostics_snapshots_js
     assert "Associated token totals" in dashboard_diagnostics_js
@@ -559,6 +563,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "applyDetailPanelState()" in dashboard_js
     assert "time-cell" in dashboard_surface
     assert "formatTimestamp" in dashboard_js
+    assert "formatDuration" in dashboard_js
+    assert 'data-sort-key="duration"' in dashboard
+    assert 'data-sort-key="gap"' in dashboard
+    assert '<option value="duration" data-i18n="option.longest_duration">Longest duration</option>' in dashboard
+    assert '<option value="gap" data-i18n="option.longest_gap">Longest gap</option>' in dashboard
     assert "scrollbar-gutter: stable" in dashboard_css
     assert "overflow-y: scroll" in dashboard_css
     assert "pricingSource.fetched_at" in dashboard_status_js
@@ -656,6 +665,10 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "cache_ratio",
         "pricing_model",
         "usage_credits",
+        "call_started_at",
+        "call_duration_seconds",
+        "previous_call_event_timestamp",
+        "previous_call_delta_seconds",
         "recommended_action",
         "call_initiator",
         "call_initiator_reason",

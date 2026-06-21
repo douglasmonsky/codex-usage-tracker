@@ -50,7 +50,9 @@ Tracked schema ids:
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
 | `codex-usage-tracker-diagnostic-commands-v1` | CLI `diagnostics commands --json`, dashboard server `/api/diagnostics/commands` |
+| `codex-usage-tracker-diagnostic-git-interactions-v1` | CLI `diagnostics git-interactions --json`, dashboard server `/api/diagnostics/git-interactions` |
 | `codex-usage-tracker-diagnostic-file-reads-v1` | CLI `diagnostics file-reads --json`, dashboard server `/api/diagnostics/file-reads` |
+| `codex-usage-tracker-diagnostic-file-modifications-v1` | CLI `diagnostics file-modifications --json`, dashboard server `/api/diagnostics/file-modifications` |
 | `codex-usage-tracker-diagnostic-read-productivity-v1` | CLI `diagnostics read-productivity --json`, dashboard server `/api/diagnostics/read-productivity` |
 | `codex-usage-tracker-diagnostic-concentration-v1` | CLI `diagnostics concentration --json`, dashboard server `/api/diagnostics/concentration` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
@@ -167,6 +169,8 @@ Supported filters:
 - `privacy_mode`: `normal`, `redacted`, or `strict`
 
 Privacy mode affects returned metadata after matching rows. `redacted` hides raw cwd/source paths, hides Git remote labels, and hashes unnamed project names. `strict` also hides project-relative cwd, Git branch, and tags. Configured project aliases are treated as explicit display opt-ins.
+
+Per-call rows include derived timing fields when returned through dashboard/live call APIs: `call_started_at`, `call_duration_seconds`, `previous_call_event_timestamp`, and `previous_call_delta_seconds`. These values are derived from aggregate timestamps and thread adjacency; they do not read or store transcript content.
 
 ## Recommendations
 
@@ -414,6 +418,59 @@ Schema: `codex-usage-tracker-diagnostic-commands-v1`
 
 The commands snapshot keeps only command roots and a bounded list of safe one-level child labels such as `status`, `diff`, or `-m:pytest`.
 
+## Diagnostic Git Interactions Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics git-interactions --json
+codex-usage-tracker diagnostics git-interactions --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/git-interactions`
+- `POST /api/diagnostics/git-interactions/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-git-interactions-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-git-interactions-v1",
+  "section": "git-interactions",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "git_shell_calls": 2,
+    "git_command_calls": 1,
+    "github_cli_calls": 1,
+    "unique_interactions": 2,
+    "interactions_with_original_token_count": 2,
+    "interactions_missing_original_token_count": 0,
+    "original_token_sum": 55
+  },
+  "interactions": [
+    {
+      "root": "git",
+      "operation": "status",
+      "category": "read_only",
+      "mutability": "read_only",
+      "calls": 1,
+      "with_original_token_count": 1,
+      "missing_original_token_count": 0,
+      "original_token_sum": 42
+    }
+  ],
+  "categories": [{"category": "read_only", "count": 1}],
+  "mutability": [{"mutability": "read_only", "count": 1}],
+  "notes": []
+}
+```
+
+The Git interactions snapshot is a specialized view of shell commands. It persists only `git`/`gh` root labels, safe operation labels, coarse categories, counts, and token coverage. It does not persist raw command strings, branch names, remotes, file paths, tags, commit messages, PR titles, release notes, or raw command output.
+
 ## Diagnostic File Reads Snapshot
 
 Commands:
@@ -455,6 +512,46 @@ Schema: `codex-usage-tracker-diagnostic-file-reads-v1`
 ```
 
 The file-reads snapshot classifies common shell readers such as `cat`, `sed`, `nl`, `rg`, and `find`. Path labels are basename-only with a short irreversible hash; raw commands, command arguments, absolute paths, file contents, and tool output are not stored.
+
+## Diagnostic File Modifications Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics file-modifications --json
+codex-usage-tracker diagnostics file-modifications --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/file-modifications`
+- `POST /api/diagnostics/file-modifications/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-file-modifications-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-file-modifications-v1",
+  "section": "file-modifications",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "modification_events": 2,
+    "modified_path_events": 3,
+    "unique_paths_modified": 2,
+    "largest_event_path_count": 2
+  },
+  "top_paths": [],
+  "by_extension": [],
+  "largest_events": [],
+  "path_privacy": {},
+  "notes": []
+}
+```
+
+The file-modifications snapshot counts structured patch events and modified paths. Path labels are basename-only with short irreversible hashes; patch text, raw absolute paths, file contents, raw commands, tool output, and JSONL fragments are not stored.
 
 ## Diagnostic Read Productivity Snapshot
 

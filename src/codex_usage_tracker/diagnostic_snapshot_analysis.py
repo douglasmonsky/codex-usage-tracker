@@ -11,6 +11,7 @@ from codex_usage_tracker.diagnostic_snapshot_events import (
     READ_PRODUCTIVITY_NOTE,
     allocate_token_count,
     command_root_and_child,
+    git_interaction_from_command,
     int_value,
     is_shell_tool,
     modified_path_refs,
@@ -28,7 +29,10 @@ from codex_usage_tracker.diagnostic_snapshot_events import (
 from codex_usage_tracker.diagnostic_snapshot_rows import (
     command_output_rows,
     command_rows,
+    file_modification_path_rows,
     function_rows,
+    git_interaction_rows,
+    largest_file_modification_event_rows,
     largest_read_command_rows,
     read_path_rows,
     read_productivity_path_rows,
@@ -88,6 +92,13 @@ def _empty_counters() -> dict[str, Any]:
         "command_with_count": Counter(),
         "command_missing_count": Counter(),
         "command_token_sum": Counter(),
+        "git_interaction_calls": Counter(),
+        "git_interaction_with_count": Counter(),
+        "git_interaction_missing_count": Counter(),
+        "git_interaction_token_sum": Counter(),
+        "git_interactions_by_category": Counter(),
+        "git_interactions_by_mutability": Counter(),
+        "git_interactions_by_root": Counter(),
         "read_events": [],
         "read_command_count": 0,
         "read_events_by_reader": Counter(),
@@ -100,6 +111,11 @@ def _empty_counters() -> dict[str, Any]:
         "read_modified_by_path": Counter(),
         "read_path_refs": {},
         "largest_read_commands": [],
+        "file_modification_events": 0,
+        "file_modification_path_events": Counter(),
+        "file_modification_path_refs": {},
+        "file_modification_extensions": Counter(),
+        "largest_file_modification_events": [],
         "missing_reasons": Counter(),
     }
 
@@ -107,6 +123,7 @@ def _empty_counters() -> dict[str, Any]:
 def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counter[str]) -> None:
     call_names: dict[str, str] = {}
     call_roots: dict[str, str] = {}
+    call_git_interactions: dict[str, tuple[str, str, str, str]] = {}
     call_read_events: dict[str, list[int]] = {}
     source_read_events: list[int] = []
     modified_orders_by_path: dict[str, list[int]] = defaultdict(list)
@@ -127,7 +144,10 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
             if not isinstance(payload, dict):
                 continue
             if envelope.get("type") == "event_msg":
-                for path_ref in modified_path_refs(payload):
+                path_refs = modified_path_refs(payload)
+                if path_refs:
+                    _record_file_modification_refs(path_refs, counters=counters)
+                for path_ref in path_refs:
                     modified_orders_by_path[path_ref["path_key"]].append(order)
                 continue
             if envelope.get("type") != "response_item":
@@ -140,6 +160,7 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
                     meta=meta,
                     call_names=call_names,
                     call_roots=call_roots,
+                    call_git_interactions=call_git_interactions,
                     call_read_events=call_read_events,
                     source_read_events=source_read_events,
                 )
@@ -149,6 +170,7 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
                     counters=counters,
                     call_names=call_names,
                     call_roots=call_roots,
+                    call_git_interactions=call_git_interactions,
                     call_read_events=call_read_events,
                 )
 
@@ -176,6 +198,7 @@ def _record_function_call(
     meta: Counter[str],
     call_names: dict[str, str],
     call_roots: dict[str, str],
+    call_git_interactions: dict[str, tuple[str, str, str, str]],
     call_read_events: dict[str, list[int]],
     source_read_events: list[int],
 ) -> None:
@@ -194,6 +217,20 @@ def _record_function_call(
     counters["command_children"].setdefault(root, Counter())[child] += 1
     if call_id:
         call_roots[call_id] = root
+    interaction = git_interaction_from_command(command, root=root)
+    if interaction is not None:
+        interaction_key = (
+            interaction["root"],
+            interaction["operation"],
+            interaction["category"],
+            interaction["mutability"],
+        )
+        counters["git_interaction_calls"][interaction_key] += 1
+        counters["git_interactions_by_category"][interaction["category"]] += 1
+        counters["git_interactions_by_mutability"][interaction["mutability"]] += 1
+        counters["git_interactions_by_root"][interaction["root"]] += 1
+        if call_id:
+            call_git_interactions[call_id] = interaction_key
     read_refs = read_path_refs_from_command(command, root=root)
     if read_refs:
         counters["read_command_count"] += 1
@@ -240,12 +277,36 @@ def _record_read_refs(
     return indexes
 
 
+def _record_file_modification_refs(
+    path_refs: list[dict[str, str]],
+    *,
+    counters: dict[str, Any],
+) -> None:
+    counters["file_modification_events"] += 1
+    event_paths: list[dict[str, str]] = []
+    for path_ref in path_refs:
+        path_key = path_ref["path_key"]
+        path_label = path_ref["path_label"]
+        counters["file_modification_path_refs"][path_key] = path_ref
+        counters["file_modification_path_events"][path_key] += 1
+        counters["file_modification_extensions"][_extension_label(path_label)] += 1
+        event_paths.append({"path_label": path_label, "path_hash": path_ref["path_hash"]})
+    counters["largest_file_modification_events"].append(
+        {
+            "event_kind": "patch_apply_end",
+            "modified_path_count": len(path_refs),
+            "paths": unique_path_rows(event_paths),
+        }
+    )
+
+
 def _record_function_output(
     payload: dict[str, Any],
     *,
     counters: dict[str, Any],
     call_names: dict[str, str],
     call_roots: dict[str, str],
+    call_git_interactions: dict[str, tuple[str, str, str, str]],
     call_read_events: dict[str, list[int]],
 ) -> None:
     call_id = optional_str(payload.get("call_id"))
@@ -254,12 +315,14 @@ def _record_function_output(
     output = payload.get("output")
     count = original_output_count(output)
     read_indexes = call_read_events.get(call_id or "", [])
+    git_interaction = call_git_interactions.get(call_id or "")
     if count is None:
         _record_missing_output_count(
             output,
             counters=counters,
             function_name=function_name,
             root=call_roots.get(call_id or ""),
+            git_interaction=git_interaction,
             read_indexes=read_indexes,
         )
         return
@@ -268,6 +331,7 @@ def _record_function_output(
         counters=counters,
         function_name=function_name,
         root=call_roots.get(call_id or ""),
+        git_interaction=git_interaction,
         read_indexes=read_indexes,
     )
 
@@ -278,12 +342,15 @@ def _record_missing_output_count(
     counters: dict[str, Any],
     function_name: str,
     root: str | None,
+    git_interaction: tuple[str, str, str, str] | None,
     read_indexes: list[int],
 ) -> None:
     counters["output_missing_count"][function_name] += 1
     counters["missing_reasons"]["string_no_header" if isinstance(output, str) else "non_string_output"] += 1
     if root:
         counters["command_missing_count"][root] += 1
+    if git_interaction:
+        counters["git_interaction_missing_count"][git_interaction] += 1
     for event_index in read_indexes:
         reader = str(counters["read_events"][event_index]["reader"])
         counters["read_events_missing_count_by_reader"][reader] += 1
@@ -295,6 +362,7 @@ def _record_output_count(
     counters: dict[str, Any],
     function_name: str,
     root: str | None,
+    git_interaction: tuple[str, str, str, str] | None,
     read_indexes: list[int],
 ) -> None:
     counters["output_with_count"][function_name] += 1
@@ -302,6 +370,9 @@ def _record_output_count(
     if root:
         counters["command_with_count"][root] += 1
         counters["command_token_sum"][root] += count
+    if git_interaction:
+        counters["git_interaction_with_count"][git_interaction] += 1
+        counters["git_interaction_token_sum"][git_interaction] += count
     if not read_indexes:
         return
     paths: list[dict[str, str]] = []
@@ -347,7 +418,9 @@ def _analysis_payload(*, counters: dict[str, Any], meta: Counter[str]) -> dict[s
         "meta": {key: int(value) for key, value in meta.items()},
         "tool_output": _tool_output_payload(counters),
         "commands": _commands_payload(counters, meta=meta),
+        "git_interactions": _git_interactions_payload(counters),
         "file_reads": _file_reads_payload(counters),
+        "file_modifications": _file_modifications_payload(counters),
         "read_productivity": _read_productivity_payload(counters),
     }
 
@@ -392,6 +465,32 @@ def _commands_payload(counters: dict[str, Any], *, meta: Counter[str]) -> dict[s
     }
 
 
+def _git_interactions_payload(counters: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "summary": {
+            "git_shell_calls": int(sum(counters["git_interaction_calls"].values())),
+            "git_command_calls": int(counters["git_interactions_by_root"]["git"]),
+            "github_cli_calls": int(counters["git_interactions_by_root"]["gh"]),
+            "unique_interactions": len(counters["git_interaction_calls"]),
+            "interactions_with_original_token_count": int(
+                sum(counters["git_interaction_with_count"].values())
+            ),
+            "interactions_missing_original_token_count": int(
+                sum(counters["git_interaction_missing_count"].values())
+            ),
+            "original_token_sum": int(sum(counters["git_interaction_token_sum"].values())),
+        },
+        "interactions": git_interaction_rows(
+            git_interaction_calls=counters["git_interaction_calls"],
+            git_interaction_with_count=counters["git_interaction_with_count"],
+            git_interaction_missing_count=counters["git_interaction_missing_count"],
+            git_interaction_token_sum=counters["git_interaction_token_sum"],
+        ),
+        "categories": simple_rows(counters["git_interactions_by_category"], key_name="category"),
+        "mutability": simple_rows(counters["git_interactions_by_mutability"], key_name="mutability"),
+    }
+
+
 def _file_reads_payload(counters: dict[str, Any]) -> dict[str, Any]:
     return {
         "summary": {
@@ -414,6 +513,31 @@ def _file_reads_payload(counters: dict[str, Any]) -> dict[str, Any]:
             read_tokens_by_path=counters["read_tokens_by_path"],
         ),
         "largest_read_commands": largest_read_command_rows(counters["largest_read_commands"]),
+        "path_privacy": path_privacy_metadata(),
+    }
+
+
+def _file_modifications_payload(counters: dict[str, Any]) -> dict[str, Any]:
+    modified_path_events = int(sum(counters["file_modification_path_events"].values()))
+    largest_event_path_count = max(
+        (int(row["modified_path_count"]) for row in counters["largest_file_modification_events"]),
+        default=0,
+    )
+    return {
+        "summary": {
+            "modification_events": int(counters["file_modification_events"]),
+            "modified_path_events": modified_path_events,
+            "unique_paths_modified": len(counters["file_modification_path_refs"]),
+            "largest_event_path_count": largest_event_path_count,
+        },
+        "top_paths": file_modification_path_rows(
+            modification_path_refs=counters["file_modification_path_refs"],
+            modifications_by_path=counters["file_modification_path_events"],
+        ),
+        "by_extension": simple_rows(counters["file_modification_extensions"], key_name="extension"),
+        "largest_events": largest_file_modification_event_rows(
+            counters["largest_file_modification_events"]
+        ),
         "path_privacy": path_privacy_metadata(),
     }
 
@@ -444,3 +568,8 @@ def _read_productivity_payload(counters: dict[str, Any]) -> dict[str, Any]:
         ),
         "path_privacy": path_privacy_metadata(),
     }
+
+
+def _extension_label(path_label: str) -> str:
+    suffix = Path(path_label).suffix.lower()
+    return suffix if suffix else "<none>"

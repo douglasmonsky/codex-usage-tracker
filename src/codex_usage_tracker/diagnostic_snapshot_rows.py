@@ -63,6 +63,45 @@ def command_rows(
     return sorted(rows, key=lambda row: (-int(row["total"]), row["root"]))
 
 
+def git_interaction_rows(
+    *,
+    git_interaction_calls: Counter[tuple[str, str, str, str]],
+    git_interaction_with_count: Counter[tuple[str, str, str, str]],
+    git_interaction_missing_count: Counter[tuple[str, str, str, str]],
+    git_interaction_token_sum: Counter[tuple[str, str, str, str]],
+) -> list[dict[str, Any]]:
+    rows = []
+    keys = (
+        set(git_interaction_calls)
+        | set(git_interaction_with_count)
+        | set(git_interaction_missing_count)
+        | set(git_interaction_token_sum)
+    )
+    for root, operation, category, mutability in keys:
+        key = (root, operation, category, mutability)
+        rows.append(
+            {
+                "root": root,
+                "operation": operation,
+                "category": category,
+                "mutability": mutability,
+                "calls": int(git_interaction_calls[key]),
+                "with_original_token_count": int(git_interaction_with_count[key]),
+                "missing_original_token_count": int(git_interaction_missing_count[key]),
+                "original_token_sum": int(git_interaction_token_sum[key]),
+            }
+        )
+    return sorted(
+        rows,
+        key=lambda row: (
+            -int(row["original_token_sum"]),
+            -int(row["calls"]),
+            row["root"],
+            row["operation"],
+        ),
+    )
+
+
 def read_reader_rows(
     *,
     read_events_by_reader: Counter[str],
@@ -120,6 +159,40 @@ def largest_read_command_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]
             -int(row["original_token_count"]),
             -int(row["read_event_count"]),
             row["root"],
+        ),
+    )[:25]
+
+
+def file_modification_path_rows(
+    *,
+    modification_path_refs: dict[str, dict[str, str]],
+    modifications_by_path: Counter[str],
+) -> list[dict[str, Any]]:
+    rows = [
+        {
+            "path_label": modification_path_refs[path_key]["path_label"],
+            "path_hash": modification_path_refs[path_key]["path_hash"],
+            "modification_events": int(modifications_by_path[path_key]),
+        }
+        for path_key in modifications_by_path
+        if path_key in modification_path_refs
+    ]
+    return sorted(
+        rows,
+        key=lambda row: (
+            -int(row["modification_events"]),
+            row["path_label"],
+            row["path_hash"],
+        ),
+    )[:50]
+
+
+def largest_file_modification_event_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            -int(row["modified_path_count"]),
+            row["event_kind"],
         ),
     )[:25]
 

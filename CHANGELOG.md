@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.10.0 - 2026-06-21
+
+- Add Git/GitHub CLI diagnostic snapshots with safe operation labels, coarse categories, mutability buckets, and terminal token-count coverage.
+- Add file-modification diagnostic snapshots for structured patch events, modified-path aggregates, extension counts, and largest modification events without storing patch text or raw paths.
+- Add derived call timing fields for call start, duration, previous-call timestamp, and previous-call gap across dashboard rows, details, CSV/export actions, live API sorting, and thread aggregates.
+- Surface `Duration`, `Prev gap`, `Longest duration`, and `Longest gap` in the dashboard with localized labels and focused regression coverage.
+- Reconcile all diagnostics panels into one release so `overview`, `tool-output`, `commands`, `git-interactions`, `file-reads`, `file-modifications`, `read-productivity`, and `concentration` can refresh together from the live dashboard.
+
 ## 0.9.0 - 2026-06-21
 
 - Add persisted aggregate diagnostic snapshots with explicit on-demand refresh metadata and schema-versioned CLI/API contracts.

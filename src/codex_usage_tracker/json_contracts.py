@@ -195,6 +195,20 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "notes": list,
         }
     },
+    "codex-usage-tracker-diagnostic-git-interactions-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "interactions": list,
+            "categories": list,
+            "mutability": list,
+            "notes": list,
+        }
+    },
     "codex-usage-tracker-diagnostic-file-reads-v1": {
         "required": {
             "section": str,
@@ -206,6 +220,21 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "by_reader": list,
             "top_paths": list,
             "largest_read_commands": list,
+            "path_privacy": dict,
+            "notes": list,
+        }
+    },
+    "codex-usage-tracker-diagnostic-file-modifications-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "top_paths": list,
+            "by_extension": list,
+            "largest_events": list,
             "path_privacy": dict,
             "notes": list,
         }

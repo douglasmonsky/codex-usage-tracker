@@ -88,6 +88,24 @@
     `;
   }
 
+  function formatDuration(value, fallback = '-') {
+    if (value === null || value === undefined || value === '') return fallback;
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) return fallback;
+    if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
+    const rounded = Math.round(seconds);
+    if (rounded < 60) return `${rounded}s`;
+    const minutes = Math.floor(rounded / 60);
+    const remainingSeconds = rounded % 60;
+    if (minutes < 60) return remainingSeconds ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours < 24) return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+  }
+
   function defaultSortDirection(key) {
     return {
       cache: 'asc',
@@ -115,7 +133,9 @@
       cache: 'Cache',
       context: 'Context use',
       cost: 'Cost',
+      duration: 'Duration',
       effort: 'Effort',
+      gap: 'Prev gap',
       model: 'Model',
       cached: 'Cached',
       uncached: 'Uncached',
@@ -142,6 +162,7 @@
     formatTimestamp,
     formatTimestampTitle,
     renderTimeCell,
+    formatDuration,
     defaultSortDirection,
     textValue,
     compareValues,

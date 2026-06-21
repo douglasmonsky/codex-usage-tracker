@@ -53,6 +53,15 @@ EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
+USAGE_TIMING_SELECT_SQL = """
+    previous_usage.event_timestamp AS previous_call_event_timestamp,
+    previous_usage.session_id AS previous_call_session_id,
+    previous_usage.turn_id AS previous_call_turn_id
+"""
+USAGE_TIMING_JOIN_SQL = """
+    LEFT JOIN usage_events AS previous_usage
+    ON previous_usage.record_id = usage_events.previous_record_id
+"""
 
 
 def refresh_usage_index(
@@ -589,15 +598,21 @@ def query_session_usage(
             session_id = str(row["session_id"])
         rows = conn.execute(
             """
-            SELECT *
+            SELECT
+                usage_events.*,
+                previous_usage.event_timestamp AS previous_call_event_timestamp,
+                previous_usage.session_id AS previous_call_session_id,
+                previous_usage.turn_id AS previous_call_turn_id
             FROM usage_events
-            WHERE session_id = ?
-            ORDER BY event_timestamp, cumulative_total_tokens
+            LEFT JOIN usage_events AS previous_usage
+            ON previous_usage.record_id = usage_events.previous_record_id
+            WHERE usage_events.session_id = ?
+            ORDER BY usage_events.event_timestamp, usage_events.cumulative_total_tokens
             LIMIT ?
             """,
             (session_id, limit),
         )
-        return [_row_to_dict(row) for row in rows]
+        return [_usage_row_to_dict(row) for row in rows]
 
 
 def query_usage_record(
@@ -612,14 +627,20 @@ def query_usage_record(
         init_db(conn)
         row = conn.execute(
             """
-            SELECT *
+            SELECT
+                usage_events.*,
+                previous_usage.event_timestamp AS previous_call_event_timestamp,
+                previous_usage.session_id AS previous_call_session_id,
+                previous_usage.turn_id AS previous_call_turn_id
             FROM usage_events
-            WHERE record_id = ?
+            LEFT JOIN usage_events AS previous_usage
+            ON previous_usage.record_id = usage_events.previous_record_id
+            WHERE usage_events.record_id = ?
             LIMIT 1
             """,
             (record_id,),
         ).fetchone()
-        return _row_to_dict(row) if row is not None else None
+        return _usage_row_to_dict(row) if row is not None else None
 
 
 def query_diagnostic_facts(
@@ -961,6 +982,9 @@ def query_diagnostic_fact_calls(
             f"""
             SELECT
                 usage_events.*,
+                previous_usage.event_timestamp AS previous_call_event_timestamp,
+                previous_usage.session_id AS previous_call_session_id,
+                previous_usage.turn_id AS previous_call_turn_id,
                 f.fact_type,
                 f.fact_name,
                 f.fact_category,
@@ -974,6 +998,8 @@ def query_diagnostic_fact_calls(
                 f.raw_content_included AS raw_content_included
             FROM call_diagnostic_facts AS f
             JOIN usage_events ON usage_events.record_id = f.record_id
+            LEFT JOIN usage_events AS previous_usage
+            ON previous_usage.record_id = usage_events.previous_record_id
             {where_clause}
             ORDER BY {order_expr} {direction_sql},
                 usage_events.event_timestamp DESC,
@@ -982,7 +1008,7 @@ def query_diagnostic_fact_calls(
             """,
             query_params,
         )
-        return [_row_to_dict(row) for row in rows]
+        return [_usage_row_to_dict(row) for row in rows]
 
 
 def query_diagnostic_fact_call_count(
@@ -1151,6 +1177,7 @@ def query_dashboard_events(
             f"""
             SELECT
                 usage_events.*,
+                {USAGE_TIMING_SELECT_SQL},
                 coalesce(
                     usage_events.parent_thread_name,
                     parent_threads.thread_name
@@ -1160,6 +1187,7 @@ def query_dashboard_events(
                     parent_threads.session_updated_at
                 ) AS resolved_parent_session_updated_at
             FROM usage_events
+            {USAGE_TIMING_JOIN_SQL}
             LEFT JOIN (
                 SELECT
                     session_id,
@@ -1176,7 +1204,7 @@ def query_dashboard_events(
             """,
             query_params,
         )
-        return [_row_to_dict(row) for row in rows]
+        return [_usage_row_to_dict(row) for row in rows]
 
 
 def query_dashboard_event_count(
@@ -1536,6 +1564,7 @@ def query_usage_api_events(
             f"""
             SELECT
                 usage_events.*,
+                {USAGE_TIMING_SELECT_SQL},
                 coalesce(
                     usage_events.parent_thread_name,
                     parent_threads.thread_name
@@ -1545,6 +1574,7 @@ def query_usage_api_events(
                     parent_threads.session_updated_at
                 ) AS resolved_parent_session_updated_at
             FROM usage_events
+            {USAGE_TIMING_JOIN_SQL}
             LEFT JOIN (
                 SELECT
                     session_id,
@@ -1563,7 +1593,7 @@ def query_usage_api_events(
             """,
             [*parent_params, *query_params],
         )
-        return [_row_to_dict(row) for row in rows]
+        return [_usage_row_to_dict(row) for row in rows]
 
 
 def query_usage_api_event_count(
@@ -1662,20 +1692,23 @@ def query_most_expensive_calls(
 ) -> list[dict[str, Any]]:
     """Return the largest aggregate model calls by last-call token count."""
 
-    where_clause, params = _since_where_clause(since)
+    where_clause, params = _usage_where_clause(since=since, table_alias="usage_events")
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(
             f"""
-            SELECT *
+            SELECT
+                usage_events.*,
+                {USAGE_TIMING_SELECT_SQL}
             FROM usage_events
+            {USAGE_TIMING_JOIN_SQL}
             {where_clause}
-            ORDER BY total_tokens DESC, event_timestamp DESC
+            ORDER BY usage_events.total_tokens DESC, usage_events.event_timestamp DESC
             LIMIT ?
             """,
             (*params, limit),
         )
-        return [_row_to_dict(row) for row in rows]
+        return [_usage_row_to_dict(row) for row in rows]
 
 
 def export_usage_csv(
@@ -1708,3 +1741,56 @@ def export_usage_csv(
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     return dict(row)
+
+
+def _usage_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return _annotate_usage_row_timing(_row_to_dict(row))
+
+
+def _annotate_usage_row_timing(row: dict[str, Any]) -> dict[str, Any]:
+    previous_timestamp = _optional_text(row.get("previous_call_event_timestamp"))
+    previous_session_id = row.pop("previous_call_session_id", None)
+    previous_turn_id = row.pop("previous_call_turn_id", None)
+    event_timestamp = _optional_text(row.get("event_timestamp"))
+    turn_timestamp = _optional_text(row.get("turn_timestamp"))
+    same_turn_previous = (
+        previous_timestamp is not None
+        and previous_session_id == row.get("session_id")
+        and previous_turn_id is not None
+        and previous_turn_id == row.get("turn_id")
+    )
+    call_started_at = previous_timestamp if same_turn_previous else turn_timestamp
+
+    row["previous_call_event_timestamp"] = previous_timestamp
+    row["call_started_at"] = call_started_at
+    row["call_duration_seconds"] = _seconds_between(call_started_at, event_timestamp)
+    row["previous_call_delta_seconds"] = _seconds_between(previous_timestamp, event_timestamp)
+    return row
+
+
+def _seconds_between(start: str | None, end: str | None) -> float | None:
+    start_time = _parse_timestamp(start)
+    end_time = _parse_timestamp(end)
+    if start_time is None or end_time is None:
+        return None
+    seconds = (end_time - start_time).total_seconds()
+    if seconds < 0:
+        return None
+    return round(seconds, 3)
+
+
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _optional_text(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
