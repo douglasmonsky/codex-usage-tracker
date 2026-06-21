@@ -132,6 +132,30 @@ def main() -> int:
                         best_rmse=best_rmse,
                     )
                 )
+        components = summary.get("token_component_regression") or {}
+        variants = components.get("variants") or {}
+        for variant_name in ("unweighted", "high_medium_fast_weighted"):
+            variant = variants.get(variant_name) or {}
+            visible = (
+                (variant.get("visible_drain") or {})
+                .get("with_intercept", {})
+                .get("all", {})
+            )
+            credits = (
+                (variant.get("credit_accounting") or {})
+                .get("no_intercept", {})
+                .get("all", {})
+            )
+            if visible or credits:
+                print(
+                    "component {variant}: visible_r2={visible_r2} "
+                    "credit_r2={credit_r2} candidate_rows={candidate_rows}".format(
+                        variant=variant_name,
+                        visible_r2=visible.get("r2"),
+                        credit_r2=credits.get("r2"),
+                        candidate_rows=variant.get("candidate_rows"),
+                    )
+                )
         capacity = summary.get("one_percent_capacity_modeling") or {}
         if capacity.get("models"):
             print(
@@ -142,6 +166,26 @@ def main() -> int:
                     best_causal=capacity.get("best_causal_by_holdout_mae"),
                 )
             )
+            capacity_components = (
+                (capacity.get("token_component_regression") or {}).get("variants") or {}
+            )
+            for variant_name in ("unweighted", "high_medium_fast_weighted"):
+                variant = capacity_components.get(variant_name) or {}
+                credits = (
+                    (variant.get("capacity_credits") or {})
+                    .get("no_intercept", {})
+                    .get("all", {})
+                )
+                if credits:
+                    print(
+                        "one-percent component {variant}: credit_r2={credit_r2} "
+                        "mae={mae} candidate_rows={candidate_rows}".format(
+                            variant=variant_name,
+                            credit_r2=credits.get("r2"),
+                            mae=credits.get("mae"),
+                            candidate_rows=variant.get("candidate_rows"),
+                        )
+                    )
     return 0
 
 

@@ -316,6 +316,53 @@ best newest-holdout MAE (`0.003436`). The gain is small, but it captures the
 right operational idea: a single `2%` tick after a long stable regime should be
 treated as a possible blip, not automatic proof that the regime changed.
 
+## Token Component Regression
+
+The report now includes `token_component_regression`, which directly tests the
+billing-shaped hypothesis across all positive spans with four token components:
+
+- uncached input tokens
+- cached input tokens
+- reasoning output tokens
+- non-reasoning output tokens
+
+It runs two variants:
+
+- `unweighted`: raw token components.
+- `high_medium_fast_weighted`: the same components, but rows with medium/high
+  fast-mode proxy confidence are multiplied by the documented model fast
+  multiplier. In the current all-history run, this affects 42 rows across 31
+  spans.
+
+Current result:
+
+| target | token variant | all-spans R2 | newest 20% holdout R2 | read |
+| --- | --- | ---: | ---: | --- |
+| visible 5-hour drain | unweighted | 0.029 | very negative | token components do not explain the coarse visible counter |
+| visible 5-hour drain | medium/high fast weighted | 0.030 | very negative | fast weighting barely moves the visible-drain fit |
+| tracker credit estimate | unweighted | 1.000 | 1.000 | token components exactly reconstruct rate-card credits |
+| fast-weighted credit estimate | medium/high fast weighted | 1.000 | 1.000 | multiplying candidate fast spans preserves exact token accounting |
+
+The no-intercept credit regression recovers the expected coefficients per
+million tokens:
+
+| component | coefficient |
+| --- | ---: |
+| uncached input | 125 |
+| cached input | 12.5 |
+| reasoning output | 750 |
+| non-reasoning output | 750 |
+
+Current read: token accounting is internally linear and consistent with the
+local Codex rate card. The visible allowance percentage is the noisy part: it is
+quantized, regime-dependent, and not a smooth per-call billing meter.
+
+The practical interpretation is: token usage plus model controls should predict
+the hidden credit/cost accounting, while spans are the normalization layer that
+aligns that accounting to the coarse visible drain meter. A `1%` span is not one
+fixed amount of tokens; it is the work that accumulated before the next visible
+`1%` tick appeared.
+
 ## One-Percent Tick Capacity
 
 The report now includes `one_percent_capacity_modeling`, which only uses exact
@@ -332,6 +379,32 @@ Current capacity distribution across 725 exact `1%` spans:
 | stddev | 37.268 |
 | min | 0.709 |
 | max | 146.557 |
+
+The direct four-component accounting regression for exact `1%` spans is now
+reported at
+`one_percent_capacity_modeling.token_component_regression`. This is the specific
+near-perfect case: once the span is closed, the four token buckets reconstruct
+the estimated credit capacity inside that `1%` tick.
+
+| target | token variant | all-spans R2 | newest 20% holdout R2 | MAE | affected fast-proxy rows |
+| --- | --- | ---: | ---: | ---: | ---: |
+| credits inside exact 1% ticks | unweighted | 1.000 | 1.000 | 0.000 | 0 |
+| credits inside exact 1% ticks | medium/high fast weighted | 1.000 | 1.000 | 0.000 | 41 |
+
+The no-intercept coefficients are unchanged in the one-percent subset:
+
+| component | coefficient |
+| --- | ---: |
+| uncached input | 125 |
+| cached input | 12.5 |
+| reasoning output | 750 |
+| non-reasoning output | 750 |
+
+That result should be read narrowly. It says the local credit estimate is a
+linear function of the four token buckets, including the documented fast-mode
+multiplier where the proxy is medium/high confidence. It does not prove that the
+visible allowance counter is an exact realtime billing meter, because the
+counter itself is rounded, sampled, and regime-dependent.
 
 The capacity models intentionally separate advance-prediction features from
 same-span explanatory features:

@@ -27,7 +27,13 @@ def _row(
     secondary_used: float | None = None,
     secondary_window_minutes: int | None = 10080,
     secondary_resets_at: int | None = 2000,
+    uncached_input_tokens: int = 0,
+    cached_input_tokens: int = 0,
+    reasoning_output_tokens: int = 0,
+    nonreasoning_output_tokens: int = 0,
 ) -> dict[str, object]:
+    output_tokens = reasoning_output_tokens + nonreasoning_output_tokens
+    input_tokens = uncached_input_tokens + cached_input_tokens
     return {
         "record_id": record_id,
         "event_timestamp": timestamp,
@@ -41,6 +47,12 @@ def _row(
         "rate_limit_secondary_resets_at": secondary_resets_at,
         "usage_credits": credits,
         "model": model,
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "uncached_input_tokens": uncached_input_tokens,
+        "output_tokens": output_tokens,
+        "reasoning_output_tokens": reasoning_output_tokens,
+        "total_tokens": input_tokens + output_tokens,
     }
 
 
@@ -208,21 +220,25 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
     used = 0.0
     for index in range(24):
+        hold_credits = 1.0 + (index % 3)
         rows.append(
             _row(
                 f"hold-{index}",
                 f"2026-06-01T00:{(index * 2) + 1:02d}:00Z",
                 used,
-                1.0 + (index % 3),
+                hold_credits,
+                uncached_input_tokens=int(hold_credits * 1_000_000 / 125.0),
             )
         )
         used += 1.0
+        tick_credits = 4.0 + (index % 5)
         rows.append(
             _row(
                 f"tick-{index}",
                 f"2026-06-01T00:{(index * 2) + 2:02d}:00Z",
                 used,
-                4.0 + (index % 5),
+                tick_credits,
+                uncached_input_tokens=int(tick_credits * 1_000_000 / 125.0),
             )
         )
 
@@ -238,6 +254,101 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     assert "capacity_causal_baseline" in kinds
     assert "causal_history_context" in kinds
     assert "explanatory_same_span" in kinds
+    component_regression = capacity["token_component_regression"]["variants"][
+        "unweighted"
+    ]["capacity_credits"]["no_intercept"]["all"]
+    assert component_regression["r2"] == 1.0
+    assert component_regression["mae"] == 0.0
+    coefficient = _coefficients_by_feature(component_regression["coefficients"])[
+        "uncached_input_tokens"
+    ]
+    assert coefficient is not None
+    assert abs(coefficient - 125.0) < 0.00001
+
+
+def test_token_component_regression_recovers_rate_card_and_fast_weighting() -> None:
+    rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    proxies: dict[str, FastProxyAnnotation] = {}
+    used = 0.0
+    component_rows = [
+        (1_000_000, 0, 0, 0, False),
+        (0, 1_000_000, 0, 0, False),
+        (0, 0, 100_000, 0, True),
+        (0, 0, 0, 100_000, False),
+        (500_000, 250_000, 10_000, 20_000, True),
+        (250_000, 750_000, 20_000, 5_000, False),
+        (750_000, 100_000, 5_000, 30_000, True),
+        (125_000, 875_000, 15_000, 10_000, False),
+    ]
+    for index, (
+        uncached,
+        cached,
+        reasoning,
+        nonreasoning,
+        is_fast,
+    ) in enumerate(component_rows):
+        used += 1.0 + (index % 3)
+        record_id = f"component-{index}"
+        if is_fast:
+            proxies[record_id] = FastProxyAnnotation(
+                label="possible_proxy",
+                timing_confidence="medium",
+            )
+        rows.append(
+            _row(
+                record_id,
+                f"2026-06-01T00:{index + 1:02d}:00Z",
+                used,
+                _component_credits(
+                    uncached=uncached,
+                    cached=cached,
+                    reasoning=reasoning,
+                    nonreasoning=nonreasoning,
+                ),
+                uncached_input_tokens=uncached,
+                cached_input_tokens=cached,
+                reasoning_output_tokens=reasoning,
+                nonreasoning_output_tokens=nonreasoning,
+            )
+        )
+
+    summary = summarize_usage_drain_model(rows, fast_proxy_annotations=proxies)
+
+    regression = summary["token_component_regression"]
+    unweighted = regression["variants"]["unweighted"]["credit_accounting"][
+        "no_intercept"
+    ]["all"]
+    weighted = regression["variants"]["high_medium_fast_weighted"]["credit_accounting"][
+        "no_intercept"
+    ]["all"]
+    assert unweighted["r2"] == 1.0
+    assert weighted["r2"] == 1.0
+    assert weighted["mae"] == 0.0
+    assert regression["variants"]["high_medium_fast_weighted"]["candidate_rows"] == 3
+    assert _coefficients_by_feature(unweighted["coefficients"]) == {
+        "uncached_input_tokens": 125.0,
+        "cached_input_tokens": 12.5,
+        "reasoning_output_tokens": 750.0,
+        "nonreasoning_output_tokens": 750.0,
+    }
+
+
+def _component_credits(
+    *,
+    uncached: int,
+    cached: int,
+    reasoning: int,
+    nonreasoning: int,
+) -> float:
+    return (
+        (uncached * 125.0)
+        + (cached * 12.5)
+        + ((reasoning + nonreasoning) * 750.0)
+    ) / 1_000_000.0
+
+
+def _coefficients_by_feature(rows: list[dict[str, object]]) -> dict[str, float | None]:
+    return {str(row["feature"]): row["coefficient"] for row in rows}
 
 
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:

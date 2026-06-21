@@ -36,6 +36,12 @@ TOKEN_TOTAL_FIELDS = (
     "reasoning_output_tokens",
     "total_tokens",
 )
+TOKEN_COMPONENT_FIELDS = (
+    "uncached_input_tokens",
+    "cached_input_tokens",
+    "reasoning_output_tokens",
+    "nonreasoning_output_tokens",
+)
 TIMING_TOTAL_FIELDS = (
     "call_duration_seconds",
     "previous_call_delta_seconds",
@@ -87,6 +93,9 @@ class UsageDeltaSpan:
     candidate_standard_credits: dict[str, float]
     documented_fast_weighted_credits: dict[str, float]
     candidate_row_counts: dict[str, int]
+    documented_fast_weighted_token_totals: dict[str, dict[str, float]] = field(
+        default_factory=dict
+    )
     models: dict[str, int] = field(default_factory=dict)
     token_totals: dict[str, float] = field(default_factory=dict)
     timing_totals: dict[str, float] = field(default_factory=dict)
@@ -325,6 +334,7 @@ def summarize_usage_drain_model(
         "delta_regimes": _delta_regime_summary(spans),
         "regime_streaks": _regime_streak_summary(spans),
         "span_correlations": _span_correlation_summary(spans),
+        "token_component_regression": _token_component_regression_summary(spans),
         "one_percent_capacity_modeling": _one_percent_capacity_modeling(spans),
         "walk_forward_prediction": _walk_forward_prediction_summary(spans),
         "documented_fast_multipliers": dict(DOCUMENTED_FAST_CREDIT_MULTIPLIERS),
@@ -527,12 +537,220 @@ def _span_correlation_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
     }
 
 
-def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
-    rows = [
-        _one_percent_capacity_row(span)
+def _token_component_regression_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    return {
+        "feature_units": "tokens_per_million",
+        "features": list(TOKEN_COMPONENT_FIELDS),
+        "variants": {
+            "unweighted": _token_component_regression_variant(
+                spans,
+                weighted_proxy=None,
+                credit_target_label="standard_usage_credits",
+            ),
+            "high_medium_fast_weighted": _token_component_regression_variant(
+                spans,
+                weighted_proxy="high_medium_candidates",
+                credit_target_label="high_medium_fast_weighted_credits",
+            ),
+        },
+        "notes": [
+            "visible_drain tests whether token components explain the selected 5-hour usage percentage delta.",
+            "credit_accounting tests whether token components reconstruct the tracker rate-card credit estimate.",
+            "The high_medium_fast_weighted variant multiplies medium/high fast-proxy token components by each row's documented model fast multiplier.",
+        ],
+    }
+
+
+def _token_component_regression_variant(
+    spans: list[UsageDeltaSpan],
+    *,
+    weighted_proxy: str | None,
+    credit_target_label: str,
+) -> dict[str, Any]:
+    x_rows = [
+        [
+            value / 1_000_000.0
+            for value in _span_token_components(
+                span, weighted_proxy=weighted_proxy
+            ).values()
+        ]
         for span in spans
-        if _is_one_percent_delta(span.delta_usage_percent)
     ]
+    visible_target = [span.delta_usage_percent for span in spans]
+    credit_target = [
+        span.documented_fast_weighted_credits.get(weighted_proxy, 0.0)
+        if weighted_proxy
+        else span.standard_usage_credits
+        for span in spans
+    ]
+    candidate_rows = (
+        sum(span.candidate_row_counts.get(weighted_proxy, 0) for span in spans)
+        if weighted_proxy
+        else 0
+    )
+    candidate_spans = (
+        sum(1 for span in spans if span.candidate_row_counts.get(weighted_proxy, 0) > 0)
+        if weighted_proxy
+        else 0
+    )
+    return {
+        "weighted_proxy": weighted_proxy,
+        "candidate_rows": candidate_rows,
+        "candidate_spans": candidate_spans,
+        "visible_drain": _token_component_target_regression(
+            x_rows, visible_target, target="delta_usage_percent"
+        ),
+        "credit_accounting": _token_component_target_regression(
+            x_rows, credit_target, target=credit_target_label
+        ),
+    }
+
+
+def _span_token_components(
+    span: UsageDeltaSpan, *, weighted_proxy: str | None
+) -> dict[str, float]:
+    if weighted_proxy:
+        weighted = span.documented_fast_weighted_token_totals.get(weighted_proxy)
+        if weighted:
+            return {
+                field_name: weighted.get(field_name, 0.0)
+                for field_name in TOKEN_COMPONENT_FIELDS
+            }
+    return {
+        "uncached_input_tokens": span.token_totals.get("uncached_input_tokens", 0.0),
+        "cached_input_tokens": span.token_totals.get("cached_input_tokens", 0.0),
+        "reasoning_output_tokens": span.token_totals.get(
+            "reasoning_output_tokens", 0.0
+        ),
+        "nonreasoning_output_tokens": max(
+            span.token_totals.get("output_tokens", 0.0)
+            - span.token_totals.get("reasoning_output_tokens", 0.0),
+            0.0,
+        ),
+    }
+
+
+def _row_token_components(row: dict[str, Any]) -> dict[str, float]:
+    cached_input = _number(row.get("cached_input_tokens"))
+    uncached_input = _number(row.get("uncached_input_tokens"))
+    if uncached_input <= 0:
+        uncached_input = max(_number(row.get("input_tokens")) - cached_input, 0.0)
+    reasoning_output = _number(row.get("reasoning_output_tokens"))
+    output_tokens = _number(row.get("output_tokens"))
+    return {
+        "uncached_input_tokens": uncached_input,
+        "cached_input_tokens": cached_input,
+        "reasoning_output_tokens": reasoning_output,
+        "nonreasoning_output_tokens": max(output_tokens - reasoning_output, 0.0),
+    }
+
+
+def _token_component_target_regression(
+    x_rows: list[list[float]], y_values: list[float], *, target: str
+) -> dict[str, Any]:
+    return {
+        "target": target,
+        "with_intercept": _token_component_fit_summary(
+            x_rows, y_values, intercept=True
+        ),
+        "no_intercept": _token_component_fit_summary(
+            x_rows, y_values, intercept=False
+        ),
+    }
+
+
+def _token_component_fit_summary(
+    x_rows: list[list[float]], y_values: list[float], *, intercept: bool
+) -> dict[str, Any]:
+    if len(x_rows) < 2 or len(x_rows) != len(y_values):
+        return {
+            "all": _regression_metrics([], []),
+            "time_ordered_holdout_20": _regression_metrics([], []),
+        }
+    train_size = max(1, min(len(x_rows) - 1, int(len(x_rows) * 0.8)))
+    all_coefficients = _fit_linear_regression_coefficients(
+        x_rows, y_values, intercept=intercept
+    )
+    train_coefficients = _fit_linear_regression_coefficients(
+        x_rows[:train_size], y_values[:train_size], intercept=intercept
+    )
+    all_predictions = _linear_regression_predictions(
+        x_rows, all_coefficients, intercept=intercept
+    )
+    holdout_x = x_rows[train_size:]
+    holdout_y = y_values[train_size:]
+    holdout_predictions = _linear_regression_predictions(
+        holdout_x, train_coefficients, intercept=intercept
+    )
+    return {
+        "all": {
+            **_regression_metrics(y_values, all_predictions),
+            "coefficients": _component_coefficient_rows(
+                all_coefficients, intercept=intercept
+            ),
+        },
+        "time_ordered_holdout_20": {
+            **_regression_metrics(holdout_y, holdout_predictions),
+            "train_coefficients": _component_coefficient_rows(
+                train_coefficients, intercept=intercept
+            ),
+        },
+    }
+
+
+def _fit_linear_regression_coefficients(
+    x_rows: list[list[float]], y_values: list[float], *, intercept: bool
+) -> list[float]:
+    width = len(x_rows[0]) + (1 if intercept else 0)
+    lhs = [[0.0 for _ in range(width)] for _ in range(width)]
+    rhs = [0.0 for _ in range(width)]
+    for row, y_value in zip(x_rows, y_values, strict=True):
+        expanded = ([1.0] if intercept else []) + row
+        for i, x_i in enumerate(expanded):
+            rhs[i] += x_i * y_value
+            for j, x_j in enumerate(expanded):
+                lhs[i][j] += x_i * x_j
+    coefficients = _solve_linear_system(lhs, rhs)
+    if coefficients is not None:
+        return coefficients
+    for index in range(1 if intercept else 0, width):
+        lhs[index][index] += 1e-9
+    coefficients = _solve_linear_system(lhs, rhs)
+    if coefficients is None:
+        return [0.0 for _index in range(width)]
+    return coefficients
+
+
+def _linear_regression_predictions(
+    x_rows: list[list[float]], coefficients: list[float], *, intercept: bool
+) -> list[float]:
+    predictions: list[float] = []
+    for row in x_rows:
+        expanded = ([1.0] if intercept else []) + row
+        predictions.append(
+            sum(
+                coefficient * value
+                for coefficient, value in zip(coefficients, expanded, strict=True)
+            )
+        )
+    return predictions
+
+
+def _component_coefficient_rows(
+    coefficients: list[float], *, intercept: bool
+) -> list[dict[str, Any]]:
+    names = (["intercept"] if intercept else []) + list(TOKEN_COMPONENT_FIELDS)
+    return [
+        {"feature": name, "coefficient": _rounded(coefficient)}
+        for name, coefficient in zip(names, coefficients, strict=True)
+    ]
+
+
+def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    one_percent_spans = [
+        span for span in spans if _is_one_percent_delta(span.delta_usage_percent)
+    ]
+    rows = [_one_percent_capacity_row(span) for span in one_percent_spans]
     if len(rows) < 10:
         return {
             "target": "standard_usage_credits",
@@ -543,6 +761,9 @@ def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any
             "splits": ["time_ordered_80_20", "interleaved_every_5th"],
             "best_by_holdout_mae": None,
             "best_causal_by_holdout_mae": None,
+            "token_component_regression": _one_percent_capacity_component_regression(
+                one_percent_spans
+            ),
             "models": [],
         }
     _add_days_since_first_span(rows)
@@ -576,11 +797,81 @@ def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any
         "splits": ["time_ordered_80_20", "interleaved_every_5th"],
         "best_by_holdout_mae": best_model["name"] if best_model else None,
         "best_causal_by_holdout_mae": best_causal["name"] if best_causal else None,
+        "token_component_regression": _one_percent_capacity_component_regression(
+            one_percent_spans
+        ),
         "models": models,
         "notes": [
             "Causal/history models use prior closed spans plus start-time context.",
             "Explanatory same-span models use work observed inside the span and should not be treated as advance predictions.",
         ],
+    }
+
+
+def _one_percent_capacity_component_regression(
+    spans: list[UsageDeltaSpan],
+) -> dict[str, Any]:
+    return {
+        "feature_units": "tokens_per_million",
+        "features": list(TOKEN_COMPONENT_FIELDS),
+        "target": "usage_credits_inside_exact_one_percent_spans",
+        "variants": {
+            "unweighted": _one_percent_capacity_component_variant(
+                spans,
+                weighted_proxy=None,
+                credit_target_label="standard_usage_credits",
+            ),
+            "high_medium_fast_weighted": _one_percent_capacity_component_variant(
+                spans,
+                weighted_proxy="high_medium_candidates",
+                credit_target_label="high_medium_fast_weighted_credits",
+            ),
+        },
+        "notes": [
+            "This is an accounting check for work inside exact 1% ticks, not an advance prediction of when the tick will occur.",
+            "A near-perfect fit is expected when the local credit target is computed from these same token components and rate-card coefficients.",
+        ],
+    }
+
+
+def _one_percent_capacity_component_variant(
+    spans: list[UsageDeltaSpan],
+    *,
+    weighted_proxy: str | None,
+    credit_target_label: str,
+) -> dict[str, Any]:
+    x_rows = [
+        [
+            value / 1_000_000.0
+            for value in _span_token_components(
+                span, weighted_proxy=weighted_proxy
+            ).values()
+        ]
+        for span in spans
+    ]
+    credit_target = [
+        span.documented_fast_weighted_credits.get(weighted_proxy, 0.0)
+        if weighted_proxy
+        else span.standard_usage_credits
+        for span in spans
+    ]
+    candidate_rows = (
+        sum(span.candidate_row_counts.get(weighted_proxy, 0) for span in spans)
+        if weighted_proxy
+        else 0
+    )
+    candidate_spans = (
+        sum(1 for span in spans if span.candidate_row_counts.get(weighted_proxy, 0) > 0)
+        if weighted_proxy
+        else 0
+    )
+    return {
+        "weighted_proxy": weighted_proxy,
+        "candidate_rows": candidate_rows,
+        "candidate_spans": candidate_spans,
+        "capacity_credits": _token_component_target_regression(
+            x_rows, credit_target, target=credit_target_label
+        ),
     }
 
 
@@ -1683,6 +1974,10 @@ def _span_from_rows(
     non_candidate = dict.fromkeys(DEFAULT_PROXY_NAMES, 0.0)
     documented_weighted = dict.fromkeys(DEFAULT_PROXY_NAMES, 0.0)
     candidate_counts = dict.fromkeys(DEFAULT_PROXY_NAMES, 0)
+    documented_weighted_token_totals = {
+        proxy: dict.fromkeys(TOKEN_COMPONENT_FIELDS, 0.0)
+        for proxy in DEFAULT_PROXY_NAMES
+    }
     model_counts: dict[str, int] = {}
     token_totals = dict.fromkeys(TOKEN_TOTAL_FIELDS, 0.0)
     timing_totals = dict.fromkeys(TIMING_TOTAL_FIELDS, 0.0)
@@ -1696,6 +1991,7 @@ def _span_from_rows(
         for field_name in TIMING_TOTAL_FIELDS:
             timing_totals[field_name] += _number(row.get(field_name))
         annotation = proxies.get(str(row.get("record_id") or ""), FastProxyAnnotation())
+        token_components = _row_token_components(row)
         proxy_flags = {
             "all_candidates": annotation.is_candidate,
             "strong_only": annotation.is_strong,
@@ -1704,6 +2000,11 @@ def _span_from_rows(
         }
         multiplier = documented_fast_credit_multiplier(model) or 1.0
         for proxy_name, is_candidate in proxy_flags.items():
+            token_multiplier = multiplier if is_candidate else 1.0
+            for field_name, value in token_components.items():
+                documented_weighted_token_totals[proxy_name][
+                    field_name
+                ] += value * token_multiplier
             if is_candidate:
                 candidate[proxy_name] += credits
                 documented_weighted[proxy_name] += credits * multiplier
@@ -1725,6 +2026,7 @@ def _span_from_rows(
         candidate_standard_credits=candidate,
         documented_fast_weighted_credits=documented_weighted,
         candidate_row_counts=candidate_counts,
+        documented_fast_weighted_token_totals=documented_weighted_token_totals,
         models=model_counts,
         token_totals=token_totals,
         timing_totals=timing_totals,
