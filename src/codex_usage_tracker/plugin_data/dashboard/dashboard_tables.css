@@ -379,10 +379,44 @@
       font-weight: 760;
       cursor: pointer;
     }
+    .diagnostics-command-children summary::marker {
+      content: "";
+    }
+    .diagnostics-command-children summary::-webkit-details-marker {
+      display: none;
+    }
     .diagnostics-command-children summary:focus-visible {
       outline: 2px solid var(--blue);
       outline-offset: 2px;
       border-radius: 4px;
+    }
+    .diagnostics-command-toggle-icon {
+      display: inline-grid;
+      width: 18px;
+      height: 18px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #ffffff;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1;
+    }
+    .diagnostics-command-toggle-icon::before {
+      content: "+";
+    }
+    .diagnostics-command-children[open] .diagnostics-command-toggle-icon::before {
+      content: "-";
+    }
+    .diagnostics-command-toggle-open {
+      display: none;
+    }
+    .diagnostics-command-children[open] .diagnostics-command-toggle-closed {
+      display: none;
+    }
+    .diagnostics-command-children[open] .diagnostics-command-toggle-open {
+      display: inline;
     }
     .diagnostics-command-children ul {
       display: grid;

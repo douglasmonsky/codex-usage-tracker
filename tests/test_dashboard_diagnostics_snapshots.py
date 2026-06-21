@@ -89,7 +89,9 @@ const html = renderer.renderPanels({
 });
 console.log(JSON.stringify({
   hasDetails: html.includes('<details class="diagnostics-command-children">'),
-  hasSummary: html.includes('2 children'),
+  hasShowSummary: html.includes('Show all 2 children'),
+  hasHideSummary: html.includes('Hide 2 children'),
+  hasToggleIcon: html.includes('diagnostics-command-toggle-icon'),
   hasFirstChild: html.includes('status') && html.includes('<b>2</b>'),
   hasSecondChild: html.includes('diff') && html.includes('<b>1</b>'),
   hasTopChildColumn: html.includes('Top child'),
@@ -98,7 +100,9 @@ console.log(JSON.stringify({
     )
 
     assert payload["hasDetails"] is True
-    assert payload["hasSummary"] is True
+    assert payload["hasShowSummary"] is True
+    assert payload["hasHideSummary"] is True
+    assert payload["hasToggleIcon"] is True
     assert payload["hasFirstChild"] is True
     assert payload["hasSecondChild"] is True
     assert payload["hasTopChildColumn"] is False

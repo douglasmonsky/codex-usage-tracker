@@ -133,7 +133,11 @@
       const label = `${tokenText(childCount)} ${childCount === 1 ? 'child' : 'children'}`;
       return `
         <details class="diagnostics-command-children">
-          <summary>${escapeHtml(label)}</summary>
+          <summary>
+            <span class="diagnostics-command-toggle-icon" aria-hidden="true"></span>
+            <span class="diagnostics-command-toggle-closed">${escapeHtml(`Show all ${label}`)}</span>
+            <span class="diagnostics-command-toggle-open">${escapeHtml(`Hide ${label}`)}</span>
+          </summary>
           <ul>
             ${rows.map(child => `
               <li>
