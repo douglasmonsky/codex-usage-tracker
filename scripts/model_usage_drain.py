@@ -166,6 +166,27 @@ def main() -> int:
                     best_causal=capacity.get("best_causal_by_holdout_mae"),
                 )
             )
+            capacity_models = {
+                str(model.get("name")): model
+                for model in capacity.get("models", [])
+                if isinstance(model, dict)
+            }
+            for model_name in (
+                "capacity_rolling3__interleaved_every_5th",
+                "capacity_history_state_buckets__interleaved_every_5th",
+                "capacity_same_span_shape_buckets__interleaved_every_5th",
+                "capacity_same_span_tokens__interleaved_every_5th",
+            ):
+                model = capacity_models.get(model_name) or {}
+                holdout = model.get("holdout") or {}
+                if holdout:
+                    print(
+                        "  {name}: r2={r2} mae={mae}".format(
+                            name=model_name,
+                            r2=holdout.get("r2"),
+                            mae=holdout.get("mae"),
+                        )
+                    )
             capacity_components = (
                 (capacity.get("token_component_regression") or {}).get("variants") or {}
             )

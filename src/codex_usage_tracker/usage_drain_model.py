@@ -996,6 +996,20 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         "same_day_of_week_seen_count",
         "ewma_capacity_credits",
     )
+    time_categories = (
+        "rate_limit_plan_type",
+        "rate_limit_limit_id",
+        "usage_window_source",
+        "day_of_week",
+    )
+    date_categories = (*time_categories, "date", "hour_bucket")
+    state_bucket_categories = (
+        *time_categories,
+        "hour_bucket",
+        "baseline_used_bucket",
+        "window_elapsed_bucket",
+        "reset_remaining_bucket",
+    )
     same_span_shape = (
         *history_context,
         "row_count",
@@ -1005,6 +1019,12 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         "span_wall_time_seconds",
         "span_wall_time_minutes",
         "mean_span_wall_time_seconds_per_call",
+    )
+    same_span_shape_categories = (
+        *state_bucket_categories,
+        "row_count_bucket",
+        "call_duration_bucket",
+        "span_wall_time_bucket",
     )
     same_span_tokens = (
         *same_span_shape,
@@ -1018,13 +1038,6 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         "output_token_share",
         "reasoning_output_share",
     )
-    time_categories = (
-        "rate_limit_plan_type",
-        "rate_limit_limit_id",
-        "usage_window_source",
-        "day_of_week",
-    )
-    date_categories = (*time_categories, "date", "hour_bucket")
     return [
         (
             PredictiveModelSpec(
@@ -1044,6 +1057,14 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         ),
         (
             PredictiveModelSpec(
+                "capacity_state_bucket_context",
+                start_context,
+                state_bucket_categories,
+            ),
+            "causal_start_context",
+        ),
+        (
+            PredictiveModelSpec(
                 "capacity_history_context",
                 history_context,
                 time_categories,
@@ -1052,9 +1073,25 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         ),
         (
             PredictiveModelSpec(
+                "capacity_history_state_buckets",
+                history_context,
+                state_bucket_categories,
+            ),
+            "causal_history_context",
+        ),
+        (
+            PredictiveModelSpec(
                 "capacity_same_span_shape",
                 same_span_shape,
                 time_categories,
+            ),
+            "explanatory_same_span",
+        ),
+        (
+            PredictiveModelSpec(
+                "capacity_same_span_shape_buckets",
+                same_span_shape,
+                same_span_shape_categories,
             ),
             "explanatory_same_span",
         ),
@@ -1572,6 +1609,63 @@ def _reset_phase_bucket(elapsed_fraction: float) -> str:
     if elapsed_fraction < 0.75:
         return "third_quarter"
     return "fourth_quarter"
+
+
+def _numeric_bucket(
+    value: float, *, width: float, max_value: float, suffix: str
+) -> str:
+    if value <= 0 or width <= 0:
+        return f"0_{suffix}"
+    if value >= max_value:
+        return f"{_format_bucket_number(max_value)}_plus_{suffix}"
+    lower = math.floor(value / width) * width
+    upper = lower + width
+    return (
+        f"{_format_bucket_number(lower)}_"
+        f"{_format_bucket_number(upper)}_{suffix}"
+    )
+
+
+def _minute_bucket(minutes: float) -> str:
+    if minutes <= 0:
+        return "0_min"
+    if minutes <= 15:
+        return "0_15_min"
+    if minutes <= 30:
+        return "15_30_min"
+    if minutes <= 60:
+        return "30_60_min"
+    if minutes <= 120:
+        return "60_120_min"
+    if minutes <= 240:
+        return "120_240_min"
+    if minutes <= 360:
+        return "240_360_min"
+    return "360_plus_min"
+
+
+def _second_bucket(seconds: float) -> str:
+    if seconds <= 0:
+        return "0_sec"
+    if seconds <= 30:
+        return "0_30_sec"
+    if seconds <= 60:
+        return "30_60_sec"
+    if seconds <= 120:
+        return "60_120_sec"
+    if seconds <= 300:
+        return "120_300_sec"
+    if seconds <= 900:
+        return "300_900_sec"
+    if seconds <= 1800:
+        return "900_1800_sec"
+    return "1800_plus_sec"
+
+
+def _format_bucket_number(value: float) -> str:
+    if float(value).is_integer():
+        return str(int(value))
+    return str(value).replace(".", "_")
 
 
 def _prediction_error_diagnostics(
@@ -2263,6 +2357,11 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
     window_elapsed_minutes = (
         max(window_minutes - reset_minutes, 0.0) if window_minutes > 0 else 0.0
     )
+    window_elapsed_fraction = (
+        min(max(window_elapsed_minutes / window_minutes, 0.0), 1.0)
+        if window_minutes > 0
+        else 0.0
+    )
     return {
         "target": span.delta_usage_percent,
         "start_event_timestamp": span.start_event_timestamp,
@@ -2290,11 +2389,12 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "usage_window_source": span.usage_window_source or "missing",
         "reset_remaining_minutes": reset_minutes,
         "window_elapsed_minutes": window_elapsed_minutes,
-        "window_elapsed_fraction": (
-            min(max(window_elapsed_minutes / window_minutes, 0.0), 1.0)
-            if window_minutes > 0
-            else 0.0
+        "window_elapsed_fraction": window_elapsed_fraction,
+        "baseline_used_bucket": _numeric_bucket(
+            span.baseline_used_percent, width=5.0, max_value=100.0, suffix="pct"
         ),
+        "window_elapsed_bucket": _reset_phase_bucket(window_elapsed_fraction),
+        "reset_remaining_bucket": _minute_bucket(reset_minutes),
         "days_since_first_span": 0.0,
         "hour_sin": math.sin(2 * math.pi * hour_value / 24.0),
         "hour_cos": math.cos(2 * math.pi * hour_value / 24.0),
@@ -2309,6 +2409,11 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "mean_span_wall_time_seconds_per_call": (
             span_wall_time_seconds / span.row_count if span.row_count else 0.0
         ),
+        "row_count_bucket": _numeric_bucket(
+            float(span.row_count), width=5.0, max_value=50.0, suffix="calls"
+        ),
+        "call_duration_bucket": _second_bucket(duration),
+        "span_wall_time_bucket": _second_bucket(span_wall_time_seconds),
         "date": date_label,
         "day_of_week": str(day_index) if day_index >= 0 else "missing",
         "hour_bucket": hour_bucket,

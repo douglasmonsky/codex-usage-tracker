@@ -363,6 +363,11 @@ aligns that accounting to the coarse visible drain meter. A `1%` span is not one
 fixed amount of tokens; it is the work that accumulated before the next visible
 `1%` tick appeared.
 
+The public Codex pricing docs currently publish five-hour message-limit ranges
+and token credit rates, not exact included credit bucket sizes by plan. This
+report should therefore continue treating allowance deltas as observed counter
+data instead of assuming a documented hidden denominator.
+
 ## One-Percent Tick Capacity
 
 The report now includes `one_percent_capacity_modeling`, which only uses exact
@@ -413,15 +418,21 @@ same-span explanatory features:
 | --- | --- | ---: | ---: | --- |
 | time-ordered 80/20 | rolling3 capacity baseline | 17.459 credits | 0.359 | best simple causal predictor of the newest capacity |
 | time-ordered 80/20 | history + start context | 19.478 credits | 0.373 | richer date/hour/window controls do not beat rolling3 MAE |
+| time-ordered 80/20 | history + bucketed state | 19.853 credits | 0.365 | nonlinear usage/window/hour buckets add noise in the newest holdout |
 | time-ordered 80/20 | same-span shape | 14.628 credits | 0.702 | row count, duration, and wall time explain more after the span is known |
+| time-ordered 80/20 | same-span shape + buckets | 11.722 credits | 0.800 | bucketed row count and wall-time controls improve explanatory fit |
 | time-ordered 80/20 | same-span tokens | 0.082 credits | 0.99999 | near-perfect but mostly accounting identity, because credits are token-derived |
 | interleaved every fifth | rolling3 capacity baseline | 15.297 credits | 0.605 | mixed-history causal capacity is moderately predictable |
+| interleaved every fifth | history + bucketed state | 16.434 credits | 0.557 | bucketed state still trails rolling3 on MAE |
 | interleaved every fifth | same-span shape | 8.967 credits | 0.892 | work-shape features explain capacity strongly |
+| interleaved every fifth | same-span shape + buckets | 6.714 credits | 0.935 | bucketed row count/duration/wall time close much of the remaining shape gap |
 | interleaved every fifth | same-span tokens | 0.049 credits | 0.999996 | again near-perfect but explanatory, not advance prediction |
 
 Current read: history matters for capacity, especially the previous few `1%`
-ticks. Date, day-of-week, hour, and reset-window context help less than recent
-capacity history. Same-span tokens make the fit look perfect, but that is not a
+ticks. Date, day-of-week, hour, reset-window, and used-percent buckets help less
+than recent capacity history for advance prediction. Once the span is closed,
+bucketed row count, duration, and wall time make the non-token shape model much
+stronger. Same-span tokens make the fit look perfect, but that is not a
 forecasting win because the token totals are observed inside the span and the
 credit estimate is derived from them.
 
