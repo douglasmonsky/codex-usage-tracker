@@ -29,8 +29,10 @@ from codex_usage_tracker.diagnostic_snapshot_events import (
 from codex_usage_tracker.diagnostic_snapshot_rows import (
     command_output_rows,
     command_rows,
+    file_modification_path_rows,
     function_rows,
     git_interaction_rows,
+    largest_file_modification_event_rows,
     largest_read_command_rows,
     read_path_rows,
     read_productivity_path_rows,
@@ -109,6 +111,11 @@ def _empty_counters() -> dict[str, Any]:
         "read_modified_by_path": Counter(),
         "read_path_refs": {},
         "largest_read_commands": [],
+        "file_modification_events": 0,
+        "file_modification_path_events": Counter(),
+        "file_modification_path_refs": {},
+        "file_modification_extensions": Counter(),
+        "largest_file_modification_events": [],
         "missing_reasons": Counter(),
     }
 
@@ -137,7 +144,10 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
             if not isinstance(payload, dict):
                 continue
             if envelope.get("type") == "event_msg":
-                for path_ref in modified_path_refs(payload):
+                path_refs = modified_path_refs(payload)
+                if path_refs:
+                    _record_file_modification_refs(path_refs, counters=counters)
+                for path_ref in path_refs:
                     modified_orders_by_path[path_ref["path_key"]].append(order)
                 continue
             if envelope.get("type") != "response_item":
@@ -267,6 +277,29 @@ def _record_read_refs(
     return indexes
 
 
+def _record_file_modification_refs(
+    path_refs: list[dict[str, str]],
+    *,
+    counters: dict[str, Any],
+) -> None:
+    counters["file_modification_events"] += 1
+    event_paths: list[dict[str, str]] = []
+    for path_ref in path_refs:
+        path_key = path_ref["path_key"]
+        path_label = path_ref["path_label"]
+        counters["file_modification_path_refs"][path_key] = path_ref
+        counters["file_modification_path_events"][path_key] += 1
+        counters["file_modification_extensions"][_extension_label(path_label)] += 1
+        event_paths.append({"path_label": path_label, "path_hash": path_ref["path_hash"]})
+    counters["largest_file_modification_events"].append(
+        {
+            "event_kind": "patch_apply_end",
+            "modified_path_count": len(path_refs),
+            "paths": unique_path_rows(event_paths),
+        }
+    )
+
+
 def _record_function_output(
     payload: dict[str, Any],
     *,
@@ -387,6 +420,7 @@ def _analysis_payload(*, counters: dict[str, Any], meta: Counter[str]) -> dict[s
         "commands": _commands_payload(counters, meta=meta),
         "git_interactions": _git_interactions_payload(counters),
         "file_reads": _file_reads_payload(counters),
+        "file_modifications": _file_modifications_payload(counters),
         "read_productivity": _read_productivity_payload(counters),
     }
 
@@ -483,6 +517,31 @@ def _file_reads_payload(counters: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _file_modifications_payload(counters: dict[str, Any]) -> dict[str, Any]:
+    modified_path_events = int(sum(counters["file_modification_path_events"].values()))
+    largest_event_path_count = max(
+        (int(row["modified_path_count"]) for row in counters["largest_file_modification_events"]),
+        default=0,
+    )
+    return {
+        "summary": {
+            "modification_events": int(counters["file_modification_events"]),
+            "modified_path_events": modified_path_events,
+            "unique_paths_modified": len(counters["file_modification_path_refs"]),
+            "largest_event_path_count": largest_event_path_count,
+        },
+        "top_paths": file_modification_path_rows(
+            modification_path_refs=counters["file_modification_path_refs"],
+            modifications_by_path=counters["file_modification_path_events"],
+        ),
+        "by_extension": simple_rows(counters["file_modification_extensions"], key_name="extension"),
+        "largest_events": largest_file_modification_event_rows(
+            counters["largest_file_modification_events"]
+        ),
+        "path_privacy": path_privacy_metadata(),
+    }
+
+
 def _read_productivity_payload(counters: dict[str, Any]) -> dict[str, Any]:
     read_modified_count = int(sum(counters["read_modified_by_reader"].values()))
     return {
@@ -509,3 +568,8 @@ def _read_productivity_payload(counters: dict[str, Any]) -> dict[str, Any]:
         ),
         "path_privacy": path_privacy_metadata(),
     }
+
+
+def _extension_label(path_label: str) -> str:
+    suffix = Path(path_label).suffix.lower()
+    return suffix if suffix else "<none>"

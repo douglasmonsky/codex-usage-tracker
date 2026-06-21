@@ -235,3 +235,60 @@ console.log(JSON.stringify({
     assert payload["hasPr"] is True
     assert payload["hasOriginalTokens"] is True
     assert payload["leaksRawCommand"] is False
+
+
+def test_dashboard_file_modifications_snapshot_renders_safe_labels() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+const renderer = factory.create({
+  escapeHtml,
+  formatTimestamp: value => value,
+  number: new Intl.NumberFormat('en-US'),
+  pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+  renderState: message => `<div>${escapeHtml(message)}</div>`,
+  rowInvestigatorLink: () => '<a>1,000</a>',
+  tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+});
+const html = renderer.renderPanels({
+  loading: false,
+  payloads: {
+    fileModifications: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      summary: {
+        modification_events: 2,
+        modified_path_events: 3,
+        unique_paths_modified: 2,
+        largest_event_path_count: 2,
+      },
+      top_paths: [
+        { path_label: 'app.py', path_hash: 'abcdef123456', modification_events: 2 },
+        { path_label: 'notes.md', path_hash: '123456abcdef', modification_events: 1 },
+      ],
+      by_extension: [
+        { extension: '.py', count: 2 },
+        { extension: '.md', count: 1 },
+      ],
+    },
+  },
+});
+console.log(JSON.stringify({
+  hasHeading: html.includes('File Modifications'),
+  hasSummary: html.includes('Modified path events') && html.includes('3'),
+  hasPathLabel: html.includes('app.py'),
+  hasExtension: html.includes('.md'),
+  leaksRawPath: html.includes('/tmp/private') || html.includes('src/app.py') || html.includes('SECRET'),
+}));
+"""
+    )
+
+    assert payload["hasHeading"] is True
+    assert payload["hasSummary"] is True
+    assert payload["hasPathLabel"] is True
+    assert payload["hasExtension"] is True
+    assert payload["leaksRawPath"] is False

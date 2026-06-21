@@ -19,6 +19,7 @@ from codex_usage_tracker.diagnostic_snapshots import (
     DIAGNOSTIC_OVERVIEW_SECTION,
     build_diagnostic_commands_report,
     build_diagnostic_concentration_report,
+    build_diagnostic_file_modifications_report,
     build_diagnostic_file_reads_report,
     build_diagnostic_git_interactions_report,
     build_diagnostic_overview_report,
@@ -137,6 +138,7 @@ def test_batch_diagnostic_refresh_shares_source_log_analysis_pass(
 
     refreshed = refresh_diagnostic_snapshots(db_path=db_path)
     stored_file_reads = build_diagnostic_file_reads_report(db_path=db_path).payload
+    stored_file_modifications = build_diagnostic_file_modifications_report(db_path=db_path).payload
     stored_read_productivity = build_diagnostic_read_productivity_report(db_path=db_path).payload
 
     assert calls == 1
@@ -147,10 +149,13 @@ def test_batch_diagnostic_refresh_shares_source_log_analysis_pass(
     assert refreshed["sections"]["commands"]["status"] == "ready"
     assert refreshed["sections"]["gitInteractions"]["status"] == "ready"
     assert refreshed["sections"]["fileReads"]["status"] == "ready"
+    assert refreshed["sections"]["fileModifications"]["status"] == "ready"
     assert refreshed["sections"]["readProductivity"]["status"] == "ready"
     assert refreshed["sections"]["concentration"]["status"] == "ready"
     assert stored_file_reads["status"] == "ready"
     assert stored_file_reads["refreshed"] is False
+    assert stored_file_modifications["status"] == "ready"
+    assert stored_file_modifications["refreshed"] is False
     assert stored_read_productivity["status"] == "ready"
     assert stored_read_productivity["refreshed"] is False
 
@@ -465,6 +470,88 @@ def test_file_read_snapshots_allocate_tokens_and_correlate_later_modifications(
     assert "src/app.py" not in serialized
     assert "/tmp/private" not in serialized
     assert "1,120p" not in serialized
+    assert "SECRET PATCH TEXT" not in serialized
+
+
+def test_file_modification_snapshot_uses_safe_path_aggregates(tmp_path: Path) -> None:
+    codex_home = tmp_path / ".codex"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "17"
+        / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": SESSION_ID}),
+            _entry(
+                "turn_context",
+                {
+                    "turn_id": "turn-a",
+                    "model": "gpt-5.5",
+                    "cwd": "/tmp/private-diagnostics",
+                },
+            ),
+            _entry(
+                "event_msg",
+                {
+                    "type": "patch_apply_end",
+                    "changed_paths": ["src/app.py", "/tmp/private/notes.md"],
+                    "patch": "SECRET PATCH TEXT",
+                },
+            ),
+            _entry(
+                "event_msg",
+                {
+                    "type": "patch_apply_end",
+                    "changes": [
+                        {"path": "docs/readme.md"},
+                        {"old_path": "src/old.py", "new_path": "src/new.py"},
+                    ],
+                    "patch": "SECRET SECOND PATCH",
+                },
+            ),
+            _token_event(100, 100),
+        ],
+    )
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    missing = build_diagnostic_file_modifications_report(db_path=db_path).payload
+    file_modifications = build_diagnostic_file_modifications_report(
+        db_path=db_path,
+        refresh=True,
+    ).payload
+
+    _assert_contract(missing)
+    _assert_contract(file_modifications)
+    assert missing["status"] == "missing"
+    assert file_modifications["status"] == "ready"
+    assert file_modifications["summary"]["modification_events"] == 2
+    assert file_modifications["summary"]["modified_path_events"] == 5
+    assert file_modifications["summary"]["unique_paths_modified"] == 5
+    assert file_modifications["summary"]["largest_event_path_count"] == 3
+
+    paths = {row["path_label"]: row for row in file_modifications["top_paths"]}
+    assert paths["app.py"]["modification_events"] == 1
+    assert paths["notes.md"]["modification_events"] == 1
+    assert paths["readme.md"]["modification_events"] == 1
+    assert paths["old.py"]["modification_events"] == 1
+    assert paths["new.py"]["modification_events"] == 1
+
+    extensions = {row["extension"]: row["count"] for row in file_modifications["by_extension"]}
+    assert extensions[".py"] == 3
+    assert extensions[".md"] == 2
+    assert file_modifications["largest_events"][0]["modified_path_count"] == 3
+
+    serialized = json.dumps(file_modifications, sort_keys=True)
+    assert "SECRET" not in serialized
+    assert "/tmp/private" not in serialized
+    assert "src/app.py" not in serialized
+    assert "docs/readme.md" not in serialized
     assert "SECRET PATCH TEXT" not in serialized
 
 

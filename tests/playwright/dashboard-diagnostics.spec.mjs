@@ -20,6 +20,7 @@ test.describe('diagnostics dashboard smoke', () => {
       'Commands',
       'Git Interactions',
       'File Reads',
+      'File Modifications',
       'Read Productivity',
       'Concentration',
     ]) {

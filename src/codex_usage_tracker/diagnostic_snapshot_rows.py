@@ -163,6 +163,40 @@ def largest_read_command_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]
     )[:25]
 
 
+def file_modification_path_rows(
+    *,
+    modification_path_refs: dict[str, dict[str, str]],
+    modifications_by_path: Counter[str],
+) -> list[dict[str, Any]]:
+    rows = [
+        {
+            "path_label": modification_path_refs[path_key]["path_label"],
+            "path_hash": modification_path_refs[path_key]["path_hash"],
+            "modification_events": int(modifications_by_path[path_key]),
+        }
+        for path_key in modifications_by_path
+        if path_key in modification_path_refs
+    ]
+    return sorted(
+        rows,
+        key=lambda row: (
+            -int(row["modification_events"]),
+            row["path_label"],
+            row["path_hash"],
+        ),
+    )[:50]
+
+
+def largest_file_modification_event_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            -int(row["modified_path_count"]),
+            row["event_kind"],
+        ),
+    )[:25]
+
+
 def read_productivity_reader_rows(
     *,
     read_events_by_reader: Counter[str],

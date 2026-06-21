@@ -308,6 +308,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/diagnostics/commands/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/git-interactions/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/file-reads/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/file-modifications/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/read-productivity/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/concentration/refresh" in dashboard_diagnostics_snapshots_js
     assert "Refresh diagnostics" in dashboard_diagnostics_snapshots_js
@@ -317,6 +318,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Tool Output" in dashboard_diagnostics_snapshots_js
     assert "Git Interactions" in dashboard_diagnostics_snapshots_js
     assert "File Reads" in dashboard_diagnostics_snapshots_js
+    assert "File Modifications" in dashboard_diagnostics_snapshots_js
     assert "Read Productivity" in dashboard_diagnostics_snapshots_js
     assert "Concentration" in dashboard_diagnostics_snapshots_js
     assert "Associated token totals" in dashboard_diagnostics_js
