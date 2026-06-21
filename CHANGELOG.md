@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.9.0 - 2026-06-21
+
+- Add persisted aggregate diagnostic snapshots with explicit on-demand refresh metadata and schema-versioned CLI/API contracts.
+- Add dashboard Diagnostics panels for overview, tool output, commands, file reads, read productivity, and concentration.
+- Add tool-output and command reports with terminal token-count buckets, missing-count coverage, command roots, and expandable command children.
+- Add file-read and read-productivity reports with token allocation, largest read commands, read-to-modify correlation, and privacy-safe path labels.
+- Add concentration reports for top source/session, project/cwd, and day shares without leaking raw source-log paths.
+- Keep Diagnostics refresh isolated from normal live dashboard refresh so regular usage updates do not recompute or blink diagnostic panels.
+- Add Playwright diagnostics smoke coverage and release documentation for the snapshot pipeline, privacy boundary, and on-demand refresh behavior.
+
 ## 0.8.1 - 2026-06-20
 
 - Make Diagnostics fact tables easier to scan by widening and pinning the Fact column while horizontally scrolling.
