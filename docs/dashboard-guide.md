@@ -2,7 +2,7 @@
 
 > **Unofficial project:** Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI.
 
-This guide uses synthetic aggregate data. The screenshots do not contain prompts, assistant text, tool output, or real Codex session content.
+This guide uses synthetic aggregate data. The screenshots do not contain real prompts, real assistant text, real tool output, or real Codex session content.
 
 ## Open The Dashboard
 
@@ -129,6 +129,8 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
 
 ## Diagnostics View
+
+![Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration.](assets/dashboard-diagnostics.png)
 
 Use `Diagnostics` view when you want to see what structured event patterns are happening and what token totals are associated with those patterns.
 

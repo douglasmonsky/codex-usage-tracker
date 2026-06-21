@@ -65,11 +65,15 @@ Threads view groups related calls so long chats, subagents, and auto-review pass
 
 ![Threads view with one expanded thread and its calls in chronological order.](docs/assets/dashboard-threads.png?v=readme-drilldown)
 
+Diagnostics surfaces on-demand snapshot reports for tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration without tying them to the normal live refresh loop.
+
+![Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file modifications, and concentration.](docs/assets/dashboard-diagnostics.png?v=readme-drilldown)
+
 Insights still gives a fast triage layer for costly threads, low cache reuse, context bloat, and pricing gaps.
 
 ![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=readme-drilldown)
 
-The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt and chat previews are synthetic. They do not contain prompts from local logs, assistant responses, tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
+The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt and chat previews are synthetic. They do not contain prompts from local logs, assistant responses, real tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
 
 If this helped you track Codex usage, starring the repo helps others find it. Issues and feature requests are welcome.
 

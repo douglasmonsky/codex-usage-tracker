@@ -74,7 +74,7 @@
   <main>
     <h1>Dashboard Guide</h1>
     <p class="disclaimer">Unofficial project: Codex Usage Tracker is independent and is not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. OpenAI and Codex are trademarks of OpenAI.</p>
-    <p>This local guide uses synthetic screenshots and does not contain prompts, assistant text, tool output, or real Codex session content.</p>
+    <p>This local guide uses synthetic screenshots and does not contain real prompts, real assistant text, real tool output, or real Codex session content.</p>
 
     <h2>Open The Dashboard</h2>
     <p>For the best experience, run the localhost dashboard server:</p>
@@ -121,6 +121,7 @@ codex-usage-tracker serve-dashboard --open</code></pre>
     <p>Use <code>Threads</code> view to understand a work session as a group. Expand a thread to see calls newest first by default, then click an expanded-call header to change the per-thread sort. Subagents with logged parent session ids are shown under their parent thread; inferred auto-review attachments are marked in the details panel. Selected threads also show lifecycle signals such as first expensive turn, largest cumulative jump, cache trend, context trend, and whether subagent or auto-review work appeared before a usage spike.</p>
 
     <h2>Diagnostics View</h2>
+    <img src="assets/dashboard-diagnostics.png" alt="Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration.">
     <p>Use <code>Diagnostics</code> view to inspect structured event patterns and the token totals associated with those patterns. The first table ranks top diagnostic facts by associated uncached input tokens. Tool/function/MCP/command-family and compaction sections expose narrower slices of the same fact data.</p>
     <ul>
       <li>The tab consumes localhost <code>/api/diagnostics/*</code> endpoints; static file dashboards show a live-API unavailable state.</li>
