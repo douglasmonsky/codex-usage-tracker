@@ -22,6 +22,8 @@ from codex_usage_tracker.diagnostic_snapshot_constants import (
     DIAGNOSTIC_CONCENTRATION_SECTION,
     DIAGNOSTIC_FILE_READS_SCHEMA,
     DIAGNOSTIC_FILE_READS_SECTION,
+    DIAGNOSTIC_GIT_INTERACTIONS_SCHEMA,
+    DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
     DIAGNOSTIC_HISTORY_ACTIVE,
     DIAGNOSTIC_HISTORY_ALL,
     DIAGNOSTIC_OVERVIEW_SCHEMA,
@@ -96,6 +98,23 @@ def build_diagnostic_commands_report(
         refresh=refresh,
         section=DIAGNOSTIC_COMMANDS_SECTION,
         schema=DIAGNOSTIC_COMMANDS_SCHEMA,
+    )
+
+
+def build_diagnostic_git_interactions_report(
+    *,
+    db_path: Path = DEFAULT_DB_PATH,
+    include_archived: bool = False,
+    refresh: bool = False,
+) -> DiagnosticSnapshotReport:
+    """Return the latest Git interaction snapshot, optionally recomputing it first."""
+
+    return _build_source_log_snapshot_report(
+        db_path=db_path,
+        include_archived=include_archived,
+        refresh=refresh,
+        section=DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
+        schema=DIAGNOSTIC_GIT_INTERACTIONS_SCHEMA,
     )
 
 
@@ -218,6 +237,7 @@ def refresh_diagnostic_snapshots(
     sections = {
         DIAGNOSTIC_TOOL_OUTPUT_SECTION: DIAGNOSTIC_TOOL_OUTPUT_SCHEMA,
         DIAGNOSTIC_COMMANDS_SECTION: DIAGNOSTIC_COMMANDS_SCHEMA,
+        DIAGNOSTIC_GIT_INTERACTIONS_SECTION: DIAGNOSTIC_GIT_INTERACTIONS_SCHEMA,
         DIAGNOSTIC_FILE_READS_SECTION: DIAGNOSTIC_FILE_READS_SCHEMA,
         DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: DIAGNOSTIC_READ_PRODUCTIVITY_SCHEMA,
     }
@@ -246,6 +266,7 @@ def refresh_diagnostic_snapshots(
             "overview": overview_payload,
             "toolOutput": source_payloads[DIAGNOSTIC_TOOL_OUTPUT_SECTION],
             "commands": source_payloads[DIAGNOSTIC_COMMANDS_SECTION],
+            "gitInteractions": source_payloads[DIAGNOSTIC_GIT_INTERACTIONS_SECTION],
             "fileReads": source_payloads[DIAGNOSTIC_FILE_READS_SECTION],
             "readProductivity": source_payloads[DIAGNOSTIC_READ_PRODUCTIVITY_SECTION],
             "concentration": concentration_payload,
@@ -339,6 +360,17 @@ def _persist_source_log_snapshot(
             refreshed=True,
             summary=analysis["commands"]["summary"],
             commands=analysis["commands"]["commands"],
+        )
+    elif section == DIAGNOSTIC_GIT_INTERACTIONS_SECTION:
+        payload = _ready_payload(
+            schema=schema,
+            section=section,
+            snapshot=snapshot,
+            refreshed=True,
+            summary=analysis["git_interactions"]["summary"],
+            interactions=analysis["git_interactions"]["interactions"],
+            categories=analysis["git_interactions"]["categories"],
+            mutability=analysis["git_interactions"]["mutability"],
         )
     elif section == DIAGNOSTIC_FILE_READS_SECTION:
         payload = _ready_payload(
@@ -581,6 +613,11 @@ def _missing_payload(
     elif section == DIAGNOSTIC_COMMANDS_SECTION:
         payload["summary"] = None
         payload["commands"] = []
+    elif section == DIAGNOSTIC_GIT_INTERACTIONS_SECTION:
+        payload["summary"] = None
+        payload["interactions"] = []
+        payload["categories"] = []
+        payload["mutability"] = []
     elif section == DIAGNOSTIC_FILE_READS_SECTION:
         payload["summary"] = None
         payload["by_reader"] = []

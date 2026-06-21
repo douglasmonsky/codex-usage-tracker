@@ -418,6 +418,15 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "--refresh",
         "--json",
     )
+    git_interactions_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "git-interactions",
+        "--refresh",
+        "--json",
+    )
     file_reads_refresh = _run_cli(
         tmp_path,
         "--db",
@@ -469,6 +478,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     overview_refresh_payload = json.loads(overview_refresh.stdout)
     tool_output_refresh_payload = json.loads(tool_output_refresh.stdout)
     commands_refresh_payload = json.loads(commands_refresh.stdout)
+    git_interactions_refresh_payload = json.loads(git_interactions_refresh.stdout)
     file_reads_refresh_payload = json.loads(file_reads_refresh.stdout)
     read_productivity_refresh_payload = json.loads(read_productivity_refresh.stdout)
     concentration_refresh_payload = json.loads(concentration_refresh.stdout)
@@ -482,6 +492,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         overview_refresh_payload,
         tool_output_refresh_payload,
         commands_refresh_payload,
+        git_interactions_refresh_payload,
         file_reads_refresh_payload,
         read_productivity_refresh_payload,
         concentration_refresh_payload,
@@ -532,6 +543,12 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "child": "status",
         "count": 1,
     }
+    assert (
+        git_interactions_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-git-interactions-v1"
+    )
+    assert git_interactions_refresh_payload["summary"]["git_shell_calls"] == 1
+    assert git_interactions_refresh_payload["interactions"][0]["operation"] == "status"
     assert (
         file_reads_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-file-reads-v1"

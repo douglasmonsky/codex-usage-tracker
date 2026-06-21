@@ -11,6 +11,7 @@ from codex_usage_tracker.diagnostic_snapshot_events import (
     READ_PRODUCTIVITY_NOTE,
     allocate_token_count,
     command_root_and_child,
+    git_interaction_from_command,
     int_value,
     is_shell_tool,
     modified_path_refs,
@@ -29,6 +30,7 @@ from codex_usage_tracker.diagnostic_snapshot_rows import (
     command_output_rows,
     command_rows,
     function_rows,
+    git_interaction_rows,
     largest_read_command_rows,
     read_path_rows,
     read_productivity_path_rows,
@@ -88,6 +90,13 @@ def _empty_counters() -> dict[str, Any]:
         "command_with_count": Counter(),
         "command_missing_count": Counter(),
         "command_token_sum": Counter(),
+        "git_interaction_calls": Counter(),
+        "git_interaction_with_count": Counter(),
+        "git_interaction_missing_count": Counter(),
+        "git_interaction_token_sum": Counter(),
+        "git_interactions_by_category": Counter(),
+        "git_interactions_by_mutability": Counter(),
+        "git_interactions_by_root": Counter(),
         "read_events": [],
         "read_command_count": 0,
         "read_events_by_reader": Counter(),
@@ -107,6 +116,7 @@ def _empty_counters() -> dict[str, Any]:
 def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counter[str]) -> None:
     call_names: dict[str, str] = {}
     call_roots: dict[str, str] = {}
+    call_git_interactions: dict[str, tuple[str, str, str, str]] = {}
     call_read_events: dict[str, list[int]] = {}
     source_read_events: list[int] = []
     modified_orders_by_path: dict[str, list[int]] = defaultdict(list)
@@ -140,6 +150,7 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
                     meta=meta,
                     call_names=call_names,
                     call_roots=call_roots,
+                    call_git_interactions=call_git_interactions,
                     call_read_events=call_read_events,
                     source_read_events=source_read_events,
                 )
@@ -149,6 +160,7 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
                     counters=counters,
                     call_names=call_names,
                     call_roots=call_roots,
+                    call_git_interactions=call_git_interactions,
                     call_read_events=call_read_events,
                 )
 
@@ -176,6 +188,7 @@ def _record_function_call(
     meta: Counter[str],
     call_names: dict[str, str],
     call_roots: dict[str, str],
+    call_git_interactions: dict[str, tuple[str, str, str, str]],
     call_read_events: dict[str, list[int]],
     source_read_events: list[int],
 ) -> None:
@@ -194,6 +207,20 @@ def _record_function_call(
     counters["command_children"].setdefault(root, Counter())[child] += 1
     if call_id:
         call_roots[call_id] = root
+    interaction = git_interaction_from_command(command, root=root)
+    if interaction is not None:
+        interaction_key = (
+            interaction["root"],
+            interaction["operation"],
+            interaction["category"],
+            interaction["mutability"],
+        )
+        counters["git_interaction_calls"][interaction_key] += 1
+        counters["git_interactions_by_category"][interaction["category"]] += 1
+        counters["git_interactions_by_mutability"][interaction["mutability"]] += 1
+        counters["git_interactions_by_root"][interaction["root"]] += 1
+        if call_id:
+            call_git_interactions[call_id] = interaction_key
     read_refs = read_path_refs_from_command(command, root=root)
     if read_refs:
         counters["read_command_count"] += 1
@@ -246,6 +273,7 @@ def _record_function_output(
     counters: dict[str, Any],
     call_names: dict[str, str],
     call_roots: dict[str, str],
+    call_git_interactions: dict[str, tuple[str, str, str, str]],
     call_read_events: dict[str, list[int]],
 ) -> None:
     call_id = optional_str(payload.get("call_id"))
@@ -254,12 +282,14 @@ def _record_function_output(
     output = payload.get("output")
     count = original_output_count(output)
     read_indexes = call_read_events.get(call_id or "", [])
+    git_interaction = call_git_interactions.get(call_id or "")
     if count is None:
         _record_missing_output_count(
             output,
             counters=counters,
             function_name=function_name,
             root=call_roots.get(call_id or ""),
+            git_interaction=git_interaction,
             read_indexes=read_indexes,
         )
         return
@@ -268,6 +298,7 @@ def _record_function_output(
         counters=counters,
         function_name=function_name,
         root=call_roots.get(call_id or ""),
+        git_interaction=git_interaction,
         read_indexes=read_indexes,
     )
 
@@ -278,12 +309,15 @@ def _record_missing_output_count(
     counters: dict[str, Any],
     function_name: str,
     root: str | None,
+    git_interaction: tuple[str, str, str, str] | None,
     read_indexes: list[int],
 ) -> None:
     counters["output_missing_count"][function_name] += 1
     counters["missing_reasons"]["string_no_header" if isinstance(output, str) else "non_string_output"] += 1
     if root:
         counters["command_missing_count"][root] += 1
+    if git_interaction:
+        counters["git_interaction_missing_count"][git_interaction] += 1
     for event_index in read_indexes:
         reader = str(counters["read_events"][event_index]["reader"])
         counters["read_events_missing_count_by_reader"][reader] += 1
@@ -295,6 +329,7 @@ def _record_output_count(
     counters: dict[str, Any],
     function_name: str,
     root: str | None,
+    git_interaction: tuple[str, str, str, str] | None,
     read_indexes: list[int],
 ) -> None:
     counters["output_with_count"][function_name] += 1
@@ -302,6 +337,9 @@ def _record_output_count(
     if root:
         counters["command_with_count"][root] += 1
         counters["command_token_sum"][root] += count
+    if git_interaction:
+        counters["git_interaction_with_count"][git_interaction] += 1
+        counters["git_interaction_token_sum"][git_interaction] += count
     if not read_indexes:
         return
     paths: list[dict[str, str]] = []
@@ -347,6 +385,7 @@ def _analysis_payload(*, counters: dict[str, Any], meta: Counter[str]) -> dict[s
         "meta": {key: int(value) for key, value in meta.items()},
         "tool_output": _tool_output_payload(counters),
         "commands": _commands_payload(counters, meta=meta),
+        "git_interactions": _git_interactions_payload(counters),
         "file_reads": _file_reads_payload(counters),
         "read_productivity": _read_productivity_payload(counters),
     }
@@ -389,6 +428,32 @@ def _commands_payload(counters: dict[str, Any], *, meta: Counter[str]) -> dict[s
             command_calls=counters["command_calls"],
             command_children=counters["command_children"],
         ),
+    }
+
+
+def _git_interactions_payload(counters: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "summary": {
+            "git_shell_calls": int(sum(counters["git_interaction_calls"].values())),
+            "git_command_calls": int(counters["git_interactions_by_root"]["git"]),
+            "github_cli_calls": int(counters["git_interactions_by_root"]["gh"]),
+            "unique_interactions": len(counters["git_interaction_calls"]),
+            "interactions_with_original_token_count": int(
+                sum(counters["git_interaction_with_count"].values())
+            ),
+            "interactions_missing_original_token_count": int(
+                sum(counters["git_interaction_missing_count"].values())
+            ),
+            "original_token_sum": int(sum(counters["git_interaction_token_sum"].values())),
+        },
+        "interactions": git_interaction_rows(
+            git_interaction_calls=counters["git_interaction_calls"],
+            git_interaction_with_count=counters["git_interaction_with_count"],
+            git_interaction_missing_count=counters["git_interaction_missing_count"],
+            git_interaction_token_sum=counters["git_interaction_token_sum"],
+        ),
+        "categories": simple_rows(counters["git_interactions_by_category"], key_name="category"),
+        "mutability": simple_rows(counters["git_interactions_by_mutability"], key_name="mutability"),
     }
 
 

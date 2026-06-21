@@ -63,6 +63,45 @@ def command_rows(
     return sorted(rows, key=lambda row: (-int(row["total"]), row["root"]))
 
 
+def git_interaction_rows(
+    *,
+    git_interaction_calls: Counter[tuple[str, str, str, str]],
+    git_interaction_with_count: Counter[tuple[str, str, str, str]],
+    git_interaction_missing_count: Counter[tuple[str, str, str, str]],
+    git_interaction_token_sum: Counter[tuple[str, str, str, str]],
+) -> list[dict[str, Any]]:
+    rows = []
+    keys = (
+        set(git_interaction_calls)
+        | set(git_interaction_with_count)
+        | set(git_interaction_missing_count)
+        | set(git_interaction_token_sum)
+    )
+    for root, operation, category, mutability in keys:
+        key = (root, operation, category, mutability)
+        rows.append(
+            {
+                "root": root,
+                "operation": operation,
+                "category": category,
+                "mutability": mutability,
+                "calls": int(git_interaction_calls[key]),
+                "with_original_token_count": int(git_interaction_with_count[key]),
+                "missing_original_token_count": int(git_interaction_missing_count[key]),
+                "original_token_sum": int(git_interaction_token_sum[key]),
+            }
+        )
+    return sorted(
+        rows,
+        key=lambda row: (
+            -int(row["original_token_sum"]),
+            -int(row["calls"]),
+            row["root"],
+            row["operation"],
+        ),
+    )
+
+
 def read_reader_rows(
     *,
     read_events_by_reader: Counter[str],

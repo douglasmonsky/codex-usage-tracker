@@ -24,6 +24,62 @@ SHELL_TOOL_NAMES = {
 }
 READ_COMMAND_ROOTS = {"cat", "find", "grep", "head", "nl", "rg", "sed", "strings", "tail", "wc"}
 SEARCH_READ_ROOTS = {"find", "rg"}
+GIT_COMMAND_ROOTS = {"git", "gh"}
+GIT_OPERATION_CATEGORIES = {
+    "add": ("local_mutation", "local_mutation"),
+    "branch": ("read_only", "read_only"),
+    "checkout": ("local_mutation", "local_mutation"),
+    "cherry-pick": ("local_mutation", "local_mutation"),
+    "clean": ("local_mutation", "local_mutation"),
+    "clone": ("remote_ref", "remote_ref"),
+    "commit": ("local_mutation", "local_mutation"),
+    "describe": ("read_only", "read_only"),
+    "diff": ("read_only", "read_only"),
+    "fetch": ("remote_ref", "remote_ref"),
+    "log": ("read_only", "read_only"),
+    "merge": ("local_mutation", "local_mutation"),
+    "mv": ("local_mutation", "local_mutation"),
+    "pull": ("remote_ref", "remote_ref"),
+    "push": ("remote_ref", "remote_ref"),
+    "rebase": ("local_mutation", "local_mutation"),
+    "remote": ("read_only", "read_only"),
+    "reset": ("local_mutation", "local_mutation"),
+    "restore": ("local_mutation", "local_mutation"),
+    "rev-parse": ("read_only", "read_only"),
+    "rm": ("local_mutation", "local_mutation"),
+    "show": ("read_only", "read_only"),
+    "stash": ("local_mutation", "local_mutation"),
+    "status": ("read_only", "read_only"),
+    "submodule": ("remote_ref", "remote_ref"),
+    "switch": ("local_mutation", "local_mutation"),
+    "tag": ("local_mutation", "local_mutation"),
+}
+GH_OPERATION_CATEGORIES = {
+    "api": ("api", "github_remote"),
+    "auth": ("auth_config", "github_remote"),
+    "config": ("auth_config", "github_remote"),
+    "issue": ("issue", "github_remote"),
+    "pr": ("pull_request", "github_remote"),
+    "release": ("release", "github_remote"),
+    "repo": ("repository", "github_remote"),
+    "run": ("workflow", "github_remote"),
+    "workflow": ("workflow", "github_remote"),
+}
+GIT_GLOBAL_OPTIONS_WITH_VALUES = {
+    "-C",
+    "-c",
+    "--config-env",
+    "--git-dir",
+    "--namespace",
+    "--super-prefix",
+    "--work-tree",
+}
+GH_GLOBAL_OPTIONS_WITH_VALUES = {
+    "-H",
+    "-R",
+    "--hostname",
+    "--repo",
+}
 READ_PRODUCTIVITY_NOTE = (
     "Read-to-modify counts are temporal correlations: a read is counted when the same "
     "privacy-preserving path key is modified later in the same source log."
@@ -88,6 +144,27 @@ def read_path_refs_from_command(command: str, *, root: str) -> list[dict[str, st
         seen.add(path_ref["path_key"])
         refs.append(path_ref)
     return refs
+
+
+def git_interaction_from_command(command: str, *, root: str) -> dict[str, str] | None:
+    if root not in GIT_COMMAND_ROOTS:
+        return None
+    tokens = _strip_command_wrappers(_command_tokens(command))
+    if not tokens:
+        return None
+    operation = _git_operation(tokens, root=root)
+    if operation is None:
+        return None
+    if root == "git":
+        category, mutability = GIT_OPERATION_CATEGORIES.get(operation, ("other", "unknown"))
+    else:
+        category, mutability = GH_OPERATION_CATEGORIES.get(operation, ("other", "github_remote"))
+    return {
+        "root": root,
+        "operation": operation,
+        "category": category,
+        "mutability": mutability,
+    }
 
 
 def read_reader(root: str) -> str:
@@ -385,6 +462,26 @@ def _command_child(root: str, tokens: list[str]) -> str:
         return "<none>"
     child = safe_label(_basename(tokens[1]))
     return child or "<arg>"
+
+
+def _git_operation(tokens: list[str], *, root: str) -> str | None:
+    option_args = GIT_GLOBAL_OPTIONS_WITH_VALUES if root == "git" else GH_GLOBAL_OPTIONS_WITH_VALUES
+    skip_next = False
+    for token in tokens[1:]:
+        if skip_next:
+            skip_next = False
+            continue
+        if _is_shell_separator(token):
+            break
+        if token == "--":
+            continue
+        if token.startswith("-"):
+            option_name = token.split("=", 1)[0]
+            if option_name in option_args and "=" not in token:
+                skip_next = True
+            continue
+        return safe_label(_basename(token))
+    return "<none>"
 
 
 def _is_shell_separator(token: str) -> bool:
