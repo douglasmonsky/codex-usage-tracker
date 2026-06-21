@@ -40,6 +40,13 @@ from aggregate local data:
 - Codex credit estimates from the bundled or local rate-card config, including
   confidence/source metadata
 
+The model explicitly prefers the 5-hour usage window (`300` minutes) when a
+usage snapshot exposes more than one rate-limit window. In the current refreshed
+local aggregate index, `primary` is the 5-hour window for all rows with usage
+snapshots and `secondary` is weekly, but the analyzer no longer depends on that
+ordering. Weekly usage is intentionally not the target because 5-hour drain is
+the more reliable local signal for these spans.
+
 Codex app-server documentation also points to live surfaces that are available
 to an integration, but are not yet part of this historical local-log model:
 
@@ -68,7 +75,8 @@ What is not readily available today:
 The model groups chronological aggregate calls into closed positive usage-delta
 spans:
 
-1. Establish a baseline from the first visible `rate_limit_primary_used_percent`.
+1. Establish a baseline from the first visible 5-hour usage percentage, preferring
+   any `300` minute rate-limit window over weekly windows.
 2. Accumulate calls while the visible usage percentage is unchanged.
 3. When the percentage increases, close the span and assign all accumulated calls
    to that positive delta.
@@ -240,6 +248,24 @@ that tokens, fast mode, date, or wall time perfectly explain underlying cost.
 The practical next step is probably to model regime changes explicitly: detect
 when the visible allowance counter leaves the current 1% mode, then use token
 and timing controls only inside comparable regimes.
+
+The `walk_forward_prediction.error_diagnostics` section now shows where the
+remaining misses live:
+
+| scope/model | exact match | within 1 pct point | large error share | strongest miss pattern |
+| --- | ---: | ---: | ---: | --- |
+| all spans, previous delta | 76.9% | 84.7% | 7.6% | large misses cluster in older high-variance periods |
+| all spans, rolling3 mean | 63.1% | 78.1% | 6.7% | smoothing reduces RMSE but creates more small misses |
+| all spans, constant 1% | 50.0% | 64.6% | 24.1% | fails badly before the current 1% regime |
+| newest 20%, previous delta | 99.3% | 100.0% | 0.0% | only a single 1% -> 2% -> 1% blip matters |
+| latest 500, constant 1% | 99.8% | 100.0% | 0.0% | one 2% span accounts for the miss |
+
+For the full-history previous-delta rule, the largest misses are transition
+errors such as `33% -> 5%`, `37% -> 11%`, and `26% -> 5%`. The highest-error
+dates are June 4-5, 2026, and reset-window phase also matters: first-quarter
+spans have a higher mean absolute error than later phases. For the newest
+holdout, the only meaningful error is a `2%` span on June 12, 2026 around hour
+`21`, followed by the expected return to `1%`.
 
 ## Run It
 

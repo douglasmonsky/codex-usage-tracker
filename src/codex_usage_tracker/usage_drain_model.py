@@ -19,6 +19,7 @@ DOCUMENTED_FAST_CREDIT_MULTIPLIERS = {
     "gpt-5.5": 2.5,
     "gpt-5.4": 2.0,
 }
+FIVE_HOUR_WINDOW_MINUTES = 300
 
 USAGE_DRAIN_MODEL_SCHEMA = "codex-usage-tracker-usage-drain-model-v1"
 DEFAULT_PROXY_NAMES = (
@@ -86,6 +87,9 @@ class UsageDeltaSpan:
     timing_totals: dict[str, float] = field(default_factory=dict)
     rate_limit_plan_type: str | None = None
     rate_limit_limit_id: str | None = None
+    usage_window_source: str | None = None
+    usage_window_minutes: float | None = None
+    usage_window_resets_at: float | None = None
     rate_limit_primary_window_minutes: float | None = None
     rate_limit_primary_resets_at: float | None = None
 
@@ -101,6 +105,9 @@ class UsageDeltaSpan:
             "models": "|".join(f"{model}:{count}" for model, count in sorted(self.models.items())),
             "rate_limit_plan_type": self.rate_limit_plan_type,
             "rate_limit_limit_id": self.rate_limit_limit_id,
+            "usage_window_source": self.usage_window_source,
+            "usage_window_minutes": _rounded(self.usage_window_minutes),
+            "usage_window_resets_at": _rounded(self.usage_window_resets_at),
             "rate_limit_primary_window_minutes": _rounded(
                 self.rate_limit_primary_window_minutes
             ),
@@ -212,6 +219,8 @@ def build_usage_delta_spans(
         "rows_without_initial_baseline": 0,
         "censored_or_reset_pending_segments": 0,
         "positive_usage_spans": 0,
+        "five_hour_usage_window_rows": 0,
+        "fallback_usage_window_rows": 0,
     }
 
     baseline_percent: float | None = None
@@ -219,15 +228,20 @@ def build_usage_delta_spans(
     pending_rows: list[dict[str, Any]] = []
 
     for row in sorted_rows:
-        used_percent = _optional_number(row.get("rate_limit_primary_used_percent"))
-        bucket = _usage_bucket(row)
-        if used_percent is None:
+        usage_observation = _preferred_usage_observation(row)
+        if usage_observation["used_percent"] is None:
             stats["rows_without_usage_snapshot"] += 1
             if baseline_percent is None:
                 stats["rows_without_initial_baseline"] += 1
             else:
                 pending_rows.append(row)
             continue
+        used_percent = float(usage_observation["used_percent"])
+        bucket = _usage_bucket(row)
+        if usage_observation["window_minutes"] == FIVE_HOUR_WINDOW_MINUTES:
+            stats["five_hour_usage_window_rows"] += 1
+        else:
+            stats["fallback_usage_window_rows"] += 1
 
         if baseline_percent is None:
             baseline_percent = used_percent
@@ -317,6 +331,7 @@ def summarize_usage_drain_model(
                 "total_tokens",
             ],
             "observed_usage_snapshots": [
+                "selected 5-hour usage window when present",
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
                 "rate_limit_primary_used_percent",
@@ -488,7 +503,15 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 if rolling10_stddev <= 1.0
                 else previous_deltas[-1],
             }
-            rows.append({"index": index, "actual": actual, "predictions": predictions})
+            rows.append(
+                {
+                    "index": index,
+                    "actual": actual,
+                    "previous_actual": previous_deltas[-1],
+                    "metadata": _span_error_metadata(span),
+                    "predictions": predictions,
+                }
+            )
         previous_deltas.append(actual)
     return rows
 
@@ -512,7 +535,177 @@ def _walk_forward_scope_metrics(
             )
             for model_name in model_names
         },
+        "error_diagnostics": {
+            model_name: _prediction_error_diagnostics(scope_rows, model_name)
+            for model_name in (
+                "constant_one_percent",
+                "previous_delta",
+                "rolling3_mean_delta",
+                "rolling10_mode_delta",
+                "adaptive_low_delta_mode",
+            )
+            if model_name in model_names
+        },
     }
+
+
+def _span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
+    start_dt = _parse_timestamp(span.start_event_timestamp)
+    reset_timestamp = (
+        span.usage_window_resets_at
+        if span.usage_window_resets_at is not None
+        else span.rate_limit_primary_resets_at
+    )
+    reset_remaining_minutes = _reset_remaining_minutes(start_dt, reset_timestamp)
+    window_minutes = (
+        span.usage_window_minutes
+        if span.usage_window_minutes is not None
+        else span.rate_limit_primary_window_minutes or 0.0
+    )
+    reset_minutes = reset_remaining_minutes or 0.0
+    elapsed_fraction = (
+        min(max((window_minutes - reset_minutes) / window_minutes, 0.0), 1.0)
+        if window_minutes > 0
+        else 0.0
+    )
+    return {
+        "date": start_dt.date().isoformat() if start_dt else "missing",
+        "day_of_week": str(start_dt.weekday()) if start_dt else "missing",
+        "hour_bucket": f"{start_dt.hour:02d}" if start_dt else "missing",
+        "reset_phase": _reset_phase_bucket(elapsed_fraction),
+        "rate_limit_plan_type": span.rate_limit_plan_type or "missing",
+        "rate_limit_limit_id": span.rate_limit_limit_id or "missing",
+    }
+
+
+def _reset_phase_bucket(elapsed_fraction: float) -> str:
+    if elapsed_fraction <= 0:
+        return "missing"
+    if elapsed_fraction < 0.25:
+        return "first_quarter"
+    if elapsed_fraction < 0.5:
+        return "second_quarter"
+    if elapsed_fraction < 0.75:
+        return "third_quarter"
+    return "fourth_quarter"
+
+
+def _prediction_error_diagnostics(
+    rows: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    errors: list[dict[str, Any]] = []
+    for row in rows:
+        predictions = row.get("predictions", {})
+        predicted = _number(predictions.get(model_name))
+        actual = _number(row.get("actual"))
+        previous_actual = _number(row.get("previous_actual"))
+        error = predicted - actual
+        errors.append(
+            {
+                "index": int(row["index"]),
+                "actual": actual,
+                "predicted": predicted,
+                "previous_actual": previous_actual,
+                "error": error,
+                "abs_error": abs(error),
+                "metadata": row.get("metadata", {}),
+            }
+        )
+    if not errors:
+        return {
+            "n": 0,
+            "exact_match_share": None,
+            "within_quarter_point_share": None,
+            "within_one_point_share": None,
+            "large_error_share": None,
+            "top_transition_errors": [],
+            "top_error_dates": [],
+            "error_by_day_of_week": [],
+            "error_by_hour": [],
+            "error_by_reset_phase": [],
+            "largest_errors": [],
+        }
+    return {
+        "n": len(errors),
+        "exact_match_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] == 0) / len(errors)
+        ),
+        "within_quarter_point_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] <= 0.25) / len(errors)
+        ),
+        "within_one_point_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] <= 1.0) / len(errors)
+        ),
+        "large_error_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] >= 5.0) / len(errors)
+        ),
+        "top_transition_errors": _top_transition_errors(errors),
+        "top_error_dates": _top_error_groups(errors, "date"),
+        "error_by_day_of_week": _top_error_groups(errors, "day_of_week"),
+        "error_by_hour": _top_error_groups(errors, "hour_bucket"),
+        "error_by_reset_phase": _top_error_groups(errors, "reset_phase"),
+        "largest_errors": _largest_prediction_errors(errors),
+    }
+
+
+def _top_transition_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[float, float], list[dict[str, Any]]] = {}
+    for item in errors:
+        key = (round(item["previous_actual"], 6), round(item["actual"], 6))
+        grouped.setdefault(key, []).append(item)
+    rows = [
+        {
+            "previous_delta_percent": previous,
+            "actual_delta_percent": actual,
+            "count": len(items),
+            "mean_abs_error": _rounded(
+                sum(item["abs_error"] for item in items) / len(items)
+            ),
+            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
+        }
+        for (previous, actual), items in grouped.items()
+    ]
+    rows.sort(key=lambda row: (-_number(row["mean_abs_error"]), -int(row["count"])))
+    return rows[:10]
+
+
+def _top_error_groups(errors: list[dict[str, Any]], field_name: str) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in errors:
+        metadata = item.get("metadata", {})
+        key = str(metadata.get(field_name) or "missing")
+        grouped.setdefault(key, []).append(item)
+    rows = [
+        {
+            field_name: key,
+            "count": len(items),
+            "mean_abs_error": _rounded(
+                sum(item["abs_error"] for item in items) / len(items)
+            ),
+            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
+        }
+        for key, items in grouped.items()
+    ]
+    rows.sort(key=lambda row: (-_number(row["mean_abs_error"]), -int(row["count"])))
+    return rows[:10]
+
+
+def _largest_prediction_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = sorted(errors, key=lambda item: item["abs_error"], reverse=True)[:10]
+    return [
+        {
+            "index": item["index"],
+            "date": item["metadata"].get("date"),
+            "hour_bucket": item["metadata"].get("hour_bucket"),
+            "day_of_week": item["metadata"].get("day_of_week"),
+            "reset_phase": item["metadata"].get("reset_phase"),
+            "previous_delta_percent": _rounded(item["previous_actual"]),
+            "actual_delta_percent": _rounded(item["actual"]),
+            "predicted_delta_percent": _rounded(item["predicted"]),
+            "abs_error": _rounded(item["abs_error"]),
+        }
+        for item in rows
+    ]
 
 
 def _value_distribution(values: list[float]) -> dict[str, Any]:
@@ -816,6 +1009,7 @@ def _span_from_rows(
             else:
                 non_candidate[proxy_name] += credits
                 documented_weighted[proxy_name] += credits
+    usage_observation = _preferred_usage_observation(rows[-1])
 
     return UsageDeltaSpan(
         start_event_timestamp=str(rows[0].get("event_timestamp") or ""),
@@ -834,6 +1028,9 @@ def _span_from_rows(
         timing_totals=timing_totals,
         rate_limit_plan_type=_optional_text(rows[-1].get("rate_limit_plan_type")),
         rate_limit_limit_id=_optional_text(rows[-1].get("rate_limit_limit_id")),
+        usage_window_source=str(usage_observation["source"] or "missing"),
+        usage_window_minutes=_optional_number(usage_observation["window_minutes"]),
+        usage_window_resets_at=_optional_number(usage_observation["resets_at"]),
         rate_limit_primary_window_minutes=_optional_number(
             rows[-1].get("rate_limit_primary_window_minutes")
         ),
@@ -873,6 +1070,7 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
     usage_state = (
         *fast_proxy,
         "baseline_used_percent",
+        "usage_window_minutes",
         "rate_limit_primary_window_minutes",
         "reset_remaining_minutes",
         "window_elapsed_minutes",
@@ -948,12 +1146,17 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         PredictiveModelSpec(
             "usage_state",
             usage_state,
-            ("rate_limit_plan_type", "rate_limit_limit_id"),
+            ("rate_limit_plan_type", "rate_limit_limit_id", "usage_window_source"),
         ),
         PredictiveModelSpec(
             "time_controls",
             time_controls,
-            ("rate_limit_plan_type", "rate_limit_limit_id", "day_of_week"),
+            (
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "usage_window_source",
+                "day_of_week",
+            ),
         ),
         PredictiveModelSpec(
             "date_day_hour_controls",
@@ -961,6 +1164,7 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
             (
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
+                "usage_window_source",
                 "date",
                 "day_of_week",
                 "hour_bucket",
@@ -972,6 +1176,7 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
             (
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
+                "usage_window_source",
                 "date",
                 "day_of_week",
                 "hour_bucket",
@@ -980,12 +1185,17 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         PredictiveModelSpec(
             "lag_regime",
             lag_regime,
-            ("rate_limit_plan_type", "rate_limit_limit_id"),
+            ("rate_limit_plan_type", "rate_limit_limit_id", "usage_window_source"),
         ),
         PredictiveModelSpec(
             "lag_time_controls",
             lag_time,
-            ("rate_limit_plan_type", "rate_limit_limit_id", "day_of_week"),
+            (
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "usage_window_source",
+                "day_of_week",
+            ),
         ),
         PredictiveModelSpec(
             "adaptive_full_controls",
@@ -993,6 +1203,7 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
             (
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
+                "usage_window_source",
                 "date",
                 "day_of_week",
                 "hour_bucket",
@@ -1003,14 +1214,6 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
 
 def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
     start_dt = _parse_timestamp(span.start_event_timestamp)
-    reset_remaining_minutes = _reset_remaining_minutes(
-        start_dt, span.rate_limit_primary_resets_at
-    )
-    window_minutes = span.rate_limit_primary_window_minutes or 0.0
-    reset_minutes = reset_remaining_minutes or 0.0
-    window_elapsed_minutes = (
-        max(window_minutes - reset_minutes, 0.0) if window_minutes > 0 else 0.0
-    )
     date_label = start_dt.date().isoformat() if start_dt else "missing"
     day_index = start_dt.weekday() if start_dt else -1
     hour_value = (
@@ -1029,6 +1232,21 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
     reasoning_tokens = span.token_totals.get("reasoning_output_tokens", 0.0)
     total_tokens = span.token_totals.get("total_tokens", 0.0)
     duration = span.timing_totals.get("call_duration_seconds", 0.0)
+    window_minutes = (
+        span.usage_window_minutes
+        if span.usage_window_minutes is not None
+        else span.rate_limit_primary_window_minutes or 0.0
+    )
+    reset_timestamp = (
+        span.usage_window_resets_at
+        if span.usage_window_resets_at is not None
+        else span.rate_limit_primary_resets_at
+    )
+    reset_remaining_minutes = _reset_remaining_minutes(start_dt, reset_timestamp)
+    reset_minutes = reset_remaining_minutes or 0.0
+    window_elapsed_minutes = (
+        max(window_minutes - reset_minutes, 0.0) if window_minutes > 0 else 0.0
+    )
     return {
         "target": span.delta_usage_percent,
         "start_event_timestamp": span.start_event_timestamp,
@@ -1051,7 +1269,9 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "documented_fast_weighted_credits": documented,
         "documented_fast_extra_credits": max(documented - standard, 0.0),
         "baseline_used_percent": span.baseline_used_percent,
-        "rate_limit_primary_window_minutes": window_minutes,
+        "rate_limit_primary_window_minutes": span.rate_limit_primary_window_minutes or 0.0,
+        "usage_window_minutes": window_minutes,
+        "usage_window_source": span.usage_window_source or "missing",
         "reset_remaining_minutes": reset_minutes,
         "window_elapsed_minutes": window_elapsed_minutes,
         "window_elapsed_fraction": (
@@ -1553,12 +1773,54 @@ def _pearson(x_values: list[float], y_values: list[float]) -> float | None:
 
 
 def _usage_bucket(row: dict[str, Any]) -> tuple[Any, ...]:
+    observation = _preferred_usage_observation(row)
     return (
         row.get("rate_limit_plan_type"),
         row.get("rate_limit_limit_id"),
-        row.get("rate_limit_primary_window_minutes"),
-        row.get("rate_limit_primary_resets_at"),
+        observation["source"],
+        observation["window_minutes"],
+        observation["resets_at"],
     )
+
+
+def _preferred_usage_observation(row: dict[str, Any]) -> dict[str, Any]:
+    """Prefer the 5-hour usage window and fall back only when it is unavailable."""
+
+    candidates = [
+        {
+            "source": "primary",
+            "used_percent": _optional_number(row.get("rate_limit_primary_used_percent")),
+            "window_minutes": _optional_number(
+                row.get("rate_limit_primary_window_minutes")
+            ),
+            "resets_at": _optional_number(row.get("rate_limit_primary_resets_at")),
+        },
+        {
+            "source": "secondary",
+            "used_percent": _optional_number(
+                row.get("rate_limit_secondary_used_percent")
+            ),
+            "window_minutes": _optional_number(
+                row.get("rate_limit_secondary_window_minutes")
+            ),
+            "resets_at": _optional_number(row.get("rate_limit_secondary_resets_at")),
+        },
+    ]
+    for candidate in candidates:
+        if (
+            candidate["used_percent"] is not None
+            and candidate["window_minutes"] == FIVE_HOUR_WINDOW_MINUTES
+        ):
+            return candidate
+    for candidate in candidates:
+        if candidate["used_percent"] is not None:
+            return candidate
+    return {
+        "source": "missing",
+        "used_percent": None,
+        "window_minutes": None,
+        "resets_at": None,
+    }
 
 
 def _parse_timestamp(value: str) -> datetime | None:

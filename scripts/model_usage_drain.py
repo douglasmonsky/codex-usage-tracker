@@ -77,6 +77,13 @@ def main() -> int:
     else:
         print(f"Wrote {summary_path}")
         print(f"Wrote {spans_path}")
+        span_stats = summary.get("span_stats") or {}
+        print(
+            "usage windows: five_hour_rows={five_hour} fallback_rows={fallback}".format(
+                five_hour=span_stats.get("five_hour_usage_window_rows"),
+                fallback=span_stats.get("fallback_usage_window_rows"),
+            )
+        )
         for result in summary["results"]:
             print(
                 "{proxy}: spans={spans} candidate_spans={candidate_spans} "

@@ -22,7 +22,11 @@ def _row(
     credits: float,
     *,
     model: str = "gpt-5.5",
+    window_minutes: int = 300,
     resets_at: int = 1000,
+    secondary_used: float | None = None,
+    secondary_window_minutes: int | None = 10080,
+    secondary_resets_at: int | None = 2000,
 ) -> dict[str, object]:
     return {
         "record_id": record_id,
@@ -30,8 +34,11 @@ def _row(
         "rate_limit_plan_type": "plus",
         "rate_limit_limit_id": "codex",
         "rate_limit_primary_used_percent": used,
-        "rate_limit_primary_window_minutes": 300,
+        "rate_limit_primary_window_minutes": window_minutes,
         "rate_limit_primary_resets_at": resets_at,
+        "rate_limit_secondary_used_percent": secondary_used,
+        "rate_limit_secondary_window_minutes": secondary_window_minutes,
+        "rate_limit_secondary_resets_at": secondary_resets_at,
         "usage_credits": credits,
         "model": model,
     }
@@ -74,6 +81,50 @@ def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets(
     assert walk_forward["actual"]["n"] == 1
     assert walk_forward["models"]["constant_one_percent"]["mae"] == 0.0
     assert walk_forward["models"]["previous_delta"]["mae"] == 1.0
+    previous_error = walk_forward["error_diagnostics"]["previous_delta"]
+    assert previous_error["exact_match_share"] == 0.0
+    assert previous_error["top_transition_errors"][0] == {
+        "previous_delta_percent": 2.0,
+        "actual_delta_percent": 1.0,
+        "count": 1,
+        "mean_abs_error": 1.0,
+        "max_abs_error": 1.0,
+    }
+    assert previous_error["largest_errors"][0]["date"] == "2026-06-01"
+
+
+def test_build_usage_delta_spans_prefers_five_hour_window_when_secondary() -> None:
+    rows = [
+        _row(
+            "a",
+            "2026-06-01T00:00:00Z",
+            50.0,
+            1.0,
+            window_minutes=10080,
+            secondary_used=10.0,
+            secondary_window_minutes=300,
+            secondary_resets_at=1500,
+        ),
+        _row(
+            "b",
+            "2026-06-01T00:01:00Z",
+            50.0,
+            2.0,
+            window_minutes=10080,
+            secondary_used=12.0,
+            secondary_window_minutes=300,
+            secondary_resets_at=1500,
+        ),
+    ]
+
+    spans, stats = build_usage_delta_spans(rows)
+
+    assert stats["five_hour_usage_window_rows"] == 2
+    assert stats["fallback_usage_window_rows"] == 0
+    assert len(spans) == 1
+    assert spans[0].usage_window_source == "secondary"
+    assert spans[0].usage_window_minutes == 300
+    assert spans[0].delta_usage_percent == 2.0
 
 
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:
