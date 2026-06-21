@@ -132,6 +132,16 @@ def main() -> int:
                         best_rmse=best_rmse,
                     )
                 )
+        capacity = summary.get("one_percent_capacity_modeling") or {}
+        if capacity.get("models"):
+            print(
+                "one-percent capacity: spans={spans} best_mae={best_mae} "
+                "best_causal_mae={best_causal}".format(
+                    spans=capacity.get("span_count"),
+                    best_mae=capacity.get("best_by_holdout_mae"),
+                    best_causal=capacity.get("best_causal_by_holdout_mae"),
+                )
+            )
     return 0
 
 

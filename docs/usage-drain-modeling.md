@@ -316,6 +316,42 @@ best newest-holdout MAE (`0.003436`). The gain is small, but it captures the
 right operational idea: a single `2%` tick after a long stable regime should be
 treated as a possible blip, not automatic proof that the regime changed.
 
+## One-Percent Tick Capacity
+
+The report now includes `one_percent_capacity_modeling`, which only uses exact
+`1%` spans and switches the target from visible delta to `standard_usage_credits`
+inside that tick. This is the better question when the visible counter is stuck
+in a `1%` regime: not "will the next span be 1%?" but "how much work fits before
+the next 1% tick?"
+
+Current capacity distribution across 725 exact `1%` spans:
+
+| metric | value |
+| --- | ---: |
+| mean standard credits per 1% tick | 42.245 |
+| stddev | 37.268 |
+| min | 0.709 |
+| max | 146.557 |
+
+The capacity models intentionally separate advance-prediction features from
+same-span explanatory features:
+
+| split | model family | holdout MAE | holdout R2 | read |
+| --- | --- | ---: | ---: | --- |
+| time-ordered 80/20 | rolling3 capacity baseline | 17.459 credits | 0.359 | best simple causal predictor of the newest capacity |
+| time-ordered 80/20 | history + start context | 19.478 credits | 0.373 | richer date/hour/window controls do not beat rolling3 MAE |
+| time-ordered 80/20 | same-span shape | 14.628 credits | 0.702 | row count, duration, and wall time explain more after the span is known |
+| time-ordered 80/20 | same-span tokens | 0.082 credits | 0.99999 | near-perfect but mostly accounting identity, because credits are token-derived |
+| interleaved every fifth | rolling3 capacity baseline | 15.297 credits | 0.605 | mixed-history causal capacity is moderately predictable |
+| interleaved every fifth | same-span shape | 8.967 credits | 0.892 | work-shape features explain capacity strongly |
+| interleaved every fifth | same-span tokens | 0.049 credits | 0.999996 | again near-perfect but explanatory, not advance prediction |
+
+Current read: history matters for capacity, especially the previous few `1%`
+ticks. Date, day-of-week, hour, and reset-window context help less than recent
+capacity history. Same-span tokens make the fit look perfect, but that is not a
+forecasting win because the token totals are observed inside the span and the
+credit estimate is derived from them.
+
 ## Run It
 
 Refresh the aggregate index first, then run:

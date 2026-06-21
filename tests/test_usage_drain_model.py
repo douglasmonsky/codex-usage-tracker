@@ -204,6 +204,42 @@ def test_one_percent_regime_grace_ignores_one_small_break() -> None:
     assert calibration["scopes"]["all_after_first"]["best_by_mae"]["mae"] <= grace["mae"]
 
 
+def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
+    rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    used = 0.0
+    for index in range(24):
+        rows.append(
+            _row(
+                f"hold-{index}",
+                f"2026-06-01T00:{(index * 2) + 1:02d}:00Z",
+                used,
+                1.0 + (index % 3),
+            )
+        )
+        used += 1.0
+        rows.append(
+            _row(
+                f"tick-{index}",
+                f"2026-06-01T00:{(index * 2) + 2:02d}:00Z",
+                used,
+                4.0 + (index % 5),
+            )
+        )
+
+    summary = summarize_usage_drain_model(rows)
+
+    capacity = summary["one_percent_capacity_modeling"]
+    assert capacity["span_count"] == 24
+    assert capacity["target"] == "standard_usage_credits"
+    assert capacity["target_distribution"]["n"] == 24
+    assert capacity["best_by_holdout_mae"] is not None
+    assert capacity["best_causal_by_holdout_mae"] is not None
+    kinds = {model["kind"] for model in capacity["models"]}
+    assert "capacity_causal_baseline" in kinds
+    assert "causal_history_context" in kinds
+    assert "explanatory_same_span" in kinds
+
+
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:
     rows = [
         _row("baseline", "2026-06-01T00:00:00Z", 0.0, 0.0),

@@ -325,6 +325,7 @@ def summarize_usage_drain_model(
         "delta_regimes": _delta_regime_summary(spans),
         "regime_streaks": _regime_streak_summary(spans),
         "span_correlations": _span_correlation_summary(spans),
+        "one_percent_capacity_modeling": _one_percent_capacity_modeling(spans),
         "walk_forward_prediction": _walk_forward_prediction_summary(spans),
         "documented_fast_multipliers": dict(DOCUMENTED_FAST_CREDIT_MULTIPLIERS),
         "available_signals": {
@@ -524,6 +525,267 @@ def _span_correlation_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
             ),
         },
     }
+
+
+def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    rows = [
+        _one_percent_capacity_row(span)
+        for span in spans
+        if _is_one_percent_delta(span.delta_usage_percent)
+    ]
+    if len(rows) < 10:
+        return {
+            "target": "standard_usage_credits",
+            "target_description": (
+                "Aggregate standard usage credits inside exact 1% visible-counter spans."
+            ),
+            "span_count": len(rows),
+            "splits": ["time_ordered_80_20", "interleaved_every_5th"],
+            "best_by_holdout_mae": None,
+            "best_causal_by_holdout_mae": None,
+            "models": [],
+        }
+    _add_days_since_first_span(rows)
+    _add_capacity_history_features(rows)
+    models: list[dict[str, Any]] = []
+    for split_name, train_rows, holdout_rows in _split_feature_rows(
+        rows, train_fraction=0.8
+    ):
+        models.extend(_fit_capacity_baseline_models(train_rows, holdout_rows, split_name))
+        for spec, kind in _capacity_model_specs():
+            fitted = _fit_predictive_model(train_rows, holdout_rows, spec)
+            if fitted is None:
+                continue
+            fitted["validation"] = split_name
+            fitted["kind"] = kind
+            fitted["name"] = f"{spec.name}__{split_name}"
+            models.append(fitted)
+    best_model = _best_holdout_model(models)
+    best_causal = _best_holdout_model(
+        [model for model in models if model.get("kind") != "explanatory_same_span"]
+    )
+    return {
+        "target": "standard_usage_credits",
+        "target_description": (
+            "Aggregate standard usage credits inside exact 1% visible-counter spans."
+        ),
+        "span_count": len(rows),
+        "target_distribution": _value_distribution(
+            [_number(row.get("target")) for row in rows]
+        ),
+        "splits": ["time_ordered_80_20", "interleaved_every_5th"],
+        "best_by_holdout_mae": best_model["name"] if best_model else None,
+        "best_causal_by_holdout_mae": best_causal["name"] if best_causal else None,
+        "models": models,
+        "notes": [
+            "Causal/history models use prior closed spans plus start-time context.",
+            "Explanatory same-span models use work observed inside the span and should not be treated as advance predictions.",
+        ],
+    }
+
+
+def _one_percent_capacity_row(span: UsageDeltaSpan) -> dict[str, Any]:
+    row = _span_feature_row(span, proxy="all_candidates")
+    row["target"] = span.standard_usage_credits
+    row["log_target"] = math.log1p(max(span.standard_usage_credits, 0.0))
+    return row
+
+
+def _add_capacity_history_features(rows: list[dict[str, Any]]) -> None:
+    previous_rows: list[dict[str, Any]] = []
+    hour_rows: dict[str, list[dict[str, Any]]] = {}
+    day_of_week_rows: dict[str, list[dict[str, Any]]] = {}
+    ewma_target: float | None = None
+    alpha = 0.2
+    for row in rows:
+        hour_key = str(row.get("hour_bucket") or "missing")
+        day_of_week_key = str(row.get("day_of_week") or "missing")
+        recent_hour_rows = hour_rows.get(hour_key, [])
+        recent_day_of_week_rows = day_of_week_rows.get(day_of_week_key, [])
+        row["previous_capacity_credits"] = _previous_value(previous_rows, "target")
+        row["rolling3_capacity_credits"] = _rolling_mean(previous_rows, "target", 3)
+        row["rolling10_capacity_credits"] = _rolling_mean(previous_rows, "target", 10)
+        row["rolling10_capacity_median"] = _rolling_median(previous_rows, "target", 10)
+        row["rolling10_capacity_stddev"] = _rolling_stddev(previous_rows, "target", 10)
+        row["same_hour_rolling10_capacity_credits"] = _rolling_mean(
+            recent_hour_rows, "target", 10
+        )
+        row["same_hour_seen_count"] = float(len(recent_hour_rows))
+        row["same_day_of_week_rolling10_capacity_credits"] = _rolling_mean(
+            recent_day_of_week_rows, "target", 10
+        )
+        row["same_day_of_week_seen_count"] = float(len(recent_day_of_week_rows))
+        row["ewma_capacity_credits"] = ewma_target or 0.0
+
+        current_target = _number(row.get("target"))
+        ewma_target = (
+            current_target
+            if ewma_target is None
+            else (alpha * current_target) + ((1 - alpha) * ewma_target)
+        )
+        previous_rows.append(row)
+        hour_rows.setdefault(hour_key, []).append(row)
+        day_of_week_rows.setdefault(day_of_week_key, []).append(row)
+
+
+def _fit_capacity_baseline_models(
+    train_rows: list[dict[str, Any]],
+    holdout_rows: list[dict[str, Any]],
+    split_name: str,
+) -> list[dict[str, Any]]:
+    train_y = [_number(row.get("target")) for row in train_rows]
+    holdout_y = [_number(row.get("target")) for row in holdout_rows]
+    train_mean = sum(train_y) / len(train_y) if train_y else 0.0
+    baselines: list[tuple[str, str | None, float | None]] = [
+        ("capacity_train_mean", None, train_mean),
+        ("capacity_previous", "previous_capacity_credits", None),
+        ("capacity_rolling3", "rolling3_capacity_credits", None),
+        ("capacity_rolling10", "rolling10_capacity_credits", None),
+        ("capacity_rolling10_median", "rolling10_capacity_median", None),
+        ("capacity_ewma", "ewma_capacity_credits", None),
+        (
+            "capacity_same_hour_rolling10",
+            "same_hour_rolling10_capacity_credits",
+            None,
+        ),
+        (
+            "capacity_same_day_of_week_rolling10",
+            "same_day_of_week_rolling10_capacity_credits",
+            None,
+        ),
+    ]
+    results: list[dict[str, Any]] = []
+    for name, feature_field, constant in baselines:
+        train_predictions = _baseline_predictions(
+            train_rows, field=feature_field, constant=constant
+        )
+        holdout_predictions = _baseline_predictions(
+            holdout_rows, field=feature_field, constant=constant
+        )
+        results.append(
+            {
+                "name": f"{name}__{split_name}",
+                "validation": split_name,
+                "kind": "capacity_causal_baseline",
+                "feature_count": 1 if feature_field or constant is not None else 0,
+                "numeric_features": [feature_field] if feature_field else [],
+                "categorical_features": [],
+                "train": _regression_metrics(train_y, train_predictions),
+                "holdout": _regression_metrics(holdout_y, holdout_predictions),
+                "top_coefficients": [],
+            }
+        )
+    return results
+
+
+def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
+    start_context = (
+        "baseline_used_percent",
+        "usage_window_minutes",
+        "reset_remaining_minutes",
+        "window_elapsed_minutes",
+        "window_elapsed_fraction",
+        "days_since_first_span",
+        "hour_sin",
+        "hour_cos",
+        "day_of_week_sin",
+        "day_of_week_cos",
+        "is_weekend",
+    )
+    history_context = (
+        *start_context,
+        "previous_capacity_credits",
+        "rolling3_capacity_credits",
+        "rolling10_capacity_credits",
+        "rolling10_capacity_median",
+        "rolling10_capacity_stddev",
+        "same_hour_rolling10_capacity_credits",
+        "same_hour_seen_count",
+        "same_day_of_week_rolling10_capacity_credits",
+        "same_day_of_week_seen_count",
+        "ewma_capacity_credits",
+    )
+    same_span_shape = (
+        *history_context,
+        "row_count",
+        "call_duration_seconds",
+        "mean_call_duration_seconds",
+        "previous_call_delta_seconds",
+        "span_wall_time_seconds",
+        "span_wall_time_minutes",
+        "mean_span_wall_time_seconds_per_call",
+    )
+    same_span_tokens = (
+        *same_span_shape,
+        "input_tokens",
+        "cached_input_tokens",
+        "uncached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "total_tokens",
+        "cache_ratio",
+        "output_token_share",
+        "reasoning_output_share",
+    )
+    time_categories = (
+        "rate_limit_plan_type",
+        "rate_limit_limit_id",
+        "usage_window_source",
+        "day_of_week",
+    )
+    date_categories = (*time_categories, "date", "hour_bucket")
+    return [
+        (
+            PredictiveModelSpec(
+                "capacity_start_context",
+                start_context,
+                time_categories,
+            ),
+            "causal_start_context",
+        ),
+        (
+            PredictiveModelSpec(
+                "capacity_date_hour_context",
+                start_context,
+                date_categories,
+            ),
+            "causal_start_context",
+        ),
+        (
+            PredictiveModelSpec(
+                "capacity_history_context",
+                history_context,
+                time_categories,
+            ),
+            "causal_history_context",
+        ),
+        (
+            PredictiveModelSpec(
+                "capacity_same_span_shape",
+                same_span_shape,
+                time_categories,
+            ),
+            "explanatory_same_span",
+        ),
+        (
+            PredictiveModelSpec(
+                "capacity_same_span_tokens",
+                same_span_tokens,
+                time_categories,
+            ),
+            "explanatory_same_span",
+        ),
+    ]
+
+
+def _best_holdout_model(models: list[dict[str, Any]]) -> dict[str, Any] | None:
+    return min(
+        models,
+        key=lambda result: _number(result.get("holdout", {}).get("mae"))
+        if result.get("holdout", {}).get("mae") is not None
+        else math.inf,
+        default=None,
+    )
 
 
 SPAN_RAW_CORRELATION_FEATURES = (
