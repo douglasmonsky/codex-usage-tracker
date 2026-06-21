@@ -303,6 +303,7 @@ def summarize_usage_drain_model(
         "model_mix": _count_values(rows, "model"),
         "rate_limit_plan_type_mix": _count_values(rows, "rate_limit_plan_type"),
         "rate_limit_limit_id_mix": _count_values(rows, "rate_limit_limit_id"),
+        "delta_regimes": _delta_regime_summary(spans),
         "documented_fast_multipliers": dict(DOCUMENTED_FAST_CREDIT_MULTIPLIERS),
         "available_signals": {
             "direct_fast_mode_flag": False,
@@ -365,6 +366,61 @@ def summarize_usage_drain_model(
             else None,
             "models": predictive_models,
         },
+    }
+
+
+def _delta_regime_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    train_size = max(1, min(len(spans) - 1, int(len(spans) * 0.8))) if spans else 0
+    return {
+        "all_spans": _delta_distribution(spans),
+        "time_ordered_train_80": _delta_distribution(spans[:train_size]),
+        "time_ordered_holdout_20": _delta_distribution(spans[train_size:]),
+        "latest_100": _delta_distribution(spans[-100:]),
+        "latest_25": _delta_distribution(spans[-25:]),
+    }
+
+
+def _delta_distribution(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    values = [span.delta_usage_percent for span in spans]
+    if not values:
+        return {
+            "spans": 0,
+            "mean_delta_percent": None,
+            "median_delta_percent": None,
+            "std_delta_percent": None,
+            "min_delta_percent": None,
+            "max_delta_percent": None,
+            "one_percent_share": None,
+            "top_delta_values": [],
+        }
+    mean_value = sum(values) / len(values)
+    counts: dict[float, int] = {}
+    for value in values:
+        rounded_value = round(value, 6)
+        counts[rounded_value] = counts.get(rounded_value, 0) + 1
+    top_values = [
+        {
+            "delta_percent": value,
+            "count": count,
+            "share": _rounded(count / len(values)),
+        }
+        for value, count in sorted(
+            counts.items(), key=lambda item: (-item[1], item[0])
+        )[:8]
+    ]
+    return {
+        "spans": len(values),
+        "mean_delta_percent": _rounded(mean_value),
+        "median_delta_percent": _rounded(median(values)),
+        "std_delta_percent": _rounded(
+            math.sqrt(sum((value - mean_value) ** 2 for value in values) / len(values))
+        ),
+        "min_delta_percent": _rounded(min(values)),
+        "max_delta_percent": _rounded(max(values)),
+        "one_percent_share": _rounded(
+            sum(1 for value in values if round(value, 6) == 1.0) / len(values)
+        ),
+        "top_delta_values": top_values,
     }
 
 
@@ -521,7 +577,36 @@ def _fit_causal_baseline_models(
         ("rolling3_delta", "rolling3_delta_percent", None),
         ("rolling10_delta", "rolling10_delta_percent", None),
         ("rolling50_delta", "rolling50_delta_percent", None),
+        ("rolling10_median_delta", "rolling10_median_delta_percent", None),
+        ("rolling10_mode_delta", "rolling10_mode_delta_percent", None),
         ("same_bucket_rolling10_delta", "same_bucket_rolling10_delta_percent", None),
+        (
+            "same_bucket_rolling10_mode_delta",
+            "same_bucket_rolling10_mode_delta_percent",
+            None,
+        ),
+        ("same_date_rolling10_delta", "same_date_rolling10_delta_percent", None),
+        (
+            "same_date_rolling10_mode_delta",
+            "same_date_rolling10_mode_delta_percent",
+            None,
+        ),
+        ("same_hour_rolling10_delta", "same_hour_rolling10_delta_percent", None),
+        (
+            "same_hour_rolling10_mode_delta",
+            "same_hour_rolling10_mode_delta_percent",
+            None,
+        ),
+        (
+            "same_day_of_week_rolling10_delta",
+            "same_day_of_week_rolling10_delta_percent",
+            None,
+        ),
+        (
+            "same_day_of_week_rolling10_mode_delta",
+            "same_day_of_week_rolling10_mode_delta_percent",
+            None,
+        ),
         ("ewma_delta", "ewma_delta_percent", None),
     ]
     results: list[dict[str, Any]] = []
@@ -659,6 +744,8 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "baseline_used_percent",
         "rate_limit_primary_window_minutes",
         "reset_remaining_minutes",
+        "window_elapsed_minutes",
+        "window_elapsed_fraction",
     )
     time_controls = (
         *usage_state,
@@ -682,14 +769,28 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "rolling3_delta_percent",
         "rolling10_delta_percent",
         "rolling50_delta_percent",
+        "rolling10_median_delta_percent",
+        "rolling10_mode_delta_percent",
+        "rolling10_delta_stddev",
+        "rolling50_delta_stddev",
         "rolling3_drain_per_credit",
         "rolling10_drain_per_credit",
         "rolling50_drain_per_credit",
         "rolling10_low_delta_share",
         "rolling3_to_50_delta_ratio",
         "same_bucket_rolling10_delta_percent",
+        "same_bucket_rolling10_mode_delta_percent",
         "same_bucket_rolling10_drain_per_credit",
         "same_bucket_seen_count",
+        "same_date_rolling10_delta_percent",
+        "same_date_rolling10_mode_delta_percent",
+        "same_date_seen_count",
+        "same_hour_rolling10_delta_percent",
+        "same_hour_rolling10_mode_delta_percent",
+        "same_hour_seen_count",
+        "same_day_of_week_rolling10_delta_percent",
+        "same_day_of_week_rolling10_mode_delta_percent",
+        "same_day_of_week_seen_count",
         "ewma_delta_percent",
         "ewma_drain_per_credit",
     )
@@ -774,6 +875,11 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
     reset_remaining_minutes = _reset_remaining_minutes(
         start_dt, span.rate_limit_primary_resets_at
     )
+    window_minutes = span.rate_limit_primary_window_minutes or 0.0
+    reset_minutes = reset_remaining_minutes or 0.0
+    window_elapsed_minutes = (
+        max(window_minutes - reset_minutes, 0.0) if window_minutes > 0 else 0.0
+    )
     date_label = start_dt.date().isoformat() if start_dt else "missing"
     day_index = start_dt.weekday() if start_dt else -1
     hour_value = (
@@ -814,8 +920,14 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "documented_fast_weighted_credits": documented,
         "documented_fast_extra_credits": max(documented - standard, 0.0),
         "baseline_used_percent": span.baseline_used_percent,
-        "rate_limit_primary_window_minutes": span.rate_limit_primary_window_minutes or 0.0,
-        "reset_remaining_minutes": reset_remaining_minutes or 0.0,
+        "rate_limit_primary_window_minutes": window_minutes,
+        "reset_remaining_minutes": reset_minutes,
+        "window_elapsed_minutes": window_elapsed_minutes,
+        "window_elapsed_fraction": (
+            min(max(window_elapsed_minutes / window_minutes, 0.0), 1.0)
+            if window_minutes > 0
+            else 0.0
+        ),
         "days_since_first_span": 0.0,
         "hour_sin": math.sin(2 * math.pi * hour_value / 24.0),
         "hour_cos": math.cos(2 * math.pi * hour_value / 24.0),
@@ -854,6 +966,9 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
 
     previous_rows: list[dict[str, Any]] = []
     bucket_rows: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    date_rows: dict[str, list[dict[str, Any]]] = {}
+    hour_rows: dict[str, list[dict[str, Any]]] = {}
+    day_of_week_rows: dict[str, list[dict[str, Any]]] = {}
     ewma_delta: float | None = None
     ewma_drain: float | None = None
     alpha = 0.2
@@ -862,12 +977,24 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
             str(row.get("rate_limit_plan_type") or "missing"),
             str(row.get("rate_limit_limit_id") or "missing"),
         )
+        date_key = str(row.get("date") or "missing")
+        hour_key = str(row.get("hour_bucket") or "missing")
+        day_of_week_key = str(row.get("day_of_week") or "missing")
         recent_bucket_rows = bucket_rows.get(bucket_key, [])
+        recent_date_rows = date_rows.get(date_key, [])
+        recent_hour_rows = hour_rows.get(hour_key, [])
+        recent_day_of_week_rows = day_of_week_rows.get(day_of_week_key, [])
         row["previous_delta_percent"] = _previous_value(previous_rows, "target")
         row["previous_drain_per_credit"] = _previous_drain_per_credit(previous_rows)
         row["rolling3_delta_percent"] = _rolling_mean(previous_rows, "target", 3)
         row["rolling10_delta_percent"] = _rolling_mean(previous_rows, "target", 10)
         row["rolling50_delta_percent"] = _rolling_mean(previous_rows, "target", 50)
+        row["rolling10_median_delta_percent"] = _rolling_median(
+            previous_rows, "target", 10
+        )
+        row["rolling10_mode_delta_percent"] = _rolling_mode(previous_rows, "target", 10)
+        row["rolling10_delta_stddev"] = _rolling_stddev(previous_rows, "target", 10)
+        row["rolling50_delta_stddev"] = _rolling_stddev(previous_rows, "target", 50)
         row["rolling3_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 3)
         row["rolling10_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 10)
         row["rolling50_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 50)
@@ -879,23 +1006,54 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
         row["same_bucket_rolling10_delta_percent"] = _rolling_mean(
             recent_bucket_rows, "target", 10
         )
+        row["same_bucket_rolling10_mode_delta_percent"] = _rolling_mode(
+            recent_bucket_rows, "target", 10
+        )
         row["same_bucket_rolling10_drain_per_credit"] = _rolling_drain_per_credit(
             recent_bucket_rows, 10
         )
         row["same_bucket_seen_count"] = float(len(recent_bucket_rows))
+        row["same_date_rolling10_delta_percent"] = _rolling_mean(
+            recent_date_rows, "target", 10
+        )
+        row["same_date_rolling10_mode_delta_percent"] = _rolling_mode(
+            recent_date_rows, "target", 10
+        )
+        row["same_date_seen_count"] = float(len(recent_date_rows))
+        row["same_hour_rolling10_delta_percent"] = _rolling_mean(
+            recent_hour_rows, "target", 10
+        )
+        row["same_hour_rolling10_mode_delta_percent"] = _rolling_mode(
+            recent_hour_rows, "target", 10
+        )
+        row["same_hour_seen_count"] = float(len(recent_hour_rows))
+        row["same_day_of_week_rolling10_delta_percent"] = _rolling_mean(
+            recent_day_of_week_rows, "target", 10
+        )
+        row["same_day_of_week_rolling10_mode_delta_percent"] = _rolling_mode(
+            recent_day_of_week_rows, "target", 10
+        )
+        row["same_day_of_week_seen_count"] = float(len(recent_day_of_week_rows))
         row["ewma_delta_percent"] = ewma_delta or 0.0
         row["ewma_drain_per_credit"] = ewma_drain or 0.0
 
         current_delta = _number(row.get("target"))
         current_drain = _drain_per_credit(row)
         ewma_delta = (
-            current_delta if ewma_delta is None else (alpha * current_delta) + ((1 - alpha) * ewma_delta)
+            current_delta
+            if ewma_delta is None
+            else (alpha * current_delta) + ((1 - alpha) * ewma_delta)
         )
         ewma_drain = (
-            current_drain if ewma_drain is None else (alpha * current_drain) + ((1 - alpha) * ewma_drain)
+            current_drain
+            if ewma_drain is None
+            else (alpha * current_drain) + ((1 - alpha) * ewma_drain)
         )
         previous_rows.append(row)
         bucket_rows.setdefault(bucket_key, []).append(row)
+        date_rows.setdefault(date_key, []).append(row)
+        hour_rows.setdefault(hour_key, []).append(row)
+        day_of_week_rows.setdefault(day_of_week_key, []).append(row)
 
 
 def _previous_value(rows: list[dict[str, Any]], field: str) -> float:
@@ -915,6 +1073,38 @@ def _rolling_mean(rows: list[dict[str, Any]], field: str, window: int) -> float:
     if not selected:
         return 0.0
     return sum(_number(row.get(field)) for row in selected) / len(selected)
+
+
+def _rolling_median(rows: list[dict[str, Any]], field: str, window: int) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    return float(median(_number(row.get(field)) for row in selected))
+
+
+def _rolling_mode(rows: list[dict[str, Any]], field: str, window: int) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    counts: dict[float, int] = {}
+    values = [_number(row.get(field)) for row in selected]
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    max_count = max(counts.values())
+    candidates = {value for value, count in counts.items() if count == max_count}
+    for value in reversed(values):
+        if value in candidates:
+            return value
+    return values[-1]
+
+
+def _rolling_stddev(rows: list[dict[str, Any]], field: str, window: int) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    values = [_number(row.get(field)) for row in selected]
+    mean = sum(values) / len(values)
+    return math.sqrt(sum((value - mean) ** 2 for value in values) / len(values))
 
 
 def _rolling_drain_per_credit(rows: list[dict[str, Any]], window: int) -> float:

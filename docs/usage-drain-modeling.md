@@ -96,14 +96,15 @@ The script also fits exploratory predictive control families on closed spans:
 - `fast_proxy`: token shape plus fast-proxy candidate credit share and documented
   fast-weighted credits
 - `usage_state`: fast proxy plus baseline observed usage percent, limit-window
-  length, reset timing, plan type, and limit id
+  length, reset timing, reset-window elapsed/fraction, plan type, and limit id
 - `time_controls`: usage state plus day-of-week, weekend, hour sine/cosine, and
   days since first span
 - `date_day_hour_controls`: time controls plus date/day/hour categorical controls
 - `full_controls`: date/day/hour controls plus call duration and previous-call gap
 - `lag_regime`: usage state plus prior-span and rolling causal history features
-  such as previous delta, rolling 3/10/50-span deltas, drain-per-credit rolling
-  means, EWMA, low-delta share, and same-limit-bucket history
+  such as previous delta, rolling 3/10/50-span deltas, rolling median/mode,
+  rolling volatility, drain-per-credit rolling means, EWMA, low-delta share,
+  same-limit-bucket history, and same-date/hour/day-of-week history
 - `lag_time_controls`: lag regime plus day/hour controls
 - `adaptive_full_controls`: lag time controls plus duration and previous-call gap
 
@@ -114,7 +115,16 @@ The script also reports simple causal baselines:
 - `rolling3_delta`
 - `rolling10_delta`
 - `rolling50_delta`
+- `rolling10_median_delta`
+- `rolling10_mode_delta`
 - `same_bucket_rolling10_delta`
+- `same_bucket_rolling10_mode_delta`
+- `same_date_rolling10_delta`
+- `same_date_rolling10_mode_delta`
+- `same_hour_rolling10_delta`
+- `same_hour_rolling10_mode_delta`
+- `same_day_of_week_rolling10_delta`
+- `same_day_of_week_rolling10_mode_delta`
 - `ewma_delta`
 
 Two validation splits are reported:
@@ -187,6 +197,28 @@ usage counter starts moving in 1% increments, the next closed positive span is
 usually another 1% increment. That is close to perfect predictability for the
 visible percentage deltas, but it is also a reminder that the target is a coarse
 displayed allowance counter, not exact per-call billing.
+
+After adding explicit date/hour/day-of-week history, rolling mode/median, and
+reset-window phase features, the aggregate report became clearer but not
+materially closer to exact billing:
+
+| validation split | model | holdout R2 | holdout MAE | interpretation |
+| --- | --- | ---: | ---: | --- |
+| time ordered 80/20 | constant one percent | -0.00 | 0.003 pct points | newest holdout is almost entirely 1% deltas |
+| time ordered 80/20 | rolling10 mode delta | -0.00 | 0.003 pct points | mode collapses to the same 1% rule |
+| time ordered 80/20 | same-date rolling10 delta | very negative | 0.027 pct points | date-specific history is close, but worse than the simple 1% rule |
+| interleaved every fifth | previous delta persistence | 0.85 | 0.85 pct points | still the best simple mixed-history MAE |
+| interleaved every fifth | same-date rolling10 delta | 0.76 | 1.43 pct points | date context helps, but does not beat immediate persistence |
+| interleaved every fifth | same-hour rolling10 delta | 0.70 | 1.71 pct points | hour-of-day context is weaker |
+| interleaved every fifth | same-day-of-week rolling10 delta | 0.74 | 1.54 pct points | weekday context helps some, but is not dominant |
+| interleaved every fifth | adaptive full controls | 0.85 | 1.36 pct points | richer controls slightly improve R2 but not MAE |
+
+The new `delta_regimes` summary explains why. In the refreshed local aggregate
+index, there are 1,452 closed positive spans. Across all spans, `1%` deltas are
+725 spans, or 49.9%. In the newest time-ordered holdout, `1%` deltas are 290 of
+291 spans, or 99.7%. The latest 100 closed spans are all `1%`. That makes the
+visible counter highly predictable right now, but mostly because the displayed
+counter is quantized and currently moving in a very stable regime.
 
 ## Run It
 

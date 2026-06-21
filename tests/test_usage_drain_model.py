@@ -11,6 +11,7 @@ from codex_usage_tracker.usage_drain_model import (
     fit_predictive_usage_drain_models,
     fit_usage_drain_proxy,
     load_fast_proxy_annotations,
+    summarize_usage_drain_model,
 )
 
 
@@ -61,6 +62,14 @@ def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets(
     assert spans[0].candidate_standard_credits["strong_only"] == 5.0
     assert spans[0].documented_fast_weighted_credits["strong_only"] == 12.5
     assert spans[1].non_candidate_standard_credits["strong_only"] == 4.0
+
+    summary = summarize_usage_drain_model(rows, fast_proxy_annotations=proxies)
+    assert summary["delta_regimes"]["all_spans"]["spans"] == 2
+    assert summary["delta_regimes"]["all_spans"]["top_delta_values"][0] == {
+        "delta_percent": 1.0,
+        "count": 1,
+        "share": 0.5,
+    }
 
 
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:
@@ -180,6 +189,12 @@ def test_causal_baselines_capture_low_delta_regime_shift() -> None:
     by_name = {result["name"]: result for result in results}
 
     persistence = by_name["persistence_previous_delta__time_ordered_80_20"]["holdout"]
+    rolling_mode = by_name["rolling10_mode_delta__time_ordered_80_20"]["holdout"]
+    same_bucket_mode = by_name[
+        "same_bucket_rolling10_mode_delta__time_ordered_80_20"
+    ]["holdout"]
     train_mean = by_name["baseline_train_mean__time_ordered_80_20"]["holdout"]
     assert persistence["mae"] == 0.0
+    assert rolling_mode["mae"] == 0.0
+    assert same_bucket_mode["mae"] == 0.0
     assert persistence["mae"] < train_mean["mae"]
