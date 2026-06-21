@@ -152,3 +152,34 @@ def test_predictive_models_compare_control_families_on_holdout() -> None:
     assert by_name["baseline_train_mean__interleaved_every_5th"]["holdout"]["r2"] < 0.1
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["r2"] > 0.9
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["mae"] < 0.2
+
+
+def test_causal_baselines_capture_low_delta_regime_shift() -> None:
+    spans: list[UsageDeltaSpan] = []
+    for index in range(80):
+        delta = 6.0 if index < 50 else 1.0
+        spans.append(
+            UsageDeltaSpan(
+                start_event_timestamp=f"2026-06-{1 + (index // 8):02d}T{index % 24:02d}:00:00Z",
+                end_event_timestamp=f"2026-06-{1 + (index // 8):02d}T{index % 24:02d}:01:00Z",
+                baseline_used_percent=20.0,
+                end_used_percent=20.0 + delta,
+                delta_usage_percent=delta,
+                row_count=1,
+                standard_usage_credits=10.0,
+                non_candidate_standard_credits={"all_candidates": 10.0},
+                candidate_standard_credits={"all_candidates": 0.0},
+                documented_fast_weighted_credits={"all_candidates": 10.0},
+                candidate_row_counts={"all_candidates": 0},
+                rate_limit_plan_type="pro",
+                rate_limit_limit_id="codex",
+            )
+        )
+
+    results = fit_predictive_usage_drain_models(spans)
+    by_name = {result["name"]: result for result in results}
+
+    persistence = by_name["persistence_previous_delta__time_ordered_80_20"]["holdout"]
+    train_mean = by_name["baseline_train_mean__time_ordered_80_20"]["holdout"]
+    assert persistence["mae"] == 0.0
+    assert persistence["mae"] < train_mean["mae"]

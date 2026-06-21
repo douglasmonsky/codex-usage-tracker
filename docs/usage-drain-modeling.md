@@ -22,7 +22,10 @@ Official Codex documentation says:
 Sources:
 
 - [Codex Speed](https://developers.openai.com/codex/speed)
+- [Codex Pricing](https://developers.openai.com/codex/pricing)
 - [Codex rate card](https://help.openai.com/en/articles/20001106-codex-rate-card)
+- [Codex app-server](https://developers.openai.com/codex/app-server)
+- [Codex configuration reference](https://developers.openai.com/codex/config-reference)
 
 Tracker documentation and schema show that these fields are readily available
 from aggregate local data:
@@ -36,6 +39,22 @@ from aggregate local data:
   dashboard/live call APIs
 - Codex credit estimates from the bundled or local rate-card config, including
   confidence/source metadata
+
+Codex app-server documentation also points to live surfaces that are available
+to an integration, but are not yet part of this historical local-log model:
+
+- `account/read` can report auth mode and `planType`.
+- `account/rateLimits/read` and `account/rateLimits/updated` can expose current
+  ChatGPT rate-limit state.
+- `account/usage/read` can fetch account token-activity summaries and daily
+  buckets.
+- streamed item schemas include command, file-change, MCP tool, dynamic tool,
+  web-search, image-view, and compaction items; command and dynamic-tool items
+  can include `durationMs`.
+
+Those sources are useful candidates for a future live calibration layer. For the
+current report, they should not be treated as historical evidence unless the
+tracker explicitly captures aggregate snapshots from them.
 
 What is not readily available today:
 
@@ -82,6 +101,21 @@ The script also fits exploratory predictive control families on closed spans:
   days since first span
 - `date_day_hour_controls`: time controls plus date/day/hour categorical controls
 - `full_controls`: date/day/hour controls plus call duration and previous-call gap
+- `lag_regime`: usage state plus prior-span and rolling causal history features
+  such as previous delta, rolling 3/10/50-span deltas, drain-per-credit rolling
+  means, EWMA, low-delta share, and same-limit-bucket history
+- `lag_time_controls`: lag regime plus day/hour controls
+- `adaptive_full_controls`: lag time controls plus duration and previous-call gap
+
+The script also reports simple causal baselines:
+
+- `constant_one_percent`
+- `persistence_previous_delta`
+- `rolling3_delta`
+- `rolling10_delta`
+- `rolling50_delta`
+- `same_bucket_rolling10_delta`
+- `ewma_delta`
 
 Two validation splits are reported:
 
@@ -135,6 +169,24 @@ Current read: better variables move the model from “barely explanatory” to
 largest remaining issue is regime drift: the newest spans average roughly 1%
 usage deltas, while earlier training spans average roughly 5%. More prediction
 work should focus on regime/window detection before adding more raw features.
+
+After adding causal rolling/regime features, the newest future holdout became
+much more predictable:
+
+| validation split | model | holdout R2 | holdout MAE | interpretation |
+| --- | --- | ---: | ---: | --- |
+| time ordered 80/20 | constant one percent | -0.00 | 0.003 pct points | newest positive deltas are almost always 1% |
+| time ordered 80/20 | previous delta persistence | -1.01 | 0.007 pct points | previous-delta prediction is also nearly exact |
+| time ordered 80/20 | lag regime ridge | very negative | 0.68 pct points | learned rolling features help, but direct causal baselines are better |
+| interleaved every fifth | previous delta persistence | 0.85 | 0.85 pct points | short-term drain regime persistence explains most mixed-history variation |
+| interleaved every fifth | adaptive full controls | 0.84 | 1.35 pct points | richer controls help less than direct persistence |
+
+Current updated read: for the latest observed regime, the best predictor is not
+model cost or calendar time. It is the counter behavior itself: once the visible
+usage counter starts moving in 1% increments, the next closed positive span is
+usually another 1% increment. That is close to perfect predictability for the
+visible percentage deltas, but it is also a reminder that the target is a coarse
+displayed allowance counter, not exact per-call billing.
 
 ## Run It
 

@@ -481,10 +481,12 @@ def fit_predictive_usage_drain_models(
     if len(feature_rows) < 10:
         return []
     _add_days_since_first_span(feature_rows)
+    _add_causal_history_features(feature_rows)
     results: list[dict[str, Any]] = []
     for split_name, train_rows, holdout_rows in _split_feature_rows(
         feature_rows, train_fraction=train_fraction
     ):
+        results.extend(_fit_causal_baseline_models(train_rows, holdout_rows, split_name))
         for spec in _predictive_model_specs():
             fitted = _fit_predictive_model(train_rows, holdout_rows, spec)
             if fitted is not None:
@@ -506,6 +508,56 @@ def _split_feature_rows(
         ("time_ordered_80_20", time_train, time_holdout),
         ("interleaved_every_5th", interleaved_train, interleaved_holdout),
     ]
+
+
+def _fit_causal_baseline_models(
+    train_rows: list[dict[str, Any]],
+    holdout_rows: list[dict[str, Any]],
+    split_name: str,
+) -> list[dict[str, Any]]:
+    baselines: list[tuple[str, str | None, float | None]] = [
+        ("constant_one_percent", None, 1.0),
+        ("persistence_previous_delta", "previous_delta_percent", None),
+        ("rolling3_delta", "rolling3_delta_percent", None),
+        ("rolling10_delta", "rolling10_delta_percent", None),
+        ("rolling50_delta", "rolling50_delta_percent", None),
+        ("same_bucket_rolling10_delta", "same_bucket_rolling10_delta_percent", None),
+        ("ewma_delta", "ewma_delta_percent", None),
+    ]
+    results: list[dict[str, Any]] = []
+    for name, feature_field, constant in baselines:
+        train_y = [_number(row.get("target")) for row in train_rows]
+        holdout_y = [_number(row.get("target")) for row in holdout_rows]
+        train_predictions = _baseline_predictions(
+            train_rows, field=feature_field, constant=constant
+        )
+        holdout_predictions = _baseline_predictions(
+            holdout_rows, field=feature_field, constant=constant
+        )
+        results.append(
+            {
+                "name": f"{name}__{split_name}",
+                "validation": split_name,
+                "kind": "causal_baseline",
+                "feature_count": 1 if feature_field or constant is not None else 0,
+                "numeric_features": [feature_field] if feature_field else [],
+                "categorical_features": [],
+                "train": _regression_metrics(train_y, train_predictions),
+                "holdout": _regression_metrics(holdout_y, holdout_predictions),
+                "top_coefficients": [],
+            }
+        )
+    return results
+
+
+def _baseline_predictions(
+    rows: list[dict[str, Any]], *, field: str | None, constant: float | None
+) -> list[float]:
+    if constant is not None:
+        return [constant for _row in rows]
+    if field is None:
+        return [0.0 for _row in rows]
+    return [_number(row.get(field)) for row in rows]
 
 
 def _span_from_rows(
@@ -623,6 +675,39 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "mean_call_duration_seconds",
         "previous_call_delta_seconds",
     )
+    lag_regime = (
+        *usage_state,
+        "previous_delta_percent",
+        "previous_drain_per_credit",
+        "rolling3_delta_percent",
+        "rolling10_delta_percent",
+        "rolling50_delta_percent",
+        "rolling3_drain_per_credit",
+        "rolling10_drain_per_credit",
+        "rolling50_drain_per_credit",
+        "rolling10_low_delta_share",
+        "rolling3_to_50_delta_ratio",
+        "same_bucket_rolling10_delta_percent",
+        "same_bucket_rolling10_drain_per_credit",
+        "same_bucket_seen_count",
+        "ewma_delta_percent",
+        "ewma_drain_per_credit",
+    )
+    lag_time = (
+        *lag_regime,
+        "days_since_first_span",
+        "hour_sin",
+        "hour_cos",
+        "day_of_week_sin",
+        "day_of_week_cos",
+        "is_weekend",
+    )
+    adaptive_full = (
+        *lag_time,
+        "call_duration_seconds",
+        "mean_call_duration_seconds",
+        "previous_call_delta_seconds",
+    )
     return [
         PredictiveModelSpec("baseline_train_mean", ()),
         PredictiveModelSpec("credits_only", base),
@@ -652,6 +737,27 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         PredictiveModelSpec(
             "full_controls",
             duration_controls,
+            (
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "date",
+                "day_of_week",
+                "hour_bucket",
+            ),
+        ),
+        PredictiveModelSpec(
+            "lag_regime",
+            lag_regime,
+            ("rate_limit_plan_type", "rate_limit_limit_id"),
+        ),
+        PredictiveModelSpec(
+            "lag_time_controls",
+            lag_time,
+            ("rate_limit_plan_type", "rate_limit_limit_id", "day_of_week"),
+        ),
+        PredictiveModelSpec(
+            "adaptive_full_controls",
+            adaptive_full,
             (
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
@@ -741,6 +847,96 @@ def _add_days_since_first_span(rows: list[dict[str, Any]]) -> None:
             row["days_since_first_span"] = max(
                 (parsed.date() - first_date.date()).days, 0
             )
+
+
+def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
+    """Attach walk-forward features that only use previous closed spans."""
+
+    previous_rows: list[dict[str, Any]] = []
+    bucket_rows: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    ewma_delta: float | None = None
+    ewma_drain: float | None = None
+    alpha = 0.2
+    for row in rows:
+        bucket_key = (
+            str(row.get("rate_limit_plan_type") or "missing"),
+            str(row.get("rate_limit_limit_id") or "missing"),
+        )
+        recent_bucket_rows = bucket_rows.get(bucket_key, [])
+        row["previous_delta_percent"] = _previous_value(previous_rows, "target")
+        row["previous_drain_per_credit"] = _previous_drain_per_credit(previous_rows)
+        row["rolling3_delta_percent"] = _rolling_mean(previous_rows, "target", 3)
+        row["rolling10_delta_percent"] = _rolling_mean(previous_rows, "target", 10)
+        row["rolling50_delta_percent"] = _rolling_mean(previous_rows, "target", 50)
+        row["rolling3_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 3)
+        row["rolling10_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 10)
+        row["rolling50_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 50)
+        row["rolling10_low_delta_share"] = _rolling_low_delta_share(previous_rows, 10)
+        rolling50 = _number(row["rolling50_delta_percent"])
+        row["rolling3_to_50_delta_ratio"] = (
+            _number(row["rolling3_delta_percent"]) / rolling50 if rolling50 > 0 else 0.0
+        )
+        row["same_bucket_rolling10_delta_percent"] = _rolling_mean(
+            recent_bucket_rows, "target", 10
+        )
+        row["same_bucket_rolling10_drain_per_credit"] = _rolling_drain_per_credit(
+            recent_bucket_rows, 10
+        )
+        row["same_bucket_seen_count"] = float(len(recent_bucket_rows))
+        row["ewma_delta_percent"] = ewma_delta or 0.0
+        row["ewma_drain_per_credit"] = ewma_drain or 0.0
+
+        current_delta = _number(row.get("target"))
+        current_drain = _drain_per_credit(row)
+        ewma_delta = (
+            current_delta if ewma_delta is None else (alpha * current_delta) + ((1 - alpha) * ewma_delta)
+        )
+        ewma_drain = (
+            current_drain if ewma_drain is None else (alpha * current_drain) + ((1 - alpha) * ewma_drain)
+        )
+        previous_rows.append(row)
+        bucket_rows.setdefault(bucket_key, []).append(row)
+
+
+def _previous_value(rows: list[dict[str, Any]], field: str) -> float:
+    if not rows:
+        return 0.0
+    return _number(rows[-1].get(field))
+
+
+def _previous_drain_per_credit(rows: list[dict[str, Any]]) -> float:
+    if not rows:
+        return 0.0
+    return _drain_per_credit(rows[-1])
+
+
+def _rolling_mean(rows: list[dict[str, Any]], field: str, window: int) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    return sum(_number(row.get(field)) for row in selected) / len(selected)
+
+
+def _rolling_drain_per_credit(rows: list[dict[str, Any]], window: int) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    return sum(_drain_per_credit(row) for row in selected) / len(selected)
+
+
+def _rolling_low_delta_share(rows: list[dict[str, Any]], window: int) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    low_count = sum(1 for row in selected if _number(row.get("target")) <= 1.0)
+    return low_count / len(selected)
+
+
+def _drain_per_credit(row: dict[str, Any]) -> float:
+    credits = _number(row.get("standard_usage_credits"))
+    if credits <= 0:
+        return 0.0
+    return _number(row.get("target")) / credits
 
 
 def _fit_predictive_model(
@@ -908,16 +1104,24 @@ def _regression_metrics(
             "pearson": None,
             "mean_actual": None,
             "mean_predicted": None,
+            "std_actual": None,
+            "min_actual": None,
+            "max_actual": None,
         }
     errors = [prediction - value for value, prediction in zip(actual, predicted, strict=True)]
+    mean_actual = sum(actual) / len(actual)
+    actual_variance = sum((value - mean_actual) ** 2 for value in actual) / len(actual)
     return {
         "n": len(actual),
         "r2": _rounded(_r2(actual, predicted)),
         "mae": _rounded(sum(abs(error) for error in errors) / len(errors)),
         "rmse": _rounded(math.sqrt(sum(error * error for error in errors) / len(errors))),
         "pearson": _rounded(_pearson(actual, predicted)),
-        "mean_actual": _rounded(sum(actual) / len(actual)),
+        "mean_actual": _rounded(mean_actual),
         "mean_predicted": _rounded(sum(predicted) / len(predicted)),
+        "std_actual": _rounded(math.sqrt(actual_variance)),
+        "min_actual": _rounded(min(actual)),
+        "max_actual": _rounded(max(actual)),
     }
 
 
