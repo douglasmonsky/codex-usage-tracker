@@ -15,6 +15,7 @@
       { key: 'toolOutput', title: 'Tool Output', path: '/api/diagnostics/tool-output', refreshPath: '/api/diagnostics/tool-output/refresh' },
       { key: 'commands', title: 'Commands', path: '/api/diagnostics/commands', refreshPath: '/api/diagnostics/commands/refresh' },
       { key: 'fileReads', title: 'File Reads', path: '/api/diagnostics/file-reads', refreshPath: '/api/diagnostics/file-reads/refresh' },
+      { key: 'fileModifications', title: 'File Modifications', path: '/api/diagnostics/file-modifications', refreshPath: '/api/diagnostics/file-modifications/refresh' },
       { key: 'readProductivity', title: 'Read Productivity', path: '/api/diagnostics/read-productivity', refreshPath: '/api/diagnostics/read-productivity/refresh' },
       { key: 'concentration', title: 'Concentration', path: '/api/diagnostics/concentration', refreshPath: '/api/diagnostics/concentration/refresh' },
     ];
@@ -75,6 +76,7 @@
       if (key === 'toolOutput') return renderToolOutput(payload);
       if (key === 'commands') return renderCommands(payload);
       if (key === 'fileReads') return renderFileReads(payload);
+      if (key === 'fileModifications') return renderFileModifications(payload);
       if (key === 'readProductivity') return renderReadProductivity(payload);
       if (key === 'concentration') return renderConcentration(payload);
       return renderState('No renderer for this diagnostic section.');
@@ -163,6 +165,30 @@
           ['Path label', 'Reads', 'Allocated tokens'],
           paths.map(row => [pathLabel(row), tokenText(row.read_events), tokenText(row.allocated_output_token_sum)]),
           'No path rows in this snapshot.',
+        )}
+      `;
+    }
+
+    function renderFileModifications(payload) {
+      const summary = payload?.summary || {};
+      const paths = Array.isArray(payload?.top_paths) ? payload.top_paths.slice(0, 8) : [];
+      const extensions = Array.isArray(payload?.by_extension) ? payload.by_extension.slice(0, 8) : [];
+      return `
+        ${renderKeyValueTable([
+          ['Modification events', tokenText(summary.modification_events)],
+          ['Modified path events', tokenText(summary.modified_path_events)],
+          ['Unique paths modified', tokenText(summary.unique_paths_modified)],
+          ['Largest event path count', tokenText(summary.largest_event_path_count)],
+        ])}
+        ${renderSimpleTable(
+          ['Path label', 'Modifications'],
+          paths.map(row => [pathLabel(row), tokenText(row.modification_events)]),
+          'No modified path rows in this snapshot.',
+        )}
+        ${renderSimpleTable(
+          ['Extension', 'Count'],
+          extensions.map(row => [row.extension, tokenText(row.count)]),
+          'No file-extension rows in this snapshot.',
         )}
       `;
     }

@@ -51,6 +51,7 @@ Tracked schema ids:
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
 | `codex-usage-tracker-diagnostic-commands-v1` | CLI `diagnostics commands --json`, dashboard server `/api/diagnostics/commands` |
 | `codex-usage-tracker-diagnostic-file-reads-v1` | CLI `diagnostics file-reads --json`, dashboard server `/api/diagnostics/file-reads` |
+| `codex-usage-tracker-diagnostic-file-modifications-v1` | CLI `diagnostics file-modifications --json`, dashboard server `/api/diagnostics/file-modifications` |
 | `codex-usage-tracker-diagnostic-read-productivity-v1` | CLI `diagnostics read-productivity --json`, dashboard server `/api/diagnostics/read-productivity` |
 | `codex-usage-tracker-diagnostic-concentration-v1` | CLI `diagnostics concentration --json`, dashboard server `/api/diagnostics/concentration` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
@@ -455,6 +456,46 @@ Schema: `codex-usage-tracker-diagnostic-file-reads-v1`
 ```
 
 The file-reads snapshot classifies common shell readers such as `cat`, `sed`, `nl`, `rg`, and `find`. Path labels are basename-only with a short irreversible hash; raw commands, command arguments, absolute paths, file contents, and tool output are not stored.
+
+## Diagnostic File Modifications Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics file-modifications --json
+codex-usage-tracker diagnostics file-modifications --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/file-modifications`
+- `POST /api/diagnostics/file-modifications/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-file-modifications-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-file-modifications-v1",
+  "section": "file-modifications",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "modification_events": 2,
+    "modified_path_events": 3,
+    "unique_paths_modified": 2,
+    "largest_event_path_count": 2
+  },
+  "top_paths": [],
+  "by_extension": [],
+  "largest_events": [],
+  "path_privacy": {},
+  "notes": []
+}
+```
+
+The file-modifications snapshot counts structured patch events and modified paths. Path labels are basename-only with short irreversible hashes; patch text, raw absolute paths, file contents, raw commands, tool output, and JSONL fragments are not stored.
 
 ## Diagnostic Read Productivity Snapshot
 

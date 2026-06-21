@@ -20,6 +20,8 @@ from codex_usage_tracker.diagnostic_snapshot_constants import (
     DIAGNOSTIC_COMMANDS_SECTION,
     DIAGNOSTIC_CONCENTRATION_SCHEMA,
     DIAGNOSTIC_CONCENTRATION_SECTION,
+    DIAGNOSTIC_FILE_MODIFICATIONS_SCHEMA,
+    DIAGNOSTIC_FILE_MODIFICATIONS_SECTION,
     DIAGNOSTIC_FILE_READS_SCHEMA,
     DIAGNOSTIC_FILE_READS_SECTION,
     DIAGNOSTIC_HISTORY_ACTIVE,
@@ -113,6 +115,23 @@ def build_diagnostic_file_reads_report(
         refresh=refresh,
         section=DIAGNOSTIC_FILE_READS_SECTION,
         schema=DIAGNOSTIC_FILE_READS_SCHEMA,
+    )
+
+
+def build_diagnostic_file_modifications_report(
+    *,
+    db_path: Path = DEFAULT_DB_PATH,
+    include_archived: bool = False,
+    refresh: bool = False,
+) -> DiagnosticSnapshotReport:
+    """Return the latest file-modification snapshot, optionally recomputing it first."""
+
+    return _build_source_log_snapshot_report(
+        db_path=db_path,
+        include_archived=include_archived,
+        refresh=refresh,
+        section=DIAGNOSTIC_FILE_MODIFICATIONS_SECTION,
+        schema=DIAGNOSTIC_FILE_MODIFICATIONS_SCHEMA,
     )
 
 
@@ -219,6 +238,7 @@ def refresh_diagnostic_snapshots(
         DIAGNOSTIC_TOOL_OUTPUT_SECTION: DIAGNOSTIC_TOOL_OUTPUT_SCHEMA,
         DIAGNOSTIC_COMMANDS_SECTION: DIAGNOSTIC_COMMANDS_SCHEMA,
         DIAGNOSTIC_FILE_READS_SECTION: DIAGNOSTIC_FILE_READS_SCHEMA,
+        DIAGNOSTIC_FILE_MODIFICATIONS_SECTION: DIAGNOSTIC_FILE_MODIFICATIONS_SCHEMA,
         DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: DIAGNOSTIC_READ_PRODUCTIVITY_SCHEMA,
     }
     source_payloads = {
@@ -247,6 +267,7 @@ def refresh_diagnostic_snapshots(
             "toolOutput": source_payloads[DIAGNOSTIC_TOOL_OUTPUT_SECTION],
             "commands": source_payloads[DIAGNOSTIC_COMMANDS_SECTION],
             "fileReads": source_payloads[DIAGNOSTIC_FILE_READS_SECTION],
+            "fileModifications": source_payloads[DIAGNOSTIC_FILE_MODIFICATIONS_SECTION],
             "readProductivity": source_payloads[DIAGNOSTIC_READ_PRODUCTIVITY_SECTION],
             "concentration": concentration_payload,
         },
@@ -351,6 +372,18 @@ def _persist_source_log_snapshot(
             top_paths=analysis["file_reads"]["top_paths"],
             largest_read_commands=analysis["file_reads"]["largest_read_commands"],
             path_privacy=analysis["file_reads"]["path_privacy"],
+        )
+    elif section == DIAGNOSTIC_FILE_MODIFICATIONS_SECTION:
+        payload = _ready_payload(
+            schema=schema,
+            section=section,
+            snapshot=snapshot,
+            refreshed=True,
+            summary=analysis["file_modifications"]["summary"],
+            top_paths=analysis["file_modifications"]["top_paths"],
+            by_extension=analysis["file_modifications"]["by_extension"],
+            largest_events=analysis["file_modifications"]["largest_events"],
+            path_privacy=analysis["file_modifications"]["path_privacy"],
         )
     elif section == DIAGNOSTIC_READ_PRODUCTIVITY_SECTION:
         payload = _ready_payload(
@@ -586,6 +619,12 @@ def _missing_payload(
         payload["by_reader"] = []
         payload["top_paths"] = []
         payload["largest_read_commands"] = []
+        payload["path_privacy"] = path_privacy_metadata()
+    elif section == DIAGNOSTIC_FILE_MODIFICATIONS_SECTION:
+        payload["summary"] = None
+        payload["top_paths"] = []
+        payload["by_extension"] = []
+        payload["largest_events"] = []
         payload["path_privacy"] = path_privacy_metadata()
     elif section == DIAGNOSTIC_READ_PRODUCTIVITY_SECTION:
         payload["summary"] = None

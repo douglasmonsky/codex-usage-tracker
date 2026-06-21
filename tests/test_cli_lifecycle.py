@@ -427,6 +427,15 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "--refresh",
         "--json",
     )
+    file_modifications_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "file-modifications",
+        "--refresh",
+        "--json",
+    )
     read_productivity_refresh = _run_cli(
         tmp_path,
         "--db",
@@ -470,6 +479,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     tool_output_refresh_payload = json.loads(tool_output_refresh.stdout)
     commands_refresh_payload = json.loads(commands_refresh.stdout)
     file_reads_refresh_payload = json.loads(file_reads_refresh.stdout)
+    file_modifications_refresh_payload = json.loads(file_modifications_refresh.stdout)
     read_productivity_refresh_payload = json.loads(read_productivity_refresh.stdout)
     concentration_refresh_payload = json.loads(concentration_refresh.stdout)
     fact_calls_payload = json.loads(fact_calls.stdout)
@@ -483,6 +493,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         tool_output_refresh_payload,
         commands_refresh_payload,
         file_reads_refresh_payload,
+        file_modifications_refresh_payload,
         read_productivity_refresh_payload,
         concentration_refresh_payload,
         fact_calls_payload,
@@ -537,6 +548,11 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         == "codex-usage-tracker-diagnostic-file-reads-v1"
     )
     assert file_reads_refresh_payload["summary"]["read_events"] == 0
+    assert (
+        file_modifications_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-file-modifications-v1"
+    )
+    assert file_modifications_refresh_payload["summary"]["modification_events"] == 1
     assert (
         read_productivity_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-read-productivity-v1"
@@ -663,7 +679,11 @@ def _make_diagnostics_codex_home(tmp_path: Path) -> Path:
             ),
             _entry(
                 "event_msg",
-                {"type": "patch_apply_end", "patch": "SECRET PATCH TEXT"},
+                {
+                    "type": "patch_apply_end",
+                    "changed_paths": ["src/app.py"],
+                    "patch": "SECRET PATCH TEXT",
+                },
             ),
             _token_event(120, 120),
             _entry(

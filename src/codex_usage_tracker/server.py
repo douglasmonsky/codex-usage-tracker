@@ -38,6 +38,7 @@ from codex_usage_tracker.diagnostic_reports import (
 from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_commands_report,
     build_diagnostic_concentration_report,
+    build_diagnostic_file_modifications_report,
     build_diagnostic_file_reads_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
@@ -325,6 +326,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/diagnostics/file-reads":
             self._handle_diagnostics_file_reads(parsed.query)
             return
+        if parsed.path == "/api/diagnostics/file-modifications":
+            self._handle_diagnostics_file_modifications(parsed.query)
+            return
         if parsed.path == "/api/diagnostics/read-productivity":
             self._handle_diagnostics_read_productivity(parsed.query)
             return
@@ -361,6 +365,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/diagnostics/file-reads/refresh":
             self._handle_diagnostics_file_reads_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/file-modifications/refresh":
+            self._handle_diagnostics_file_modifications_refresh(parsed.query)
             return
         if parsed.path == "/api/diagnostics/read-productivity/refresh":
             self._handle_diagnostics_read_productivity_refresh(parsed.query)
@@ -1086,6 +1093,22 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             build_report=build_diagnostic_file_reads_report,
             refresh=True,
             label="diagnostic file reads",
+        )
+
+    def _handle_diagnostics_file_modifications(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_file_modifications_report,
+            refresh=False,
+            label="diagnostic file modifications",
+        )
+
+    def _handle_diagnostics_file_modifications_refresh(self, query: str) -> None:
+        self._handle_diagnostic_snapshot(
+            query,
+            build_report=build_diagnostic_file_modifications_report,
+            refresh=True,
+            label="diagnostic file modifications",
         )
 
     def _handle_diagnostics_read_productivity(self, query: str) -> None:

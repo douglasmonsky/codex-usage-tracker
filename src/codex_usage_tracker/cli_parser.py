@@ -375,6 +375,18 @@ def _add_diagnostics_parser(
     )
     file_reads.add_argument("--json", action="store_true", dest="as_json")
 
+    file_modifications = diagnostic_subparsers.add_parser(
+        "file-modifications",
+        help="Show on-demand aggregate file-modification snapshots",
+    )
+    file_modifications.add_argument("--include-archived", action="store_true")
+    file_modifications.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the file-modification snapshot before reading it.",
+    )
+    file_modifications.add_argument("--json", action="store_true", dest="as_json")
+
     read_productivity = diagnostic_subparsers.add_parser(
         "read-productivity",
         help="Show temporal read-to-modify diagnostic correlations",

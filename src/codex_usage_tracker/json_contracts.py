@@ -210,6 +210,21 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "notes": list,
         }
     },
+    "codex-usage-tracker-diagnostic-file-modifications-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "top_paths": list,
+            "by_extension": list,
+            "largest_events": list,
+            "path_privacy": dict,
+            "notes": list,
+        }
+    },
     "codex-usage-tracker-diagnostic-read-productivity-v1": {
         "required": {
             "section": str,
