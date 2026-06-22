@@ -54,6 +54,31 @@ REGIME_GRACE_SPANS = 1
 REGIME_GRACE_MAX_BREAK_DELTA = 2.0
 REGIME_GRACE_THRESHOLD_GRID = (3, 5, 10, 25, 50, 100, 200)
 REGIME_GRACE_SPAN_GRID = (1, 2, 3)
+RISK_GATE_THRESHOLDS = (
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0,
+)
+TRANSITION_DELTA_RISK_GATE_THRESHOLD = 0.5
+TRANSITION_DELTA_RISK_GATE_THRESHOLDS = RISK_GATE_THRESHOLDS
 STATE_BUCKET_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
     "empirical_history_state_mode": (
         (
@@ -199,29 +224,7 @@ BOUNDARY_CONDITIONED_DELTA_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ..
     ),
 }
 BOUNDARY_DELTA_RISK_GATE_THRESHOLD = 0.5
-BOUNDARY_DELTA_RISK_GATE_THRESHOLDS = (
-    0.0,
-    0.05,
-    0.1,
-    0.15,
-    0.2,
-    0.25,
-    0.3,
-    0.35,
-    0.4,
-    0.45,
-    0.5,
-    0.55,
-    0.6,
-    0.65,
-    0.7,
-    0.75,
-    0.8,
-    0.85,
-    0.9,
-    0.95,
-    1.0,
-)
+BOUNDARY_DELTA_RISK_GATE_THRESHOLDS = RISK_GATE_THRESHOLDS
 BOUNDARY_DELTA_RESIDUAL_MODELS = (
     "previous_delta",
     "risk_weighted_label_segment_age_mode",
@@ -3305,6 +3308,18 @@ def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
                 "Uses the modal prior actual delta from matching previous-delta "
                 "plus the prior span's wall-time and call-duration buckets."
             ),
+            "transition_gated_history_state_mode": (
+                "Uses the 1% continuation grace rule unless matched history-state "
+                "transition risk is at least 50%, then uses matched history-state mode."
+            ),
+            "transition_weighted_history_state_mode": (
+                "Blends the 1% continuation grace rule with matched history-state "
+                "mode according to matched history-state transition risk."
+            ),
+            "adaptive_mae_transition_gate_history_state_mode": (
+                "Learns the prior-best transition-risk threshold by MAE, then gates "
+                "between the 1% continuation grace rule and matched history-state mode."
+            ),
         },
         "scopes": {
             name: _walk_forward_scope_metrics(rows, start_index=start_index)
@@ -3319,6 +3334,9 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
     rows: list[dict[str, Any]] = []
     previous_deltas: list[float] = []
     previous_state_rows: list[dict[str, Any]] = []
+    transition_gate_absolute_error_sums = {
+        threshold: 0.0 for threshold in TRANSITION_DELTA_RISK_GATE_THRESHOLDS
+    }
     for index, span in enumerate(spans):
         actual = span.delta_usage_percent
         metadata = _span_error_metadata(span)
@@ -3393,17 +3411,96 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 previous_state_rows,
                 state,
             )
-            rows.append(
-                {
-                    "index": index,
-                    "actual": actual,
-                    "previous_actual": previous_deltas[-1],
-                    "metadata": state,
-                    "predictions": predictions,
-                    "prediction_details": state_prediction_details,
-                    "transition_risks": transition_risks,
-                    "transition_risk_details": transition_risk_details,
-                }
+            history_state_prediction = _number(
+                predictions.get("empirical_history_state_mode")
+            )
+            continuation_prediction = _number(predictions.get("one_percent_regime_grace"))
+            history_state_risk = _number(transition_risks.get("history_state_risk"))
+            adaptive_threshold, adaptive_threshold_detail = (
+                _best_transition_delta_gate_threshold_from_sums(
+                    transition_gate_absolute_error_sums,
+                    training_count=len(rows),
+                )
+            )
+            transition_gate_prediction = _risk_gated_transition_delta_prediction(
+                continuation_prediction=continuation_prediction,
+                alternate_prediction=history_state_prediction,
+                risk=history_state_risk,
+                threshold=TRANSITION_DELTA_RISK_GATE_THRESHOLD,
+            )
+            transition_weighted_prediction = continuation_prediction + (
+                history_state_risk
+                * (history_state_prediction - continuation_prediction)
+            )
+            adaptive_gate_prediction = _risk_gated_transition_delta_prediction(
+                continuation_prediction=continuation_prediction,
+                alternate_prediction=history_state_prediction,
+                risk=history_state_risk,
+                threshold=adaptive_threshold,
+            )
+            predictions["transition_gated_history_state_mode"] = (
+                transition_gate_prediction
+            )
+            predictions["transition_weighted_history_state_mode"] = (
+                transition_weighted_prediction
+            )
+            predictions["adaptive_mae_transition_gate_history_state_mode"] = (
+                adaptive_gate_prediction
+            )
+            history_state_risk_detail = (
+                transition_risk_details.get("history_state_risk") or {}
+            )
+            prediction_details = {
+                **state_prediction_details,
+                "transition_gated_history_state_mode": {
+                    "source": "transition_gate_history_state_mode"
+                    if history_state_risk >= TRANSITION_DELTA_RISK_GATE_THRESHOLD
+                    else "transition_gate_continuation",
+                    "risk_model": "history_state_risk",
+                    "risk": _rounded(history_state_risk),
+                    "risk_threshold": TRANSITION_DELTA_RISK_GATE_THRESHOLD,
+                    "risk_detail": history_state_risk_detail,
+                    "continuation_model": "one_percent_regime_grace",
+                    "alternate_model": "empirical_history_state_mode",
+                },
+                "transition_weighted_history_state_mode": {
+                    "source": "transition_weighted_blend",
+                    "risk_model": "history_state_risk",
+                    "risk": _rounded(history_state_risk),
+                    "risk_detail": history_state_risk_detail,
+                    "continuation_model": "one_percent_regime_grace",
+                    "alternate_model": "empirical_history_state_mode",
+                },
+                "adaptive_mae_transition_gate_history_state_mode": {
+                    "source": "adaptive_transition_gate_history_state_mode"
+                    if history_state_risk >= adaptive_threshold
+                    else "adaptive_transition_gate_continuation",
+                    "risk_model": "history_state_risk",
+                    "risk": _rounded(history_state_risk),
+                    "risk_threshold": adaptive_threshold,
+                    "training_metric": adaptive_threshold_detail.get("metric"),
+                    "training_error": adaptive_threshold_detail.get("error"),
+                    "training_support": adaptive_threshold_detail.get("support"),
+                    "threshold_source": adaptive_threshold_detail.get("source"),
+                    "risk_detail": history_state_risk_detail,
+                    "continuation_model": "one_percent_regime_grace",
+                    "alternate_model": "empirical_history_state_mode",
+                },
+            }
+            row = {
+                "index": index,
+                "actual": actual,
+                "previous_actual": previous_deltas[-1],
+                "metadata": state,
+                "predictions": predictions,
+                "prediction_details": prediction_details,
+                "transition_risks": transition_risks,
+                "transition_risk_details": transition_risk_details,
+            }
+            rows.append(row)
+            _update_transition_delta_gate_threshold_sums(
+                transition_gate_absolute_error_sums,
+                row=row,
             )
         previous_state_rows.append(
             {
@@ -3413,6 +3510,72 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
         )
         previous_deltas.append(actual)
     return rows
+
+
+def _risk_gated_transition_delta_prediction(
+    *,
+    continuation_prediction: float,
+    alternate_prediction: float,
+    risk: float,
+    threshold: float,
+) -> float:
+    if risk >= threshold:
+        return alternate_prediction
+    return continuation_prediction
+
+
+def _best_transition_delta_gate_threshold_from_sums(
+    error_sums: dict[float, float],
+    *,
+    training_count: int,
+) -> tuple[float, dict[str, Any]]:
+    if training_count < STATE_BUCKET_MIN_SUPPORT:
+        return TRANSITION_DELTA_RISK_GATE_THRESHOLD, {
+            "source": "fallback_fixed_threshold",
+            "metric": "mae",
+            "support": training_count,
+            "error": None,
+        }
+    candidates = [
+        (threshold, error_sum / training_count)
+        for threshold, error_sum in error_sums.items()
+    ]
+    threshold, error_value = min(
+        candidates,
+        key=lambda item: (
+            item[1],
+            abs(item[0] - TRANSITION_DELTA_RISK_GATE_THRESHOLD),
+            item[0],
+        ),
+    )
+    return threshold, {
+        "source": "prior_best_threshold",
+        "metric": "mae",
+        "support": training_count,
+        "error": _rounded(error_value),
+    }
+
+
+def _update_transition_delta_gate_threshold_sums(
+    absolute_error_sums: dict[float, float],
+    *,
+    row: dict[str, Any],
+) -> None:
+    actual = _number(row.get("actual"))
+    predictions = row.get("predictions") or {}
+    continuation_prediction = _number(predictions.get("one_percent_regime_grace"))
+    alternate_prediction = _number(predictions.get("empirical_history_state_mode"))
+    details = row.get("prediction_details") or {}
+    gate_detail = details.get("transition_gated_history_state_mode") or {}
+    risk = _number(gate_detail.get("risk"))
+    for threshold in TRANSITION_DELTA_RISK_GATE_THRESHOLDS:
+        prediction = _risk_gated_transition_delta_prediction(
+            continuation_prediction=continuation_prediction,
+            alternate_prediction=alternate_prediction,
+            risk=risk,
+            threshold=threshold,
+        )
+        absolute_error_sums[threshold] += abs(prediction - actual)
 
 
 def _walk_forward_scope_metrics(
@@ -3448,6 +3611,18 @@ def _walk_forward_scope_metrics(
                 "empirical_calendar_state_mode",
                 "empirical_reset_state_mode",
                 "empirical_previous_work_state_mode",
+                "transition_gated_history_state_mode",
+                "transition_weighted_history_state_mode",
+                "adaptive_mae_transition_gate_history_state_mode",
+            )
+            if model_name in model_names
+        },
+        "transition_gate_diagnostics": {
+            model_name: _transition_delta_gate_diagnostics(scope_rows, model_name)
+            for model_name in (
+                "transition_gated_history_state_mode",
+                "transition_weighted_history_state_mode",
+                "adaptive_mae_transition_gate_history_state_mode",
             )
             if model_name in model_names
         },
@@ -3665,6 +3840,55 @@ def _state_bucket_model_diagnostics(
         ),
         "fallback_share": _rounded((len(details) - len(matched)) / len(details)),
         "top_signatures": top_signatures,
+    }
+
+
+def _transition_delta_gate_diagnostics(
+    rows: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    details = [
+        (row.get("prediction_details") or {}).get(model_name) or {}
+        for row in rows
+    ]
+    if not details:
+        return {
+            "n": 0,
+            "override_share": None,
+            "mean_risk": None,
+            "mean_threshold": None,
+            "source_counts": [],
+        }
+    source_counts: dict[str, int] = {}
+    risks: list[float] = []
+    thresholds: list[float] = []
+    for detail in details:
+        source = str(detail.get("source") or "missing")
+        source_counts[source] = source_counts.get(source, 0) + 1
+        risks.append(_number(detail.get("risk")))
+        if detail.get("risk_threshold") is not None:
+            thresholds.append(_number(detail.get("risk_threshold")))
+    override_count = sum(
+        count
+        for source, count in source_counts.items()
+        if source.endswith("_history_state_mode")
+    )
+    return {
+        "n": len(details),
+        "override_share": _rounded(override_count / len(details)),
+        "mean_risk": _rounded(sum(risks) / len(risks) if risks else None),
+        "mean_threshold": _rounded(
+            sum(thresholds) / len(thresholds) if thresholds else None
+        ),
+        "source_counts": [
+            {
+                "source": source,
+                "count": count,
+                "share": _rounded(count / len(details)),
+            }
+            for source, count in sorted(
+                source_counts.items(), key=lambda item: (-item[1], item[0])
+            )
+        ],
     }
 
 

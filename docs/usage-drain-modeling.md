@@ -346,6 +346,28 @@ diagnostic ceiling test, but they are not the path to perfect prediction on the
 current data. The best visible-counter predictor remains the simpler current
 regime rule: if the counter is in a long `1%` run, keep predicting `1%`.
 
+The report now also tests a more explicit two-stage gate:
+
+1. Use transition risk to decide whether the next span is likely to break away
+   from `1%` continuation.
+2. If it looks like a break, use matched history-state magnitude; otherwise keep
+   the `one_percent_regime_grace` continuation prediction.
+
+Real-data result:
+
+| model | all-history MAE | newest 20% MAE | read |
+| --- | ---: | ---: | --- |
+| one-percent grace | 0.936 | 0.003 | best simple continuation rule |
+| transition-gated history-state mode | 1.344 | 0.007 | fixed 50% gate switches too often in old regimes |
+| transition-weighted history-state mode | 1.307 | 0.006 | soft blend is still worse than continuation |
+| adaptive MAE transition gate | 1.226 | 0.003 | learns to back off in the newest regime but still trails continuation overall |
+
+The adaptive gate raises its all-history mean threshold to about `0.915`,
+overrides `29.1%` of opportunities, and matches the `1%` continuation rule in
+the newest holdout by making no overrides. This is useful negative evidence:
+binary transition risk is real, but converting it into exact visible-delta
+magnitude is still the hard part.
+
 The new `walk_forward_prediction.transition_risk` section turns the same problem
 into a binary question: "will the next positive visible delta be something other
 than `1%`?" It reports Brier score, AUC, average precision, and top-10% risk

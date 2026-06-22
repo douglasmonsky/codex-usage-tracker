@@ -165,6 +165,23 @@ def main() -> int:
                             support=diagnostics.get("mean_support"),
                         )
                     )
+                transition_gate = (scope.get("transition_gate_diagnostics") or {}).get(
+                    "adaptive_mae_transition_gate_history_state_mode"
+                ) or {}
+                transition_gate_model = (
+                    models.get("adaptive_mae_transition_gate_history_state_mode")
+                    or {}
+                )
+                if transition_gate_model:
+                    print(
+                        "walk-forward transition-gate {scope}: mae={mae} "
+                        "override={override} threshold={threshold}".format(
+                            scope=scope_name,
+                            mae=transition_gate_model.get("mae"),
+                            override=transition_gate.get("override_share"),
+                            threshold=transition_gate.get("mean_threshold"),
+                        )
+                    )
                 transition_scope = (
                     ((walk_forward.get("transition_risk") or {}).get("scopes") or {})
                     .get(scope_name)

@@ -434,7 +434,12 @@ def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
     walk_forward = summary["walk_forward_prediction"]["scopes"]["all_after_10"]
     previous = walk_forward["models"]["previous_delta"]
     empirical = walk_forward["models"]["empirical_history_state_mode"]
+    adaptive_gate = walk_forward["models"][
+        "adaptive_mae_transition_gate_history_state_mode"
+    ]
     assert empirical["mae"] < previous["mae"]
+    assert adaptive_gate["mae"] == empirical["mae"]
+    assert adaptive_gate["r2"] == empirical["r2"]
     assert (
         walk_forward["state_bucket_diagnostics"]["empirical_history_state_mode"][
             "matched_state_share"
@@ -454,6 +459,11 @@ def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
         transition["models"]["history_state_risk"]["average_precision"]
         > transition["models"]["overall_prior_rate"]["average_precision"]
     )
+    gate = walk_forward["transition_gate_diagnostics"][
+        "adaptive_mae_transition_gate_history_state_mode"
+    ]
+    assert gate["override_share"] == 1.0
+    assert gate["mean_threshold"] == 0.0
 
 
 def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
