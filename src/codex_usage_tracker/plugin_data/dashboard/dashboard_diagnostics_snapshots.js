@@ -680,9 +680,10 @@
 
     function renderSimpleTable(headers, rows, emptyMessage) {
       if (!rows.length) return renderState(emptyMessage);
-      const head = headers.map(header => `<th>${escapeHtml(header)}</th>`).join('');
+      const numericColumns = headers.map((_, index) => columnNumeric(rows, index));
+      const head = headers.map((header, index) => `<th${numericColumns[index] ? ' class="num"' : ''}>${escapeHtml(header)}</th>`).join('');
       const body = rows.map(row => `
-        <tr>${row.map((cell, index) => `<td${cellNumeric(cell, index) ? ' class="num"' : ''}>${cellHtml(cell)}</td>`).join('')}</tr>
+        <tr>${row.map((cell, index) => `<td${numericColumns[index] ? ' class="num"' : ''}>${cellHtml(cell)}</td>`).join('')}</tr>
       `).join('');
       return `
         <div class="diagnostics-table-wrap diagnostics-mini-table-wrap">
@@ -694,16 +695,30 @@
       `;
     }
 
+    function columnNumeric(rows, index) {
+      if (index === 0) return false;
+      const values = rows
+        .map(row => row[index])
+        .filter(value => value !== null && value !== undefined && value !== '');
+      if (!values.length) return false;
+      return values.every(value => cellNumeric(value));
+    }
+
     function cellHtml(value) {
       if (value === null || value === undefined || value === '') return '';
       if (typeof value === 'object' && value.html) return value.html;
       return escapeHtml(String(value));
     }
 
-    function cellNumeric(value, index) {
-      if (index === 0) return false;
-      if (typeof value === 'object' && value && value.numeric === false) return false;
-      return true;
+    function cellNumeric(value) {
+      if (typeof value === 'object' && value) {
+        if (value.numeric === true) return true;
+        if (value.numeric === false || value.html) return false;
+      }
+      if (typeof value === 'number') return Number.isFinite(value);
+      const text = String(value || '').trim();
+      if (!text || text.toLowerCase() === 'n/a') return true;
+      return /^[$+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?$/.test(text);
     }
 
     function numberText(value) {
