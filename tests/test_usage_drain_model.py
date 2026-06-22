@@ -320,15 +320,24 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     delta_scope = delta_prediction["scopes"]["all_after_10"]
     previous_delta = delta_scope["models"]["previous_delta"]
     label_segment_age_mode = delta_scope["models"]["label_segment_age_mode"]
+    boundary_conditioned = delta_scope["models"][
+        "boundary_conditioned_label_segment_age_mode"
+    ]
     adaptive_mae_gate = delta_scope["models"][
         "adaptive_mae_gate_label_segment_age_mode"
     ]
     adaptive_rmse_gate = delta_scope["models"][
         "adaptive_rmse_gate_label_segment_age_mode"
     ]
+    boundary_conditioned_weighted = delta_scope["models"][
+        "risk_weighted_boundary_conditioned_mode"
+    ]
     assert label_segment_age_mode["mae"] == 0.0
     assert label_segment_age_mode["rmse"] == 0.0
     assert label_segment_age_mode["mae"] < previous_delta["mae"]
+    assert boundary_conditioned_weighted["mae"] == 0.0
+    assert boundary_conditioned_weighted["rmse"] == 0.0
+    assert boundary_conditioned["mae"] >= boundary_conditioned_weighted["mae"]
     assert adaptive_mae_gate["mae"] == 0.0
     assert adaptive_rmse_gate["rmse"] == 0.0
     delta_diagnostics = delta_scope["prediction_detail_diagnostics"][
@@ -338,6 +347,10 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     assert delta_diagnostics["top_signatures"][0]["signature"] == (
         "previous_label,previous_segment_position_bucket"
     )
+    boundary_conditioned_diagnostics = delta_scope["prediction_detail_diagnostics"][
+        "boundary_conditioned_label_segment_age_mode"
+    ]
+    assert boundary_conditioned_diagnostics["matched_state_share"] > 0.0
     adaptive_diagnostics = delta_scope["risk_gate_diagnostics"][
         "adaptive_mae_gate_label_segment_age_mode"
     ]
@@ -536,6 +549,43 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     ]
     assert coefficient is not None
     assert abs(coefficient - 125.0) < 0.00001
+
+
+def test_allowance_breakpoint_analysis_detects_capacity_denominator_change() -> None:
+    rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    used = 0.0
+    index = 0
+    for capacity_per_percent in (10.0, 40.0):
+        for repeat in range(30):
+            index += 1
+            delta = 1.0 + float(repeat % 3)
+            used += delta
+            hour, minute = divmod(index, 60)
+            rows.append(
+                _row(
+                    f"capacity-{index}",
+                    f"2026-06-01T{hour:02d}:{minute:02d}:00Z",
+                    used,
+                    delta * capacity_per_percent,
+                )
+            )
+
+    summary = summarize_usage_drain_model(rows)
+
+    analysis = summary["allowance_breakpoint_analysis"]
+    assert analysis["span_count"] == 60
+    assert analysis["piecewise_sse_reduction_share"] == 1.0
+    split = analysis["best_single_break"]
+    assert split["split_index"] == 30
+    assert split["left_mean_credits_per_percent"] == 10.0
+    assert split["right_mean_credits_per_percent"] == 40.0
+    assert analysis["global_credit_to_delta_fit"]["metrics"]["r2"] < 1.0
+    segments = analysis["segments"]
+    assert len(segments) == 2
+    assert segments[0]["credits_per_visible_percent"]["mean"] == 10.0
+    assert segments[1]["credits_per_visible_percent"]["mean"] == 40.0
+    assert segments[0]["credit_to_delta_fit"]["metrics"]["r2"] == 1.0
+    assert segments[1]["credit_to_delta_fit"]["metrics"]["r2"] == 1.0
 
 
 def test_token_component_regression_recovers_rate_card_and_fast_weighting() -> None:

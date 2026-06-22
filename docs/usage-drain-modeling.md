@@ -500,11 +500,13 @@ After the first 10 opportunities, the all-history next-delta results are:
 | adaptive RMSE risk gate | 0.995 | 2.888 | 0.765 | 0.883 |
 | risk-gated label + segment age | 1.016 | 2.907 | 0.762 | 0.881 |
 | risk-weighted label + segment age | 1.028 | 2.728 | 0.790 | 0.893 |
+| risk-weighted prior-boundary label + segment age | 1.244 | 2.742 | 0.788 | 0.890 |
 | previous label + segment age | 1.580 | 3.542 | 0.646 | 0.811 |
 | reset + segment age | 1.836 | 3.979 | 0.553 | 0.756 |
 | calendar + segment age | 1.990 | 4.332 | 0.471 | 0.710 |
 | segment age only | 3.141 | 6.391 | -0.152 | 0.203 |
 | prior mode | 3.179 | 6.546 | -0.209 | 0.268 |
+| prior-boundary label + segment age | 3.465 | 6.340 | -0.134 | 0.132 |
 
 So the newest boundary feature is useful, but not in the way a perfect
 next-delta predictor would need. It improves causal boundary-risk ranking, while
@@ -521,6 +523,10 @@ of opportunities, and lands between previous-delta persistence and the fixed
 gate. The learned threshold mostly says the same thing the current data says:
 exact next-delta prediction should almost always stay with persistence unless
 boundary risk is extremely high.
+The prior-boundary variant is a useful negative control: using only matched
+historical boundary rows does not solve magnitude prediction. It matches prior
+boundary state often, but loses because many current opportunities are
+continuations where persistence is still the right answer.
 
 The residual diagnostics make the remaining miss pattern much sharper. For the
 all-history `previous_delta` model, boundaries are only `19.8%` of next-delta
@@ -743,6 +749,55 @@ This points toward two different next steps. For advance prediction, high-work
 pre-span history alone. For explanatory analysis after the span closes,
 large-span shape still has some structure left, but token accounting absorbs
 almost all of it.
+
+## Allowance Breakpoint Analysis
+
+The report now includes `allowance_breakpoint_analysis` to test the hypothesis
+that token/credit usage may correlate much better after accounting for
+allowance-denominator changes. It builds a chronological
+`standard_usage_credits_per_visible_percent` series for every closed positive
+usage-delta span, then greedily splits that series where piecewise segment means
+reduce variance.
+
+On the current refreshed local aggregate index:
+
+| metric | value |
+| --- | ---: |
+| closed positive spans | 1,452 |
+| global credit-to-visible-delta R2 | -0.479 |
+| global mean credits per visible percent | 23.571 |
+| global stddev credits per visible percent | 34.088 |
+| piecewise SSE reduction | 60.9% |
+| strongest single split | June 7, 2026 18:33 UTC |
+| pre-split mean credits per visible percent | 6.670 |
+| post-split mean credits per visible percent | 50.727 |
+
+The detected segments are:
+
+| segment | date range | spans | mean credits per visible % | exact 1% spans | plan/window read |
+| --- | --- | ---: | ---: | ---: | --- |
+| 1 | May 17-June 7 | 895 | 6.670 | 184 | mixed `prolite`/`pro`, 300-minute Codex window |
+| 2 | June 7-June 11 | 154 | 78.383 | 139 | all `pro`, 300-minute Codex window |
+| 3 | June 11-June 12 | 159 | 38.376 | 159 | all `pro`, 300-minute Codex window |
+| 4 | June 12-June 13 | 80 | 7.335 | 79 | all `pro`, 300-minute Codex window |
+| 5 | June 13-June 18 | 50 | 86.838 | 50 | all `pro`, 300-minute Codex window |
+| 6 | June 18-June 21 | 114 | 45.208 | 114 | all `pro`, 300-minute Codex window |
+
+This supports the concern that a single global token-to-drain regression can
+hide strong local structure. The later segments all have the same observed plan
+type, limit id, and 5-hour window, so the shifts are not explained by the
+tracker accidentally mixing weekly and 5-hour counters. They still should not be
+described as proven official allowance changes: the same pattern could come
+from counter rounding, hidden account-side state, usage from other surfaces,
+sampling cadence, or imperfect span assignment.
+
+The research implication is that the right metric is probably piecewise:
+
+1. Detect stable allowance-capacity eras from
+   `standard_usage_credits / visible_delta_percent`.
+2. Within each era, test whether token-derived credits predict visible drain or
+   exact `1%` tick capacity.
+3. Report boundary dates and segment fit separately from the global fit.
 
 ## Run It
 
