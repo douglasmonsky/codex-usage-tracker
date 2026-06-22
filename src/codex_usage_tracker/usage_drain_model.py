@@ -113,6 +113,12 @@ TRANSITION_RISK_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
         "empirical_previous_work_state_mode"
     ],
 }
+SEGMENT_PREDICTION_MODELS = (
+    "constant_one_percent",
+    "previous_delta",
+    "one_percent_regime_grace",
+    "empirical_reset_state_mode",
+)
 
 
 @dataclass(frozen=True)
@@ -396,6 +402,7 @@ def summarize_usage_drain_model(
         "rate_limit_limit_id_mix": _count_values(rows, "rate_limit_limit_id"),
         "delta_regimes": _delta_regime_summary(spans),
         "regime_streaks": _regime_streak_summary(spans),
+        "piecewise_regime_segments": _piecewise_regime_segment_summary(spans),
         "span_correlations": _span_correlation_summary(spans),
         "token_component_regression": _token_component_regression_summary(spans),
         "one_percent_capacity_modeling": _one_percent_capacity_modeling(spans),
@@ -512,6 +519,164 @@ def _regime_streak_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
         },
         "breaks_after_long_one_percent_runs": breaks[:10],
     }
+
+
+def _piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
+    if not spans:
+        return {
+            "segment_count": 0,
+            "segment_label_counts": {},
+            "segments": [],
+            "latest_segment": None,
+            "by_label": {},
+        }
+    prediction_rows = {
+        int(row["index"]): row for row in _walk_forward_prediction_rows(spans)
+    }
+    segments = _piecewise_regime_segments(spans)
+    segment_records = [
+        _piecewise_segment_record(spans, prediction_rows, segment)
+        for segment in segments
+    ]
+    label_rows: dict[str, list[dict[str, Any]]] = {}
+    for row in prediction_rows.values():
+        label = _delta_regime_label(_number(row.get("actual")))
+        label_rows.setdefault(label, []).append(row)
+    return {
+        "segment_count": len(segment_records),
+        "segment_label_counts": _count_segment_labels(segment_records),
+        "latest_segment": segment_records[-1] if segment_records else None,
+        "longest_segments": sorted(
+            segment_records, key=lambda row: -int(row["span_count"])
+        )[:10],
+        "largest_mean_delta_segments": sorted(
+            segment_records,
+            key=lambda row: _number(
+                (row.get("distribution") or {}).get("mean_delta_percent")
+            ),
+            reverse=True,
+        )[:10],
+        "by_label": {
+            label: _piecewise_label_record(rows)
+            for label, rows in sorted(label_rows.items())
+        },
+    }
+
+
+def _piecewise_regime_segments(spans: list[UsageDeltaSpan]) -> list[dict[str, Any]]:
+    segments: list[dict[str, Any]] = []
+    current_label: str | None = None
+    start_index = 0
+    for index, span in enumerate(spans):
+        label = _delta_regime_label(span.delta_usage_percent)
+        if current_label is None:
+            current_label = label
+            start_index = index
+            continue
+        if label == current_label:
+            continue
+        segments.append(
+            {
+                "label": current_label,
+                "start_index": start_index,
+                "end_index": index - 1,
+            }
+        )
+        current_label = label
+        start_index = index
+    if current_label is not None:
+        segments.append(
+            {
+                "label": current_label,
+                "start_index": start_index,
+                "end_index": len(spans) - 1,
+            }
+        )
+    return segments
+
+
+def _piecewise_segment_record(
+    spans: list[UsageDeltaSpan],
+    prediction_rows: dict[int, dict[str, Any]],
+    segment: dict[str, Any],
+) -> dict[str, Any]:
+    start_index = int(segment["start_index"])
+    end_index = int(segment["end_index"])
+    segment_spans = spans[start_index : end_index + 1]
+    rows = [
+        prediction_rows[index]
+        for index in range(start_index, end_index + 1)
+        if index in prediction_rows
+    ]
+    return {
+        "label": segment["label"],
+        "start_index": start_index,
+        "end_index": end_index,
+        "span_count": end_index - start_index + 1,
+        "start_timestamp": segment_spans[0].start_event_timestamp,
+        "end_timestamp": segment_spans[-1].start_event_timestamp,
+        "start_date": _date_label(segment_spans[0].start_event_timestamp),
+        "end_date": _date_label(segment_spans[-1].start_event_timestamp),
+        "distribution": _delta_distribution(segment_spans),
+        "prediction_metrics": _segment_prediction_metrics(rows),
+        "best_by_mae": _best_segment_prediction(rows),
+    }
+
+
+def _piecewise_label_record(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "prediction_rows": len(rows),
+        "actual": _value_distribution([_number(row.get("actual")) for row in rows]),
+        "prediction_metrics": _segment_prediction_metrics(rows),
+        "best_by_mae": _best_segment_prediction(rows),
+    }
+
+
+def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    actual = [_number(row.get("actual")) for row in rows]
+    return {
+        model_name: _regression_metrics(
+            actual,
+            [
+                _number((row.get("predictions") or {}).get(model_name))
+                for row in rows
+            ],
+        )
+        for model_name in SEGMENT_PREDICTION_MODELS
+    }
+
+
+def _best_segment_prediction(rows: list[dict[str, Any]]) -> str | None:
+    metrics = _segment_prediction_metrics(rows)
+    candidates = [
+        (name, values.get("mae"))
+        for name, values in metrics.items()
+        if isinstance(values, dict) and values.get("mae") is not None
+    ]
+    if not candidates:
+        return None
+    name, value = min(candidates, key=lambda item: float(item[1]))
+    return f"{name}:{value}"
+
+
+def _count_segment_labels(segment_records: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for segment in segment_records:
+        label = str(segment.get("label") or "missing")
+        counts[label] = counts.get(label, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _delta_regime_label(value: float) -> str:
+    if _is_one_percent_delta(value):
+        return "stable_one_percent"
+    if value <= 2.0:
+        return "small_blip"
+    if value <= 5.0:
+        return "moderate_delta"
+    if value <= 10.0:
+        return "high_delta"
+    return "very_high_delta"
 
 
 def _one_percent_runs(spans: list[UsageDeltaSpan]) -> list[dict[str, Any]]:

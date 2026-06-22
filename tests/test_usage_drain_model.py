@@ -186,6 +186,13 @@ def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
         "grace_spans": 1,
         "max_break_delta_percent": 2.0,
     }
+    segments = summary["piecewise_regime_segments"]
+    assert segments["segment_count"] == 3
+    assert segments["latest_segment"]["label"] == "stable_one_percent"
+    assert segments["latest_segment"]["span_count"] == 1
+    assert segments["longest_segments"][0]["label"] == "stable_one_percent"
+    assert segments["longest_segments"][0]["span_count"] == 4
+    assert "stable_one_percent" in segments["by_label"]
 
 
 def test_one_percent_regime_grace_ignores_one_small_break() -> None:

@@ -182,6 +182,30 @@ def main() -> int:
                             best_brier=best_transition,
                         )
                     )
+        segments = summary.get("piecewise_regime_segments") or {}
+        latest_segment = segments.get("latest_segment") or {}
+        longest_segments = segments.get("longest_segments") or []
+        if latest_segment:
+            print(
+                "regime segments: count={count} latest={latest_label}:{latest_count} "
+                "best={latest_best}".format(
+                    count=segments.get("segment_count"),
+                    latest_label=latest_segment.get("label"),
+                    latest_count=latest_segment.get("span_count"),
+                    latest_best=latest_segment.get("best_by_mae"),
+                )
+            )
+        if longest_segments:
+            longest = longest_segments[0]
+            print(
+                "longest regime segment: {label}:{count} {start}->{end} best={best}".format(
+                    label=longest.get("label"),
+                    count=longest.get("span_count"),
+                    start=longest.get("start_date"),
+                    end=longest.get("end_date"),
+                    best=longest.get("best_by_mae"),
+                )
+            )
         components = summary.get("token_component_regression") or {}
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):

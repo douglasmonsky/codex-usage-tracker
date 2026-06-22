@@ -367,6 +367,46 @@ best-calibrated behavior is still to assign almost zero break risk after a long
 with one positive event this is not enough evidence to trust as a general
 predictor.
 
+The report now adds `piecewise_regime_segments`, which groups contiguous spans
+by actual visible-delta regime:
+
+- `stable_one_percent`: exactly `1%`
+- `small_blip`: `>1%` through `2%`
+- `moderate_delta`: `>2%` through `5%`
+- `high_delta`: `>5%` through `10%`
+- `very_high_delta`: above `10%`
+
+Current segment shape:
+
+| diagnostic | value |
+| --- | ---: |
+| contiguous segments | 290 |
+| stable `1%` segments | 70 |
+| small-blip segments | 89 |
+| moderate-delta segments | 56 |
+| high-delta segments | 48 |
+| very-high-delta segments | 27 |
+| latest segment | `stable_one_percent`, 243 spans, June 12-21 |
+| longest segment | `stable_one_percent`, 271 spans, June 9-12 |
+
+Inside segment labels, the best simple predictors are much closer:
+
+| segment label | prediction rows | mean delta | best model | MAE |
+| --- | ---: | ---: | --- | ---: |
+| stable `1%` | 725 | 1.000 | constant `1%` | 0.000 |
+| small blip | 213 | 2.000 | constant `1%` | 1.000 |
+| moderate delta | 164 | 3.970 | previous delta | 1.256 |
+| high delta | 168 | 8.149 | previous delta | 1.607 |
+| very high delta | 181 | 17.564 | previous delta | 1.674 |
+
+The longest old high-delta segments are also highly predictable once the segment
+is known: a 53-span `very_high_delta` run on June 5 averages `21.17%` and has
+previous-delta MAE `1.04`; another 45-span run that day averages `19.47%` and
+has previous-delta MAE `0.69`. This is the clearest evidence so far that the
+remaining problem is not "which raw variables explain every span?" It is
+"where are the regime boundaries?" Once a segment has started, a simple local
+rule is already close to perfect for that segment.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the
