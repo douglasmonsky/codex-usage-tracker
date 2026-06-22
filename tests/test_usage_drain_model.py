@@ -351,6 +351,13 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
         "boundary_conditioned_label_segment_age_mode"
     ]
     assert boundary_conditioned_diagnostics["matched_state_share"] > 0.0
+    ambiguity = summary["walk_forward_prediction"]["state_ambiguity"]["scopes"][
+        "all_after_10"
+    ]["signatures"]
+    assert ambiguity["previous_delta"]["ambiguous_group_count"] == 1
+    assert ambiguity["previous_delta"]["ambiguous_row_share"] > 0.0
+    assert ambiguity["history_state"]["ambiguous_group_count"] == 0
+    assert ambiguity["history_state"]["repeated_oracle_mode_metrics"]["mae"] == 0.0
     adaptive_diagnostics = delta_scope["risk_gate_diagnostics"][
         "adaptive_mae_gate_label_segment_age_mode"
     ]

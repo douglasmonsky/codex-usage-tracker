@@ -843,6 +843,34 @@ stateful:
 3. Within stable regimes, model exact `1%` tick capacity.
 4. Report boundary dates and segment fit separately from the global fit.
 
+## State Ambiguity Lower Bound
+
+The report now includes `walk_forward_prediction.state_ambiguity` to test
+whether aggregate state is specific enough to make exact next-delta prediction
+possible. It groups walk-forward rows by state signatures, then asks whether
+identical-looking prior states produced different next visible deltas. This is
+an oracle diagnostic, not a causal predictor, because the mode for each group is
+computed with all rows in the scope.
+
+Current result:
+
+| scope | signature | repeated row share | ambiguous row share | oracle MAE on repeated states | read |
+| --- | --- | ---: | ---: | ---: | --- |
+| all history after first | previous delta | 99.9% | 99.9% | 1.283 | previous delta alone is heavily ambiguous |
+| all history after first | reset state | 91.0% | 51.9% | 0.889 | reset/window buckets reduce ambiguity but do not remove it |
+| all history after first | full bucket state | 59.5% | 26.9% | 0.811 | richer state helps, but repeated states still conflict |
+| newest 20% holdout | full bucket state | 47.8% | 0.0% | 0.000 | the newest regime is unambiguous because it is nearly all `1%` |
+| latest 100 spans | full bucket state | 49.0% | 0.0% | 0.000 | current local data is fully stable at visible-counter granularity |
+
+The all-history result is the important caution. Even with previous delta,
+streaks, reset-window buckets, day/hour, prior work buckets, plan type, and
+limit id, about `26.9%` of rows live in repeated states that produced more than
+one next delta. That means a perfect global predictor probably needs either
+more historical account-side state, a better boundary detector, or an explicit
+piecewise regime model. The recent zero-ambiguity result is still useful, but it
+mostly says the current counter regime is stable, not that the hidden allowance
+formula has been solved.
+
 ## Run It
 
 Refresh the aggregate index first, then run:

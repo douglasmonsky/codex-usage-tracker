@@ -165,6 +165,28 @@ def main() -> int:
                             support=diagnostics.get("mean_support"),
                         )
                     )
+                ambiguity = (
+                    (
+                        ((walk_forward.get("state_ambiguity") or {}).get("scopes") or {})
+                        .get(scope_name)
+                        or {}
+                    )
+                    .get("signatures")
+                    or {}
+                ).get("full_bucket_state") or {}
+                repeated_metrics = (
+                    ambiguity.get("repeated_oracle_mode_metrics") or {}
+                )
+                if ambiguity:
+                    print(
+                        "state ambiguity {scope}: full_state_ambiguous={ambiguous} "
+                        "repeated_share={repeated} oracle_mae={mae}".format(
+                            scope=scope_name,
+                            ambiguous=ambiguity.get("ambiguous_row_share"),
+                            repeated=ambiguity.get("repeated_row_share"),
+                            mae=repeated_metrics.get("mae"),
+                        )
+                    )
                 transition_gate = (scope.get("transition_gate_diagnostics") or {}).get(
                     "adaptive_mae_transition_gate_history_state_mode"
                 ) or {}
