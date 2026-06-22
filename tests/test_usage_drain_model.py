@@ -244,6 +244,18 @@ def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
         > 0.0
     )
     assert "empirical_calendar_state_mode" in walk_forward["models"]
+    transition = summary["walk_forward_prediction"]["transition_risk"]["scopes"][
+        "all_after_10"
+    ]["non_one_percent_delta"]
+    assert transition["positive_rate"] > 0.0
+    assert (
+        transition["models"]["history_state_risk"]["brier"]
+        < transition["models"]["overall_prior_rate"]["brier"]
+    )
+    assert (
+        transition["models"]["history_state_risk"]["average_precision"]
+        > transition["models"]["overall_prior_rate"]["average_precision"]
+    )
 
 
 def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:

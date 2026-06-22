@@ -101,6 +101,18 @@ STATE_BUCKET_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
 }
 STATE_BUCKET_MIN_SUPPORT = 2
+TRANSITION_RISK_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "history_state_risk": STATE_BUCKET_MODEL_SIGNATURES[
+        "empirical_history_state_mode"
+    ],
+    "calendar_state_risk": STATE_BUCKET_MODEL_SIGNATURES[
+        "empirical_calendar_state_mode"
+    ],
+    "reset_state_risk": STATE_BUCKET_MODEL_SIGNATURES["empirical_reset_state_mode"],
+    "previous_work_state_risk": STATE_BUCKET_MODEL_SIGNATURES[
+        "empirical_previous_work_state_mode"
+    ],
+}
 
 
 @dataclass(frozen=True)
@@ -1560,6 +1572,7 @@ def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
             for name, start_index in scopes.items()
         },
         "one_percent_grace_calibration": _one_percent_grace_calibration(spans, scopes),
+        "transition_risk": _transition_risk_summary(rows, scopes),
     }
 
 
@@ -1600,9 +1613,13 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
             )
             state = {
                 **metadata,
+                "previous_delta_value": previous_deltas[-1],
                 "previous_delta_bucket": _delta_bucket(previous_deltas[-1]),
+                "one_percent_streak_count": one_percent_streak,
                 "one_percent_streak_bucket": _streak_bucket(one_percent_streak),
+                "low_delta_streak_count": low_delta_streak,
                 "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
+                "same_delta_streak_count": same_delta_streak,
                 "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
                 "previous_span_wall_time_bucket": _previous_span_wall_time_bucket(
                     spans, index
@@ -1633,6 +1650,10 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 fallback_prediction=previous_deltas[-1],
             )
             predictions.update(state_predictions)
+            transition_risks, transition_risk_details = _transition_risk_predictions(
+                previous_state_rows,
+                state,
+            )
             rows.append(
                 {
                     "index": index,
@@ -1641,6 +1662,8 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                     "metadata": state,
                     "predictions": predictions,
                     "prediction_details": state_prediction_details,
+                    "transition_risks": transition_risks,
+                    "transition_risk_details": transition_risk_details,
                 }
             )
         previous_state_rows.append(
@@ -1711,17 +1734,23 @@ def _history_state_for_span(
             previous_deltas, predicate=lambda value: value <= 1.0
         )
         same_delta_streak = _same_value_tail_streak(previous_deltas)
+        previous_delta_value = previous_deltas[-1]
         previous_delta_bucket = _delta_bucket(previous_deltas[-1])
     else:
         one_percent_streak = 0
         low_delta_streak = 0
         same_delta_streak = 0
+        previous_delta_value = 0.0
         previous_delta_bucket = "missing"
     return {
         **metadata,
+        "previous_delta_value": previous_delta_value,
         "previous_delta_bucket": previous_delta_bucket,
+        "one_percent_streak_count": one_percent_streak,
         "one_percent_streak_bucket": _streak_bucket(one_percent_streak),
+        "low_delta_streak_count": low_delta_streak,
         "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
+        "same_delta_streak_count": same_delta_streak,
         "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
         "previous_span_wall_time_bucket": _previous_span_wall_time_bucket(
             spans, index
@@ -1748,6 +1777,82 @@ def _state_bucket_predictions(
         predictions[model_name] = prediction
         details[model_name] = detail
     return predictions, details
+
+
+def _transition_risk_predictions(
+    previous_state_rows: list[dict[str, Any]],
+    state: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    prior_rate = _transition_rate(previous_state_rows)
+    risks = {
+        "overall_prior_rate": prior_rate,
+        "stable_one_percent_rule": (
+            0.0
+            if int(state.get("one_percent_streak_count") or 0)
+            >= REGIME_GRACE_STREAK_THRESHOLD
+            else prior_rate
+        ),
+    }
+    details = {
+        "overall_prior_rate": {
+            "source": "all_prior_spans",
+            "support": len(previous_state_rows),
+        },
+        "stable_one_percent_rule": {
+            "source": "long_one_percent_streak"
+            if int(state.get("one_percent_streak_count") or 0)
+            >= REGIME_GRACE_STREAK_THRESHOLD
+            else "fallback_prior_rate",
+            "support": len(previous_state_rows),
+        },
+    }
+    for model_name, signatures in TRANSITION_RISK_MODEL_SIGNATURES.items():
+        risk, detail = _state_bucket_transition_risk(
+            previous_state_rows,
+            state,
+            signatures=signatures,
+            fallback_rate=prior_rate,
+        )
+        risks[model_name] = risk
+        details[model_name] = detail
+    return risks, details
+
+
+def _state_bucket_transition_risk(
+    previous_state_rows: list[dict[str, Any]],
+    state: dict[str, Any],
+    *,
+    signatures: tuple[tuple[str, ...], ...],
+    fallback_rate: float,
+) -> tuple[float, dict[str, Any]]:
+    for signature in signatures:
+        matches = [
+            row
+            for row in previous_state_rows
+            if _state_signature(row.get("state", {}), signature)
+            == _state_signature(state, signature)
+        ]
+        if len(matches) < STATE_BUCKET_MIN_SUPPORT:
+            continue
+        risk = _transition_rate(matches)
+        return risk, {
+            "source": "matched_state",
+            "signature": list(signature),
+            "support": len(matches),
+            "risk": _rounded(risk),
+        }
+    return fallback_rate, {
+        "source": "fallback_prior_rate",
+        "signature": [],
+        "support": 0,
+        "risk": _rounded(fallback_rate),
+    }
+
+
+def _transition_rate(rows: list[dict[str, Any]]) -> float:
+    if not rows:
+        return 0.0
+    return sum(1 for row in rows if not _is_one_percent_delta(_number(row.get("actual")))) / len(rows)
 
 
 def _state_bucket_prediction(
@@ -1821,6 +1926,224 @@ def _state_bucket_model_diagnostics(
         ),
         "fallback_share": _rounded((len(details) - len(matched)) / len(details)),
         "top_signatures": top_signatures,
+    }
+
+
+def _transition_risk_summary(
+    rows: list[dict[str, Any]], scopes: dict[str, int]
+) -> dict[str, Any]:
+    target_definitions = {
+        "non_one_percent_delta": (
+            "Next visible positive delta is not exactly 1%, across all scoped spans."
+        ),
+        "break_after_long_one_percent_run": (
+            "Scoped to rows whose prior state has at least the configured long "
+            "1% streak; target is whether the next delta breaks away from 1%."
+        ),
+    }
+    return {
+        "risk_models": {
+            "overall_prior_rate": "Historical non-1% rate before the current span.",
+            "stable_one_percent_rule": (
+                "Predicts zero break risk after the configured long 1% streak; "
+                "otherwise uses the historical prior rate."
+            ),
+            "history_state_risk": "Empirical non-1% rate for matching history/streak buckets.",
+            "calendar_state_risk": "Empirical non-1% rate for matching calendar buckets.",
+            "reset_state_risk": "Empirical non-1% rate for matching reset/window buckets.",
+            "previous_work_state_risk": (
+                "Empirical non-1% rate for matching previous-span work-duration buckets."
+            ),
+        },
+        "target_definitions": target_definitions,
+        "scopes": {
+            scope_name: _transition_risk_scope(rows, start_index=start_index)
+            for scope_name, start_index in scopes.items()
+        },
+    }
+
+
+def _transition_risk_scope(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> dict[str, Any]:
+    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
+    long_run_rows = [
+        row
+        for row in scope_rows
+        if int((row.get("metadata") or {}).get("one_percent_streak_count") or 0)
+        >= REGIME_GRACE_STREAK_THRESHOLD
+    ]
+    return {
+        "non_one_percent_delta": _transition_target_metrics(scope_rows),
+        "break_after_long_one_percent_run": _transition_target_metrics(
+            long_run_rows
+        ),
+    }
+
+
+def _transition_target_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    actual = [
+        0 if _is_one_percent_delta(_number(row.get("actual"))) else 1
+        for row in rows
+    ]
+    risk_models = _transition_risk_model_names(rows)
+    return {
+        "n": len(rows),
+        "positive_count": sum(actual),
+        "positive_rate": _rounded(sum(actual) / len(actual) if actual else None),
+        "models": {
+            model_name: _binary_risk_metrics(
+                actual,
+                [
+                    _number((row.get("transition_risks") or {}).get(model_name))
+                    for row in rows
+                ],
+            )
+            for model_name in risk_models
+        },
+        "risk_detail_diagnostics": {
+            model_name: _transition_risk_detail_diagnostics(rows, model_name)
+            for model_name in risk_models
+            if model_name not in {"overall_prior_rate", "stable_one_percent_rule"}
+        },
+    }
+
+
+def _transition_risk_model_names(rows: list[dict[str, Any]]) -> list[str]:
+    if not rows:
+        return []
+    names: list[str] = []
+    for row in rows:
+        for name in (row.get("transition_risks") or {}):
+            if name not in names:
+                names.append(str(name))
+    return names
+
+
+def _binary_risk_metrics(actual: list[int], scores: list[float]) -> dict[str, Any]:
+    if not actual or len(actual) != len(scores):
+        return {
+            "n": len(actual),
+            "brier": None,
+            "auc": None,
+            "average_precision": None,
+            "precision_at_top_10pct": None,
+            "recall_at_top_10pct": None,
+            "top_10pct_positive_rate": None,
+            "mean_score_positive": None,
+            "mean_score_negative": None,
+        }
+    clipped_scores = [min(max(score, 0.0), 1.0) for score in scores]
+    positives = [score for value, score in zip(actual, clipped_scores, strict=True) if value]
+    negatives = [
+        score for value, score in zip(actual, clipped_scores, strict=True) if not value
+    ]
+    top_count = max(1, math.ceil(len(actual) * 0.1))
+    ranked = sorted(
+        zip(actual, clipped_scores, strict=True),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    top = ranked[:top_count]
+    positive_count = sum(actual)
+    top_positive_count = sum(value for value, _score in top)
+    return {
+        "n": len(actual),
+        "brier": _rounded(
+            sum((score - value) ** 2 for value, score in zip(actual, clipped_scores, strict=True))
+            / len(actual)
+        ),
+        "auc": _rounded(_binary_auc(actual, clipped_scores)),
+        "average_precision": _rounded(_average_precision(actual, clipped_scores)),
+        "precision_at_top_10pct": _rounded(top_positive_count / len(top)),
+        "recall_at_top_10pct": _rounded(
+            top_positive_count / positive_count if positive_count else None
+        ),
+        "top_10pct_positive_rate": _rounded(top_positive_count / len(top)),
+        "mean_score_positive": _rounded(
+            sum(positives) / len(positives) if positives else None
+        ),
+        "mean_score_negative": _rounded(
+            sum(negatives) / len(negatives) if negatives else None
+        ),
+    }
+
+
+def _binary_auc(actual: list[int], scores: list[float]) -> float | None:
+    positive_count = sum(actual)
+    negative_count = len(actual) - positive_count
+    if positive_count == 0 or negative_count == 0:
+        return None
+    ranked = sorted(zip(scores, actual, strict=True), key=lambda item: item[0])
+    rank_sum = 0.0
+    index = 0
+    while index < len(ranked):
+        end = index
+        while end + 1 < len(ranked) and ranked[end + 1][0] == ranked[index][0]:
+            end += 1
+        average_rank = ((index + 1) + (end + 1)) / 2.0
+        positives_in_tie = sum(value for _score, value in ranked[index : end + 1])
+        rank_sum += positives_in_tie * average_rank
+        index = end + 1
+    return (rank_sum - (positive_count * (positive_count + 1) / 2.0)) / (
+        positive_count * negative_count
+    )
+
+
+def _average_precision(actual: list[int], scores: list[float]) -> float | None:
+    positive_count = sum(actual)
+    if positive_count == 0:
+        return None
+    ranked = sorted(
+        zip(actual, scores, strict=True), key=lambda item: item[1], reverse=True
+    )
+    seen_positive = 0
+    precision_sum = 0.0
+    for rank, (value, _score) in enumerate(ranked, start=1):
+        if not value:
+            continue
+        seen_positive += 1
+        precision_sum += seen_positive / rank
+    return precision_sum / positive_count
+
+
+def _transition_risk_detail_diagnostics(
+    rows: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    details = [
+        (row.get("transition_risk_details") or {}).get(model_name) or {}
+        for row in rows
+    ]
+    if not details:
+        return {
+            "matched_state_share": None,
+            "mean_support": None,
+            "top_signatures": [],
+        }
+    matched = [detail for detail in details if detail.get("source") == "matched_state"]
+    signature_counts: dict[str, int] = {}
+    for detail in matched:
+        label = ",".join(str(item) for item in detail.get("signature") or [])
+        signature_counts[label or "missing"] = (
+            signature_counts.get(label or "missing", 0) + 1
+        )
+    return {
+        "matched_state_share": _rounded(len(matched) / len(details)),
+        "mean_support": _rounded(
+            sum(int(detail.get("support") or 0) for detail in matched) / len(matched)
+            if matched
+            else None
+        ),
+        "top_signatures": [
+            {
+                "signature": signature,
+                "count": count,
+                "share": _rounded(count / len(details)),
+            }
+            for signature, count in sorted(
+                signature_counts.items(), key=lambda item: (-item[1], item[0])
+            )[:8]
+        ],
     }
 
 

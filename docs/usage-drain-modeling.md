@@ -346,6 +346,27 @@ diagnostic ceiling test, but they are not the path to perfect prediction on the
 current data. The best visible-counter predictor remains the simpler current
 regime rule: if the counter is in a long `1%` run, keep predicting `1%`.
 
+The new `walk_forward_prediction.transition_risk` section turns the same problem
+into a binary question: "will the next positive visible delta be something other
+than `1%`?" It reports Brier score, AUC, average precision, and top-10% risk
+precision/recall for causal risk scores.
+
+| scope | positive rate | best Brier model | Brier | AUC | average precision | read |
+| --- | ---: | --- | ---: | ---: | ---: | --- |
+| all spans after first | 50.0% | history-state risk | 0.080 | 0.953 | 0.932 | older high-variance regimes are rankable from streak/history buckets |
+| newest 20% holdout | 0.3% | history-state risk | 0.008 | 0.340 | 0.007 | only one positive; low Brier mostly means "predict near zero" |
+| newest 20% holdout | 0.3% | reset-state risk | 0.009 | 0.976 | 0.125 | ranks the single blip higher, but precision is still one event in a tiny sample |
+| latest 500 | 0.2% | history-state risk | 0.006 | 0.368 | 0.003 | almost no positives, so ranking is unstable |
+| after long 1% runs | 1.0% | stable one-percent rule | 0.010 | 0.500 | 0.215 | "long 1% run means near-zero break risk" is hard to beat on calibration |
+
+Current read: binary risk framing is useful for proving that date/hour/reset and
+streak variables can rank old regime transitions, but it does not reveal a
+reliable early warning signal for the current regime. In the newest data, the
+best-calibrated behavior is still to assign almost zero break risk after a long
+`1%` streak. Reset state may occasionally rank the one visible blip higher, but
+with one positive event this is not enough evidence to trust as a general
+predictor.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the

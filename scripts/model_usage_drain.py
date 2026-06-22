@@ -165,6 +165,23 @@ def main() -> int:
                             support=diagnostics.get("mean_support"),
                         )
                     )
+                transition_scope = (
+                    ((walk_forward.get("transition_risk") or {}).get("scopes") or {})
+                    .get(scope_name)
+                    or {}
+                )
+                transition_target = transition_scope.get("non_one_percent_delta") or {}
+                transition_models = transition_target.get("models") or {}
+                best_transition = _best_metric_model(transition_models, "brier")
+                if best_transition:
+                    print(
+                        "transition-risk {scope}: positives={positive_rate} "
+                        "best_brier={best_brier}".format(
+                            scope=scope_name,
+                            positive_rate=transition_target.get("positive_rate"),
+                            best_brier=best_transition,
+                        )
+                    )
         components = summary.get("token_component_regression") or {}
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):
