@@ -1791,7 +1791,7 @@ def _boundary_delta_top_error_groups(
         key=lambda row: (
             -_number(row["share_abs_error"]),
             -_number(row["mean_abs_error"]),
-            -int(row["count"]),
+            -int(_number(row.get("count"))),
             str(row.get(field_name) or ""),
         )
     )
@@ -1838,14 +1838,16 @@ def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _best_segment_prediction(rows: list[dict[str, Any]]) -> str | None:
     metrics = _segment_prediction_metrics(rows)
-    candidates = [
-        (name, values.get("mae"))
-        for name, values in metrics.items()
-        if isinstance(values, dict) and values.get("mae") is not None
-    ]
+    candidates: list[tuple[str, float]] = []
+    for name, values in metrics.items():
+        if not isinstance(values, dict):
+            continue
+        mae = values.get("mae")
+        if mae is not None:
+            candidates.append((name, _number(mae)))
     if not candidates:
         return None
-    name, value = min(candidates, key=lambda item: float(item[1]))
+    name, value = min(candidates, key=lambda item: item[1])
     return f"{name}:{value}"
 
 
@@ -3325,15 +3327,15 @@ def _model_family_attribution(
             previous_mae: float | None = None
             previous_r2: float | None = None
             for family, base_name in steps:
-                model = by_key.get((validation, base_name))
-                if model is None:
+                matched_model = by_key.get((validation, base_name))
+                if matched_model is None:
                     continue
-                mae = _holdout_metric(model, "mae")
-                r2 = _holdout_metric(model, "r2")
+                mae = _holdout_metric(matched_model, "mae")
+                r2 = _holdout_metric(matched_model, "r2")
                 rows.append(
                     {
                         "family": family,
-                        "model": model.get("name"),
+                        "model": matched_model.get("name"),
                         "holdout_mae": _rounded(mae),
                         "holdout_r2": _rounded(r2),
                         "mae_improvement_vs_previous": _rounded(
@@ -4136,7 +4138,7 @@ def _transition_risk_predictions(
     state: dict[str, Any],
 ) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
     prior_rate = _transition_rate(previous_state_rows)
-    risks = {
+    risks: dict[str, float] = {
         "overall_prior_rate": prior_rate,
         "stable_one_percent_rule": (
             0.0
@@ -4145,7 +4147,7 @@ def _transition_risk_predictions(
             else prior_rate
         ),
     }
-    details = {
+    details: dict[str, dict[str, Any]] = {
         "overall_prior_rate": {
             "source": "all_prior_spans",
             "support": len(previous_state_rows),
@@ -4932,7 +4934,12 @@ def _top_transition_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]
         }
         for (previous, actual), items in grouped.items()
     ]
-    rows.sort(key=lambda row: (-_number(row["mean_abs_error"]), -int(row["count"])))
+    rows.sort(
+        key=lambda row: (
+            -_number(row["mean_abs_error"]),
+            -int(_number(row.get("count"))),
+        )
+    )
     return rows[:10]
 
 
@@ -4953,7 +4960,12 @@ def _top_error_groups(errors: list[dict[str, Any]], field_name: str) -> list[dic
         }
         for key, items in grouped.items()
     ]
-    rows.sort(key=lambda row: (-_number(row["mean_abs_error"]), -int(row["count"])))
+    rows.sort(
+        key=lambda row: (
+            -_number(row["mean_abs_error"]),
+            -int(_number(row.get("count"))),
+        )
+    )
     return rows[:10]
 
 
@@ -4994,7 +5006,7 @@ CAPACITY_RESIDUAL_GROUP_FIELDS = (
 def _capacity_residual_diagnostics(
     rows: list[dict[str, Any]], actual: list[float], predicted: list[float]
 ) -> dict[str, Any]:
-    errors = [
+    errors: list[dict[str, Any]] = [
         {
             "actual": actual_value,
             "predicted": predicted_value,
@@ -5067,7 +5079,12 @@ def _capacity_top_error_groups(
         }
         for key, items in grouped.items()
     ]
-    rows.sort(key=lambda row: (-_number(row["mean_abs_error"]), -int(row["count"])))
+    rows.sort(
+        key=lambda row: (
+            -_number(row["mean_abs_error"]),
+            -int(_number(row.get("count"))),
+        )
+    )
     return rows[:10]
 
 
@@ -5164,10 +5181,14 @@ def fit_usage_drain_proxy(
         _fit_grid_multiplier(spans, proxy=proxy, multiplier=multiplier)
         for multiplier in grid_multipliers
     ]
+    valid_grid = [item for item in grid if item.get("r2_slope") is not None]
     best_grid = max(
-        (item for item in grid if item.get("r2_slope") is not None),
-        key=lambda item: float(item["r2_slope"]),
+        valid_grid,
+        key=lambda item: _number(item.get("r2_slope")),
         default=None,
+    )
+    best_grid_multiplier = (
+        _number(best_grid.get("multiplier")) if best_grid is not None else None
     )
     with_candidates = _drain_stats(
         [
@@ -5202,9 +5223,7 @@ def fit_usage_drain_proxy(
         documented_weighted_candidate_multiplier=_rounded(documented_multiplier),
         two_feature_r2=_rounded(_r2(y_values, y_hat) if y_hat is not None else None),
         grid=grid,
-        best_grid_multiplier_by_r2=(
-            float(best_grid["multiplier"]) if best_grid is not None else None
-        ),
+        best_grid_multiplier_by_r2=best_grid_multiplier,
         corr_candidate_credit_share_vs_drain_per_standard_credit=_rounded(
             _candidate_share_correlation(spans, proxy)
         ),
