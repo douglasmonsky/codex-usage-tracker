@@ -212,6 +212,28 @@ BOUNDARY_DELTA_RISK_GATE_THRESHOLDS = (
     0.95,
     1.0,
 )
+BOUNDARY_DELTA_RESIDUAL_MODELS = (
+    "previous_delta",
+    "risk_weighted_label_segment_age_mode",
+    "adaptive_mae_gate_label_segment_age_mode",
+)
+BOUNDARY_DELTA_ERROR_CONTEXT_FIELDS = (
+    "boundary_state",
+    "transition",
+    "previous_label",
+    "current_label",
+    "previous_segment_position_bucket",
+    "previous_segment_wall_time_bucket",
+    "window_elapsed_bucket",
+    "reset_remaining_bucket",
+    "day_of_week",
+    "hour_bucket",
+    "previous_span_wall_time_bucket",
+    "previous_call_duration_bucket",
+    "one_percent_streak_bucket",
+    "same_delta_streak_bucket",
+    "low_delta_streak_bucket",
+)
 BOUNDARY_RISK_SCOPE_STARTS = {
     "all_after_first": 1,
     "all_after_10": 10,
@@ -1419,6 +1441,11 @@ def _boundary_delta_prediction_scope(
             )
             if model_name in model_names
         },
+        "residual_diagnostics": {
+            model_name: _boundary_delta_residual_diagnostics(scope_rows, model_name)
+            for model_name in BOUNDARY_DELTA_RESIDUAL_MODELS
+            if model_name in model_names
+        },
     }
 
 
@@ -1552,6 +1579,127 @@ def _boundary_delta_risk_gate_diagnostics(
             )
         ],
     }
+
+
+def _boundary_delta_residual_diagnostics(
+    rows: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    errors: list[dict[str, Any]] = []
+    for row in rows:
+        predicted = _number((row.get("boundary_delta_predictions") or {}).get(model_name))
+        actual = _number(row.get("delta_percent"))
+        error = predicted - actual
+        errors.append(
+            {
+                "index": int(row["index"]),
+                "actual": actual,
+                "predicted": predicted,
+                "previous_delta_percent": _number(row.get("previous_delta_percent")),
+                "error": error,
+                "abs_error": abs(error),
+                "metadata": row,
+            }
+        )
+    if not errors:
+        return {
+            "n": 0,
+            "total_abs_error": None,
+            "exact_match_share": None,
+            "within_one_point_share": None,
+            "large_error_share": None,
+            "top_error_groups": {},
+            "largest_errors": [],
+        }
+    total_abs_error = sum(item["abs_error"] for item in errors)
+    return {
+        "n": len(errors),
+        "total_abs_error": _rounded(total_abs_error),
+        "exact_match_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] == 0) / len(errors)
+        ),
+        "within_one_point_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] <= 1.0) / len(errors)
+        ),
+        "large_error_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] >= 5.0) / len(errors)
+        ),
+        "top_error_groups": {
+            field_name: _boundary_delta_top_error_groups(errors, field_name)
+            for field_name in BOUNDARY_DELTA_ERROR_CONTEXT_FIELDS
+        },
+        "largest_errors": _largest_boundary_delta_errors(errors),
+    }
+
+
+def _boundary_delta_top_error_groups(
+    errors: list[dict[str, Any]], field_name: str
+) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in errors:
+        metadata = item.get("metadata", {})
+        if field_name == "boundary_state":
+            key = "boundary" if metadata.get("is_boundary") else "same_label"
+        else:
+            key = str(metadata.get(field_name) or "missing")
+        grouped.setdefault(key, []).append(item)
+    total_abs_error = sum(item["abs_error"] for item in errors)
+    rows = [
+        {
+            field_name: key,
+            "count": len(items),
+            "count_share": _rounded(len(items) / len(errors)),
+            "share_abs_error": _rounded(
+                sum(item["abs_error"] for item in items) / total_abs_error
+                if total_abs_error
+                else None
+            ),
+            "mean_abs_error": _rounded(
+                sum(item["abs_error"] for item in items) / len(items)
+            ),
+            "rmse": _rounded(
+                math.sqrt(sum(item["error"] * item["error"] for item in items) / len(items))
+            ),
+            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
+            "mean_actual": _rounded(sum(item["actual"] for item in items) / len(items)),
+            "mean_predicted": _rounded(
+                sum(item["predicted"] for item in items) / len(items)
+            ),
+        }
+        for key, items in grouped.items()
+    ]
+    rows.sort(
+        key=lambda row: (
+            -_number(row["share_abs_error"]),
+            -_number(row["mean_abs_error"]),
+            -int(row["count"]),
+            str(row.get(field_name) or ""),
+        )
+    )
+    return rows[:10]
+
+
+def _largest_boundary_delta_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = sorted(errors, key=lambda item: item["abs_error"], reverse=True)[:10]
+    return [
+        {
+            "index": item["index"],
+            "date": item["metadata"].get("date"),
+            "day_of_week": item["metadata"].get("day_of_week"),
+            "hour_bucket": item["metadata"].get("hour_bucket"),
+            "transition": item["metadata"].get("transition"),
+            "previous_segment_position_bucket": item["metadata"].get(
+                "previous_segment_position_bucket"
+            ),
+            "boundary_state": "boundary"
+            if item["metadata"].get("is_boundary")
+            else "same_label",
+            "previous_delta_percent": _rounded(item["previous_delta_percent"]),
+            "actual_delta_percent": _rounded(item["actual"]),
+            "predicted_delta_percent": _rounded(item["predicted"]),
+            "abs_error": _rounded(item["abs_error"]),
+        }
+        for item in rows
+    ]
 
 
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:

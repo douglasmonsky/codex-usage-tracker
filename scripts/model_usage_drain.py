@@ -294,6 +294,26 @@ def main() -> int:
                 or {}
             )
             if best_boundary_delta:
+                previous_delta_residuals = (
+                    (boundary_delta_scope.get("residual_diagnostics") or {}).get(
+                        "previous_delta"
+                    )
+                    or {}
+                )
+                boundary_state_errors = (
+                    (previous_delta_residuals.get("top_error_groups") or {}).get(
+                        "boundary_state"
+                    )
+                    or []
+                )
+                transition_errors = (
+                    (previous_delta_residuals.get("top_error_groups") or {}).get(
+                        "transition"
+                    )
+                    or []
+                )
+                top_boundary_error = boundary_state_errors[0] if boundary_state_errors else {}
+                top_transition_error = transition_errors[0] if transition_errors else {}
                 print(
                     "boundary delta all_after_10: mean={mean} best_mae={best} "
                     "best_rmse={best_rmse} gated_override={override} "
@@ -309,6 +329,16 @@ def main() -> int:
                         adaptive_threshold=adaptive_gate_diagnostics.get(
                             "mean_threshold"
                         ),
+                    )
+                )
+                print(
+                    "boundary delta residuals previous_delta: top_state={state} "
+                    "state_abs_share={state_share} top_transition={transition} "
+                    "transition_abs_share={transition_share}".format(
+                        state=top_boundary_error.get("boundary_state"),
+                        state_share=top_boundary_error.get("share_abs_error"),
+                        transition=top_transition_error.get("transition"),
+                        transition_share=top_transition_error.get("share_abs_error"),
                     )
                 )
         components = summary.get("token_component_regression") or {}

@@ -521,6 +521,20 @@ of opportunities, and lands between previous-delta persistence and the fixed
 gate. The learned threshold mostly says the same thing the current data says:
 exact next-delta prediction should almost always stay with persistence unless
 boundary risk is extremely high.
+
+The residual diagnostics make the remaining miss pattern much sharper. For the
+all-history `previous_delta` model, boundaries are only `19.8%` of next-delta
+opportunities but account for `89.4%` of absolute error. The biggest transition
+error bucket is `very_high_delta->small_blip`: only `1.3%` of rows, but `16.7%`
+of absolute error. Segment-position age points in the same direction:
+first-span opportunities account for `51.9%` of absolute error, while
+sixth-plus opportunities account for `25.9%`. Time buckets are also
+concentrated, but they mostly look like where the hard regime changes happened:
+day-of-week `4` accounts for `54.1%` of absolute error, hour `17` for `43.5%`,
+the first reset-window quarter for `63.2%`, and previous call duration
+`0_30_sec` for `63.0%`. Those are useful targeting variables, but the stronger
+structural takeaway is that exact-delta predictability is now a boundary/first-
+span problem, not a broad calendar regression problem.
 In the newest time-ordered holdout, almost every opportunity is a `1%`
 continuation: prior mode and segment age both reach `0.003` MAE, and the latest
 100 opportunities are all exactly predicted by every simple model. That confirms

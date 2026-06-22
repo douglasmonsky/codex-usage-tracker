@@ -343,6 +343,11 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     ]
     assert adaptive_diagnostics["override_share"] > 0.0
     assert adaptive_diagnostics["mean_threshold"] == 0.55
+    previous_delta_residuals = delta_scope["residual_diagnostics"]["previous_delta"]
+    boundary_errors = previous_delta_residuals["top_error_groups"]["boundary_state"]
+    assert boundary_errors[0]["boundary_state"] == "boundary"
+    assert boundary_errors[0]["share_abs_error"] == 1.0
+    assert previous_delta_residuals["largest_errors"][0]["boundary_state"] == "boundary"
 
 
 def test_boundary_delta_risk_gate_keeps_previous_delta_for_stable_regime() -> None:
@@ -389,6 +394,11 @@ def test_boundary_delta_risk_gate_keeps_previous_delta_for_stable_regime() -> No
         adaptive_diagnostics["source_counts"][0]["source"]
         == "adaptive_risk_gate_previous_delta"
     )
+    previous_delta_residuals = delta_scope["residual_diagnostics"]["previous_delta"]
+    boundary_errors = previous_delta_residuals["top_error_groups"]["boundary_state"]
+    assert boundary_errors[0]["boundary_state"] == "same_label"
+    assert boundary_errors[0]["share_abs_error"] == 1.0
+    assert previous_delta_residuals["largest_errors"][0]["boundary_state"] == "same_label"
 
 
 def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
