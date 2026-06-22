@@ -332,6 +332,40 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     )
 
 
+def test_boundary_delta_risk_gate_keeps_previous_delta_for_stable_regime() -> None:
+    rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    used = 0.0
+    for index, delta in enumerate(([8.0] * 18) + ([9.0] * 18), start=1):
+        used += delta
+        hour, minute = divmod(index, 60)
+        rows.append(
+            _row(
+                f"span-{index}",
+                f"2026-06-01T{hour:02d}:{minute:02d}:00Z",
+                used,
+                1.0,
+            )
+        )
+
+    summary = summarize_usage_drain_model(rows)
+
+    delta_scope = summary["piecewise_regime_segments"]["boundary_diagnostics"][
+        "walk_forward_delta_prediction"
+    ]["scopes"]["all_after_10"]
+    previous_delta = delta_scope["models"]["previous_delta"]
+    label_segment_age_mode = delta_scope["models"]["label_segment_age_mode"]
+    gated = delta_scope["models"]["risk_gated_label_segment_age_mode"]
+    weighted = delta_scope["models"]["risk_weighted_label_segment_age_mode"]
+    assert gated["mae"] == previous_delta["mae"]
+    assert gated["mae"] < label_segment_age_mode["mae"]
+    assert weighted["mae"] <= label_segment_age_mode["mae"]
+    gate_diagnostics = delta_scope["risk_gate_diagnostics"][
+        "risk_gated_label_segment_age_mode"
+    ]
+    assert gate_diagnostics["override_share"] == 0.0
+    assert gate_diagnostics["source_counts"][0]["source"] == "risk_gate_previous_delta"
+
+
 def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
     rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
     used = 0.0

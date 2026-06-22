@@ -496,6 +496,8 @@ After the first 10 opportunities, the all-history next-delta results are:
 | model | MAE | RMSE | R2 | Pearson |
 | --- | ---: | ---: | ---: | ---: |
 | previous delta | 0.936 | 2.786 | 0.781 | 0.891 |
+| risk-gated label + segment age | 1.016 | 2.907 | 0.762 | 0.881 |
+| risk-weighted label + segment age | 1.028 | 2.728 | 0.790 | 0.893 |
 | previous label + segment age | 1.580 | 3.542 | 0.646 | 0.811 |
 | reset + segment age | 1.836 | 3.979 | 0.553 | 0.756 |
 | calendar + segment age | 1.990 | 4.332 | 0.471 | 0.710 |
@@ -505,7 +507,13 @@ After the first 10 opportunities, the all-history next-delta results are:
 So the newest boundary feature is useful, but not in the way a perfect
 next-delta predictor would need. It improves causal boundary-risk ranking, while
 the exact magnitude is still best predicted by the immediately previous visible
-delta. In the newest time-ordered holdout, almost every opportunity is a `1%`
+delta. A risk-gated variant only overrides previous-delta prediction when
+label+segment-age boundary risk is at least `50%`; it overrides `16.7%` of
+all-history opportunities and improves sharply over always using the stale
+label+segment-age mode, but it still loses to previous-delta MAE. A
+risk-weighted blend is slightly worse on MAE but slightly better on RMSE and R2,
+which says it reduces some larger misses while adding small errors elsewhere.
+In the newest time-ordered holdout, almost every opportunity is a `1%`
 continuation: prior mode and segment age both reach `0.003` MAE, and the latest
 100 opportunities are all exactly predicted by every simple model. That confirms
 the current regime is easy because it is stable, not because calendar/reset

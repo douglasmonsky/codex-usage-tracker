@@ -188,6 +188,7 @@ BOUNDARY_DELTA_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
         ("previous_segment_position_bucket",),
     ),
 }
+BOUNDARY_DELTA_RISK_GATE_THRESHOLD = 0.5
 BOUNDARY_RISK_SCOPE_STARTS = {
     "all_after_first": 1,
     "all_after_10": 10,
@@ -1152,6 +1153,14 @@ def _boundary_walk_forward_delta_prediction_summary(
                 "Uses the modal prior next-span delta from matching segment age "
                 "plus day/hour context."
             ),
+            "risk_gated_label_segment_age_mode": (
+                "Uses previous delta unless previous-label plus segment-age boundary "
+                "risk is at least 50%, then uses the matched label/segment-age mode."
+            ),
+            "risk_weighted_label_segment_age_mode": (
+                "Blends previous delta with matched label/segment-age mode according "
+                "to the prior boundary-risk estimate."
+            ),
         },
         "scopes": {
             scope_name: _boundary_delta_prediction_scope(
@@ -1167,9 +1176,11 @@ def _boundary_walk_forward_delta_prediction_rows(
     rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
+    previous_rows: list[dict[str, Any]] = []
     previous_state_rows: list[dict[str, Any]] = []
     for row in rows:
         previous_delta = _number(row.get("previous_delta_percent"))
+        prior_boundary_rate = _boundary_rate(previous_rows)
         if previous_state_rows:
             prior_values = [
                 _number(previous.get("actual")) for previous in previous_state_rows
@@ -1211,6 +1222,45 @@ def _boundary_walk_forward_delta_prediction_rows(
             )
             predictions[model_name] = prediction
             details[model_name] = detail
+        label_segment_age_prediction = _number(predictions.get("label_segment_age_mode"))
+        label_segment_age_risk, label_segment_age_risk_detail = (
+            _state_bucket_boundary_risk(
+                previous_rows,
+                row,
+                signatures=BOUNDARY_RISK_MODEL_SIGNATURES["label_segment_age_risk"],
+                fallback_rate=prior_boundary_rate,
+            )
+        )
+        risk_gated_prediction = (
+            label_segment_age_prediction
+            if label_segment_age_risk >= BOUNDARY_DELTA_RISK_GATE_THRESHOLD
+            else previous_delta
+        )
+        risk_weighted_prediction = previous_delta + (
+            label_segment_age_risk * (label_segment_age_prediction - previous_delta)
+        )
+        predictions["risk_gated_label_segment_age_mode"] = risk_gated_prediction
+        predictions["risk_weighted_label_segment_age_mode"] = risk_weighted_prediction
+        details["risk_gated_label_segment_age_mode"] = {
+            "source": "risk_gate_override"
+            if label_segment_age_risk >= BOUNDARY_DELTA_RISK_GATE_THRESHOLD
+            else "risk_gate_previous_delta",
+            "risk_model": "label_segment_age_risk",
+            "risk": _rounded(label_segment_age_risk),
+            "risk_threshold": BOUNDARY_DELTA_RISK_GATE_THRESHOLD,
+            "risk_detail": label_segment_age_risk_detail,
+            "support": int(label_segment_age_risk_detail.get("support") or 0),
+            "matched_mode": _rounded(label_segment_age_prediction),
+        }
+        details["risk_weighted_label_segment_age_mode"] = {
+            "source": "risk_weighted_blend",
+            "risk_model": "label_segment_age_risk",
+            "risk": _rounded(label_segment_age_risk),
+            "risk_threshold": BOUNDARY_DELTA_RISK_GATE_THRESHOLD,
+            "risk_detail": label_segment_age_risk_detail,
+            "support": int(label_segment_age_risk_detail.get("support") or 0),
+            "matched_mode": _rounded(label_segment_age_prediction),
+        }
         output.append(
             {
                 **row,
@@ -1225,6 +1275,7 @@ def _boundary_walk_forward_delta_prediction_rows(
                 "state": row,
             }
         )
+        previous_rows.append(row)
     return output
 
 
@@ -1253,7 +1304,15 @@ def _boundary_delta_prediction_scope(
         "prediction_detail_diagnostics": {
             model_name: _state_bucket_model_diagnostics(scope_rows, model_name)
             for model_name in model_names
-            if model_name not in {"previous_delta", "prior_mode_delta"}
+            if model_name in BOUNDARY_DELTA_MODEL_SIGNATURES
+        },
+        "risk_gate_diagnostics": {
+            model_name: _boundary_delta_risk_gate_diagnostics(scope_rows, model_name)
+            for model_name in (
+                "risk_gated_label_segment_age_mode",
+                "risk_weighted_label_segment_age_mode",
+            )
+            if model_name in model_names
         },
     }
 
@@ -1265,6 +1324,48 @@ def _boundary_delta_model_names(rows: list[dict[str, Any]]) -> list[str]:
             if name not in names:
                 names.append(str(name))
     return names
+
+
+def _boundary_delta_risk_gate_diagnostics(
+    rows: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    details = [
+        (row.get("boundary_delta_prediction_details") or {}).get(model_name) or {}
+        for row in rows
+    ]
+    if not details:
+        return {
+            "n": 0,
+            "override_share": None,
+            "mean_risk": None,
+            "mean_support": None,
+            "source_counts": [],
+        }
+    source_counts: dict[str, int] = {}
+    risks: list[float] = []
+    supports: list[int] = []
+    for detail in details:
+        source = str(detail.get("source") or "missing")
+        source_counts[source] = source_counts.get(source, 0) + 1
+        risks.append(_number(detail.get("risk")))
+        supports.append(int(detail.get("support") or 0))
+    override_count = source_counts.get("risk_gate_override", 0)
+    return {
+        "n": len(details),
+        "override_share": _rounded(override_count / len(details)),
+        "mean_risk": _rounded(sum(risks) / len(risks)),
+        "mean_support": _rounded(sum(supports) / len(supports)),
+        "source_counts": [
+            {
+                "source": source,
+                "count": count,
+                "share": _rounded(count / len(details)),
+            }
+            for source, count in sorted(
+                source_counts.items(), key=lambda item: (-item[1], item[0])
+            )
+        ],
+    }
 
 
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
