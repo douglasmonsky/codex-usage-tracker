@@ -129,6 +129,8 @@ SEGMENT_POSITION_BUCKETS = (
 BOUNDARY_CONTEXT_FIELDS = (
     "previous_label",
     "previous_delta_bucket",
+    "previous_segment_position_bucket",
+    "previous_segment_wall_time_bucket",
     "one_percent_streak_bucket",
     "same_delta_streak_bucket",
     "low_delta_streak_bucket",
@@ -762,11 +764,17 @@ def _piecewise_boundary_rows(
     prediction_rows: dict[int, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    segment_start_index = 0
     for index in range(1, len(spans)):
         span = spans[index]
         previous_span = spans[index - 1]
         current_label = _delta_regime_label(span.delta_usage_percent)
         previous_label = _delta_regime_label(previous_span.delta_usage_percent)
+        previous_segment_position = index - segment_start_index
+        previous_segment_wall_time_seconds = _bounded_wall_time_seconds(
+            spans[segment_start_index].start_event_timestamp,
+            previous_span.start_event_timestamp,
+        )
         prediction_row = prediction_rows.get(index) or {}
         metadata = prediction_row.get("metadata") or _span_error_metadata(span)
         row = {
@@ -777,6 +785,16 @@ def _piecewise_boundary_rows(
             "transition": f"{previous_label}->{current_label}",
             "delta_percent": _rounded(span.delta_usage_percent),
             "previous_delta_percent": _rounded(previous_span.delta_usage_percent),
+            "previous_segment_position": previous_segment_position,
+            "previous_segment_position_bucket": _segment_position_bucket(
+                previous_segment_position
+            ),
+            "previous_segment_wall_time_seconds": _rounded(
+                previous_segment_wall_time_seconds
+            ),
+            "previous_segment_wall_time_bucket": _second_bucket(
+                previous_segment_wall_time_seconds
+            ),
             "timestamp": span.start_event_timestamp,
         }
         for field_name in BOUNDARY_CONTEXT_FIELDS:
@@ -787,6 +805,8 @@ def _piecewise_boundary_rows(
             metadata.get("one_percent_streak_count") or 0
         )
         rows.append(row)
+        if current_label != previous_label:
+            segment_start_index = index
     return rows
 
 
@@ -856,6 +876,10 @@ def _latest_piecewise_boundaries(rows: list[dict[str, Any]]) -> list[dict[str, A
             "hour_bucket": row.get("hour_bucket"),
             "window_elapsed_bucket": row.get("window_elapsed_bucket"),
             "previous_delta_percent": row.get("previous_delta_percent"),
+            "previous_segment_position": row.get("previous_segment_position"),
+            "previous_segment_position_bucket": row.get(
+                "previous_segment_position_bucket"
+            ),
             "delta_percent": row.get("delta_percent"),
             "one_percent_streak_count": row.get("one_percent_streak_count"),
         }
@@ -1814,8 +1838,15 @@ def _span_correlation_row(span: UsageDeltaSpan) -> dict[str, float]:
 
 
 def _span_wall_time_seconds(span: UsageDeltaSpan) -> float:
-    start_dt = _parse_timestamp(span.start_event_timestamp)
-    end_dt = _parse_timestamp(span.end_event_timestamp)
+    return _bounded_wall_time_seconds(
+        span.start_event_timestamp,
+        span.end_event_timestamp,
+    )
+
+
+def _bounded_wall_time_seconds(start_timestamp: str, end_timestamp: str) -> float:
+    start_dt = _parse_timestamp(start_timestamp)
+    end_dt = _parse_timestamp(end_timestamp)
     if start_dt is None or end_dt is None:
         return 0.0
     return max((end_dt - start_dt).total_seconds(), 0.0)

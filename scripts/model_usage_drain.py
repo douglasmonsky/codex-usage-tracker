@@ -223,12 +223,30 @@ def main() -> int:
         boundary = segments.get("boundary_diagnostics") or {}
         if boundary:
             long_one_percent = boundary.get("after_long_one_percent_run") or {}
+            position_rows = (
+                (boundary.get("by_context") or {}).get(
+                    "previous_segment_position_bucket"
+                )
+                or []
+            )
+            position_rates = {
+                row.get("previous_segment_position_bucket"): row.get("boundary_rate")
+                for row in position_rows
+                if isinstance(row, dict)
+            }
             print(
                 "regime boundaries: count={count} rate={rate} "
                 "after_long_1pct_rate={long_rate}".format(
                     count=boundary.get("boundary_count"),
                     rate=boundary.get("boundary_rate"),
                     long_rate=long_one_percent.get("boundary_rate"),
+                )
+            )
+            print(
+                "boundary hazard: first={first} second={second} sixth_plus={sixth}".format(
+                    first=position_rates.get("first_span"),
+                    second=position_rates.get("second_span"),
+                    sixth=position_rates.get("sixth_plus_span"),
                 )
             )
         components = summary.get("token_component_regression") or {}

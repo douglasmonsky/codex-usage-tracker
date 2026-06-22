@@ -448,6 +448,23 @@ history. The practical read is still conservative: these buckets describe where
 past boundaries clustered, but the current long `1%` regime has a much lower
 observed break rate than the all-history average.
 
+Segment age is the strongest boundary context added so far:
+
+| previous segment position | opportunities | boundaries | boundary rate |
+| --- | ---: | ---: | ---: |
+| first span | 290 | 168 | 57.9% |
+| second span | 122 | 40 | 32.8% |
+| third span | 82 | 17 | 20.7% |
+| fourth/fifth span | 120 | 21 | 17.5% |
+| sixth-plus span | 837 | 43 | 5.1% |
+
+Wall-clock segment age points the same way: transitions immediately after a new
+segment starts (`0_sec`) have a `57.9%` boundary rate, while segments older than
+30 minutes (`1800_plus_sec`) have a `2.1%` boundary rate. That makes the best
+current boundary model look like a survival problem: new segments are
+untrustworthy until they survive one or two confirming spans; old segments,
+especially long `1%` segments, are much less likely to break.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the

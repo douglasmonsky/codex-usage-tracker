@@ -221,6 +221,15 @@ def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
             "share": 0.5,
         },
     ]
+    assert "previous_segment_position_bucket" in boundaries["context_fields"]
+    assert "previous_segment_wall_time_bucket" in boundaries["context_fields"]
+    assert boundaries["by_context"]["previous_segment_position_bucket"][0] == {
+        "previous_segment_position_bucket": "fourth_fifth_span",
+        "n": 1,
+        "boundary_count": 1,
+        "non_boundary_count": 0,
+        "boundary_rate": 1.0,
+    }
     assert boundaries["by_previous_label"][0] == {
         "previous_label": "small_blip",
         "n": 1,
@@ -264,6 +273,9 @@ def test_one_percent_regime_grace_ignores_one_small_break() -> None:
         "non_boundary_count": 1,
         "boundary_rate": 0.5,
     }
+    latest = boundaries["latest_boundaries"][0]
+    assert latest["previous_segment_position_bucket"] == "first_span"
+    assert latest["previous_segment_position"] == 1
 
 
 def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
