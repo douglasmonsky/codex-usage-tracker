@@ -324,7 +324,11 @@
       const innerHeight = height - margin.top - margin.bottom;
       const timed = points
         .map(point => ({ ...point, ts: Date.parse(point.timestamp || '') }))
-        .filter(point => Number.isFinite(point.ts));
+        .filter(point => (
+          Number.isFinite(point.ts)
+          && point.weekly_used_percent !== null
+          && point.weekly_used_percent !== undefined
+        ));
       if (!timed.length) return renderState('No timestamped visible usage points in this snapshot.');
       const minX = Math.min(...timed.map(point => point.ts));
       const maxX = Math.max(...timed.map(point => point.ts));
@@ -509,17 +513,6 @@
       if (index === 0) return 'start';
       if (index === total - 1) return 'end';
       return 'middle';
-    }
-
-    function chartTicks(points, maxTicks) {
-      if (!points.length || maxTicks <= 0) return [];
-      if (points.length <= maxTicks) return points;
-      const selected = new Set();
-      const last = points.length - 1;
-      for (let index = 0; index < maxTicks; index += 1) {
-        selected.add(Math.round(index * last / (maxTicks - 1)));
-      }
-      return Array.from(selected).sort((left, right) => left - right).map(index => points[index]);
     }
 
     function timeChartTicks(points, maxTicks) {

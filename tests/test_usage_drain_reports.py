@@ -74,6 +74,38 @@ def test_weekly_projection_uses_high_water_usage_deltas(tmp_path: Path) -> None:
     assert points[0]["span_count"] == 2
 
 
+def test_weekly_time_series_ignores_stale_reset_window_snapshots(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    events = [
+        _event(
+            "stale",
+            "thread:Alpha",
+            "2026-05-01T00:00:00Z",
+            100,
+            50.0,
+            secondary_used_percent=90.0,
+        ),
+        _event("base", "thread:Alpha", "2026-06-01T00:00:00Z", 220, 0.0, secondary_used_percent=0.0),
+        _event("up", "thread:Alpha", "2026-06-01T00:01:00Z", 340, 1.0, secondary_used_percent=1.0),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+
+    report = build_usage_drain_dashboard_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+    )
+
+    visible_points = report["time_series"]["visible_usage"]["points"]
+    assert visible_points[0]["timestamp"] == "2026-05-01T00:00:00Z"
+    assert visible_points[0]["weekly_used_percent"] is None
+    projection_points = report["time_series"]["weekly_credit_projection"]["points"]
+    assert len(projection_points) == 1
+    assert projection_points[0]["observed_usage_delta_percent"] == 1.0
+
+
 def _event(
     record_id: str,
     thread_key: str,
