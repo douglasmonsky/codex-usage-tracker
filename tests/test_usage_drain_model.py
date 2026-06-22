@@ -216,6 +216,36 @@ def test_one_percent_regime_grace_ignores_one_small_break() -> None:
     assert calibration["scopes"]["all_after_first"]["best_by_mae"]["mae"] <= grace["mae"]
 
 
+def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
+    rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    used = 0.0
+    for day in range(20):
+        for hour, delta in ((0, 1.0), (12, 4.0)):
+            used += delta
+            rows.append(
+                _row(
+                    f"span-{day}-{hour}",
+                    f"2026-06-{day + 1:02d}T{hour:02d}:00:00Z",
+                    used,
+                    1.0,
+                )
+            )
+
+    summary = summarize_usage_drain_model(rows)
+
+    walk_forward = summary["walk_forward_prediction"]["scopes"]["all_after_10"]
+    previous = walk_forward["models"]["previous_delta"]
+    empirical = walk_forward["models"]["empirical_history_state_mode"]
+    assert empirical["mae"] < previous["mae"]
+    assert (
+        walk_forward["state_bucket_diagnostics"]["empirical_history_state_mode"][
+            "matched_state_share"
+        ]
+        > 0.0
+    )
+    assert "empirical_calendar_state_mode" in walk_forward["models"]
+
+
 def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
     used = 0.0

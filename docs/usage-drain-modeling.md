@@ -316,6 +316,36 @@ best newest-holdout MAE (`0.003436`). The gain is small, but it captures the
 right operational idea: a single `2%` tick after a long stable regime should be
 treated as a possible blip, not automatic proof that the regime changed.
 
+The report also includes empirical state-bucket walk-forward predictors. These
+learn the modal prior actual delta for matching state buckets, then fall back to
+simpler signatures when support is thin:
+
+- `empirical_history_state_mode`: previous delta plus streak buckets
+- `empirical_calendar_state_mode`: previous delta plus day-of-week and hour
+- `empirical_reset_state_mode`: previous delta plus baseline/reset-window buckets
+- `empirical_previous_work_state_mode`: previous delta plus the previous span's
+  wall-time and call-duration buckets
+
+Current full-history result:
+
+| model | MAE | exact match | matched-state share | mean support |
+| --- | ---: | ---: | ---: | ---: |
+| previous delta | 0.936 pct points | 76.9% | | |
+| one-percent grace | 0.936 pct points | 77.0% | | |
+| empirical reset state | 1.155 pct points | 72.1% | 99.0% | 23.0 |
+| empirical previous-work state | 1.344 pct points | 64.6% | 99.0% | 32.0 |
+| empirical history state | 1.346 pct points | 66.6% | 99.0% | 59.1 |
+| empirical calendar state | 1.358 pct points | 70.2% | 99.6% | 22.4 |
+
+For the newest 20% holdout, the reset-state bucket predictor ties the simple
+`1%`/grace rule at `0.003` MAE, but it does not beat it. The latest 500 spans
+make the limitation clearer: constant `1%` is `0.002` MAE, while the empirical
+calendar bucket degrades to `0.246` MAE because older calendar states sometimes
+vote for stale high-delta behavior. So these bucket predictors are useful as a
+diagnostic ceiling test, but they are not the path to perfect prediction on the
+current data. The best visible-counter predictor remains the simpler current
+regime rule: if the counter is in a long `1%` run, keep predicting `1%`.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the

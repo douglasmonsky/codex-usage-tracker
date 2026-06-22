@@ -51,6 +51,56 @@ REGIME_GRACE_SPANS = 1
 REGIME_GRACE_MAX_BREAK_DELTA = 2.0
 REGIME_GRACE_THRESHOLD_GRID = (3, 5, 10, 25, 50, 100, 200)
 REGIME_GRACE_SPAN_GRID = (1, 2, 3)
+STATE_BUCKET_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "empirical_history_state_mode": (
+        (
+            "previous_delta_bucket",
+            "one_percent_streak_bucket",
+            "same_delta_streak_bucket",
+            "low_delta_streak_bucket",
+        ),
+        ("previous_delta_bucket", "one_percent_streak_bucket"),
+        ("previous_delta_bucket",),
+    ),
+    "empirical_calendar_state_mode": (
+        (
+            "previous_delta_bucket",
+            "one_percent_streak_bucket",
+            "day_of_week",
+            "hour_bucket",
+        ),
+        ("previous_delta_bucket", "day_of_week", "hour_bucket"),
+        ("day_of_week", "hour_bucket"),
+        ("previous_delta_bucket", "one_percent_streak_bucket"),
+        ("previous_delta_bucket",),
+    ),
+    "empirical_reset_state_mode": (
+        (
+            "previous_delta_bucket",
+            "one_percent_streak_bucket",
+            "baseline_used_bucket",
+            "window_elapsed_bucket",
+            "reset_remaining_bucket",
+        ),
+        ("previous_delta_bucket", "window_elapsed_bucket", "reset_remaining_bucket"),
+        ("previous_delta_bucket", "baseline_used_bucket"),
+        ("previous_delta_bucket", "one_percent_streak_bucket"),
+        ("previous_delta_bucket",),
+    ),
+    "empirical_previous_work_state_mode": (
+        (
+            "previous_delta_bucket",
+            "one_percent_streak_bucket",
+            "previous_span_wall_time_bucket",
+            "previous_call_duration_bucket",
+        ),
+        ("previous_delta_bucket", "previous_span_wall_time_bucket"),
+        ("previous_delta_bucket", "previous_call_duration_bucket"),
+        ("previous_delta_bucket", "one_percent_streak_bucket"),
+        ("previous_delta_bucket",),
+    ),
+}
+STATE_BUCKET_MIN_SUPPORT = 2
 
 
 @dataclass(frozen=True)
@@ -1488,6 +1538,22 @@ def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
                 "Uses rolling10 mode when rolling10 standard deviation is <=1%; "
                 "otherwise uses previous delta."
             ),
+            "empirical_history_state_mode": (
+                "Uses the modal prior actual delta from matching previous-delta "
+                "and streak buckets, falling back to simpler history buckets."
+            ),
+            "empirical_calendar_state_mode": (
+                "Uses the modal prior actual delta from matching previous-delta, "
+                "day-of-week, and hour buckets, with history fallbacks."
+            ),
+            "empirical_reset_state_mode": (
+                "Uses the modal prior actual delta from matching previous-delta, "
+                "baseline, reset-phase, and reset-remaining buckets."
+            ),
+            "empirical_previous_work_state_mode": (
+                "Uses the modal prior actual delta from matching previous-delta "
+                "plus the prior span's wall-time and call-duration buckets."
+            ),
         },
         "scopes": {
             name: _walk_forward_scope_metrics(rows, start_index=start_index)
@@ -1500,8 +1566,10 @@ def _walk_forward_prediction_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
 def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     previous_deltas: list[float] = []
+    previous_state_rows: list[dict[str, Any]] = []
     for index, span in enumerate(spans):
         actual = span.delta_usage_percent
+        metadata = _span_error_metadata(span)
         if previous_deltas:
             recent3 = previous_deltas[-3:]
             recent10 = previous_deltas[-10:]
@@ -1530,6 +1598,19 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 grace_spans=REGIME_GRACE_SPANS,
                 max_break_delta=REGIME_GRACE_MAX_BREAK_DELTA,
             )
+            state = {
+                **metadata,
+                "previous_delta_bucket": _delta_bucket(previous_deltas[-1]),
+                "one_percent_streak_bucket": _streak_bucket(one_percent_streak),
+                "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
+                "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
+                "previous_span_wall_time_bucket": _previous_span_wall_time_bucket(
+                    spans, index
+                ),
+                "previous_call_duration_bucket": _previous_call_duration_bucket(
+                    spans, index
+                ),
+            }
             predictions = {
                 "constant_one_percent": 1.0,
                 "previous_delta": previous_deltas[-1],
@@ -1546,22 +1627,28 @@ def _walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str,
                 if rolling10_stddev <= 1.0
                 else previous_deltas[-1],
             }
+            state_predictions, state_prediction_details = _state_bucket_predictions(
+                previous_state_rows,
+                state,
+                fallback_prediction=previous_deltas[-1],
+            )
+            predictions.update(state_predictions)
             rows.append(
                 {
                     "index": index,
                     "actual": actual,
                     "previous_actual": previous_deltas[-1],
-                    "metadata": {
-                        **_span_error_metadata(span),
-                        "one_percent_streak_bucket": _streak_bucket(
-                            one_percent_streak
-                        ),
-                        "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
-                        "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
-                    },
+                    "metadata": state,
                     "predictions": predictions,
+                    "prediction_details": state_prediction_details,
                 }
             )
+        previous_state_rows.append(
+            {
+                "actual": actual,
+                "state": _history_state_for_span(spans, index, metadata, previous_deltas),
+            }
+        )
         previous_deltas.append(actual)
     return rows
 
@@ -1595,10 +1682,181 @@ def _walk_forward_scope_metrics(
                 "hybrid_streak_regime",
                 "one_percent_regime_grace",
                 "adaptive_low_delta_mode",
+                "empirical_history_state_mode",
+                "empirical_calendar_state_mode",
+                "empirical_reset_state_mode",
+                "empirical_previous_work_state_mode",
             )
             if model_name in model_names
         },
+        "state_bucket_diagnostics": {
+            model_name: _state_bucket_model_diagnostics(scope_rows, model_name)
+            for model_name in STATE_BUCKET_MODEL_SIGNATURES
+            if model_name in model_names
+        },
     }
+
+
+def _history_state_for_span(
+    spans: list[UsageDeltaSpan],
+    index: int,
+    metadata: dict[str, Any],
+    previous_deltas: list[float],
+) -> dict[str, Any]:
+    if previous_deltas:
+        one_percent_streak = _tail_streak(
+            previous_deltas, predicate=_is_one_percent_delta
+        )
+        low_delta_streak = _tail_streak(
+            previous_deltas, predicate=lambda value: value <= 1.0
+        )
+        same_delta_streak = _same_value_tail_streak(previous_deltas)
+        previous_delta_bucket = _delta_bucket(previous_deltas[-1])
+    else:
+        one_percent_streak = 0
+        low_delta_streak = 0
+        same_delta_streak = 0
+        previous_delta_bucket = "missing"
+    return {
+        **metadata,
+        "previous_delta_bucket": previous_delta_bucket,
+        "one_percent_streak_bucket": _streak_bucket(one_percent_streak),
+        "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
+        "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
+        "previous_span_wall_time_bucket": _previous_span_wall_time_bucket(
+            spans, index
+        ),
+        "previous_call_duration_bucket": _previous_call_duration_bucket(spans, index),
+    }
+
+
+def _state_bucket_predictions(
+    previous_state_rows: list[dict[str, Any]],
+    state: dict[str, Any],
+    *,
+    fallback_prediction: float,
+) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    predictions: dict[str, float] = {}
+    details: dict[str, dict[str, Any]] = {}
+    for model_name, signatures in STATE_BUCKET_MODEL_SIGNATURES.items():
+        prediction, detail = _state_bucket_prediction(
+            previous_state_rows,
+            state,
+            signatures=signatures,
+            fallback_prediction=fallback_prediction,
+        )
+        predictions[model_name] = prediction
+        details[model_name] = detail
+    return predictions, details
+
+
+def _state_bucket_prediction(
+    previous_state_rows: list[dict[str, Any]],
+    state: dict[str, Any],
+    *,
+    signatures: tuple[tuple[str, ...], ...],
+    fallback_prediction: float,
+) -> tuple[float, dict[str, Any]]:
+    for signature in signatures:
+        matches = [
+            row
+            for row in previous_state_rows
+            if _state_signature(row.get("state", {}), signature)
+            == _state_signature(state, signature)
+        ]
+        if len(matches) < STATE_BUCKET_MIN_SUPPORT:
+            continue
+        actual_values = [_number(row.get("actual")) for row in matches]
+        prediction = _value_mode(actual_values)
+        return prediction, {
+            "source": "matched_state",
+            "signature": list(signature),
+            "support": len(matches),
+            "matched_mode": _rounded(prediction),
+        }
+    return fallback_prediction, {
+        "source": "fallback_previous_delta",
+        "signature": [],
+        "support": 0,
+        "matched_mode": None,
+    }
+
+
+def _state_signature(state: dict[str, Any], signature: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(str(state.get(field) or "missing") for field in signature)
+
+
+def _state_bucket_model_diagnostics(
+    rows: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    details = [
+        (row.get("prediction_details") or {}).get(model_name) or {}
+        for row in rows
+    ]
+    if not details:
+        return {
+            "n": 0,
+            "matched_state_share": None,
+            "mean_support": None,
+            "top_signatures": [],
+        }
+    matched = [detail for detail in details if detail.get("source") == "matched_state"]
+    signature_counts: dict[str, int] = {}
+    for detail in matched:
+        label = ",".join(str(item) for item in detail.get("signature") or [])
+        signature_counts[label or "missing"] = signature_counts.get(label or "missing", 0) + 1
+    top_signatures = [
+        {"signature": signature, "count": count, "share": _rounded(count / len(details))}
+        for signature, count in sorted(
+            signature_counts.items(), key=lambda item: (-item[1], item[0])
+        )[:8]
+    ]
+    return {
+        "n": len(details),
+        "matched_state_share": _rounded(len(matched) / len(details)),
+        "mean_support": _rounded(
+            sum(int(detail.get("support") or 0) for detail in matched) / len(matched)
+            if matched
+            else None
+        ),
+        "fallback_share": _rounded((len(details) - len(matched)) / len(details)),
+        "top_signatures": top_signatures,
+    }
+
+
+def _previous_span_wall_time_bucket(spans: list[UsageDeltaSpan], index: int) -> str:
+    if index <= 0:
+        return "missing"
+    return _second_bucket(_span_wall_time_seconds(spans[index - 1]))
+
+
+def _previous_call_duration_bucket(spans: list[UsageDeltaSpan], index: int) -> str:
+    if index <= 0:
+        return "missing"
+    return _second_bucket(
+        spans[index - 1].timing_totals.get("call_duration_seconds", 0.0)
+    )
+
+
+def _delta_bucket(value: float) -> str:
+    rounded = round(value, 6)
+    if rounded == 1.0:
+        return "1_pct"
+    if rounded == 2.0:
+        return "2_pct"
+    if rounded == 3.0:
+        return "3_pct"
+    if rounded <= 0:
+        return "0_pct"
+    if rounded < 1.0:
+        return "0_1_pct"
+    if rounded < 5.0:
+        return "3_5_pct"
+    if rounded < 10.0:
+        return "5_10_pct"
+    if rounded < 25.0:
+        return "10_25_pct"
+    return "25_plus_pct"
 
 
 def _one_percent_grace_calibration(
@@ -1787,8 +2045,14 @@ def _span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
         "day_of_week": str(start_dt.weekday()) if start_dt else "missing",
         "hour_bucket": f"{start_dt.hour:02d}" if start_dt else "missing",
         "reset_phase": _reset_phase_bucket(elapsed_fraction),
+        "baseline_used_bucket": _numeric_bucket(
+            span.baseline_used_percent, width=5.0, max_value=100.0, suffix="pct"
+        ),
+        "window_elapsed_bucket": _reset_phase_bucket(elapsed_fraction),
+        "reset_remaining_bucket": _minute_bucket(reset_minutes),
         "rate_limit_plan_type": span.rate_limit_plan_type or "missing",
         "rate_limit_limit_id": span.rate_limit_limit_id or "missing",
+        "usage_window_source": span.usage_window_source or "missing",
     }
 
 

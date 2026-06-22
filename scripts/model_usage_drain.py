@@ -145,6 +145,26 @@ def main() -> int:
                         best_rmse=best_rmse,
                     )
                 )
+                state_models = {
+                    name: values
+                    for name, values in models.items()
+                    if name.startswith("empirical_")
+                }
+                best_state = _best_metric_model(state_models, "mae")
+                if best_state:
+                    best_state_name = best_state.split(":", 1)[0]
+                    diagnostics = (scope.get("state_bucket_diagnostics") or {}).get(
+                        best_state_name
+                    ) or {}
+                    print(
+                        "walk-forward state-bucket {scope}: best_mae={best_mae} "
+                        "matched={matched} support={support}".format(
+                            scope=scope_name,
+                            best_mae=best_state,
+                            matched=diagnostics.get("matched_state_share"),
+                            support=diagnostics.get("mean_support"),
+                        )
+                    )
         components = summary.get("token_component_regression") or {}
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):
