@@ -32,14 +32,19 @@ def _row(
     reasoning_output_tokens: int = 0,
     nonreasoning_output_tokens: int = 0,
     effort: str | None = "xhigh",
+    session_id: str = "session",
+    turn_id: str | None = None,
+    rate_limit_limit_id: str = "codex",
 ) -> dict[str, object]:
     output_tokens = reasoning_output_tokens + nonreasoning_output_tokens
     input_tokens = uncached_input_tokens + cached_input_tokens
     return {
         "record_id": record_id,
+        "session_id": session_id,
+        "turn_id": turn_id if turn_id is not None else record_id,
         "event_timestamp": timestamp,
         "rate_limit_plan_type": "plus",
-        "rate_limit_limit_id": "codex",
+        "rate_limit_limit_id": rate_limit_limit_id,
         "rate_limit_primary_used_percent": used,
         "rate_limit_primary_window_minutes": window_minutes,
         "rate_limit_primary_resets_at": resets_at,
@@ -61,8 +66,8 @@ def _row(
 def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets() -> None:
     rows = [
         _row("a", "2026-06-01T00:00:00Z", 10.0, 99.0),
-        _row("b", "2026-06-01T00:01:00Z", 10.0, 2.0),
-        _row("c", "2026-06-01T00:02:00Z", 12.0, 3.0),
+        _row("b", "2026-06-01T00:01:00Z", 10.0, 2.0, turn_id="turn-1"),
+        _row("c", "2026-06-01T00:02:00Z", 12.0, 3.0, turn_id="turn-1"),
         _row("d", "2026-06-01T00:03:00Z", 12.0, 1.0),
         _row("e", "2026-06-01T00:04:00Z", 5.0, 1.0),
         _row("f", "2026-06-01T00:05:00Z", 6.0, 4.0),
@@ -81,6 +86,8 @@ def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets(
     assert [span.row_count for span in spans] == [2, 1]
     assert spans[0].delta_usage_percent == 2.0
     assert spans[0].effort_counts == {"xhigh": 2}
+    assert spans[0].turn_count == 1
+    assert spans[0].max_calls_in_turn == 2
     assert spans[0].candidate_standard_credits["strong_only"] == 5.0
     assert spans[0].documented_fast_weighted_credits["strong_only"] == 12.5
     assert spans[1].non_candidate_standard_credits["strong_only"] == 4.0
@@ -106,6 +113,32 @@ def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets(
         "max_abs_error": 1.0,
     }
     assert previous_error["largest_errors"][0]["date"] == "2026-06-01"
+
+
+def test_alternate_codex_limit_rows_count_as_work_but_not_boundaries() -> None:
+    rows = [
+        _row("a", "2026-06-01T00:00:00Z", 10.0, 1.0),
+        _row(
+            "bengal",
+            "2026-06-01T00:01:00Z",
+            0.0,
+            5.0,
+            rate_limit_limit_id="codex_bengalfox",
+        ),
+        _row("hold", "2026-06-01T00:02:00Z", 10.0, 2.0),
+        _row("close", "2026-06-01T00:03:00Z", 11.0, 3.0),
+    ]
+
+    spans, stats = build_usage_delta_spans(rows)
+
+    assert stats["alternate_codex_limit_rows_ignored_for_boundaries"] == 1
+    assert stats["rows_without_usage_snapshot"] == 1
+    assert stats["positive_usage_spans"] == 1
+    assert stats["censored_or_reset_pending_segments"] == 0
+    assert len(spans) == 1
+    assert spans[0].row_count == 3
+    assert spans[0].standard_usage_credits == 10.0
+    assert spans[0].rate_limit_limit_id == "codex"
 
 
 def test_build_usage_delta_spans_prefers_five_hour_window_when_secondary() -> None:
@@ -826,6 +859,7 @@ def test_predictive_models_compare_control_families_on_holdout() -> None:
     by_name = {result["name"]: result for result in results}
 
     assert by_name["baseline_train_mean__interleaved_every_5th"]["holdout"]["r2"] < 0.1
+    assert "turn_batching__interleaved_every_5th" in by_name
     assert "effort_controls__interleaved_every_5th" in by_name
     assert "online_capacity_controls__interleaved_every_5th" in by_name
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["r2"] > 0.9

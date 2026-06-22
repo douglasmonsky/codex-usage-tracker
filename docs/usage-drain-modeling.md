@@ -83,6 +83,12 @@ spans:
 4. If the usage percentage goes down, the limit bucket changes, or reset metadata
    changes, censor the pending span instead of pretending it was zero cost.
 
+Rows from alternate Codex limit IDs such as `codex_bengalfox` are treated as
+work rows with missing counter observations. Their tokens, credits, timing, and
+turn metadata stay in the pending span, but their reported `0%` counters are not
+allowed to close, reset, or censor spans. This avoids undercounting the normal
+`codex` span that later shows the visible usage increase.
+
 This preserves zero-change calls instead of dropping them. They are part of the
 work that may have caused the next visible usage-drain jump.
 
@@ -101,8 +107,10 @@ The script also fits exploratory predictive control families on closed spans:
 - `credits_only`: standard Codex credit estimate and log credit estimate
 - `token_shape`: credits plus row count, input/cache/output/reasoning token mix,
   cache ratio, and per-call credit density
-- `fast_proxy`: token shape plus fast-proxy candidate credit share and documented
-  fast-weighted credits
+- `turn_batching`: token shape plus aggregate turn count, calls per turn,
+  largest-turn share, and token/credit density per turn
+- `fast_proxy`: turn batching plus fast-proxy candidate credit share and
+  documented fast-weighted credits
 - `effort_controls`: fast proxy plus effort mix and dominant-effort controls
 - `online_capacity_controls`: effort controls plus prior-only capacity and
   remainder estimates, using earlier closed spans to estimate credits per
@@ -929,6 +937,17 @@ relative to effort-only controls, but the higher MAE means it is mostly helping
 rank some large spans while making typical span prediction worse. That points
 back to a stateful model: predict the visible-counter regime and boundary risk
 first, then use credits/cost/time as within-regime explanatory components.
+
+An additional bengalfox-controlled turn-batching check found that turn structure
+has real but limited signal. In the controlled all-row span set, median turns per
+span is `1`, mean turns per span is `1.57`, and some spans contain hundreds of
+calls in a single turn. After treating `5,029` alternate Codex-limit rows as
+work with ignored counters, the built-in report produces `1,491` closed spans.
+On the interleaved holdout, turn batching improves R2 from `0.104` for credits
+only and `0.124` for token shape to `0.158`. On the time-ordered holdout, MAE
+improves from `1.709` for credits only and `1.542` for token shape to `1.156`.
+This supports using turn batching as a control, while still leaving
+regime/boundary state as the strongest visible-counter predictor.
 
 The research implication is that the right metric is probably piecewise and
 stateful:

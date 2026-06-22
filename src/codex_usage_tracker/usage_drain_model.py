@@ -346,6 +346,9 @@ class UsageDeltaSpan:
     )
     models: dict[str, int] = field(default_factory=dict)
     effort_counts: dict[str, int] = field(default_factory=dict)
+    turn_count: int = 0
+    multi_call_turn_count: int = 0
+    max_calls_in_turn: int = 0
     token_totals: dict[str, float] = field(default_factory=dict)
     timing_totals: dict[str, float] = field(default_factory=dict)
     rate_limit_plan_type: str | None = None
@@ -369,6 +372,9 @@ class UsageDeltaSpan:
             "efforts": "|".join(
                 f"{effort}:{count}" for effort, count in sorted(self.effort_counts.items())
             ),
+            "turn_count": self.turn_count,
+            "multi_call_turn_count": self.multi_call_turn_count,
+            "max_calls_in_turn": self.max_calls_in_turn,
             "rate_limit_plan_type": self.rate_limit_plan_type,
             "rate_limit_limit_id": self.rate_limit_limit_id,
             "usage_window_source": self.usage_window_source,
@@ -484,6 +490,7 @@ def build_usage_delta_spans(
         "input_rows": len(rows),
         "rows_without_usage_snapshot": 0,
         "rows_without_initial_baseline": 0,
+        "alternate_codex_limit_rows_ignored_for_boundaries": 0,
         "censored_or_reset_pending_segments": 0,
         "positive_usage_spans": 0,
         "five_hour_usage_window_rows": 0,
@@ -495,6 +502,8 @@ def build_usage_delta_spans(
     pending_rows: list[dict[str, Any]] = []
 
     for row in sorted_rows:
+        if _is_alternate_codex_limit(row.get("rate_limit_limit_id")):
+            stats["alternate_codex_limit_rows_ignored_for_boundaries"] += 1
         usage_observation = _preferred_usage_observation(row)
         if usage_observation["used_percent"] is None:
             stats["rows_without_usage_snapshot"] += 1
@@ -3251,6 +3260,7 @@ def _visible_delta_family_sequences() -> dict[str, list[tuple[str, str]]]:
             ("train mean", "baseline_train_mean"),
             ("credits", "credits_only"),
             ("token shape", "token_shape"),
+            ("turn batching", "turn_batching"),
             ("fast proxy", "fast_proxy"),
             ("effort", "effort_controls"),
             ("online capacity", "online_capacity_controls"),
@@ -5357,6 +5367,7 @@ def _span_from_rows(
     }
     model_counts: dict[str, int] = {}
     effort_counts: dict[str, int] = {}
+    turn_counts: dict[tuple[str, str], int] = {}
     token_totals = dict.fromkeys(TOKEN_TOTAL_FIELDS, 0.0)
     timing_totals = dict.fromkeys(TIMING_TOTAL_FIELDS, 0.0)
     for row in rows:
@@ -5366,6 +5377,8 @@ def _span_from_rows(
         model_counts[model] = model_counts.get(model, 0) + 1
         effort = _normalized_effort(row.get("effort"))
         effort_counts[effort] = effort_counts.get(effort, 0) + 1
+        turn_key = _turn_key(row)
+        turn_counts[turn_key] = turn_counts.get(turn_key, 0) + 1
         for field_name in TOKEN_TOTAL_FIELDS:
             token_totals[field_name] += _number(row.get(field_name))
         for field_name in TIMING_TOTAL_FIELDS:
@@ -5409,6 +5422,9 @@ def _span_from_rows(
         documented_fast_weighted_token_totals=documented_weighted_token_totals,
         models=model_counts,
         effort_counts=effort_counts,
+        turn_count=len(turn_counts),
+        multi_call_turn_count=sum(1 for count in turn_counts.values() if count > 1),
+        max_calls_in_turn=max(turn_counts.values(), default=0),
         token_totals=token_totals,
         timing_totals=timing_totals,
         rate_limit_plan_type=_optional_text(rows[-1].get("rate_limit_plan_type")),
@@ -5444,8 +5460,23 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "reasoning_output_share",
         "mean_usage_credits_per_call",
     )
-    fast_proxy = (
+    turn_batching = (
         *token_shape,
+        "turn_count",
+        "log_turn_count",
+        "multi_call_turn_count",
+        "max_calls_in_turn",
+        "same_turn_share",
+        "calls_per_turn",
+        "credits_per_turn",
+        "tokens_per_turn",
+        "input_tokens_per_turn",
+        "output_tokens_per_turn",
+        "credits_per_call",
+        "tokens_per_call",
+    )
+    fast_proxy = (
+        *turn_batching,
         "candidate_standard_credits",
         "non_candidate_standard_credits",
         "candidate_credit_share",
@@ -5570,6 +5601,7 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         PredictiveModelSpec("baseline_train_mean", ()),
         PredictiveModelSpec("credits_only", base),
         PredictiveModelSpec("token_shape", token_shape),
+        PredictiveModelSpec("turn_batching", turn_batching),
         PredictiveModelSpec("fast_proxy", fast_proxy),
         PredictiveModelSpec(
             "effort_controls",
@@ -5693,6 +5725,11 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
     total_tokens = span.token_totals.get("total_tokens", 0.0)
     duration = span.timing_totals.get("call_duration_seconds", 0.0)
     span_wall_time_seconds = _span_wall_time_seconds(span)
+    turn_count = span.turn_count if span.turn_count > 0 else min(span.row_count, 1)
+    max_calls_in_turn = span.max_calls_in_turn if span.max_calls_in_turn > 0 else (
+        span.row_count if span.row_count > 0 else 0
+    )
+    same_turn_share = max_calls_in_turn / span.row_count if span.row_count else 0.0
     window_minutes = (
         span.usage_window_minutes
         if span.usage_window_minutes is not None
@@ -5750,6 +5787,18 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "output_token_share": output_tokens / total_tokens if total_tokens else 0.0,
         "reasoning_output_share": reasoning_tokens / output_tokens if output_tokens else 0.0,
         "mean_usage_credits_per_call": standard / span.row_count if span.row_count else 0.0,
+        "turn_count": float(turn_count),
+        "log_turn_count": math.log1p(max(turn_count, 0)),
+        "multi_call_turn_count": float(span.multi_call_turn_count),
+        "max_calls_in_turn": float(max_calls_in_turn),
+        "same_turn_share": same_turn_share,
+        "calls_per_turn": span.row_count / turn_count if turn_count else 0.0,
+        "credits_per_turn": standard / turn_count if turn_count else 0.0,
+        "tokens_per_turn": total_tokens / turn_count if turn_count else 0.0,
+        "input_tokens_per_turn": input_tokens / turn_count if turn_count else 0.0,
+        "output_tokens_per_turn": output_tokens / turn_count if turn_count else 0.0,
+        "credits_per_call": standard / span.row_count if span.row_count else 0.0,
+        "tokens_per_call": total_tokens / span.row_count if span.row_count else 0.0,
         "candidate_standard_credits": candidate,
         "non_candidate_standard_credits": non_candidate,
         "candidate_credit_share": candidate / standard if standard else 0.0,
@@ -6550,6 +6599,14 @@ def _usage_bucket(row: dict[str, Any]) -> tuple[Any, ...]:
 def _preferred_usage_observation(row: dict[str, Any]) -> dict[str, Any]:
     """Prefer the 5-hour usage window and fall back only when it is unavailable."""
 
+    if _is_alternate_codex_limit(row.get("rate_limit_limit_id")):
+        return {
+            "source": "alternate_codex_limit_ignored",
+            "used_percent": None,
+            "window_minutes": None,
+            "resets_at": None,
+        }
+
     candidates = [
         {
             "source": "primary",
@@ -6585,6 +6642,18 @@ def _preferred_usage_observation(row: dict[str, Any]) -> dict[str, Any]:
         "window_minutes": None,
         "resets_at": None,
     }
+
+
+def _is_alternate_codex_limit(limit_id: object) -> bool:
+    if not isinstance(limit_id, str):
+        return False
+    return limit_id.startswith("codex_") and limit_id != "codex"
+
+
+def _turn_key(row: dict[str, Any]) -> tuple[str, str]:
+    session_id = str(row.get("session_id") or "missing")
+    turn_id = str(row.get("turn_id") or row.get("record_id") or "missing")
+    return session_id, turn_id
 
 
 def _parse_timestamp(value: str) -> datetime | None:
