@@ -448,6 +448,22 @@ regularized shape interactions improve it further. Same-span tokens make the fit
 look perfect, but that is not a forecasting win because the token totals are
 observed inside the span and the credit estimate is derived from them.
 
+Residual diagnostics are now included on each capacity model under
+`holdout_error_diagnostics`. The current interleaved holdout shows the remaining
+non-token error is concentrated in large spans:
+
+| model | within 10 credits | large error share | largest error drivers |
+| --- | ---: | ---: | --- |
+| causal history + state interactions | 55.9% | 18.6% | `50_plus_calls` spans average `50.0` credits of absolute error; `900_1800_sec` call-duration spans average `38.9` |
+| same-span shape + interactions, ridge30 | 76.6% | 1.4% | `50_plus_calls` spans average `19.5` credits of absolute error; `900_1800_sec` call-duration spans average `20.7` |
+| same-span tokens | 100.0% | 0.0% | largest residual is `0.33` credits, consistent with numerical/accounting noise |
+
+This points toward two different next steps. For advance prediction, high-work
+`1%` ticks remain the hard cases because their size is not knowable from
+pre-span history alone. For explanatory analysis after the span closes,
+large-span shape still has some structure left, but token accounting absorbs
+almost all of it.
+
 ## Run It
 
 Refresh the aggregate index first, then run:

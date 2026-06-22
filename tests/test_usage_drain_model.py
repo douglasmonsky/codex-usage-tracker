@@ -282,6 +282,10 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
         == "capacity_same_span_shape_interactions_ridge30__time_ordered_80_20"
     )
     assert ridge_model["ridge_alpha"] == 30.0
+    diagnostics = ridge_model["holdout_error_diagnostics"]
+    assert diagnostics["n"] > 0
+    assert "row_count_bucket" in diagnostics["top_error_groups"]
+    assert diagnostics["largest_errors"]
     component_regression = capacity["token_component_regression"]["variants"][
         "unweighted"
     ]["capacity_credits"]["no_intercept"]["all"]

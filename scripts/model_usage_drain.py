@@ -184,11 +184,15 @@ def main() -> int:
                 model = capacity_models.get(model_name) or {}
                 holdout = model.get("holdout") or {}
                 if holdout:
+                    diagnostics = model.get("holdout_error_diagnostics") or {}
                     print(
-                        "  {name}: r2={r2} mae={mae}".format(
+                        "  {name}: r2={r2} mae={mae} within10={within10} "
+                        "large={large}".format(
                             name=model_name,
                             r2=holdout.get("r2"),
                             mae=holdout.get("mae"),
+                            within10=diagnostics.get("within_10_credits_share"),
+                            large=diagnostics.get("large_error_share"),
                         )
                     )
             capacity_components = (

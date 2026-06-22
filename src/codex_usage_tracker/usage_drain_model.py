@@ -775,7 +775,12 @@ def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any
     ):
         models.extend(_fit_capacity_baseline_models(train_rows, holdout_rows, split_name))
         for spec, kind in _capacity_model_specs():
-            fitted = _fit_predictive_model(train_rows, holdout_rows, spec)
+            fitted = _fit_predictive_model(
+                train_rows,
+                holdout_rows,
+                spec,
+                include_capacity_residual_diagnostics=True,
+            )
             if fitted is None:
                 continue
             fitted["validation"] = split_name
@@ -964,6 +969,9 @@ def _fit_capacity_baseline_models(
                 "categorical_features": [],
                 "train": _regression_metrics(train_y, train_predictions),
                 "holdout": _regression_metrics(holdout_y, holdout_predictions),
+                "holdout_error_diagnostics": _capacity_residual_diagnostics(
+                    holdout_rows, holdout_y, holdout_predictions
+                ),
                 "top_coefficients": [],
             }
         )
@@ -1845,6 +1853,118 @@ def _largest_prediction_errors(errors: list[dict[str, Any]]) -> list[dict[str, A
             "actual_delta_percent": _rounded(item["actual"]),
             "predicted_delta_percent": _rounded(item["predicted"]),
             "abs_error": _rounded(item["abs_error"]),
+        }
+        for item in rows
+    ]
+
+
+CAPACITY_RESIDUAL_GROUP_FIELDS = (
+    "date",
+    "day_of_week",
+    "hour_bucket",
+    "baseline_used_bucket",
+    "window_elapsed_bucket",
+    "reset_remaining_bucket",
+    "row_count_bucket",
+    "call_duration_bucket",
+    "span_wall_time_bucket",
+    "rate_limit_plan_type",
+    "rate_limit_limit_id",
+    "usage_window_source",
+)
+
+
+def _capacity_residual_diagnostics(
+    rows: list[dict[str, Any]], actual: list[float], predicted: list[float]
+) -> dict[str, Any]:
+    errors = [
+        {
+            "actual": actual_value,
+            "predicted": predicted_value,
+            "error": predicted_value - actual_value,
+            "abs_error": abs(predicted_value - actual_value),
+            "metadata": _capacity_residual_metadata(row),
+        }
+        for row, actual_value, predicted_value in zip(rows, actual, predicted, strict=True)
+    ]
+    if not errors:
+        return {
+            "n": 0,
+            "mean_error": None,
+            "within_5_credits_share": None,
+            "within_10_credits_share": None,
+            "large_error_share": None,
+            "top_error_groups": {},
+            "largest_errors": [],
+        }
+    return {
+        "n": len(errors),
+        "mean_error": _rounded(
+            sum(item["error"] for item in errors) / len(errors)
+        ),
+        "within_5_credits_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] <= 5.0) / len(errors)
+        ),
+        "within_10_credits_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] <= 10.0) / len(errors)
+        ),
+        "large_error_share": _rounded(
+            sum(1 for item in errors if item["abs_error"] >= 25.0) / len(errors)
+        ),
+        "top_error_groups": {
+            field_name: _capacity_top_error_groups(errors, field_name)
+            for field_name in CAPACITY_RESIDUAL_GROUP_FIELDS
+        },
+        "largest_errors": _largest_capacity_residual_errors(errors),
+    }
+
+
+def _capacity_residual_metadata(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        field_name: row.get(field_name, "missing")
+        for field_name in CAPACITY_RESIDUAL_GROUP_FIELDS
+    }
+
+
+def _capacity_top_error_groups(
+    errors: list[dict[str, Any]], field_name: str
+) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in errors:
+        metadata = item.get("metadata", {})
+        key = str(metadata.get(field_name) or "missing")
+        grouped.setdefault(key, []).append(item)
+    rows = [
+        {
+            field_name: key,
+            "count": len(items),
+            "mean_abs_error": _rounded(
+                sum(item["abs_error"] for item in items) / len(items)
+            ),
+            "mean_error": _rounded(sum(item["error"] for item in items) / len(items)),
+            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
+            "mean_actual": _rounded(sum(item["actual"] for item in items) / len(items)),
+            "mean_predicted": _rounded(
+                sum(item["predicted"] for item in items) / len(items)
+            ),
+        }
+        for key, items in grouped.items()
+    ]
+    rows.sort(key=lambda row: (-_number(row["mean_abs_error"]), -int(row["count"])))
+    return rows[:10]
+
+
+def _largest_capacity_residual_errors(
+    errors: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    rows = sorted(errors, key=lambda item: item["abs_error"], reverse=True)[:10]
+    return [
+        {
+            "actual_credits": _rounded(item["actual"]),
+            "predicted_credits": _rounded(item["predicted"]),
+            "error_credits": _rounded(item["error"]),
+            "abs_error_credits": _rounded(item["abs_error"]),
+            **item["metadata"],
         }
         for item in rows
     ]
@@ -2765,6 +2885,8 @@ def _fit_predictive_model(
     train_rows: list[dict[str, Any]],
     holdout_rows: list[dict[str, Any]],
     spec: PredictiveModelSpec,
+    *,
+    include_capacity_residual_diagnostics: bool = False,
 ) -> dict[str, Any] | None:
     prepared = _prepare_design(train_rows, spec)
     if prepared is None:
@@ -2798,7 +2920,7 @@ def _fit_predictive_model(
         for feature, value in zip(feature_names, coefficients[1:], strict=True)
     ]
     coefficient_rows.sort(key=lambda row: abs(_number(row["coefficient"])), reverse=True)
-    return {
+    result = {
         "name": spec.name,
         "feature_count": len(feature_names),
         "ridge_alpha": _rounded(spec.ridge_alpha),
@@ -2808,6 +2930,11 @@ def _fit_predictive_model(
         "holdout": _regression_metrics(holdout_y, holdout_predictions),
         "top_coefficients": coefficient_rows[:12],
     }
+    if include_capacity_residual_diagnostics:
+        result["holdout_error_diagnostics"] = _capacity_residual_diagnostics(
+            holdout_rows, holdout_y, holdout_predictions
+        )
+    return result
 
 
 def _prepare_design(
