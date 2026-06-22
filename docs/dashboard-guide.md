@@ -130,7 +130,7 @@ Use `Threads` view when you want to understand a work session as a group instead
 
 ## Diagnostics View
 
-![Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file reads, file modifications, read productivity, concentration, and usage drain.](assets/dashboard-diagnostics.png)
+![Diagnostics view showing on-demand usage-drain charts for weekly usage remaining and projected weekly credits.](assets/dashboard-diagnostics.png)
 
 Use `Diagnostics` view when you want to see what structured event patterns are happening and what token totals are associated with those patterns.
 

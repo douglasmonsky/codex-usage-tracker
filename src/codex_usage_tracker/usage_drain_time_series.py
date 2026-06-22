@@ -215,7 +215,7 @@ def _weekly_projection_point(
 def _weekly_projection_trend(points: list[dict[str, Any]]) -> dict[str, Any]:
     trend_points, basis = _trend_points_for_latest_plan(points)
     values = [_number(point.get("projected_weekly_credits")) for point in trend_points]
-    if len(values) < 2:
+    if basis.startswith("insufficient") or len(values) < 3:
         return {
             "point_count": len(values),
             "basis": basis,
@@ -259,14 +259,12 @@ def _trend_points_for_latest_plan(points: list[dict[str, Any]]) -> tuple[list[di
     if latest_plan is not None:
         plan_points = [point for point in points if point.get("rate_limit_plan_type") == latest_plan]
         confident = [point for point in plan_points if point.get("confidence") in {"medium", "high"}]
-        if len(confident) >= 2:
+        if len(confident) >= 3:
             return confident, "latest_plan_medium_high_confidence"
-        if len(plan_points) >= 2:
+        if len(plan_points) >= 3:
             return plan_points, "latest_plan_all_points"
-    confident = [point for point in points if point.get("confidence") in {"medium", "high"}]
-    if len(confident) >= 2:
-        return confident, "mixed_plan_medium_high_confidence"
-    return points, "all_points"
+        return plan_points, "latest_plan_insufficient_same_plan_windows"
+    return points, "insufficient_known_plan_windows"
 
 
 def _valid_weekly_used_percent(row: dict[str, Any]) -> float | None:

@@ -388,6 +388,15 @@
       gap: 12px;
       min-width: 720px;
     }
+    .diagnostics-chart-title-medium {
+      min-width: 1040px;
+    }
+    .diagnostics-chart-title-wide {
+      min-width: 1520px;
+    }
+    .diagnostics-chart-title-xwide {
+      min-width: 2200px;
+    }
     .diagnostics-chart-title strong {
       font-size: 14px;
       font-weight: 780;
@@ -405,6 +414,15 @@
       font-size: 12px;
       font-variant-numeric: tabular-nums;
     }
+    .diagnostics-line-chart-medium {
+      min-width: 1040px;
+    }
+    .diagnostics-line-chart-wide {
+      min-width: 1520px;
+    }
+    .diagnostics-line-chart-xwide {
+      min-width: 2200px;
+    }
     .diagnostics-axis {
       stroke: #94a3b8;
       stroke-width: 1;
@@ -418,7 +436,6 @@
       stroke-width: 1.4;
     }
     .diagnostics-trend-line {
-      stroke: #0f172a;
       stroke-width: 1.8;
       stroke-dasharray: 6 5;
     }
@@ -430,6 +447,15 @@
       color: #334155;
       font-size: 12px;
       font-weight: 680;
+    }
+    .diagnostics-chart-legend-medium {
+      min-width: 1040px;
+    }
+    .diagnostics-chart-legend-wide {
+      min-width: 1520px;
+    }
+    .diagnostics-chart-legend-xwide {
+      min-width: 2200px;
     }
     .diagnostics-chart-legend span {
       display: inline-flex;

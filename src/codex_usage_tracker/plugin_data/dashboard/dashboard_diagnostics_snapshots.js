@@ -354,23 +354,17 @@
           Number.isFinite(point.ts)
           && point.weekly_remaining_percent !== null
           && point.weekly_remaining_percent !== undefined
-        ));
+        ))
+        .sort((left, right) => left.ts - right.ts);
       if (!timed.length) return renderState('No timestamped visible usage points in this snapshot.');
       const minX = Math.min(...timed.map(point => point.ts));
       const maxX = Math.max(...timed.map(point => point.ts));
       const spanX = Math.max(maxX - minX, 1);
       const x = value => margin.left + ((value - minX) / spanX) * innerWidth;
       const y = value => margin.top + innerHeight - (Number(value || 0) / 100) * innerHeight;
-      const lineFor = (field, color) => {
-        const line = timed
-          .filter(point => point[field] !== null && point[field] !== undefined)
-          .map(point => `${x(point.ts).toFixed(1)},${y(point[field]).toFixed(1)}`)
-          .join(' ');
-        if (!line) return '';
-        return `<polyline points="${escapeHtml(line)}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
-      };
+      const lineFor = (field, color) => segmentedUsageLines(timed, field, color, x, y);
       const yTicks = [0, 25, 50, 75, 100];
-      const xTicks = timeChartTicks(timed, 8);
+      const xTicks = timeChartTicks(timed, 10);
       return `
         <div class="diagnostics-chart-card">
           <div class="diagnostics-chart-title">
@@ -403,8 +397,10 @@
       const points = Array.isArray(projection?.points) ? projection.points : [];
       if (!points.length) return renderState('No weekly projection points in this snapshot.');
       const chartPoints = weeklyProjectionChartPoints(points);
+      if (!chartPoints.length) return renderState('No known-plan weekly projection points in this snapshot.');
       const chartSubtitle = weeklyProjectionSubtitle(chartPoints);
-      const width = 760;
+      const layout = weeklyProjectionChartLayout(chartPoints.length);
+      const width = layout.width;
       const height = 300;
       const margin = { top: 20, right: 28, bottom: 46, left: 92 };
       const innerWidth = width - margin.left - margin.right;
@@ -419,7 +415,21 @@
       const line = chartPoints
         .map((point, index) => `${x(index).toFixed(1)},${y(point.projected_weekly_credits).toFixed(1)}`)
         .join(' ');
-      const trendLine = weeklyProjectionTrendLine(chartPoints, x, y);
+      const colors = diagnosticsChartColors();
+      const series = weeklyProjectionPlanSeries(chartPoints);
+      const colorForPlan = key => colors[Math.max(series.findIndex(group => group.key === key), 0) % colors.length];
+      const trendLines = weeklyProjectionTrendLines(series, x, y, colorForPlan);
+      const hasTrendLines = trendLines.trim().length > 0;
+      const seriesLines = series.map(group => {
+        if (group.points.length < 2) return '';
+        const pointText = group.points
+          .map(item => `${x(item.index).toFixed(1)},${y(item.point.projected_weekly_credits).toFixed(1)}`)
+          .join(' ');
+        return `<polyline points="${escapeHtml(pointText)}" fill="none" stroke="${colorForPlan(group.key)}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
+      }).join('');
+      const markers = chartPoints.map((point, index) => `
+        <circle cx="${x(index).toFixed(1)}" cy="${y(point.projected_weekly_credits).toFixed(1)}" r="3.6" fill="${colorForPlan(weeklyProjectionPlanKey(point))}" stroke="#ffffff" stroke-width="1.4"></circle>
+      `).join('');
       const bars = chartPoints.map((point, index) => {
         if (point.ci_low === null || point.ci_low === undefined || point.ci_high === null || point.ci_high === undefined) {
           return '';
@@ -433,16 +443,14 @@
           <line x1="${(center - 5).toFixed(1)}" y1="${low.toFixed(1)}" x2="${(center + 5).toFixed(1)}" y2="${low.toFixed(1)}" class="diagnostics-confidence-bar"></line>
         `;
       }).join('');
-      const xTicks = chartPoints.map((point, index) => ({ point, index })).filter((_item, index) => (
-        chartPoints.length <= 4 || index === 0 || index === Math.floor((chartPoints.length - 1) / 2) || index === chartPoints.length - 1
-      ));
+      const xTicks = indexedChartTicks(chartPoints, layout.tickLimit);
       return `
         <div class="diagnostics-chart-card">
-          <div class="diagnostics-chart-title">
+          <div class="${chartWidthClass('diagnostics-chart-title', layout.classSuffix)}">
             <strong>Projected weekly credits over time</strong>
             <span>${escapeHtml(chartSubtitle)}</span>
           </div>
-          <svg class="diagnostics-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Projected weekly credits over time">
+          <svg class="${chartWidthClass('diagnostics-line-chart', layout.classSuffix)}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Projected weekly credits over time">
             <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
             <line x1="${margin.left}" y1="${margin.top + innerHeight}" x2="${margin.left + innerWidth}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
             ${yTicks.map(tick => `
@@ -451,17 +459,19 @@
             `).join('')}
             ${xTicks.map(({ point, index }) => `
               <line x1="${x(index).toFixed(1)}" y1="${margin.top + innerHeight}" x2="${x(index).toFixed(1)}" y2="${margin.top + innerHeight + 5}" class="diagnostics-axis"></line>
-              <text x="${x(index).toFixed(1)}" y="${margin.top + innerHeight + 24}" text-anchor="${tickTextAnchor(index, chartPoints.length)}">${escapeHtml(point.label || shortDate(point.end_event_timestamp))}</text>
+              <text x="${x(index).toFixed(1)}" y="${margin.top + innerHeight + 24}" text-anchor="${tickTextAnchor(index, chartPoints.length)}">${escapeHtml(weeklyProjectionTickLabel(point))}</text>
             `).join('')}
             ${bars}
-            <polyline points="${escapeHtml(line)}" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>
-            ${trendLine}
+            ${series.length > 1 ? '' : `<polyline points="${escapeHtml(line)}" fill="none" stroke="${colors[0]}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>`}
+            ${series.length > 1 ? seriesLines : ''}
+            ${markers}
+            ${trendLines}
             <text x="${margin.left + innerWidth / 2}" y="${height - 8}" text-anchor="middle">Weekly reset window</text>
             <text x="18" y="${margin.top + innerHeight / 2}" transform="rotate(-90 18 ${margin.top + innerHeight / 2})" text-anchor="middle">Projected credits</text>
           </svg>
-          <div class="diagnostics-chart-legend">
-            <span><i class="diagnostics-series-0"></i>Projected weekly credits</span>
-            <span><i class="diagnostics-trend-swatch"></i>Trend</span>
+          <div class="${chartWidthClass('diagnostics-chart-legend', layout.classSuffix)}">
+            ${weeklyProjectionLegend(series)}
+            ${hasTrendLines ? '<span><i class="diagnostics-trend-swatch"></i>Trend per plan</span>' : ''}
           </div>
         </div>
         ${renderSimpleTable(
@@ -479,29 +489,76 @@
       `;
     }
 
+    function weeklyProjectionChartLayout(pointCount) {
+      const count = Math.max(1, Number(pointCount || 1));
+      if (count > 40) return { width: 2200, classSuffix: 'xwide', tickLimit: 14 };
+      if (count > 24) return { width: 1520, classSuffix: 'wide', tickLimit: 12 };
+      if (count > 12) return { width: 1040, classSuffix: 'medium', tickLimit: 10 };
+      return { width: 760, classSuffix: '', tickLimit: Math.min(8, count) };
+    }
+
+    function chartWidthClass(baseClass, suffix) {
+      return suffix ? `${baseClass} ${baseClass}-${suffix}` : baseClass;
+    }
+
     function weeklyProjectionChartPoints(points) {
-      const latestPlan = [...points].reverse().find(point => point.rate_limit_plan_type)?.rate_limit_plan_type || null;
-      const samePlan = latestPlan ? points.filter(point => point.rate_limit_plan_type === latestPlan) : [];
-      let candidates = samePlan.length >= 2 ? samePlan : points;
-      const confident = candidates.filter(point => point.confidence === 'medium' || point.confidence === 'high');
-      if (confident.length >= 2) candidates = confident;
-      return candidates;
+      const knownPlanPoints = points.filter(point => isKnownProjectionPlan(point));
+      return knownPlanPoints.sort((left, right) => {
+        const leftTime = Date.parse(left.start_event_timestamp || left.end_event_timestamp || '');
+        const rightTime = Date.parse(right.start_event_timestamp || right.end_event_timestamp || '');
+        if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) return leftTime - rightTime;
+        return String(left.label || '').localeCompare(String(right.label || ''));
+      });
+    }
+
+    function isKnownProjectionPlan(point) {
+      const key = weeklyProjectionPlanKey(point);
+      return key !== 'unknown' && key !== 'missing';
     }
 
     function weeklyProjectionSubtitle(points) {
       const plans = Array.from(new Set(points.map(point => point.rate_limit_plan_type || 'unknown')));
-      const planText = plans.length === 1 ? `${humanizeMetric(plans[0])} plan` : 'mixed plan';
-      return `${planText} windows with descriptive confidence bars`;
+      if (plans.length === 1) {
+        return `${humanizeMetric(plans[0])} plan windows with descriptive confidence bars`;
+      }
+      return `${tokenText(plans.length)} plan types shown; trend requires 3+ medium/high windows per plan`;
     }
 
-    function weeklyProjectionTrendLine(points, x, y) {
-      let trendPoints = points
-        .map((point, index) => ({ point, index }))
+    function weeklyProjectionTickLabel(point) {
+      const label = point.label || shortDate(point.end_event_timestamp);
+      return String(label || '').replace(/^Reset\s+/i, '');
+    }
+
+    function weeklyProjectionPlanKey(point) {
+      return point.rate_limit_plan_type || 'unknown';
+    }
+
+    function weeklyProjectionPlanSeries(points) {
+      const groups = new Map();
+      points.forEach((point, index) => {
+        const key = weeklyProjectionPlanKey(point);
+        if (!groups.has(key)) {
+          groups.set(key, { key, label: humanizeMetric(key), points: [] });
+        }
+        groups.get(key).points.push({ point, index });
+      });
+      return Array.from(groups.values());
+    }
+
+    function weeklyProjectionLegend(series) {
+      return series.map((group, index) => `
+        <span><i class="diagnostics-series-${index % diagnosticsChartColors().length}"></i>${escapeHtml(group.label)}</span>
+      `).join('');
+    }
+
+    function weeklyProjectionTrendLines(series, x, y, colorForPlan) {
+      return series.map(group => weeklyProjectionTrendLine(group, x, y, colorForPlan(group.key))).join('');
+    }
+
+    function weeklyProjectionTrendLine(group, x, y, color) {
+      const trendPoints = group.points
         .filter(item => item.point.confidence === 'medium' || item.point.confidence === 'high');
-      if (trendPoints.length < 2) {
-        trendPoints = points.map((point, index) => ({ point, index }));
-      }
-      if (trendPoints.length < 2) return '';
+      if (trendPoints.length < 3) return '';
       const values = trendPoints.map(item => Number(item.point.projected_weekly_credits || 0));
       const indexes = trendPoints.map(item => item.index);
       const xMean = indexes.reduce((total, value) => total + value, 0) / indexes.length;
@@ -510,9 +567,15 @@
       if (!denom) return '';
       const slope = values.reduce((total, value, offset) => total + ((indexes[offset] - xMean) * (value - yMean)), 0) / denom;
       const intercept = yMean - slope * xMean;
-      const first = intercept;
-      const last = intercept + slope * (points.length - 1);
-      return `<line x1="${x(0).toFixed(1)}" y1="${y(first).toFixed(1)}" x2="${x(points.length - 1).toFixed(1)}" y2="${y(last).toFixed(1)}" class="diagnostics-trend-line"></line>`;
+      const firstIndex = indexes[0];
+      const lastIndex = indexes[indexes.length - 1];
+      const first = intercept + slope * firstIndex;
+      const last = intercept + slope * lastIndex;
+      return `<line x1="${x(firstIndex).toFixed(1)}" y1="${y(first).toFixed(1)}" x2="${x(lastIndex).toFixed(1)}" y2="${y(last).toFixed(1)}" class="diagnostics-trend-line" stroke="${color}"></line>`;
+    }
+
+    function diagnosticsChartColors() {
+      return ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#be123c', '#4d7c0f', '#0f766e', '#9333ea', '#b45309', '#475569'];
     }
 
     function niceAxisTicks(maxValue, maxTicks = 5) {
@@ -553,6 +616,55 @@
         ticks.push({ ts: target, timestamp: new Date(target).toISOString() });
       }
       return ticks;
+    }
+
+    function segmentedUsageLines(points, field, color, x, y) {
+      const segments = [];
+      let current = [];
+      let previousValue = null;
+      points.forEach(point => {
+        const value = point[field];
+        if (value === null || value === undefined) {
+          if (current.length) segments.push(current);
+          current = [];
+          previousValue = null;
+          return;
+        }
+        const numeric = Number(value);
+        if (previousValue !== null && numeric > previousValue + 0.001) {
+          if (current.length) segments.push(current);
+          current = [];
+        }
+        current.push(point);
+        previousValue = numeric;
+      });
+      if (current.length) segments.push(current);
+      return segments
+        .filter(segment => segment.length >= 2)
+        .map(segment => {
+          const line = segment
+            .map(point => `${x(point.ts).toFixed(1)},${y(point[field]).toFixed(1)}`)
+            .join(' ');
+          return `<polyline points="${escapeHtml(line)}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
+        })
+        .join('');
+    }
+
+    function indexedChartTicks(points, maxTicks) {
+      if (!points.length || maxTicks <= 0) return [];
+      if (points.length <= maxTicks) {
+        return points.map((point, index) => ({ point, index }));
+      }
+      const lastIndex = points.length - 1;
+      const indexes = new Set();
+      for (let tick = 0; tick < maxTicks; tick += 1) {
+        indexes.add(Math.round(tick * lastIndex / Math.max(maxTicks - 1, 1)));
+      }
+      indexes.add(0);
+      indexes.add(lastIndex);
+      return Array.from(indexes)
+        .sort((left, right) => left - right)
+        .map(index => ({ point: points[index], index }));
     }
 
     function renderUsageDrainCostChart(threads) {

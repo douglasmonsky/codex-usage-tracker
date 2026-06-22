@@ -106,6 +106,65 @@ def test_weekly_time_series_ignores_stale_reset_window_snapshots(tmp_path: Path)
     assert projection_points[0]["observed_usage_delta_percent"] == 1.0
 
 
+def test_weekly_projection_keeps_separate_plan_windows(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    events = [
+        _event(
+            "plus-base",
+            "thread:Plus",
+            "2026-06-01T00:00:00Z",
+            100,
+            0.0,
+            secondary_used_percent=0.0,
+            plan_type="plus",
+        ),
+        _event(
+            "plus-up",
+            "thread:Plus",
+            "2026-06-01T00:01:00Z",
+            220,
+            5.0,
+            secondary_used_percent=5.0,
+            plan_type="plus",
+        ),
+        _event(
+            "pro-base",
+            "thread:Pro",
+            "2026-06-01T00:02:00Z",
+            340,
+            0.0,
+            secondary_used_percent=0.0,
+            plan_type="pro",
+        ),
+        _event(
+            "pro-up",
+            "thread:Pro",
+            "2026-06-01T00:03:00Z",
+            460,
+            10.0,
+            secondary_used_percent=10.0,
+            plan_type="pro",
+        ),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+
+    report = build_usage_drain_dashboard_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+    )
+
+    points = report["time_series"]["weekly_credit_projection"]["points"]
+    assert [point["rate_limit_plan_type"] for point in points] == ["plus", "pro"]
+    assert all(point["projected_weekly_credits"] > 0 for point in points)
+    trend = report["time_series"]["weekly_credit_projection"]["trend"]
+    assert trend["direction"] == "insufficient_data"
+    assert trend["basis"] == "latest_plan_insufficient_same_plan_windows"
+    assert trend["rate_limit_plan_type"] == "pro"
+
+
 def _event(
     record_id: str,
     thread_key: str,
@@ -115,6 +174,7 @@ def _event(
     *,
     secondary_used_percent: float | None = None,
     secondary_resets_at: int = 1780876800,
+    plan_type: str = "pro",
 ):
     return _usage_event(
         record_id=record_id,
@@ -122,7 +182,7 @@ def _event(
         thread_key=thread_key,
         event_timestamp=timestamp,
         cumulative_total_tokens=cumulative_total_tokens,
-        rate_limit_plan_type="pro",
+        rate_limit_plan_type=plan_type,
         rate_limit_limit_id="codex",
         rate_limit_primary_used_percent=used_percent,
         rate_limit_primary_window_minutes=300,
