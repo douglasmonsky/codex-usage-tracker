@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.11.0 - 2026-06-22
+
+- Add usage-drain diagnostic reports for token accounting, allowance breakpoints, predictive model highlights, weekly visible usage, weekly projected credits, and cumulative thread cost curves.
+- Add dashboard Diagnostics charts for weekly usage remaining and projected weekly credits, including per-plan trend lines, confidence bars, compact date labels, and large-history horizontal scaling.
+- Add CLI/API support for usage-drain diagnostics with stable JSON contracts and synthetic report-generation tests.
+- Add usage-drain modeling documentation and a synthetic README screenshot focused on the new diagnostics charts.
+- Harden diagnostic table alignment, parser-warning visibility, file-modification rendering, and Python 3.14 type-check coverage.
+
 ## 0.10.1 - 2026-06-21
 
 - Add lightweight action timing metadata to context evidence so call investigations can show elapsed time for parsed tool and command actions without persisting raw command text or outputs.
