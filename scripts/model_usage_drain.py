@@ -287,14 +287,28 @@ def main() -> int:
                 )
                 or {}
             )
+            adaptive_gate_diagnostics = (
+                (boundary_delta_scope.get("risk_gate_diagnostics") or {}).get(
+                    "adaptive_mae_gate_label_segment_age_mode"
+                )
+                or {}
+            )
             if best_boundary_delta:
                 print(
                     "boundary delta all_after_10: mean={mean} best_mae={best} "
-                    "best_rmse={best_rmse} gated_override={override}".format(
+                    "best_rmse={best_rmse} gated_override={override} "
+                    "adaptive_override={adaptive_override} "
+                    "adaptive_threshold={adaptive_threshold}".format(
                         mean=(boundary_delta_scope.get("actual") or {}).get("mean"),
                         best=best_boundary_delta,
                         best_rmse=best_boundary_delta_rmse,
                         override=gate_diagnostics.get("override_share"),
+                        adaptive_override=adaptive_gate_diagnostics.get(
+                            "override_share"
+                        ),
+                        adaptive_threshold=adaptive_gate_diagnostics.get(
+                            "mean_threshold"
+                        ),
                     )
                 )
         components = summary.get("token_component_regression") or {}

@@ -496,6 +496,8 @@ After the first 10 opportunities, the all-history next-delta results are:
 | model | MAE | RMSE | R2 | Pearson |
 | --- | ---: | ---: | ---: | ---: |
 | previous delta | 0.936 | 2.786 | 0.781 | 0.891 |
+| adaptive MAE risk gate | 0.959 | 2.845 | 0.772 | 0.886 |
+| adaptive RMSE risk gate | 0.995 | 2.888 | 0.765 | 0.883 |
 | risk-gated label + segment age | 1.016 | 2.907 | 0.762 | 0.881 |
 | risk-weighted label + segment age | 1.028 | 2.728 | 0.790 | 0.893 |
 | previous label + segment age | 1.580 | 3.542 | 0.646 | 0.811 |
@@ -513,6 +515,12 @@ all-history opportunities and improves sharply over always using the stale
 label+segment-age mode, but it still loses to previous-delta MAE. A
 risk-weighted blend is slightly worse on MAE but slightly better on RMSE and R2,
 which says it reduces some larger misses while adding small errors elsewhere.
+The adaptive gate learns its threshold from prior rows only. On all history, the
+MAE-tuned gate raises the average threshold to `0.915`, overrides only `2.36%`
+of opportunities, and lands between previous-delta persistence and the fixed
+gate. The learned threshold mostly says the same thing the current data says:
+exact next-delta prediction should almost always stay with persistence unless
+boundary risk is extremely high.
 In the newest time-ordered holdout, almost every opportunity is a `1%`
 continuation: prior mode and segment age both reach `0.003` MAE, and the latest
 100 opportunities are all exactly predicted by every simple model. That confirms

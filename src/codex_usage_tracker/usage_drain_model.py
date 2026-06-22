@@ -189,6 +189,29 @@ BOUNDARY_DELTA_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
 }
 BOUNDARY_DELTA_RISK_GATE_THRESHOLD = 0.5
+BOUNDARY_DELTA_RISK_GATE_THRESHOLDS = (
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0,
+)
 BOUNDARY_RISK_SCOPE_STARTS = {
     "all_after_first": 1,
     "all_after_10": 10,
@@ -1161,6 +1184,14 @@ def _boundary_walk_forward_delta_prediction_summary(
                 "Blends previous delta with matched label/segment-age mode according "
                 "to the prior boundary-risk estimate."
             ),
+            "adaptive_mae_gate_label_segment_age_mode": (
+                "Selects the prior-best boundary-risk threshold by MAE, then gates "
+                "between previous delta and matched label/segment-age mode."
+            ),
+            "adaptive_rmse_gate_label_segment_age_mode": (
+                "Selects the prior-best boundary-risk threshold by RMSE, then gates "
+                "between previous delta and matched label/segment-age mode."
+            ),
         },
         "scopes": {
             scope_name: _boundary_delta_prediction_scope(
@@ -1178,7 +1209,13 @@ def _boundary_walk_forward_delta_prediction_rows(
     output: list[dict[str, Any]] = []
     previous_rows: list[dict[str, Any]] = []
     previous_state_rows: list[dict[str, Any]] = []
-    for row in rows:
+    threshold_absolute_error_sums = {
+        threshold: 0.0 for threshold in BOUNDARY_DELTA_RISK_GATE_THRESHOLDS
+    }
+    threshold_squared_error_sums = {
+        threshold: 0.0 for threshold in BOUNDARY_DELTA_RISK_GATE_THRESHOLDS
+    }
+    for threshold_training_count, row in enumerate(rows):
         previous_delta = _number(row.get("previous_delta_percent"))
         prior_boundary_rate = _boundary_rate(previous_rows)
         if previous_state_rows:
@@ -1239,8 +1276,40 @@ def _boundary_walk_forward_delta_prediction_rows(
         risk_weighted_prediction = previous_delta + (
             label_segment_age_risk * (label_segment_age_prediction - previous_delta)
         )
+        adaptive_mae_threshold, adaptive_mae_threshold_detail = (
+            _best_boundary_delta_gate_threshold_from_sums(
+                threshold_absolute_error_sums,
+                training_count=threshold_training_count,
+                metric="mae",
+            )
+        )
+        adaptive_rmse_threshold, adaptive_rmse_threshold_detail = (
+            _best_boundary_delta_gate_threshold_from_sums(
+                threshold_squared_error_sums,
+                training_count=threshold_training_count,
+                metric="rmse",
+            )
+        )
+        adaptive_mae_prediction = _risk_gated_boundary_delta_prediction(
+            previous_delta=previous_delta,
+            alternate_prediction=label_segment_age_prediction,
+            risk=label_segment_age_risk,
+            threshold=adaptive_mae_threshold,
+        )
+        adaptive_rmse_prediction = _risk_gated_boundary_delta_prediction(
+            previous_delta=previous_delta,
+            alternate_prediction=label_segment_age_prediction,
+            risk=label_segment_age_risk,
+            threshold=adaptive_rmse_threshold,
+        )
         predictions["risk_gated_label_segment_age_mode"] = risk_gated_prediction
         predictions["risk_weighted_label_segment_age_mode"] = risk_weighted_prediction
+        predictions["adaptive_mae_gate_label_segment_age_mode"] = (
+            adaptive_mae_prediction
+        )
+        predictions["adaptive_rmse_gate_label_segment_age_mode"] = (
+            adaptive_rmse_prediction
+        )
         details["risk_gated_label_segment_age_mode"] = {
             "source": "risk_gate_override"
             if label_segment_age_risk >= BOUNDARY_DELTA_RISK_GATE_THRESHOLD
@@ -1261,13 +1330,47 @@ def _boundary_walk_forward_delta_prediction_rows(
             "support": int(label_segment_age_risk_detail.get("support") or 0),
             "matched_mode": _rounded(label_segment_age_prediction),
         }
-        output.append(
-            {
-                **row,
-                "boundary_delta_predictions": predictions,
-                "boundary_delta_prediction_details": details,
-                "prediction_details": details,
-            }
+        details["adaptive_mae_gate_label_segment_age_mode"] = {
+            "source": "adaptive_risk_gate_override"
+            if label_segment_age_risk >= adaptive_mae_threshold
+            else "adaptive_risk_gate_previous_delta",
+            "risk_model": "label_segment_age_risk",
+            "risk": _rounded(label_segment_age_risk),
+            "risk_threshold": adaptive_mae_threshold,
+            "training_metric": adaptive_mae_threshold_detail.get("metric"),
+            "training_error": adaptive_mae_threshold_detail.get("error"),
+            "training_support": adaptive_mae_threshold_detail.get("support"),
+            "threshold_source": adaptive_mae_threshold_detail.get("source"),
+            "risk_detail": label_segment_age_risk_detail,
+            "support": int(label_segment_age_risk_detail.get("support") or 0),
+            "matched_mode": _rounded(label_segment_age_prediction),
+        }
+        details["adaptive_rmse_gate_label_segment_age_mode"] = {
+            "source": "adaptive_risk_gate_override"
+            if label_segment_age_risk >= adaptive_rmse_threshold
+            else "adaptive_risk_gate_previous_delta",
+            "risk_model": "label_segment_age_risk",
+            "risk": _rounded(label_segment_age_risk),
+            "risk_threshold": adaptive_rmse_threshold,
+            "training_metric": adaptive_rmse_threshold_detail.get("metric"),
+            "training_error": adaptive_rmse_threshold_detail.get("error"),
+            "training_support": adaptive_rmse_threshold_detail.get("support"),
+            "threshold_source": adaptive_rmse_threshold_detail.get("source"),
+            "risk_detail": label_segment_age_risk_detail,
+            "support": int(label_segment_age_risk_detail.get("support") or 0),
+            "matched_mode": _rounded(label_segment_age_prediction),
+        }
+        output_row = {
+            **row,
+            "boundary_delta_predictions": predictions,
+            "boundary_delta_prediction_details": details,
+            "prediction_details": details,
+        }
+        output.append(output_row)
+        _update_boundary_delta_gate_threshold_sums(
+            threshold_absolute_error_sums,
+            threshold_squared_error_sums,
+            row=output_row,
         )
         previous_state_rows.append(
             {
@@ -1311,6 +1414,8 @@ def _boundary_delta_prediction_scope(
             for model_name in (
                 "risk_gated_label_segment_age_mode",
                 "risk_weighted_label_segment_age_mode",
+                "adaptive_mae_gate_label_segment_age_mode",
+                "adaptive_rmse_gate_label_segment_age_mode",
             )
             if model_name in model_names
         },
@@ -1326,6 +1431,81 @@ def _boundary_delta_model_names(rows: list[dict[str, Any]]) -> list[str]:
     return names
 
 
+def _risk_gated_boundary_delta_prediction(
+    *,
+    previous_delta: float,
+    alternate_prediction: float,
+    risk: float,
+    threshold: float,
+) -> float:
+    if risk >= threshold:
+        return alternate_prediction
+    return previous_delta
+
+
+def _best_boundary_delta_gate_threshold_from_sums(
+    error_sums: dict[float, float],
+    *,
+    training_count: int,
+    metric: str,
+) -> tuple[float, dict[str, Any]]:
+    if training_count < STATE_BUCKET_MIN_SUPPORT:
+        return BOUNDARY_DELTA_RISK_GATE_THRESHOLD, {
+            "source": "fallback_fixed_threshold",
+            "metric": metric,
+            "support": training_count,
+            "error": None,
+        }
+    candidates: list[tuple[float, float]] = []
+    for threshold, error_sum in error_sums.items():
+        if metric == "rmse":
+            error_value = math.sqrt(error_sum / training_count)
+        else:
+            error_value = error_sum / training_count
+        candidates.append((threshold, error_value))
+    threshold, error_value = min(
+        candidates,
+        key=lambda item: (
+            item[1],
+            abs(item[0] - BOUNDARY_DELTA_RISK_GATE_THRESHOLD),
+            item[0],
+        ),
+    )
+    return threshold, {
+        "source": "prior_best_threshold",
+        "metric": metric,
+        "support": training_count,
+        "error": _rounded(error_value),
+    }
+
+
+def _update_boundary_delta_gate_threshold_sums(
+    absolute_error_sums: dict[float, float],
+    squared_error_sums: dict[float, float],
+    *,
+    row: dict[str, Any],
+) -> None:
+    actual = _number(row.get("delta_percent"))
+    previous_delta = _number(row.get("previous_delta_percent"))
+    alternate_prediction = _number(
+        (row.get("boundary_delta_predictions") or {}).get("label_segment_age_mode")
+    )
+    detail = (row.get("boundary_delta_prediction_details") or {}).get(
+        "risk_gated_label_segment_age_mode"
+    ) or {}
+    risk = _number(detail.get("risk"))
+    for threshold in BOUNDARY_DELTA_RISK_GATE_THRESHOLDS:
+        prediction = _risk_gated_boundary_delta_prediction(
+            previous_delta=previous_delta,
+            alternate_prediction=alternate_prediction,
+            risk=risk,
+            threshold=threshold,
+        )
+        error = prediction - actual
+        absolute_error_sums[threshold] += abs(error)
+        squared_error_sums[threshold] += error * error
+
+
 def _boundary_delta_risk_gate_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
@@ -1339,22 +1519,28 @@ def _boundary_delta_risk_gate_diagnostics(
             "override_share": None,
             "mean_risk": None,
             "mean_support": None,
+            "mean_threshold": None,
             "source_counts": [],
         }
     source_counts: dict[str, int] = {}
     risks: list[float] = []
     supports: list[int] = []
+    thresholds: list[float] = []
     for detail in details:
         source = str(detail.get("source") or "missing")
         source_counts[source] = source_counts.get(source, 0) + 1
         risks.append(_number(detail.get("risk")))
         supports.append(int(detail.get("support") or 0))
-    override_count = source_counts.get("risk_gate_override", 0)
+        thresholds.append(_number(detail.get("risk_threshold")))
+    override_count = sum(
+        count for source, count in source_counts.items() if source.endswith("_override")
+    )
     return {
         "n": len(details),
         "override_share": _rounded(override_count / len(details)),
         "mean_risk": _rounded(sum(risks) / len(risks)),
         "mean_support": _rounded(sum(supports) / len(supports)),
+        "mean_threshold": _rounded(sum(thresholds) / len(thresholds)),
         "source_counts": [
             {
                 "source": source,

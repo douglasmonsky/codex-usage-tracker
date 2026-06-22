@@ -320,9 +320,17 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     delta_scope = delta_prediction["scopes"]["all_after_10"]
     previous_delta = delta_scope["models"]["previous_delta"]
     label_segment_age_mode = delta_scope["models"]["label_segment_age_mode"]
+    adaptive_mae_gate = delta_scope["models"][
+        "adaptive_mae_gate_label_segment_age_mode"
+    ]
+    adaptive_rmse_gate = delta_scope["models"][
+        "adaptive_rmse_gate_label_segment_age_mode"
+    ]
     assert label_segment_age_mode["mae"] == 0.0
     assert label_segment_age_mode["rmse"] == 0.0
     assert label_segment_age_mode["mae"] < previous_delta["mae"]
+    assert adaptive_mae_gate["mae"] == 0.0
+    assert adaptive_rmse_gate["rmse"] == 0.0
     delta_diagnostics = delta_scope["prediction_detail_diagnostics"][
         "label_segment_age_mode"
     ]
@@ -330,6 +338,11 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     assert delta_diagnostics["top_signatures"][0]["signature"] == (
         "previous_label,previous_segment_position_bucket"
     )
+    adaptive_diagnostics = delta_scope["risk_gate_diagnostics"][
+        "adaptive_mae_gate_label_segment_age_mode"
+    ]
+    assert adaptive_diagnostics["override_share"] > 0.0
+    assert adaptive_diagnostics["mean_threshold"] == 0.55
 
 
 def test_boundary_delta_risk_gate_keeps_previous_delta_for_stable_regime() -> None:
@@ -356,14 +369,26 @@ def test_boundary_delta_risk_gate_keeps_previous_delta_for_stable_regime() -> No
     label_segment_age_mode = delta_scope["models"]["label_segment_age_mode"]
     gated = delta_scope["models"]["risk_gated_label_segment_age_mode"]
     weighted = delta_scope["models"]["risk_weighted_label_segment_age_mode"]
+    adaptive_mae_gate = delta_scope["models"][
+        "adaptive_mae_gate_label_segment_age_mode"
+    ]
     assert gated["mae"] == previous_delta["mae"]
     assert gated["mae"] < label_segment_age_mode["mae"]
     assert weighted["mae"] <= label_segment_age_mode["mae"]
+    assert adaptive_mae_gate["mae"] == previous_delta["mae"]
     gate_diagnostics = delta_scope["risk_gate_diagnostics"][
         "risk_gated_label_segment_age_mode"
     ]
     assert gate_diagnostics["override_share"] == 0.0
     assert gate_diagnostics["source_counts"][0]["source"] == "risk_gate_previous_delta"
+    adaptive_diagnostics = delta_scope["risk_gate_diagnostics"][
+        "adaptive_mae_gate_label_segment_age_mode"
+    ]
+    assert adaptive_diagnostics["override_share"] == 0.0
+    assert (
+        adaptive_diagnostics["source_counts"][0]["source"]
+        == "adaptive_risk_gate_previous_delta"
+    )
 
 
 def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
