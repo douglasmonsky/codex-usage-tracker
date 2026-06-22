@@ -268,6 +268,20 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "notes": list,
         }
     },
+    "codex-usage-tracker-diagnostic-usage-drain-v1": {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "thread_cost_curves": dict,
+            "model_highlights": dict,
+            "pricing": dict,
+            "notes": list,
+        }
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),

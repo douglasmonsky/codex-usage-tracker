@@ -13,6 +13,7 @@ from codex_usage_tracker.diagnostic_snapshot_constants import (
     DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
     DIAGNOSTIC_READ_PRODUCTIVITY_SECTION,
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
+    DIAGNOSTIC_USAGE_DRAIN_SECTION,
 )
 from codex_usage_tracker.diagnostic_snapshot_events import READ_PRODUCTIVITY_NOTE, int_value
 
@@ -42,6 +43,8 @@ class DiagnosticSnapshotReport:
             return self._render_read_productivity()
         if section == DIAGNOSTIC_CONCENTRATION_SECTION:
             return self._render_concentration()
+        if section == DIAGNOSTIC_USAGE_DRAIN_SECTION:
+            return self._render_usage_drain()
         return self._render_overview()
 
     def _render_overview(self) -> str:
@@ -164,6 +167,25 @@ class DiagnosticSnapshotReport:
             ]
         )
 
+    def _render_usage_drain(self) -> str:
+        snapshot = self.payload.get("snapshot") or {}
+        summary = self.payload.get("summary") or {}
+        curves = self.payload.get("thread_cost_curves") or {}
+        return "\n".join(
+            [
+                "Diagnostic usage-drain snapshot",
+                f"Computed: {snapshot.get('computed_at')}",
+                f"History scope: {snapshot.get('history_scope')}",
+                f"Usage rows: {_int_text(summary.get('usage_rows'))}",
+                f"Positive usage spans: {_int_text(summary.get('positive_usage_spans'))}",
+                f"Estimated cost: ${_float_text(summary.get('estimated_cost_usd'))}",
+                f"Usage credits: {_float_text(summary.get('usage_credits'))}",
+                f"Threads shown: {_int_text(curves.get('shown_threads'))}",
+                f"Top thread cost share: {_pct_text(summary.get('top_thread_cost_share'))}",
+                f"Best predictive model: {summary.get('best_predictive_model') or 'n/a'}",
+            ]
+        )
+
 
 def _int_text(value: object) -> str:
     return f"{int_value(value):,}"
@@ -175,3 +197,11 @@ def _pct_text(value: object) -> str:
     except (TypeError, ValueError):
         ratio = 0.0
     return f"{ratio:.1%}"
+
+
+def _float_text(value: object) -> str:
+    try:
+        number = float(value) if isinstance(value, int | float | str) and value != "" else 0.0
+    except (TypeError, ValueError):
+        number = 0.0
+    return f"{number:,.2f}"

@@ -445,9 +445,12 @@
         overview: null,
         toolOutput: null,
         commands: null,
+        gitInteractions: null,
         fileReads: null,
+        fileModifications: null,
         readProductivity: null,
         concentration: null,
+        usageDrain: null,
       };
     }
 

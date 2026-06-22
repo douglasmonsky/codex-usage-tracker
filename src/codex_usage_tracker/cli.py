@@ -38,6 +38,7 @@ from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
+    build_diagnostic_usage_drain_report,
 )
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
@@ -504,6 +505,15 @@ def _run_diagnostics(args: argparse.Namespace) -> int:
     elif command == "concentration":
         report = build_diagnostic_concentration_report(
             db_path=args.db,
+            include_archived=args.include_archived,
+            refresh=args.refresh,
+        )
+    elif command == "usage-drain":
+        report = build_diagnostic_usage_drain_report(
+            db_path=args.db,
+            pricing_path=args.pricing,
+            allowance_path=args.allowance,
+            rate_card_path=args.rate_card,
             include_archived=args.include_archived,
             refresh=args.refresh,
         )

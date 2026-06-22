@@ -114,6 +114,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         diagnostic_concentration_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "concentration"
         ]
+        diagnostic_usage_drain_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "usageDrain"
+        ]
         diagnostic_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview"
         )
@@ -137,6 +140,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         )
         diagnostic_concentration_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/concentration"
+        )
+        diagnostic_usage_drain_stored_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/usage-drain"
         )
         diagnostic_computed_at = diagnostic_stored_payload["snapshot"]["computed_at"]
         with urllib.request.urlopen(  # noqa: S310 - local test server only
@@ -241,6 +247,13 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     )
     assert diagnostic_concentration_refresh_payload["status"] == "ready"
     assert diagnostic_concentration_refresh_payload["summary"]["usage_rows"] == 4
+    assert (
+        diagnostic_usage_drain_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-usage-drain-v1"
+    )
+    assert diagnostic_usage_drain_refresh_payload["status"] == "ready"
+    assert diagnostic_usage_drain_refresh_payload["summary"]["usage_rows"] == 4
+    assert diagnostic_usage_drain_refresh_payload["thread_cost_curves"]["threads"]
     assert diagnostic_stored_payload["status"] == "ready"
     assert diagnostic_stored_payload["refreshed"] is False
     assert diagnostic_tool_output_stored_payload["status"] == "ready"
@@ -257,6 +270,8 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_read_productivity_stored_payload["refreshed"] is False
     assert diagnostic_concentration_stored_payload["status"] == "ready"
     assert diagnostic_concentration_stored_payload["refreshed"] is False
+    assert diagnostic_usage_drain_stored_payload["status"] == "ready"
+    assert diagnostic_usage_drain_stored_payload["refreshed"] is False
     assert second_usage_refresh_payload["refresh_result"]["parsed_events"] == 0
     assert diagnostic_after_second_usage_refresh["snapshot"]["computed_at"] == diagnostic_computed_at
     assert len(limited_payload["rows"]) == 2

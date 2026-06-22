@@ -35,15 +35,23 @@ from codex_usage_tracker.diagnostic_snapshot_constants import (
     DIAGNOSTIC_SNAPSHOT_NOTES,
     DIAGNOSTIC_TOOL_OUTPUT_SCHEMA,
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
+    DIAGNOSTIC_USAGE_DRAIN_SCHEMA,
+    DIAGNOSTIC_USAGE_DRAIN_SECTION,
 )
 from codex_usage_tracker.diagnostic_snapshot_report import DiagnosticSnapshotReport
-from codex_usage_tracker.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.paths import (
+    DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_DB_PATH,
+    DEFAULT_PRICING_PATH,
+    DEFAULT_RATE_CARD_PATH,
+)
 from codex_usage_tracker.store import (
     connect,
     query_diagnostic_snapshot,
     upsert_diagnostic_snapshot,
 )
 from codex_usage_tracker.store_schema import init_db
+from codex_usage_tracker.usage_drain_reports import build_usage_drain_dashboard_report
 
 
 def build_diagnostic_overview_report(
@@ -196,6 +204,37 @@ def build_diagnostic_concentration_report(
     )
 
 
+def build_diagnostic_usage_drain_report(
+    *,
+    db_path: Path = DEFAULT_DB_PATH,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    include_archived: bool = False,
+    refresh: bool = False,
+) -> DiagnosticSnapshotReport:
+    """Return the latest usage-drain snapshot, optionally recomputing it first."""
+
+    if refresh:
+        return DiagnosticSnapshotReport(
+            _refresh_usage_drain_snapshot(
+                db_path=db_path,
+                pricing_path=pricing_path,
+                allowance_path=allowance_path,
+                rate_card_path=rate_card_path,
+                include_archived=include_archived,
+            )
+        )
+    return DiagnosticSnapshotReport(
+        _source_log_snapshot_payload(
+            db_path=db_path,
+            include_archived=include_archived,
+            section=DIAGNOSTIC_USAGE_DRAIN_SECTION,
+            schema=DIAGNOSTIC_USAGE_DRAIN_SCHEMA,
+        )
+    )
+
+
 def refresh_diagnostic_overview_snapshot(
     *,
     db_path: Path = DEFAULT_DB_PATH,
@@ -238,6 +277,9 @@ def refresh_diagnostic_overview_snapshot(
 def refresh_diagnostic_snapshots(
     *,
     db_path: Path = DEFAULT_DB_PATH,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
     include_archived: bool = False,
 ) -> dict[str, Any]:
     """Recompute and persist all dashboard diagnostic snapshots.
@@ -276,6 +318,13 @@ def refresh_diagnostic_snapshots(
         db_path=db_path,
         include_archived=include_archived,
     )
+    usage_drain_payload = _refresh_usage_drain_snapshot(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        include_archived=include_archived,
+    )
     return {
         "schema": DIAGNOSTIC_BATCH_REFRESH_SCHEMA,
         "status": "ready",
@@ -291,6 +340,7 @@ def refresh_diagnostic_snapshots(
             "fileModifications": source_payloads[DIAGNOSTIC_FILE_MODIFICATIONS_SECTION],
             "readProductivity": source_payloads[DIAGNOSTIC_READ_PRODUCTIVITY_SECTION],
             "concentration": concentration_payload,
+            "usageDrain": usage_drain_payload,
         },
         "meta": {
             "source_log_analysis_passes": 1,
@@ -478,6 +528,61 @@ def _refresh_concentration_snapshot(
         usage_rows_scanned=analysis["summary"]["usage_rows"],
         raw_content_included=False,
     )
+    return payload
+
+
+def _refresh_usage_drain_snapshot(
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    rate_card_path: Path,
+    include_archived: bool,
+) -> dict[str, Any]:
+    history_scope = _history_scope(include_archived)
+    computed_at = _utc_now()
+    analysis = build_usage_drain_dashboard_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        include_archived=include_archived,
+    )
+    overview, source_logs_scanned = _compute_overview(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    usage_rows_scanned = int(analysis["summary"]["usage_rows"])
+    snapshot = _snapshot_metadata(
+        computed_at=computed_at,
+        history_scope=history_scope,
+        source_logs_scanned=source_logs_scanned,
+        usage_rows_scanned=usage_rows_scanned,
+    )
+    payload = _ready_payload(
+        schema=DIAGNOSTIC_USAGE_DRAIN_SCHEMA,
+        section=DIAGNOSTIC_USAGE_DRAIN_SECTION,
+        snapshot=snapshot,
+        refreshed=True,
+        summary=analysis["summary"],
+        thread_cost_curves=analysis["thread_cost_curves"],
+        model_highlights=analysis["model_highlights"],
+        pricing=analysis["pricing"],
+    )
+    payload["notes"].extend(analysis["notes"])
+    upsert_diagnostic_snapshot(
+        db_path=db_path,
+        section=DIAGNOSTIC_USAGE_DRAIN_SECTION,
+        history_scope=history_scope,
+        payload=payload,
+        computed_at=computed_at,
+        source_logs_scanned=source_logs_scanned,
+        usage_rows_scanned=usage_rows_scanned,
+        raw_content_included=False,
+    )
+    # Keep static type checkers aware that overview is intentionally only used
+    # for the source-log count returned by _compute_overview.
+    _ = overview
     return payload
 
 
@@ -674,6 +779,11 @@ def _missing_payload(
         payload["dimensions"] = []
         payload["largest_impact_rows"] = []
         payload["privacy"] = concentration_privacy_metadata()
+    elif section == DIAGNOSTIC_USAGE_DRAIN_SECTION:
+        payload["summary"] = None
+        payload["thread_cost_curves"] = {"threads": []}
+        payload["model_highlights"] = {}
+        payload["pricing"] = {}
     return payload
 
 

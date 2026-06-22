@@ -121,10 +121,11 @@ codex-usage-tracker serve-dashboard --open</code></pre>
     <p>Use <code>Threads</code> view to understand a work session as a group. Expand a thread to see calls newest first by default, then click an expanded-call header to change the per-thread sort. Subagents with logged parent session ids are shown under their parent thread; inferred auto-review attachments are marked in the details panel. Selected threads also show lifecycle signals such as first expensive turn, largest cumulative jump, cache trend, context trend, and whether subagent or auto-review work appeared before a usage spike.</p>
 
     <h2>Diagnostics View</h2>
-    <img src="assets/dashboard-diagnostics.png" alt="Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration.">
+    <img src="assets/dashboard-diagnostics.png" alt="Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file reads, file modifications, read productivity, concentration, and usage drain.">
     <p>Use <code>Diagnostics</code> view to inspect structured event patterns and the token totals associated with those patterns. The first table ranks top diagnostic facts by associated uncached input tokens. Tool/function/MCP/command-family and compaction sections expose narrower slices of the same fact data.</p>
     <ul>
       <li>The tab consumes localhost <code>/api/diagnostics/*</code> endpoints; static file dashboards show a live-API unavailable state.</li>
+      <li><code>Usage Drain</code> runs on indexed aggregate rows and renders cumulative estimated-cost curves by thread, visible usage span counts, allowance-breakpoint highlights, and compact predictor summaries.</li>
       <li>Command diagnostics store only a command family such as <code>pytest</code>, <code>git</code>, or <code>unknown_command</code>, never command text or arguments.</li>
       <li>Skill and MCP labels are detected only when they are present as structured event metadata.</li>
       <li>Associated token totals are not causal allocations and are not additive when one model call has multiple diagnostic facts.</li>

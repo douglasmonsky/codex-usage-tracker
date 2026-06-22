@@ -19,6 +19,7 @@
       { key: 'fileModifications', title: 'File Modifications', path: '/api/diagnostics/file-modifications', refreshPath: '/api/diagnostics/file-modifications/refresh' },
       { key: 'readProductivity', title: 'Read Productivity', path: '/api/diagnostics/read-productivity', refreshPath: '/api/diagnostics/read-productivity/refresh' },
       { key: 'concentration', title: 'Concentration', path: '/api/diagnostics/concentration', refreshPath: '/api/diagnostics/concentration/refresh' },
+      { key: 'usageDrain', title: 'Usage Drain', path: '/api/diagnostics/usage-drain', refreshPath: '/api/diagnostics/usage-drain/refresh' },
     ];
 
     function renderToolbar({ loading, payloads, refreshStatus, refreshError }) {
@@ -81,6 +82,7 @@
       if (key === 'fileModifications') return renderFileModifications(payload);
       if (key === 'readProductivity') return renderReadProductivity(payload);
       if (key === 'concentration') return renderConcentration(payload);
+      if (key === 'usageDrain') return renderUsageDrain(payload);
       return renderState('No renderer for this diagnostic section.');
     }
 
@@ -276,6 +278,133 @@
       `;
     }
 
+    function renderUsageDrain(payload) {
+      const summary = payload?.summary || {};
+      const curves = payload?.thread_cost_curves || {};
+      const highlights = payload?.model_highlights || {};
+      const threads = Array.isArray(curves?.threads) ? curves.threads.slice(0, 12) : [];
+      return `
+        ${renderKeyValueTable([
+          ['Usage rows', tokenText(summary.usage_rows)],
+          ['Positive usage spans', tokenText(summary.positive_usage_spans)],
+          ['Estimated cost', moneyText(summary.estimated_cost_usd)],
+          ['Usage credits', numberText(summary.usage_credits)],
+          ['Top thread cost share', pct(summary.top_thread_cost_share)],
+          ['Best predictive model', summary.best_predictive_model || 'n/a'],
+        ])}
+        ${renderUsageDrainCostChart(threads)}
+        ${renderSimpleTable(
+          ['Thread', 'Calls', 'Cost', 'Avg/call', 'Shape', 'First half', 'Largest call'],
+          threads.map(row => [
+            row.thread,
+            tokenText(row.call_count),
+            moneyText(row.estimated_cost_usd),
+            moneyText(row.avg_cost_usd),
+            humanizeMetric(row.shape),
+            pct(row.first_half_cost_share),
+            pct(row.largest_call_cost_share),
+          ]),
+          'No thread cost curves in this snapshot.',
+        )}
+        ${renderPredictiveHighlights(highlights)}
+        ${renderAllowanceBreakpoints(highlights.allowance_breakpoints)}
+      `;
+    }
+
+    function renderUsageDrainCostChart(threads) {
+      if (!threads.length) return renderState('No thread cost curves in this snapshot.');
+      const width = 760;
+      const height = 300;
+      const margin = { top: 20, right: 28, bottom: 46, left: 72 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+      const maxX = Math.max(1, ...threads.map(thread => Number(thread.call_count || 0)));
+      const maxY = Math.max(0.01, ...threads.map(thread => Number(thread.estimated_cost_usd || 0)));
+      const colors = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#be123c', '#4d7c0f', '#0f766e', '#9333ea', '#b45309', '#475569'];
+      const x = value => margin.left + (Number(value || 0) / maxX) * innerWidth;
+      const y = value => margin.top + innerHeight - (Number(value || 0) / maxY) * innerHeight;
+      const xTicks = [0, Math.round(maxX / 2), maxX];
+      const yTicks = [0, maxY / 2, maxY];
+      const lines = threads.map((thread, index) => {
+        const points = Array.isArray(thread.points) ? thread.points : [];
+        const pointText = points.map(point => `${x(point.call_index).toFixed(1)},${y(point.cumulative_cost_usd).toFixed(1)}`).join(' ');
+        if (!pointText) return '';
+        return `<polyline points="${escapeHtml(pointText)}" fill="none" stroke="${colors[index % colors.length]}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
+      }).join('');
+      const legend = threads.slice(0, 8).map((thread, index) => `
+        <span><i class="diagnostics-series-${index % colors.length}"></i>${escapeHtml(truncateText(thread.thread, 34))}</span>
+      `).join('');
+      return `
+        <div class="diagnostics-chart-card">
+          <div class="diagnostics-chart-title">
+            <strong>Cumulative estimated cost by thread</strong>
+            <span>calls on x-axis, cumulative cost on y-axis</span>
+          </div>
+          <svg class="diagnostics-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Cumulative estimated cost by thread">
+            <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
+            <line x1="${margin.left}" y1="${margin.top + innerHeight}" x2="${margin.left + innerWidth}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
+            ${yTicks.map(tick => `
+              <line x1="${margin.left}" y1="${y(tick).toFixed(1)}" x2="${margin.left + innerWidth}" y2="${y(tick).toFixed(1)}" class="diagnostics-gridline"></line>
+              <text x="${margin.left - 10}" y="${y(tick).toFixed(1)}" text-anchor="end" dominant-baseline="middle">${escapeHtml(moneyText(tick))}</text>
+            `).join('')}
+            ${xTicks.map(tick => `
+              <line x1="${x(tick).toFixed(1)}" y1="${margin.top + innerHeight}" x2="${x(tick).toFixed(1)}" y2="${margin.top + innerHeight + 5}" class="diagnostics-axis"></line>
+              <text x="${x(tick).toFixed(1)}" y="${margin.top + innerHeight + 24}" text-anchor="middle">${escapeHtml(tokenText(tick))}</text>
+            `).join('')}
+            ${lines}
+            <text x="${margin.left + innerWidth / 2}" y="${height - 8}" text-anchor="middle">Call index within thread</text>
+            <text x="18" y="${margin.top + innerHeight / 2}" transform="rotate(-90 18 ${margin.top + innerHeight / 2})" text-anchor="middle">Cumulative cost</text>
+          </svg>
+          <div class="diagnostics-chart-legend">${legend}</div>
+        </div>
+      `;
+    }
+
+    function renderPredictiveHighlights(highlights) {
+      const predictive = highlights?.predictive_modeling || {};
+      const best = predictive.best_mae_model || predictive.best_r2_model || {};
+      const accounting = highlights?.token_accounting || {};
+      return renderSimpleTable(
+        ['Predictive metric', 'Value'],
+        [
+          ['Best by MAE', predictive.best_by_holdout_mae || 'n/a'],
+          ['Best by R2', predictive.best_by_holdout_r2 || 'n/a'],
+          ['Best MAE', best.mae === null || best.mae === undefined ? 'n/a' : numberText(best.mae)],
+          ['Best R2', best.r2 === null || best.r2 === undefined ? 'n/a' : numberText(best.r2)],
+          ['Best Pearson', best.pearson === null || best.pearson === undefined ? 'n/a' : numberText(best.pearson)],
+          ['Credit-to-visible-delta R2', numberText(accounting.credits_to_visible_delta?.r2)],
+        ],
+        'No predictive highlights in this snapshot.',
+      );
+    }
+
+    function renderAllowanceBreakpoints(breakpoints) {
+      const segments = Array.isArray(breakpoints?.segments) ? breakpoints.segments.slice(0, 6) : [];
+      return `
+        ${renderSimpleTable(
+          ['Allowance metric', 'Value'],
+          [
+            ['Spans', tokenText(breakpoints?.span_count)],
+            ['Global credits / 1%', numberText(breakpoints?.global_mean_credits_per_percent)],
+            ['Piecewise SSE reduction', pct(breakpoints?.piecewise_sse_reduction_share)],
+            ['Global credit-to-delta R2', numberText(breakpoints?.global_credit_to_delta_r2)],
+            ['Piecewise credit-to-delta R2', numberText(breakpoints?.piecewise_credit_to_delta_r2)],
+          ],
+          'No allowance-breakpoint highlights in this snapshot.',
+        )}
+        ${renderSimpleTable(
+          ['Segment', 'Rows', 'Mean credits / 1%', 'R2'],
+          segments.map(row => [
+            tokenText(row.segment_index),
+            tokenText(row.n),
+            numberText(row.mean_credits_per_percent),
+            numberText(row.credit_to_delta_r2),
+          ]),
+          'No allowance-breakpoint segments in this snapshot.',
+        )}
+      `;
+    }
+
     function readoutMetric(label, count) {
       return `<span><b>${number.format(Number(count || 0))}</b>${escapeHtml(label)}</span>`;
     }
@@ -359,6 +488,18 @@
       return true;
     }
 
+    function numberText(value) {
+      if (value === null || value === undefined || value === '') return 'n/a';
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 'n/a';
+      return number.format(Math.round(numeric * 1000) / 1000);
+    }
+
+    function moneyText(value) {
+      const numeric = Number(value || 0);
+      return `$${number.format(Math.round(numeric * 100) / 100)}`;
+    }
+
     function pathLabel(row) {
       const label = row.path_label || 'path';
       const hash = row.path_hash ? ` · ${String(row.path_hash).slice(0, 6)}` : '';
@@ -386,6 +527,12 @@
         .filter(Boolean)
         .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
         .join(' ');
+    }
+
+    function truncateText(value, length) {
+      const text = String(value || '');
+      if (text.length <= length) return text;
+      return `${text.slice(0, Math.max(length - 1, 1))}…`;
     }
 
     return {
