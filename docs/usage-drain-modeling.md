@@ -424,6 +424,30 @@ when using the constant `1%` rule. So the practical model is: first span after a
 boundary is the expensive uncertainty; after one or two confirming spans, local
 persistence is already extremely strong.
 
+The new `boundary_diagnostics` view reframes this as a transition-risk problem.
+Across 1,451 possible next-span transitions, 289 change visible-delta regime
+label, for an overall boundary rate of `19.9%`. After a configured long `1%`
+run, however, only 5 of 509 next-span opportunities change label, a `0.98%`
+boundary rate.
+
+| previous label | opportunities | boundaries | boundary rate |
+| --- | ---: | ---: | ---: |
+| small blip | 214 | 89 | 41.6% |
+| stable `1%` | 724 | 69 | 9.5% |
+| moderate delta | 164 | 56 | 34.1% |
+| high delta | 168 | 48 | 28.6% |
+| very high delta | 181 | 27 | 14.9% |
+
+The top observed boundary transitions are mostly adjacent regime flips:
+`small_blip->stable_one_percent` (36), `stable_one_percent->small_blip` (35),
+`moderate_delta->stable_one_percent` (25), `small_blip->high_delta` (24), and
+`stable_one_percent->moderate_delta` (24). Reset phase and clock hour still add
+context: first-quarter reset-window spans have a `23.4%` boundary rate versus
+`9.3%` in the third quarter, and hour `17` has a `36.3%` boundary rate in this
+history. The practical read is still conservative: these buckets describe where
+past boundaries clustered, but the current long `1%` regime has a much lower
+observed break rate than the all-history average.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the

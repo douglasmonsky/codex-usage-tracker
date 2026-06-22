@@ -220,6 +220,17 @@ def main() -> int:
                     sixth=sixth.get("best_by_mae"),
                 )
             )
+        boundary = segments.get("boundary_diagnostics") or {}
+        if boundary:
+            long_one_percent = boundary.get("after_long_one_percent_run") or {}
+            print(
+                "regime boundaries: count={count} rate={rate} "
+                "after_long_1pct_rate={long_rate}".format(
+                    count=boundary.get("boundary_count"),
+                    rate=boundary.get("boundary_rate"),
+                    long_rate=long_one_percent.get("boundary_rate"),
+                )
+            )
         components = summary.get("token_component_regression") or {}
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):

@@ -126,6 +126,23 @@ SEGMENT_POSITION_BUCKETS = (
     "fourth_fifth_span",
     "sixth_plus_span",
 )
+BOUNDARY_CONTEXT_FIELDS = (
+    "previous_label",
+    "previous_delta_bucket",
+    "one_percent_streak_bucket",
+    "same_delta_streak_bucket",
+    "low_delta_streak_bucket",
+    "baseline_used_bucket",
+    "window_elapsed_bucket",
+    "reset_remaining_bucket",
+    "date",
+    "day_of_week",
+    "hour_bucket",
+    "previous_span_wall_time_bucket",
+    "previous_call_duration_bucket",
+    "rate_limit_plan_type",
+    "rate_limit_limit_id",
+)
 
 
 @dataclass(frozen=True)
@@ -536,6 +553,7 @@ def _piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, 
             "segments": [],
             "latest_segment": None,
             "adaptation_by_position": {},
+            "boundary_diagnostics": {},
             "by_label": {},
         }
     prediction_rows = {
@@ -566,6 +584,9 @@ def _piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, 
         )[:10],
         "adaptation_by_position": _piecewise_adaptation_by_position(
             prediction_rows, segments
+        ),
+        "boundary_diagnostics": _piecewise_boundary_diagnostics(
+            spans, prediction_rows
         ),
         "by_label": {
             label: _piecewise_label_record(rows)
@@ -703,6 +724,143 @@ def _segment_position_bucket(position: int) -> str:
     if position <= 5:
         return "fourth_fifth_span"
     return "sixth_plus_span"
+
+
+def _piecewise_boundary_diagnostics(
+    spans: list[UsageDeltaSpan],
+    prediction_rows: dict[int, dict[str, Any]],
+) -> dict[str, Any]:
+    rows = _piecewise_boundary_rows(spans, prediction_rows)
+    long_one_percent_rows = [
+        row
+        for row in rows
+        if row["previous_label"] == "stable_one_percent"
+        and int(row.get("one_percent_streak_count") or 0)
+        >= REGIME_GRACE_STREAK_THRESHOLD
+    ]
+    return {
+        "target": "next_span_regime_label_changes",
+        "definition": (
+            "A boundary means the current span's visible-delta regime label differs "
+            "from the previous span's label."
+        ),
+        "context_fields": list(BOUNDARY_CONTEXT_FIELDS),
+        **_boundary_basic_metrics(rows),
+        "after_long_one_percent_run": _boundary_basic_metrics(long_one_percent_rows),
+        "transition_counts": _piecewise_boundary_transition_counts(rows),
+        "by_previous_label": _boundary_context_rates(rows, "previous_label"),
+        "by_context": {
+            field_name: _boundary_context_rates(rows, field_name)
+            for field_name in BOUNDARY_CONTEXT_FIELDS
+        },
+        "latest_boundaries": _latest_piecewise_boundaries(rows),
+    }
+
+
+def _piecewise_boundary_rows(
+    spans: list[UsageDeltaSpan],
+    prediction_rows: dict[int, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for index in range(1, len(spans)):
+        span = spans[index]
+        previous_span = spans[index - 1]
+        current_label = _delta_regime_label(span.delta_usage_percent)
+        previous_label = _delta_regime_label(previous_span.delta_usage_percent)
+        prediction_row = prediction_rows.get(index) or {}
+        metadata = prediction_row.get("metadata") or _span_error_metadata(span)
+        row = {
+            "index": index,
+            "is_boundary": current_label != previous_label,
+            "previous_label": previous_label,
+            "current_label": current_label,
+            "transition": f"{previous_label}->{current_label}",
+            "delta_percent": _rounded(span.delta_usage_percent),
+            "previous_delta_percent": _rounded(previous_span.delta_usage_percent),
+            "timestamp": span.start_event_timestamp,
+        }
+        for field_name in BOUNDARY_CONTEXT_FIELDS:
+            if field_name in row:
+                continue
+            row[field_name] = metadata.get(field_name, "missing")
+        row["one_percent_streak_count"] = int(
+            metadata.get("one_percent_streak_count") or 0
+        )
+        rows.append(row)
+    return rows
+
+
+def _boundary_basic_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    boundary_count = sum(1 for row in rows if row.get("is_boundary"))
+    return {
+        "n": len(rows),
+        "boundary_count": boundary_count,
+        "non_boundary_count": len(rows) - boundary_count,
+        "boundary_rate": _rounded(boundary_count / len(rows) if rows else None),
+    }
+
+
+def _piecewise_boundary_transition_counts(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        if not row.get("is_boundary"):
+            continue
+        transition = str(row.get("transition") or "missing")
+        counts[transition] = counts.get(transition, 0) + 1
+    total = sum(counts.values())
+    return [
+        {
+            "transition": transition,
+            "count": count,
+            "share": _rounded(count / total if total else None),
+        }
+        for transition, count in sorted(
+            counts.items(), key=lambda item: (-item[1], item[0])
+        )[:10]
+    ]
+
+
+def _boundary_context_rates(
+    rows: list[dict[str, Any]],
+    field_name: str,
+) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        key = str(row.get(field_name) or "missing")
+        grouped.setdefault(key, []).append(row)
+    output_rows = [
+        {
+            field_name: key,
+            **_boundary_basic_metrics(items),
+        }
+        for key, items in grouped.items()
+    ]
+    output_rows.sort(
+        key=lambda row: (
+            -int(row["boundary_count"]),
+            -_number(row["boundary_rate"]),
+            -int(row["n"]),
+            str(row.get(field_name) or ""),
+        )
+    )
+    return output_rows[:10]
+
+
+def _latest_piecewise_boundaries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    boundary_rows = [row for row in rows if row.get("is_boundary")]
+    return [
+        {
+            "index": row["index"],
+            "transition": row["transition"],
+            "date": row.get("date"),
+            "hour_bucket": row.get("hour_bucket"),
+            "window_elapsed_bucket": row.get("window_elapsed_bucket"),
+            "previous_delta_percent": row.get("previous_delta_percent"),
+            "delta_percent": row.get("delta_percent"),
+            "one_percent_streak_count": row.get("one_percent_streak_count"),
+        }
+        for row in reversed(boundary_rows[-10:])
+    ]
 
 
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:

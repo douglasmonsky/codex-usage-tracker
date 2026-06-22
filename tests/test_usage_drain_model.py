@@ -205,6 +205,30 @@ def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
     assert adaptation["by_label"]["stable_one_percent"]["first_span"][
         "prediction_rows"
     ] == 1
+    boundaries = segments["boundary_diagnostics"]
+    assert boundaries["n"] == 5
+    assert boundaries["boundary_count"] == 2
+    assert boundaries["boundary_rate"] == 0.4
+    assert boundaries["transition_counts"] == [
+        {
+            "transition": "small_blip->stable_one_percent",
+            "count": 1,
+            "share": 0.5,
+        },
+        {
+            "transition": "stable_one_percent->small_blip",
+            "count": 1,
+            "share": 0.5,
+        },
+    ]
+    assert boundaries["by_previous_label"][0] == {
+        "previous_label": "small_blip",
+        "n": 1,
+        "boundary_count": 1,
+        "non_boundary_count": 0,
+        "boundary_rate": 1.0,
+    }
+    assert boundaries["after_long_one_percent_run"]["boundary_count"] == 0
 
 
 def test_one_percent_regime_grace_ignores_one_small_break() -> None:
@@ -233,6 +257,13 @@ def test_one_percent_regime_grace_ignores_one_small_break() -> None:
     assert grace["mae"] < previous["mae"]
     calibration = summary["walk_forward_prediction"]["one_percent_grace_calibration"]
     assert calibration["scopes"]["all_after_first"]["best_by_mae"]["mae"] <= grace["mae"]
+    boundaries = summary["piecewise_regime_segments"]["boundary_diagnostics"]
+    assert boundaries["after_long_one_percent_run"] == {
+        "n": 2,
+        "boundary_count": 1,
+        "non_boundary_count": 1,
+        "boundary_rate": 0.5,
+    }
 
 
 def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
