@@ -67,7 +67,7 @@ Threads view groups related calls so long chats, subagents, and auto-review pass
 
 Diagnostics surfaces on-demand snapshot reports for tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration without tying them to the normal live refresh loop.
 
-![Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file modifications, and concentration.](docs/assets/dashboard-diagnostics.png?v=readme-drilldown)
+![Diagnostics view showing weekly usage remaining and projected weekly credits from on-demand usage-drain reports.](docs/assets/dashboard-diagnostics.png?v=readme-usage-drain)
 
 The Git Interactions panel expands the safe Git and GitHub CLI operation families without storing command text, branch names, release notes, or patch content.
 
@@ -164,7 +164,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
-- `Insights`, `Calls`, `Threads`, and `Diagnostics` dashboard views.
+- `Insights`, `Calls`, `Threads`, and `Diagnostics` dashboard views, including on-demand usage-drain report runs with cumulative per-thread cost curves.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
@@ -243,6 +243,7 @@ Full model: [Privacy Guide](docs/privacy.md).
 - [Privacy Guide](docs/privacy.md)
 - [Architecture](docs/architecture.md)
 - [CLI And MCP JSON Schemas](docs/cli-json-schemas.md)
+- [Usage Drain Modeling](docs/usage-drain-modeling.md)
 - [Development And Release](docs/development.md)
 
 ## Codex-Assisted Install

@@ -44,6 +44,7 @@ from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
+    build_diagnostic_usage_drain_report,
     refresh_diagnostic_snapshots,
 )
 from codex_usage_tracker.i18n import normalize_language
@@ -339,6 +340,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/diagnostics/concentration":
             self._handle_diagnostics_concentration(parsed.query)
             return
+        if parsed.path == "/api/diagnostics/usage-drain":
+            self._handle_diagnostics_usage_drain(parsed.query)
+            return
         if parsed.path == "/api/usage":
             self._handle_usage(parsed.query)
             return
@@ -381,6 +385,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/diagnostics/concentration/refresh":
             self._handle_diagnostics_concentration_refresh(parsed.query)
+            return
+        if parsed.path == "/api/diagnostics/usage-drain/refresh":
+            self._handle_diagnostics_usage_drain_refresh(parsed.query)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
 
@@ -1036,6 +1043,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             with self._refresh_lock:
                 payload = refresh_diagnostic_snapshots(
                     db_path=self._db_path,
+                    pricing_path=self._pricing_path,
+                    allowance_path=self._allowance_path,
+                    rate_card_path=self._rate_card_path,
                     include_archived=include_archived,
                 )
         except sqlite3.Error as exc:
@@ -1165,6 +1175,63 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             refresh=True,
             label="diagnostic concentration",
         )
+
+    def _handle_diagnostics_usage_drain(self, query: str) -> None:
+        self._handle_diagnostic_usage_drain_snapshot(
+            query,
+            refresh=False,
+        )
+
+    def _handle_diagnostics_usage_drain_refresh(self, query: str) -> None:
+        self._handle_diagnostic_usage_drain_snapshot(
+            query,
+            refresh=True,
+        )
+
+    def _handle_diagnostic_usage_drain_snapshot(
+        self,
+        query: str,
+        *,
+        refresh: bool,
+    ) -> None:
+        params = parse_qs(query)
+        if refresh and not self._has_valid_api_token(params):
+            self._send_json(
+                HTTPStatus.FORBIDDEN,
+                {"error": "Valid API token is required for diagnostic refresh"},
+            )
+            return
+        include_archived = _parse_bool(
+            _first(params.get("include_archived")),
+            self._include_archived,
+        )
+        try:
+            if refresh:
+                with self._refresh_lock:
+                    payload = build_diagnostic_usage_drain_report(
+                        db_path=self._db_path,
+                        pricing_path=self._pricing_path,
+                        allowance_path=self._allowance_path,
+                        rate_card_path=self._rate_card_path,
+                        include_archived=include_archived,
+                        refresh=True,
+                    ).payload
+            else:
+                payload = build_diagnostic_usage_drain_report(
+                    db_path=self._db_path,
+                    pricing_path=self._pricing_path,
+                    allowance_path=self._allowance_path,
+                    rate_card_path=self._rate_card_path,
+                    include_archived=include_archived,
+                    refresh=False,
+                ).payload
+        except sqlite3.Error as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"Database error while reading diagnostic usage drain: {exc}"},
+            )
+            return
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_diagnostic_snapshot(
         self,

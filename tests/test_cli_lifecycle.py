@@ -463,6 +463,15 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "--refresh",
         "--json",
     )
+    usage_drain_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "usage-drain",
+        "--refresh",
+        "--json",
+    )
     fact_calls = _run_cli(
         tmp_path,
         "--db",
@@ -492,6 +501,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     file_modifications_refresh_payload = json.loads(file_modifications_refresh.stdout)
     read_productivity_refresh_payload = json.loads(read_productivity_refresh.stdout)
     concentration_refresh_payload = json.loads(concentration_refresh.stdout)
+    usage_drain_refresh_payload = json.loads(usage_drain_refresh.stdout)
     fact_calls_payload = json.loads(fact_calls.stdout)
     for payload in (
         summary_payload,
@@ -507,6 +517,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         file_modifications_refresh_payload,
         read_productivity_refresh_payload,
         concentration_refresh_payload,
+        usage_drain_refresh_payload,
         fact_calls_payload,
     ):
         _assert_contract(payload)
@@ -581,6 +592,12 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     )
     assert concentration_refresh_payload["summary"]["usage_rows"] == 2
     assert concentration_refresh_payload["metrics"]
+    assert (
+        usage_drain_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-usage-drain-v1"
+    )
+    assert usage_drain_refresh_payload["summary"]["usage_rows"] == 2
+    assert "thread_cost_curves" in usage_drain_refresh_payload
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
     assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")
@@ -590,6 +607,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
             facts_payload,
             compactions_payload,
             tools_payload,
+            usage_drain_refresh_payload,
             fact_calls_payload,
         ]
     )

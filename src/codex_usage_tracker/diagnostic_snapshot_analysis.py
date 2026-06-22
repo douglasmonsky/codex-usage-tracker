@@ -146,11 +146,25 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
             if envelope.get("type") == "event_msg":
                 path_refs = modified_path_refs(payload)
                 if path_refs:
-                    _record_file_modification_refs(path_refs, counters=counters)
+                    _record_file_modification_refs(
+                        path_refs,
+                        counters=counters,
+                        event_kind=safe_label(payload.get("type")) or "file_modification",
+                    )
                 for path_ref in path_refs:
                     modified_orders_by_path[path_ref["path_key"]].append(order)
                 continue
             if envelope.get("type") != "response_item":
+                continue
+            path_refs = modified_path_refs(payload)
+            if path_refs:
+                _record_file_modification_refs(
+                    path_refs,
+                    counters=counters,
+                    event_kind=safe_label(payload.get("name")) or "file_modification",
+                )
+                for path_ref in path_refs:
+                    modified_orders_by_path[path_ref["path_key"]].append(order)
                 continue
             if payload.get("type") == "function_call":
                 _record_function_call(
@@ -281,6 +295,7 @@ def _record_file_modification_refs(
     path_refs: list[dict[str, str]],
     *,
     counters: dict[str, Any],
+    event_kind: str,
 ) -> None:
     counters["file_modification_events"] += 1
     event_paths: list[dict[str, str]] = []
@@ -293,7 +308,7 @@ def _record_file_modification_refs(
         event_paths.append({"path_label": path_label, "path_hash": path_ref["path_hash"]})
     counters["largest_file_modification_events"].append(
         {
-            "event_kind": "patch_apply_end",
+            "event_kind": event_kind,
             "modified_path_count": len(path_refs),
             "paths": unique_path_rows(event_paths),
         }

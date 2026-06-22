@@ -86,7 +86,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - The `History` control defaults to `Active sessions only`. Switch to `All history` only when you want live refresh to scan archived session logs and include any archived rows already present in SQLite.
 - The URL tracks the active view, filters, time preset or custom range, sort, preset, selected row or thread, page, and expanded threads. `Copy link` copies that state so the same investigation can be reopened.
 - `Export CSV` downloads the currently filtered aggregate calls. In Threads view, it exports the calls behind the filtered thread list rather than only the visible group headers.
-- A `Parser warnings` chip appears only when the latest refresh reports skipped token events, missing expected token fields, invalid counters, duplicate cumulative snapshots, or unknown event shapes. Use `codex-usage-tracker inspect-log <path>` to inspect a suspect log without writing to SQLite.
+- A `Parser warnings` chip appears only when the latest refresh reports actionable issues such as skipped token events, missing expected token fields, invalid counters, or unknown event shapes. Duplicate cumulative snapshots are ignored for this top-level chip. Use `codex-usage-tracker inspect-log <path>` to inspect a suspect log without writing to SQLite.
 - Search matches thread, cwd, model, session id, turn id, subagent role, and parent thread fields.
 - Search also matches derived project names, project-relative cwd values, tags, branch names, and redacted remote labels.
 - In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.
@@ -130,14 +130,15 @@ Use `Threads` view when you want to understand a work session as a group instead
 
 ## Diagnostics View
 
-![Diagnostics view showing stored snapshot panels for tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration.](assets/dashboard-diagnostics.png)
+![Diagnostics view showing on-demand usage-drain charts for weekly usage remaining and projected weekly credits.](assets/dashboard-diagnostics.png)
 
 Use `Diagnostics` view when you want to see what structured event patterns are happening and what token totals are associated with those patterns.
 
 - The tab consumes the localhost `/api/diagnostics/*` endpoints; static file dashboards show a live-API unavailable state.
 - The first table shows top diagnostic facts by associated uncached input tokens. Tool/function/MCP/command-family and compaction sections expose narrower slices of the same fact data.
 - Command diagnostics store only a command family such as `pytest`, `git`, or `unknown_command`. Skill and MCP labels are detected only when they are present as structured event metadata.
-- Newer on-demand diagnostic snapshot endpoints are section-specific (`overview`, `tool-output`, `commands`, `git-interactions`, `file-reads`, `file-modifications`, `read-productivity`, and `concentration`). Heavy recomputation happens only through explicit diagnostic refresh endpoints. The dashboard's `Refresh diagnostics` button uses one batched refresh so source-log sections share one scan.
+- Newer on-demand diagnostic snapshot endpoints are section-specific (`overview`, `tool-output`, `commands`, `git-interactions`, `file-reads`, `file-modifications`, `read-productivity`, `concentration`, and `usage-drain`). Heavy recomputation happens only through explicit diagnostic refresh endpoints. The dashboard's `Refresh diagnostics` button uses one batched refresh so source-log sections share one scan.
+- Usage-drain snapshots run on indexed aggregate rows and render cumulative estimated-cost curves by thread, visible usage span counts, allowance-breakpoint highlights, and compact predictor summaries.
 - Git interaction panels persist only safe roots and operations such as `git/status` or `gh/pr`, plus coarse categories and counts. They do not expose branch names, remotes, file paths, tags, commit messages, PR titles, release notes, or raw command output.
 - File-modification panels count structured patch events and modified paths using basename-only labels plus short irreversible path hashes. They do not expose patch text, raw paths, file contents, or JSONL fragments.
 - Click `Refresh diagnostics` when you want to recompute stored diagnostic snapshots. The normal dashboard `Refresh` action updates usage rows only.

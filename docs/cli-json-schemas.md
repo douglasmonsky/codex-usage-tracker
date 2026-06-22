@@ -55,6 +55,7 @@ Tracked schema ids:
 | `codex-usage-tracker-diagnostic-file-modifications-v1` | CLI `diagnostics file-modifications --json`, dashboard server `/api/diagnostics/file-modifications` |
 | `codex-usage-tracker-diagnostic-read-productivity-v1` | CLI `diagnostics read-productivity --json`, dashboard server `/api/diagnostics/read-productivity` |
 | `codex-usage-tracker-diagnostic-concentration-v1` | CLI `diagnostics concentration --json`, dashboard server `/api/diagnostics/concentration` |
+| `codex-usage-tracker-diagnostic-usage-drain-v1` | CLI `diagnostics usage-drain --json`, dashboard server `/api/diagnostics/usage-drain` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |
 | `codex-usage-tracker-context-disabled-v1` | MCP `usage_call_context` when raw context is disabled |
@@ -636,6 +637,96 @@ Schema: `codex-usage-tracker-diagnostic-concentration-v1`
 ```
 
 The concentration snapshot computes top-1/top-3/top-5 share and effective group count by source log/session, cwd/project label, and day. Metric ids such as `top_1_source_log_share` are stable JSON contract fields; dashboard views should render them as reader-facing labels. Source log labels use session-id prefixes or source hashes, cwd labels use basename-only labels, and raw source paths/cwd paths are not included.
+
+## Diagnostic Usage Drain Snapshot
+
+Commands:
+
+```bash
+codex-usage-tracker diagnostics usage-drain --json
+codex-usage-tracker diagnostics usage-drain --refresh --json
+```
+
+Dashboard server API:
+
+- `GET /api/diagnostics/usage-drain`
+- `POST /api/diagnostics/usage-drain/refresh`
+
+Schema: `codex-usage-tracker-diagnostic-usage-drain-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-diagnostic-usage-drain-v1",
+  "section": "usage-drain",
+  "status": "ready",
+  "refreshed": false,
+  "raw_context_included": false,
+  "snapshot": {},
+  "summary": {
+    "usage_rows": 4,
+    "thread_count": 2,
+    "positive_usage_spans": 3,
+    "estimated_cost_usd": 0.42,
+    "usage_credits": 120.0,
+    "top_thread_cost_share": 0.6,
+    "best_predictive_model": "previous_delta"
+  },
+  "thread_cost_curves": {
+    "total_threads": 2,
+    "shown_threads": 2,
+    "max_points_per_thread": 120,
+    "estimated_cost_usd": 0.42,
+    "top_thread_share": 0.6,
+    "threads": [
+      {
+        "thread_key": "thread:alpha",
+        "thread": "Alpha",
+        "call_count": 3,
+        "estimated_cost_usd": 0.25,
+        "avg_cost_usd": 0.083333,
+        "shape": "near-linear",
+        "points": [
+          {"call_index": 1, "cumulative_cost_usd": 0.1},
+          {"call_index": 3, "cumulative_cost_usd": 0.25}
+        ]
+      }
+    ]
+  },
+  "time_series": {
+    "visible_usage": {
+      "unit": "visible_used_percent",
+      "series": ["five_hour_used_percent", "weekly_used_percent"],
+      "points": [
+        {
+          "timestamp": "2026-06-01T00:00:00Z",
+          "five_hour_used_percent": 10.0,
+          "weekly_used_percent": 20.0
+        }
+      ]
+    },
+    "weekly_credit_projection": {
+      "unit": "projected_standard_usage_credits_per_full_week",
+      "window_minutes": 10080,
+      "points": [
+        {
+          "label": "Reset Jun 08",
+          "observed_usage_delta_percent": 30.0,
+          "observed_standard_usage_credits": 15000.0,
+          "projected_weekly_credits": 50000.0,
+          "ci_low": 47000.0,
+          "ci_high": 53000.0,
+          "confidence": "medium"
+        }
+      ]
+    }
+  },
+  "model_highlights": {},
+  "pricing": {},
+  "notes": []
+}
+```
+
+The usage-drain snapshot is an on-demand, aggregate-only research report. It uses indexed usage rows, estimated costs, Codex credit-rate annotations, visible usage counter spans, and compact model highlights. The dashboard renders thread names for the cumulative cost chart because this is local runtime metadata, not a shared support bundle. It still excludes prompts, assistant text, tool outputs, command text, raw JSONL paths, and patch text.
 
 ## Pricing Coverage
 

@@ -292,3 +292,406 @@ console.log(JSON.stringify({
     assert payload["hasPathLabel"] is True
     assert payload["hasExtension"] is True
     assert payload["leaksRawPath"] is False
+
+
+def test_dashboard_usage_drain_charts_render_as_featured_first() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+const renderer = factory.create({
+  escapeHtml,
+  formatTimestamp: value => value,
+  number: new Intl.NumberFormat('en-US'),
+  pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+  renderState: message => `<div>${escapeHtml(message)}</div>`,
+  rowInvestigatorLink: () => '<a>1,000</a>',
+  tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+});
+const html = renderer.renderPanels({
+  loading: false,
+  payloads: {
+    overview: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      overview: { usage_rows: 2 },
+    },
+    usageDrain: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      summary: { usage_rows: 2, estimated_cost_usd: 0.1 },
+      time_series: {
+        visible_usage: {
+          points: [
+            { timestamp: '2026-06-12T00:00:00Z', weekly_used_percent: 25 },
+            { timestamp: '2026-06-13T00:00:00Z', weekly_used_percent: 40 },
+            { timestamp: '2026-06-19T00:00:00Z', weekly_used_percent: 10 },
+            { timestamp: '2026-06-20T00:00:00Z', weekly_used_percent: 30 },
+          ],
+        },
+        weekly_credit_projection: {
+          points: [
+            {
+              label: 'Reset Jun 12',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 40,
+              observed_standard_usage_credits: 12000,
+              projected_weekly_credits: 30000,
+              ci_low: 25000,
+              ci_high: 35000,
+            },
+            {
+              label: 'Reset Jun 19',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 50,
+              observed_standard_usage_credits: 20000,
+              projected_weekly_credits: 40000,
+              ci_low: 36000,
+              ci_high: 44000,
+            },
+          ],
+        },
+      },
+      thread_cost_curves: { threads: [] },
+      model_highlights: {},
+    },
+  },
+});
+console.log(JSON.stringify({
+  hasFeaturedBlock: html.includes('data-diagnostics-featured="usage-drain"'),
+  featuredBeforeGrid: html.indexOf('data-diagnostics-featured="usage-drain"') < html.indexOf('diagnostics-snapshot-grid'),
+  weeklyBeforeProjection: html.indexOf('Weekly usage over time') < html.indexOf('Projected weekly credits over time'),
+  projectionBeforeOverview: html.indexOf('Projected weekly credits over time') < html.indexOf('Overview'),
+  weeklyChartTitleCount: (html.match(/<strong>Weekly usage over time<\\/strong>/g) || []).length,
+  weeklyRemainingPolylineCount: (html.match(/stroke="#059669"/g) || []).length,
+  projectedChartTitleCount: (html.match(/<strong>Projected weekly credits over time<\\/strong>/g) || []).length,
+  labelsRemainingAllowance: html.includes('Usage remaining') && html.includes('Weekly remaining'),
+  labelsVisibleUsage: html.includes('Visible usage'),
+  preservesMoneyCents: html.includes('$0.10'),
+}));
+"""
+    )
+
+    assert payload["hasFeaturedBlock"] is True
+    assert payload["featuredBeforeGrid"] is True
+    assert payload["weeklyBeforeProjection"] is True
+    assert payload["projectionBeforeOverview"] is True
+    assert payload["weeklyChartTitleCount"] == 1
+    assert payload["weeklyRemainingPolylineCount"] == 2
+    assert payload["projectedChartTitleCount"] == 1
+    assert payload["labelsRemainingAllowance"] is True
+    assert payload["labelsVisibleUsage"] is False
+    assert payload["preservesMoneyCents"] is True
+
+
+def test_dashboard_weekly_projection_keeps_non_latest_plan_points() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+const renderer = factory.create({
+  escapeHtml,
+  formatTimestamp: value => value,
+  number: new Intl.NumberFormat('en-US'),
+  pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+  renderState: message => `<div>${escapeHtml(message)}</div>`,
+  rowInvestigatorLink: () => '<a>1,000</a>',
+  tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+});
+const html = renderer.renderPanels({
+  loading: false,
+  payloads: {
+    usageDrain: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      summary: { usage_rows: 4 },
+      time_series: {
+        weekly_credit_projection: {
+          points: [
+            {
+              label: 'Reset Jun 07',
+              start_event_timestamp: '2026-06-01T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'plus',
+              observed_usage_delta_percent: 40,
+              observed_standard_usage_credits: 4000,
+              projected_weekly_credits: 10000,
+              ci_low: 9000,
+              ci_high: 11000,
+            },
+            {
+              label: 'Reset Jun 10',
+              start_event_timestamp: '2026-06-03T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'plus',
+              observed_usage_delta_percent: 50,
+              observed_standard_usage_credits: 6000,
+              projected_weekly_credits: 12000,
+              ci_low: 10000,
+              ci_high: 14000,
+            },
+            {
+              label: 'Reset Jun 12',
+              start_event_timestamp: '2026-06-05T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 60,
+              observed_standard_usage_credits: 24000,
+              projected_weekly_credits: 40000,
+              ci_low: 36000,
+              ci_high: 44000,
+            },
+            {
+              label: 'Reset Jun 19',
+              start_event_timestamp: '2026-06-12T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 70,
+              observed_standard_usage_credits: 35000,
+              projected_weekly_credits: 50000,
+              ci_low: 45000,
+              ci_high: 55000,
+            },
+            {
+              label: 'Reset Jun 24',
+              start_event_timestamp: '2026-06-18T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 45,
+              observed_standard_usage_credits: 21000,
+              projected_weekly_credits: 46667,
+              ci_low: 42000,
+              ci_high: 50000,
+            },
+            {
+              label: 'Reset Jun 28',
+              start_event_timestamp: '2026-06-22T00:00:00Z',
+              confidence: 'medium',
+              rate_limit_plan_type: 'plus',
+              observed_usage_delta_percent: 30,
+              observed_standard_usage_credits: 3300,
+              projected_weekly_credits: 11000,
+              ci_low: 9500,
+              ci_high: 12500,
+            },
+            {
+              label: 'Reset Unknown',
+              start_event_timestamp: '2026-06-25T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: null,
+              observed_usage_delta_percent: 20,
+              observed_standard_usage_credits: 8000,
+              projected_weekly_credits: 40000,
+              ci_low: 35000,
+              ci_high: 45000,
+            },
+          ],
+        },
+      },
+      thread_cost_curves: { threads: [] },
+      model_highlights: {},
+    },
+  },
+});
+console.log(JSON.stringify({
+  hasMixedPlanSubtitle: html.includes('2 plan types shown; trend requires 3+ medium/high windows per plan'),
+  hasPlusLegend: html.includes('>Plus</span>'),
+  hasProLegend: html.includes('>Pro</span>'),
+  hasPlusTableRows: html.includes('<td>Plus</td>'),
+  hasProTableRows: html.includes('<td>Pro</td>'),
+  hasUnknownLegend: html.includes('>Unknown</span>'),
+  hasUnknownTableRows: html.includes('<td>Unknown</td>') || html.includes('Reset Unknown'),
+  markerCount: (html.match(/<circle /g) || []).length,
+  resetLabelCount: (html.match(/Reset Jun/g) || []).length,
+  hasCompactAxisLabel: html.includes('>Jun 07</text>'),
+  hasResetAxisLabel: html.includes('>Reset Jun 07</text>'),
+  trendLabel: html.includes('Trend per plan'),
+  hasInlineTrendStyle: html.includes('style="stroke:'),
+  hidesOlderPlan: !html.includes('Reset Jun 07') || !html.includes('Reset Jun 10'),
+}));
+"""
+    )
+
+    assert payload["hasMixedPlanSubtitle"] is True
+    assert payload["hasPlusLegend"] is True
+    assert payload["hasProLegend"] is True
+    assert payload["hasPlusTableRows"] is True
+    assert payload["hasProTableRows"] is True
+    assert payload["hasUnknownLegend"] is False
+    assert payload["hasUnknownTableRows"] is False
+    assert payload["markerCount"] == 6
+    assert payload["resetLabelCount"] >= 6
+    assert payload["hasCompactAxisLabel"] is True
+    assert payload["hasResetAxisLabel"] is False
+    assert payload["trendLabel"] is True
+    assert payload["hasInlineTrendStyle"] is False
+    assert payload["hidesOlderPlan"] is False
+
+
+def test_dashboard_weekly_projection_omits_sparse_plan_trend() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+const renderer = factory.create({
+  escapeHtml,
+  formatTimestamp: value => value,
+  number: new Intl.NumberFormat('en-US'),
+  pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+  renderState: message => `<div>${escapeHtml(message)}</div>`,
+  rowInvestigatorLink: () => '<a>1,000</a>',
+  tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+});
+const html = renderer.renderPanels({
+  loading: false,
+  payloads: {
+    usageDrain: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      summary: { usage_rows: 3 },
+      time_series: {
+        weekly_credit_projection: {
+          points: [
+            {
+              label: 'Reset Jun 07',
+              start_event_timestamp: '2026-06-01T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'plus',
+              observed_usage_delta_percent: 40,
+              observed_standard_usage_credits: 4000,
+              projected_weekly_credits: 10000,
+              ci_low: 9000,
+              ci_high: 11000,
+            },
+            {
+              label: 'Reset Jun 14',
+              start_event_timestamp: '2026-06-08T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'plus',
+              observed_usage_delta_percent: 50,
+              observed_standard_usage_credits: 6000,
+              projected_weekly_credits: 12000,
+              ci_low: 10000,
+              ci_high: 14000,
+            },
+            {
+              label: 'Reset Jun 21',
+              start_event_timestamp: '2026-06-15T00:00:00Z',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 60,
+              observed_standard_usage_credits: 24000,
+              projected_weekly_credits: 40000,
+              ci_low: 36000,
+              ci_high: 44000,
+            },
+          ],
+        },
+      },
+      thread_cost_curves: { threads: [] },
+      model_highlights: {},
+    },
+  },
+});
+console.log(JSON.stringify({
+  trendLineCount: (html.match(/diagnostics-trend-line/g) || []).length,
+  trendLabel: html.includes('Trend per plan'),
+  markerCount: (html.match(/<circle /g) || []).length,
+  hasSparseSubtitle: html.includes('trend requires 3+ medium/high windows per plan'),
+}));
+"""
+    )
+
+    assert payload["trendLineCount"] == 0
+    assert payload["trendLabel"] is False
+    assert payload["markerCount"] == 3
+    assert payload["hasSparseSubtitle"] is True
+
+
+def test_dashboard_weekly_projection_scales_many_windows() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+const renderer = factory.create({
+  escapeHtml,
+  formatTimestamp: value => value,
+  number: new Intl.NumberFormat('en-US'),
+  pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+  renderState: message => `<div>${escapeHtml(message)}</div>`,
+  rowInvestigatorLink: () => '<a>1,000</a>',
+  tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+});
+const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const points = Array.from({ length: 50 }, (_, index) => {
+  const reset = new Date(Date.UTC(2026, 0, 5 + (index * 7)));
+  const day = String(reset.getUTCDate()).padStart(2, '0');
+  const month = monthNames[reset.getUTCMonth()];
+  const projected = 34000 + Math.round(Math.sin(index / 4) * 3000) + (index * 50);
+  return {
+    label: `Reset ${month} ${day}`,
+    start_event_timestamp: reset.toISOString(),
+    confidence: 'high',
+    rate_limit_plan_type: 'pro',
+    observed_usage_delta_percent: 35,
+    observed_standard_usage_credits: projected * 0.35,
+    projected_weekly_credits: projected,
+    ci_low: projected - 4000,
+    ci_high: projected + 4000,
+  };
+});
+const html = renderer.renderPanels({
+  loading: false,
+  payloads: {
+    usageDrain: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      summary: { usage_rows: 50 },
+      time_series: {
+        weekly_credit_projection: { points },
+      },
+      thread_cost_curves: { threads: [] },
+      model_highlights: {},
+    },
+  },
+});
+console.log(JSON.stringify({
+  hasXwideChart: html.includes('diagnostics-line-chart-xwide'),
+  hasXwideTitle: html.includes('diagnostics-chart-title-xwide'),
+  hasXwideLegend: html.includes('diagnostics-chart-legend-xwide'),
+  hasXwideViewBox: html.includes('viewBox="0 0 2200 300"'),
+  markerCount: (html.match(/<circle /g) || []).length,
+  axisLabelCount: (html.match(/>[A-Z][a-z]{2} \\d{2}<\\/text>/g) || []).length,
+  hasResetAxisLabel: html.includes('>Reset Jan 05</text>'),
+  trendLabel: html.includes('Trend per plan'),
+}));
+"""
+    )
+
+    assert payload["hasXwideChart"] is True
+    assert payload["hasXwideTitle"] is True
+    assert payload["hasXwideLegend"] is True
+    assert payload["hasXwideViewBox"] is True
+    assert payload["markerCount"] == 50
+    assert payload["axisLabelCount"] <= 14
+    assert payload["hasResetAxisLabel"] is False
+    assert payload["trendLabel"] is True

@@ -423,6 +423,18 @@ def _add_diagnostics_parser(
     )
     concentration.add_argument("--json", action="store_true", dest="as_json")
 
+    usage_drain = diagnostic_subparsers.add_parser(
+        "usage-drain",
+        help="Show usage-drain modeling and cumulative cost diagnostic reports",
+    )
+    usage_drain.add_argument("--include-archived", action="store_true")
+    usage_drain.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist the usage-drain snapshot before reading it.",
+    )
+    usage_drain.add_argument("--json", action="store_true", dest="as_json")
+
     fact_calls = diagnostic_subparsers.add_parser(
         "fact-calls",
         help="List calls associated with one diagnostic fact",

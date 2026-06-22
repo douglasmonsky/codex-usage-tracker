@@ -311,6 +311,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/diagnostics/file-modifications/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/read-productivity/refresh" in dashboard_diagnostics_snapshots_js
     assert "/api/diagnostics/concentration/refresh" in dashboard_diagnostics_snapshots_js
+    assert "/api/diagnostics/usage-drain/refresh" in dashboard_diagnostics_snapshots_js
     assert "Refresh diagnostics" in dashboard_diagnostics_snapshots_js
     assert "data-diagnostics-refresh" in dashboard_diagnostics_js
     assert "Live API required for diagnostics refresh" in dashboard_diagnostics_js
@@ -321,6 +322,11 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "File Modifications" in dashboard_diagnostics_snapshots_js
     assert "Read Productivity" in dashboard_diagnostics_snapshots_js
     assert "Concentration" in dashboard_diagnostics_snapshots_js
+    assert "Usage Drain" in dashboard_diagnostics_snapshots_js
+    assert "Cumulative estimated cost by thread" in dashboard_diagnostics_snapshots_js
+    assert "Weekly usage over time" in dashboard_diagnostics_snapshots_js
+    assert "Projected weekly credits over time" in dashboard_diagnostics_snapshots_js
+    assert "Credit-to-visible-delta R2" in dashboard_diagnostics_snapshots_js
     assert "Associated token totals" in dashboard_diagnostics_js
     assert "Raw context remains on-demand" in dashboard_diagnostics_js
     assert "rowInvestigatorLink" in dashboard_diagnostics_js
@@ -340,6 +346,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "diagnostics-snapshot-grid" in dashboard_css
     assert "diagnostics-toolbar" in dashboard_css
     assert "diagnostics-mini-table" in dashboard_css
+    assert "diagnostics-line-chart" in dashboard_css
     assert "diagnostics-facts-table th:first-child" in dashboard_css
     assert "td.diagnostics-fact-cell" in dashboard_css
     assert "captureScrollAnchor" in dashboard_diagnostics_js
