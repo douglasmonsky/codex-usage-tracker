@@ -408,6 +408,15 @@
       stroke: #e2e8f0;
       stroke-width: 1;
     }
+    .diagnostics-confidence-bar {
+      stroke: #94a3b8;
+      stroke-width: 1.4;
+    }
+    .diagnostics-trend-line {
+      stroke: #0f172a;
+      stroke-width: 1.8;
+      stroke-dasharray: 6 5;
+    }
     .diagnostics-chart-legend {
       display: flex;
       flex-wrap: wrap;
@@ -440,6 +449,15 @@
     .diagnostics-series-9 { background: #9333ea; }
     .diagnostics-series-10 { background: #b45309; }
     .diagnostics-series-11 { background: #475569; }
+    .diagnostics-trend-swatch {
+      background: repeating-linear-gradient(
+        90deg,
+        #0f172a 0,
+        #0f172a 6px,
+        transparent 6px,
+        transparent 10px
+      );
+    }
     .diagnostics-muted {
       color: var(--muted);
       font-weight: 700;

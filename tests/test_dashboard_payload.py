@@ -324,6 +324,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Concentration" in dashboard_diagnostics_snapshots_js
     assert "Usage Drain" in dashboard_diagnostics_snapshots_js
     assert "Cumulative estimated cost by thread" in dashboard_diagnostics_snapshots_js
+    assert "Weekly usage over time" in dashboard_diagnostics_snapshots_js
+    assert "Projected weekly credits over time" in dashboard_diagnostics_snapshots_js
     assert "Credit-to-visible-delta R2" in dashboard_diagnostics_snapshots_js
     assert "Associated token totals" in dashboard_diagnostics_js
     assert "Raw context remains on-demand" in dashboard_diagnostics_js

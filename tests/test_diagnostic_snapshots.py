@@ -514,6 +514,23 @@ def test_file_modification_snapshot_uses_safe_path_aggregates(tmp_path: Path) ->
                     "patch": "SECRET SECOND PATCH",
                 },
             ),
+            _entry(
+                "response_item",
+                {
+                    "type": "custom_tool_call",
+                    "name": "apply_patch",
+                    "input": (
+                        "*** Begin Patch\n"
+                        "*** Update File: src/tool.py\n"
+                        "@@\n"
+                        "-SECRET OLD\n"
+                        "+SECRET NEW\n"
+                        "*** Add File: docs/new.md\n"
+                        "+SECRET NEW DOC\n"
+                        "*** End Patch\n"
+                    ),
+                },
+            ),
             _token_event(100, 100),
         ],
     )
@@ -530,9 +547,9 @@ def test_file_modification_snapshot_uses_safe_path_aggregates(tmp_path: Path) ->
     _assert_contract(file_modifications)
     assert missing["status"] == "missing"
     assert file_modifications["status"] == "ready"
-    assert file_modifications["summary"]["modification_events"] == 2
-    assert file_modifications["summary"]["modified_path_events"] == 5
-    assert file_modifications["summary"]["unique_paths_modified"] == 5
+    assert file_modifications["summary"]["modification_events"] == 3
+    assert file_modifications["summary"]["modified_path_events"] == 7
+    assert file_modifications["summary"]["unique_paths_modified"] == 7
     assert file_modifications["summary"]["largest_event_path_count"] == 3
 
     paths = {row["path_label"]: row for row in file_modifications["top_paths"]}
@@ -541,16 +558,19 @@ def test_file_modification_snapshot_uses_safe_path_aggregates(tmp_path: Path) ->
     assert paths["readme.md"]["modification_events"] == 1
     assert paths["old.py"]["modification_events"] == 1
     assert paths["new.py"]["modification_events"] == 1
+    assert paths["tool.py"]["modification_events"] == 1
+    assert paths["new.md"]["modification_events"] == 1
 
     extensions = {row["extension"]: row["count"] for row in file_modifications["by_extension"]}
-    assert extensions[".py"] == 3
-    assert extensions[".md"] == 2
+    assert extensions[".py"] == 4
+    assert extensions[".md"] == 3
     assert file_modifications["largest_events"][0]["modified_path_count"] == 3
 
     serialized = json.dumps(file_modifications, sort_keys=True)
     assert "SECRET" not in serialized
     assert "/tmp/private" not in serialized
     assert "src/app.py" not in serialized
+    assert "src/tool.py" not in serialized
     assert "docs/readme.md" not in serialized
     assert "SECRET PATCH TEXT" not in serialized
 

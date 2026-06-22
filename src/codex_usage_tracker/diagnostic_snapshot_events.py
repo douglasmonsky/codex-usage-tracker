@@ -174,12 +174,13 @@ def read_reader(root: str) -> str:
 
 
 def modified_path_refs(payload: dict[str, Any]) -> list[dict[str, str]]:
-    if payload.get("type") != "patch_apply_end":
-        return []
     paths: list[str] = []
-    for key in ("changed_paths", "paths", "files", "modified_paths"):
-        paths.extend(_path_values(payload.get(key)))
-    paths.extend(_path_values(payload.get("changes")))
+    if payload.get("type") == "patch_apply_end":
+        for key in ("changed_paths", "paths", "files", "modified_paths"):
+            paths.extend(_path_values(payload.get(key)))
+        paths.extend(_path_values(payload.get("changes")))
+    if _is_apply_patch_tool_payload(payload):
+        paths.extend(_patch_header_paths(payload.get("input")))
     refs: list[dict[str, str]] = []
     seen: set[str] = set()
     for path in paths:
@@ -189,6 +190,27 @@ def modified_path_refs(payload: dict[str, Any]) -> list[dict[str, str]]:
         seen.add(path_ref["path_key"])
         refs.append(path_ref)
     return refs
+
+
+def _is_apply_patch_tool_payload(payload: dict[str, Any]) -> bool:
+    name = payload.get("name")
+    return isinstance(name, str) and name.rsplit(".", 1)[-1] == "apply_patch"
+
+
+def _patch_header_paths(value: object) -> list[str]:
+    if not isinstance(value, str):
+        return []
+    paths: list[str] = []
+    for line in value.splitlines():
+        if line.startswith("*** Add File: "):
+            paths.append(line.removeprefix("*** Add File: ").strip())
+        elif line.startswith("*** Update File: "):
+            paths.append(line.removeprefix("*** Update File: ").strip())
+        elif line.startswith("*** Delete File: "):
+            paths.append(line.removeprefix("*** Delete File: ").strip())
+        elif line.startswith("*** Move to: "):
+            paths.append(line.removeprefix("*** Move to: ").strip())
+    return paths
 
 
 def path_privacy_metadata() -> dict[str, str]:

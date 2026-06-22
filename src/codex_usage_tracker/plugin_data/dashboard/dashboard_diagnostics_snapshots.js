@@ -281,6 +281,7 @@
     function renderUsageDrain(payload) {
       const summary = payload?.summary || {};
       const curves = payload?.thread_cost_curves || {};
+      const timeSeries = payload?.time_series || {};
       const highlights = payload?.model_highlights || {};
       const threads = Array.isArray(curves?.threads) ? curves.threads.slice(0, 12) : [];
       return `
@@ -292,6 +293,8 @@
           ['Top thread cost share', pct(summary.top_thread_cost_share)],
           ['Best predictive model', summary.best_predictive_model || 'n/a'],
         ])}
+        ${renderVisibleUsageChart(timeSeries.visible_usage)}
+        ${renderWeeklyProjectionChart(timeSeries.weekly_credit_projection)}
         ${renderUsageDrainCostChart(threads)}
         ${renderSimpleTable(
           ['Thread', 'Calls', 'Cost', 'Avg/call', 'Shape', 'First half', 'Largest call'],
@@ -309,6 +312,228 @@
         ${renderPredictiveHighlights(highlights)}
         ${renderAllowanceBreakpoints(highlights.allowance_breakpoints)}
       `;
+    }
+
+    function renderVisibleUsageChart(series) {
+      const points = Array.isArray(series?.points) ? series.points : [];
+      if (!points.length) return renderState('No visible usage time-series points in this snapshot.');
+      const width = 760;
+      const height = 260;
+      const margin = { top: 20, right: 28, bottom: 42, left: 66 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+      const timed = points
+        .map(point => ({ ...point, ts: Date.parse(point.timestamp || '') }))
+        .filter(point => Number.isFinite(point.ts));
+      if (!timed.length) return renderState('No timestamped visible usage points in this snapshot.');
+      const minX = Math.min(...timed.map(point => point.ts));
+      const maxX = Math.max(...timed.map(point => point.ts));
+      const spanX = Math.max(maxX - minX, 1);
+      const x = value => margin.left + ((value - minX) / spanX) * innerWidth;
+      const y = value => margin.top + innerHeight - (Number(value || 0) / 100) * innerHeight;
+      const lineFor = (field, color) => {
+        const line = timed
+          .filter(point => point[field] !== null && point[field] !== undefined)
+          .map(point => `${x(point.ts).toFixed(1)},${y(point[field]).toFixed(1)}`)
+          .join(' ');
+        if (!line) return '';
+        return `<polyline points="${escapeHtml(line)}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
+      };
+      const yTicks = [0, 25, 50, 75, 100];
+      const xTicks = timeChartTicks(timed, 8);
+      return `
+        <div class="diagnostics-chart-card">
+          <div class="diagnostics-chart-title">
+            <strong>Weekly usage over time</strong>
+            <span>weekly visible counter from indexed calls</span>
+          </div>
+          <svg class="diagnostics-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly usage over time">
+            <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
+            <line x1="${margin.left}" y1="${margin.top + innerHeight}" x2="${margin.left + innerWidth}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
+            ${yTicks.map(tick => `
+              <line x1="${margin.left}" y1="${y(tick).toFixed(1)}" x2="${margin.left + innerWidth}" y2="${y(tick).toFixed(1)}" class="diagnostics-gridline"></line>
+              <text x="${margin.left - 10}" y="${y(tick).toFixed(1)}" text-anchor="end" dominant-baseline="middle">${escapeHtml(pct(tick / 100))}</text>
+            `).join('')}
+            ${xTicks.map((point, index) => `
+              <line x1="${x(point.ts).toFixed(1)}" y1="${margin.top + innerHeight}" x2="${x(point.ts).toFixed(1)}" y2="${margin.top + innerHeight + 5}" class="diagnostics-axis"></line>
+              <text x="${x(point.ts).toFixed(1)}" y="${margin.top + innerHeight + 24}" text-anchor="${tickTextAnchor(index, xTicks.length)}">${escapeHtml(shortDate(point.timestamp))}</text>
+            `).join('')}
+            ${lineFor('weekly_used_percent', '#059669')}
+            <text x="${margin.left + innerWidth / 2}" y="${height - 8}" text-anchor="middle">Time</text>
+            <text x="18" y="${margin.top + innerHeight / 2}" transform="rotate(-90 18 ${margin.top + innerHeight / 2})" text-anchor="middle">Visible usage</text>
+          </svg>
+          <div class="diagnostics-chart-legend">
+            <span><i class="diagnostics-series-1"></i>Weekly usage</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderWeeklyProjectionChart(projection) {
+      const points = Array.isArray(projection?.points) ? projection.points : [];
+      if (!points.length) return renderState('No weekly projection points in this snapshot.');
+      const chartPoints = weeklyProjectionChartPoints(points);
+      const chartSubtitle = weeklyProjectionSubtitle(chartPoints);
+      const width = 760;
+      const height = 300;
+      const margin = { top: 20, right: 28, bottom: 46, left: 92 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+      const yTicks = niceAxisTicks(Math.max(1, ...chartPoints.map(point => Number(point.ci_high || point.projected_weekly_credits || 0))));
+      const maxY = yTicks[yTicks.length - 1] || 1;
+      const x = index => margin.left + (chartPoints.length === 1 ? innerWidth / 2 : (index / (chartPoints.length - 1)) * innerWidth);
+      const y = value => {
+        const numeric = Math.max(0, Math.min(maxY, Number(value || 0)));
+        return margin.top + innerHeight - (numeric / maxY) * innerHeight;
+      };
+      const line = chartPoints
+        .map((point, index) => `${x(index).toFixed(1)},${y(point.projected_weekly_credits).toFixed(1)}`)
+        .join(' ');
+      const trendLine = weeklyProjectionTrendLine(chartPoints, x, y);
+      const bars = chartPoints.map((point, index) => {
+        if (point.ci_low === null || point.ci_low === undefined || point.ci_high === null || point.ci_high === undefined) {
+          return '';
+        }
+        const center = x(index);
+        const low = y(point.ci_low);
+        const high = y(point.ci_high);
+        return `
+          <line x1="${center.toFixed(1)}" y1="${high.toFixed(1)}" x2="${center.toFixed(1)}" y2="${low.toFixed(1)}" class="diagnostics-confidence-bar"></line>
+          <line x1="${(center - 5).toFixed(1)}" y1="${high.toFixed(1)}" x2="${(center + 5).toFixed(1)}" y2="${high.toFixed(1)}" class="diagnostics-confidence-bar"></line>
+          <line x1="${(center - 5).toFixed(1)}" y1="${low.toFixed(1)}" x2="${(center + 5).toFixed(1)}" y2="${low.toFixed(1)}" class="diagnostics-confidence-bar"></line>
+        `;
+      }).join('');
+      const xTicks = chartPoints.map((point, index) => ({ point, index })).filter((_item, index) => (
+        chartPoints.length <= 4 || index === 0 || index === Math.floor((chartPoints.length - 1) / 2) || index === chartPoints.length - 1
+      ));
+      return `
+        <div class="diagnostics-chart-card">
+          <div class="diagnostics-chart-title">
+            <strong>Projected weekly credits over time</strong>
+            <span>${escapeHtml(chartSubtitle)}</span>
+          </div>
+          <svg class="diagnostics-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Projected weekly credits over time">
+            <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
+            <line x1="${margin.left}" y1="${margin.top + innerHeight}" x2="${margin.left + innerWidth}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
+            ${yTicks.map(tick => `
+              <line x1="${margin.left}" y1="${y(tick).toFixed(1)}" x2="${margin.left + innerWidth}" y2="${y(tick).toFixed(1)}" class="diagnostics-gridline"></line>
+              <text x="${margin.left - 10}" y="${y(tick).toFixed(1)}" text-anchor="end" dominant-baseline="middle">${escapeHtml(numberText(tick))}</text>
+            `).join('')}
+            ${xTicks.map(({ point, index }) => `
+              <line x1="${x(index).toFixed(1)}" y1="${margin.top + innerHeight}" x2="${x(index).toFixed(1)}" y2="${margin.top + innerHeight + 5}" class="diagnostics-axis"></line>
+              <text x="${x(index).toFixed(1)}" y="${margin.top + innerHeight + 24}" text-anchor="${tickTextAnchor(index, chartPoints.length)}">${escapeHtml(point.label || shortDate(point.end_event_timestamp))}</text>
+            `).join('')}
+            ${bars}
+            <polyline points="${escapeHtml(line)}" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+            ${trendLine}
+            <text x="${margin.left + innerWidth / 2}" y="${height - 8}" text-anchor="middle">Weekly reset window</text>
+            <text x="18" y="${margin.top + innerHeight / 2}" transform="rotate(-90 18 ${margin.top + innerHeight / 2})" text-anchor="middle">Projected credits</text>
+          </svg>
+          <div class="diagnostics-chart-legend">
+            <span><i class="diagnostics-series-0"></i>Projected weekly credits</span>
+            <span><i class="diagnostics-trend-swatch"></i>Trend</span>
+          </div>
+        </div>
+        ${renderSimpleTable(
+          ['Week', 'Plan', 'Observed %', 'Credits', 'Projected/week', 'Confidence'],
+          chartPoints.slice(-6).map(point => [
+            point.label,
+            humanizeMetric(point.rate_limit_plan_type || 'unknown'),
+            pct(Number(point.observed_usage_delta_percent || 0) / 100),
+            numberText(point.observed_standard_usage_credits),
+            numberText(point.projected_weekly_credits),
+            humanizeMetric(point.confidence),
+          ]),
+          'No weekly projection points in this snapshot.',
+        )}
+      `;
+    }
+
+    function weeklyProjectionChartPoints(points) {
+      const latestPlan = [...points].reverse().find(point => point.rate_limit_plan_type)?.rate_limit_plan_type || null;
+      const samePlan = latestPlan ? points.filter(point => point.rate_limit_plan_type === latestPlan) : [];
+      let candidates = samePlan.length >= 2 ? samePlan : points;
+      const confident = candidates.filter(point => point.confidence === 'medium' || point.confidence === 'high');
+      if (confident.length >= 2) candidates = confident;
+      return candidates;
+    }
+
+    function weeklyProjectionSubtitle(points) {
+      const plans = Array.from(new Set(points.map(point => point.rate_limit_plan_type || 'unknown')));
+      const planText = plans.length === 1 ? `${humanizeMetric(plans[0])} plan` : 'mixed plan';
+      return `${planText} windows with descriptive confidence bars`;
+    }
+
+    function weeklyProjectionTrendLine(points, x, y) {
+      let trendPoints = points
+        .map((point, index) => ({ point, index }))
+        .filter(item => item.point.confidence === 'medium' || item.point.confidence === 'high');
+      if (trendPoints.length < 2) {
+        trendPoints = points.map((point, index) => ({ point, index }));
+      }
+      if (trendPoints.length < 2) return '';
+      const values = trendPoints.map(item => Number(item.point.projected_weekly_credits || 0));
+      const indexes = trendPoints.map(item => item.index);
+      const xMean = indexes.reduce((total, value) => total + value, 0) / indexes.length;
+      const yMean = values.reduce((total, value) => total + value, 0) / values.length;
+      const denom = indexes.reduce((total, index) => total + Math.pow(index - xMean, 2), 0);
+      if (!denom) return '';
+      const slope = values.reduce((total, value, offset) => total + ((indexes[offset] - xMean) * (value - yMean)), 0) / denom;
+      const intercept = yMean - slope * xMean;
+      const first = intercept;
+      const last = intercept + slope * (points.length - 1);
+      return `<line x1="${x(0).toFixed(1)}" y1="${y(first).toFixed(1)}" x2="${x(points.length - 1).toFixed(1)}" y2="${y(last).toFixed(1)}" class="diagnostics-trend-line"></line>`;
+    }
+
+    function niceAxisTicks(maxValue, maxTicks = 5) {
+      const numeric = Math.max(1, Number(maxValue || 1));
+      const step = niceAxisStep(numeric / Math.max(maxTicks - 1, 1));
+      const maxTick = Math.ceil(numeric / step) * step;
+      const ticks = [];
+      for (let tick = 0; tick <= maxTick + (step / 2); tick += step) {
+        ticks.push(tick);
+      }
+      return ticks.length >= 2 ? ticks : [0, maxTick || 1];
+    }
+
+    function niceAxisStep(rawStep) {
+      const magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(rawStep, 1))));
+      const normalized = rawStep / magnitude;
+      if (normalized <= 1) return magnitude;
+      if (normalized <= 2) return 2 * magnitude;
+      if (normalized <= 5) return 5 * magnitude;
+      return 10 * magnitude;
+    }
+
+    function tickTextAnchor(index, total) {
+      if (index === 0) return 'start';
+      if (index === total - 1) return 'end';
+      return 'middle';
+    }
+
+    function chartTicks(points, maxTicks) {
+      if (!points.length || maxTicks <= 0) return [];
+      if (points.length <= maxTicks) return points;
+      const selected = new Set();
+      const last = points.length - 1;
+      for (let index = 0; index < maxTicks; index += 1) {
+        selected.add(Math.round(index * last / (maxTicks - 1)));
+      }
+      return Array.from(selected).sort((left, right) => left - right).map(index => points[index]);
+    }
+
+    function timeChartTicks(points, maxTicks) {
+      if (!points.length || maxTicks <= 0) return [];
+      if (points.length <= maxTicks) return points;
+      const minTs = Math.min(...points.map(point => point.ts));
+      const maxTs = Math.max(...points.map(point => point.ts));
+      const span = Math.max(maxTs - minTs, 1);
+      const ticks = [];
+      for (let tick = 0; tick < maxTicks; tick += 1) {
+        const target = minTs + (span * tick / Math.max(maxTicks - 1, 1));
+        ticks.push({ ts: target, timestamp: new Date(target).toISOString() });
+      }
+      return ticks;
     }
 
     function renderUsageDrainCostChart(threads) {
@@ -533,6 +758,12 @@
       const text = String(value || '');
       if (text.length <= length) return text;
       return `${text.slice(0, Math.max(length - 1, 1))}…`;
+    }
+
+    function shortDate(value) {
+      const date = new Date(value || '');
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     }
 
     return {

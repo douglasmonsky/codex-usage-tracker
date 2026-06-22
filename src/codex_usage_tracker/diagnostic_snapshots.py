@@ -566,6 +566,7 @@ def _refresh_usage_drain_snapshot(
         refreshed=True,
         summary=analysis["summary"],
         thread_cost_curves=analysis["thread_cost_curves"],
+        time_series=analysis["time_series"],
         model_highlights=analysis["model_highlights"],
         pricing=analysis["pricing"],
     )
@@ -782,6 +783,7 @@ def _missing_payload(
     elif section == DIAGNOSTIC_USAGE_DRAIN_SECTION:
         payload["summary"] = None
         payload["thread_cost_curves"] = {"threads": []}
+        payload["time_series"] = {}
         payload["model_highlights"] = {}
         payload["pricing"] = {}
     return payload

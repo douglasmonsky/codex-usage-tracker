@@ -277,6 +277,7 @@ JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "snapshot": (dict, NoneType),
             "summary": (dict, NoneType),
             "thread_cost_curves": dict,
+            "time_series": dict,
             "model_highlights": dict,
             "pricing": dict,
             "notes": list,

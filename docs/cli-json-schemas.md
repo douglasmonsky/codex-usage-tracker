@@ -692,6 +692,34 @@ Schema: `codex-usage-tracker-diagnostic-usage-drain-v1`
       }
     ]
   },
+  "time_series": {
+    "visible_usage": {
+      "unit": "visible_used_percent",
+      "series": ["five_hour_used_percent", "weekly_used_percent"],
+      "points": [
+        {
+          "timestamp": "2026-06-01T00:00:00Z",
+          "five_hour_used_percent": 10.0,
+          "weekly_used_percent": 20.0
+        }
+      ]
+    },
+    "weekly_credit_projection": {
+      "unit": "projected_standard_usage_credits_per_full_week",
+      "window_minutes": 10080,
+      "points": [
+        {
+          "label": "Reset Jun 08",
+          "observed_usage_delta_percent": 30.0,
+          "observed_standard_usage_credits": 15000.0,
+          "projected_weekly_credits": 50000.0,
+          "ci_low": 47000.0,
+          "ci_high": 53000.0,
+          "confidence": "medium"
+        }
+      ]
+    }
+  },
   "model_highlights": {},
   "pricing": {},
   "notes": []
