@@ -883,6 +883,7 @@
       getDiagnosticFilters: diagnosticApiFilters,
       isActive: () => activeView === 'diagnostics',
       liveRefreshSupported,
+      moneyText,
       number,
       openInvestigatorUrl,
       pagerEl,

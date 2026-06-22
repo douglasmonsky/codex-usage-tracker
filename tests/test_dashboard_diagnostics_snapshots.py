@@ -292,3 +292,99 @@ console.log(JSON.stringify({
     assert payload["hasPathLabel"] is True
     assert payload["hasExtension"] is True
     assert payload["leaksRawPath"] is False
+
+
+def test_dashboard_usage_drain_charts_render_as_featured_first() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+const renderer = factory.create({
+  escapeHtml,
+  formatTimestamp: value => value,
+  number: new Intl.NumberFormat('en-US'),
+  pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+  renderState: message => `<div>${escapeHtml(message)}</div>`,
+  rowInvestigatorLink: () => '<a>1,000</a>',
+  tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+});
+const html = renderer.renderPanels({
+  loading: false,
+  payloads: {
+    overview: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      overview: { usage_rows: 2 },
+    },
+    usageDrain: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      summary: { usage_rows: 2, estimated_cost_usd: 0.1 },
+      time_series: {
+        visible_usage: {
+          points: [
+            { timestamp: '2026-06-12T00:00:00Z', weekly_used_percent: 25 },
+            { timestamp: '2026-06-13T00:00:00Z', weekly_used_percent: 40 },
+          ],
+        },
+        weekly_credit_projection: {
+          points: [
+            {
+              label: 'Reset Jun 12',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 40,
+              observed_standard_usage_credits: 12000,
+              projected_weekly_credits: 30000,
+              ci_low: 25000,
+              ci_high: 35000,
+            },
+            {
+              label: 'Reset Jun 19',
+              confidence: 'high',
+              rate_limit_plan_type: 'pro',
+              observed_usage_delta_percent: 50,
+              observed_standard_usage_credits: 20000,
+              projected_weekly_credits: 40000,
+              ci_low: 36000,
+              ci_high: 44000,
+            },
+          ],
+        },
+      },
+      thread_cost_curves: { threads: [] },
+      model_highlights: {},
+    },
+  },
+});
+console.log(JSON.stringify({
+  hasFeaturedBlock: html.includes('data-diagnostics-featured="usage-drain"'),
+  featuredBeforeGrid: html.indexOf('data-diagnostics-featured="usage-drain"') < html.indexOf('diagnostics-snapshot-grid'),
+  weeklyBeforeProjection: html.indexOf('Weekly usage over time') < html.indexOf('Projected weekly credits over time'),
+  projectionBeforeOverview: html.indexOf('Projected weekly credits over time') < html.indexOf('Overview'),
+  weeklyChartTitleCount: (html.match(/<strong>Weekly usage over time<\\/strong>/g) || []).length,
+  projectedChartTitleCount: (html.match(/<strong>Projected weekly credits over time<\\/strong>/g) || []).length,
+  labelsRemainingAllowance: html.includes('Usage remaining') && html.includes('Weekly remaining'),
+  labelsVisibleUsage: html.includes('Visible usage'),
+  preservesMoneyCents: html.includes('$0.10'),
+}));
+"""
+    )
+
+    assert payload["hasFeaturedBlock"] is True
+    assert payload["featuredBeforeGrid"] is True
+    assert payload["weeklyBeforeProjection"] is True
+    assert payload["projectionBeforeOverview"] is True
+    assert payload["weeklyChartTitleCount"] == 1
+    assert payload["projectedChartTitleCount"] == 1
+    assert payload["labelsRemainingAllowance"] is True
+    assert payload["labelsVisibleUsage"] is False
+    assert payload["preservesMoneyCents"] is True

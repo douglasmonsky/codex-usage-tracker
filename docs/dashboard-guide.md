@@ -86,7 +86,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - The `History` control defaults to `Active sessions only`. Switch to `All history` only when you want live refresh to scan archived session logs and include any archived rows already present in SQLite.
 - The URL tracks the active view, filters, time preset or custom range, sort, preset, selected row or thread, page, and expanded threads. `Copy link` copies that state so the same investigation can be reopened.
 - `Export CSV` downloads the currently filtered aggregate calls. In Threads view, it exports the calls behind the filtered thread list rather than only the visible group headers.
-- A `Parser warnings` chip appears only when the latest refresh reports skipped token events, missing expected token fields, invalid counters, duplicate cumulative snapshots, or unknown event shapes. Use `codex-usage-tracker inspect-log <path>` to inspect a suspect log without writing to SQLite.
+- A `Parser warnings` chip appears only when the latest refresh reports actionable issues such as skipped token events, missing expected token fields, invalid counters, or unknown event shapes. Duplicate cumulative snapshots are ignored for this top-level chip. Use `codex-usage-tracker inspect-log <path>` to inspect a suspect log without writing to SQLite.
 - Search matches thread, cwd, model, session id, turn id, subagent role, and parent thread fields.
 - Search also matches derived project names, project-relative cwd values, tags, branch names, and redacted remote labels.
 - In redacted or strict privacy mode, search only sees the redacted metadata fields included in the dashboard payload.

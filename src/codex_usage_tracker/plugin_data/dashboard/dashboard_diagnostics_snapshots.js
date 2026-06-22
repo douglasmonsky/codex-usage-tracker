@@ -3,6 +3,7 @@
     const {
       escapeHtml,
       formatTimestamp,
+      moneyText: sharedMoneyText,
       number,
       pct,
       renderState,
@@ -48,9 +49,29 @@
     }
 
     function renderPanels({ loading, payloads }) {
+      const featuredUsageDrain = renderFeaturedUsageDrain(payloads.usageDrain);
       return `
+        ${featuredUsageDrain}
         <div class="diagnostics-snapshot-grid">
           ${sections.map(section => renderPanel(section, payloads[section.key], loading)).join('')}
+        </div>
+      `;
+    }
+
+    function renderFeaturedUsageDrain(payload) {
+      if (!payload || payload.status !== 'ready') return '';
+      const timeSeries = payload?.time_series || {};
+      const charts = [];
+      if (Array.isArray(timeSeries.visible_usage?.points) && timeSeries.visible_usage.points.length) {
+        charts.push(renderVisibleUsageChart(timeSeries.visible_usage));
+      }
+      if (Array.isArray(timeSeries.weekly_credit_projection?.points) && timeSeries.weekly_credit_projection.points.length) {
+        charts.push(renderWeeklyProjectionChart(timeSeries.weekly_credit_projection));
+      }
+      if (!charts.length) return '';
+      return `
+        <div class="diagnostics-featured-charts" data-diagnostics-featured="usage-drain">
+          ${charts.join('')}
         </div>
       `;
     }
@@ -293,8 +314,6 @@
           ['Top thread cost share', pct(summary.top_thread_cost_share)],
           ['Best predictive model', summary.best_predictive_model || 'n/a'],
         ])}
-        ${renderVisibleUsageChart(timeSeries.visible_usage)}
-        ${renderWeeklyProjectionChart(timeSeries.weekly_credit_projection)}
         ${renderUsageDrainCostChart(threads)}
         ${renderSimpleTable(
           ['Thread', 'Calls', 'Cost', 'Avg/call', 'Shape', 'First half', 'Largest call'],
@@ -323,11 +342,18 @@
       const innerWidth = width - margin.left - margin.right;
       const innerHeight = height - margin.top - margin.bottom;
       const timed = points
-        .map(point => ({ ...point, ts: Date.parse(point.timestamp || '') }))
+        .map(point => {
+          const used = Number(point.weekly_used_percent);
+          return {
+            ...point,
+            ts: Date.parse(point.timestamp || ''),
+            weekly_remaining_percent: Number.isFinite(used) ? Math.max(0, Math.min(100, 100 - used)) : null,
+          };
+        })
         .filter(point => (
           Number.isFinite(point.ts)
-          && point.weekly_used_percent !== null
-          && point.weekly_used_percent !== undefined
+          && point.weekly_remaining_percent !== null
+          && point.weekly_remaining_percent !== undefined
         ));
       if (!timed.length) return renderState('No timestamped visible usage points in this snapshot.');
       const minX = Math.min(...timed.map(point => point.ts));
@@ -349,9 +375,9 @@
         <div class="diagnostics-chart-card">
           <div class="diagnostics-chart-title">
             <strong>Weekly usage over time</strong>
-            <span>weekly visible counter from indexed calls</span>
+            <span>remaining weekly allowance from indexed calls</span>
           </div>
-          <svg class="diagnostics-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly usage over time">
+          <svg class="diagnostics-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly usage remaining over time">
             <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
             <line x1="${margin.left}" y1="${margin.top + innerHeight}" x2="${margin.left + innerWidth}" y2="${margin.top + innerHeight}" class="diagnostics-axis"></line>
             ${yTicks.map(tick => `
@@ -362,12 +388,12 @@
               <line x1="${x(point.ts).toFixed(1)}" y1="${margin.top + innerHeight}" x2="${x(point.ts).toFixed(1)}" y2="${margin.top + innerHeight + 5}" class="diagnostics-axis"></line>
               <text x="${x(point.ts).toFixed(1)}" y="${margin.top + innerHeight + 24}" text-anchor="${tickTextAnchor(index, xTicks.length)}">${escapeHtml(shortDate(point.timestamp))}</text>
             `).join('')}
-            ${lineFor('weekly_used_percent', '#059669')}
+            ${lineFor('weekly_remaining_percent', '#059669')}
             <text x="${margin.left + innerWidth / 2}" y="${height - 8}" text-anchor="middle">Time</text>
-            <text x="18" y="${margin.top + innerHeight / 2}" transform="rotate(-90 18 ${margin.top + innerHeight / 2})" text-anchor="middle">Visible usage</text>
+            <text x="18" y="${margin.top + innerHeight / 2}" transform="rotate(-90 18 ${margin.top + innerHeight / 2})" text-anchor="middle">Usage remaining</text>
           </svg>
           <div class="diagnostics-chart-legend">
-            <span><i class="diagnostics-series-1"></i>Weekly usage</span>
+            <span><i class="diagnostics-series-1"></i>Weekly remaining</span>
           </div>
         </div>
       `;
@@ -729,8 +755,14 @@
     }
 
     function moneyText(value) {
+      if (typeof sharedMoneyText === 'function') return sharedMoneyText(value);
+      if (value === null || value === undefined) return 'No price';
       const numeric = Number(value || 0);
-      return `$${number.format(Math.round(numeric * 100) / 100)}`;
+      if (numeric > 0 && numeric < 0.01) return `$${numeric.toFixed(4)}`;
+      return `$${new Intl.NumberFormat([], {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(numeric)}`;
     }
 
     function pathLabel(row) {

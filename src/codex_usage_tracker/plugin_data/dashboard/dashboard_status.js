@@ -1,4 +1,8 @@
 (() => {
+  const NON_ACTIONABLE_PARSER_DIAGNOSTICS = new Set([
+    'duplicate_cumulative_total',
+  ]);
+
   function createDashboardStatus(deps) {
     const {
       allowanceImpactElement,
@@ -218,7 +222,11 @@
 
     function updateParserDiagnosticsLine() {
       const sourceEl = parserDiagnosticsElement;
-      const entries = Object.entries(getParserDiagnostics() || {}).filter(([, value]) => Number(value || 0) > 0);
+      const entries = Object.entries(getParserDiagnostics() || {})
+        .filter(([key, value]) => (
+          Number(value || 0) > 0
+          && !NON_ACTIONABLE_PARSER_DIAGNOSTICS.has(key)
+        ));
       if (!entries.length) {
         sourceEl.hidden = true;
         sourceEl.textContent = '';

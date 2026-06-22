@@ -8,6 +8,7 @@
       getDiagnosticFilters,
       isActive,
       liveRefreshSupported,
+      moneyText,
       number,
       openInvestigatorUrl,
       pagerEl,
@@ -40,6 +41,7 @@
     const snapshotRenderer = window.CodexUsageDashboardDiagnosticSnapshots.create({
       escapeHtml,
       formatTimestamp,
+      moneyText,
       number,
       pct,
       renderState,
