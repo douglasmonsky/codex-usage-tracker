@@ -485,6 +485,32 @@ previous-label plus segment-age model, versus `0.053` for the prior). The read
 is: segment age is now a real causal predictor of boundary risk, while
 date/hour/reset buckets are useful secondary context but not the dominant signal.
 
+The companion `walk_forward_delta_prediction` subsection asks the stricter
+question: given the same boundary-opportunity context, what visible percent jump
+comes next? This is intentionally different from boundary risk. Segment age can
+tell us that a transition is more likely without beating the simple magnitude
+rule that says "repeat the previous delta."
+
+After the first 10 opportunities, the all-history next-delta results are:
+
+| model | MAE | RMSE | R2 | Pearson |
+| --- | ---: | ---: | ---: | ---: |
+| previous delta | 0.936 | 2.786 | 0.781 | 0.891 |
+| previous label + segment age | 1.580 | 3.542 | 0.646 | 0.811 |
+| reset + segment age | 1.836 | 3.979 | 0.553 | 0.756 |
+| calendar + segment age | 1.990 | 4.332 | 0.471 | 0.710 |
+| segment age only | 3.141 | 6.391 | -0.152 | 0.203 |
+| prior mode | 3.179 | 6.546 | -0.209 | 0.268 |
+
+So the newest boundary feature is useful, but not in the way a perfect
+next-delta predictor would need. It improves causal boundary-risk ranking, while
+the exact magnitude is still best predicted by the immediately previous visible
+delta. In the newest time-ordered holdout, almost every opportunity is a `1%`
+continuation: prior mode and segment age both reach `0.003` MAE, and the latest
+100 opportunities are all exactly predicted by every simple model. That confirms
+the current regime is easy because it is stable, not because calendar/reset
+controls have uncovered a hidden pricing formula.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the

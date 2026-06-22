@@ -266,6 +266,24 @@ def main() -> int:
                         best=best_boundary_risk,
                     )
                 )
+            boundary_delta_scope = (
+                (
+                    (boundary.get("walk_forward_delta_prediction") or {}).get("scopes")
+                    or {}
+                ).get("all_after_10")
+                or {}
+            )
+            best_boundary_delta = _best_metric_model(
+                boundary_delta_scope.get("models") or {},
+                "mae",
+            )
+            if best_boundary_delta:
+                print(
+                    "boundary delta all_after_10: mean={mean} best_mae={best}".format(
+                        mean=(boundary_delta_scope.get("actual") or {}).get("mean"),
+                        best=best_boundary_delta,
+                    )
+                )
         components = summary.get("token_component_regression") or {}
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):

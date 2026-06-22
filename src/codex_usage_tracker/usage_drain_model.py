@@ -168,6 +168,26 @@ BOUNDARY_RISK_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
         ("previous_segment_position_bucket",),
     ),
 }
+BOUNDARY_DELTA_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "segment_age_mode": (
+        ("previous_segment_position_bucket",),
+        ("previous_segment_wall_time_bucket",),
+    ),
+    "label_segment_age_mode": (
+        ("previous_label", "previous_segment_position_bucket"),
+        ("previous_label",),
+    ),
+    "reset_segment_age_mode": (
+        ("previous_label", "previous_segment_position_bucket", "window_elapsed_bucket"),
+        ("previous_segment_position_bucket", "window_elapsed_bucket"),
+        ("previous_segment_position_bucket",),
+    ),
+    "calendar_segment_age_mode": (
+        ("previous_label", "previous_segment_position_bucket", "day_of_week", "hour_bucket"),
+        ("previous_segment_position_bucket", "day_of_week", "hour_bucket"),
+        ("previous_segment_position_bucket",),
+    ),
+}
 BOUNDARY_RISK_SCOPE_STARTS = {
     "all_after_first": 1,
     "all_after_10": 10,
@@ -786,6 +806,9 @@ def _piecewise_boundary_diagnostics(
             for field_name in BOUNDARY_CONTEXT_FIELDS
         },
         "walk_forward_risk": _boundary_walk_forward_risk_summary(rows),
+        "walk_forward_delta_prediction": _boundary_walk_forward_delta_prediction_summary(
+            rows
+        ),
         "latest_boundaries": _latest_piecewise_boundaries(rows),
     }
 
@@ -1103,6 +1126,145 @@ def _boundary_risk_detail_diagnostics(
             )[:8]
         ],
     }
+
+
+def _boundary_walk_forward_delta_prediction_summary(
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    prediction_rows = _boundary_walk_forward_delta_prediction_rows(rows)
+    return {
+        "target": "next_visible_usage_delta_percent",
+        "prediction_models": {
+            "previous_delta": "Predicts the previous visible usage delta.",
+            "prior_mode_delta": "Predicts the modal prior next-span delta.",
+            "segment_age_mode": (
+                "Uses the modal prior next-span delta from matching segment age."
+            ),
+            "label_segment_age_mode": (
+                "Uses the modal prior next-span delta from matching previous label "
+                "plus segment-position age."
+            ),
+            "reset_segment_age_mode": (
+                "Uses the modal prior next-span delta from matching segment age "
+                "plus reset-window context."
+            ),
+            "calendar_segment_age_mode": (
+                "Uses the modal prior next-span delta from matching segment age "
+                "plus day/hour context."
+            ),
+        },
+        "scopes": {
+            scope_name: _boundary_delta_prediction_scope(
+                prediction_rows,
+                start_index=_boundary_scope_start_index(rows, start),
+            )
+            for scope_name, start in BOUNDARY_RISK_SCOPE_STARTS.items()
+        },
+    }
+
+
+def _boundary_walk_forward_delta_prediction_rows(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    previous_state_rows: list[dict[str, Any]] = []
+    for row in rows:
+        previous_delta = _number(row.get("previous_delta_percent"))
+        if previous_state_rows:
+            prior_values = [
+                _number(previous.get("actual")) for previous in previous_state_rows
+            ]
+            prior_mode = _value_mode(prior_values)
+            prior_mode_detail = {
+                "source": "all_prior_delta_mode",
+                "signature": [],
+                "support": len(previous_state_rows),
+                "matched_mode": _rounded(prior_mode),
+            }
+        else:
+            prior_mode = previous_delta
+            prior_mode_detail = {
+                "source": "fallback_previous_delta",
+                "signature": [],
+                "support": 0,
+                "matched_mode": None,
+            }
+        predictions = {
+            "previous_delta": previous_delta,
+            "prior_mode_delta": prior_mode,
+        }
+        details = {
+            "previous_delta": {
+                "source": "previous_delta",
+                "signature": [],
+                "support": 1,
+                "matched_mode": _rounded(previous_delta),
+            },
+            "prior_mode_delta": prior_mode_detail,
+        }
+        for model_name, signatures in BOUNDARY_DELTA_MODEL_SIGNATURES.items():
+            prediction, detail = _state_bucket_prediction(
+                previous_state_rows,
+                row,
+                signatures=signatures,
+                fallback_prediction=previous_delta,
+            )
+            predictions[model_name] = prediction
+            details[model_name] = detail
+        output.append(
+            {
+                **row,
+                "boundary_delta_predictions": predictions,
+                "boundary_delta_prediction_details": details,
+                "prediction_details": details,
+            }
+        )
+        previous_state_rows.append(
+            {
+                "actual": _number(row.get("delta_percent")),
+                "state": row,
+            }
+        )
+    return output
+
+
+def _boundary_delta_prediction_scope(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> dict[str, Any]:
+    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
+    actual = [_number(row.get("delta_percent")) for row in scope_rows]
+    model_names = _boundary_delta_model_names(scope_rows)
+    return {
+        "start_index": start_index,
+        "n": len(scope_rows),
+        "actual": _value_distribution(actual),
+        "models": {
+            model_name: _regression_metrics(
+                actual,
+                [
+                    _number(
+                        (row.get("boundary_delta_predictions") or {}).get(model_name)
+                    )
+                    for row in scope_rows
+                ],
+            )
+            for model_name in model_names
+        },
+        "prediction_detail_diagnostics": {
+            model_name: _state_bucket_model_diagnostics(scope_rows, model_name)
+            for model_name in model_names
+            if model_name not in {"previous_delta", "prior_mode_delta"}
+        },
+    }
+
+
+def _boundary_delta_model_names(rows: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for row in rows:
+        for name in row.get("boundary_delta_predictions") or {}:
+            if name not in names:
+                names.append(str(name))
+    return names
 
 
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:

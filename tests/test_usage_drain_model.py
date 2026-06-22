@@ -314,6 +314,23 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
         "previous_label,previous_segment_position_bucket"
     )
 
+    delta_prediction = summary["piecewise_regime_segments"]["boundary_diagnostics"][
+        "walk_forward_delta_prediction"
+    ]
+    delta_scope = delta_prediction["scopes"]["all_after_10"]
+    previous_delta = delta_scope["models"]["previous_delta"]
+    label_segment_age_mode = delta_scope["models"]["label_segment_age_mode"]
+    assert label_segment_age_mode["mae"] == 0.0
+    assert label_segment_age_mode["rmse"] == 0.0
+    assert label_segment_age_mode["mae"] < previous_delta["mae"]
+    delta_diagnostics = delta_scope["prediction_detail_diagnostics"][
+        "label_segment_age_mode"
+    ]
+    assert delta_diagnostics["matched_state_share"] == 1.0
+    assert delta_diagnostics["top_signatures"][0]["signature"] == (
+        "previous_label,previous_segment_position_bucket"
+    )
+
 
 def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
     rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
