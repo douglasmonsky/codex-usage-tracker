@@ -119,6 +119,13 @@ SEGMENT_PREDICTION_MODELS = (
     "one_percent_regime_grace",
     "empirical_reset_state_mode",
 )
+SEGMENT_POSITION_BUCKETS = (
+    "first_span",
+    "second_span",
+    "third_span",
+    "fourth_fifth_span",
+    "sixth_plus_span",
+)
 
 
 @dataclass(frozen=True)
@@ -528,6 +535,7 @@ def _piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, 
             "segment_label_counts": {},
             "segments": [],
             "latest_segment": None,
+            "adaptation_by_position": {},
             "by_label": {},
         }
     prediction_rows = {
@@ -556,6 +564,9 @@ def _piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, 
             ),
             reverse=True,
         )[:10],
+        "adaptation_by_position": _piecewise_adaptation_by_position(
+            prediction_rows, segments
+        ),
         "by_label": {
             label: _piecewise_label_record(rows)
             for label, rows in sorted(label_rows.items())
@@ -630,6 +641,68 @@ def _piecewise_label_record(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "prediction_metrics": _segment_prediction_metrics(rows),
         "best_by_mae": _best_segment_prediction(rows),
     }
+
+
+def _piecewise_adaptation_by_position(
+    prediction_rows: dict[int, dict[str, Any]],
+    segments: list[dict[str, Any]],
+) -> dict[str, Any]:
+    all_rows_by_position: dict[str, list[dict[str, Any]]] = {
+        bucket: [] for bucket in SEGMENT_POSITION_BUCKETS
+    }
+    label_rows_by_position: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for segment in segments:
+        label = str(segment.get("label") or "missing")
+        start_index = int(segment["start_index"])
+        end_index = int(segment["end_index"])
+        for index in range(start_index, end_index + 1):
+            row = prediction_rows.get(index)
+            if row is None:
+                continue
+            position = index - start_index + 1
+            bucket = _segment_position_bucket(position)
+            all_rows_by_position[bucket].append(row)
+            label_rows = label_rows_by_position.setdefault(
+                label, {item: [] for item in SEGMENT_POSITION_BUCKETS}
+            )
+            label_rows[bucket].append(row)
+    return {
+        "position_buckets": list(SEGMENT_POSITION_BUCKETS),
+        "all_segments": {
+            bucket: _piecewise_position_record(rows)
+            for bucket, rows in all_rows_by_position.items()
+            if rows
+        },
+        "by_label": {
+            label: {
+                bucket: _piecewise_position_record(rows)
+                for bucket, rows in rows_by_position.items()
+                if rows
+            }
+            for label, rows_by_position in sorted(label_rows_by_position.items())
+        },
+    }
+
+
+def _piecewise_position_record(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "prediction_rows": len(rows),
+        "actual": _value_distribution([_number(row.get("actual")) for row in rows]),
+        "prediction_metrics": _segment_prediction_metrics(rows),
+        "best_by_mae": _best_segment_prediction(rows),
+    }
+
+
+def _segment_position_bucket(position: int) -> str:
+    if position <= 1:
+        return "first_span"
+    if position == 2:
+        return "second_span"
+    if position == 3:
+        return "third_span"
+    if position <= 5:
+        return "fourth_fifth_span"
+    return "sixth_plus_span"
 
 
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:

@@ -407,6 +407,23 @@ remaining problem is not "which raw variables explain every span?" It is
 "where are the regime boundaries?" Once a segment has started, a simple local
 rule is already close to perfect for that segment.
 
+The `adaptation_by_position` view makes that boundary cost explicit:
+
+| position inside segment | prediction rows | mean delta | best model | MAE |
+| --- | ---: | ---: | --- | ---: |
+| first span | 289 | 4.107 | constant `1%` | 3.107 |
+| second span | 122 | 4.156 | previous delta | 0.279 |
+| third span | 82 | 4.512 | previous delta | 0.134 |
+| fourth/fifth span | 120 | 4.975 | previous delta | 0.067 |
+| sixth-plus span | 838 | 4.402 | previous delta | 0.110 |
+
+For `very_high_delta` segments specifically, the first-span previous-delta MAE
+is still `7.44`, but it drops to `1.00` on the second span, `0.27` on the third,
+and `0.74` after the sixth. Stable `1%` segments are exact from the first span
+when using the constant `1%` rule. So the practical model is: first span after a
+boundary is the expensive uncertainty; after one or two confirming spans, local
+persistence is already extremely strong.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the

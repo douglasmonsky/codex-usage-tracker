@@ -206,6 +206,20 @@ def main() -> int:
                     best=longest.get("best_by_mae"),
                 )
             )
+        adaptation = (
+            (segments.get("adaptation_by_position") or {}).get("all_segments") or {}
+        )
+        if adaptation:
+            first = adaptation.get("first_span") or {}
+            second = adaptation.get("second_span") or {}
+            sixth = adaptation.get("sixth_plus_span") or {}
+            print(
+                "regime adaptation: first={first} second={second} sixth_plus={sixth}".format(
+                    first=first.get("best_by_mae"),
+                    second=second.get("best_by_mae"),
+                    sixth=sixth.get("best_by_mae"),
+                )
+            )
         components = summary.get("token_component_regression") or {}
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):

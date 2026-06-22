@@ -193,6 +193,18 @@ def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
     assert segments["longest_segments"][0]["label"] == "stable_one_percent"
     assert segments["longest_segments"][0]["span_count"] == 4
     assert "stable_one_percent" in segments["by_label"]
+    adaptation = segments["adaptation_by_position"]
+    assert adaptation["position_buckets"] == [
+        "first_span",
+        "second_span",
+        "third_span",
+        "fourth_fifth_span",
+        "sixth_plus_span",
+    ]
+    assert adaptation["all_segments"]["first_span"]["prediction_rows"] == 2
+    assert adaptation["by_label"]["stable_one_percent"]["first_span"][
+        "prediction_rows"
+    ] == 1
 
 
 def test_one_percent_regime_grace_ignores_one_small_break() -> None:
