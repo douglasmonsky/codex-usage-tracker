@@ -420,28 +420,33 @@ same-span explanatory features:
 | time-ordered 80/20 | history + start context | 19.478 credits | 0.373 | richer date/hour/window controls do not beat rolling3 MAE |
 | time-ordered 80/20 | history + bucketed state | 19.853 credits | 0.365 | nonlinear usage/window/hour buckets add noise in the newest holdout |
 | time-ordered 80/20 | history + state interactions | 55.844 credits | -2.745 | day/hour/window interactions badly overfit older history |
+| time-ordered 80/20 | history + state interactions, ridge100 | 19.756 credits | 0.389 | stronger shrinkage fixes the blow-up but still trails rolling3 MAE |
 | time-ordered 80/20 | same-span shape | 14.628 credits | 0.702 | row count, duration, and wall time explain more after the span is known |
 | time-ordered 80/20 | same-span shape + buckets | 11.722 credits | 0.800 | bucketed row count and wall-time controls improve explanatory fit |
 | time-ordered 80/20 | same-span shape + interactions | 12.290 credits | 0.791 | more interactions do not beat simpler buckets |
+| time-ordered 80/20 | same-span shape + interactions, ridge30 | 10.321 credits | 0.839 | regularized interactions beat simple shape buckets |
 | time-ordered 80/20 | same-span tokens | 0.082 credits | 0.99999 | near-perfect but mostly accounting identity, because credits are token-derived |
 | interleaved every fifth | rolling3 capacity baseline | 15.297 credits | 0.605 | mixed-history causal capacity is moderately predictable |
 | interleaved every fifth | history + bucketed state | 16.434 credits | 0.557 | bucketed state still trails rolling3 on MAE |
 | interleaved every fifth | history + state interactions | 14.632 credits | 0.627 | interactions help when train/holdout are mixed across history |
+| interleaved every fifth | history + state interactions, ridge100 | 16.270 credits | 0.601 | shrinkage improves stability but loses mixed-history accuracy |
 | interleaved every fifth | same-span shape | 8.967 credits | 0.892 | work-shape features explain capacity strongly |
 | interleaved every fifth | same-span shape + buckets | 6.714 credits | 0.935 | bucketed row count/duration/wall time close much of the remaining shape gap |
 | interleaved every fifth | same-span shape + interactions | 7.383 credits | 0.921 | extra shape interactions overfit compared with simpler buckets |
+| interleaved every fifth | same-span shape + interactions, ridge30 | 6.428 credits | 0.940 | best non-token explanatory shape model so far |
 | interleaved every fifth | same-span tokens | 0.049 credits | 0.999996 | again near-perfect but explanatory, not advance prediction |
 
 Current read: history matters for capacity, especially the previous few `1%`
 ticks. Date, day-of-week, hour, reset-window, and used-percent buckets alone help
 less than recent capacity history for advance prediction. Day/hour/window
 interactions can improve mixed-history validation, but the time-ordered split
-shows they are brittle against regime drift. Once the span is closed, bucketed
-row count, duration, and wall time make the non-token shape model much stronger,
-while extra shape interactions overfit compared with simpler buckets. Same-span
-tokens make the fit look perfect, but that is not a forecasting win because the
-token totals are observed inside the span and the credit estimate is derived
-from them.
+shows they are brittle against regime drift. Stronger ridge shrinkage repairs
+the worst interaction overfit, but does not beat the simple rolling3 causal
+baseline on the newest holdout. Once the span is closed, bucketed row count,
+duration, and wall time make the non-token shape model much stronger, and
+regularized shape interactions improve it further. Same-span tokens make the fit
+look perfect, but that is not a forecasting win because the token totals are
+observed inside the span and the credit estimate is derived from them.
 
 ## Run It
 

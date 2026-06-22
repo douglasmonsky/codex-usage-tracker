@@ -174,6 +174,7 @@ class PredictiveModelSpec:
     name: str
     numeric_features: tuple[str, ...]
     categorical_features: tuple[str, ...] = ()
+    ridge_alpha: float = 1.0
 
 
 def documented_fast_credit_multiplier(model: object) -> float | None:
@@ -1052,7 +1053,7 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
         "output_token_share",
         "reasoning_output_share",
     )
-    return [
+    specs: list[tuple[PredictiveModelSpec, str]] = [
         (
             PredictiveModelSpec(
                 "capacity_start_context",
@@ -1134,6 +1135,31 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
             "explanatory_same_span",
         ),
     ]
+    for alpha in (10.0, 30.0, 100.0):
+        alpha_label = _format_bucket_number(alpha)
+        specs.extend(
+            [
+                (
+                    PredictiveModelSpec(
+                        f"capacity_history_state_interactions_ridge{alpha_label}",
+                        history_context,
+                        state_interaction_categories,
+                        ridge_alpha=alpha,
+                    ),
+                    "causal_history_context",
+                ),
+                (
+                    PredictiveModelSpec(
+                        f"capacity_same_span_shape_interactions_ridge{alpha_label}",
+                        same_span_shape,
+                        same_span_shape_interaction_categories,
+                        ridge_alpha=alpha,
+                    ),
+                    "explanatory_same_span",
+                ),
+            ]
+        )
+    return specs
 
 
 def _best_holdout_model(models: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -2753,7 +2779,7 @@ def _fit_predictive_model(
         category_levels=category_levels,
     )
     train_y = [_number(row.get("target")) for row in train_rows]
-    coefficients = _fit_ridge(train_x, train_y, alpha=1.0)
+    coefficients = _fit_ridge(train_x, train_y, alpha=spec.ridge_alpha)
     if coefficients is None:
         return None
     holdout_x = _design_matrix(
@@ -2775,6 +2801,7 @@ def _fit_predictive_model(
     return {
         "name": spec.name,
         "feature_count": len(feature_names),
+        "ridge_alpha": _rounded(spec.ridge_alpha),
         "numeric_features": list(spec.numeric_features),
         "categorical_features": list(spec.categorical_features),
         "train": _regression_metrics(train_y, train_predictions),

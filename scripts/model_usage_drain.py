@@ -175,8 +175,10 @@ def main() -> int:
                 "capacity_rolling3__interleaved_every_5th",
                 "capacity_history_state_buckets__interleaved_every_5th",
                 "capacity_history_state_interactions__interleaved_every_5th",
+                "capacity_history_state_interactions_ridge100__interleaved_every_5th",
                 "capacity_same_span_shape_buckets__interleaved_every_5th",
                 "capacity_same_span_shape_interactions__interleaved_every_5th",
+                "capacity_same_span_shape_interactions_ridge30__interleaved_every_5th",
                 "capacity_same_span_tokens__interleaved_every_5th",
             ):
                 model = capacity_models.get(model_name) or {}
