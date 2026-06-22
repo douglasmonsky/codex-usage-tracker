@@ -586,6 +586,28 @@ def test_allowance_breakpoint_analysis_detects_capacity_denominator_change() -> 
     assert segments[1]["credits_per_visible_percent"]["mean"] == 40.0
     assert segments[0]["credit_to_delta_fit"]["metrics"]["r2"] == 1.0
     assert segments[1]["credit_to_delta_fit"]["metrics"]["r2"] == 1.0
+    piecewise = analysis["piecewise_credit_to_delta_fit"]["models"]
+    assert (
+        piecewise["global_no_intercept_credit_slope"]["metrics"]["r2"]
+        == analysis["global_credit_to_delta_fit"]["metrics"]["r2"]
+    )
+    assert (
+        piecewise["piecewise_mean_capacity_denominator"]["metrics"]["r2"]
+        == 1.0
+    )
+    assert (
+        piecewise["piecewise_ceiling_mean_capacity_denominator"]["metrics"]["r2"]
+        == 1.0
+    )
+    assert (
+        piecewise["piecewise_leave_one_out_capacity_denominator"]["metrics"]["r2"]
+        == 1.0
+    )
+    assert piecewise["piecewise_no_intercept_credit_slope"]["metrics"]["r2"] == 1.0
+    assert (
+        piecewise["piecewise_ceiling_no_intercept_credit_slope"]["metrics"]["r2"]
+        == 1.0
+    )
 
 
 def test_token_component_regression_recovers_rate_card_and_fast_weighting() -> None:

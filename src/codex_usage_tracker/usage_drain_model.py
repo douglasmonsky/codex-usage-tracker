@@ -2259,6 +2259,10 @@ def _allowance_breakpoint_analysis(spans: list[UsageDeltaSpan]) -> dict[str, Any
             "global_credit_to_delta_fit": _credit_to_delta_fit(rows),
             "best_single_break": None,
             "segments": [],
+            "piecewise_credit_to_delta_fit": _allowance_piecewise_credit_to_delta_fit(
+                rows,
+                [],
+            ),
             "piecewise_sse_reduction_share": None,
             "notes": _allowance_breakpoint_notes(),
         }
@@ -2291,6 +2295,10 @@ def _allowance_breakpoint_analysis(spans: list[UsageDeltaSpan]) -> dict[str, Any
             _allowance_segment_record(rows, start, end, segment_index=index)
             for index, (start, end) in enumerate(segments, start=1)
         ],
+        "piecewise_credit_to_delta_fit": _allowance_piecewise_credit_to_delta_fit(
+            rows,
+            segments,
+        ),
         "piecewise_sse_reduction_share": _rounded(
             (global_sse - piecewise_sse) / global_sse if global_sse > 0 else 0.0
         ),
@@ -2302,6 +2310,7 @@ def _allowance_breakpoint_notes() -> list[str]:
     return [
         "This tests whether the apparent credits-per-visible-percent denominator changes over time.",
         "A strong breakpoint result means token/credit correlation should be checked within each segment, not only globally.",
+        "Piecewise credit-to-delta fits are explanatory diagnostics because the breakpoint detector sees the full series.",
         "Segments are chronological diagnostics over closed positive usage-delta spans; they are not proof of an official allowance change.",
     ]
 
@@ -2490,6 +2499,151 @@ def _allowance_segment_record(
         ),
         "credit_to_delta_fit": _credit_to_delta_fit(segment_rows),
     }
+
+
+def _allowance_piecewise_credit_to_delta_fit(
+    rows: list[dict[str, Any]],
+    segments: list[tuple[int, int]],
+) -> dict[str, Any]:
+    actual = [_number(row.get("delta_usage_percent")) for row in rows]
+    if not rows or not segments:
+        return {
+            "target": "visible_delta_percent",
+            "models": {},
+            "notes": [
+                "No piecewise fit is available without breakpoint segments.",
+            ],
+        }
+
+    mean_capacity_predictions: list[float] = []
+    mean_capacity_ceiling_predictions: list[float] = []
+    leave_one_out_predictions: list[float] = []
+    slope_predictions: list[float] = []
+    slope_ceiling_predictions: list[float] = []
+    global_slope_ceiling_predictions: list[float] = []
+    segment_models: list[dict[str, Any]] = []
+    global_coefficients = _fit_linear_regression_coefficients(
+        [[_number(row.get("standard_usage_credits"))] for row in rows],
+        actual,
+        intercept=False,
+    )
+    global_slope = global_coefficients[0] if global_coefficients else 0.0
+    for segment_index, (start, end) in enumerate(segments, start=1):
+        segment_rows = rows[start:end]
+        capacities = [
+            _number(row.get("credits_per_visible_percent")) for row in segment_rows
+        ]
+        credits = [_number(row.get("standard_usage_credits")) for row in segment_rows]
+        delta = [_number(row.get("delta_usage_percent")) for row in segment_rows]
+        mean_capacity = sum(capacities) / len(capacities) if capacities else 0.0
+        segment_coefficients = _fit_linear_regression_coefficients(
+            [[credit] for credit in credits],
+            delta,
+            intercept=False,
+        )
+        slope = segment_coefficients[0] if segment_coefficients else 0.0
+        capacity_sum = sum(capacities)
+        for offset, credit in enumerate(credits):
+            global_prediction = global_slope * credit
+            mean_prediction = credit / mean_capacity if mean_capacity > 0 else 0.0
+            slope_prediction = slope * credit
+            global_slope_ceiling_predictions.append(
+                _ceil_to_visible_tick(global_prediction)
+            )
+            mean_capacity_predictions.append(mean_prediction)
+            mean_capacity_ceiling_predictions.append(
+                _ceil_to_visible_tick(mean_prediction)
+            )
+            slope_predictions.append(slope_prediction)
+            slope_ceiling_predictions.append(_ceil_to_visible_tick(slope_prediction))
+            if len(capacities) > 1:
+                loo_capacity = (capacity_sum - capacities[offset]) / (
+                    len(capacities) - 1
+                )
+            else:
+                loo_capacity = mean_capacity
+            leave_one_out_predictions.append(
+                credit / loo_capacity if loo_capacity > 0 else 0.0
+            )
+        segment_models.append(
+            {
+                "segment_index": segment_index,
+                "n": len(segment_rows),
+                "mean_credits_per_visible_percent": _rounded(mean_capacity),
+                "no_intercept_slope_delta_percent_per_credit": _rounded(slope),
+                "no_intercept_implied_credits_per_percent": _rounded(
+                    1 / slope if slope > 0 else None
+                ),
+            }
+        )
+
+    return {
+        "target": "visible_delta_percent",
+        "models": {
+            "global_no_intercept_credit_slope": _credit_to_delta_fit(rows),
+            "global_ceiling_no_intercept_credit_slope": {
+                "description": (
+                    "Fits one global no-intercept credit slope, then rounds each "
+                    "positive prediction up to the next visible 1% tick."
+                ),
+                "metrics": _regression_metrics(
+                    actual,
+                    global_slope_ceiling_predictions,
+                ),
+            },
+            "piecewise_mean_capacity_denominator": {
+                "description": (
+                    "Predicts visible delta as credits divided by the detected "
+                    "segment mean credits per visible percent."
+                ),
+                "metrics": _regression_metrics(actual, mean_capacity_predictions),
+            },
+            "piecewise_ceiling_mean_capacity_denominator": {
+                "description": (
+                    "Predicts visible delta as credits divided by the detected "
+                    "segment mean, then rounds positive predictions up to the "
+                    "next visible 1% tick."
+                ),
+                "metrics": _regression_metrics(
+                    actual,
+                    mean_capacity_ceiling_predictions,
+                ),
+            },
+            "piecewise_leave_one_out_capacity_denominator": {
+                "description": (
+                    "Predicts visible delta as credits divided by the detected "
+                    "segment mean after excluding the current row from that mean."
+                ),
+                "metrics": _regression_metrics(actual, leave_one_out_predictions),
+            },
+            "piecewise_no_intercept_credit_slope": {
+                "description": (
+                    "Fits a no-intercept credit-to-delta slope separately inside "
+                    "each detected segment."
+                ),
+                "metrics": _regression_metrics(actual, slope_predictions),
+            },
+            "piecewise_ceiling_no_intercept_credit_slope": {
+                "description": (
+                    "Fits a no-intercept credit-to-delta slope inside each "
+                    "detected segment, then rounds positive predictions up to "
+                    "the next visible 1% tick."
+                ),
+                "metrics": _regression_metrics(actual, slope_ceiling_predictions),
+            },
+        },
+        "segment_models": segment_models,
+        "notes": [
+            "These fits test whether a capacity-adjusted credit metric explains visible drain after detected breakpoints.",
+            "They are explanatory, not causal, because breakpoint detection uses the full observed series.",
+        ],
+    }
+
+
+def _ceil_to_visible_tick(value: float, *, tick_size: float = 1.0) -> float:
+    if value <= 0 or tick_size <= 0:
+        return 0.0
+    return math.ceil((value / tick_size) - 1e-9) * tick_size
 
 
 def _mean_field(rows: list[dict[str, Any]], field_name: str) -> float | None:

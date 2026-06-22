@@ -443,13 +443,39 @@ def main() -> int:
                 (breakpoints.get("global_credit_to_delta_fit") or {}).get("metrics")
                 or {}
             )
+            piecewise_models = (
+                (breakpoints.get("piecewise_credit_to_delta_fit") or {}).get("models")
+                or {}
+            )
+            piecewise_fit = (
+                (
+                    piecewise_models.get("piecewise_mean_capacity_denominator")
+                    or {}
+                ).get("metrics")
+                or {}
+            )
+            ceiling_fit = (
+                (
+                    piecewise_models.get(
+                        "piecewise_ceiling_mean_capacity_denominator"
+                    )
+                    or {}
+                ).get("metrics")
+                or {}
+            )
             split = breakpoints.get("best_single_break") or {}
             print(
                 "allowance breakpoints: spans={spans} global_r2={global_r2} "
+                "piecewise_r2={piecewise_r2} piecewise_mae={piecewise_mae} "
+                "ceiling_r2={ceiling_r2} ceiling_mae={ceiling_mae} "
                 "piecewise_sse_reduction={reduction} split_left={left} "
                 "split_right={right}".format(
                     spans=breakpoints.get("span_count"),
                     global_r2=global_fit.get("r2"),
+                    piecewise_r2=piecewise_fit.get("r2"),
+                    piecewise_mae=piecewise_fit.get("mae"),
+                    ceiling_r2=ceiling_fit.get("r2"),
+                    ceiling_mae=ceiling_fit.get("mae"),
                     reduction=breakpoints.get("piecewise_sse_reduction_share"),
                     left=split.get("left_mean_credits_per_percent"),
                     right=split.get("right_mean_credits_per_percent"),

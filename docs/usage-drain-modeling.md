@@ -791,13 +791,35 @@ described as proven official allowance changes: the same pattern could come
 from counter rounding, hidden account-side state, usage from other surfaces,
 sampling cadence, or imperfect span assignment.
 
-The research implication is that the right metric is probably piecewise:
+The follow-up piecewise credit-to-delta fit is the more important negative
+control. It asks whether a capacity-adjusted metric can predict visible drain:
+`predicted_visible_delta = credits / detected_segment_capacity`. A second
+variant rounds positive predictions up to the next visible `1%` tick.
+
+| model | R2 | MAE | read |
+| --- | ---: | ---: | --- |
+| global credit slope | -0.479 | 4.093 | plain tokens/credits do not explain visible drain |
+| global credit slope, ceiling to 1% tick | -0.312 | 3.597 | visible rounding helps, but the fit is still poor |
+| piecewise mean capacity | -0.657 | 4.298 | denominator segments alone make the fit worse |
+| piecewise mean capacity, ceiling to 1% tick | -0.580 | 4.108 | rounding helps but still misses badly |
+| piecewise no-intercept slope | -0.442 | 3.958 | fitting a slope per segment helps only slightly |
+| piecewise no-intercept slope, ceiling to 1% tick | -0.299 | 3.550 | best credit-derived variant here, still poor |
+
+Current read: breakpoint detection shows real capacity clustering, but it does
+not by itself produce a near-perfect visible-drain metric. Denominator shifts
+plus display rounding are not enough. The stronger route is probably a two-stage
+model: first predict counter regime/boundary state, then model credits or
+capacity inside that regime.
+
+The research implication is that the right metric is probably piecewise and
+stateful:
 
 1. Detect stable allowance-capacity eras from
    `standard_usage_credits / visible_delta_percent`.
-2. Within each era, test whether token-derived credits predict visible drain or
-   exact `1%` tick capacity.
-3. Report boundary dates and segment fit separately from the global fit.
+2. Detect whether the next span is a continuation or boundary using recent
+   counter state.
+3. Within stable regimes, model exact `1%` tick capacity.
+4. Report boundary dates and segment fit separately from the global fit.
 
 ## Run It
 
