@@ -145,6 +145,36 @@ BOUNDARY_CONTEXT_FIELDS = (
     "rate_limit_plan_type",
     "rate_limit_limit_id",
 )
+BOUNDARY_RISK_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "previous_label_risk": (
+        ("previous_label",),
+    ),
+    "segment_age_risk": (
+        ("previous_segment_position_bucket",),
+        ("previous_segment_wall_time_bucket",),
+    ),
+    "label_segment_age_risk": (
+        ("previous_label", "previous_segment_position_bucket"),
+        ("previous_label",),
+    ),
+    "reset_segment_age_risk": (
+        ("previous_label", "previous_segment_position_bucket", "window_elapsed_bucket"),
+        ("previous_segment_position_bucket", "window_elapsed_bucket"),
+        ("previous_segment_position_bucket",),
+    ),
+    "calendar_segment_age_risk": (
+        ("previous_label", "previous_segment_position_bucket", "day_of_week", "hour_bucket"),
+        ("previous_segment_position_bucket", "day_of_week", "hour_bucket"),
+        ("previous_segment_position_bucket",),
+    ),
+}
+BOUNDARY_RISK_SCOPE_STARTS = {
+    "all_after_first": 1,
+    "all_after_10": 10,
+    "time_ordered_holdout_20": 0.8,
+    "latest_500": -500,
+    "latest_100": -100,
+}
 
 
 @dataclass(frozen=True)
@@ -755,6 +785,7 @@ def _piecewise_boundary_diagnostics(
             field_name: _boundary_context_rates(rows, field_name)
             for field_name in BOUNDARY_CONTEXT_FIELDS
         },
+        "walk_forward_risk": _boundary_walk_forward_risk_summary(rows),
         "latest_boundaries": _latest_piecewise_boundaries(rows),
     }
 
@@ -885,6 +916,193 @@ def _latest_piecewise_boundaries(rows: list[dict[str, Any]]) -> list[dict[str, A
         }
         for row in reversed(boundary_rows[-10:])
     ]
+
+
+def _boundary_walk_forward_risk_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    risk_rows = _boundary_walk_forward_risk_rows(rows)
+    return {
+        "target": "next_span_regime_label_changes",
+        "risk_models": {
+            "overall_prior_rate": "Historical boundary rate before the current opportunity.",
+            "previous_label_risk": "Empirical boundary rate for the previous regime label.",
+            "segment_age_risk": "Empirical boundary rate for segment-position or wall-time age.",
+            "label_segment_age_risk": (
+                "Empirical boundary rate for previous label plus segment-position age."
+            ),
+            "reset_segment_age_risk": (
+                "Empirical boundary rate for segment age with reset-window context."
+            ),
+            "calendar_segment_age_risk": (
+                "Empirical boundary rate for segment age with day/hour context."
+            ),
+        },
+        "scopes": {
+            scope_name: _boundary_risk_scope(
+                risk_rows,
+                start_index=_boundary_scope_start_index(rows, start),
+            )
+            for scope_name, start in BOUNDARY_RISK_SCOPE_STARTS.items()
+        },
+    }
+
+
+def _boundary_scope_start_index(rows: list[dict[str, Any]], start: int | float) -> int:
+    if not rows:
+        return 0
+    if isinstance(start, float):
+        return max(1, min(len(rows) - 1, int(len(rows) * start)))
+    if start < 0:
+        return max(len(rows) + start, 1)
+    return start
+
+
+def _boundary_walk_forward_risk_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    previous_rows: list[dict[str, Any]] = []
+    for row in rows:
+        prior_rate = _boundary_rate(previous_rows)
+        risks = {"overall_prior_rate": prior_rate}
+        details = {
+            "overall_prior_rate": {
+                "source": "all_prior_boundaries",
+                "support": len(previous_rows),
+                "risk": _rounded(prior_rate),
+            }
+        }
+        for model_name, signatures in BOUNDARY_RISK_MODEL_SIGNATURES.items():
+            risk, detail = _state_bucket_boundary_risk(
+                previous_rows,
+                row,
+                signatures=signatures,
+                fallback_rate=prior_rate,
+            )
+            risks[model_name] = risk
+            details[model_name] = detail
+        output.append(
+            {
+                **row,
+                "boundary_risks": risks,
+                "boundary_risk_details": details,
+            }
+        )
+        previous_rows.append(row)
+    return output
+
+
+def _state_bucket_boundary_risk(
+    previous_rows: list[dict[str, Any]],
+    row: dict[str, Any],
+    *,
+    signatures: tuple[tuple[str, ...], ...],
+    fallback_rate: float,
+) -> tuple[float, dict[str, Any]]:
+    for signature in signatures:
+        matches = [
+            previous
+            for previous in previous_rows
+            if _state_signature(previous, signature) == _state_signature(row, signature)
+        ]
+        if len(matches) < STATE_BUCKET_MIN_SUPPORT:
+            continue
+        risk = _boundary_rate(matches)
+        return risk, {
+            "source": "matched_boundary_state",
+            "signature": list(signature),
+            "support": len(matches),
+            "risk": _rounded(risk),
+        }
+    return fallback_rate, {
+        "source": "fallback_prior_rate",
+        "signature": [],
+        "support": 0,
+        "risk": _rounded(fallback_rate),
+    }
+
+
+def _boundary_rate(rows: list[dict[str, Any]]) -> float:
+    if not rows:
+        return 0.0
+    return sum(1 for row in rows if row.get("is_boundary")) / len(rows)
+
+
+def _boundary_risk_scope(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> dict[str, Any]:
+    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
+    actual = [1 if row.get("is_boundary") else 0 for row in scope_rows]
+    model_names = _boundary_risk_model_names(scope_rows)
+    return {
+        "start_index": start_index,
+        "n": len(scope_rows),
+        "boundary_count": sum(actual),
+        "boundary_rate": _rounded(sum(actual) / len(actual) if actual else None),
+        "models": {
+            model_name: _binary_risk_metrics(
+                actual,
+                [
+                    _number((row.get("boundary_risks") or {}).get(model_name))
+                    for row in scope_rows
+                ],
+            )
+            for model_name in model_names
+        },
+        "risk_detail_diagnostics": {
+            model_name: _boundary_risk_detail_diagnostics(scope_rows, model_name)
+            for model_name in model_names
+            if model_name != "overall_prior_rate"
+        },
+    }
+
+
+def _boundary_risk_model_names(rows: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for row in rows:
+        for name in row.get("boundary_risks") or {}:
+            if name not in names:
+                names.append(str(name))
+    return names
+
+
+def _boundary_risk_detail_diagnostics(
+    rows: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    details = [
+        (row.get("boundary_risk_details") or {}).get(model_name) or {}
+        for row in rows
+    ]
+    if not details:
+        return {
+            "matched_state_share": None,
+            "mean_support": None,
+            "top_signatures": [],
+        }
+    matched = [
+        detail for detail in details if detail.get("source") == "matched_boundary_state"
+    ]
+    signature_counts: dict[str, int] = {}
+    for detail in matched:
+        label = ",".join(str(item) for item in detail.get("signature") or [])
+        signature_counts[label or "missing"] = (
+            signature_counts.get(label or "missing", 0) + 1
+        )
+    return {
+        "matched_state_share": _rounded(len(matched) / len(details)),
+        "mean_support": _rounded(
+            sum(int(detail.get("support") or 0) for detail in matched) / len(matched)
+            if matched
+            else None
+        ),
+        "top_signatures": [
+            {
+                "signature": signature,
+                "count": count,
+                "share": _rounded(count / len(details)),
+            }
+            for signature, count in sorted(
+                signature_counts.items(), key=lambda item: (-item[1], item[0])
+            )[:8]
+        ],
+    }
 
 
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:

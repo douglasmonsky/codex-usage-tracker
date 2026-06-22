@@ -278,6 +278,43 @@ def test_one_percent_regime_grace_ignores_one_small_break() -> None:
     assert latest["previous_segment_position"] == 1
 
 
+def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
+    rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    used = 0.0
+    index = 0
+    for _repeat in range(16):
+        for delta in (1.0, 1.0, 2.0):
+            index += 1
+            used += delta
+            rows.append(
+                _row(
+                    f"span-{index}",
+                    f"2026-06-01T00:{index:02d}:00Z",
+                    used,
+                    1.0,
+                )
+            )
+
+    summary = summarize_usage_drain_model(rows)
+
+    risk = summary["piecewise_regime_segments"]["boundary_diagnostics"][
+        "walk_forward_risk"
+    ]
+    scope = risk["scopes"]["all_after_10"]
+    assert scope["boundary_count"] > 0
+    prior = scope["models"]["overall_prior_rate"]
+    segment_age = scope["models"]["segment_age_risk"]
+    label_segment_age = scope["models"]["label_segment_age_risk"]
+    assert segment_age["average_precision"] > prior["average_precision"]
+    assert label_segment_age["brier"] == 0.0
+    assert label_segment_age["auc"] == 1.0
+    diagnostics = scope["risk_detail_diagnostics"]["label_segment_age_risk"]
+    assert diagnostics["matched_state_share"] == 1.0
+    assert diagnostics["top_signatures"][0]["signature"] == (
+        "previous_label,previous_segment_position_bucket"
+    )
+
+
 def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
     rows = [_row("base", "2026-06-01T00:00:00Z", 0.0, 0.0)]
     used = 0.0

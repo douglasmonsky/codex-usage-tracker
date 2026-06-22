@@ -465,6 +465,26 @@ current boundary model look like a survival problem: new segments are
 untrustworthy until they survive one or two confirming spans; old segments,
 especially long `1%` segments, are much less likely to break.
 
+The `walk_forward_risk` subsection tests this causally by predicting each
+boundary opportunity from only earlier opportunities. After the first 10
+opportunities, segment age is the best calibrated boundary-risk model by Brier
+score:
+
+| model | Brier | AUC | average precision | top-10% precision |
+| --- | ---: | ---: | ---: | ---: |
+| overall prior rate | 0.160 | 0.671 | 0.303 | 33.1% |
+| segment age | 0.119 | 0.830 | 0.492 | 55.9% |
+| previous label + segment age | 0.125 | 0.804 | 0.508 | 58.6% |
+| reset + segment age | 0.133 | 0.771 | 0.473 | 54.5% |
+| calendar + segment age | 0.135 | 0.781 | 0.487 | 56.6% |
+
+In the newest time-ordered holdout there are only 2 boundaries in 292
+opportunities, so ranking metrics are fragile. Still, segment-age variants beat
+the prior-rate baseline on Brier (`0.009` for segment age and `0.006` for the
+previous-label plus segment-age model, versus `0.053` for the prior). The read
+is: segment age is now a real causal predictor of boundary risk, while
+date/hour/reset buckets are useful secondary context but not the dominant signal.
+
 ## Token Component Regression
 
 The report now includes `token_component_regression`, which directly tests the

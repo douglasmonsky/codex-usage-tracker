@@ -249,6 +249,23 @@ def main() -> int:
                     sixth=position_rates.get("sixth_plus_span"),
                 )
             )
+            boundary_risk_scope = (
+                ((boundary.get("walk_forward_risk") or {}).get("scopes") or {}).get(
+                    "all_after_10"
+                )
+                or {}
+            )
+            best_boundary_risk = _best_metric_model(
+                boundary_risk_scope.get("models") or {},
+                "brier",
+            )
+            if best_boundary_risk:
+                print(
+                    "boundary risk all_after_10: rate={rate} best_brier={best}".format(
+                        rate=boundary_risk_scope.get("boundary_rate"),
+                        best=best_boundary_risk,
+                    )
+                )
         components = summary.get("token_component_regression") or {}
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):
