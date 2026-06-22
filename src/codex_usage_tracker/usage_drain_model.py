@@ -404,6 +404,9 @@ def summarize_usage_drain_model(
             "best_by_holdout_mae": best_predictive_mae_model["name"]
             if best_predictive_mae_model
             else None,
+            "feature_family_attribution": _model_family_attribution(
+                predictive_models, _visible_delta_family_sequences()
+            ),
             "models": predictive_models,
         },
     }
@@ -806,6 +809,9 @@ def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any
         "token_component_regression": _one_percent_capacity_component_regression(
             one_percent_spans
         ),
+        "feature_family_attribution": _model_family_attribution(
+            models, _capacity_family_sequences()
+        ),
         "models": models,
         "notes": [
             "Causal/history models use prior closed spans plus start-time context.",
@@ -1168,6 +1174,129 @@ def _capacity_model_specs() -> list[tuple[PredictiveModelSpec, str]]:
             ]
         )
     return specs
+
+
+def _visible_delta_family_sequences() -> dict[str, list[tuple[str, str]]]:
+    return {
+        "cost_and_time_controls": [
+            ("train mean", "baseline_train_mean"),
+            ("credits", "credits_only"),
+            ("token shape", "token_shape"),
+            ("fast proxy", "fast_proxy"),
+            ("usage state", "usage_state"),
+            ("cyclic time", "time_controls"),
+            ("date/day/hour categories", "date_day_hour_controls"),
+            ("duration and wall time", "full_controls"),
+        ],
+        "history_regime_controls": [
+            ("usage state", "usage_state"),
+            ("history/regime", "lag_regime"),
+            ("history plus cyclic time", "lag_time_controls"),
+            ("history plus date and wall time", "adaptive_full_controls"),
+        ],
+    }
+
+
+def _capacity_family_sequences() -> dict[str, list[tuple[str, str]]]:
+    return {
+        "causal_capacity_controls": [
+            ("train mean", "capacity_train_mean"),
+            ("start context", "capacity_start_context"),
+            ("date/hour context", "capacity_date_hour_context"),
+            ("state buckets", "capacity_state_bucket_context"),
+            ("history", "capacity_history_context"),
+            ("history plus buckets", "capacity_history_state_buckets"),
+            ("history plus interactions", "capacity_history_state_interactions"),
+            ("regularized interactions", "capacity_history_state_interactions_ridge100"),
+        ],
+        "same_span_capacity_controls": [
+            ("train mean", "capacity_train_mean"),
+            ("same-span shape", "capacity_same_span_shape"),
+            ("shape buckets", "capacity_same_span_shape_buckets"),
+            ("shape interactions", "capacity_same_span_shape_interactions"),
+            (
+                "regularized shape interactions",
+                "capacity_same_span_shape_interactions_ridge30",
+            ),
+            ("same-span tokens", "capacity_same_span_tokens"),
+        ],
+    }
+
+
+def _model_family_attribution(
+    models: list[dict[str, Any]],
+    sequences: dict[str, list[tuple[str, str]]],
+) -> dict[str, Any]:
+    by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    validations: list[str] = []
+    for model in models:
+        validation = str(model.get("validation") or "missing")
+        if validation not in validations:
+            validations.append(validation)
+        base_name = _model_base_name(model, validation)
+        by_key[(validation, base_name)] = model
+
+    sequence_results: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for sequence_name, steps in sequences.items():
+        validation_rows: dict[str, list[dict[str, Any]]] = {}
+        for validation in validations:
+            rows: list[dict[str, Any]] = []
+            previous_mae: float | None = None
+            previous_r2: float | None = None
+            for family, base_name in steps:
+                model = by_key.get((validation, base_name))
+                if model is None:
+                    continue
+                mae = _holdout_metric(model, "mae")
+                r2 = _holdout_metric(model, "r2")
+                rows.append(
+                    {
+                        "family": family,
+                        "model": model.get("name"),
+                        "holdout_mae": _rounded(mae),
+                        "holdout_r2": _rounded(r2),
+                        "mae_improvement_vs_previous": _rounded(
+                            previous_mae - mae
+                            if previous_mae is not None and mae is not None
+                            else None
+                        ),
+                        "r2_delta_vs_previous": _rounded(
+                            r2 - previous_r2
+                            if previous_r2 is not None and r2 is not None
+                            else None
+                        ),
+                    }
+                )
+                previous_mae = mae
+                previous_r2 = r2
+            validation_rows[validation] = rows
+        sequence_results[sequence_name] = validation_rows
+
+    return {
+        "metric_notes": [
+            "mae_improvement_vs_previous is positive when the later family reduces holdout MAE.",
+            "Sequences are diagnostic comparisons between named model families, not causal proof that one field caused the gain.",
+        ],
+        "sequences": sequence_results,
+    }
+
+
+def _model_base_name(model: dict[str, Any], validation: str) -> str:
+    name = str(model.get("name") or "")
+    suffix = f"__{validation}"
+    if name.endswith(suffix):
+        return name[: -len(suffix)]
+    return name.rsplit("__", 1)[0]
+
+
+def _holdout_metric(model: dict[str, Any], metric: str) -> float | None:
+    holdout = model.get("holdout")
+    if not isinstance(holdout, dict):
+        return None
+    value = holdout.get(metric)
+    if value is None:
+        return None
+    return _number(value)
 
 
 def _best_holdout_model(models: list[dict[str, Any]]) -> dict[str, Any] | None:

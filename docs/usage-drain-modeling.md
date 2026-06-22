@@ -368,6 +368,47 @@ and token credit rates, not exact included credit bucket sizes by plan. This
 report should therefore continue treating allowance deltas as observed counter
 data instead of assuming a documented hidden denominator.
 
+## Feature Family Attribution
+
+The report now includes `feature_family_attribution` for the main visible-delta
+models and the one-percent capacity models. It compares named model families in
+fixed sequences and reports `mae_improvement_vs_previous`; positive means the
+later family reduced holdout MAE. This is a diagnostic comparison, not causal
+proof that a specific field caused the gain.
+
+On the current interleaved holdout for visible drain, the main cost/time
+sequence looks like this:
+
+| family | holdout MAE | MAE improvement vs previous |
+| --- | ---: | ---: |
+| train mean | 4.146 pct points | |
+| credits | 3.650 pct points | 0.496 |
+| token shape | 3.592 pct points | 0.058 |
+| fast proxy | 3.610 pct points | -0.019 |
+| usage state | 3.122 pct points | 0.488 |
+| cyclic time | 3.151 pct points | -0.028 |
+| date/day/hour categories | 2.786 pct points | 0.365 |
+| duration and wall time | 2.852 pct points | -0.067 |
+
+That says token-derived credits and observed usage/window state help some, and
+categorical date/day/hour context helps mixed-history explanation. The current
+fast proxy, cyclic time, and duration/wall-time controls do not improve MAE in
+that sequence.
+
+The history/regime sequence is much stronger:
+
+| family | holdout MAE | MAE improvement vs previous |
+| --- | ---: | ---: |
+| usage state | 3.122 pct points | |
+| history/regime | 1.314 pct points | 1.808 |
+| history plus cyclic time | 1.332 pct points | -0.018 |
+| history plus date and wall time | 1.443 pct points | -0.112 |
+
+This reinforces the main modeling lesson so far: recent counter behavior is the
+strongest visible-drain predictor. Date and wall-time controls are useful as
+descriptive context, but once the model has recent regime/history state, they do
+not move it closer to perfect predictability on this holdout.
+
 ## One-Percent Tick Capacity
 
 The report now includes `one_percent_capacity_modeling`, which only uses exact
@@ -435,6 +476,20 @@ same-span explanatory features:
 | interleaved every fifth | same-span shape + interactions | 7.383 credits | 0.921 | extra shape interactions overfit compared with simpler buckets |
 | interleaved every fifth | same-span shape + interactions, ridge30 | 6.428 credits | 0.940 | best non-token explanatory shape model so far |
 | interleaved every fifth | same-span tokens | 0.049 credits | 0.999996 | again near-perfect but explanatory, not advance prediction |
+
+The one-percent capacity attribution separates advance-prediction gains from
+same-span explanatory gains:
+
+| sequence/family | holdout MAE | MAE improvement vs previous |
+| --- | ---: | ---: |
+| causal start context | 25.754 credits | 6.018 |
+| causal date/hour context | 22.702 credits | 3.052 |
+| causal history | 16.120 credits | 7.316 |
+| causal history plus interactions | 14.632 credits | 1.802 |
+| same-span shape | 8.967 credits | 22.804 |
+| same-span shape buckets | 6.714 credits | 2.253 |
+| same-span regularized shape interactions | 6.428 credits | 0.956 |
+| same-span tokens | 0.049 credits | 6.378 |
 
 Current read: history matters for capacity, especially the previous few `1%`
 ticks. Date, day-of-week, hour, reset-window, and used-percent buckets alone help

@@ -110,6 +110,19 @@ def main() -> int:
                         pearson=holdout.get("pearson"),
                     )
                 )
+            attribution = predictive.get("feature_family_attribution") or {}
+            _print_feature_attribution(
+                "predictive cost/time",
+                attribution,
+                sequence_name="cost_and_time_controls",
+                validation="interleaved_every_5th",
+            )
+            _print_feature_attribution(
+                "predictive history",
+                attribution,
+                sequence_name="history_regime_controls",
+                validation="interleaved_every_5th",
+            )
         walk_forward = summary.get("walk_forward_prediction") or {}
         scopes = walk_forward.get("scopes") or {}
         if scopes:
@@ -195,6 +208,19 @@ def main() -> int:
                             large=diagnostics.get("large_error_share"),
                         )
                     )
+            capacity_attribution = capacity.get("feature_family_attribution") or {}
+            _print_feature_attribution(
+                "capacity causal",
+                capacity_attribution,
+                sequence_name="causal_capacity_controls",
+                validation="interleaved_every_5th",
+            )
+            _print_feature_attribution(
+                "capacity same-span",
+                capacity_attribution,
+                sequence_name="same_span_capacity_controls",
+                validation="interleaved_every_5th",
+            )
             capacity_components = (
                 (capacity.get("token_component_regression") or {}).get("variants") or {}
             )
@@ -216,6 +242,40 @@ def main() -> int:
                         )
                     )
     return 0
+
+
+def _print_feature_attribution(
+    label: str,
+    attribution: dict[str, Any],
+    *,
+    sequence_name: str,
+    validation: str,
+) -> None:
+    rows = (
+        ((attribution.get("sequences") or {}).get(sequence_name) or {}).get(
+            validation
+        )
+        or []
+    )
+    improvements = [
+        row
+        for row in rows
+        if row.get("mae_improvement_vs_previous") is not None
+    ]
+    if not improvements:
+        return
+    improvements.sort(
+        key=lambda row: float(row.get("mae_improvement_vs_previous") or 0.0),
+        reverse=True,
+    )
+    top = ", ".join(
+        "{family}:{delta}".format(
+            family=row.get("family"),
+            delta=row.get("mae_improvement_vs_previous"),
+        )
+        for row in improvements[:4]
+    )
+    print(f"{label} attribution {validation}: {top}")
 
 
 def _best_metric_model(models: dict[str, Any], metric: str) -> str | None:

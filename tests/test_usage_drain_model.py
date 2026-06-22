@@ -286,6 +286,19 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     assert diagnostics["n"] > 0
     assert "row_count_bucket" in diagnostics["top_error_groups"]
     assert diagnostics["largest_errors"]
+    attribution = capacity["feature_family_attribution"]["sequences"]
+    causal_families = [
+        row["family"]
+        for row in attribution["causal_capacity_controls"]["time_ordered_80_20"]
+    ]
+    same_span_families = [
+        row["family"]
+        for row in attribution["same_span_capacity_controls"]["time_ordered_80_20"]
+    ]
+    assert "date/hour context" in causal_families
+    assert "regularized interactions" in causal_families
+    assert "duration and wall time" not in causal_families
+    assert "same-span tokens" in same_span_families
     component_regression = capacity["token_component_regression"]["variants"][
         "unweighted"
     ]["capacity_credits"]["no_intercept"]["all"]
@@ -435,14 +448,17 @@ def test_load_fast_proxy_annotations_and_documented_model_multipliers(tmp_path: 
 
 def test_predictive_models_compare_control_families_on_holdout() -> None:
     spans: list[UsageDeltaSpan] = []
+    raw_rows = [_row("baseline", "2026-06-01T00:00:00Z", 0.0, 0.0)]
+    used = 0.0
     for index in range(70):
         credit = float(1 + (index % 7))
         day_index = index % 7
         weekend_boost = 2.0 if day_index in {5, 6} else 0.0
         delta = 0.75 * credit + weekend_boost
+        timestamp = f"2026-06-{1 + (index % 14):02d}T{index % 24:02d}:00:00Z"
         spans.append(
             UsageDeltaSpan(
-                start_event_timestamp=f"2026-06-{1 + (index % 14):02d}T{index % 24:02d}:00:00Z",
+                start_event_timestamp=timestamp,
                 end_event_timestamp=f"2026-06-{1 + (index % 14):02d}T{index % 24:02d}:01:00Z",
                 baseline_used_percent=10.0,
                 end_used_percent=10.0 + delta,
@@ -465,6 +481,19 @@ def test_predictive_models_compare_control_families_on_holdout() -> None:
                 rate_limit_limit_id="codex",
             )
         )
+        used += delta
+        raw_rows.append(
+            _row(
+                f"delta-{index}",
+                timestamp,
+                used,
+                credit,
+                uncached_input_tokens=int(credit * 100),
+                cached_input_tokens=int(credit * 20),
+                reasoning_output_tokens=int(credit * 2),
+                nonreasoning_output_tokens=int(credit * 8),
+            )
+        )
 
     results = fit_predictive_usage_drain_models(spans)
     by_name = {result["name"]: result for result in results}
@@ -472,6 +501,19 @@ def test_predictive_models_compare_control_families_on_holdout() -> None:
     assert by_name["baseline_train_mean__interleaved_every_5th"]["holdout"]["r2"] < 0.1
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["r2"] > 0.9
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["mae"] < 0.2
+
+    summary = summarize_usage_drain_model(raw_rows)
+    attribution = summary["predictive_modeling"]["feature_family_attribution"][
+        "sequences"
+    ]
+    rows = attribution["cost_and_time_controls"]["interleaved_every_5th"]
+    by_family = {row["family"]: row for row in rows}
+    assert "cyclic time" in by_family
+    assert by_family["cyclic time"]["mae_improvement_vs_previous"] > 0.0
+    assert "history/regime" in {
+        row["family"]
+        for row in attribution["history_regime_controls"]["interleaved_every_5th"]
+    }
 
 
 def test_causal_baselines_capture_low_delta_regime_shift() -> None:
