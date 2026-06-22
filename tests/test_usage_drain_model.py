@@ -31,6 +31,7 @@ def _row(
     cached_input_tokens: int = 0,
     reasoning_output_tokens: int = 0,
     nonreasoning_output_tokens: int = 0,
+    effort: str | None = "xhigh",
 ) -> dict[str, object]:
     output_tokens = reasoning_output_tokens + nonreasoning_output_tokens
     input_tokens = uncached_input_tokens + cached_input_tokens
@@ -47,6 +48,7 @@ def _row(
         "rate_limit_secondary_resets_at": secondary_resets_at,
         "usage_credits": credits,
         "model": model,
+        "effort": effort,
         "input_tokens": input_tokens,
         "cached_input_tokens": cached_input_tokens,
         "uncached_input_tokens": uncached_input_tokens,
@@ -78,6 +80,7 @@ def test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets(
     assert stats["censored_or_reset_pending_segments"] == 1
     assert [span.row_count for span in spans] == [2, 1]
     assert spans[0].delta_usage_percent == 2.0
+    assert spans[0].effort_counts == {"xhigh": 2}
     assert spans[0].candidate_standard_credits["strong_only"] == 5.0
     assert spans[0].documented_fast_weighted_credits["strong_only"] == 12.5
     assert spans[1].non_candidate_standard_credits["strong_only"] == 4.0
@@ -625,6 +628,14 @@ def test_allowance_breakpoint_analysis_detects_capacity_denominator_change() -> 
         piecewise["piecewise_ceiling_no_intercept_credit_slope"]["metrics"]["r2"]
         == 1.0
     )
+    online = analysis["online_capacity_credit_to_delta_fit"]
+    assert online["prediction_rows"] == 59
+    previous = online["models"]["previous_capacity_denominator"]
+    assert previous["metrics"]["mae"] == 0.050847
+    breakpoint_diagnostics = previous["known_breakpoint_diagnostics"]
+    assert breakpoint_diagnostics["known_breakpoint_row_count"] == 1
+    assert breakpoint_diagnostics["known_breakpoint_abs_error_share"] == 1.0
+    assert breakpoint_diagnostics["non_breakpoint_mae"] == 0.0
 
 
 def test_token_component_regression_recovers_rate_card_and_fast_weighting() -> None:
@@ -815,6 +826,8 @@ def test_predictive_models_compare_control_families_on_holdout() -> None:
     by_name = {result["name"]: result for result in results}
 
     assert by_name["baseline_train_mean__interleaved_every_5th"]["holdout"]["r2"] < 0.1
+    assert "effort_controls__interleaved_every_5th" in by_name
+    assert "online_capacity_controls__interleaved_every_5th" in by_name
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["r2"] > 0.9
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["mae"] < 0.2
 

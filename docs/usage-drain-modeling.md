@@ -103,6 +103,10 @@ The script also fits exploratory predictive control families on closed spans:
   cache ratio, and per-call credit density
 - `fast_proxy`: token shape plus fast-proxy candidate credit share and documented
   fast-weighted credits
+- `effort_controls`: fast proxy plus effort mix and dominant-effort controls
+- `online_capacity_controls`: effort controls plus prior-only capacity and
+  remainder estimates, using earlier closed spans to estimate credits per
+  visible percentage point
 - `usage_state`: fast proxy plus baseline observed usage percent, limit-window
   length, reset timing, reset-window elapsed/fraction, plan type, and limit id
 - `time_controls`: usage state plus day-of-week, weekend, hour sine/cosine, and
@@ -832,6 +836,99 @@ not by itself produce a near-perfect visible-drain metric. Denominator shifts
 plus display rounding are not enough. The stronger route is probably a two-stage
 model: first predict counter regime/boundary state, then model credits or
 capacity inside that regime.
+
+The report now also includes
+`allowance_breakpoint_analysis.online_capacity_credit_to_delta_fit`. This is a
+causal denominator test: for each closed span, it predicts visible delta from
+current same-span credits divided by a capacity estimate learned only from prior
+spans. On a synthetic fixture with a clean `10 -> 40` capacity change, the
+previous-capacity denominator is exact except for the first row after the
+breakpoint. On the current local data, it fails badly:
+
+| online denominator | R2 | MAE | known-breakpoint abs-error share | read |
+| --- | ---: | ---: | ---: | --- |
+| EWMA capacity | -42.014 | 5.601 | 10.1% | best online denominator, still much worse than counter persistence |
+| rolling-3 mean capacity | -48.463 | 6.313 | 9.1% | reacts faster but still overpredicts large spans |
+| rolling-10 mean capacity | -86.511 | 6.418 | 12.0% | stale denominator after shifts creates large misses |
+| previous capacity | -36.644 | 7.071 | 3.5% | volatile one-span capacity causes extreme overprediction |
+| rolling-10 median capacity | -284.385 | 12.140 | 11.7% | robust median is too sticky around regime changes |
+
+That is useful negative evidence. If allowance changes were the only missing
+piece, the online denominator models would be close after the first row of each
+new segment and detected breakpoint rows would dominate the residuals. Instead,
+most error happens away from detected breakpoint rows. The available aggregate
+data still needs counter-state persistence, boundary/segment state, and probably
+hidden account-side state; same-span credits plus an online denominator is not a
+near-perfect visible-drain metric.
+
+## GPT-5.5 Pro-Only Isolation
+
+The report script now supports `--plan-type`, so the same analysis can be rerun
+against a narrower slice:
+
+```bash
+PYTHONPATH=src python scripts/model_usage_drain.py \
+  --include-archived \
+  --model gpt-5.5 \
+  --plan-type pro \
+  --fast-proxy-csv /tmp/codex-fast-mode-inference-all-calls-v1/all_call_fast_mode_features.csv \
+  --output-dir /tmp/codex-usage-drain-model-gpt55-pro
+```
+
+This is a row-level filter. It removes `prolite`, missing-plan, and other-model
+rows before building spans, which is useful for isolating the dominant observed
+plan/model regime. It is still not perfect causal attribution if excluded work
+happened between two included rows.
+
+Current comparison:
+
+| metric | all rows | `gpt-5.5` + `pro` only | read |
+| --- | ---: | ---: | --- |
+| source rows | 26,952 | 19,760 | pro-only removes `prolite`, missing-plan, and one auto-review row |
+| positive spans | 1,452 | 957 | fewer closed visible-delta spans |
+| exact `1%` spans | 49.9% | 69.2% | pro-only is more dominated by the stable `1%` regime |
+| mean visible delta | 4.374% | 2.178% | high-delta older behavior is reduced |
+| token-component visible-drain R2 | 0.029 | 0.047 | tokens explain slightly more, but still very little |
+| credits-only interleaved R2 | 0.075 | 0.163 | cost signal improves after isolating pro, still weak |
+| best history/regime interleaved R2 | 0.852 | 0.476 | mixed-history predictability drops because there is less high-variance regime structure to learn |
+| best walk-forward MAE | 0.936 | 0.733 | pro-only improves all-history causal next-delta error |
+| latest 100 MAE | 0.000 | 0.000 | both scopes are currently stable at visible-counter granularity |
+| breakpoint SSE reduction | 60.9% | 57.5% | capacity clustering remains after removing non-pro rows |
+| best online denominator MAE | 5.570 | 2.510 | pro-only helps denominator tracking, but it is still not close to perfect |
+
+The pro-only slice is cleaner and more recent-regime-heavy, but it does not
+turn token usage into a near-perfect visible-drain predictor. The best read is
+that plan isolation removes some noise and lowers errors, while the target is
+still mainly governed by coarse counter regime, boundary state, and hidden
+account-side context.
+
+Adding effort and prior-capacity controls to the same `gpt-5.5` + `pro` run
+clarified what helps:
+
+| model family | interleaved R2 | interleaved MAE | read |
+| --- | ---: | ---: | --- |
+| credits only | 0.163 | 1.305 | first useful signal, but weak alone |
+| token shape | 0.157 | 1.326 | token mix does not improve over credits |
+| fast proxy | 0.182 | 1.303 | small improvement |
+| effort controls | 0.183 | 1.291 | tiny MAE gain; effort has little variance here |
+| online capacity controls | 0.254 | 1.342 | raises R2 but worsens MAE, so not a clean metric |
+| usage state | 0.269 | 1.362 | counter/window state helps R2, but still not enough |
+| lag regime | 0.418 | 1.059 | prior counter behavior remains much stronger |
+| lag + cyclic time | 0.467 | 1.038 | best mixed-history learned control in this run |
+
+In the 957 closed positive pro-only spans, the calls assigned to those spans are
+heavily concentrated in one effort level: `xhigh` is 12,241 of 12,721 calls
+inside closed spans, `high` is 398, `medium` is 77, and `low` is 5. Only 41
+spans have mixed effort. That makes effort a useful control column but not a
+major explanatory variable for this local dataset.
+
+The prior-capacity result is more interesting. If hidden allowance denominator
+were the main missing factor, then current credits divided by a denominator
+learned from recent prior spans should get close. It does not. It improves R2
+relative to effort-only controls, but the higher MAE means it is mostly helping
+rank some large spans while making typical span prediction worse. That points
+back to a stateful model: predict the visible-counter regime and boundary risk
+first, then use credits/cost/time as within-regime explanatory components.
 
 The research implication is that the right metric is probably piecewise and
 stateful:

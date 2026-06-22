@@ -29,6 +29,15 @@ def main() -> int:
     parser.add_argument("--until")
     parser.add_argument("--model")
     parser.add_argument("--effort")
+    parser.add_argument(
+        "--plan-type",
+        action="append",
+        dest="plan_types",
+        help=(
+            "Filter rows to one rate_limit_plan_type. Repeat to include multiple "
+            "plan types."
+        ),
+    )
     parser.add_argument("--thread")
     parser.add_argument("--include-archived", action="store_true")
     parser.add_argument(
@@ -56,6 +65,7 @@ def main() -> int:
     )
     allowance = load_allowance_config(args.allowance)
     rows = annotate_rows_with_allowance(rows, allowance)
+    rows = _filter_rows_by_plan_type(rows, args.plan_types)
     annotations = load_fast_proxy_annotations(args.fast_proxy_csv)
     summary = summarize_usage_drain_model(rows, fast_proxy_annotations=annotations)
     spans, _stats = build_usage_delta_spans(rows, fast_proxy_annotations=annotations)
@@ -68,6 +78,15 @@ def main() -> int:
         "summary_json": str(summary_path),
         "spans_csv": str(spans_path),
         "fast_proxy_csv": str(args.fast_proxy_csv) if args.fast_proxy_csv else None,
+    }
+    summary["filters"] = {
+        "since": args.since,
+        "until": args.until,
+        "model": args.model,
+        "effort": args.effort,
+        "plan_types": args.plan_types or [],
+        "thread": args.thread,
+        "include_archived": args.include_archived,
     }
     summary_path.write_text(json.dumps(_json_safe(summary), indent=2, sort_keys=True) + "\n")
     write_usage_drain_spans_csv(spans, spans_path)
@@ -502,6 +521,30 @@ def main() -> int:
                 ).get("metrics")
                 or {}
             )
+            online_models = (
+                (breakpoints.get("online_capacity_credit_to_delta_fit") or {}).get(
+                    "models"
+                )
+                or {}
+            )
+            online_previous = (
+                (online_models.get("previous_capacity_denominator") or {}).get(
+                    "metrics"
+                )
+                or {}
+            )
+            online_previous_errors = (
+                (
+                    online_models.get("previous_capacity_denominator") or {}
+                ).get("known_breakpoint_diagnostics")
+                or {}
+            )
+            online_metric_models = {
+                name: (row.get("metrics") or {})
+                for name, row in online_models.items()
+                if isinstance(row, dict)
+            }
+            best_online = _best_metric_model(online_metric_models, "mae")
             split = breakpoints.get("best_single_break") or {}
             print(
                 "allowance breakpoints: spans={spans} global_r2={global_r2} "
@@ -520,7 +563,34 @@ def main() -> int:
                     right=split.get("right_mean_credits_per_percent"),
                 )
             )
+            if online_previous:
+                print(
+                    "online capacity: best_mae={best} previous_r2={r2} previous_mae={mae} "
+                    "known_breakpoint_error_share={error_share}".format(
+                        best=best_online,
+                        r2=online_previous.get("r2"),
+                        mae=online_previous.get("mae"),
+                        error_share=online_previous_errors.get(
+                            "known_breakpoint_abs_error_share"
+                        ),
+                    )
+                )
     return 0
+
+
+def _filter_rows_by_plan_type(
+    rows: list[dict[str, Any]], plan_types: list[str] | None
+) -> list[dict[str, Any]]:
+    if not plan_types:
+        return rows
+    allowed = {str(plan_type).strip().lower() for plan_type in plan_types if plan_type}
+    if not allowed:
+        return rows
+    return [
+        row
+        for row in rows
+        if str(row.get("rate_limit_plan_type") or "").strip().lower() in allowed
+    ]
 
 
 def _print_feature_attribution(

@@ -45,6 +45,7 @@ TOKEN_COMPONENT_FIELDS = (
     "reasoning_output_tokens",
     "nonreasoning_output_tokens",
 )
+EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "missing", "other")
 TIMING_TOTAL_FIELDS = (
     "call_duration_seconds",
     "previous_call_delta_seconds",
@@ -344,6 +345,7 @@ class UsageDeltaSpan:
         default_factory=dict
     )
     models: dict[str, int] = field(default_factory=dict)
+    effort_counts: dict[str, int] = field(default_factory=dict)
     token_totals: dict[str, float] = field(default_factory=dict)
     timing_totals: dict[str, float] = field(default_factory=dict)
     rate_limit_plan_type: str | None = None
@@ -364,6 +366,9 @@ class UsageDeltaSpan:
             "row_count": self.row_count,
             "standard_usage_credits": round(self.standard_usage_credits, 6),
             "models": "|".join(f"{model}:{count}" for model, count in sorted(self.models.items())),
+            "efforts": "|".join(
+                f"{effort}:{count}" for effort, count in sorted(self.effort_counts.items())
+            ),
             "rate_limit_plan_type": self.rate_limit_plan_type,
             "rate_limit_limit_id": self.rate_limit_limit_id,
             "usage_window_source": self.usage_window_source,
@@ -2309,6 +2314,9 @@ def _allowance_breakpoint_analysis(spans: list[UsageDeltaSpan]) -> dict[str, Any
                 rows,
                 [],
             ),
+            "online_capacity_credit_to_delta_fit": (
+                _allowance_online_capacity_credit_to_delta_fit(rows, [])
+            ),
             "piecewise_sse_reduction_share": None,
             "notes": _allowance_breakpoint_notes(),
         }
@@ -2344,6 +2352,9 @@ def _allowance_breakpoint_analysis(spans: list[UsageDeltaSpan]) -> dict[str, Any
         "piecewise_credit_to_delta_fit": _allowance_piecewise_credit_to_delta_fit(
             rows,
             segments,
+        ),
+        "online_capacity_credit_to_delta_fit": (
+            _allowance_online_capacity_credit_to_delta_fit(rows, segments)
         ),
         "piecewise_sse_reduction_share": _rounded(
             (global_sse - piecewise_sse) / global_sse if global_sse > 0 else 0.0
@@ -2686,6 +2697,224 @@ def _allowance_piecewise_credit_to_delta_fit(
     }
 
 
+def _allowance_online_capacity_credit_to_delta_fit(
+    rows: list[dict[str, Any]],
+    segments: list[tuple[int, int]],
+) -> dict[str, Any]:
+    if len(rows) < 2:
+        return {
+            "target": "visible_delta_percent",
+            "prediction_rows": 0,
+            "skipped_initial_rows": len(rows),
+            "models": {},
+            "notes": [
+                "No online capacity fit is available without at least two positive usage-delta spans.",
+            ],
+        }
+
+    model_descriptions = {
+        "previous_capacity_denominator": (
+            "Predicts visible delta as current credits divided by the immediately previous observed credits per visible percent."
+        ),
+        "rolling3_mean_capacity_denominator": (
+            "Predicts visible delta as current credits divided by the mean observed capacity over the previous three spans."
+        ),
+        "rolling10_mean_capacity_denominator": (
+            "Predicts visible delta as current credits divided by the mean observed capacity over the previous ten spans."
+        ),
+        "rolling10_median_capacity_denominator": (
+            "Predicts visible delta as current credits divided by the median observed capacity over the previous ten spans."
+        ),
+        "ewma_capacity_denominator": (
+            "Predicts visible delta as current credits divided by an EWMA of prior observed capacity, alpha 0.30."
+        ),
+    }
+    predictions: dict[str, list[float]] = {
+        name: [] for name in model_descriptions
+    }
+    ceiling_predictions: dict[str, list[float]] = {
+        f"{name}_ceiling": [] for name in model_descriptions
+    }
+    actual: list[float] = []
+    row_indexes: list[int] = []
+    capacity_history: list[float] = []
+    ewma_capacity: float | None = None
+    for row_index, row in enumerate(rows):
+        if capacity_history:
+            credit = _number(row.get("standard_usage_credits"))
+            estimates = {
+                "previous_capacity_denominator": capacity_history[-1],
+                "rolling3_mean_capacity_denominator": sum(capacity_history[-3:])
+                / len(capacity_history[-3:]),
+                "rolling10_mean_capacity_denominator": sum(capacity_history[-10:])
+                / len(capacity_history[-10:]),
+                "rolling10_median_capacity_denominator": float(
+                    median(capacity_history[-10:])
+                ),
+                "ewma_capacity_denominator": ewma_capacity
+                if ewma_capacity is not None
+                else capacity_history[-1],
+            }
+            actual.append(_number(row.get("delta_usage_percent")))
+            row_indexes.append(row_index)
+            for model_name, capacity in estimates.items():
+                prediction = credit / capacity if capacity and capacity > 0 else 0.0
+                predictions[model_name].append(prediction)
+                ceiling_predictions[f"{model_name}_ceiling"].append(
+                    _ceil_to_visible_tick(prediction)
+                )
+
+        current_capacity = _number(row.get("credits_per_visible_percent"))
+        if ewma_capacity is None:
+            ewma_capacity = current_capacity
+        else:
+            ewma_capacity = (0.3 * current_capacity) + (0.7 * ewma_capacity)
+        capacity_history.append(current_capacity)
+
+    segment_start_indexes = {start for start, _end in segments if start > 0}
+    models: dict[str, dict[str, Any]] = {}
+    for model_name, values in predictions.items():
+        models[model_name] = _allowance_online_capacity_model_record(
+            rows,
+            row_indexes,
+            actual,
+            values,
+            description=model_descriptions[model_name],
+            segment_start_indexes=segment_start_indexes,
+        )
+    for model_name, values in ceiling_predictions.items():
+        base_name = model_name.removesuffix("_ceiling")
+        models[model_name] = _allowance_online_capacity_model_record(
+            rows,
+            row_indexes,
+            actual,
+            values,
+            description=(
+                model_descriptions[base_name]
+                + " Positive predictions are rounded up to the next visible 1% tick."
+            ),
+            segment_start_indexes=segment_start_indexes,
+        )
+
+    return {
+        "target": "visible_delta_percent",
+        "prediction_rows": len(actual),
+        "skipped_initial_rows": len(rows) - len(actual),
+        "models": models,
+        "notes": [
+            "Online capacity fits use current same-span credits but only prior spans for the capacity denominator.",
+            "These are explanatory diagnostics for allowance-denominator drift; they are not advance predictions before current-span tokens are known.",
+            "Known-breakpoint diagnostics use detected piecewise segment starts only to explain residual concentration.",
+        ],
+    }
+
+
+def _allowance_online_capacity_model_record(
+    rows: list[dict[str, Any]],
+    row_indexes: list[int],
+    actual: list[float],
+    predicted: list[float],
+    *,
+    description: str,
+    segment_start_indexes: set[int],
+) -> dict[str, Any]:
+    return {
+        "description": description,
+        "metrics": _regression_metrics(actual, predicted),
+        "known_breakpoint_diagnostics": (
+            _allowance_online_capacity_error_diagnostics(
+                rows,
+                row_indexes,
+                actual,
+                predicted,
+                segment_start_indexes=segment_start_indexes,
+            )
+        ),
+    }
+
+
+def _allowance_online_capacity_error_diagnostics(
+    rows: list[dict[str, Any]],
+    row_indexes: list[int],
+    actual: list[float],
+    predicted: list[float],
+    *,
+    segment_start_indexes: set[int],
+) -> dict[str, Any]:
+    errors = [
+        {
+            "row_index": row_index,
+            "actual": actual_value,
+            "predicted": predicted_value,
+            "abs_error": abs(predicted_value - actual_value),
+            "is_known_breakpoint": row_index in segment_start_indexes,
+        }
+        for row_index, actual_value, predicted_value in zip(
+            row_indexes,
+            actual,
+            predicted,
+            strict=True,
+        )
+    ]
+    breakpoint_errors = [
+        row["abs_error"] for row in errors if row["is_known_breakpoint"]
+    ]
+    non_breakpoint_errors = [
+        row["abs_error"] for row in errors if not row["is_known_breakpoint"]
+    ]
+    total_abs_error = sum(row["abs_error"] for row in errors)
+    largest = sorted(
+        errors,
+        key=lambda row: (-_number(row.get("abs_error")), int(row["row_index"])),
+    )[:8]
+    return {
+        "known_breakpoint_row_count": len(breakpoint_errors),
+        "non_breakpoint_row_count": len(non_breakpoint_errors),
+        "known_breakpoint_abs_error_share": _rounded(
+            sum(breakpoint_errors) / total_abs_error if total_abs_error > 0 else 0.0
+        ),
+        "known_breakpoint_mae": _rounded(
+            sum(breakpoint_errors) / len(breakpoint_errors)
+            if breakpoint_errors
+            else None
+        ),
+        "non_breakpoint_mae": _rounded(
+            sum(non_breakpoint_errors) / len(non_breakpoint_errors)
+            if non_breakpoint_errors
+            else None
+        ),
+        "largest_errors": [
+            {
+                "row_index": int(item["row_index"]),
+                "span_index": int(rows[int(item["row_index"])]["span_index"]),
+                "is_known_breakpoint": bool(item["is_known_breakpoint"]),
+                "actual_delta_percent": _rounded(_number(item["actual"])),
+                "predicted_delta_percent": _rounded(_number(item["predicted"])),
+                "abs_error": _rounded(_number(item["abs_error"])),
+                "credits_per_visible_percent": _rounded(
+                    _number(
+                        rows[int(item["row_index"])].get(
+                            "credits_per_visible_percent"
+                        )
+                    )
+                ),
+                "standard_usage_credits": _rounded(
+                    _number(
+                        rows[int(item["row_index"])].get("standard_usage_credits")
+                    )
+                ),
+                "start_event_timestamp": rows[int(item["row_index"])].get(
+                    "start_event_timestamp"
+                ),
+                "end_event_timestamp": rows[int(item["row_index"])].get(
+                    "end_event_timestamp"
+                ),
+            }
+            for item in largest
+        ],
+    }
+
+
 def _ceil_to_visible_tick(value: float, *, tick_size: float = 1.0) -> float:
     if value <= 0 or tick_size <= 0:
         return 0.0
@@ -3023,6 +3252,8 @@ def _visible_delta_family_sequences() -> dict[str, list[tuple[str, str]]]:
             ("credits", "credits_only"),
             ("token shape", "token_shape"),
             ("fast proxy", "fast_proxy"),
+            ("effort", "effort_controls"),
+            ("online capacity", "online_capacity_controls"),
             ("usage state", "usage_state"),
             ("cyclic time", "time_controls"),
             ("date/day/hour categories", "date_day_hour_controls"),
@@ -5125,6 +5356,7 @@ def _span_from_rows(
         for proxy in DEFAULT_PROXY_NAMES
     }
     model_counts: dict[str, int] = {}
+    effort_counts: dict[str, int] = {}
     token_totals = dict.fromkeys(TOKEN_TOTAL_FIELDS, 0.0)
     timing_totals = dict.fromkeys(TIMING_TOTAL_FIELDS, 0.0)
     for row in rows:
@@ -5132,6 +5364,8 @@ def _span_from_rows(
         standard += credits
         model = str(row.get("model") or "unknown")
         model_counts[model] = model_counts.get(model, 0) + 1
+        effort = _normalized_effort(row.get("effort"))
+        effort_counts[effort] = effort_counts.get(effort, 0) + 1
         for field_name in TOKEN_TOTAL_FIELDS:
             token_totals[field_name] += _number(row.get(field_name))
         for field_name in TIMING_TOTAL_FIELDS:
@@ -5174,6 +5408,7 @@ def _span_from_rows(
         candidate_row_counts=candidate_counts,
         documented_fast_weighted_token_totals=documented_weighted_token_totals,
         models=model_counts,
+        effort_counts=effort_counts,
         token_totals=token_totals,
         timing_totals=timing_totals,
         rate_limit_plan_type=_optional_text(rows[-1].get("rate_limit_plan_type")),
@@ -5217,8 +5452,40 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         "documented_fast_weighted_credits",
         "documented_fast_extra_credits",
     )
-    usage_state = (
+    effort_controls = (
         *fast_proxy,
+        "effort_purity",
+        "effort_low_share",
+        "effort_medium_share",
+        "effort_high_share",
+        "effort_xhigh_share",
+        "effort_missing_share",
+        "effort_other_share",
+        "effort_non_xhigh_share",
+    )
+    online_capacity_controls = (
+        *effort_controls,
+        "previous_capacity_credits_per_percent",
+        "rolling3_capacity_credits_per_percent",
+        "rolling10_capacity_credits_per_percent",
+        "rolling10_median_capacity_credits_per_percent",
+        "ewma_capacity_credits_per_percent",
+        "previous_capacity_delta_prediction",
+        "rolling3_capacity_delta_prediction",
+        "rolling10_capacity_delta_prediction",
+        "rolling10_median_capacity_delta_prediction",
+        "ewma_capacity_delta_prediction",
+        "rolling3_remainder_credits",
+        "rolling3_remainder_fraction",
+        "rolling3_remainder_floor_delta_prediction",
+        "rolling3_remainder_ceiling_delta_prediction",
+        "ewma_remainder_credits",
+        "ewma_remainder_fraction",
+        "ewma_remainder_floor_delta_prediction",
+        "ewma_remainder_ceiling_delta_prediction",
+    )
+    usage_state = (
+        *online_capacity_controls,
         "baseline_used_percent",
         "usage_window_minutes",
         "rate_limit_primary_window_minutes",
@@ -5305,9 +5572,25 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         PredictiveModelSpec("token_shape", token_shape),
         PredictiveModelSpec("fast_proxy", fast_proxy),
         PredictiveModelSpec(
+            "effort_controls",
+            effort_controls,
+            ("dominant_effort", "effort_mix"),
+        ),
+        PredictiveModelSpec(
+            "online_capacity_controls",
+            online_capacity_controls,
+            ("dominant_effort", "effort_mix"),
+        ),
+        PredictiveModelSpec(
             "usage_state",
             usage_state,
-            ("rate_limit_plan_type", "rate_limit_limit_id", "usage_window_source"),
+            (
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "usage_window_source",
+                "dominant_effort",
+                "effort_mix",
+            ),
         ),
         PredictiveModelSpec(
             "time_controls",
@@ -5316,6 +5599,8 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
                 "usage_window_source",
+                "dominant_effort",
+                "effort_mix",
                 "day_of_week",
             ),
         ),
@@ -5326,6 +5611,8 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
                 "usage_window_source",
+                "dominant_effort",
+                "effort_mix",
                 "date",
                 "day_of_week",
                 "hour_bucket",
@@ -5338,6 +5625,8 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
                 "usage_window_source",
+                "dominant_effort",
+                "effort_mix",
                 "date",
                 "day_of_week",
                 "hour_bucket",
@@ -5346,7 +5635,13 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
         PredictiveModelSpec(
             "lag_regime",
             lag_regime,
-            ("rate_limit_plan_type", "rate_limit_limit_id", "usage_window_source"),
+            (
+                "rate_limit_plan_type",
+                "rate_limit_limit_id",
+                "usage_window_source",
+                "dominant_effort",
+                "effort_mix",
+            ),
         ),
         PredictiveModelSpec(
             "lag_time_controls",
@@ -5355,6 +5650,8 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
                 "usage_window_source",
+                "dominant_effort",
+                "effort_mix",
                 "day_of_week",
             ),
         ),
@@ -5365,6 +5662,8 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
                 "rate_limit_plan_type",
                 "rate_limit_limit_id",
                 "usage_window_source",
+                "dominant_effort",
+                "effort_mix",
                 "date",
                 "day_of_week",
                 "hour_bucket",
@@ -5425,6 +5724,16 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
     )
     call_duration_bucket = _second_bucket(duration)
     span_wall_time_bucket = _second_bucket(span_wall_time_seconds)
+    effort_total = sum(span.effort_counts.values())
+    dominant_effort = _dominant_label(span.effort_counts, default="missing")
+    dominant_effort_count = span.effort_counts.get(dominant_effort, 0)
+    effort_purity = dominant_effort_count / effort_total if effort_total else 0.0
+    effort_shares = {
+        effort: span.effort_counts.get(effort, 0) / effort_total
+        if effort_total
+        else 0.0
+        for effort in EFFORT_LEVELS
+    }
     return {
         "target": span.delta_usage_percent,
         "start_event_timestamp": span.start_event_timestamp,
@@ -5446,6 +5755,16 @@ def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
         "candidate_credit_share": candidate / standard if standard else 0.0,
         "documented_fast_weighted_credits": documented,
         "documented_fast_extra_credits": max(documented - standard, 0.0),
+        "dominant_effort": dominant_effort,
+        "effort_mix": "pure" if effort_purity >= 1.0 else "mixed",
+        "effort_purity": effort_purity,
+        "effort_low_share": effort_shares["low"],
+        "effort_medium_share": effort_shares["medium"],
+        "effort_high_share": effort_shares["high"],
+        "effort_xhigh_share": effort_shares["xhigh"],
+        "effort_missing_share": effort_shares["missing"],
+        "effort_other_share": effort_shares["other"],
+        "effort_non_xhigh_share": 1.0 - effort_shares["xhigh"],
         "baseline_used_percent": span.baseline_used_percent,
         "rate_limit_primary_window_minutes": span.rate_limit_primary_window_minutes or 0.0,
         "usage_window_minutes": window_minutes,
@@ -5525,6 +5844,14 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
     day_of_week_rows: dict[str, list[dict[str, Any]]] = {}
     ewma_delta: float | None = None
     ewma_drain: float | None = None
+    ewma_capacity: float | None = None
+    remainder_states = {
+        "previous": 0.0,
+        "rolling3": 0.0,
+        "rolling10": 0.0,
+        "rolling10_median": 0.0,
+        "ewma": 0.0,
+    }
     alpha = 0.2
     for row in rows:
         bucket_key = (
@@ -5579,6 +5906,46 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
         row["rolling10_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 10)
         row["rolling50_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 50)
         row["rolling10_low_delta_share"] = _rolling_low_delta_share(previous_rows, 10)
+        capacity_estimates = {
+            "previous": _previous_capacity_per_visible_percent(previous_rows),
+            "rolling3": _rolling_capacity_per_visible_percent(previous_rows, 3),
+            "rolling10": _rolling_capacity_per_visible_percent(previous_rows, 10),
+            "rolling10_median": _rolling_capacity_median_per_visible_percent(
+                previous_rows, 10
+            ),
+            "ewma": ewma_capacity or 0.0,
+        }
+        row["previous_capacity_credits_per_percent"] = capacity_estimates["previous"]
+        row["rolling3_capacity_credits_per_percent"] = capacity_estimates["rolling3"]
+        row["rolling10_capacity_credits_per_percent"] = capacity_estimates["rolling10"]
+        row["rolling10_median_capacity_credits_per_percent"] = capacity_estimates[
+            "rolling10_median"
+        ]
+        row["ewma_capacity_credits_per_percent"] = capacity_estimates["ewma"]
+        current_credits = _number(row.get("standard_usage_credits"))
+        for capacity_name, capacity in capacity_estimates.items():
+            prefix = (
+                "rolling10_median"
+                if capacity_name == "rolling10_median"
+                else capacity_name
+            )
+            row[f"{prefix}_capacity_delta_prediction"] = (
+                current_credits / capacity if capacity > 0 else 0.0
+            )
+        _attach_remainder_features(
+            row,
+            prefix="rolling3",
+            capacity=capacity_estimates["rolling3"],
+            current_credits=current_credits,
+            remainder=remainder_states["rolling3"],
+        )
+        _attach_remainder_features(
+            row,
+            prefix="ewma",
+            capacity=capacity_estimates["ewma"],
+            current_credits=current_credits,
+            remainder=remainder_states["ewma"],
+        )
         rolling50 = _number(row["rolling50_delta_percent"])
         row["rolling3_to_50_delta_ratio"] = (
             _number(row["rolling3_delta_percent"]) / rolling50 if rolling50 > 0 else 0.0
@@ -5619,6 +5986,7 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
 
         current_delta = _number(row.get("target"))
         current_drain = _drain_per_credit(row)
+        current_capacity = _capacity_per_visible_percent(row)
         ewma_delta = (
             current_delta
             if ewma_delta is None
@@ -5629,11 +5997,87 @@ def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
             if ewma_drain is None
             else (alpha * current_drain) + ((1 - alpha) * ewma_drain)
         )
+        ewma_capacity = (
+            current_capacity
+            if ewma_capacity is None
+            else (alpha * current_capacity) + ((1 - alpha) * ewma_capacity)
+        )
+        for capacity_name, capacity in capacity_estimates.items():
+            remainder_states[capacity_name] = _updated_remainder_credits(
+                remainder_states[capacity_name],
+                current_credits=current_credits,
+                actual_delta=current_delta,
+                capacity=capacity,
+            )
         previous_rows.append(row)
         bucket_rows.setdefault(bucket_key, []).append(row)
         date_rows.setdefault(date_key, []).append(row)
         hour_rows.setdefault(hour_key, []).append(row)
         day_of_week_rows.setdefault(day_of_week_key, []).append(row)
+
+
+def _attach_remainder_features(
+    row: dict[str, Any],
+    *,
+    prefix: str,
+    capacity: float,
+    current_credits: float,
+    remainder: float,
+) -> None:
+    row[f"{prefix}_remainder_credits"] = remainder
+    row[f"{prefix}_remainder_fraction"] = (
+        min(max(remainder / capacity, 0.0), 1.0) if capacity > 0 else 0.0
+    )
+    accumulated = (remainder + current_credits) / capacity if capacity > 0 else 0.0
+    row[f"{prefix}_remainder_floor_delta_prediction"] = (
+        float(math.floor(accumulated + 1e-9)) if accumulated > 0 else 0.0
+    )
+    row[f"{prefix}_remainder_ceiling_delta_prediction"] = _ceil_to_visible_tick(
+        accumulated
+    )
+
+
+def _updated_remainder_credits(
+    previous_remainder: float,
+    *,
+    current_credits: float,
+    actual_delta: float,
+    capacity: float,
+) -> float:
+    if capacity <= 0:
+        return 0.0
+    return (previous_remainder + current_credits - (actual_delta * capacity)) % capacity
+
+
+def _capacity_per_visible_percent(row: dict[str, Any]) -> float:
+    delta = _number(row.get("target"))
+    if delta <= 0:
+        return 0.0
+    return _number(row.get("standard_usage_credits")) / delta
+
+
+def _previous_capacity_per_visible_percent(rows: list[dict[str, Any]]) -> float:
+    if not rows:
+        return 0.0
+    return _capacity_per_visible_percent(rows[-1])
+
+
+def _rolling_capacity_per_visible_percent(
+    rows: list[dict[str, Any]], window: int
+) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    return sum(_capacity_per_visible_percent(row) for row in selected) / len(selected)
+
+
+def _rolling_capacity_median_per_visible_percent(
+    rows: list[dict[str, Any]], window: int
+) -> float:
+    selected = rows[-window:]
+    if not selected:
+        return 0.0
+    return float(median(_capacity_per_visible_percent(row) for row in selected))
 
 
 def _previous_value(rows: list[dict[str, Any]], field: str) -> float:
@@ -6175,6 +6619,20 @@ def _optional_text(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _normalized_effort(value: object) -> str:
+    text = _optional_text(value)
+    if text is None:
+        return "missing"
+    normalized = text.lower().replace("-", "_")
+    return normalized if normalized in EFFORT_LEVELS else "other"
+
+
+def _dominant_label(counts: dict[str, int], *, default: str) -> str:
+    if not counts:
+        return default
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
 
 
 def _count_values(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
