@@ -30,6 +30,7 @@
     let errorMessage = '';
     let snapshotRefreshStatus = 'idle';
     let snapshotRefreshError = '';
+    let sectionRefreshStatuses = {};
     let requestGeneration = 0;
     let payloads = emptyPayloads();
     let selectedFactKey = '';
@@ -82,6 +83,7 @@
       errorMessage = '';
       snapshotRefreshStatus = 'idle';
       snapshotRefreshError = '';
+      sectionRefreshStatuses = {};
       selectedFactKey = '';
       payloads = emptyPayloads();
       factCallPayloads.clear();
@@ -110,6 +112,7 @@
         errorMessage = '';
         snapshotRefreshStatus = 'idle';
         snapshotRefreshError = '';
+        sectionRefreshStatuses = {};
         selectedFactKey = '';
         payloads = emptyPayloads();
         factCallPayloads.clear();
@@ -134,6 +137,7 @@
         ]);
         if (generation !== requestGeneration || signature !== activeSignature) return;
         payloads = { facts, tools, compactions, ...snapshots };
+        sectionRefreshStatuses = {};
         status = 'ready';
       } catch (error) {
         if (generation !== requestGeneration || signature !== activeSignature) return;
@@ -173,11 +177,44 @@
         const snapshots = refreshPayload.sections || {};
         if (signature !== activeSignature) return;
         payloads = { ...payloads, ...snapshots };
+        sectionRefreshStatuses = {};
         snapshotRefreshStatus = 'ready';
       } catch (error) {
         if (signature !== activeSignature) return;
         snapshotRefreshStatus = 'error';
         snapshotRefreshError = error.message || String(error);
+      }
+      renderIfActive();
+    }
+
+    async function refreshDiagnosticSnapshot(sectionKey) {
+      const section = snapshotRenderer.sections.find(candidate => candidate.key === sectionKey);
+      if (!section || sectionRefreshStatuses[sectionKey] === 'refreshing') return;
+      const signature = activeSignature;
+      sectionRefreshStatuses = { ...sectionRefreshStatuses, [sectionKey]: 'refreshing' };
+      renderIfActive();
+      try {
+        const filters = getDiagnosticFilters();
+        const snapshotFilters = { include_archived: filters?.include_archived || '0' };
+        const payload = await fetchPayload(
+          section.refreshPath,
+          snapshotFilters,
+          { method: 'POST' },
+        );
+        if (signature !== activeSignature) return;
+        payloads = { ...payloads, [sectionKey]: payload };
+        sectionRefreshStatuses = { ...sectionRefreshStatuses, [sectionKey]: 'ready' };
+      } catch (error) {
+        if (signature !== activeSignature) return;
+        payloads = {
+          ...payloads,
+          [sectionKey]: {
+            ...(payloads[sectionKey] || {}),
+            status: 'error',
+            error: error.message || String(error),
+          },
+        };
+        sectionRefreshStatuses = { ...sectionRefreshStatuses, [sectionKey]: 'error' };
       }
       renderIfActive();
     }
@@ -308,7 +345,7 @@
             ${snapshotRenderer.readoutMetric('Snapshot sections', snapshotRenderer.readyCount(payloads))}
             <span class="diagnostics-note">Structured labels only. Raw context remains on-demand in the call investigator.</span>
           </div>
-          ${snapshotRenderer.renderPanels({ loading, payloads })}
+          ${snapshotRenderer.renderPanels({ loading, payloads, sectionRefreshStatuses })}
           ${factRenderer.renderFactSection('facts', 'Top Diagnostic Facts', 'Structured facts associated with model calls.', payloads.facts, loading)}
           ${factRenderer.renderFactSection('tools', 'Tool and Function Activity', 'Tool/function facts associated with model calls.', payloads.tools, loading)}
           ${factRenderer.renderFactSection('compactions', 'Compaction Activity', 'Compaction facts and post-compaction associated costs.', payloads.compactions, loading)}
@@ -475,6 +512,13 @@
         event.preventDefault();
         event.stopPropagation();
         void refreshDiagnosticSnapshots();
+        return;
+      }
+      const sectionRefreshButton = target.closest('[data-diagnostics-section-refresh]');
+      if (sectionRefreshButton && diagnosticsPanelEl.contains(sectionRefreshButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        void refreshDiagnosticSnapshot(sectionRefreshButton.dataset.diagnosticsSectionRefresh || '');
         return;
       }
       const loadMoreButton = target.closest('[data-diagnostics-call-load-more]');

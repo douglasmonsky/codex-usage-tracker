@@ -344,7 +344,15 @@
       font-weight: 680;
       line-height: 1.35;
     }
-    .diagnostics-section-header > span {
+    .diagnostics-section-actions {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .diagnostics-section-actions > span {
       flex: 0 0 auto;
       padding: 3px 8px;
       border: 1px solid var(--line);
@@ -354,6 +362,12 @@
       font-size: 11px;
       font-weight: 780;
       white-space: nowrap;
+    }
+    .diagnostics-section-refresh {
+      min-height: 26px;
+      padding: 5px 9px;
+      font-size: 11px;
+      line-height: 1.1;
     }
     .diagnostics-table-wrap {
       overflow-x: auto;
