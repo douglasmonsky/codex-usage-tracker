@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.11.1 - 2026-06-23
+
+- Move projected weekly credits to the top of the Diagnostics tab and add the 95% CI range to the projection table.
+- Add per-section `Reload` controls for stale or missing diagnostic snapshot cards so one failed or missing section can be recomputed without a full diagnostics refresh.
+
 ## 0.11.0 - 2026-06-22
 
 - Add usage-drain diagnostic reports for token accounting, allowance breakpoints, predictive model highlights, weekly visible usage, weekly projected credits, and cumulative thread cost curves.
