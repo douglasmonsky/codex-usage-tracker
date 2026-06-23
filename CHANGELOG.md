@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.11.3 - 2026-06-23
+
+- Fix Windows `serve-dashboard` asset loading by forcing JavaScript, CSS, JSON, and SVG MIME types in the localhost server instead of trusting OS registry MIME mappings.
+
 ## 0.11.2 - 2026-06-23
 
 - Fix served dashboard shell hydration so `serve-dashboard --no-refresh` reliably populates the calls table from `/api/usage` when the initial HTML contains zero rows but indexed rows are available.

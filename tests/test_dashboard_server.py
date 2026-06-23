@@ -7,9 +7,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from functools import partial
-from http.server import ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import pytest
 from store_dashboard_helpers import (
     SESSION_ID,
     _assert_contract,
@@ -29,6 +30,80 @@ from codex_usage_tracker.store import (
     refresh_usage_index,
     upsert_usage_events,
 )
+
+
+def test_dashboard_server_forces_dashboard_asset_mime_types(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codex_usage_tracker.server import _UsageDashboardHandler
+
+    def registry_text_plain_guess_type(self: SimpleHTTPRequestHandler, path: str) -> str:
+        suffix = Path(path).suffix.lower()
+        if suffix in {".css", ".js", ".json"}:
+            return "text/plain"
+        return "application/octet-stream"
+
+    monkeypatch.setattr(
+        SimpleHTTPRequestHandler,
+        "guess_type",
+        registry_text_plain_guess_type,
+    )
+
+    asset_dir = tmp_path / "codex-usage-tracker-assets"
+    locale_dir = asset_dir / "locales"
+    locale_dir.mkdir(parents=True)
+    (asset_dir / "dashboard.js").write_text("window.__dashboardLoaded = true;\n", encoding="utf-8")
+    (asset_dir / "dashboard.css").write_text("body { color: black; }\n", encoding="utf-8")
+    (locale_dir / "en.json").write_text('{"dashboard": "Usage"}\n', encoding="utf-8")
+
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / ".codex",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    responses = []
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}/codex-usage-tracker-assets"
+        expected_assets = {
+            "dashboard.js": "text/javascript",
+            "dashboard.css": "text/css",
+            "locales/en.json": "application/json",
+        }
+        for asset_path, expected_content_type in expected_assets.items():
+            with urllib.request.urlopen(  # noqa: S310 - local test server only
+                f"{base_url}/{asset_path}",
+                timeout=5,
+            ) as response:
+                content_type = response.headers.get("Content-Type")
+                nosniff = response.headers.get("X-Content-Type-Options")
+                responses.append((asset_path, expected_content_type, content_type, nosniff))
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert len(responses) == len(expected_assets)
+    for asset_path, expected_content_type, content_type, nosniff in responses:
+        assert content_type is not None, asset_path
+        assert content_type.split(";", 1)[0] == expected_content_type
+        assert nosniff == "nosniff"
 
 
 def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> None:
