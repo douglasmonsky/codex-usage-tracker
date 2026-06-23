@@ -109,6 +109,13 @@ _utc_now = server_utils.utc_now
 _validate_context_api_mode = server_utils.validate_context_api_mode
 _validate_loopback_host = server_utils.validate_loopback_host
 
+_DASHBOARD_ASSET_MIME_TYPES = {
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+}
+
 
 def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
     value = _first(params.get(key))
@@ -403,6 +410,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             "img-src 'self' data:; object-src 'none'; base-uri 'none'",
         )
         super().end_headers()
+
+    def guess_type(self, path: str) -> str:
+        forced_type = _DASHBOARD_ASSET_MIME_TYPES.get(Path(path).suffix.lower())
+        if forced_type is not None:
+            return forced_type
+        return super().guess_type(path)
 
     def _is_dashboard_html_request(self) -> bool:
         path = urlparse(self.path).path
