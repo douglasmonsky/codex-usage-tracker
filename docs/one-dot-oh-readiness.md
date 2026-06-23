@@ -24,12 +24,12 @@ Not guaranteed:
 
 ## 1. Public Install And Package Metadata
 
-- [x] Verify the current public PyPI version is visible as `0.11.1`: `python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/codex-usage-tracking/json'))['info']['version'])"`.
-- [x] Verify public venv install for `0.11.1`: `python -m venv /tmp/codex-usage-pypi-smoke && . /tmp/codex-usage-pypi-smoke/bin/activate && python -m pip install codex-usage-tracking==0.11.1 && codex-usage-tracker --version`.
-- [x] Verify public pipx install path for `0.11.1`: `PIPX_HOME=/tmp/codex-usage-pipx-home PIPX_BIN_DIR=/tmp/codex-usage-pipx-bin pipx install codex-usage-tracking==0.11.1 && /tmp/codex-usage-pipx-bin/codex-usage-tracker --version`.
+- [x] Verify the current public PyPI version is visible as `0.11.2`: `python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/codex-usage-tracking/json'))['info']['version'])"`.
+- [x] Verify public venv install for `0.11.2`: `python -m venv /tmp/codex-usage-pypi-smoke && . /tmp/codex-usage-pypi-smoke/bin/activate && python -m pip install codex-usage-tracking==0.11.2 && codex-usage-tracker --version`.
+- [x] Verify public pipx install path for `0.11.2`: `PIPX_HOME=/tmp/codex-usage-pipx-home PIPX_BIN_DIR=/tmp/codex-usage-pipx-bin pipx install codex-usage-tracking==0.11.2 && /tmp/codex-usage-pipx-bin/codex-usage-tracker --version`.
 - [x] Verify installed package resources from a built wheel: `python scripts/smoke_installed_package.py`.
 - [x] Verify installed package resources in Linux Docker: `python scripts/smoke_installed_package.py --docker`.
-- [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version 0.11.1`.
+- [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version 0.11.2`.
 - [x] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
 - [x] Add Python 3.14 as an official support target after CI, package classifiers, docs, and installed-package smoke coverage were added. Docker smoke coverage uses `python:3.14-slim` by default. Track this in issue #12.
 
@@ -134,14 +134,14 @@ Not guaranteed:
 
 ## Evidence References
 
-These references are the concrete proof behind completed checklist items. Public package smoke commands are version-specific to `0.11.1`; all repo tests use synthetic or aggregate-only data.
+These references are the concrete proof behind completed checklist items. Public package smoke commands are version-specific to `0.11.2`; all repo tests use synthetic or aggregate-only data.
 
 ### Public Install And Package Metadata
 
 - Public PyPI version, public venv install, and public pipx install are proven by the exact public-install commands in section 1.
 - Built-wheel and installed-resource coverage is proven by `scripts/smoke_installed_package.py` and `tests/test_cli_release.py::test_installed_package_smoke_checks_help_for_stable_commands`.
 - Linux package-resource coverage is proven by `scripts/smoke_installed_package.py --docker`.
-- Public PyPI Docker coverage is proven by `scripts/smoke_installed_package.py --docker --from-pypi --version 0.11.1`.
+- Public PyPI Docker coverage is proven by `scripts/smoke_installed_package.py --docker --from-pypi --version 0.11.2`.
 - PyPI metadata, package/distribution names, package resources, source/wheel member names, Python 3.10-3.14 support metadata, CI workflow requirements, publish workflow safety text, and tracked secret patterns are proven by `scripts/check_release.py`, `scripts/check_release.py --dist`, and `tests/test_cli_release.py::test_release_check_script_passes`.
 
 ### Upgrade And Migration
@@ -219,8 +219,8 @@ These references are the concrete proof behind completed checklist items. Public
 - Publish workflow package name, Trusted Publishing, TestPyPI/PyPI job presence, event guards, no push/PR publishing, no token/password publishing, and manual PyPI main/tag preflight are proven by `scripts/check_release.py::_check_publish_workflow`.
 - The GitHub `pypi` environment gate is proven by `gh api repos/douglasmonsky/codex-usage-tracker/environments/pypi`, which reports a `required_reviewers` protection rule and `can_admins_bypass=false`.
 - Dist filename and wheel/sdist member checks are proven by `python -m build`, `python -m twine check dist/*`, and `python scripts/check_release.py --dist`.
-- TestPyPI publish process is proven by a workflow-dispatch run on `main`, followed by TestPyPI metadata and clean virtualenv install checks for `codex-usage-tracking==0.11.1`.
-- PyPI publish process is proven by a workflow-dispatch run on `main`, protected `pypi` environment approval, PyPI metadata visibility, clean virtualenv install, temporary pipx install, and Docker public-package smoke for `codex-usage-tracking==0.11.1`.
+- TestPyPI publish process is proven by a workflow-dispatch run on `main`, followed by TestPyPI metadata and clean virtualenv install checks for `codex-usage-tracking==0.11.2`.
+- PyPI publish process is proven by a workflow-dispatch run on `main`, protected `pypi` environment approval, PyPI metadata visibility, clean virtualenv install, temporary pipx install, and Docker public-package smoke for `codex-usage-tracking==0.11.2`.
 - Release recovery documentation is proven by `scripts/check_release.py` required-file and docs checks.
 
 ### Known Limitations

@@ -38,7 +38,7 @@ fix/<issue-number>-short-description
 docs/<issue-number>-short-description
 chore/<issue-number>-short-description
 test/<issue-number>-short-description
-release/0.11.1
+release/0.11.2
 hotfix/0.3.3
 ```
 
@@ -91,7 +91,7 @@ blocked
 Recommended milestones:
 
 ```text
-0.11.1
+0.11.2
 1.0-readiness
 1.0.0
 ```
@@ -146,8 +146,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.11.1
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.11.1
+python scripts/smoke_installed_package.py --from-pypi --version 0.11.2
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.11.2
 ```
 
 `scripts/check_release.py` treats these public-package smoke commands as release-state claims. Keep their `--version` and `codex-usage-tracking==...` values aligned with `pyproject.toml`; the release gate fails when the docs claim a different public version. It also checks that install docs point at the real PyPI distribution, `codex-usage-tracking`, and keep the warning that `codex-usage-tracker` is a different PyPI package.
@@ -294,8 +294,8 @@ After the release branch merges, tag from updated `main`, not from an unreviewed
 ```bash
 git switch main
 git pull --ff-only
-git tag -a v0.11.1 -m "codex-usage-tracker 0.11.1"
-git push origin v0.11.1
+git tag -a v0.11.2 -m "codex-usage-tracker 0.11.2"
+git push origin v0.11.2
 ```
 
 Do not create or push release tags without maintainer approval.
@@ -304,7 +304,7 @@ Do not create or push release tags without maintainer approval.
 
 Publishing uses GitHub Actions Trusted Publishing through `.github/workflows/publish.yml`; do not upload from a local machine and do not add PyPI or TestPyPI API tokens.
 
-The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading. Minor release `0.4.0` added Python 3.14 support, release recovery docs, stricter privacy/support-bundle regression coverage, and large-history benchmark thresholds. Patch release `0.4.1` was published by workflow dispatch from `main`; it hardened the PyPI publish workflow and checked off completed 1.0 readiness gates. Minor release `0.5.0` added dashboard localization support and initial language catalogs. Minor release `0.6.0` is the performance and call-drilldown release with SQL-backed live API slices, materialized thread summaries, faster evidence loading, and dashboard runtime module refactors. Patch release `0.6.1` aligns the final README/package screenshots and companion plugin assets. Minor release `0.7.0` adds observed usage snapshots and the latest-observed dashboard card while keeping raw evidence on demand only. Minor release `0.8.0` adds aggregate diagnostics, source-offset context seeking, and live dashboard loading hardening. Patch release `0.8.1` improves Diagnostics fact table readability with pinned fact names and sortable fact columns. Minor release `0.9.0` adds persisted diagnostic snapshots, on-demand diagnostic refresh, tool/command/file-read/concentration reports, and Diagnostics dashboard panels. Minor release `0.10.0` adds Git/GitHub CLI diagnostics, file-modification diagnostics, and derived call timing fields across the dashboard and API. Patch release `0.10.1` adds lightweight action timing to context evidence and ships the synthetic Git Interactions README screenshot. Minor release `0.11.0` adds usage-drain diagnostic reports, projected weekly credit charts, and cumulative thread cost curves. Patch release `0.11.1` improves the Diagnostics weekly projection table and stale snapshot reload controls.
+The first public package release, `0.3.0`, was published on June 8, 2026. Patch release `0.3.1` followed the same day to ship the live-dashboard skill launch fix. Patch release `0.3.2` made dashboard launch refresh the default and added runtime enablement for context loading. Minor release `0.4.0` added Python 3.14 support, release recovery docs, stricter privacy/support-bundle regression coverage, and large-history benchmark thresholds. Patch release `0.4.1` was published by workflow dispatch from `main`; it hardened the PyPI publish workflow and checked off completed 1.0 readiness gates. Minor release `0.5.0` added dashboard localization support and initial language catalogs. Minor release `0.6.0` is the performance and call-drilldown release with SQL-backed live API slices, materialized thread summaries, faster evidence loading, and dashboard runtime module refactors. Patch release `0.6.1` aligns the final README/package screenshots and companion plugin assets. Minor release `0.7.0` adds observed usage snapshots and the latest-observed dashboard card while keeping raw evidence on demand only. Minor release `0.8.0` adds aggregate diagnostics, source-offset context seeking, and live dashboard loading hardening. Patch release `0.8.1` improves Diagnostics fact table readability with pinned fact names and sortable fact columns. Minor release `0.9.0` adds persisted diagnostic snapshots, on-demand diagnostic refresh, tool/command/file-read/concentration reports, and Diagnostics dashboard panels. Minor release `0.10.0` adds Git/GitHub CLI diagnostics, file-modification diagnostics, and derived call timing fields across the dashboard and API. Patch release `0.10.1` adds lightweight action timing to context evidence and ships the synthetic Git Interactions README screenshot. Minor release `0.11.0` adds usage-drain diagnostic reports, projected weekly credit charts, and cumulative thread cost curves. Patch release `0.11.1` improves the Diagnostics weekly projection table and stale snapshot reload controls. Patch release `0.11.2` hardens the synthetic source-log benchmark smoke test and improves benchmark failure diagnostics.
 
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.0`
 - GitHub Release: `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.3.1`

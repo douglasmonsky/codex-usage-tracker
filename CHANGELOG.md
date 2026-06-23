@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.11.2 - 2026-06-23
+
+- Fix served dashboard shell hydration so `serve-dashboard --no-refresh` reliably populates the calls table from `/api/usage` when the initial HTML contains zero rows but indexed rows are available.
+- Harden the synthetic source-log benchmark smoke test so shared-runner timing noise does not leave a stale red release check.
+- Improve benchmark smoke test failures so future threshold failures report the parsed JSON payload and threshold details instead of only a generic subprocess error.
+
 ## 0.11.1 - 2026-06-23
 
 - Move projected weekly credits to the top of the Diagnostics tab and add the 95% CI range to the projection table.

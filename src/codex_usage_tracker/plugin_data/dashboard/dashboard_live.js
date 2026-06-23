@@ -225,7 +225,7 @@
         if (rowCountChanged || refreshChanged) {
           refreshDashboardLive();
         } else if (rowsNeedHydration()) {
-          hydrateDashboardRows();
+          await hydrateDashboardRows();
         }
       } catch (_error) {
         // Background freshness checks must never interrupt the local dashboard.
@@ -291,7 +291,7 @@
           rowHydrationComplete = getData().length >= rowHydrationTarget();
           updateRowLoadProgress();
         } else if (rowsNeedHydration()) {
-          hydrateDashboardRows();
+          await hydrateDashboardRows();
         }
 
         const result = shellPayload.refresh_result || {};
@@ -356,7 +356,7 @@
           rowHydrationComplete = false;
         }
         applyDashboardPayload(nextPayload);
-        if (!['call', 'diagnostics'].includes(activeView())) hydrateDashboardRows({ reset: resetRows });
+        if (!['call', 'diagnostics'].includes(activeView())) await hydrateDashboardRows({ reset: resetRows });
         const result = nextPayload.refresh_result || {};
         const indexed = result.inserted_or_updated_events === undefined
           ? ''
