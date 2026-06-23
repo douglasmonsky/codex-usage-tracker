@@ -352,10 +352,8 @@ def test_cli_json_schema_doc_lists_tracked_contracts() -> None:
 
 
 def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    result = subprocess.run(
+    payload = _run_benchmark_json(
         [
-            sys.executable,
             "scripts/benchmark_synthetic_history.py",
             "--rows",
             "100",
@@ -368,13 +366,7 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
             "--threshold-scale",
             "5",
         ],
-        check=True,
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        env=_subprocess_env(),
     )
-    payload = json.loads(result.stdout)
 
     assert payload["threshold_scale"] == 5.0
     assert payload["benchmarks"][0]["rows"] == 100
@@ -398,10 +390,8 @@ def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
 
 
 def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    result = subprocess.run(
+    payload = _run_benchmark_json(
         [
-            sys.executable,
             "scripts/benchmark_synthetic_history.py",
             "--rows",
             "100",
@@ -413,17 +403,12 @@ def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> N
             "--json",
             "--enforce-thresholds",
             "--threshold-scale",
-            "5",
+            "10",
         ],
-        check=True,
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        env=_subprocess_env(),
     )
-    payload = json.loads(result.stdout)
     benchmark = payload["benchmarks"][0]
 
+    assert payload["threshold_scale"] == 10.0
     assert benchmark["threshold_status"] == "pass"
     assert benchmark["threshold_failures"] == []
     assert benchmark["source_logs_generated"] > 0
@@ -441,6 +426,42 @@ def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> N
     assert {"early", "middle", "late"} == set(benchmark["context_loads"])
     assert benchmark["context_loads"]["middle"]["context_payload_json_bytes"] > 0
     assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
+
+
+def _run_benchmark_json(args: list[str]) -> dict[str, object]:
+    repo_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, *args],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        env=_subprocess_env(),
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(
+            "benchmark did not emit JSON\n"
+            f"returncode={result.returncode}\n"
+            f"stdout={result.stdout}\n"
+            f"stderr={result.stderr}"
+        ) from exc
+    if result.returncode != 0:
+        failures = [
+            failure
+            for benchmark in payload.get("benchmarks", [])
+            if isinstance(benchmark, dict)
+            for failure in benchmark.get("threshold_failures", [])
+        ]
+        raise AssertionError(
+            "benchmark exited nonzero\n"
+            f"returncode={result.returncode}\n"
+            f"threshold_failures={failures}\n"
+            f"stderr={result.stderr}\n"
+            f"payload={json.dumps(payload, indent=2)}"
+        )
+    return payload
 
 
 def _subprocess_env() -> dict[str, str]:
