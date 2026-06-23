@@ -314,6 +314,9 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "/api/diagnostics/usage-drain/refresh" in dashboard_diagnostics_snapshots_js
     assert "Refresh diagnostics" in dashboard_diagnostics_snapshots_js
     assert "data-diagnostics-refresh" in dashboard_diagnostics_js
+    assert "data-diagnostics-section-refresh" in dashboard_diagnostics_js
+    assert "data-diagnostics-section-refresh" in dashboard_diagnostics_snapshots_js
+    assert "refreshDiagnosticSnapshot" in dashboard_diagnostics_js
     assert "Live API required for diagnostics refresh" in dashboard_diagnostics_js
     assert "Overview" in dashboard_diagnostics_snapshots_js
     assert "Tool Output" in dashboard_diagnostics_snapshots_js

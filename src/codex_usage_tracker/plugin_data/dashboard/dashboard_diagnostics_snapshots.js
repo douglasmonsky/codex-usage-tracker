@@ -48,12 +48,12 @@
       `;
     }
 
-    function renderPanels({ loading, payloads }) {
+    function renderPanels({ loading, payloads, sectionRefreshStatuses = {} }) {
       const featuredUsageDrain = renderFeaturedUsageDrain(payloads.usageDrain);
       return `
         ${featuredUsageDrain}
         <div class="diagnostics-snapshot-grid">
-          ${sections.map(section => renderPanel(section, payloads[section.key], loading)).join('')}
+          ${sections.map(section => renderPanel(section, payloads[section.key], loading, sectionRefreshStatuses[section.key] || '')).join('')}
         </div>
       `;
     }
@@ -62,11 +62,11 @@
       if (!payload || payload.status !== 'ready') return '';
       const timeSeries = payload?.time_series || {};
       const charts = [];
-      if (Array.isArray(timeSeries.visible_usage?.points) && timeSeries.visible_usage.points.length) {
-        charts.push(renderVisibleUsageChart(timeSeries.visible_usage));
-      }
       if (Array.isArray(timeSeries.weekly_credit_projection?.points) && timeSeries.weekly_credit_projection.points.length) {
         charts.push(renderWeeklyProjectionChart(timeSeries.weekly_credit_projection));
+      }
+      if (Array.isArray(timeSeries.visible_usage?.points) && timeSeries.visible_usage.points.length) {
+        charts.push(renderVisibleUsageChart(timeSeries.visible_usage));
       }
       if (!charts.length) return '';
       return `
@@ -76,7 +76,7 @@
       `;
     }
 
-    function renderPanel(section, payload, loading) {
+    function renderPanel(section, payload, loading, sectionRefreshStatus) {
       const meta = snapshotMeta(payload);
       const state = snapshotState(payload, loading);
       const body = state ? renderState(state) : renderBody(section.key, payload);
@@ -87,11 +87,30 @@
               <h3>${escapeHtml(section.title)}</h3>
               <p>${escapeHtml(meta)}</p>
             </div>
-            <span>${escapeHtml(snapshotBadge(payload, loading))}</span>
+            ${renderSnapshotHeaderActions(section, payload, loading, sectionRefreshStatus)}
           </div>
           ${body}
         </div>
       `;
+    }
+
+    function renderSnapshotHeaderActions(section, payload, loading, sectionRefreshStatus) {
+      const refreshing = sectionRefreshStatus === 'refreshing';
+      const reloadButton = snapshotRefreshable(payload, loading)
+        ? `<button class="toolbar-button diagnostics-section-refresh" type="button" data-diagnostics-section-refresh="${escapeHtml(section.key)}" ${refreshing ? 'disabled' : ''}>${escapeHtml(refreshing ? 'Reloading...' : 'Reload')}</button>`
+        : '';
+      return `
+        <div class="diagnostics-section-actions">
+          <span>${escapeHtml(refreshing ? 'refreshing' : snapshotBadge(payload, loading))}</span>
+          ${reloadButton}
+        </div>
+      `;
+    }
+
+    function snapshotRefreshable(payload, loading) {
+      if (loading) return false;
+      if (!payload) return true;
+      return payload.status !== 'ready';
     }
 
     function renderBody(key, payload) {
@@ -475,13 +494,14 @@
           </div>
         </div>
         ${renderSimpleTable(
-          ['Week', 'Plan', 'Observed %', 'Credits', 'Projected/week', 'Confidence'],
+          ['Week', 'Plan', 'Observed %', 'Credits', 'Projected/week', '95% CI', 'Confidence'],
           chartPoints.slice(-6).map(point => [
             point.label,
             humanizeMetric(point.rate_limit_plan_type || 'unknown'),
             pct(Number(point.observed_usage_delta_percent || 0) / 100),
             numberText(point.observed_standard_usage_credits),
             numberText(point.projected_weekly_credits),
+            weeklyProjectionCiText(point),
             humanizeMetric(point.confidence),
           ]),
           'No weekly projection points in this snapshot.',
@@ -527,6 +547,13 @@
     function weeklyProjectionTickLabel(point) {
       const label = point.label || shortDate(point.end_event_timestamp);
       return String(label || '').replace(/^Reset\s+/i, '');
+    }
+
+    function weeklyProjectionCiText(point) {
+      if (point.ci_low === null || point.ci_low === undefined || point.ci_high === null || point.ci_high === undefined) {
+        return 'n/a';
+      }
+      return `${numberText(point.ci_low)} - ${numberText(point.ci_high)}`;
     }
 
     function weeklyProjectionPlanKey(point) {

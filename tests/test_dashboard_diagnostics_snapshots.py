@@ -294,6 +294,60 @@ console.log(JSON.stringify({
     assert payload["leaksRawPath"] is False
 
 
+def test_dashboard_stale_snapshot_panels_render_reload_buttons() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+const renderer = factory.create({
+  escapeHtml,
+  formatTimestamp: value => value,
+  number: new Intl.NumberFormat('en-US'),
+  pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+  renderState: message => `<div>${escapeHtml(message)}</div>`,
+  rowInvestigatorLink: () => '<a>1,000</a>',
+  tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+});
+const html = renderer.renderPanels({
+  loading: false,
+  payloads: {
+    overview: {
+      status: 'missing',
+      snapshot: {
+        history_scope: 'active',
+      },
+    },
+    toolOutput: {
+      status: 'ready',
+      refreshed: false,
+      snapshot: {
+        computed_at: '2026-06-20T00:00:00Z',
+        history_scope: 'active',
+        source_logs_scanned: 1,
+      },
+      summary: { function_calls: 1 },
+      functions: [],
+    },
+  },
+  sectionRefreshStatuses: {
+    overview: 'refreshing',
+  },
+});
+console.log(JSON.stringify({
+  hasOverviewReload: html.includes('data-diagnostics-section-refresh="overview"'),
+  overviewReloads: html.includes('Reloading...'),
+  hasCommandsReload: html.includes('data-diagnostics-section-refresh="commands"'),
+  hasToolOutputReload: html.includes('data-diagnostics-section-refresh="toolOutput"'),
+  readyBadgeStillVisible: html.includes('<span>stored</span>'),
+}));
+"""
+    )
+
+    assert payload["hasOverviewReload"] is True
+    assert payload["overviewReloads"] is True
+    assert payload["hasCommandsReload"] is True
+    assert payload["hasToolOutputReload"] is False
+    assert payload["readyBadgeStillVisible"] is True
+
+
 def test_dashboard_usage_drain_charts_render_as_featured_first() -> None:
     payload = _run_snapshot_renderer_script(
         """
@@ -370,11 +424,13 @@ const html = renderer.renderPanels({
 console.log(JSON.stringify({
   hasFeaturedBlock: html.includes('data-diagnostics-featured="usage-drain"'),
   featuredBeforeGrid: html.indexOf('data-diagnostics-featured="usage-drain"') < html.indexOf('diagnostics-snapshot-grid'),
-  weeklyBeforeProjection: html.indexOf('Weekly usage over time') < html.indexOf('Projected weekly credits over time'),
+  projectionBeforeWeekly: html.indexOf('Projected weekly credits over time') < html.indexOf('Weekly usage over time'),
   projectionBeforeOverview: html.indexOf('Projected weekly credits over time') < html.indexOf('Overview'),
   weeklyChartTitleCount: (html.match(/<strong>Weekly usage over time<\\/strong>/g) || []).length,
   weeklyRemainingPolylineCount: (html.match(/stroke="#059669"/g) || []).length,
   projectedChartTitleCount: (html.match(/<strong>Projected weekly credits over time<\\/strong>/g) || []).length,
+  hasCiColumn: html.includes('95% CI'),
+  hasFormattedCiRange: html.includes('25,000 - 35,000') && html.includes('36,000 - 44,000'),
   labelsRemainingAllowance: html.includes('Usage remaining') && html.includes('Weekly remaining'),
   labelsVisibleUsage: html.includes('Visible usage'),
   preservesMoneyCents: html.includes('$0.10'),
@@ -384,11 +440,13 @@ console.log(JSON.stringify({
 
     assert payload["hasFeaturedBlock"] is True
     assert payload["featuredBeforeGrid"] is True
-    assert payload["weeklyBeforeProjection"] is True
+    assert payload["projectionBeforeWeekly"] is True
     assert payload["projectionBeforeOverview"] is True
     assert payload["weeklyChartTitleCount"] == 1
     assert payload["weeklyRemainingPolylineCount"] == 2
     assert payload["projectedChartTitleCount"] == 1
+    assert payload["hasCiColumn"] is True
+    assert payload["hasFormattedCiRange"] is True
     assert payload["labelsRemainingAllowance"] is True
     assert payload["labelsVisibleUsage"] is False
     assert payload["preservesMoneyCents"] is True
