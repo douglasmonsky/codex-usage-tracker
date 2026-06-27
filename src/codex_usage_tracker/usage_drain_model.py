@@ -13,6 +13,15 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
+from codex_usage_tracker.usage_drain_error_diagnostics import (
+    prediction_error_diagnostics as _prediction_error_diagnostics,
+)
+from codex_usage_tracker.usage_drain_error_diagnostics import (
+    span_error_metadata as _span_error_metadata,
+)
+from codex_usage_tracker.usage_drain_error_diagnostics import (
+    value_distribution as _value_distribution,
+)
 from codex_usage_tracker.usage_drain_feature_history import (
     date_label as _date_label,
 )
@@ -198,22 +207,7 @@ from codex_usage_tracker.usage_drain_utils import (
     format_bucket_number as _format_bucket_number,
 )
 from codex_usage_tracker.usage_drain_utils import (
-    minute_bucket as _minute_bucket,
-)
-from codex_usage_tracker.usage_drain_utils import (
     number as _number,
-)
-from codex_usage_tracker.usage_drain_utils import (
-    numeric_bucket as _numeric_bucket,
-)
-from codex_usage_tracker.usage_drain_utils import (
-    parse_timestamp as _parse_timestamp,
-)
-from codex_usage_tracker.usage_drain_utils import (
-    reset_phase_bucket as _reset_phase_bucket,
-)
-from codex_usage_tracker.usage_drain_utils import (
-    reset_remaining_minutes as _reset_remaining_minutes,
 )
 from codex_usage_tracker.usage_drain_utils import (
     rounded as _rounded,
@@ -3551,194 +3545,16 @@ def _delta_bucket(value: float) -> str:
 
 
 
-def _span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
-    start_dt = _parse_timestamp(span.start_event_timestamp)
-    reset_timestamp = (
-        span.usage_window_resets_at
-        if span.usage_window_resets_at is not None
-        else span.rate_limit_primary_resets_at
-    )
-    reset_remaining_minutes = _reset_remaining_minutes(start_dt, reset_timestamp)
-    window_minutes = (
-        span.usage_window_minutes
-        if span.usage_window_minutes is not None
-        else span.rate_limit_primary_window_minutes or 0.0
-    )
-    reset_minutes = reset_remaining_minutes or 0.0
-    elapsed_fraction = (
-        min(max((window_minutes - reset_minutes) / window_minutes, 0.0), 1.0)
-        if window_minutes > 0
-        else 0.0
-    )
-    return {
-        "date": start_dt.date().isoformat() if start_dt else "missing",
-        "day_of_week": str(start_dt.weekday()) if start_dt else "missing",
-        "hour_bucket": f"{start_dt.hour:02d}" if start_dt else "missing",
-        "reset_phase": _reset_phase_bucket(elapsed_fraction),
-        "baseline_used_bucket": _numeric_bucket(
-            span.baseline_used_percent, width=5.0, max_value=100.0, suffix="pct"
-        ),
-        "window_elapsed_bucket": _reset_phase_bucket(elapsed_fraction),
-        "reset_remaining_bucket": _minute_bucket(reset_minutes),
-        "rate_limit_plan_type": span.rate_limit_plan_type or "missing",
-        "rate_limit_limit_id": span.rate_limit_limit_id or "missing",
-        "usage_window_source": span.usage_window_source or "missing",
-    }
 
 
-def _prediction_error_diagnostics(
-    rows: list[dict[str, Any]], model_name: str
-) -> dict[str, Any]:
-    errors: list[dict[str, Any]] = []
-    for row in rows:
-        predictions = row.get("predictions", {})
-        predicted = _number(predictions.get(model_name))
-        actual = _number(row.get("actual"))
-        previous_actual = _number(row.get("previous_actual"))
-        error = predicted - actual
-        errors.append(
-            {
-                "index": int(row["index"]),
-                "actual": actual,
-                "predicted": predicted,
-                "previous_actual": previous_actual,
-                "error": error,
-                "abs_error": abs(error),
-                "metadata": row.get("metadata", {}),
-            }
-        )
-    if not errors:
-        return {
-            "n": 0,
-            "exact_match_share": None,
-            "within_quarter_point_share": None,
-            "within_one_point_share": None,
-            "large_error_share": None,
-            "top_transition_errors": [],
-            "top_error_dates": [],
-            "error_by_day_of_week": [],
-            "error_by_hour": [],
-            "error_by_reset_phase": [],
-            "error_by_one_percent_streak": [],
-            "error_by_same_delta_streak": [],
-            "largest_errors": [],
-        }
-    return {
-        "n": len(errors),
-        "exact_match_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] == 0) / len(errors)
-        ),
-        "within_quarter_point_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] <= 0.25) / len(errors)
-        ),
-        "within_one_point_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] <= 1.0) / len(errors)
-        ),
-        "large_error_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] >= 5.0) / len(errors)
-        ),
-        "top_transition_errors": _top_transition_errors(errors),
-        "top_error_dates": _top_error_groups(errors, "date"),
-        "error_by_day_of_week": _top_error_groups(errors, "day_of_week"),
-        "error_by_hour": _top_error_groups(errors, "hour_bucket"),
-        "error_by_reset_phase": _top_error_groups(errors, "reset_phase"),
-        "error_by_one_percent_streak": _top_error_groups(
-            errors, "one_percent_streak_bucket"
-        ),
-        "error_by_same_delta_streak": _top_error_groups(
-            errors, "same_delta_streak_bucket"
-        ),
-        "largest_errors": _largest_prediction_errors(errors),
-    }
 
 
-def _top_transition_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    grouped: dict[tuple[float, float], list[dict[str, Any]]] = {}
-    for item in errors:
-        key = (round(item["previous_actual"], 6), round(item["actual"], 6))
-        grouped.setdefault(key, []).append(item)
-    rows = [
-        {
-            "previous_delta_percent": previous,
-            "actual_delta_percent": actual,
-            "count": len(items),
-            "mean_abs_error": _rounded(
-                sum(item["abs_error"] for item in items) / len(items)
-            ),
-            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
-        }
-        for (previous, actual), items in grouped.items()
-    ]
-    rows.sort(
-        key=lambda row: (
-            -_number(row["mean_abs_error"]),
-            -int(_number(row.get("count"))),
-        )
-    )
-    return rows[:10]
 
 
-def _top_error_groups(errors: list[dict[str, Any]], field_name: str) -> list[dict[str, Any]]:
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for item in errors:
-        metadata = item.get("metadata", {})
-        key = str(metadata.get(field_name) or "missing")
-        grouped.setdefault(key, []).append(item)
-    rows = [
-        {
-            field_name: key,
-            "count": len(items),
-            "mean_abs_error": _rounded(
-                sum(item["abs_error"] for item in items) / len(items)
-            ),
-            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
-        }
-        for key, items in grouped.items()
-    ]
-    rows.sort(
-        key=lambda row: (
-            -_number(row["mean_abs_error"]),
-            -int(_number(row.get("count"))),
-        )
-    )
-    return rows[:10]
 
 
-def _largest_prediction_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    rows = sorted(errors, key=lambda item: item["abs_error"], reverse=True)[:10]
-    return [
-        {
-            "index": item["index"],
-            "date": item["metadata"].get("date"),
-            "hour_bucket": item["metadata"].get("hour_bucket"),
-            "day_of_week": item["metadata"].get("day_of_week"),
-            "reset_phase": item["metadata"].get("reset_phase"),
-            "previous_delta_percent": _rounded(item["previous_actual"]),
-            "actual_delta_percent": _rounded(item["actual"]),
-            "predicted_delta_percent": _rounded(item["predicted"]),
-            "abs_error": _rounded(item["abs_error"]),
-        }
-        for item in rows
-    ]
 
 
-def _value_distribution(values: list[float]) -> dict[str, Any]:
-    if not values:
-        return {
-            "n": 0,
-            "mean": None,
-            "stddev": None,
-            "min": None,
-            "max": None,
-        }
-    mean = sum(values) / len(values)
-    return {
-        "n": len(values),
-        "mean": _rounded(mean),
-        "stddev": _rounded(_value_stddev(values)),
-        "min": _rounded(min(values)),
-        "max": _rounded(max(values)),
-    }
 
 
 def fit_usage_drain_proxy(
