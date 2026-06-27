@@ -6,7 +6,7 @@
   },
   "baselines": {
     "duplicate_helpers": {
-      "metric_value": 79,
+      "metric_value": 76,
       "items": [
         {
           "name": "_allowance_segment_record",
@@ -68,7 +68,6 @@
           "name": "_is_alternate_codex_limit",
           "occurrences": [
             "src/codex_usage_tracker/store.py",
-            "src/codex_usage_tracker/usage_drain_model.py",
             "src/codex_usage_tracker/usage_drain_reports.py",
             "src/codex_usage_tracker/usage_drain_time_series.py"
           ]
@@ -138,13 +137,6 @@
             "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
             "src/codex_usage_tracker/parser.py",
             "src/codex_usage_tracker/threads.py"
-          ]
-        },
-        {
-          "name": "_optional_text",
-          "occurrences": [
-            "src/codex_usage_tracker/store.py",
-            "src/codex_usage_tracker/usage_drain_model.py"
           ]
         },
         {

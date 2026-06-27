@@ -253,3 +253,60 @@ Checks:
 - `tach report src/codex_usage_tracker/usage_drain_reports.py --dependencies --usages`: passed.
 - `tach check`: expected informational failure with the same 13 documented boundary violations.
 - `git diff --check`: passed.
+
+### `refactor/usage-drain-model-split-2`
+
+Goal:
+
+- Move usage-drain span construction out of `usage_drain_model.py`.
+- Preserve `usage_drain_model.py` compatibility imports for existing scripts/tests.
+- Keep usage-drain dashboard/report/model payloads unchanged.
+- Ratchet maintainability baselines downward when the split reduces existing debt.
+
+Acceptance:
+
+- Direct usage-drain model tests pass.
+- Usage-drain dashboard report tests pass.
+- Full suite passes.
+- `tach.toml` tracks the new spans module without adding new strict-check violations.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_spans.py`.
+- Moved `build_usage_delta_spans`, `load_fast_proxy_annotations`, span row construction, usage-window selection, token component row conversion, and span-specific row coercion helpers.
+- Moved `TOKEN_COMPONENT_FIELDS` and `EFFORT_LEVELS` to `usage_drain_types.py`.
+- Kept compatibility imports in `usage_drain_model.py` for existing `scripts/model_usage_drain.py` and tests.
+- Updated `tach.toml` so `usage_drain_spans.py` belongs to the diagnostics module group.
+
+Metrics:
+
+- `usage_drain_model.py`: 6,269 lines after split.
+- `usage_drain_spans.py`: 348 lines.
+- `usage_drain_types.py`: 187 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down from 10,001 to 9,668 total source-line overage.
+- `git-agent-ratchet duplicate-helpers`: baseline ratcheted down from 79 to 76 duplicate helper names.
+
+Checks:
+
+- `python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `python -m pytest`: 325 passed.
+- `python -m ruff check .`: passed.
+- `python -m mypy`: passed.
+- `python -m compileall src`: passed.
+- `python scripts/check_release.py`: passed.
+- `python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning and a large-diff warning.
+- `git-agent-ratchet max-file-lines ...`: passed after ratcheting the baseline down.
+- `git-agent-ratchet no-cross-module-private-import ...`: passed.
+- `git-agent-ratchet no-duplicate-helpers ...`: passed after ratcheting the baseline down.
+- `tach report src/codex_usage_tracker/usage_drain_reports.py --dependencies --usages`: passed.
+- `tach map -o /tmp/codex-usage-tracker-tach-map.json`: passed.
+- `tach check`: expected informational failure with the same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+
+- Continue with feature/model-fitting extraction inside usage-drain modeling, targeting `_span_feature_row`, predictive feature row enrichment, and `fit_usage_drain_proxy` in smaller commits.

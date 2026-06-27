@@ -26,10 +26,19 @@ TOKEN_TOTAL_FIELDS = (
     "total_tokens",
 )
 
+TOKEN_COMPONENT_FIELDS = (
+    "uncached_input_tokens",
+    "cached_input_tokens",
+    "reasoning_output_tokens",
+    "nonreasoning_output_tokens",
+)
+
 TIMING_TOTAL_FIELDS = (
     "call_duration_seconds",
     "previous_call_delta_seconds",
 )
+
+EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "missing", "other")
 
 def _span_optional_round(value: float | int | None, digits: int = 6) -> float | None:
     if value is None:
