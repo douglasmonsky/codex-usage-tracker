@@ -635,3 +635,50 @@ Checks:
 
 Next handoff:
 - Continue the walk-forward diagnostic split in a separate local branch. Good next candidates are `_state_bucket_predictions`, `_transition_risk_predictions`, `_state_bucket_transition_risk`, `_transition_rate`, `_state_bucket_prediction`, and state bucket diagnostics; keep threshold-gated delta prediction and row generation for later slices if the module would exceed the size budget.
+### `refactor/usage-drain-state-buckets`
+
+Goal:
+- Move reusable state-bucket prediction and transition-risk detail helpers out of `usage_drain_model.py`.
+- Keep regime-grace transition orchestration in `usage_drain_model.py` for a later narrower branch.
+- Preserve existing report schema and helper names through compatibility imports.
+
+Acceptance:
+- Focused usage-drain tests pass.
+- Full test suite passes.
+- `agent-maintainer verify --profile fast` passes.
+- Ratchets pass and max-file-lines tightens.
+- `tach.toml` explicitly tracks the new state bucket module.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/usage_drain_state_buckets.py` for state-bucket model signatures, minimum support, state-bucket predictions, transition-rate helpers, bucket diagnostics, and transition-risk detail diagnostics.
+- Replaced local state-bucket helper definitions in `usage_drain_model.py` with compatibility imports.
+- Left `_transition_risk_predictions` in `usage_drain_model.py` because it still owns regime-grace policy decisions.
+- Updated `tach.toml` so `usage_drain_state_buckets.py` belongs to the diagnostics/reporting boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Metrics:
+- `usage_drain_model.py`: 4,205 lines.
+- `usage_drain_state_buckets.py`: 235 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down 7,811 -> 7,617 total source-line overage.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_state_buckets.py src/codex_usage_tracker/usage_drain_state_diagnostics.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and no-test-file change-budget warning for behavior-preserving refactor.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_state_buckets.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-state-buckets.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+- Continue usage-drain walk-forward split with threshold-gated delta helpers or transition-risk summary metrics in a separate branch. Keep `_walk_forward_prediction_rows` and `_walk_forward_prediction_summary` for a later orchestration branch unless characterization coverage is broadened first.
