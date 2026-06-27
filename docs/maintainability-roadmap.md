@@ -201,3 +201,55 @@ Current boundary debt:
 Next handoff:
 
 - Use the boundary debt list to choose the first safe refactor target after the usage-drain split branches, or deliberately reorder if store/parser/context boundaries look lower risk than usage-drain.
+
+### `refactor/usage-drain-model-split-1`
+
+Goal:
+
+- Add characterization coverage for the usage-drain model summary payload.
+- Move shared usage-drain types and constants out of the giant model module.
+- Preserve `usage_drain_model.py` as the compatibility facade for current imports.
+- Keep CLI/API/dashboard payload behavior unchanged.
+
+Acceptance:
+
+- Existing usage-drain report tests pass.
+- New characterization test protects summary schema, span stats, plan/model mixes, token component features, fast-proxy result list, and predictive-modeling block shape.
+- `usage_drain_model.py` line count moves downward without algorithm changes.
+- `tach.toml` tracks the new type module.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_types.py`.
+- Moved `FastProxyAnnotation`, `UsageDeltaSpan`, `UsageDrainModelResult`, `PredictiveModelSpec`, documented fast multipliers, proxy names, and shared span field constants.
+- Added `test_usage_drain_model_summary_characterizes_synthetic_spans`.
+
+Remaining before local commit:
+
+- None.
+
+Metrics:
+
+- `usage_drain_model.py`: 6,602 lines after split.
+- `usage_drain_types.py`: 178 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down from 10,152 to 10,001 total source-line overage.
+
+Checks:
+
+- `python -m pytest tests/test_usage_drain_reports.py`: 5 passed.
+- `python -m pytest`: 325 passed.
+- `python -m ruff check .`: passed.
+- `python -m mypy`: passed.
+- `python -m compileall src`: passed.
+- `python scripts/check_release.py`: passed.
+- `python -m agent_maintainer verify --profile fast`: passed with the existing structure-cohesion warning.
+- `git-agent-ratchet max-file-lines ...`: passed after ratcheting the baseline down.
+- `git-agent-ratchet no-cross-module-private-import ...`: passed.
+- `git-agent-ratchet no-duplicate-helpers ...`: passed.
+- `tach report src/codex_usage_tracker/usage_drain_reports.py --dependencies --usages`: passed.
+- `tach check`: expected informational failure with the same 13 documented boundary violations.
+- `git diff --check`: passed.

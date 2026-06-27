@@ -23,6 +23,7 @@ paths = [
     "codex_usage_tracker.projects",
     "codex_usage_tracker.redaction",
     "codex_usage_tracker.schema",
+    "codex_usage_tracker.usage_drain_types",
 ]
 depends_on = [
     "codex_usage_tracker.call_origin",
@@ -34,6 +35,7 @@ depends_on = [
     "codex_usage_tracker.projects",
     "codex_usage_tracker.redaction",
     "codex_usage_tracker.schema",
+    "codex_usage_tracker.usage_drain_types",
 ]
 
 [[modules]]
@@ -217,6 +219,7 @@ depends_on = [
     "codex_usage_tracker.usage_drain_model",
     "codex_usage_tracker.usage_drain_reports",
     "codex_usage_tracker.usage_drain_time_series",
+    "codex_usage_tracker.usage_drain_types",
 ]
 
 [[modules]]
