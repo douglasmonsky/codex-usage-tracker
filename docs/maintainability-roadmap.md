@@ -534,3 +534,58 @@ Checks:
 Next handoff:
 
 - Continue usage-drain split work with walk-forward and boundary diagnostics. Keep the next branch narrower than the current one; target one diagnostic family at a time before moving on to store/server roadmap items.
+
+### `refactor/usage-drain-summary-metrics`
+
+Goal:
+
+- Move usage-drain summary metric helpers out of `usage_drain_model.py` before extracting the larger walk-forward engine.
+- Preserve existing summary/report behavior through compatibility aliases and imported correlation constants.
+- Keep the new summary module under `agent-maintainer` source-line limits.
+
+Acceptance:
+
+- Focused usage-drain tests pass.
+- Full test suite passes.
+- `agent-maintainer verify --profile fast` passes.
+- Ratchets pass and max-file-lines tightens.
+- `tach.toml` explicitly tracks the summary metrics module.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_summary_metrics.py` for model family attribution, best-holdout selection, span correlation rows, correlation reports, and delta distributions.
+- Moved `SPAN_RAW_CORRELATION_FEATURES` and `SPAN_CAPACITY_CORRELATION_FEATURES` with the correlation helpers.
+- Replaced local helper definitions in `usage_drain_model.py` with compatibility aliases from the summary metrics module.
+- Fixed moved-module dependencies on token total fields and span wall-time helpers.
+- Updated `tach.toml` so `usage_drain_summary_metrics.py` belongs to the diagnostics/reporting boundary group.
+
+Metrics:
+
+- `usage_drain_model.py`: 4,596 lines.
+- `usage_drain_summary_metrics.py`: 288 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down 8,247 -> 7,995 total source-line overage.
+
+Checks:
+
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion and large-diff/no-test-file warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines ...`: passed and ratcheted baseline down.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import ...`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers ...`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_summary_metrics.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-summary-metrics.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+
+- Continue with walk-forward transition diagnostics in a separate branch. Start by moving `_walk_forward_prediction_summary`, `_walk_forward_prediction_rows`, and directly required transition-risk helpers if they stay under the file-size gate; otherwise split risk helpers first.
