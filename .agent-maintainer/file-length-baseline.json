@@ -1,0 +1,125 @@
+{
+  "files": {
+    "scripts/benchmark_synthetic_history.py": {
+      "physical": 843,
+      "source": 782
+    },
+    "scripts/check_release.py": {
+      "physical": 658,
+      "source": 603
+    },
+    "scripts/model_usage_drain.py": {
+      "physical": 653,
+      "source": 634
+    },
+    "src/codex_usage_tracker/allowance.py": {
+      "physical": 759,
+      "source": 669
+    },
+    "src/codex_usage_tracker/cli.py": {
+      "physical": 976,
+      "source": 901
+    },
+    "src/codex_usage_tracker/cli_parser.py": {
+      "physical": 742,
+      "source": 662
+    },
+    "src/codex_usage_tracker/context.py": {
+      "physical": 1082,
+      "source": 961
+    },
+    "src/codex_usage_tracker/dashboard.py": {
+      "physical": 667,
+      "source": 619
+    },
+    "src/codex_usage_tracker/diagnostic_facts.py": {
+      "physical": 636,
+      "source": 554
+    },
+    "src/codex_usage_tracker/diagnostic_reports.py": {
+      "physical": 507,
+      "source": 458
+    },
+    "src/codex_usage_tracker/diagnostic_snapshot_analysis.py": {
+      "physical": 590,
+      "source": 543
+    },
+    "src/codex_usage_tracker/diagnostic_snapshots.py": {
+      "physical": 823,
+      "source": 755
+    },
+    "src/codex_usage_tracker/diagnostics.py": {
+      "physical": 640,
+      "source": 583
+    },
+    "src/codex_usage_tracker/json_contracts.py": {
+      "physical": 574,
+      "source": 555
+    },
+    "src/codex_usage_tracker/parser.py": {
+      "physical": 852,
+      "source": 747
+    },
+    "src/codex_usage_tracker/reports.py": {
+      "physical": 637,
+      "source": 585
+    },
+    "src/codex_usage_tracker/server.py": {
+      "physical": 1508,
+      "source": 1440
+    },
+    "src/codex_usage_tracker/store.py": {
+      "physical": 1800,
+      "source": 1677
+    },
+    "src/codex_usage_tracker/usage_drain_model.py": {
+      "physical": 6753,
+      "source": 6287
+    },
+    "src/codex_usage_tracker/usage_drain_reports.py": {
+      "physical": 677,
+      "source": 601
+    },
+    "tests/test_cli_lifecycle.py": {
+      "physical": 796,
+      "source": 751
+    },
+    "tests/test_cli_release.py": {
+      "physical": 537,
+      "source": 461
+    },
+    "tests/test_dashboard_diagnostics_snapshots.py": {
+      "physical": 755,
+      "source": 724
+    },
+    "tests/test_dashboard_payload.py": {
+      "physical": 800,
+      "source": 767
+    },
+    "tests/test_dashboard_server.py": {
+      "physical": 1150,
+      "source": 1087
+    },
+    "tests/test_diagnostic_snapshots.py": {
+      "physical": 714,
+      "source": 652
+    },
+    "tests/test_parser.py": {
+      "physical": 603,
+      "source": 544
+    },
+    "tests/test_store_dashboard_mcp.py": {
+      "physical": 1186,
+      "source": 1092
+    },
+    "tests/test_usage_drain_model.py": {
+      "physical": 918,
+      "source": 847
+    }
+  },
+  "limits": {
+    "max_physical": 600,
+    "max_source": 450
+  },
+  "version": 1
+}
