@@ -112,9 +112,6 @@ from codex_usage_tracker.usage_drain_state_buckets import (
 from codex_usage_tracker.usage_drain_state_buckets import (
     transition_rate as _transition_rate,
 )
-from codex_usage_tracker.usage_drain_state_buckets import (
-    transition_risk_detail_diagnostics as _transition_risk_detail_diagnostics,
-)
 from codex_usage_tracker.usage_drain_state_diagnostics import (
     state_ambiguity_summary as _state_ambiguity_summary,
 )
@@ -145,6 +142,12 @@ from codex_usage_tracker.usage_drain_summary_metrics import (
 )
 from codex_usage_tracker.usage_drain_summary_metrics import (
     visible_delta_family_sequences as _visible_delta_family_sequences,
+)
+from codex_usage_tracker.usage_drain_transition_metrics import (
+    binary_risk_metrics as _binary_risk_metrics,
+)
+from codex_usage_tracker.usage_drain_transition_metrics import (
+    transition_target_metrics as _transition_target_metrics,
 )
 from codex_usage_tracker.usage_drain_types import (
     DEFAULT_PROXY_NAMES,
@@ -3600,130 +3603,14 @@ def _transition_risk_scope(
     }
 
 
-def _transition_target_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    actual = [
-        0 if _is_one_percent_delta(_number(row.get("actual"))) else 1
-        for row in rows
-    ]
-    risk_models = _transition_risk_model_names(rows)
-    return {
-        "n": len(rows),
-        "positive_count": sum(actual),
-        "positive_rate": _rounded(sum(actual) / len(actual) if actual else None),
-        "models": {
-            model_name: _binary_risk_metrics(
-                actual,
-                [
-                    _number((row.get("transition_risks") or {}).get(model_name))
-                    for row in rows
-                ],
-            )
-            for model_name in risk_models
-        },
-        "risk_detail_diagnostics": {
-            model_name: _transition_risk_detail_diagnostics(rows, model_name)
-            for model_name in risk_models
-            if model_name not in {"overall_prior_rate", "stable_one_percent_rule"}
-        },
-    }
 
 
-def _transition_risk_model_names(rows: list[dict[str, Any]]) -> list[str]:
-    if not rows:
-        return []
-    names: list[str] = []
-    for row in rows:
-        for name in (row.get("transition_risks") or {}):
-            if name not in names:
-                names.append(str(name))
-    return names
 
 
-def _binary_risk_metrics(actual: list[int], scores: list[float]) -> dict[str, Any]:
-    if not actual or len(actual) != len(scores):
-        return {
-            "n": len(actual),
-            "brier": None,
-            "auc": None,
-            "average_precision": None,
-            "precision_at_top_10pct": None,
-            "recall_at_top_10pct": None,
-            "top_10pct_positive_rate": None,
-            "mean_score_positive": None,
-            "mean_score_negative": None,
-        }
-    clipped_scores = [min(max(score, 0.0), 1.0) for score in scores]
-    positives = [score for value, score in zip(actual, clipped_scores, strict=True) if value]
-    negatives = [
-        score for value, score in zip(actual, clipped_scores, strict=True) if not value
-    ]
-    top_count = max(1, math.ceil(len(actual) * 0.1))
-    ranked = sorted(
-        zip(actual, clipped_scores, strict=True),
-        key=lambda item: item[1],
-        reverse=True,
-    )
-    top = ranked[:top_count]
-    positive_count = sum(actual)
-    top_positive_count = sum(value for value, _score in top)
-    return {
-        "n": len(actual),
-        "brier": _rounded(
-            sum((score - value) ** 2 for value, score in zip(actual, clipped_scores, strict=True))
-            / len(actual)
-        ),
-        "auc": _rounded(_binary_auc(actual, clipped_scores)),
-        "average_precision": _rounded(_average_precision(actual, clipped_scores)),
-        "precision_at_top_10pct": _rounded(top_positive_count / len(top)),
-        "recall_at_top_10pct": _rounded(
-            top_positive_count / positive_count if positive_count else None
-        ),
-        "top_10pct_positive_rate": _rounded(top_positive_count / len(top)),
-        "mean_score_positive": _rounded(
-            sum(positives) / len(positives) if positives else None
-        ),
-        "mean_score_negative": _rounded(
-            sum(negatives) / len(negatives) if negatives else None
-        ),
-    }
 
 
-def _binary_auc(actual: list[int], scores: list[float]) -> float | None:
-    positive_count = sum(actual)
-    negative_count = len(actual) - positive_count
-    if positive_count == 0 or negative_count == 0:
-        return None
-    ranked = sorted(zip(scores, actual, strict=True), key=lambda item: item[0])
-    rank_sum = 0.0
-    index = 0
-    while index < len(ranked):
-        end = index
-        while end + 1 < len(ranked) and ranked[end + 1][0] == ranked[index][0]:
-            end += 1
-        average_rank = ((index + 1) + (end + 1)) / 2.0
-        positives_in_tie = sum(value for _score, value in ranked[index : end + 1])
-        rank_sum += positives_in_tie * average_rank
-        index = end + 1
-    return (rank_sum - (positive_count * (positive_count + 1) / 2.0)) / (
-        positive_count * negative_count
-    )
 
 
-def _average_precision(actual: list[int], scores: list[float]) -> float | None:
-    positive_count = sum(actual)
-    if positive_count == 0:
-        return None
-    ranked = sorted(
-        zip(actual, scores, strict=True), key=lambda item: item[1], reverse=True
-    )
-    seen_positive = 0
-    precision_sum = 0.0
-    for rank, (value, _score) in enumerate(ranked, start=1):
-        if not value:
-            continue
-        seen_positive += 1
-        precision_sum += seen_positive / rank
-    return precision_sum / positive_count
 
 
 

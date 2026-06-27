@@ -188,6 +188,7 @@ paths = [
   "codex_usage_tracker.usage_drain_state_diagnostics",
   "codex_usage_tracker.usage_drain_summary_metrics",
   "codex_usage_tracker.usage_drain_time_series",
+  "codex_usage_tracker.usage_drain_transition_metrics",
 ]
 depends_on = [
     "codex_usage_tracker.allowance",
@@ -239,6 +240,7 @@ depends_on = [
   "codex_usage_tracker.usage_drain_state_diagnostics",
   "codex_usage_tracker.usage_drain_summary_metrics",
   "codex_usage_tracker.usage_drain_time_series",
+  "codex_usage_tracker.usage_drain_transition_metrics",
   "codex_usage_tracker.usage_drain_types",
   "codex_usage_tracker.usage_drain_utils",
 ]
