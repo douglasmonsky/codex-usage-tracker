@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.11.4 - 2026-06-27
+
+- Fix `codex-usage-tracker setup` on large local histories by batching stale diagnostic-fact deletes so SQLite does not exceed bound-variable limits during usage index refresh.
+- Add synthetic regression coverage for large diagnostic fact refreshes under a low SQLite variable ceiling. Thanks to `@gevikhn` for the Windows setup failure report.
+
 ## 0.11.3 - 2026-06-23
 
 - Fix Windows `serve-dashboard` asset loading by forcing JavaScript, CSS, JSON, and SVG MIME types in the localhost server instead of trusting OS registry MIME mappings.
