@@ -2,6 +2,6 @@
 
 from codex_usage_tracker.models import UsageEvent
 
-__version__ = "0.11.3"
+__version__ = "0.11.4"
 
 __all__ = ["UsageEvent", "__version__"]
