@@ -53,6 +53,7 @@ EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
+SQLITE_VARIABLE_BATCH_SIZE = 500
 USAGE_TIMING_SELECT_SQL = """
     previous_usage.event_timestamp AS previous_call_event_timestamp,
     previous_usage.session_id AS previous_call_session_id,
@@ -436,11 +437,14 @@ def _delete_diagnostic_facts_for_record_ids(
 ) -> None:
     if not record_ids:
         return
-    placeholders = ", ".join("?" for _record_id in record_ids)
-    conn.execute(
-        f"DELETE FROM call_diagnostic_facts WHERE record_id IN ({placeholders})",
-        record_ids,
-    )
+    unique_record_ids = list(dict.fromkeys(record_ids))
+    for start in range(0, len(unique_record_ids), SQLITE_VARIABLE_BATCH_SIZE):
+        chunk = unique_record_ids[start : start + SQLITE_VARIABLE_BATCH_SIZE]
+        placeholders = ", ".join("?" for _record_id in chunk)
+        conn.execute(
+            f"DELETE FROM call_diagnostic_facts WHERE record_id IN ({placeholders})",
+            chunk,
+        )
 
 
 def _insert_diagnostic_facts(
