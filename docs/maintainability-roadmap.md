@@ -477,3 +477,60 @@ Checks:
 Next handoff:
 
 - Continue predictive fitting orchestration extraction in a separate branch. Target `_fit_predictive_model`, `_fit_causal_baseline_models`, `_predictive_model_specs`, and capacity residual diagnostics separately from walk-forward diagnostics.
+
+### `refactor/usage-drain-predictive-orchestration`
+
+Goal:
+
+- Move predictive usage-drain model orchestration out of `usage_drain_model.py`.
+- Keep predictive model specs in a separate size-compliant module.
+- Preserve existing model/report behavior through compatibility aliases still used by capacity modeling paths.
+
+Acceptance:
+
+- Focused usage-drain tests pass.
+- Full test suite passes.
+- `agent-maintainer verify --profile fast` passes after splitting oversized new modules.
+- Ratchets pass and max-file-lines tightens.
+- `tach.toml` explicitly tracks predictive orchestration and spec modules.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_predictive.py` for predictive model orchestration, split generation, causal baselines, fitted model assembly, and capacity residual diagnostics.
+- Added `src/codex_usage_tracker/usage_drain_predictive_specs.py` for predictive model specifications.
+- Replaced local predictive orchestration definitions in `usage_drain_model.py` with compatibility aliases from the new modules.
+- Split predictive specs into their own module after `agent-maintainer` flagged the first new predictive module as over the source-line budget.
+- Updated `tach.toml` so both predictive modules live in the diagnostics/reporting boundary group.
+
+Metrics:
+
+- `usage_drain_model.py`: 4,848 lines.
+- `usage_drain_predictive.py`: 315 lines.
+- `usage_drain_predictive_specs.py`: 268 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down 8,802 -> 8,247 total source-line overage.
+
+Checks:
+
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion and large-diff/no-test-file warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines ...`: passed and ratcheted baseline down.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import ...`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers ...`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_predictive.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_predictive_specs.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-predictive.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+
+- Continue usage-drain split work with walk-forward and boundary diagnostics. Keep the next branch narrower than the current one; target one diagnostic family at a time before moving on to store/server roadmap items.
