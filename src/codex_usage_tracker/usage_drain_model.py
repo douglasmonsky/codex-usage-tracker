@@ -9,11 +9,46 @@ from __future__ import annotations
 
 import csv
 import math
-from datetime import datetime
 from pathlib import Path
 from statistics import median
 from typing import Any
 
+from codex_usage_tracker.usage_drain_feature_history import (
+    add_causal_history_features as _add_causal_history_features,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    date_label as _date_label,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    is_one_percent_delta as _is_one_percent_delta,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    previous_value as _previous_value,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    rolling_mean as _rolling_mean,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    rolling_median as _rolling_median,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    rolling_stddev as _rolling_stddev,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    same_value_tail_streak as _same_value_tail_streak,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    streak_bucket as _streak_bucket,
+)
+from codex_usage_tracker.usage_drain_feature_history import (
+    tail_streak as _tail_streak,
+)
+from codex_usage_tracker.usage_drain_features import (
+    add_days_since_first_span as _add_days_since_first_span,
+)
+from codex_usage_tracker.usage_drain_features import (
+    span_feature_row as _span_feature_row,
+)
 from codex_usage_tracker.usage_drain_spans import (
     build_usage_delta_spans,
     load_fast_proxy_annotations,  # noqa: F401
@@ -21,7 +56,6 @@ from codex_usage_tracker.usage_drain_spans import (
 from codex_usage_tracker.usage_drain_types import (
     DEFAULT_PROXY_NAMES,
     DOCUMENTED_FAST_CREDIT_MULTIPLIERS,
-    EFFORT_LEVELS,
     TIMING_TOTAL_FIELDS,  # noqa: F401
     TOKEN_COMPONENT_FIELDS,
     TOKEN_TOTAL_FIELDS,
@@ -36,9 +70,6 @@ from codex_usage_tracker.usage_drain_utils import (
 )
 from codex_usage_tracker.usage_drain_utils import (
     ceil_to_visible_tick as _ceil_to_visible_tick,
-)
-from codex_usage_tracker.usage_drain_utils import (
-    dominant_label as _dominant_label,
 )
 from codex_usage_tracker.usage_drain_utils import (
     format_bucket_number as _format_bucket_number,
@@ -5269,552 +5300,6 @@ def _predictive_model_specs() -> list[PredictiveModelSpec]:
             ),
         ),
     ]
-
-
-def _span_feature_row(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]:
-    start_dt = _parse_timestamp(span.start_event_timestamp)
-    date_label = start_dt.date().isoformat() if start_dt else "missing"
-    day_index = start_dt.weekday() if start_dt else -1
-    hour_value = (
-        start_dt.hour + (start_dt.minute / 60.0) + (start_dt.second / 3600.0)
-        if start_dt
-        else 0.0
-    )
-    hour_bucket = f"{start_dt.hour:02d}" if start_dt else "missing"
-    standard = span.standard_usage_credits
-    candidate = span.candidate_standard_credits.get(proxy, 0.0)
-    non_candidate = span.non_candidate_standard_credits.get(proxy, 0.0)
-    documented = span.documented_fast_weighted_credits.get(proxy, standard)
-    input_tokens = span.token_totals.get("input_tokens", 0.0)
-    cached_tokens = span.token_totals.get("cached_input_tokens", 0.0)
-    output_tokens = span.token_totals.get("output_tokens", 0.0)
-    reasoning_tokens = span.token_totals.get("reasoning_output_tokens", 0.0)
-    total_tokens = span.token_totals.get("total_tokens", 0.0)
-    duration = span.timing_totals.get("call_duration_seconds", 0.0)
-    span_wall_time_seconds = _span_wall_time_seconds(span)
-    turn_count = span.turn_count if span.turn_count > 0 else min(span.row_count, 1)
-    max_calls_in_turn = span.max_calls_in_turn if span.max_calls_in_turn > 0 else (
-        span.row_count if span.row_count > 0 else 0
-    )
-    same_turn_share = max_calls_in_turn / span.row_count if span.row_count else 0.0
-    window_minutes = (
-        span.usage_window_minutes
-        if span.usage_window_minutes is not None
-        else span.rate_limit_primary_window_minutes or 0.0
-    )
-    reset_timestamp = (
-        span.usage_window_resets_at
-        if span.usage_window_resets_at is not None
-        else span.rate_limit_primary_resets_at
-    )
-    reset_remaining_minutes = _reset_remaining_minutes(start_dt, reset_timestamp)
-    reset_minutes = reset_remaining_minutes or 0.0
-    window_elapsed_minutes = (
-        max(window_minutes - reset_minutes, 0.0) if window_minutes > 0 else 0.0
-    )
-    window_elapsed_fraction = (
-        min(max(window_elapsed_minutes / window_minutes, 0.0), 1.0)
-        if window_minutes > 0
-        else 0.0
-    )
-    day_of_week = str(day_index) if day_index >= 0 else "missing"
-    baseline_used_bucket = _numeric_bucket(
-        span.baseline_used_percent, width=5.0, max_value=100.0, suffix="pct"
-    )
-    window_elapsed_bucket = _reset_phase_bucket(window_elapsed_fraction)
-    reset_remaining_bucket = _minute_bucket(reset_minutes)
-    row_count_bucket = _numeric_bucket(
-        float(span.row_count), width=5.0, max_value=50.0, suffix="calls"
-    )
-    call_duration_bucket = _second_bucket(duration)
-    span_wall_time_bucket = _second_bucket(span_wall_time_seconds)
-    effort_total = sum(span.effort_counts.values())
-    dominant_effort = _dominant_label(span.effort_counts, default="missing")
-    dominant_effort_count = span.effort_counts.get(dominant_effort, 0)
-    effort_purity = dominant_effort_count / effort_total if effort_total else 0.0
-    effort_shares = {
-        effort: span.effort_counts.get(effort, 0) / effort_total
-        if effort_total
-        else 0.0
-        for effort in EFFORT_LEVELS
-    }
-    return {
-        "target": span.delta_usage_percent,
-        "start_event_timestamp": span.start_event_timestamp,
-        "standard_usage_credits": standard,
-        "log_standard_usage_credits": math.log1p(max(standard, 0.0)),
-        "row_count": float(span.row_count),
-        "input_tokens": input_tokens,
-        "cached_input_tokens": cached_tokens,
-        "uncached_input_tokens": span.token_totals.get("uncached_input_tokens", 0.0),
-        "output_tokens": output_tokens,
-        "reasoning_output_tokens": reasoning_tokens,
-        "total_tokens": total_tokens,
-        "cache_ratio": cached_tokens / input_tokens if input_tokens else 0.0,
-        "output_token_share": output_tokens / total_tokens if total_tokens else 0.0,
-        "reasoning_output_share": reasoning_tokens / output_tokens if output_tokens else 0.0,
-        "mean_usage_credits_per_call": standard / span.row_count if span.row_count else 0.0,
-        "turn_count": float(turn_count),
-        "log_turn_count": math.log1p(max(turn_count, 0)),
-        "multi_call_turn_count": float(span.multi_call_turn_count),
-        "max_calls_in_turn": float(max_calls_in_turn),
-        "same_turn_share": same_turn_share,
-        "calls_per_turn": span.row_count / turn_count if turn_count else 0.0,
-        "credits_per_turn": standard / turn_count if turn_count else 0.0,
-        "tokens_per_turn": total_tokens / turn_count if turn_count else 0.0,
-        "input_tokens_per_turn": input_tokens / turn_count if turn_count else 0.0,
-        "output_tokens_per_turn": output_tokens / turn_count if turn_count else 0.0,
-        "credits_per_call": standard / span.row_count if span.row_count else 0.0,
-        "tokens_per_call": total_tokens / span.row_count if span.row_count else 0.0,
-        "candidate_standard_credits": candidate,
-        "non_candidate_standard_credits": non_candidate,
-        "candidate_credit_share": candidate / standard if standard else 0.0,
-        "documented_fast_weighted_credits": documented,
-        "documented_fast_extra_credits": max(documented - standard, 0.0),
-        "dominant_effort": dominant_effort,
-        "effort_mix": "pure" if effort_purity >= 1.0 else "mixed",
-        "effort_purity": effort_purity,
-        "effort_low_share": effort_shares["low"],
-        "effort_medium_share": effort_shares["medium"],
-        "effort_high_share": effort_shares["high"],
-        "effort_xhigh_share": effort_shares["xhigh"],
-        "effort_missing_share": effort_shares["missing"],
-        "effort_other_share": effort_shares["other"],
-        "effort_non_xhigh_share": 1.0 - effort_shares["xhigh"],
-        "baseline_used_percent": span.baseline_used_percent,
-        "rate_limit_primary_window_minutes": span.rate_limit_primary_window_minutes or 0.0,
-        "usage_window_minutes": window_minutes,
-        "usage_window_source": span.usage_window_source or "missing",
-        "reset_remaining_minutes": reset_minutes,
-        "window_elapsed_minutes": window_elapsed_minutes,
-        "window_elapsed_fraction": window_elapsed_fraction,
-        "baseline_used_bucket": baseline_used_bucket,
-        "window_elapsed_bucket": window_elapsed_bucket,
-        "reset_remaining_bucket": reset_remaining_bucket,
-        "baseline_used_x_window_elapsed_bucket": (
-            f"{baseline_used_bucket}__{window_elapsed_bucket}"
-        ),
-        "hour_x_window_elapsed_bucket": f"{hour_bucket}__{window_elapsed_bucket}",
-        "day_x_hour_bucket": f"{day_of_week}__{hour_bucket}",
-        "days_since_first_span": 0.0,
-        "hour_sin": math.sin(2 * math.pi * hour_value / 24.0),
-        "hour_cos": math.cos(2 * math.pi * hour_value / 24.0),
-        "day_of_week_sin": math.sin(2 * math.pi * day_index / 7.0) if day_index >= 0 else 0.0,
-        "day_of_week_cos": math.cos(2 * math.pi * day_index / 7.0) if day_index >= 0 else 0.0,
-        "is_weekend": 1.0 if day_index in {5, 6} else 0.0,
-        "call_duration_seconds": duration,
-        "mean_call_duration_seconds": duration / span.row_count if span.row_count else 0.0,
-        "previous_call_delta_seconds": span.timing_totals.get("previous_call_delta_seconds", 0.0),
-        "span_wall_time_seconds": span_wall_time_seconds,
-        "span_wall_time_minutes": span_wall_time_seconds / 60.0,
-        "mean_span_wall_time_seconds_per_call": (
-            span_wall_time_seconds / span.row_count if span.row_count else 0.0
-        ),
-        "row_count_bucket": row_count_bucket,
-        "call_duration_bucket": call_duration_bucket,
-        "span_wall_time_bucket": span_wall_time_bucket,
-        "row_count_x_call_duration_bucket": (
-            f"{row_count_bucket}__{call_duration_bucket}"
-        ),
-        "row_count_x_span_wall_time_bucket": (
-            f"{row_count_bucket}__{span_wall_time_bucket}"
-        ),
-        "call_duration_x_span_wall_time_bucket": (
-            f"{call_duration_bucket}__{span_wall_time_bucket}"
-        ),
-        "hour_x_row_count_bucket": f"{hour_bucket}__{row_count_bucket}",
-        "baseline_used_x_row_count_bucket": (
-            f"{baseline_used_bucket}__{row_count_bucket}"
-        ),
-        "date": date_label,
-        "day_of_week": day_of_week,
-        "hour_bucket": hour_bucket,
-        "rate_limit_plan_type": span.rate_limit_plan_type or "missing",
-        "rate_limit_limit_id": span.rate_limit_limit_id or "missing",
-    }
-
-
-def _add_days_since_first_span(rows: list[dict[str, Any]]) -> None:
-    first_date: datetime | None = None
-    for row in rows:
-        parsed = _parse_timestamp(str(row.get("date") or ""))
-        if parsed is None:
-            parsed = _parse_timestamp(str(row.get("start_event_timestamp") or ""))
-        if parsed is not None and first_date is None:
-            first_date = parsed
-        if parsed is None or first_date is None:
-            row["days_since_first_span"] = 0.0
-        else:
-            row["days_since_first_span"] = max(
-                (parsed.date() - first_date.date()).days, 0
-            )
-
-
-def _add_causal_history_features(rows: list[dict[str, Any]]) -> None:
-    """Attach walk-forward features that only use previous closed spans."""
-
-    previous_rows: list[dict[str, Any]] = []
-    bucket_rows: dict[tuple[str, str], list[dict[str, Any]]] = {}
-    date_rows: dict[str, list[dict[str, Any]]] = {}
-    hour_rows: dict[str, list[dict[str, Any]]] = {}
-    day_of_week_rows: dict[str, list[dict[str, Any]]] = {}
-    ewma_delta: float | None = None
-    ewma_drain: float | None = None
-    ewma_capacity: float | None = None
-    remainder_states = {
-        "previous": 0.0,
-        "rolling3": 0.0,
-        "rolling10": 0.0,
-        "rolling10_median": 0.0,
-        "ewma": 0.0,
-    }
-    alpha = 0.2
-    for row in rows:
-        bucket_key = (
-            str(row.get("rate_limit_plan_type") or "missing"),
-            str(row.get("rate_limit_limit_id") or "missing"),
-        )
-        date_key = str(row.get("date") or "missing")
-        hour_key = str(row.get("hour_bucket") or "missing")
-        day_of_week_key = str(row.get("day_of_week") or "missing")
-        recent_bucket_rows = bucket_rows.get(bucket_key, [])
-        recent_date_rows = date_rows.get(date_key, [])
-        recent_hour_rows = hour_rows.get(hour_key, [])
-        recent_day_of_week_rows = day_of_week_rows.get(day_of_week_key, [])
-        row["previous_delta_percent"] = _previous_value(previous_rows, "target")
-        row["previous_drain_per_credit"] = _previous_drain_per_credit(previous_rows)
-        row["rolling3_delta_percent"] = _rolling_mean(previous_rows, "target", 3)
-        row["rolling10_delta_percent"] = _rolling_mean(previous_rows, "target", 10)
-        row["rolling50_delta_percent"] = _rolling_mean(previous_rows, "target", 50)
-        row["rolling10_median_delta_percent"] = _rolling_median(
-            previous_rows, "target", 10
-        )
-        row["rolling10_mode_delta_percent"] = _rolling_mode(previous_rows, "target", 10)
-        row["rolling10_delta_stddev"] = _rolling_stddev(previous_rows, "target", 10)
-        row["rolling50_delta_stddev"] = _rolling_stddev(previous_rows, "target", 50)
-        one_percent_streak = _row_tail_streak(
-            previous_rows,
-            predicate=lambda previous: _is_one_percent_delta(
-                _number(previous.get("target"))
-            ),
-        )
-        low_delta_streak = _row_tail_streak(
-            previous_rows,
-            predicate=lambda previous: _number(previous.get("target")) <= 1.0,
-        )
-        same_delta_streak = _same_target_tail_streak(previous_rows)
-        high_delta_streak = _row_tail_streak(
-            previous_rows,
-            predicate=lambda previous: _number(previous.get("target")) > 1.0,
-        )
-        row["one_percent_streak"] = float(one_percent_streak)
-        row["low_delta_streak"] = float(low_delta_streak)
-        row["same_delta_streak"] = float(same_delta_streak)
-        row["high_delta_streak"] = float(high_delta_streak)
-        row["hybrid_streak_delta_percent"] = (
-            1.0
-            if one_percent_streak >= 3
-            else _number(row["previous_delta_percent"])
-            if same_delta_streak >= 2
-            else _number(row["rolling3_delta_percent"])
-        )
-        row["rolling3_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 3)
-        row["rolling10_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 10)
-        row["rolling50_drain_per_credit"] = _rolling_drain_per_credit(previous_rows, 50)
-        row["rolling10_low_delta_share"] = _rolling_low_delta_share(previous_rows, 10)
-        capacity_estimates = {
-            "previous": _previous_capacity_per_visible_percent(previous_rows),
-            "rolling3": _rolling_capacity_per_visible_percent(previous_rows, 3),
-            "rolling10": _rolling_capacity_per_visible_percent(previous_rows, 10),
-            "rolling10_median": _rolling_capacity_median_per_visible_percent(
-                previous_rows, 10
-            ),
-            "ewma": ewma_capacity or 0.0,
-        }
-        row["previous_capacity_credits_per_percent"] = capacity_estimates["previous"]
-        row["rolling3_capacity_credits_per_percent"] = capacity_estimates["rolling3"]
-        row["rolling10_capacity_credits_per_percent"] = capacity_estimates["rolling10"]
-        row["rolling10_median_capacity_credits_per_percent"] = capacity_estimates[
-            "rolling10_median"
-        ]
-        row["ewma_capacity_credits_per_percent"] = capacity_estimates["ewma"]
-        current_credits = _number(row.get("standard_usage_credits"))
-        for capacity_name, capacity in capacity_estimates.items():
-            prefix = (
-                "rolling10_median"
-                if capacity_name == "rolling10_median"
-                else capacity_name
-            )
-            row[f"{prefix}_capacity_delta_prediction"] = (
-                current_credits / capacity if capacity > 0 else 0.0
-            )
-        _attach_remainder_features(
-            row,
-            prefix="rolling3",
-            capacity=capacity_estimates["rolling3"],
-            current_credits=current_credits,
-            remainder=remainder_states["rolling3"],
-        )
-        _attach_remainder_features(
-            row,
-            prefix="ewma",
-            capacity=capacity_estimates["ewma"],
-            current_credits=current_credits,
-            remainder=remainder_states["ewma"],
-        )
-        rolling50 = _number(row["rolling50_delta_percent"])
-        row["rolling3_to_50_delta_ratio"] = (
-            _number(row["rolling3_delta_percent"]) / rolling50 if rolling50 > 0 else 0.0
-        )
-        row["same_bucket_rolling10_delta_percent"] = _rolling_mean(
-            recent_bucket_rows, "target", 10
-        )
-        row["same_bucket_rolling10_mode_delta_percent"] = _rolling_mode(
-            recent_bucket_rows, "target", 10
-        )
-        row["same_bucket_rolling10_drain_per_credit"] = _rolling_drain_per_credit(
-            recent_bucket_rows, 10
-        )
-        row["same_bucket_seen_count"] = float(len(recent_bucket_rows))
-        row["same_date_rolling10_delta_percent"] = _rolling_mean(
-            recent_date_rows, "target", 10
-        )
-        row["same_date_rolling10_mode_delta_percent"] = _rolling_mode(
-            recent_date_rows, "target", 10
-        )
-        row["same_date_seen_count"] = float(len(recent_date_rows))
-        row["same_hour_rolling10_delta_percent"] = _rolling_mean(
-            recent_hour_rows, "target", 10
-        )
-        row["same_hour_rolling10_mode_delta_percent"] = _rolling_mode(
-            recent_hour_rows, "target", 10
-        )
-        row["same_hour_seen_count"] = float(len(recent_hour_rows))
-        row["same_day_of_week_rolling10_delta_percent"] = _rolling_mean(
-            recent_day_of_week_rows, "target", 10
-        )
-        row["same_day_of_week_rolling10_mode_delta_percent"] = _rolling_mode(
-            recent_day_of_week_rows, "target", 10
-        )
-        row["same_day_of_week_seen_count"] = float(len(recent_day_of_week_rows))
-        row["ewma_delta_percent"] = ewma_delta or 0.0
-        row["ewma_drain_per_credit"] = ewma_drain or 0.0
-
-        current_delta = _number(row.get("target"))
-        current_drain = _drain_per_credit(row)
-        current_capacity = _capacity_per_visible_percent(row)
-        ewma_delta = (
-            current_delta
-            if ewma_delta is None
-            else (alpha * current_delta) + ((1 - alpha) * ewma_delta)
-        )
-        ewma_drain = (
-            current_drain
-            if ewma_drain is None
-            else (alpha * current_drain) + ((1 - alpha) * ewma_drain)
-        )
-        ewma_capacity = (
-            current_capacity
-            if ewma_capacity is None
-            else (alpha * current_capacity) + ((1 - alpha) * ewma_capacity)
-        )
-        for capacity_name, capacity in capacity_estimates.items():
-            remainder_states[capacity_name] = _updated_remainder_credits(
-                remainder_states[capacity_name],
-                current_credits=current_credits,
-                actual_delta=current_delta,
-                capacity=capacity,
-            )
-        previous_rows.append(row)
-        bucket_rows.setdefault(bucket_key, []).append(row)
-        date_rows.setdefault(date_key, []).append(row)
-        hour_rows.setdefault(hour_key, []).append(row)
-        day_of_week_rows.setdefault(day_of_week_key, []).append(row)
-
-
-def _attach_remainder_features(
-    row: dict[str, Any],
-    *,
-    prefix: str,
-    capacity: float,
-    current_credits: float,
-    remainder: float,
-) -> None:
-    row[f"{prefix}_remainder_credits"] = remainder
-    row[f"{prefix}_remainder_fraction"] = (
-        min(max(remainder / capacity, 0.0), 1.0) if capacity > 0 else 0.0
-    )
-    accumulated = (remainder + current_credits) / capacity if capacity > 0 else 0.0
-    row[f"{prefix}_remainder_floor_delta_prediction"] = (
-        float(math.floor(accumulated + 1e-9)) if accumulated > 0 else 0.0
-    )
-    row[f"{prefix}_remainder_ceiling_delta_prediction"] = _ceil_to_visible_tick(
-        accumulated
-    )
-
-
-def _updated_remainder_credits(
-    previous_remainder: float,
-    *,
-    current_credits: float,
-    actual_delta: float,
-    capacity: float,
-) -> float:
-    if capacity <= 0:
-        return 0.0
-    return (previous_remainder + current_credits - (actual_delta * capacity)) % capacity
-
-
-def _capacity_per_visible_percent(row: dict[str, Any]) -> float:
-    delta = _number(row.get("target"))
-    if delta <= 0:
-        return 0.0
-    return _number(row.get("standard_usage_credits")) / delta
-
-
-def _previous_capacity_per_visible_percent(rows: list[dict[str, Any]]) -> float:
-    if not rows:
-        return 0.0
-    return _capacity_per_visible_percent(rows[-1])
-
-
-def _rolling_capacity_per_visible_percent(
-    rows: list[dict[str, Any]], window: int
-) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    return sum(_capacity_per_visible_percent(row) for row in selected) / len(selected)
-
-
-def _rolling_capacity_median_per_visible_percent(
-    rows: list[dict[str, Any]], window: int
-) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    return float(median(_capacity_per_visible_percent(row) for row in selected))
-
-
-def _previous_value(rows: list[dict[str, Any]], field: str) -> float:
-    if not rows:
-        return 0.0
-    return _number(rows[-1].get(field))
-
-
-def _previous_drain_per_credit(rows: list[dict[str, Any]]) -> float:
-    if not rows:
-        return 0.0
-    return _drain_per_credit(rows[-1])
-
-
-def _rolling_mean(rows: list[dict[str, Any]], field: str, window: int) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    return sum(_number(row.get(field)) for row in selected) / len(selected)
-
-
-def _rolling_median(rows: list[dict[str, Any]], field: str, window: int) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    return float(median(_number(row.get(field)) for row in selected))
-
-
-def _rolling_mode(rows: list[dict[str, Any]], field: str, window: int) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    return _value_mode([_number(row.get(field)) for row in selected])
-
-
-def _rolling_stddev(rows: list[dict[str, Any]], field: str, window: int) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    return _value_stddev([_number(row.get(field)) for row in selected])
-
-
-def _rolling_drain_per_credit(rows: list[dict[str, Any]], window: int) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    return sum(_drain_per_credit(row) for row in selected) / len(selected)
-
-
-def _rolling_low_delta_share(rows: list[dict[str, Any]], window: int) -> float:
-    selected = rows[-window:]
-    if not selected:
-        return 0.0
-    low_count = sum(1 for row in selected if _number(row.get("target")) <= 1.0)
-    return low_count / len(selected)
-
-
-def _row_tail_streak(
-    rows: list[dict[str, Any]], *, predicate: Any
-) -> int:
-    count = 0
-    for row in reversed(rows):
-        if not predicate(row):
-            break
-        count += 1
-    return count
-
-
-def _tail_streak(values: list[float], *, predicate: Any) -> int:
-    count = 0
-    for value in reversed(values):
-        if not predicate(value):
-            break
-        count += 1
-    return count
-
-
-def _same_target_tail_streak(rows: list[dict[str, Any]]) -> int:
-    if not rows:
-        return 0
-    return _tail_streak(
-        [_number(row.get("target")) for row in rows],
-        predicate=lambda value: round(value, 6) == round(_number(rows[-1].get("target")), 6),
-    )
-
-
-def _same_value_tail_streak(values: list[float]) -> int:
-    if not values:
-        return 0
-    target = round(values[-1], 6)
-    return _tail_streak(values, predicate=lambda value: round(value, 6) == target)
-
-
-def _is_one_percent_delta(value: float) -> bool:
-    return round(value, 6) == 1.0
-
-
-def _streak_bucket(value: int) -> str:
-    if value <= 0:
-        return "0"
-    if value <= 2:
-        return str(value)
-    if value <= 9:
-        return "3_9"
-    if value <= 49:
-        return "10_49"
-    if value <= 199:
-        return "50_199"
-    return "200_plus"
-
-
-def _date_label(timestamp: str) -> str:
-    parsed = _parse_timestamp(timestamp)
-    return parsed.date().isoformat() if parsed else "missing"
-
-
-def _drain_per_credit(row: dict[str, Any]) -> float:
-    credits = _number(row.get("standard_usage_credits"))
-    if credits <= 0:
-        return 0.0
-    return _number(row.get("target")) / credits
 
 
 def _fit_predictive_model(

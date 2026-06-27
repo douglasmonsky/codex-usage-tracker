@@ -364,3 +364,60 @@ Checks:
 Next handoff:
 
 - Start `refactor/usage-drain-feature-rows` and move `_span_feature_row`, causal history features, and remainder/capacity feature helpers onto the shared utilities without private imports.
+
+### `refactor/usage-drain-feature-rows`
+
+Goal:
+
+- Move usage-drain feature-row construction out of `usage_drain_model.py`.
+- Keep the existing model/report API unchanged through compatibility aliases.
+- Keep new files under `agent-maintainer` source-line limits.
+
+Acceptance:
+
+- Focused usage-drain tests pass.
+- Full test suite passes.
+- `agent-maintainer verify --profile fast` passes.
+- Ratchets pass and max-file-lines tightens.
+- `tach.toml` explicitly tracks the new feature modules.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_features.py` for span feature-row construction and days-since-first-span enrichment.
+- Added `src/codex_usage_tracker/usage_drain_feature_history.py` for causal history, rolling, streak, remainder, and capacity feature helpers.
+- Replaced local helper definitions in `usage_drain_model.py` with compatibility aliases from the new modules.
+- Split the initial feature module again after `agent-maintainer` caught it exceeding the source-line budget.
+- Updated `tach.toml` so the feature modules live in the diagnostics/reporting boundary group.
+
+Metrics:
+
+- `usage_drain_model.py`: 5,643 lines.
+- `usage_drain_features.py`: 200 lines.
+- `usage_drain_feature_history.py`: 383 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down 9,557 -> 9,042 total source-line overage.
+
+Checks:
+
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion and large-diff/no-test-file warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines ...`: passed and ratcheted baseline down.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import ...`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers ...`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_feature_history.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_features.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-feature-rows.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+
+- Continue `refactor/usage-drain-model-split-2` with predictive fitting/model diagnostic extraction. Keep the next branch smaller than this one if possible; target `_fit_predictive_model`, design-matrix preparation, and regression metrics separately from walk-forward diagnostics.
