@@ -729,3 +729,50 @@ Checks:
 
 Next handoff:
 - Continue with threshold-gated delta helpers or one-percent grace calibration in separate local branches. Avoid moving full walk-forward row generation until the surrounding diagnostics are smaller and characterization coverage is easier to audit.
+### `refactor/usage-drain-transition-gates`
+
+Goal:
+- Move transition delta gate thresholds and gate helper functions out of `usage_drain_model.py`.
+- Preserve the shared threshold constants by importing them back into the model for existing boundary and transition row logic.
+- Keep walk-forward row generation in `usage_drain_model.py` for a later orchestration branch.
+
+Acceptance:
+- Focused usage-drain tests pass.
+- Full test suite passes.
+- `agent-maintainer verify --profile fast` passes.
+- Ratchets pass and max-file-lines tightens.
+- `tach.toml` explicitly tracks the new transition gate module.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/usage_drain_transition_gates.py` for risk-gate threshold constants, risk-gated transition delta prediction, gate-threshold selection, threshold error-sum updates, and gate diagnostics.
+- Replaced local transition gate helper definitions in `usage_drain_model.py` with compatibility imports.
+- Preserved `RISK_GATE_THRESHOLDS`, `TRANSITION_DELTA_RISK_GATE_THRESHOLD`, and `TRANSITION_DELTA_RISK_GATE_THRESHOLDS` as single-source imported constants.
+- Updated `tach.toml` so `usage_drain_transition_gates.py` belongs to the diagnostics/reporting boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Metrics:
+- `usage_drain_model.py`: 3,982 lines.
+- `usage_drain_transition_gates.py`: 147 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down 7,504 -> 7,389 total source-line overage.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and no-test-file change-budget warning for behavior-preserving refactor.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_transition_gates.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-transition-gates.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+- Continue with one-percent grace calibration helpers or prediction error diagnostics in separate local branches. `usage_drain_model.py` is now below 4,000 lines; keep using small modules rather than moving full walk-forward row generation in one shot.
