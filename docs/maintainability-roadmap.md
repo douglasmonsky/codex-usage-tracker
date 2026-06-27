@@ -421,3 +421,59 @@ Checks:
 Next handoff:
 
 - Continue `refactor/usage-drain-model-split-2` with predictive fitting/model diagnostic extraction. Keep the next branch smaller than this one if possible; target `_fit_predictive_model`, design-matrix preparation, and regression metrics separately from walk-forward diagnostics.
+
+### `refactor/usage-drain-fitting-core`
+
+Goal:
+
+- Move usage-drain regression, correlation, and fast-proxy fit helper functions out of `usage_drain_model.py`.
+- Keep existing private helper names available inside `usage_drain_model.py` through compatibility aliases.
+- Preserve report/model JSON behavior, especially regression metric keys such as `mean_predicted`.
+
+Acceptance:
+
+- Focused usage-drain tests pass.
+- Full test suite passes.
+- Regression metrics smoke check confirms `mean_predicted` key remains stable.
+- Ratchets pass and tighten file-length and duplicate-helper baselines.
+- `tach.toml` explicitly tracks the new regression module.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_regression.py` for design-matrix preparation, ridge fitting, prediction, regression metrics, correlations, ranks, count summaries, and proxy multiplier helper fits.
+- Replaced local helper definitions in `usage_drain_model.py` with aliases imported from the regression module.
+- Updated `tach.toml` so `usage_drain_regression.py` belongs to the diagnostics/reporting boundary group.
+- Added a one-off smoke verification for the `mean_predicted` metric key after catching a mechanical rename typo.
+
+Metrics:
+
+- `usage_drain_model.py`: 5,403 lines.
+- `usage_drain_regression.py`: 297 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down 9,042 -> 8,802 total source-line overage.
+- `git-agent-ratchet duplicate-helpers`: baseline ratcheted down 72 -> 66 duplicate helper names.
+
+Checks:
+
+- `PYTHONPATH=src .venv/bin/python - <<'PY' ... regression_metrics smoke ... PY`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion and large-diff/no-test-file warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines ...`: passed and ratcheted baseline down.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import ...`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers ...`: passed and ratcheted baseline down.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_regression.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-regression.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+
+- Continue predictive fitting orchestration extraction in a separate branch. Target `_fit_predictive_model`, `_fit_causal_baseline_models`, `_predictive_model_specs`, and capacity residual diagnostics separately from walk-forward diagnostics.
