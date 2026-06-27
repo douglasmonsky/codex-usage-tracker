@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 import math
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -30,6 +30,51 @@ from codex_usage_tracker.usage_drain_types import (
     UsageDeltaSpan,
     UsageDrainModelResult,
     documented_fast_credit_multiplier,  # noqa: F401
+)
+from codex_usage_tracker.usage_drain_utils import (
+    bounded_wall_time_seconds as _bounded_wall_time_seconds,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    ceil_to_visible_tick as _ceil_to_visible_tick,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    dominant_label as _dominant_label,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    format_bucket_number as _format_bucket_number,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    minute_bucket as _minute_bucket,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    number as _number,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    numeric_bucket as _numeric_bucket,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    parse_timestamp as _parse_timestamp,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    reset_phase_bucket as _reset_phase_bucket,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    reset_remaining_minutes as _reset_remaining_minutes,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    rounded as _rounded,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    second_bucket as _second_bucket,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    span_wall_time_seconds as _span_wall_time_seconds,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    value_mode as _value_mode,
+)
+from codex_usage_tracker.usage_drain_utils import (
+    value_stddev as _value_stddev,
 )
 
 ALLOWANCE_BREAKPOINT_MIN_SEGMENT_SIZE = 20
@@ -2634,12 +2679,6 @@ def _allowance_online_capacity_error_diagnostics(
     }
 
 
-def _ceil_to_visible_tick(value: float, *, tick_size: float = 1.0) -> float:
-    if value <= 0 or tick_size <= 0:
-        return 0.0
-    return math.ceil((value / tick_size) - 1e-9) * tick_size
-
-
 def _mean_field(rows: list[dict[str, Any]], field_name: str) -> float | None:
     if not rows:
         return None
@@ -3144,21 +3183,6 @@ def _span_correlation_row(span: UsageDeltaSpan) -> dict[str, float]:
     for field_name in TOKEN_TOTAL_FIELDS:
         row[field_name] = span.token_totals.get(field_name, 0.0)
     return row
-
-
-def _span_wall_time_seconds(span: UsageDeltaSpan) -> float:
-    return _bounded_wall_time_seconds(
-        span.start_event_timestamp,
-        span.end_event_timestamp,
-    )
-
-
-def _bounded_wall_time_seconds(start_timestamp: str, end_timestamp: str) -> float:
-    start_dt = _parse_timestamp(start_timestamp)
-    end_dt = _parse_timestamp(end_timestamp)
-    if start_dt is None or end_dt is None:
-        return 0.0
-    return max((end_dt - start_dt).total_seconds(), 0.0)
 
 
 def _correlation_report(
@@ -4490,75 +4514,6 @@ def _span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
     }
 
 
-def _reset_phase_bucket(elapsed_fraction: float) -> str:
-    if elapsed_fraction <= 0:
-        return "missing"
-    if elapsed_fraction < 0.25:
-        return "first_quarter"
-    if elapsed_fraction < 0.5:
-        return "second_quarter"
-    if elapsed_fraction < 0.75:
-        return "third_quarter"
-    return "fourth_quarter"
-
-
-def _numeric_bucket(
-    value: float, *, width: float, max_value: float, suffix: str
-) -> str:
-    if value <= 0 or width <= 0:
-        return f"0_{suffix}"
-    if value >= max_value:
-        return f"{_format_bucket_number(max_value)}_plus_{suffix}"
-    lower = math.floor(value / width) * width
-    upper = lower + width
-    return (
-        f"{_format_bucket_number(lower)}_"
-        f"{_format_bucket_number(upper)}_{suffix}"
-    )
-
-
-def _minute_bucket(minutes: float) -> str:
-    if minutes <= 0:
-        return "0_min"
-    if minutes <= 15:
-        return "0_15_min"
-    if minutes <= 30:
-        return "15_30_min"
-    if minutes <= 60:
-        return "30_60_min"
-    if minutes <= 120:
-        return "60_120_min"
-    if minutes <= 240:
-        return "120_240_min"
-    if minutes <= 360:
-        return "240_360_min"
-    return "360_plus_min"
-
-
-def _second_bucket(seconds: float) -> str:
-    if seconds <= 0:
-        return "0_sec"
-    if seconds <= 30:
-        return "0_30_sec"
-    if seconds <= 60:
-        return "30_60_sec"
-    if seconds <= 120:
-        return "60_120_sec"
-    if seconds <= 300:
-        return "120_300_sec"
-    if seconds <= 900:
-        return "300_900_sec"
-    if seconds <= 1800:
-        return "900_1800_sec"
-    return "1800_plus_sec"
-
-
-def _format_bucket_number(value: float) -> str:
-    if float(value).is_integer():
-        return str(int(value))
-    return str(value).replace(".", "_")
-
-
 def _prediction_error_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
@@ -4829,27 +4784,6 @@ def _value_distribution(values: list[float]) -> dict[str, Any]:
         "min": _rounded(min(values)),
         "max": _rounded(max(values)),
     }
-
-
-def _value_mode(values: list[float]) -> float:
-    if not values:
-        return 0.0
-    counts: dict[float, int] = {}
-    for value in values:
-        counts[value] = counts.get(value, 0) + 1
-    max_count = max(counts.values())
-    candidates = {value for value, count in counts.items() if count == max_count}
-    for value in reversed(values):
-        if value in candidates:
-            return value
-    return values[-1]
-
-
-def _value_stddev(values: list[float]) -> float:
-    if not values:
-        return 0.0
-    mean = sum(values) / len(values)
-    return math.sqrt(sum((value - mean) ** 2 for value in values) / len(values))
 
 
 def fit_usage_drain_proxy(
@@ -6216,54 +6150,9 @@ def _rank_values(values: list[float]) -> list[float]:
             ranks[ordered[rank_index][1]] = rank
         index = end_index + 1
     return ranks
-def _parse_timestamp(value: str) -> datetime | None:
-    if not value:
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    if len(text) == 10 and text[4] == "-" and text[7] == "-":
-        text = f"{text}T00:00:00+00:00"
-    if text.endswith("Z"):
-        text = f"{text[:-1]}+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
-
-
-def _reset_remaining_minutes(
-    event_timestamp: datetime | None, reset_at: float | None
-) -> float | None:
-    if event_timestamp is None or reset_at is None:
-        return None
-    return max((reset_at - event_timestamp.timestamp()) / 60.0, 0.0)
-def _dominant_label(counts: dict[str, int], *, default: str) -> str:
-    if not counts:
-        return default
-    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
-
-
 def _count_values(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
     counts: dict[str, int] = {}
     for row in rows:
         label = str(row.get(key) or "missing")
         counts[label] = counts.get(label, 0) + 1
     return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
-def _number(value: object) -> float:
-    if isinstance(value, bool):
-        return float(int(value))
-    if isinstance(value, int | float):
-        return float(value)
-    if isinstance(value, str) and value.strip():
-        return float(value)
-    return 0.0
-
-
-def _rounded(value: float | None) -> float | None:
-    if value is None:
-        return None
-    return round(value, 6)

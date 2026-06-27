@@ -22,8 +22,9 @@ paths = [
     "codex_usage_tracker.paths",
     "codex_usage_tracker.projects",
     "codex_usage_tracker.redaction",
-    "codex_usage_tracker.schema",
-    "codex_usage_tracker.usage_drain_types",
+  "codex_usage_tracker.schema",
+  "codex_usage_tracker.usage_drain_types",
+  "codex_usage_tracker.usage_drain_utils",
 ]
 depends_on = [
     "codex_usage_tracker.call_origin",
@@ -34,8 +35,9 @@ depends_on = [
     "codex_usage_tracker.paths",
     "codex_usage_tracker.projects",
     "codex_usage_tracker.redaction",
-    "codex_usage_tracker.schema",
-    "codex_usage_tracker.usage_drain_types",
+  "codex_usage_tracker.schema",
+  "codex_usage_tracker.usage_drain_types",
+  "codex_usage_tracker.usage_drain_utils",
 ]
 
 [[modules]]
