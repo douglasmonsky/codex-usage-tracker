@@ -57,6 +57,9 @@ Maintainability gate:
 python -m agent_maintainer doctor --strict
 python -m agent_maintainer verify --profile fast
 python -m agent_maintainer verify --profile precommit
+git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__
+git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__
+git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python
 radon cc src -a -s
 radon mi src -s
 xenon --max-absolute B --max-modules A --max-average A src
@@ -103,3 +106,54 @@ Status:
 Next handoff:
 
 - `chore/maintainability-ratchet-workflow-local` should make `precommit` useful locally without adding remote workflow files. Start by deciding whether strict `xenon B/A/A` should remain fast-profile blocking now or move to a later profile until module splitting reduces current complexity.
+
+### `chore/maintainability-ratchet-workflow-local`
+
+Goal:
+
+- Keep the maintainability workflow local-only.
+- Add `git-agent-ratchet` as Python 3.11+ dev tooling.
+- Seed local ratchet baselines for current line overage, cross-module private imports, and duplicate helpers.
+- Clarify that `fast` is the green local maintainer gate today, while `precommit` and `full` are diagnostic until their failures are paid down.
+
+Acceptance:
+
+- `agent-maintainer verify --profile fast` passes.
+- `agent-maintainer verify --profile precommit` runs and writes diagnostics, but known existing failures are recorded.
+- `git-agent-ratchet` baseline checks pass without worsening current debt counters.
+- No remote workflow files are added.
+
+Status:
+
+- Complete locally.
+
+Baseline metrics:
+
+- `max-file-lines`: 10,152 total line overage across `src`.
+- `cross-module-private-imports`: 10 current private-import edges.
+- `duplicate-helpers`: 79 current duplicate helper names.
+
+Checks:
+
+- `python -m pip install ".[dev]"`: passed.
+- `python -m agent_maintainer verify --profile fast`: passed with the existing structure-cohesion warning.
+- `git-agent-ratchet max-file-lines ...`: passed.
+- `git-agent-ratchet no-cross-module-private-import ...`: passed.
+- `git-agent-ratchet no-duplicate-helpers ...`: passed.
+- `python -m ruff check .`: passed.
+- `python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `python -m mypy`: passed.
+- `python -m compileall src`: passed.
+- `python -m pytest`: 324 passed.
+
+Known `precommit` diagnostics:
+
+- `ruff-format` would reformat many existing Python files. Do not apply globally in this branch.
+- `pyright` reports existing type issues in broad modules such as `cli.py`, `context.py`, `dashboard.py`, and `server.py`.
+- `xenon-complexity-gate` fails on known high-complexity blocks, especially `usage_drain_model.py`, `server.py`, `store.py`, diagnostics, and time-series reporting.
+
+Next handoff:
+
+- Keep `fast` as the green local gate.
+- In the next branch, add a local command wrapper or documented alias that runs the green gate plus optional diagnostics without implying `precommit` is clean.

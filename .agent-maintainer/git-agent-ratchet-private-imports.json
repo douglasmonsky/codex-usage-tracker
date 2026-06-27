@@ -1,0 +1,74 @@
+{
+  "$schema": "https://git-agent-ratchet.org/schemas/v1.json",
+  "ratchet_meta": {
+    "repo_signature": "",
+    "last_updated_by": "git-agent-ratchet-core"
+  },
+  "baselines": {
+    "cross_module_private_imports": {
+      "metric_value": 10,
+      "items": [
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_group_expression",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_normalize_limit",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_normalize_offset",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_normalize_sort_direction",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_since_where_clause",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_usage_api_sort_expression",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_usage_api_where_clause",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store.py",
+          "line": 30,
+          "name": "_usage_where_clause",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store_thread_summaries.py",
+          "line": 8,
+          "name": "_thread_key_expression",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        },
+        {
+          "file": "src/codex_usage_tracker/store_thread_summaries.py",
+          "line": 8,
+          "name": "_usage_where_clause",
+          "source_module": "codex_usage_tracker.store_query_sql"
+        }
+      ]
+    }
+  }
+}

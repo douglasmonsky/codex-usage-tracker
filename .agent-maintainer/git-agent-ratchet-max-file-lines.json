@@ -1,0 +1,84 @@
+{
+  "$schema": "https://git-agent-ratchet.org/schemas/v1.json",
+  "ratchet_meta": {
+    "repo_signature": "",
+    "last_updated_by": "git-agent-ratchet-core"
+  },
+  "baselines": {
+    "max_file_lines": {
+      "metric_value": 10152,
+      "items": [
+        {
+          "path": "src/codex_usage_tracker/usage_drain_model.py",
+          "line_count": 6753,
+          "overage": 6153
+        },
+        {
+          "path": "src/codex_usage_tracker/store.py",
+          "line_count": 1800,
+          "overage": 1200
+        },
+        {
+          "path": "src/codex_usage_tracker/server.py",
+          "line_count": 1508,
+          "overage": 908
+        },
+        {
+          "path": "src/codex_usage_tracker/context.py",
+          "line_count": 1082,
+          "overage": 482
+        },
+        {
+          "path": "src/codex_usage_tracker/cli.py",
+          "line_count": 976,
+          "overage": 376
+        },
+        {
+          "path": "src/codex_usage_tracker/parser.py",
+          "line_count": 852,
+          "overage": 252
+        },
+        {
+          "path": "src/codex_usage_tracker/diagnostic_snapshots.py",
+          "line_count": 823,
+          "overage": 223
+        },
+        {
+          "path": "src/codex_usage_tracker/allowance.py",
+          "line_count": 759,
+          "overage": 159
+        },
+        {
+          "path": "src/codex_usage_tracker/cli_parser.py",
+          "line_count": 742,
+          "overage": 142
+        },
+        {
+          "path": "src/codex_usage_tracker/usage_drain_reports.py",
+          "line_count": 677,
+          "overage": 77
+        },
+        {
+          "path": "src/codex_usage_tracker/dashboard.py",
+          "line_count": 667,
+          "overage": 67
+        },
+        {
+          "path": "src/codex_usage_tracker/diagnostics.py",
+          "line_count": 640,
+          "overage": 40
+        },
+        {
+          "path": "src/codex_usage_tracker/reports.py",
+          "line_count": 637,
+          "overage": 37
+        },
+        {
+          "path": "src/codex_usage_tracker/diagnostic_facts.py",
+          "line_count": 636,
+          "overage": 36
+        }
+      ]
+    }
+  }
+}
