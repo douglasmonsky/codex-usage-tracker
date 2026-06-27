@@ -50,6 +50,7 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.8",
+    "tach>=0.35.0; python_version >= '3.11'",
     "tomli>=2.0; python_version < '3.11'",
     "zizmor>=1.26.1; python_version >= '3.11'",
 ]

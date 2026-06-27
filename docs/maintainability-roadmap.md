@@ -157,3 +157,47 @@ Next handoff:
 
 - Keep `fast` as the green local gate.
 - In the next branch, add a local command wrapper or documented alias that runs the green gate plus optional diagnostics without implying `precommit` is clean.
+
+### `refactor/architecture-boundary-map`
+
+Goal:
+
+- Add `tach` as explicit Python 3.11+ dev tooling.
+- Add a report-mode `tach.toml` boundary map for current coarse modules.
+- Document intended dependency direction before moving code.
+- Keep `tach check` informational until the later strict-local branch.
+
+Acceptance:
+
+- `tach report` runs against a representative module.
+- `tach map` emits a local dependency map.
+- Known `tach check` violations are documented.
+- No runtime behavior changes.
+
+Status:
+
+- Complete locally.
+
+Checks:
+
+- `python -m pip install ".[dev]"`: passed.
+- `tach report src/codex_usage_tracker/usage_drain_reports.py --dependencies --usages`: passed.
+- `tach map -o /tmp/codex-usage-tracker-tach-map.json`: passed.
+- `tach check`: expected informational failure with 13 documented boundary violations.
+- `python -m agent_maintainer verify --profile fast`: passed with the existing structure-cohesion warning.
+- `python -m ruff check .`: passed.
+- `python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `python -m mypy`: passed.
+- `python -m compileall src`: passed.
+- `python -m pytest`: 324 passed.
+
+Current boundary debt:
+
+- `context.py` reaches into persistence through `store.query_usage_record`.
+- `store.py` and `store_sources.py` reach into parser refresh/state helpers.
+- `support.py` reaches upward into `diagnostics.run_doctor`.
+
+Next handoff:
+
+- Use the boundary debt list to choose the first safe refactor target after the usage-drain split branches, or deliberately reorder if store/parser/context boundaries look lower risk than usage-drain.
