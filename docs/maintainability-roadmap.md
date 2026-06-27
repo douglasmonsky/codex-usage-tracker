@@ -589,3 +589,49 @@ Checks:
 Next handoff:
 
 - Continue with walk-forward transition diagnostics in a separate branch. Start by moving `_walk_forward_prediction_summary`, `_walk_forward_prediction_rows`, and directly required transition-risk helpers if they stay under the file-size gate; otherwise split risk helpers first.
+### `refactor/usage-drain-diagnostic-helpers`
+
+Goal:
+- Move the state ambiguity diagnostic helpers out of `usage_drain_model.py` as a smaller bite-size split before tackling the broader walk-forward transition-risk engine.
+- Preserve existing walk-forward report behavior through public helper imports aliased back to the existing private names.
+- Keep the new diagnostic module under `agent-maintainer` source-line limits.
+
+Acceptance:
+- Focused usage-drain tests pass.
+- Full test suite passes.
+- `agent-maintainer verify --profile fast` passes.
+- Ratchets pass and max-file-lines tightens.
+- `tach.toml` explicitly tracks the new state diagnostics module.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/usage_drain_state_diagnostics.py` for state ambiguity signatures, ambiguity scope summaries, ambiguous-state row formatting, and state signature generation.
+- Replaced local state ambiguity helper definitions in `usage_drain_model.py` with compatibility imports.
+- Updated `tach.toml` so `usage_drain_state_diagnostics.py` belongs to the diagnostics/reporting boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Metrics:
+- `usage_drain_model.py`: 4,412 lines.
+- `usage_drain_state_diagnostics.py`: 204 lines.
+- `git-agent-ratchet max-file-lines`: baseline ratcheted down 7,995 -> 7,811 total source-line overage.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and no-test-file change-budget warning for behavior-preserving refactor.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_state_diagnostics.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-state-diagnostics.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+- Continue the walk-forward diagnostic split in a separate local branch. Good next candidates are `_state_bucket_predictions`, `_transition_risk_predictions`, `_state_bucket_transition_risk`, `_transition_rate`, `_state_bucket_prediction`, and state bucket diagnostics; keep threshold-gated delta prediction and row generation for later slices if the module would exceed the size budget.

@@ -1,0 +1,204 @@
+"""State ambiguity diagnostics for usage-drain modeling."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from codex_usage_tracker.usage_drain_regression import regression_metrics
+from codex_usage_tracker.usage_drain_utils import number, rounded, value_mode
+
+STATE_AMBIGUITY_SIGNATURES: dict[str, tuple[str, ...]] = {
+    "previous_delta": ("previous_delta_bucket",),
+    "history_state": (
+        "previous_delta_bucket",
+        "one_percent_streak_bucket",
+        "same_delta_streak_bucket",
+        "low_delta_streak_bucket",
+    ),
+    "calendar_state": (
+        "previous_delta_bucket",
+        "one_percent_streak_bucket",
+        "day_of_week",
+        "hour_bucket",
+    ),
+    "reset_state": (
+        "previous_delta_bucket",
+        "one_percent_streak_bucket",
+        "baseline_used_bucket",
+        "window_elapsed_bucket",
+        "reset_remaining_bucket",
+    ),
+    "previous_work_state": (
+        "previous_delta_bucket",
+        "one_percent_streak_bucket",
+        "previous_span_wall_time_bucket",
+        "previous_call_duration_bucket",
+    ),
+    "full_bucket_state": (
+        "previous_delta_bucket",
+        "one_percent_streak_bucket",
+        "same_delta_streak_bucket",
+        "low_delta_streak_bucket",
+        "baseline_used_bucket",
+        "window_elapsed_bucket",
+        "reset_remaining_bucket",
+        "day_of_week",
+        "hour_bucket",
+        "previous_span_wall_time_bucket",
+        "previous_call_duration_bucket",
+        "rate_limit_plan_type",
+        "rate_limit_limit_id",
+    ),
+}
+
+def state_ambiguity_summary(
+    rows: list[dict[str, Any]], scopes: dict[str, int]
+) -> dict[str, Any]:
+    return {
+        "target": "next_visible_usage_delta_percent",
+        "definition": (
+            "Groups walk-forward rows by aggregate state signatures and reports "
+            "whether identical-looking prior states produce different next "
+            "visible deltas."
+        ),
+        "interpretation": [
+            "Oracle mode metrics use all rows in the scope and are lower-bound diagnostics, not causal predictions.",
+            "Repeated ambiguous states indicate missing variables, overly coarse buckets, or true counter nondeterminism from the available logs.",
+            "Unique states can look perfect by construction, so repeated-state metrics are the stricter signal.",
+        ],
+        "signatures": {
+            name: list(signature)
+            for name, signature in STATE_AMBIGUITY_SIGNATURES.items()
+        },
+        "scopes": {
+            scope_name: state_ambiguity_scope(rows, start_index=start_index)
+            for scope_name, start_index in scopes.items()
+        },
+    }
+
+def state_ambiguity_scope(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> dict[str, Any]:
+    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
+    return {
+        "start_index": start_index,
+        "n": len(scope_rows),
+        "signatures": {
+            name: state_signature_ambiguity(scope_rows, name, signature)
+            for name, signature in STATE_AMBIGUITY_SIGNATURES.items()
+        },
+    }
+
+def state_signature_ambiguity(
+    rows: list[dict[str, Any]],
+    signature_name: str,
+    signature: tuple[str, ...],
+) -> dict[str, Any]:
+    groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in rows:
+        key = state_signature(row.get("metadata") or {}, signature)
+        groups.setdefault(key, []).append(row)
+    actual: list[float] = []
+    predicted: list[float] = []
+    repeated_actual: list[float] = []
+    repeated_predicted: list[float] = []
+    ambiguous_groups: list[dict[str, Any]] = []
+    repeated_group_count = 0
+    repeated_row_count = 0
+    ambiguous_group_count = 0
+    ambiguous_row_count = 0
+    for key, items in groups.items():
+        values = [number(item.get("actual")) for item in items]
+        mode_value = value_mode(values)
+        unique_values = sorted({round(value, 6) for value in values})
+        actual.extend(values)
+        predicted.extend([mode_value] * len(values))
+        if len(items) > 1:
+            repeated_group_count += 1
+            repeated_row_count += len(items)
+            repeated_actual.extend(values)
+            repeated_predicted.extend([mode_value] * len(values))
+        if len(unique_values) > 1:
+            ambiguous_group_count += 1
+            ambiguous_row_count += len(items)
+            ambiguous_groups.append(
+                state_ambiguous_group_record(
+                    key,
+                    items,
+                    signature=signature,
+                    mode_value=mode_value,
+                )
+            )
+    ambiguous_groups.sort(
+        key=lambda row: (
+            -number(row.get("total_abs_error")),
+            -int(row.get("n") or 0),
+            str(row.get("state") or ""),
+        )
+    )
+    return {
+        "signature": signature_name,
+        "fields": list(signature),
+        "n": len(rows),
+        "group_count": len(groups),
+        "repeated_group_count": repeated_group_count,
+        "repeated_row_count": repeated_row_count,
+        "repeated_row_share": rounded(
+            repeated_row_count / len(rows) if rows else None
+        ),
+        "ambiguous_group_count": ambiguous_group_count,
+        "ambiguous_row_count": ambiguous_row_count,
+        "ambiguous_row_share": rounded(
+            ambiguous_row_count / len(rows) if rows else None
+        ),
+        "oracle_mode_metrics": regression_metrics(actual, predicted),
+        "repeated_oracle_mode_metrics": regression_metrics(
+            repeated_actual,
+            repeated_predicted,
+        ),
+        "top_ambiguous_states": ambiguous_groups[:8],
+    }
+
+def state_ambiguous_group_record(
+    key: tuple[str, ...],
+    rows: list[dict[str, Any]],
+    *,
+    signature: tuple[str, ...],
+    mode_value: float,
+) -> dict[str, Any]:
+    values = [number(row.get("actual")) for row in rows]
+    value_counts: dict[float, int] = {}
+    for value in values:
+        rounded_value = round(value, 6)
+        value_counts[rounded_value] = value_counts.get(rounded_value, 0) + 1
+    errors = [abs(value - mode_value) for value in values]
+    dates = [
+        str((row.get("metadata") or {}).get("date") or "missing")
+        for row in rows
+    ]
+    return {
+        "state": {
+            field_name: key[index] if index < len(key) else "missing"
+            for index, field_name in enumerate(signature)
+        },
+        "n": len(rows),
+        "actual_values": [
+            {
+                "delta_percent": value,
+                "count": count,
+                "share": rounded(count / len(rows)),
+            }
+            for value, count in sorted(
+                value_counts.items(), key=lambda item: (-item[1], item[0])
+            )
+        ],
+        "mode_delta_percent": rounded(mode_value),
+        "mode_share": rounded(value_counts.get(round(mode_value, 6), 0) / len(rows)),
+        "oracle_mae": rounded(sum(errors) / len(errors) if errors else None),
+        "total_abs_error": rounded(sum(errors)),
+        "first_date": min(dates) if dates else None,
+        "last_date": max(dates) if dates else None,
+    }
+
+def state_signature(state: dict[str, Any], signature: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(str(state.get(field) or "missing") for field in signature)
