@@ -6,12 +6,12 @@
   },
   "baselines": {
     "duplicate_helpers": {
-      "metric_value": 62,
+      "metric_value": 60,
       "items": [
         {
           "name": "_allowance_segment_record",
           "occurrences": [
-            "src/codex_usage_tracker/usage_drain_model.py",
+            "src/codex_usage_tracker/usage_drain_allowance_breakpoints.py",
             "src/codex_usage_tracker/usage_drain_reports.py"
           ]
         },
@@ -34,13 +34,6 @@
           "occurrences": [
             "src/codex_usage_tracker/dashboard.py",
             "src/codex_usage_tracker/plugin_installer.py"
-          ]
-        },
-        {
-          "name": "_credit_to_delta_fit",
-          "occurrences": [
-            "src/codex_usage_tracker/usage_drain_model.py",
-            "src/codex_usage_tracker/usage_drain_reports.py"
           ]
         },
         {

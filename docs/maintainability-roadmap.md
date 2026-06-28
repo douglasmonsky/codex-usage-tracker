@@ -1632,3 +1632,51 @@ Remaining risks:
 Next handoff:
 
 - Continue splitting the remaining allowance-capacity prediction helpers or summary row-formatting helpers into another narrow usage-drain module.
+### refactor/usage-drain-capacity-prediction-boundary
+
+Objective:
+
+- Split allowance breakpoint, piecewise credit-to-delta, and online-capacity fit helpers out of `usage_drain_model.py`.
+- Keep the existing `allowance_breakpoint_analysis` payload shape unchanged.
+- Keep each newly extracted module below agent-maintainer new-file size limits.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_allowance_breakpoints.py` for allowance breakpoint segmentation and row shaping.
+- Added `src/codex_usage_tracker/usage_drain_allowance_fits.py` for global, piecewise, and online credit-to-delta fit mechanics.
+- Updated `usage_drain_model.py` to call the new allowance breakpoint module through a public module namespace.
+- Updated `tach.toml` to include both new usage-drain allowance modules in the existing diagnostics/report boundary.
+- Ratcheted `max_file_lines` baseline 4862 -> 4205 and `duplicate_helpers` baseline 62 -> 60.
+- `usage_drain_model.py` is now 2148 lines; new modules are 290 and 409 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_allowance_breakpoints.py src/codex_usage_tracker/usage_drain_allowance_fits.py src/codex_usage_tracker/usage_drain_model.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_allowance_breakpoints.py src/codex_usage_tracker/usage_drain_allowance_fits.py src/codex_usage_tracker/usage_drain_model.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/usage-drain-capacity-prediction-boundary-tach-map.json`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 4862 -> 4205.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed, ratcheted baseline 62 -> 60.
+- `git diff --check`: passed.
+
+Remaining risks:
+
+- `usage_drain_model.py` is still over the 600-line target, though now much smaller than the baseline.
+- Walk-forward prediction rows and segment/regime summaries remain candidates for further extraction.
+- Agent-maintainer still warns that the package folder is large and that this refactor branch changes Python source without adding new tests; behavior is covered by existing usage-drain characterization tests.
+
+Next handoff:
+
+- Continue with one more usage-drain split around walk-forward prediction row construction or segment/regime summary formatting.
