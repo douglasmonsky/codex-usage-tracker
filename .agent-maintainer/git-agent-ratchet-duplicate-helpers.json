@@ -6,7 +6,7 @@
   },
   "baselines": {
     "duplicate_helpers": {
-      "metric_value": 57,
+      "metric_value": 51,
       "items": [
         {
           "name": "_allowance_segment_record",
@@ -34,20 +34,6 @@
           "occurrences": [
             "src/codex_usage_tracker/dashboard.py",
             "src/codex_usage_tracker/plugin_installer.py"
-          ]
-        },
-        {
-          "name": "_history_scope",
-          "occurrences": [
-            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
-            "src/codex_usage_tracker/diagnostic_snapshots.py"
-          ]
-        },
-        {
-          "name": "_int_value",
-          "occurrences": [
-            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
-            "src/codex_usage_tracker/diagnostic_snapshots.py"
           ]
         },
         {
@@ -176,13 +162,6 @@
           "occurrences": [
             "src/codex_usage_tracker/diagnostic_facts.py",
             "src/codex_usage_tracker/diagnostic_snapshot_events.py"
-          ]
-        },
-        {
-          "name": "_utc_now",
-          "occurrences": [
-            "src/codex_usage_tracker/allowance.py",
-            "src/codex_usage_tracker/diagnostic_snapshots.py"
           ]
         }
       ]

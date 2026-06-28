@@ -3762,3 +3762,55 @@ Remaining risks:
 
 Next handoff:
 - Stop server route-wrapper slicing here unless another route wrapper is clearly trivial; move to the next roadmap module so the branch series does not over-optimize one file.
+
+### `refactor/diagnostic-snapshot-report-slice`
+
+Goal:
+- Move pure diagnostic snapshot payload/metadata helpers out of `diagnostic_snapshots.py`.
+- Avoid private cross-module imports by exposing public helper names.
+- Preserve existing missing/ready snapshot payload schemas.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-duplicate-helpers.json`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/diagnostic_snapshot_payloads.py`
+- `src/codex_usage_tracker/diagnostic_snapshots.py`
+- `tach.toml`
+
+Completed edits:
+- Added `diagnostic_snapshot_payloads.py` for `ready_payload`, `missing_payload`, `snapshot_metadata`, `history_scope`, `utc_now`, and `int_value`.
+- Updated `diagnostic_snapshots.py` to import public helpers and removed the moved helper tail.
+- Preserved missing-payload defaults, including `by_extension` for file-modification snapshots.
+- Added `diagnostic_snapshot_payloads` to the relevant `tach.toml` module path/dependency lists.
+- Ratcheted max-file baseline `1506 -> 1388`; `diagnostic_snapshots.py` reduced `823 -> 705` lines.
+- Ratcheted duplicate-helper baseline `57 -> 51`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_payloads.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_payloads.py tests/test_diagnostic_snapshots.py tach.toml`: passed after mechanical import sort.
+- `.venv/bin/python -m pytest tests/test_diagnostic_snapshots.py tests/test_server_diagnostic_snapshots.py tests/test_cli_lifecycle.py -q`: 24 passed.
+- `radon cc src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_payloads.py -a -s`: passed; moved `missing_payload` remains B-rated under current ceiling.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_payloads.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed and ratcheted.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach map -o /tmp/diagnostic-snapshot-report-slice-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning plus expected change-budget warning because existing tests covered this extraction.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- `server.py` remains oversized at `823` lines.
+- `diagnostic_snapshots.py` remains above the 600-line target at `705` lines.
+- `missing_payload` is B-complexity and may deserve a small table-driven cleanup later.
+
+Next handoff:
+- Continue diagnostic snapshot reduction with a narrow table-driven `missing_payload` cleanup or split source-log refresh persistence from `diagnostic_snapshots.py`.
