@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from math import ceil
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -11,6 +10,11 @@ from typing import Any
 from codex_usage_tracker.context_action_timing import (
     annotate_action_timing,
     normalize_millisecond_value,
+)
+from codex_usage_tracker.context_serialized import (
+    collect_serialized_envelope,
+    quick_serialized_context_estimate,
+    serialized_context_estimate,
 )
 from codex_usage_tracker.context_summaries import (
     dedupe_chat_message_echoes,
@@ -20,14 +24,11 @@ from codex_usage_tracker.context_summaries import (
 from codex_usage_tracker.context_token_estimates import (
     context_encoding,
     estimate_visible_tokens,
-    token_estimate,
 )
 from codex_usage_tracker.context_values import (
-    compact_json,
     nonnegative_float,
     optional_str,
     positive_int,
-    redact_json_value,
     redact_text,
 )
 from codex_usage_tracker.paths import DEFAULT_DB_PATH
@@ -228,7 +229,7 @@ def _read_context_entries(
                     serialized_line_count = 0
                     serialized_raw_char_count = 0
                     if full_serialized_analysis:
-                        _collect_serialized_envelope(
+                        collect_serialized_envelope(
                             raw_entries=raw_entries,
                             field_buckets=field_buckets,
                             envelope=envelope,
@@ -263,7 +264,7 @@ def _read_context_entries(
 
             if collecting:
                 if full_serialized_analysis:
-                    _collect_serialized_envelope(
+                    collect_serialized_envelope(
                         raw_entries=raw_entries,
                         field_buckets=field_buckets,
                         envelope=envelope,
@@ -324,7 +325,7 @@ def _read_context_entries(
 
     serialized_started = perf_counter()
     if full_serialized_analysis:
-        serialized_estimate = _serialized_context_estimate(
+        serialized_estimate = serialized_context_estimate(
             raw_entries=raw_entries,
             field_buckets=field_buckets,
             parse_errors=omitted_parse_errors,
@@ -332,7 +333,7 @@ def _read_context_entries(
             estimator=estimator,
         )
     else:
-        serialized_estimate = _quick_serialized_context_estimate(
+        serialized_estimate = quick_serialized_context_estimate(
             raw_line_count=serialized_line_count,
             raw_json_char_count=serialized_raw_char_count,
             parse_errors=omitted_parse_errors,
@@ -345,77 +346,6 @@ def _read_context_entries(
     omitted["target_turn_id"] = target_turn_id
     omitted["total_entries"] = len(candidates)
     return limited, omitted, candidates, serialized_estimate, serialized_estimate_ms, action_timing
-
-
-def _collect_serialized_envelope(
-    *,
-    raw_entries: list[dict[str, Any]],
-    field_buckets: dict[str, dict[str, Any]],
-    envelope: dict[str, Any],
-    entry_type: str,
-    payload: dict[str, Any],
-    encoding: Any | None,
-) -> None:
-    raw_entries.append(envelope)
-    _collect_serialized_field_buckets(
-        buckets=field_buckets,
-        entry_type=entry_type,
-        payload=payload,
-        encoding=encoding,
-    )
-
-
-def _serialized_context_estimate(
-    *,
-    raw_entries: list[dict[str, Any]],
-    field_buckets: dict[str, dict[str, Any]],
-    parse_errors: int,
-    encoding: Any | None,
-    estimator: str,
-) -> dict[str, Any]:
-    raw_json = "\n".join(compact_json(redact_json_value(entry)) for entry in raw_entries)
-    top_buckets = sorted(
-        field_buckets.values(),
-        key=lambda bucket: int(bucket.get("token_estimate") or 0),
-        reverse=True,
-    )[:8]
-    return {
-        "available": bool(raw_entries),
-        "scope": "selected_turn_raw_jsonl",
-        "raw_line_count": len(raw_entries),
-        "raw_json_char_count": len(raw_json),
-        "raw_json_token_estimate": token_estimate(raw_json, encoding),
-        "token_estimator": estimator,
-        "parse_errors": parse_errors,
-        "upper_bound": True,
-        "raw_text_returned": False,
-        "buckets": top_buckets,
-        "deferred": False,
-        "deferred_buckets": False,
-    }
-
-
-def _quick_serialized_context_estimate(
-    *,
-    raw_line_count: int,
-    raw_json_char_count: int,
-    parse_errors: int,
-) -> dict[str, Any]:
-    return {
-        "available": raw_line_count > 0,
-        "scope": "selected_turn_raw_jsonl_fast_estimate",
-        "raw_line_count": raw_line_count,
-        "raw_json_char_count": raw_json_char_count,
-        "raw_json_token_estimate": ceil(raw_json_char_count / 4) if raw_json_char_count else 0,
-        "token_estimator": "chars_per_4_fallback",
-        "parse_errors": parse_errors,
-        "upper_bound": True,
-        "raw_text_returned": False,
-        "buckets": [],
-        "deferred": True,
-        "deferred_buckets": True,
-        "reason": "full_serialized_analysis_not_requested",
-    }
 
 
 def _summarized_context_entry(
@@ -515,99 +445,3 @@ def _limit_entries(
         "max_entries": max_entries,
         "returned_entries": len(limited),
     }
-
-
-
-def _collect_serialized_field_buckets(
-    *,
-    buckets: dict[str, dict[str, Any]],
-    entry_type: str,
-    payload: dict[str, Any],
-    encoding: Any | None,
-) -> None:
-    payload_type = optional_str(payload.get("type")) or ""
-    for key, value in payload.items():
-        if key == "type":
-            continue
-        bucket_key, label, note = _serialized_bucket_label(entry_type, payload_type, key)
-        rendered = compact_json({key: redact_json_value(value)})
-        stats = buckets.setdefault(
-            bucket_key,
-            {
-                "key": bucket_key,
-                "label": label,
-                "note": note,
-                "count": 0,
-                "char_count": 0,
-                "token_estimate": 0,
-            },
-        )
-        stats["count"] = int(stats["count"]) + 1
-        stats["char_count"] = int(stats["char_count"]) + len(rendered)
-        stats["token_estimate"] = int(stats["token_estimate"]) + token_estimate(rendered, encoding)
-
-
-def _serialized_bucket_label(
-    entry_type: str,
-    payload_type: str,
-    key: str,
-) -> tuple[str, str, str]:
-    if entry_type == "response_item" and key == "encrypted_content":
-        return (
-            "encrypted_reasoning_state",
-            "Encrypted reasoning/state payload",
-            "Opaque local payload; counted as serialized evidence, not readable text.",
-        )
-    if key in {"content", "message", "output", "arguments", "input"}:
-        return (
-            "visible_payload_fields",
-            "Visible message/tool payload fields",
-            "Raw JSON representation of content already summarized in evidence.",
-        )
-    if key == "goal":
-        return (
-            "local_goal_metadata",
-            "Local thread goal metadata",
-            "Client-side workflow metadata in the log; may not be model prompt input.",
-        )
-    if entry_type == "event_msg" and key == "rate_limits":
-        return (
-            "rate_limit_metadata",
-            "Rate-limit metadata",
-            "Client-side rate-limit state in the log; useful as an upper-bound bucket only.",
-        )
-    if entry_type == "event_msg" and payload_type == "token_count" and key == "info":
-        return (
-            "token_callback_metadata",
-            "Token callback metadata",
-            "Structured callback accounting already partly summarized in evidence.",
-        )
-    if key in {
-        "call_id",
-        "threadId",
-        "turnId",
-        "turn_id",
-        "phase",
-        "status",
-        "name",
-        "role",
-        "memory_citation",
-        "summary",
-        "duration_ms",
-    }:
-        return (
-            "protocol_metadata",
-            "Protocol and response metadata",
-            "IDs, roles, names, phases, or summaries in the local event stream.",
-        )
-    if entry_type == "turn_context":
-        return (
-            "turn_context_metadata",
-            "Turn context metadata",
-            "Local turn configuration such as cwd, model, effort, date, and timezone.",
-        )
-    return (
-        "other_serialized_metadata",
-        "Other serialized metadata",
-        "Additional local JSONL fields not separately categorized.",
-    )

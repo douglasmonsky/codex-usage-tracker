@@ -3101,3 +3101,52 @@ Remaining risks:
 
 Next handoff:
 - Continue with serialized evidence helper extraction from `context.py`; this should likely bring `context.py` below 600 and reduce the context module average, while leaving the selected-turn scan loop as the facade.
+### `refactor/context-serialized-evidence`
+Goal:
+- Move serialized raw JSONL evidence estimates and field-bucket accounting out of `context.py`.
+- Keep quick vs full serialized analysis behavior unchanged.
+- Keep selected-turn scan orchestration in `context.py`.
+
+Files touched:
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/context_serialized.py`
+- `tach.toml`
+- `tests/test_context_serialized.py`
+
+Completed edits:
+- Added `context_serialized.py` with public helpers `collect_serialized_envelope`, `serialized_context_estimate`, and `quick_serialized_context_estimate`.
+- Moved raw envelope accumulation, redacted raw JSON upper-bound estimates, quick char/4 fallback estimates, top-bucket sorting, and serialized field bucket labeling out of `context.py`.
+- Reworked bucket labeling into smaller table-driven helpers while preserving the existing bucket keys, labels, and notes.
+- Added direct characterization tests for bucket grouping, full serialized estimates, top-bucket ordering, and quick deferred estimates.
+- Added `context_serialized` to the context/parser `tach` boundary.
+- Reduced `context.py` from `613` to `447` lines; it is now below the 600-line local ratchet target.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/context.py src/codex_usage_tracker/context_serialized.py tests/test_context_serialized.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/context.py src/codex_usage_tracker/context_serialized.py tests/test_context_serialized.py tests/test_context_evidence.py tests/test_privacy.py`: passed after import formatting.
+- `.venv/bin/python -m pytest tests/test_context_serialized.py tests/test_context_action_timing.py tests/test_context_summaries.py tests/test_context_evidence.py tests/test_privacy.py -q`: 22 passed.
+- `radon cc src/codex_usage_tracker/context_serialized.py src/codex_usage_tracker/context.py -a -s`: `context_serialized.py` worst block B (9); `context.py` still has existing `_read_context_entries` E.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/context_serialized.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed after trimming EOF whitespace.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 401 passed.
+- `.venv/bin/tach map -o /tmp/context-serialized-evidence-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning; warning about changed Python source before staging expected.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed; command reported current baseline still ratchets against remaining oversized non-context modules.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `_read_context_entries` is still high complexity and should be the next context target if we continue this area.
+- `context_serialized.py` has a B-complexity special bucket helper accepted under current xenon settings.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing non-context hotspots outside this slice.
+
+Next handoff:
+- Decide whether to split `_read_context_entries` state handling next, or switch back to larger roadmap targets now that `context.py` is below the local file-length target.
