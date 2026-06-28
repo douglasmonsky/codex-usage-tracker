@@ -1014,11 +1014,11 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
     def broken_dashboard_payload(**kwargs):
         raise sqlite3.OperationalError("database is locked")
 
-    def broken_context(**kwargs):
+    def broken_context(*args, **kwargs):
         raise sqlite3.OperationalError("database is locked")
 
     monkeypatch.setattr(server_module, "dashboard_payload", broken_dashboard_payload)
-    monkeypatch.setattr(server_module, "load_call_context", broken_context)
+    monkeypatch.setattr(server_module, "context_payload", broken_context)
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),

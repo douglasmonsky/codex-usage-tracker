@@ -2631,3 +2631,56 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with raw context handler extraction or another route plumbing split.
+
+### `refactor/server-context-payload`
+
+Goal:
+- Extract raw-context request validation and payload construction from `_UsageDashboardHandler`.
+- Keep dashboard-server enablement and API-token enforcement in the HTTP handler.
+- Preserve existing error mappings and privacy behavior; this helper loads context on demand and does not persist raw prompts, tool outputs, command text, or patch text.
+
+Files touched:
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_context.py`
+- `tests/test_server_context.py`
+- `tests/test_dashboard_server.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `context_payload()` and `ContextRequestError` for context API query parsing and `load_call_context()` dispatch.
+- Replaced inline context parameter parsing in `_handle_context` with the helper while keeping disabled-context and token checks in `server.py`.
+- Added tests for full parameter normalization, defaults, missing `record_id`, and invalid context mode.
+- Updated the SQLite-error dashboard server test to patch the new helper boundary instead of the old direct `load_call_context` import.
+- Declared `server_context` in the dashboard/server `tach` boundary.
+- Ratcheted file-line baseline `2262 -> 2231`, reducing `server.py` from `1097` to `1066` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_context.py tests/test_server_context.py`: passed.
+- `.venv/bin/python -m ruff check tests/test_dashboard_server.py src/codex_usage_tracker/server.py src/codex_usage_tracker/server_context.py tests/test_server_context.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_context.py tests/test_dashboard_server.py -q`: 15 passed.
+- `radon cc src/codex_usage_tracker/server_context.py -a -s`: average A (2.5).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_context.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 366 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/server-context-payload-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2262 -> 2231`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `server.py` remains oversized at `1066` lines; usage handler, context settings, open-investigator, diagnostic snapshot plumbing, and dashboard-server factory code still need extraction.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `context.py`, `cli.py`, diagnostics/report modules, usage-drain modules, and persistence modules remain above eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with a small context-settings, open-investigator, or usage-handler extraction.

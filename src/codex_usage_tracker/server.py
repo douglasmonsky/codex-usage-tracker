@@ -16,13 +16,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker import server_utils
-from codex_usage_tracker.context import (
-    CONTEXT_MODE_QUICK,
-    CONTEXT_MODES,
-    DEFAULT_CONTEXT_CHARS,
-    DEFAULT_CONTEXT_ENTRIES,
-    load_call_context,
-)
+from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS
 from codex_usage_tracker.dashboard import (
     dashboard_payload,
     generate_dashboard,
@@ -58,6 +52,7 @@ from codex_usage_tracker.server_call_lists import (
     calls_payload,
     thread_calls_payload,
 )
+from codex_usage_tracker.server_context import ContextRequestError, context_payload
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
 from codex_usage_tracker.server_diagnostic_facts import (
     diagnostic_fact_calls_payload,
@@ -92,7 +87,6 @@ _matches_live_derived_filters = server_utils.matches_live_derived_filters
 _parse_api_limit = server_utils.parse_api_limit
 _parse_api_offset = server_utils.parse_api_offset
 _parse_bool = server_utils.parse_bool_query_value
-_parse_context_limit = server_utils.parse_context_limit
 _parse_limit = server_utils.parse_dashboard_limit
 _parse_offset = server_utils.parse_dashboard_offset
 _parse_optional_float = server_utils.parse_optional_float
@@ -404,49 +398,24 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._send_json(
                 HTTPStatus.FORBIDDEN,
                 {
-                    "error": "Context loading is disabled for this dashboard server.",
+                    "error": "Context loading disabled for dashboard server.",
                     "context_api_enabled": False,
                     "can_enable_context_api": True,
                 },
             )
             return
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token is required"})
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token required"})
             return
-        record_id = _first(params.get("record_id"))
-        if not record_id:
-            self._send_json(
-                HTTPStatus.BAD_REQUEST,
-                {"error": "record_id is required"},
-            )
-            return
-        include_tool_output = _truthy(_first(params.get("include_tool_output")))
-        include_compaction_history = _truthy(_first(params.get("include_compaction_history")))
-        diagnostics = _parse_bool(_first(params.get("diagnostics")), False)
-        context_mode = (_first(params.get("mode")) or CONTEXT_MODE_QUICK).strip().lower()
-        if context_mode not in CONTEXT_MODES:
-            self._send_json(
-                HTTPStatus.BAD_REQUEST,
-                {
-                    "error": "mode must be one of: " + ", ".join(sorted(CONTEXT_MODES)),
-                },
-            )
-            return
-        max_chars = _parse_context_limit(_first(params.get("max_chars")), self._context_chars)
-        max_entries = _parse_context_limit(
-            _first(params.get("max_entries")), DEFAULT_CONTEXT_ENTRIES
-        )
         try:
-            payload = load_call_context(
-                record_id=record_id,
+            payload = context_payload(
+                query,
                 db_path=self._db_path,
-                max_chars=max_chars,
-                max_entries=max_entries,
-                include_tool_output=include_tool_output,
-                include_compaction_history=include_compaction_history,
-                diagnostics=diagnostics,
-                mode=context_mode,
+                default_context_chars=self._context_chars,
             )
+        except ContextRequestError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
