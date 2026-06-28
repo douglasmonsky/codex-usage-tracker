@@ -2526,3 +2526,55 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with call-list/thread-call response helper extraction or raw context handler extraction after characterization tests.
+
+### refactor/server-call-detail-payload
+
+Objective:
+- Extract call-detail API payload construction from `_UsageDashboardHandler`.
+- Preserve `record_id`/`record` alias behavior, missing-id 400, not-found 404, adjacent-record lookup, annotation, raw-context suppression, and existing database error mapping.
+- Keep HTTP response writing in `server.py` while moving call-detail payload assembly into a focused helper module.
+
+Files touched:
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_call_detail.py`
+- `tests/test_server_call_detail.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `call_detail_payload()` with explicit `MissingRecordIdError` and `UsageRecordNotFoundError` exception types for handler status mapping.
+- Replaced inline call-detail payload construction in `server.py` with helper call and preserved 400/404/500 mappings.
+- Added focused tests for record alias handling, adjacent-record annotation/order, missing record id, and not-found behavior.
+- Split helper internals until the new module passed direct `xenon` B/A/A.
+- Declared `server_call_detail` in the dashboard/server `tach` boundary.
+- Ratcheted max file-line baseline `2336 -> 2311`, reducing `server.py` from `1171` to `1146` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_call_detail.py tests/test_server_call_detail.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_call_detail.py tests/test_server_call_detail.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_call_detail.py tests/test_dashboard_server.py -q`: 14 passed.
+- `radon cc src/codex_usage_tracker/server_call_detail.py -a -s`: average A (2.56).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_call_detail.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 358 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/server-call-detail-payload-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2336 -> 2311`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `server.py` remains oversized at `1146` lines; context, call-list, thread-call, and usage handlers still need extraction.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `context.py`, `cli.py`, diagnostics/report modules, and usage-drain modules remain above the eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with call-list/thread-call response helpers or raw context handler extraction after characterization tests.

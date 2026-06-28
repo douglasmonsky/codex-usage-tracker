@@ -52,6 +52,11 @@ from codex_usage_tracker.reports import (
     QUERY_CREDIT_CONFIDENCE_CHOICES,
     QUERY_PRICING_STATUS_CHOICES,
 )
+from codex_usage_tracker.server_call_detail import (
+    MissingRecordIdError,
+    UsageRecordNotFoundError,
+    call_detail_payload,
+)
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
 from codex_usage_tracker.server_diagnostic_facts import (
     diagnostic_fact_calls_payload,
@@ -77,7 +82,6 @@ from codex_usage_tracker.server_status import status_payload
 from codex_usage_tracker.server_summary import summary_payload
 from codex_usage_tracker.server_threads import threads_payload
 from codex_usage_tracker.server_usage_refresh import refresh_usage_payload
-from codex_usage_tracker.store import query_usage_record
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
 _elapsed_ms = server_utils.elapsed_ms
@@ -588,54 +592,25 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_call(self, query: str) -> None:
-        params = parse_qs(query)
-        record_id = _first(params.get("record_id")) or _first(params.get("record"))
-        if not record_id:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "record_id is required"})
-            return
         try:
-            row = query_usage_record(db_path=self._db_path, record_id=record_id)
-            if row is None:
-                self._send_json(HTTPStatus.NOT_FOUND, {"error": f"No usage record found: {record_id}"})
-                return
-            adjacent_raw_rows = [
-                query_usage_record(db_path=self._db_path, record_id=adjacent_id)
-                for adjacent_id in (row.get("previous_record_id"), row.get("next_record_id"))
-                if adjacent_id
-            ]
-            rows_by_id = {
-                candidate["record_id"]: candidate
-                for candidate in self._annotate_live_rows(
-                    [candidate for candidate in [row, *adjacent_raw_rows] if candidate]
-                )
-                if candidate.get("record_id")
-            }
-            selected_row = rows_by_id.get(record_id, row)
+            payload = call_detail_payload(
+                query,
+                db_path=self._db_path,
+                annotate_rows=self._annotate_live_rows,
+            )
+        except MissingRecordIdError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except UsageRecordNotFoundError as exc:
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            return
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"error": f"Database error while reading call: {exc}"},
             )
             return
-        previous_record = rows_by_id.get(str(row.get("previous_record_id") or ""))
-        next_record = rows_by_id.get(str(row.get("next_record_id") or ""))
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-call-v1",
-                "record": selected_row,
-                "previous_record": previous_record,
-                "next_record": next_record,
-                "adjacent_records": [
-                    candidate
-                    for candidate in (previous_record, selected_row, next_record)
-                    if candidate
-                ],
-                "previous_record_id": row.get("previous_record_id"),
-                "next_record_id": row.get("next_record_id"),
-                "raw_context_included": False,
-            },
-        )
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_threads(self, query: str) -> None:
         try:
