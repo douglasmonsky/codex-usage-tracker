@@ -59,6 +59,7 @@ from codex_usage_tracker.reports import (
     build_recommendations_report,
     build_summary_report,
 )
+from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
 from codex_usage_tracker.server_diagnostic_snapshots import (
     diagnostic_snapshot_payload,
     refresh_all_diagnostic_snapshots_payload,
@@ -362,23 +363,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_html(body)
 
     def _dashboard_shell_payload(self, query: str) -> dict[str, object] | None:
-        params = parse_qs(query)
-        include_archived = self._include_archived
-        history_scope = _first(params.get("history"))
-        if history_scope == "all":
-            include_archived = True
-        elif history_scope == "active":
-            include_archived = False
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            include_archived,
-        )
-        language = normalize_language(_first(params.get("lang")) or self._language)
         try:
-            return dashboard_payload(
+            return dashboard_shell_payload(
+                query,
                 db_path=self._db_path,
-                limit=0,
-                offset=0,
                 pricing_path=self._pricing_path,
                 allowance_path=self._allowance_path,
                 rate_card_path=self._rate_card_path,
@@ -388,9 +376,8 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 since=self._since,
                 api_token=self._api_token,
                 context_api_enabled=self._context_api_state.enabled,
-                include_archived=include_archived,
-                language=language,
-                include_rows=False,
+                include_archived_default=self._include_archived,
+                language_default=self._language,
             )
         except sqlite3.Error as exc:
             self._send_json(
