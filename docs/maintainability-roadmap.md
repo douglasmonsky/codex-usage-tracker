@@ -1504,3 +1504,43 @@ Remaining risks:
 
 Next handoff:
 - Move to smaller store persistence slices or server route-handler extraction now that Tach passes for the current boundary map.
+
+### `refactor/usage-drain-regression-helper-boundary`
+
+Goal:
+- Remove generic linear-regression helper code from the large usage-drain model module.
+- Reuse the existing `usage_drain_regression.py` boundary for ordinary least-squares coefficients and predictions.
+- Keep usage-drain model outputs unchanged.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `fit_linear_coefficients` and `predict_linear` to `src/codex_usage_tracker/usage_drain_regression.py`.
+- Updated `usage_drain_model.py` to import those helpers under existing internal aliases.
+- Removed the duplicate local regression helper implementations from `usage_drain_model.py`.
+- Ratcheted `max_file_lines` 5380 -> 5347.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_regression.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_regression.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure/cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5380 -> 5347.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach map -o /tmp/usage-drain-regression-helper-boundary-tach-map.json`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `fit_usage_drain_proxy` remains the highest complexity block and should be split behind characterization checks.
+- `usage_drain_model.py` is still large at roughly 3.3k lines.
+
+Next handoff:
+- Split one `fit_usage_drain_proxy` output family or one walk-forward helper cluster into a dedicated model submodule, with usage-drain tests as the characterization gate.

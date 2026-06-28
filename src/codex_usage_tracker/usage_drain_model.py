@@ -112,16 +112,19 @@ from codex_usage_tracker.usage_drain_regression import (
     fit_grid_multiplier as _fit_grid_multiplier,
 )
 from codex_usage_tracker.usage_drain_regression import (
+    fit_linear_coefficients as _fit_linear_regression_coefficients,
+)
+from codex_usage_tracker.usage_drain_regression import (
     fit_two_feature_no_intercept as _fit_two_feature_no_intercept,
+)
+from codex_usage_tracker.usage_drain_regression import (
+    predict_linear as _linear_regression_predictions,
 )
 from codex_usage_tracker.usage_drain_regression import (
     r2 as _r2,
 )
 from codex_usage_tracker.usage_drain_regression import (
     regression_metrics as _regression_metrics,
-)
-from codex_usage_tracker.usage_drain_regression import (
-    solve_linear_system as _solve_linear_system,
 )
 from codex_usage_tracker.usage_drain_spans import (
     build_usage_delta_spans,
@@ -1891,42 +1894,6 @@ def _token_component_fit_summary(
     }
 
 
-def _fit_linear_regression_coefficients(
-    x_rows: list[list[float]], y_values: list[float], *, intercept: bool
-) -> list[float]:
-    width = len(x_rows[0]) + (1 if intercept else 0)
-    lhs = [[0.0 for _ in range(width)] for _ in range(width)]
-    rhs = [0.0 for _ in range(width)]
-    for row, y_value in zip(x_rows, y_values, strict=True):
-        expanded = ([1.0] if intercept else []) + row
-        for i, x_i in enumerate(expanded):
-            rhs[i] += x_i * y_value
-            for j, x_j in enumerate(expanded):
-                lhs[i][j] += x_i * x_j
-    coefficients = _solve_linear_system(lhs, rhs)
-    if coefficients is not None:
-        return coefficients
-    for index in range(1 if intercept else 0, width):
-        lhs[index][index] += 1e-9
-    coefficients = _solve_linear_system(lhs, rhs)
-    if coefficients is None:
-        return [0.0 for _index in range(width)]
-    return coefficients
-
-
-def _linear_regression_predictions(
-    x_rows: list[list[float]], coefficients: list[float], *, intercept: bool
-) -> list[float]:
-    predictions: list[float] = []
-    for row in x_rows:
-        expanded = ([1.0] if intercept else []) + row
-        predictions.append(
-            sum(
-                coefficient * value
-                for coefficient, value in zip(coefficients, expanded, strict=True)
-            )
-        )
-    return predictions
 
 
 def _component_coefficient_rows(

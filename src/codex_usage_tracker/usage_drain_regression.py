@@ -115,6 +115,53 @@ def predict(x_rows: list[list[float]], coefficients: list[float]) -> list[float]
     ]
 
 
+
+def fit_linear_coefficients(
+    x_rows: list[list[float]],
+    y_values: list[float],
+    *,
+    intercept: bool,
+) -> list[float]:
+    """Fit ordinary least-squares coefficients with a tiny ridge fallback."""
+
+    width = len(x_rows[0]) + (1 if intercept else 0)
+    lhs = [[0.0 for _ in range(width)] for _ in range(width)]
+    rhs = [0.0 for _ in range(width)]
+    for row, y_value in zip(x_rows, y_values, strict=True):
+        expanded = ([1.0] if intercept else []) + row
+        for i, x_i in enumerate(expanded):
+            rhs[i] += x_i * y_value
+            for j, x_j in enumerate(expanded):
+                lhs[i][j] += x_i * x_j
+    coefficients = solve_linear_system(lhs, rhs)
+    if coefficients is not None:
+        return coefficients
+    for index in range(1 if intercept else 0, width):
+        lhs[index][index] += 1e-9
+    coefficients = solve_linear_system(lhs, rhs)
+    if coefficients is None:
+        return [0.0 for _index in range(width)]
+    return coefficients
+
+
+def predict_linear(
+    x_rows: list[list[float]],
+    coefficients: list[float],
+    *,
+    intercept: bool,
+) -> list[float]:
+    predictions: list[float] = []
+    for row in x_rows:
+        expanded = ([1.0] if intercept else []) + row
+        predictions.append(
+            sum(
+                coefficient * value
+                for coefficient, value in zip(coefficients, expanded, strict=True)
+            )
+        )
+    return predictions
+
+
 def regression_metrics(
     actual: list[float], predicted: list[float]
 ) -> dict[str, float | int | None]:
