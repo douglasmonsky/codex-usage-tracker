@@ -114,6 +114,7 @@ _DASHBOARD_ASSET_MIME_TYPES = {
     ".json": "application/json; charset=utf-8",
     ".svg": "image/svg+xml",
 }
+_DIAGNOSTIC_REFRESH_AUTH_ERROR = "Valid API token is required for diagnostic refresh"
 
 
 def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
@@ -625,11 +626,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
 
     def _handle_diagnostics_refresh(self, query: str) -> None:
         params = parse_qs(query)
-        if not self._has_valid_api_token(params):
-            self._send_error(
-                HTTPStatus.FORBIDDEN,
-                "Valid API token is required for diagnostic refresh",
-            )
+        if self._reject_missing_diagnostic_refresh_token(params):
             return
         try:
             payload = diagnostic_refresh_payload(
@@ -784,11 +781,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         refresh: bool,
     ) -> None:
         params = parse_qs(query)
-        if refresh and not self._has_valid_api_token(params):
-            self._send_error(
-                HTTPStatus.FORBIDDEN,
-                "Valid API token is required for diagnostic refresh",
-            )
+        if refresh and self._reject_missing_diagnostic_refresh_token(params):
             return
         include_archived = _parse_bool(
             _first(params.get("include_archived")),
@@ -818,11 +811,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         label: str,
     ) -> None:
         params = parse_qs(query)
-        if refresh and not self._has_valid_api_token(params):
-            self._send_error(
-                HTTPStatus.FORBIDDEN,
-                "Valid API token is required for diagnostic refresh",
-            )
+        if refresh and self._reject_missing_diagnostic_refresh_token(params):
             return
         include_archived = _parse_bool(
             _first(params.get("include_archived")),
@@ -921,6 +910,15 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool:
         return has_valid_api_token(self.headers, params, self._api_token)
+
+    def _reject_missing_diagnostic_refresh_token(
+        self,
+        params: dict[str, list[str]],
+    ) -> bool:
+        if self._has_valid_api_token(params):
+            return False
+        self._send_error(HTTPStatus.FORBIDDEN, _DIAGNOSTIC_REFRESH_AUTH_ERROR)
+        return True
 
     def _send_error(
         self,

@@ -3250,3 +3250,51 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with another low-risk slice around context route handling or diagnostic route handler repetition.
+
+### `refactor/server-diagnostic-refresh-auth`
+
+Goal:
+- Consolidate repeated diagnostic refresh token denial logic in the dashboard server.
+- Preserve the same 403 JSON payload for refresh endpoints without adding lines to oversized legacy tests.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `tests/test_server_diagnostic_refresh_auth.py`
+
+Completed edits:
+- Added `_DIAGNOSTIC_REFRESH_AUTH_ERROR` and `_reject_missing_diagnostic_refresh_token`.
+- Replaced three repeated diagnostics-refresh token checks with the shared helper.
+- Added focused tests for missing-token rejection and valid header acceptance.
+- Moved the new assertion out of the oversized `tests/test_dashboard_server.py` after `agent-maintainer verify --profile fast` caught the legacy file-length regression.
+- Ratcheted max-file baseline `1620 -> 1618`; `server.py` reduced `937 -> 935` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py tests/test_dashboard_server.py tests/test_server_diagnostic_refresh_auth.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py tests/test_dashboard_server.py tests/test_server_diagnostic_refresh_auth.py`: passed.
+- `.venv/bin/python -m pytest tests/test_dashboard_server.py tests/test_server_diagnostic_refresh_auth.py -q`: 13 passed.
+- `radon cc src/codex_usage_tracker/server.py -a -s`: server hotspots unchanged; `_handle_context` remains B.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m pytest -q`: 410 passed.
+- `.venv/bin/tach map -o /tmp/server-diagnostic-refresh-auth-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1620 -> 1618`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning after moving assertion to the focused test file.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `server.py` remains oversized at `935` lines.
+- `_UsageDashboardHandler._handle_context` remains the server complexity hotspot.
+- The diagnostic refresh helper is still handler-local; a later route/handler split should move this concern out with the broader routing boundary.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with another small server branch, preferably extracting context route handling or diagnostic snapshot dispatch into tested helpers.
