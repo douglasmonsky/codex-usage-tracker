@@ -55,9 +55,9 @@ from codex_usage_tracker.server_context_settings import (
 )
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
 from codex_usage_tracker.server_diagnostic_facts import (
-    diagnostic_fact_calls_payload,
-    diagnostics_facts_payload,
-    diagnostics_summary_payload,
+    handle_diagnostics_fact_calls_request,
+    handle_diagnostics_facts_request,
+    handle_diagnostics_summary_request,
 )
 from codex_usage_tracker.server_diagnostic_snapshots import (
     handle_diagnostic_refresh_request,
@@ -537,19 +537,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_diagnostics_summary(self, query: str) -> None:
-        try:
-            payload = diagnostics_summary_payload(
-                query,
-                db_path=self._db_path,
-                include_archived_default=self._include_archived,
-            )
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading diagnostics", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_diagnostics_summary_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_diagnostics_facts(
         self,
@@ -558,38 +553,28 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         fact_type: str | None = None,
         fact_group: str | None = None,
     ) -> None:
-        try:
-            payload = diagnostics_facts_payload(
-                query,
-                db_path=self._db_path,
-                include_archived_default=self._include_archived,
-                request_path=urlparse(self.path).path,
-                fact_type=fact_type,
-                fact_group=fact_group,
-            )
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading diagnostics", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_diagnostics_facts_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            request_path=urlparse(self.path).path,
+            fact_type=fact_type,
+            fact_group=fact_group,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_diagnostics_fact_calls(self, query: str) -> None:
-        try:
-            payload = diagnostic_fact_calls_payload(
-                query,
-                db_path=self._db_path,
-                include_archived_default=self._include_archived,
-                privacy_mode=self._privacy_mode,
-            )
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading diagnostic calls", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_diagnostics_fact_calls_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            privacy_mode=self._privacy_mode,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_diagnostics_overview(self, query: str) -> None:
         self._handle_diagnostic_snapshot(

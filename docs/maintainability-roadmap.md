@@ -3450,3 +3450,53 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with diagnostic fact route wrappers or stop server slicing and switch to the next roadmap module if server risk starts increasing.
+
+### `refactor/server-diagnostic-fact-handlers`
+
+Goal:
+- Move diagnostic summary, fact-list, and fact-call route wrappers out of `_UsageDashboardHandler`.
+- Preserve bad-request and SQLite error response behavior.
+- Continue reducing `server.py` while keeping helper/test modules below file-length budgets.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_diagnostic_facts.py`
+- `tests/test_server_diagnostic_facts.py`
+
+Completed edits:
+- Added `handle_diagnostics_summary_request`, `handle_diagnostics_facts_request`, and `handle_diagnostics_fact_calls_request`.
+- Replaced three `_UsageDashboardHandler` diagnostic fact wrappers with delegates.
+- Added focused tests for successful summary response, bad-request mapping, and diagnostic-call SQLite error mapping.
+- Ratcheted max-file baseline `1573 -> 1558`; `server.py` reduced `890 -> 875` lines.
+- Kept `server_diagnostic_facts.py` at `210` lines and `tests/test_server_diagnostic_facts.py` at `218` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_facts.py tests/test_server_diagnostic_facts.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_facts.py tests/test_server_diagnostic_facts.py tests/test_dashboard_server.py`: passed after mechanical Ruff import fix.
+- `.venv/bin/python -m pytest tests/test_server_diagnostic_facts.py tests/test_dashboard_server.py -q`: 18 passed.
+- `radon cc src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_facts.py -a -s`: extracted fact handlers A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_facts.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m pytest -q`: 421 passed.
+- `.venv/bin/tach map -o /tmp/server-diagnostic-fact-handlers-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1573 -> 1558`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `server.py` remains oversized at `875` lines.
+- Usage/call/thread route wrappers remain server-owned.
+- Broad package structure remains too flat for strict cohesion.
+
+Next handoff:
+- Continue server route wrapper extraction with call/thread/list/status routes, or switch to store/query boundaries if the next route family looks too coupled.

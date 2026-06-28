@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +14,111 @@ from codex_usage_tracker import server_diagnostic_facts
 @dataclass
 class _Report:
     payload: dict[str, object]
+
+
+class _RouteSenders:
+    def __init__(self) -> None:
+        self.errors: list[tuple[HTTPStatus, str]] = []
+        self.exceptions: list[tuple[str, BaseException]] = []
+        self.json_payloads: list[tuple[HTTPStatus, dict[str, object]]] = []
+
+    def send_error(self, status: HTTPStatus, message: str) -> None:
+        self.errors.append((status, message))
+
+    def send_exception(self, prefix: str, exc: BaseException) -> None:
+        self.exceptions.append((prefix, exc))
+
+    def send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
+        self.json_payloads.append((status, payload))
+
+
+def test_handle_diagnostics_summary_request_sends_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def diagnostics_summary_payload(query: str, **kwargs: Any) -> dict[str, object]:
+        return {"query": query, "archived": kwargs["include_archived_default"]}
+
+    monkeypatch.setattr(
+        server_diagnostic_facts,
+        "diagnostics_summary_payload",
+        diagnostics_summary_payload,
+    )
+
+    server_diagnostic_facts.handle_diagnostics_summary_request(
+        "limit=5",
+        db_path=tmp_path / "usage.sqlite3",
+        include_archived_default=True,
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == []
+    assert senders.json_payloads == [(HTTPStatus.OK, {"query": "limit=5", "archived": True})]
+
+
+def test_handle_diagnostics_facts_request_sends_bad_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def diagnostics_facts_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise ValueError("bad sort")
+
+    monkeypatch.setattr(
+        server_diagnostic_facts,
+        "diagnostics_facts_payload",
+        diagnostics_facts_payload,
+    )
+
+    server_diagnostic_facts.handle_diagnostics_facts_request(
+        "sort=bad",
+        db_path=tmp_path / "usage.sqlite3",
+        include_archived_default=True,
+        request_path="/api/diagnostics/tools",
+        fact_type="tool_call",
+        fact_group="tools",
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == [(HTTPStatus.BAD_REQUEST, "bad sort")]
+    assert senders.json_payloads == []
+
+
+def test_handle_diagnostics_fact_calls_request_sends_sqlite_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def diagnostic_fact_calls_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(
+        server_diagnostic_facts,
+        "diagnostic_fact_calls_payload",
+        diagnostic_fact_calls_payload,
+    )
+
+    server_diagnostic_facts.handle_diagnostics_fact_calls_request(
+        "",
+        db_path=tmp_path / "usage.sqlite3",
+        include_archived_default=True,
+        privacy_mode="normal",
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.json_payloads == []
+    assert senders.exceptions[0][0] == "Database error while reading diagnostic calls"
+    assert str(senders.exceptions[0][1]) == "database is locked"
 
 
 def test_diagnostics_summary_payload_normalizes_filters(

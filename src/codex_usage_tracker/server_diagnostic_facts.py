@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -17,6 +20,93 @@ from codex_usage_tracker.server_utils import (
     parse_report_limit,
     safe_int,
 )
+
+ErrorSender = Callable[[HTTPStatus, str], None]
+ExceptionSender = Callable[[str, BaseException], None]
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+
+
+def handle_diagnostics_summary_request(
+    query: str,
+    *,
+    db_path: Path,
+    include_archived_default: bool,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle diagnostic summary route errors and response writing."""
+    try:
+        payload = diagnostics_summary_payload(
+            query,
+            db_path=db_path,
+            include_archived_default=include_archived_default,
+        )
+    except ValueError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading diagnostics", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
+
+
+def handle_diagnostics_facts_request(
+    query: str,
+    *,
+    db_path: Path,
+    include_archived_default: bool,
+    request_path: str,
+    fact_type: str | None,
+    fact_group: str | None,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle diagnostic fact-list route errors and response writing."""
+    try:
+        payload = diagnostics_facts_payload(
+            query,
+            db_path=db_path,
+            include_archived_default=include_archived_default,
+            request_path=request_path,
+            fact_type=fact_type,
+            fact_group=fact_group,
+        )
+    except ValueError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading diagnostics", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
+
+
+def handle_diagnostics_fact_calls_request(
+    query: str,
+    *,
+    db_path: Path,
+    include_archived_default: bool,
+    privacy_mode: str,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle diagnostic fact-call route errors and response writing."""
+    try:
+        payload = diagnostic_fact_calls_payload(
+            query,
+            db_path=db_path,
+            include_archived_default=include_archived_default,
+            privacy_mode=privacy_mode,
+        )
+    except ValueError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading diagnostic calls", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def diagnostics_summary_payload(
