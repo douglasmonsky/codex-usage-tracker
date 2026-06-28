@@ -55,9 +55,7 @@ from codex_usage_tracker.store_diagnostic_queries import (
     query_diagnostic_summary as query_diagnostic_summary,
 )
 from codex_usage_tracker.store_query_sql import (
-    _group_expression,
     _normalize_limit,
-    _since_where_clause,
 )
 from codex_usage_tracker.store_rows import (
     row_to_dict as _row_to_dict,
@@ -72,6 +70,7 @@ from codex_usage_tracker.store_sources import (
     source_logs_requiring_parse,
     upsert_source_file_metadata,
 )
+from codex_usage_tracker.store_summary_queries import query_summary as query_summary
 from codex_usage_tracker.store_thread_summaries import (
     query_thread_summaries as query_thread_summaries,
 )
@@ -556,43 +555,6 @@ def refresh_thread_summaries(db_path: Path = DEFAULT_DB_PATH) -> int:
     with connect(db_path) as conn:
         init_db(conn)
         return rebuild_thread_summaries(conn)
-
-
-def query_summary(
-    db_path: Path = DEFAULT_DB_PATH,
-    group_by: str = "thread",
-    limit: int = 20,
-    since: str | None = None,
-) -> list[dict[str, Any]]:
-    group_expr = _group_expression(group_by)
-    where_clause, raw_params = _since_where_clause(since)
-    params: list[Any] = list(raw_params)
-    sql = f"""
-        SELECT
-            {group_expr} AS group_key,
-            COUNT(*) AS model_calls,
-            COUNT(DISTINCT session_id) AS sessions,
-            COUNT(DISTINCT turn_id) AS turns,
-            SUM(input_tokens) AS input_tokens,
-            SUM(cached_input_tokens) AS cached_input_tokens,
-            SUM(uncached_input_tokens) AS uncached_input_tokens,
-            SUM(output_tokens) AS output_tokens,
-            SUM(reasoning_output_tokens) AS reasoning_output_tokens,
-            SUM(total_tokens) AS total_tokens,
-            AVG(cache_ratio) AS avg_cache_ratio,
-            AVG(reasoning_output_ratio) AS avg_reasoning_output_ratio,
-            AVG(context_window_percent) AS avg_context_window_percent,
-            MAX(event_timestamp) AS latest_event
-        FROM usage_events
-        {where_clause}
-        GROUP BY group_key
-        ORDER BY total_tokens DESC
-        LIMIT ?
-    """
-    params.append(limit)
-    with connect(db_path) as conn:
-        init_db(conn)
-        return [_row_to_dict(row) for row in conn.execute(sql, params)]
 
 
 def export_usage_csv(

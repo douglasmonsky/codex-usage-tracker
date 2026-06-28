@@ -217,9 +217,11 @@ def _normalize_offset(offset: int | None) -> int:
     return int(offset)
 
 
+group_expression = _group_expression
 normalize_limit = _normalize_limit
 normalize_offset = _normalize_offset
 normalize_sort_direction = _normalize_sort_direction
+since_where_clause = _since_where_clause
 thread_key_expression = _thread_key_expression
 usage_api_sort_expression = _usage_api_sort_expression
 usage_api_where_clause = _usage_api_where_clause
