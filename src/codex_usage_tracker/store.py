@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import json
 import sqlite3
 from collections.abc import Iterable
@@ -20,7 +19,6 @@ from codex_usage_tracker.parser import (
     parse_usage_events_from_file_with_state,
 )
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
-from codex_usage_tracker.projects import apply_project_privacy_to_rows, validate_privacy_mode
 from codex_usage_tracker.schema import (
     DIAGNOSTIC_FACT_COLUMN_NAMES,
     USAGE_EVENT_COLUMN_NAMES,
@@ -54,9 +52,7 @@ from codex_usage_tracker.store_diagnostic_queries import (
 from codex_usage_tracker.store_diagnostic_queries import (
     query_diagnostic_summary as query_diagnostic_summary,
 )
-from codex_usage_tracker.store_query_sql import (
-    _normalize_limit,
-)
+from codex_usage_tracker.store_exports import export_usage_csv as export_usage_csv
 from codex_usage_tracker.store_rows import (
     row_to_dict as _row_to_dict,
 )
@@ -555,30 +551,3 @@ def refresh_thread_summaries(db_path: Path = DEFAULT_DB_PATH) -> int:
     with connect(db_path) as conn:
         init_db(conn)
         return rebuild_thread_summaries(conn)
-
-
-def export_usage_csv(
-    output_path: Path,
-    db_path: Path = DEFAULT_DB_PATH,
-    limit: int | None = None,
-    privacy_mode: str = "normal",
-) -> int:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    privacy_mode = validate_privacy_mode(privacy_mode)
-    sql = "SELECT * FROM usage_events ORDER BY event_timestamp, cumulative_total_tokens"
-    params: tuple[int, ...] = ()
-    normalized_limit = _normalize_limit(limit)
-    if normalized_limit is not None:
-        sql += " LIMIT ?"
-        params = (normalized_limit,)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = [_row_to_dict(row) for row in conn.execute(sql, params)]
-    rows = apply_project_privacy_to_rows(rows, privacy_mode=privacy_mode)
-
-    with output_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=EVENT_COLUMNS)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({column: row.get(column) for column in EVENT_COLUMNS})
-    return len(rows)

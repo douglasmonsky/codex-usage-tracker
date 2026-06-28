@@ -1312,3 +1312,45 @@ Remaining risks:
 
 Next handoff:
 - Extract export behavior next to eliminate the remaining private SQL helper import from `store.py`.
+### `refactor/store-export-boundary`
+
+Goal:
+- Move CSV export behavior out of `store.py`.
+- Preserve `store.py` compatibility facade import for CLI/MCP callers.
+- Eliminate the remaining cross-module private SQL helper import from `store.py`.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_exports.py` for `export_usage_csv`.
+- Moved export privacy handling and CSV writing out of `store.py`.
+- Re-exported `export_usage_csv` from `store.py`.
+- Updated `tach.toml` so the export module belongs to the persistence/store boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-private-imports.json` to zero.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_exports.py`: passed.
+- `.venv/bin/python -m compileall src/codex_usage_tracker/store.py src/codex_usage_tracker/store_exports.py`: passed.
+- `.venv/bin/python -m pytest -q tests/test_mcp_integration.py tests/test_privacy.py tests/test_cli_release.py`: 23 passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py tests/test_store_dashboard_mcp.py tests/test_privacy.py tests/test_mcp_integration.py tests/test_context_evidence.py tests/test_usage_drain_reports.py tests/test_dashboard_payload.py tests/test_dashboard_data.py`: 61 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion warning and behavior-preserving refactor no-test-file warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed, ratcheted baseline 1 to 0.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_exports.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-exports.json`: passed.
+- `.venv/bin/tach check`: expected informational failure, 12 documented legacy parser/support boundary violations.
+- `git diff --check`: passed after removing the EOF blank line from `store.py`.
+
+Remaining risks:
+- `store.py` still owns parser-facing refresh/upsert orchestration and diagnostic snapshot persistence.
+- Tach blockers are now dominated by parser imports in store/store_sources and the support-to-diagnostics dependency.
+
+Next handoff:
+- Start splitting parser-facing refresh orchestration from store persistence, or isolate support diagnostics, now that read/export query boundaries are smaller.

@@ -6,15 +6,8 @@
   },
   "baselines": {
     "cross_module_private_imports": {
-      "metric_value": 1,
-      "items": [
-        {
-          "file": "src/codex_usage_tracker/store.py",
-          "line": 57,
-          "name": "_normalize_limit",
-          "source_module": "codex_usage_tracker.store_query_sql"
-        }
-      ]
+      "metric_value": 0,
+      "items": []
     }
   }
 }
