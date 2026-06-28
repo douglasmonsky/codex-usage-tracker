@@ -982,3 +982,39 @@ Checks:
 
 Next handoff:
 - Consider moving from usage-drain split work to store/query boundary characterization, because further usage-drain orchestration moves are higher-risk and should be handled only with more targeted tests.
+
+### `refactor/store-connection-boundary`
+
+Goal:
+- Move the SQLite connection context manager out of `store.py`.
+- Preserve `codex_usage_tracker.store.connect` as a compatibility facade import.
+- Set up future store query modules without circular imports back into `store.py`.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_connection.py` for the SQLite connection context manager.
+- Removed the local `connect` definition from `store.py` and imported it from `store_connection.py`.
+- Updated `tach.toml` so `store_connection.py` belongs to the persistence/store boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_connection.py`: passed.
+- `.venv/bin/python -m pytest tests/test_store_migrations.py tests/test_store_dashboard_mcp.py tests/test_store_large_batches.py`: 27 passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and no-test-file change-budget warning for behavior-preserving refactor.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline from 6722 to 6706.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_connection.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-connection.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+- Extract diagnostic read queries into a store query module now that they can import `store_connection.connect` and `store_schema.init_db` without circularly depending on `store.py`.

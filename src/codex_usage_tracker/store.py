@@ -5,8 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import sqlite3
-from collections.abc import Iterable, Iterator
-from contextlib import contextmanager, suppress
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,6 +26,7 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
+from codex_usage_tracker.store_connection import connect
 from codex_usage_tracker.store_query_sql import (
     _group_expression,
     _normalize_limit,
@@ -164,22 +164,6 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
 
-@contextmanager
-def connect(db_path: Path = DEFAULT_DB_PATH) -> Iterator[sqlite3.Connection]:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path, timeout=5.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
-    with suppress(sqlite3.DatabaseError):
-        conn.execute("PRAGMA journal_mode = WAL")
-    try:
-        yield conn
-        conn.commit()
-    except BaseException:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
 
 
 def record_refresh_metadata(

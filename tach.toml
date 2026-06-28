@@ -96,8 +96,9 @@ depends_on = [
 
 [[modules]]
 paths = [
-    "codex_usage_tracker.store",
-    "codex_usage_tracker.store_query_sql",
+  "codex_usage_tracker.store",
+  "codex_usage_tracker.store_connection",
+  "codex_usage_tracker.store_query_sql",
     "codex_usage_tracker.store_schema",
     "codex_usage_tracker.store_sources",
     "codex_usage_tracker.store_thread_summaries",
@@ -119,8 +120,9 @@ depends_on = [
     "codex_usage_tracker.projects",
     "codex_usage_tracker.redaction",
     "codex_usage_tracker.schema",
-    "codex_usage_tracker.store",
-    "codex_usage_tracker.store_query_sql",
+  "codex_usage_tracker.store",
+  "codex_usage_tracker.store_connection",
+  "codex_usage_tracker.store_query_sql",
     "codex_usage_tracker.store_schema",
     "codex_usage_tracker.store_sources",
     "codex_usage_tracker.store_thread_summaries",
