@@ -1680,3 +1680,49 @@ Remaining risks:
 Next handoff:
 
 - Continue with one more usage-drain split around walk-forward prediction row construction or segment/regime summary formatting.
+### refactor/usage-drain-walk-forward-boundary
+
+Objective:
+
+- Split walk-forward prediction summary, row construction, and scope metrics out of `usage_drain_model.py`.
+- Preserve the existing `walk_forward_prediction` report payload and piecewise-regime dependency on prediction rows.
+- Keep the new module below agent-maintainer new-file size limits and avoid private cross-module imports.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_walk_forward.py` for walk-forward prediction summaries, rows, scope metrics, transition gate diagnostics, and state-bucket diagnostics.
+- Updated `usage_drain_model.py` to call `usage_drain_walk_forward` through a public module namespace.
+- Updated `tach.toml` to include the walk-forward usage-drain module in the existing diagnostics/report boundary.
+- Ratcheted `max_file_lines` baseline 4205 -> 3744.
+- `usage_drain_model.py` is now 1687 lines; the new walk-forward module is 419 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_walk_forward.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_walk_forward.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/usage-drain-walk-forward-boundary-tach-map.json`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 4205 -> 3744.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+
+- `usage_drain_model.py` remains above the 600-line target and still contains piecewise regime, boundary, token-component, and one-percent capacity modeling helpers.
+- Agent-maintainer still warns about package folder size and source changes without new tests; existing usage-drain tests are serving as characterization coverage.
+
+Next handoff:
+
+- Extract either the piecewise-regime/boundary summary cluster or token-component regression cluster into a focused module.
