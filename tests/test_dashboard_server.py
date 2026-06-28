@@ -1060,16 +1060,16 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
 
 
 def test_dashboard_server_can_enable_context_api_at_runtime(tmp_path: Path) -> None:
-    from codex_usage_tracker.server import _ContextApiState, _UsageDashboardHandler
+    from codex_usage_tracker import server as server_module
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
-    context_api_state = _ContextApiState(False)
+    context_api_state = server_module.ContextApiState(False)
 
     handler = partial(
-        _UsageDashboardHandler,
+        server_module._UsageDashboardHandler,
         directory=str(tmp_path),
         db_path=db_path,
         pricing_path=tmp_path / "pricing.json",

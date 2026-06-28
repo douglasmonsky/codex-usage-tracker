@@ -53,6 +53,10 @@ from codex_usage_tracker.server_call_lists import (
     thread_calls_payload,
 )
 from codex_usage_tracker.server_context import ContextRequestError, context_payload
+from codex_usage_tracker.server_context_settings import (
+    ContextApiState,
+    context_settings_payload,
+)
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
 from codex_usage_tracker.server_diagnostic_facts import (
     diagnostic_fact_calls_payload,
@@ -111,21 +115,6 @@ def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
     return None if value is None else _safe_int(value)
 
 
-class _ContextApiState:
-    def __init__(self, enabled: bool) -> None:
-        self._enabled = enabled
-        self._lock = threading.Lock()
-
-    @property
-    def enabled(self) -> bool:
-        with self._lock:
-            return self._enabled
-
-    def set_enabled(self, enabled: bool) -> None:
-        with self._lock:
-            self._enabled = enabled
-
-
 def serve_dashboard(
     db_path: Path,
     output_path: Path = DEFAULT_DASHBOARD_PATH,
@@ -153,7 +142,7 @@ def serve_dashboard(
     api_token = secrets.token_urlsafe(32)
     context_api_enabled = context_api != "disabled"
     selected_language = normalize_language(language)
-    context_api_state = _ContextApiState(context_api_enabled)
+    context_api_state = ContextApiState(context_api_enabled)
     output = generate_dashboard(
         db_path=db_path,
         output_path=output_path,
@@ -232,7 +221,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         refresh_lock: threading.Lock,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
-        context_api_state: _ContextApiState | None = None,
+        context_api_state: ContextApiState | None = None,
         privacy_mode: str = "normal",
         rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
         language: str = "en",
@@ -258,7 +247,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
         self._context_chars = context_chars
         self._api_token = api_token
-        self._context_api_state = context_api_state or _ContextApiState(context_api_enabled)
+        self._context_api_state = context_api_state or ContextApiState(context_api_enabled)
         self._refresh_lock = refresh_lock
         super().__init__(*args, **kwargs)
 
@@ -439,19 +428,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def _handle_context_settings(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token is required"})
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token required"})
             return
-        enabled = _parse_bool(_first(params.get("enabled")), True)
-        self._context_api_state.set_enabled(enabled)
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-context-settings-v1",
-                "context_api_enabled": self._context_api_state.enabled,
-                "raw_context_persisted": False,
-            },
-        )
-
+        payload = context_settings_payload(query, context_api_state=self._context_api_state)
+        self._send_json(HTTPStatus.OK, payload)
     def _handle_open_investigator(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
