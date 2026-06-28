@@ -70,13 +70,13 @@ from codex_usage_tracker.server_routes import (
     POST_ROUTE_METHODS,
     is_dashboard_shell_path,
 )
+from codex_usage_tracker.server_usage_refresh import refresh_usage_payload
 from codex_usage_tracker.store import (
     query_latest_observed_usage,
     query_thread_summaries,
     query_usage_record,
     query_usage_status,
     refresh_metadata,
-    refresh_usage_index,
 )
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
@@ -1241,23 +1241,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                         {"error": "Valid API token is required for refresh"},
                     )
                     return
-                refresh_started = perf_counter()
-                with self._refresh_lock:
-                    result = refresh_usage_index(
-                        codex_home=self._codex_home,
-                        db_path=self._db_path,
-                        include_archived=include_archived,
-                    )
-                refresh_ms = _elapsed_ms(refresh_started)
-                refresh_result = {
-                    "scanned_files": result.scanned_files,
-                    "parsed_events": result.parsed_events,
-                    "skipped_events": result.skipped_events,
-                    "inserted_or_updated_events": result.inserted_or_updated_events,
-                    "db_path": result.db_path,
-                    "parser_diagnostics": result.parser_diagnostics,
-                    "include_archived": include_archived,
-                }
+                refresh_result, refresh_ms = refresh_usage_payload(
+                    codex_home=self._codex_home,
+                    db_path=self._db_path,
+                    include_archived=include_archived,
+                    refresh_lock=self._refresh_lock,
+                )
             payload_started = perf_counter()
             payload = dashboard_payload(
                 db_path=self._db_path,
