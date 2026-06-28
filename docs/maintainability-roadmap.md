@@ -1397,3 +1397,26 @@ Remaining risks:
 
 Next handoff:
 - Continue `server.py` split with an API route dispatch table or one handler family extraction after adding focused route characterization.
+### `refactor/support-diagnostics-boundary-map`
+
+Goal:
+- Encode the intentional support-bundle dependency on diagnostics in `tach.toml`.
+- Remove the stale support-to-diagnostics boundary violation without changing runtime behavior.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `codex_usage_tracker.diagnostics` to the support/report module group's allowed dependencies.
+
+Checks:
+- `.venv/bin/tach check`: expected informational failure now reduced to 11 parser/store-source boundary violations.
+- `.venv/bin/tach report src/codex_usage_tracker/support.py --dependencies --usages`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+- Remaining Tach blockers are parser dependencies from `store.py` and `store_sources.py`.
+
+Next handoff:
+- Split parser-facing refresh/source-state code so persistence modules no longer depend directly on parser internals.

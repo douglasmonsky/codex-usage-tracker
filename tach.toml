@@ -161,6 +161,7 @@ depends_on = [
     "codex_usage_tracker.call_origin",
     "codex_usage_tracker.context",
     "codex_usage_tracker.costing",
+    "codex_usage_tracker.diagnostics",
     "codex_usage_tracker.diagnostic_facts",
     "codex_usage_tracker.formatting",
     "codex_usage_tracker.i18n",
