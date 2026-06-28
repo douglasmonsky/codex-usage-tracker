@@ -1420,3 +1420,45 @@ Remaining risks:
 
 Next handoff:
 - Split parser-facing refresh/source-state code so persistence modules no longer depend directly on parser internals.
+
+### `refactor/parser-state-boundary`
+
+Goal:
+- Move persisted parser cursor and diagnostic counter metadata behind a narrow state contract.
+- Remove `store_sources.py` dependency on parser implementation while preserving parser compatibility names.
+- Keep behavior unchanged and reduce Tach blockers before the larger refresh orchestration split.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/parser_state.py` for `ParserState`, parser adapter version, diagnostic key ordering, parser-state JSON serialization, and compact diagnostic counters.
+- Updated `parser.py` to consume parser-state helpers and keep compatibility aliases for `parser_state_from_json` and `parser_state_to_json`.
+- Updated `store.py` and `store_sources.py` to import parser metadata from `parser_state.py` instead of `parser.py`.
+- Updated `tach.toml` so parser-state is an explicit narrow dependency for store persistence code.
+- Ratcheted `max_file_lines` 5506 -> 5380 and `duplicate_helpers` 63 -> 62.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/parser.py src/codex_usage_tracker/parser_state.py src/codex_usage_tracker/store.py src/codex_usage_tracker/store_sources.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/parser.py src/codex_usage_tracker/parser_state.py src/codex_usage_tracker/store.py src/codex_usage_tracker/store_sources.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_store_migrations.py tests/test_context_evidence.py tests/test_dashboard_payload.py tests/test_privacy.py`: 21 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure/cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5506 -> 5380.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed, ratcheted baseline 63 -> 62.
+- `.venv/bin/tach report src/codex_usage_tracker/store_sources.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/parser-state-boundary-tach-map.json`: passed.
+- `.venv/bin/tach check --output json`: expected informational failure now reduced to 3 `store.py` -> `parser.py` refresh-orchestration imports.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `store.py` still imports parser scanning/parsing functions for `refresh_usage_index`; this is the last known Tach blocker in this area.
+- Parser state now depends on diagnostic-fact serialization, so it remains in the parser/context boundary group rather than lowest-level core.
+
+Next handoff:
+- Extract refresh orchestration out of `store.py` into a service module allowed to depend on both parser and store persistence, while preserving the `store.refresh_usage_index`/`rebuild_usage_index` public facade.

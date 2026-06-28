@@ -6,7 +6,7 @@
   },
   "baselines": {
     "duplicate_helpers": {
-      "metric_value": 63,
+      "metric_value": 62,
       "items": [
         {
           "name": "_allowance_segment_record",
@@ -126,7 +126,6 @@
             "src/codex_usage_tracker/context.py",
             "src/codex_usage_tracker/diagnostic_facts.py",
             "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
-            "src/codex_usage_tracker/parser.py",
             "src/codex_usage_tracker/threads.py"
           ]
         },

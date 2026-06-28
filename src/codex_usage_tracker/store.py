@@ -11,12 +11,14 @@ from typing import Any
 
 from codex_usage_tracker.models import DiagnosticFact, RefreshResult, UsageEvent
 from codex_usage_tracker.parser import (
-    PARSER_ADAPTER_VERSION,
-    PARSER_DIAGNOSTIC_KEYS,
-    compact_parser_diagnostics,
     find_session_logs,
     load_session_index,
     parse_usage_events_from_file_with_state,
+)
+from codex_usage_tracker.parser_state import (
+    PARSER_ADAPTER_VERSION,
+    PARSER_DIAGNOSTIC_KEYS,
+    compact_parser_diagnostics,
 )
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
 from codex_usage_tracker.schema import (

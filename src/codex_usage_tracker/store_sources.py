@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.models import UsageEvent
-from codex_usage_tracker.parser import (
+from codex_usage_tracker.parser_state import (
     PARSER_ADAPTER_VERSION,
     ParserState,
     compact_parser_diagnostics,

@@ -6,10 +6,11 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable, MutableMapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker import parser_state as _parser_state
 from codex_usage_tracker.call_origin import (
     CallOriginFlags,
     classify_call_origin,
@@ -18,32 +19,22 @@ from codex_usage_tracker.call_origin import (
 from codex_usage_tracker.diagnostic_facts import (
     add_diagnostic_fact,
     assign_record_id_to_diagnostic_facts,
-    diagnostic_fact_from_json,
-    diagnostic_fact_to_json,
     diagnostic_facts_from_envelope,
 )
 from codex_usage_tracker.models import DiagnosticFact, SessionInfo, UsageEvent
+from codex_usage_tracker.parser_state import (
+    PARSER_ADAPTER_VERSION,
+    ParserState,
+    compact_parser_diagnostics,
+    empty_parser_diagnostics,
+    optional_str,
+)
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME
+
+PARSER_DIAGNOSTIC_KEYS = _parser_state.PARSER_DIAGNOSTIC_KEYS
 
 SESSION_ID_RE = re.compile(
     r"rollout-[^-]+-[0-9T:-]+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
-)
-
-PARSER_ADAPTER_VERSION = "codex-jsonl-v2"
-PARSER_DIAGNOSTIC_KEYS = (
-    "invalid_json",
-    "missing_payload",
-    "unknown_filename_format",
-    "unknown_event_shape",
-    "missing_info",
-    "missing_last_token_usage",
-    "missing_total_token_usage",
-    "missing_cumulative_total",
-    "duplicate_cumulative_total",
-    "invalid_integer",
-    "partial_field_count",
-    "invalid_model_context_window",
-    "skipped_events",
 )
 
 KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset({
@@ -111,20 +102,6 @@ DEFAULT_PARSER_ADAPTER = ParserAdapter()
 
 
 @dataclass(frozen=True)
-class ParserState:
-    """Aggregate-only parser cursor for continuing append-only JSONL parsing."""
-
-    session_id: str | None = None
-    session_meta: dict[str, str | None] = field(default_factory=dict)
-    current_turn: dict[str, Any] = field(default_factory=dict)
-    last_cumulative_total: int = -1
-    call_origin_segment: tuple[CallOriginFlags, ...] = ()
-    diagnostic_facts_segment: tuple[DiagnosticFact, ...] = ()
-    latest_record_id: str | None = None
-    latest_event_timestamp: str | None = None
-
-
-@dataclass(frozen=True)
 class ParsedUsageFile:
     """Parsed aggregate usage events plus the final parser cursor."""
 
@@ -152,8 +129,8 @@ def load_session_index(codex_home: Path = DEFAULT_CODEX_HOME) -> dict[str, Sessi
                 continue
             sessions[session_id] = SessionInfo(
                 session_id=session_id,
-                thread_name=_optional_str(payload.get("thread_name")),
-                updated_at=_optional_str(payload.get("updated_at")),
+                thread_name=optional_str(payload.get("thread_name")),
+                updated_at=optional_str(payload.get("updated_at")),
             )
     return sessions
 
@@ -214,68 +191,8 @@ def parse_usage_events_from_file_with_state(
     )
 
 
-def parser_state_from_json(raw: str | None) -> ParserState | None:
-    """Decode a persisted aggregate-only parser cursor."""
-
-    if not raw:
-        return None
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, dict) or payload.get("version") != 1:
-        return None
-    segment = payload.get("call_origin_segment")
-    if not isinstance(segment, list):
-        segment = []
-    diagnostic_segment = payload.get("diagnostic_facts_segment")
-    if not isinstance(diagnostic_segment, list):
-        diagnostic_segment = []
-    return ParserState(
-        session_id=_optional_str(payload.get("session_id")),
-        session_meta=_string_dict(payload.get("session_meta")),
-        current_turn=_string_dict(payload.get("current_turn")),
-        last_cumulative_total=_json_int(payload.get("last_cumulative_total"), -1),
-        call_origin_segment=tuple(_call_origin_flags_from_json(item) for item in segment),
-        diagnostic_facts_segment=tuple(
-            fact
-            for fact in (
-                diagnostic_fact_from_json(item) for item in diagnostic_segment
-            )
-            if fact is not None
-        ),
-        latest_record_id=_optional_str(payload.get("latest_record_id")),
-        latest_event_timestamp=_optional_str(payload.get("latest_event_timestamp")),
-    )
-
-
-def parser_state_to_json(state: ParserState) -> str:
-    """Encode an aggregate-only parser cursor for source-file refresh metadata."""
-
-    return json.dumps(
-        {
-            "version": 1,
-            "session_id": state.session_id,
-            "session_meta": state.session_meta,
-            "current_turn": state.current_turn,
-            "last_cumulative_total": state.last_cumulative_total,
-            "call_origin_segment": [
-                {
-                    "user_message": flags.user_message,
-                    "compaction": flags.compaction,
-                    "tool_result": flags.tool_result,
-                    "codex_activity": flags.codex_activity,
-                }
-                for flags in state.call_origin_segment
-            ],
-            "diagnostic_facts_segment": [
-                diagnostic_fact_to_json(fact) for fact in state.diagnostic_facts_segment
-            ],
-            "latest_record_id": state.latest_record_id,
-            "latest_event_timestamp": state.latest_event_timestamp,
-        },
-        sort_keys=True,
-    )
+parser_state_from_json = _parser_state.parser_state_from_json
+parser_state_to_json = _parser_state.parser_state_to_json
 
 
 def inspect_log(
@@ -324,18 +241,6 @@ def inspect_log(
             for event in events
         ],
     }
-
-
-def empty_parser_diagnostics() -> dict[str, int]:
-    """Return all parser diagnostic counters initialized to zero."""
-
-    return {key: 0 for key in PARSER_DIAGNOSTIC_KEYS}
-
-
-def compact_parser_diagnostics(stats: MutableMapping[str, int]) -> dict[str, int]:
-    """Return non-zero parser diagnostics in stable key order."""
-
-    return {key: int(stats.get(key, 0)) for key in PARSER_DIAGNOSTIC_KEYS if stats.get(key, 0)}
 
 
 def _parse_codex_jsonl_v1(
@@ -387,24 +292,24 @@ def _parse_codex_jsonl_v1(
                 continue
 
             entry_type = envelope.get("type")
-            timestamp = _optional_str(envelope.get("timestamp")) or ""
+            timestamp = optional_str(envelope.get("timestamp")) or ""
 
             if entry_type == "session_meta":
                 if not session_id:
-                    session_id = _optional_str(payload.get("id"))
+                    session_id = optional_str(payload.get("id"))
                     session_info = index.get(session_id or "")
                 session_meta = _session_metadata(payload, index)
                 continue
 
             if entry_type == "turn_context":
                 current_turn = {
-                    "turn_id": _optional_str(payload.get("turn_id")),
+                    "turn_id": optional_str(payload.get("turn_id")),
                     "turn_timestamp": timestamp,
-                    "cwd": _optional_str(payload.get("cwd")),
-                    "model": _optional_str(payload.get("model")),
-                    "effort": _optional_str(payload.get("effort")),
-                    "current_date": _optional_str(payload.get("current_date")),
-                    "timezone": _optional_str(payload.get("timezone")),
+                    "cwd": optional_str(payload.get("cwd")),
+                    "model": optional_str(payload.get("model")),
+                    "effort": optional_str(payload.get("effort")),
+                    "current_date": optional_str(payload.get("current_date")),
+                    "timezone": optional_str(payload.get("timezone")),
                 }
                 continue
 
@@ -541,7 +446,7 @@ def _build_event(
     observed_usage = _observed_usage_from_rate_limits(rate_limits, stats=stats)
     record_id = _record_id(
         session_id=session_id,
-        turn_id=_optional_str(current_turn.get("turn_id")),
+        turn_id=optional_str(current_turn.get("turn_id")),
         event_timestamp=event_timestamp,
         cumulative_total_tokens=cumulative_total_tokens,
         total_tokens=total_tokens,
@@ -554,13 +459,13 @@ def _build_event(
         event_timestamp=event_timestamp,
         source_file=str(path),
         line_number=line_number,
-        turn_id=_optional_str(current_turn.get("turn_id")),
-        turn_timestamp=_optional_str(current_turn.get("turn_timestamp")),
-        cwd=_optional_str(current_turn.get("cwd")),
-        model=_optional_str(current_turn.get("model")),
-        effort=_optional_str(current_turn.get("effort")),
-        current_date=_optional_str(current_turn.get("current_date")),
-        timezone=_optional_str(current_turn.get("timezone")),
+        turn_id=optional_str(current_turn.get("turn_id")),
+        turn_timestamp=optional_str(current_turn.get("turn_timestamp")),
+        cwd=optional_str(current_turn.get("cwd")),
+        model=optional_str(current_turn.get("model")),
+        effort=optional_str(current_turn.get("effort")),
+        current_date=optional_str(current_turn.get("current_date")),
+        timezone=optional_str(current_turn.get("timezone")),
         call_initiator=call_origin.get("call_initiator"),
         call_initiator_reason=call_origin.get("call_initiator_reason"),
         call_initiator_confidence=call_origin.get("call_initiator_confidence"),
@@ -609,8 +514,8 @@ def _observed_usage_from_rate_limits(
     primary = _rate_limit_window(value.get("primary"), "primary", stats=stats)
     secondary = _rate_limit_window(value.get("secondary"), "secondary", stats=stats)
     return {
-        "rate_limit_plan_type": _optional_str(value.get("plan_type")),
-        "rate_limit_limit_id": _optional_str(value.get("limit_id")),
+        "rate_limit_plan_type": optional_str(value.get("plan_type")),
+        "rate_limit_limit_id": optional_str(value.get("limit_id")),
         **primary,
         **secondary,
     }
@@ -646,7 +551,7 @@ def _session_metadata(
 ) -> dict[str, str | None]:
     source = payload.get("source")
     metadata = _empty_session_metadata()
-    metadata["thread_source"] = _optional_str(payload.get("thread_source"))
+    metadata["thread_source"] = optional_str(payload.get("thread_source"))
     if not isinstance(source, dict):
         return metadata
 
@@ -654,7 +559,7 @@ def _session_metadata(
     if not isinstance(subagent, dict):
         return metadata
 
-    other = _optional_str(subagent.get("other"))
+    other = optional_str(subagent.get("other"))
     if other:
         metadata["subagent_type"] = other
         return metadata
@@ -662,9 +567,9 @@ def _session_metadata(
     thread_spawn = subagent.get("thread_spawn")
     if isinstance(thread_spawn, dict):
         metadata["subagent_type"] = "thread_spawn"
-        metadata["agent_role"] = _optional_str(thread_spawn.get("agent_role"))
-        metadata["agent_nickname"] = _optional_str(thread_spawn.get("agent_nickname"))
-        parent_session_id = _optional_str(thread_spawn.get("parent_thread_id"))
+        metadata["agent_role"] = optional_str(thread_spawn.get("agent_role"))
+        metadata["agent_nickname"] = optional_str(thread_spawn.get("agent_nickname"))
+        parent_session_id = optional_str(thread_spawn.get("parent_thread_id"))
         metadata["parent_session_id"] = parent_session_id
         if parent_session_id:
             parent_info = session_index.get(parent_session_id)
@@ -732,37 +637,6 @@ def _session_id_from_path(path: Path) -> str | None:
     if not match:
         return None
     return match.group(1)
-
-
-def _optional_str(value: object) -> str | None:
-    if isinstance(value, str):
-        return value
-    return None
-
-
-def _string_dict(value: object) -> dict[str, str | None]:
-    if not isinstance(value, dict):
-        return {}
-    return {
-        str(key): item if isinstance(item, str) else None
-        for key, item in value.items()
-        if isinstance(key, str)
-    }
-
-
-def _json_int(value: object, default: int) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) else default
-
-
-def _call_origin_flags_from_json(value: object) -> CallOriginFlags:
-    if not isinstance(value, dict):
-        return CallOriginFlags()
-    return CallOriginFlags(
-        user_message=value.get("user_message") is True,
-        compaction=value.get("compaction") is True,
-        tool_result=value.get("tool_result") is True,
-        codex_activity=value.get("codex_activity") is True,
-    )
 
 
 def _nullable_int(

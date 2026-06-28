@@ -72,6 +72,7 @@ paths = [
     "codex_usage_tracker.context",
     "codex_usage_tracker.diagnostic_facts",
     "codex_usage_tracker.parser",
+    "codex_usage_tracker.parser_state",
 ]
 depends_on = [
     "codex_usage_tracker.allowance",
@@ -84,6 +85,7 @@ depends_on = [
     "codex_usage_tracker.json_contracts",
     "codex_usage_tracker.models",
     "codex_usage_tracker.parser",
+    "codex_usage_tracker.parser_state",
     "codex_usage_tracker.paths",
     "codex_usage_tracker.pricing",
     "codex_usage_tracker.pricing_config",
@@ -122,6 +124,7 @@ depends_on = [
     "codex_usage_tracker.i18n",
     "codex_usage_tracker.json_contracts",
     "codex_usage_tracker.models",
+    "codex_usage_tracker.parser_state",
     "codex_usage_tracker.paths",
     "codex_usage_tracker.pricing",
     "codex_usage_tracker.pricing_config",
