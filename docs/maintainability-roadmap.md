@@ -2841,3 +2841,55 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers`; likely extract repeated diagnostic section wrapper methods or the `/api/usage` handler.
+
+### `refactor/server-usage-payload`
+
+Goal:
+- Extract `/api/usage` query parsing, optional refresh execution, dashboard payload timing, and diagnostics metadata from `_UsageDashboardHandler`.
+- Keep HTTP token/status mapping in the server handler.
+- Preserve the existing live dashboard JSON shape, refresh token behavior, shell-only row omission, and diagnostics payload.
+
+Files touched:
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_usage_refresh.py`
+- `tests/test_server_usage_refresh.py`
+- `tests/test_dashboard_server.py`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `usage_payload()` and `UsageRefreshAuthError` to `server_usage_refresh.py`.
+- Replaced inline `/api/usage` payload construction in `server.py` with the helper while preserving 403, SQLite, and `OSError` mappings.
+- Added tests for query option forwarding, refresh-token rejection, refresh diagnostics metadata, `refreshed_at`, `refresh_result`, shell-only behavior, and include-archived parsing.
+- Updated the dashboard server SQLite-error test to patch the new `usage_payload` boundary without growing the oversized test file.
+- Ratcheted file-line baseline `2185 -> 2149`, reducing `server.py` from `1020` to `984` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_usage_refresh.py tests/test_server_usage_refresh.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_usage_refresh.py tests/test_server_usage_refresh.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_usage_refresh.py tests/test_dashboard_server.py -q`: 15 passed.
+- `radon cc src/codex_usage_tracker/server_usage_refresh.py -a -s`: average A (3.0); `usage_payload` is B (7), accepted for this slice.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_usage_refresh.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 382 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/server-usage-payload-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2185 -> 2149`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `server.py` is now below 1000 lines, but still above the eventual 600-line target at `984` lines.
+- `usage_payload()` is B complexity and can be split later if strict style gates require it.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `context.py`, `cli.py`, diagnostics/report modules, usage-drain modules, and persistence modules remain above eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with diagnostic section wrapper consolidation or dashboard-server factory extraction, then proceed toward store/context/parser splits.

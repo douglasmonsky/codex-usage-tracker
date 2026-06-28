@@ -11,14 +11,12 @@ from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from time import perf_counter
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker import server_utils
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS
 from codex_usage_tracker.dashboard import (
-    dashboard_payload,
     generate_dashboard,
     render_dashboard_html,
 )
@@ -85,10 +83,9 @@ from codex_usage_tracker.server_routes import (
 from codex_usage_tracker.server_status import status_payload
 from codex_usage_tracker.server_summary import summary_payload
 from codex_usage_tracker.server_threads import threads_payload
-from codex_usage_tracker.server_usage_refresh import refresh_usage_payload
+from codex_usage_tracker.server_usage_refresh import UsageRefreshAuthError, usage_payload
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
-_elapsed_ms = server_utils.elapsed_ms
 _first = server_utils.first_query_value
 _host_header_name = server_utils.host_header_name
 _matches_live_derived_filters = server_utils.matches_live_derived_filters
@@ -102,7 +99,6 @@ _parse_report_limit = server_utils.parse_report_limit
 _safe_int = server_utils.safe_int
 _truthy = server_utils.truthy_query_value
 _url_host = server_utils.url_host
-_utc_now = server_utils.utc_now
 _validate_context_api_mode = server_utils.validate_context_api_mode
 _validate_loopback_host = server_utils.validate_loopback_host
 
@@ -931,33 +927,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
 
     def _handle_usage(self, query: str) -> None:
         params = parse_qs(query)
-        limit = _parse_limit(_first(params.get("limit")), self._limit)
-        offset = _parse_offset(_first(params.get("offset")))
-        include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
-        language = normalize_language(_first(params.get("lang")) or self._language)
-        diagnostics_enabled = _parse_bool(_first(params.get("diagnostics")), False)
-        shell_only = _parse_bool(_first(params.get("shell")), False)
-        refresh_result = None
-        refresh_ms: float | None = None
         try:
-            if _truthy(_first(params.get("refresh"))):
-                if not self._has_valid_api_token(params):
-                    self._send_json(
-                        HTTPStatus.FORBIDDEN,
-                        {"error": "Valid API token is required for refresh"},
-                    )
-                    return
-                refresh_result, refresh_ms = refresh_usage_payload(
-                    codex_home=self._codex_home,
-                    db_path=self._db_path,
-                    include_archived=include_archived,
-                    refresh_lock=self._refresh_lock,
-                )
-            payload_started = perf_counter()
-            payload = dashboard_payload(
+            payload = usage_payload(
+                query,
                 db_path=self._db_path,
-                limit=limit,
-                offset=offset,
                 pricing_path=self._pricing_path,
                 allowance_path=self._allowance_path,
                 rate_card_path=self._rate_card_path,
@@ -967,11 +940,16 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 since=self._since,
                 api_token=self._api_token,
                 context_api_enabled=self._context_api_state.enabled,
-                include_archived=include_archived,
-                language=language,
-                include_rows=not shell_only,
+                include_archived_default=self._include_archived,
+                language_default=self._language,
+                limit_default=self._limit,
+                codex_home=self._codex_home,
+                refresh_lock=self._refresh_lock,
+                refresh_allowed=self._has_valid_api_token(params),
             )
-            dashboard_payload_ms = _elapsed_ms(payload_started)
+        except UsageRefreshAuthError as exc:
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": str(exc)})
+            return
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -984,21 +962,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": f"Could not read aggregate dashboard data: {exc}"},
             )
             return
-        payload["refreshed_at"] = _utc_now()
-        payload["refresh_result"] = refresh_result
-        if diagnostics_enabled:
-            diagnostic_payload: dict[str, object] = {
-                "dashboard_payload_ms": dashboard_payload_ms,
-                "rows_returned": len(payload.get("rows") or []),
-                "include_archived": include_archived,
-                "limit": limit,
-                "offset": offset,
-            }
-            if refresh_ms is not None:
-                diagnostic_payload["refresh_ms"] = refresh_ms
-            payload["diagnostics"] = diagnostic_payload
         self._send_json(HTTPStatus.OK, payload)
-
     def _request_origin_allowed(self) -> bool:
         if not _allowed_loopback_host(_host_header_name(self.headers.get("Host"))):
             return False
