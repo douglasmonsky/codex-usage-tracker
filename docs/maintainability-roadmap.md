@@ -2792,3 +2792,52 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers`; likely extract diagnostic snapshot/refresh route plumbing or usage refresh handler next.
+
+### `refactor/server-diagnostics-refresh-payload`
+
+Goal:
+- Move `/api/diagnostics/refresh` query parsing into the existing diagnostic snapshot payload module.
+- Keep API-token enforcement and HTTP error mapping in `_UsageDashboardHandler`.
+- Preserve explicit diagnostic refresh behavior and include-archived defaults.
+
+Files touched:
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_diagnostic_snapshots.py`
+- `tests/test_server_diagnostic_snapshots.py`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `diagnostic_refresh_payload()` to parse `include_archived` from the query and delegate to `refresh_all_diagnostic_snapshots_payload()`.
+- Replaced inline include-archived parsing in `_handle_diagnostics_refresh` with the helper.
+- Added tests for default include-archived behavior and explicit query override.
+- Ratcheted file-line baseline `2189 -> 2185`, reducing `server.py` from `1024` to `1020` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_snapshots.py tests/test_server_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_snapshots.py tests/test_server_diagnostic_snapshots.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_diagnostic_snapshots.py tests/test_dashboard_server.py -q`: 17 passed.
+- `radon cc src/codex_usage_tracker/server_diagnostic_snapshots.py -a -s`: average A (1.43).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 379 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/server-diagnostics-refresh-payload-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2189 -> 2185`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `server.py` remains oversized at `1020` lines; single-section diagnostic snapshot wrappers, usage handler, and dashboard-server factory code still need extraction.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `context.py`, `cli.py`, diagnostics/report modules, usage-drain modules, and persistence modules remain above eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers`; likely extract repeated diagnostic section wrapper methods or the `/api/usage` handler.

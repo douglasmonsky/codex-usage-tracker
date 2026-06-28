@@ -64,8 +64,8 @@ from codex_usage_tracker.server_diagnostic_facts import (
     diagnostics_summary_payload,
 )
 from codex_usage_tracker.server_diagnostic_snapshots import (
+    diagnostic_refresh_payload,
     diagnostic_snapshot_payload,
-    refresh_all_diagnostic_snapshots_payload,
     usage_drain_snapshot_payload,
 )
 from codex_usage_tracker.server_live_queries import live_query_params
@@ -667,17 +667,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": "Valid API token is required for diagnostic refresh"},
             )
             return
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
-        )
         try:
-            payload = refresh_all_diagnostic_snapshots_payload(
+            payload = diagnostic_refresh_payload(
+                query,
                 db_path=self._db_path,
                 pricing_path=self._pricing_path,
                 allowance_path=self._allowance_path,
                 rate_card_path=self._rate_card_path,
-                include_archived=include_archived,
+                include_archived_default=self._include_archived,
                 refresh_lock=self._refresh_lock,
             )
         except sqlite3.Error as exc:
@@ -687,7 +684,6 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             )
             return
         self._send_json(HTTPStatus.OK, payload)
-
     def _handle_diagnostics_overview_refresh(self, query: str) -> None:
         self._handle_diagnostic_snapshot(
             query,

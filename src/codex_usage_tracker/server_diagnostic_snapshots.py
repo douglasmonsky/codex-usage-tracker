@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import parse_qs
 
 from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_usage_drain_report,
     refresh_diagnostic_snapshots,
 )
+from codex_usage_tracker.server_utils import first_query_value, parse_bool_query_value
 
 
 class SnapshotReport(Protocol):
@@ -43,6 +45,32 @@ def refresh_all_diagnostic_snapshots_payload(
             rate_card_path=rate_card_path,
             include_archived=include_archived,
         )
+
+
+def diagnostic_refresh_payload(
+    query: str,
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    rate_card_path: Path,
+    include_archived_default: bool,
+    refresh_lock: Any,
+) -> dict[str, object]:
+    """Refresh all diagnostic snapshots using dashboard query defaults."""
+    params = parse_qs(query)
+    include_archived = parse_bool_query_value(
+        first_query_value(params.get("include_archived")),
+        include_archived_default,
+    )
+    return refresh_all_diagnostic_snapshots_payload(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        include_archived=include_archived,
+        refresh_lock=refresh_lock,
+    )
 
 
 def diagnostic_snapshot_payload(

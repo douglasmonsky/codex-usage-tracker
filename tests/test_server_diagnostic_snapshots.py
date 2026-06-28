@@ -60,6 +60,68 @@ def test_refresh_all_diagnostic_snapshots_payload_uses_refresh_lock(
     assert calls["db_path"] == tmp_path / "usage.sqlite3"
 
 
+def test_diagnostic_refresh_payload_uses_include_archived_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, Any] = {}
+
+    def refresh_diagnostic_snapshots(**kwargs: Any) -> dict[str, object]:
+        calls.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        server_diagnostic_snapshots,
+        "refresh_diagnostic_snapshots",
+        refresh_diagnostic_snapshots,
+    )
+    lock = _FakeLock()
+
+    payload = server_diagnostic_snapshots.diagnostic_refresh_payload(
+        "",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+        include_archived_default=True,
+        refresh_lock=lock,
+    )
+
+    assert payload == {"ok": True}
+    assert calls["include_archived"] is True
+    assert lock.entered == 1
+    assert lock.exited == 1
+
+
+def test_diagnostic_refresh_payload_allows_query_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, Any] = {}
+
+    def refresh_diagnostic_snapshots(**kwargs: Any) -> dict[str, object]:
+        calls.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        server_diagnostic_snapshots,
+        "refresh_diagnostic_snapshots",
+        refresh_diagnostic_snapshots,
+    )
+
+    server_diagnostic_snapshots.diagnostic_refresh_payload(
+        "include_archived=false",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+        include_archived_default=True,
+        refresh_lock=_FakeLock(),
+    )
+
+    assert calls["include_archived"] is False
+
+
 def test_diagnostic_snapshot_payload_refreshes_under_lock(tmp_path: Path) -> None:
     lock = _FakeLock()
     calls: list[dict[str, Any]] = []
