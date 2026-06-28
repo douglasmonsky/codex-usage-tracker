@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from functools import lru_cache
 from math import ceil
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from codex_usage_tracker.context_token_estimates import (
+    context_encoding,
+    estimate_visible_tokens,
+    token_estimate,
+)
 from codex_usage_tracker.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.redaction import redact_secrets
 from codex_usage_tracker.store_usage_record_queries import query_usage_record
@@ -116,7 +120,7 @@ def load_call_context(
     source_scan_ms = _elapsed_ms(source_scan_started)
     if diagnostic_payload is not None:
         diagnostic_payload["source_scan_ms"] = source_scan_ms
-    visible_estimate = _estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
+    visible_estimate = estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
     if diagnostic_payload is not None:
         diagnostic_payload["serialized_estimate_ms"] = serialized_estimate_ms
         diagnostic_payload["source_file_bytes"] = source_file_bytes
@@ -216,7 +220,7 @@ def _read_context_entries(
     pending_diagnostic_events: list[dict[str, Any]] = []
     full_serialized_analysis = context_mode == CONTEXT_MODE_FULL
     encoding, estimator = (
-        _context_encoding(model or "")
+        context_encoding(model or "")
         if full_serialized_analysis
         else (None, "chars_per_4_fallback")
     )
@@ -402,7 +406,7 @@ def _serialized_context_estimate(
         "scope": "selected_turn_raw_jsonl",
         "raw_line_count": len(raw_entries),
         "raw_json_char_count": len(raw_json),
-        "raw_json_token_estimate": _token_estimate(raw_json, encoding),
+        "raw_json_token_estimate": token_estimate(raw_json, encoding),
         "token_estimator": estimator,
         "parse_errors": parse_errors,
         "upper_bound": True,
@@ -867,19 +871,6 @@ def _limit_entries(
     }
 
 
-def _estimate_visible_tokens(entries: list[dict[str, Any]], model: str | None) -> dict[str, Any]:
-    text = "\n\n".join(str(entry.get("text") or "") for entry in entries if entry.get("text"))
-    visible_chars = len(text)
-    encoding, estimator = _context_encoding(model or "")
-    visible_tokens = _token_estimate(text, encoding)
-    if encoding is None:
-        visible_tokens = ceil(visible_chars / 4) if visible_chars else 0
-    return {
-        "visible_char_count": visible_chars,
-        "visible_token_estimate": visible_tokens,
-        "visible_token_estimator": estimator,
-    }
-
 
 def _collect_serialized_field_buckets(
     *,
@@ -907,7 +898,7 @@ def _collect_serialized_field_buckets(
         )
         stats["count"] = int(stats["count"]) + 1
         stats["char_count"] = int(stats["char_count"]) + len(rendered)
-        stats["token_estimate"] = int(stats["token_estimate"]) + _token_estimate(rendered, encoding)
+        stats["token_estimate"] = int(stats["token_estimate"]) + token_estimate(rendered, encoding)
 
 
 def _serialized_bucket_label(
@@ -976,13 +967,6 @@ def _serialized_bucket_label(
     )
 
 
-def _token_estimate(text: str, encoding: Any | None) -> int:
-    if not text:
-        return 0
-    if encoding is None:
-        return ceil(len(text) / 4)
-    return len(encoding.encode(text))
-
 
 def _redact_json_value(value: object) -> object:
     if isinstance(value, str):
@@ -1000,27 +984,6 @@ def _compact_json(value: object) -> str:
     except TypeError:
         return str(value)
 
-
-@lru_cache(maxsize=32)
-def _context_encoding(model: str) -> tuple[Any | None, str]:
-    try:
-        import tiktoken  # type: ignore[import-not-found]
-    except Exception:
-        return None, "chars_per_4_fallback"
-
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        try:
-            encoding = tiktoken.get_encoding("o200k_base")
-        except Exception:
-            try:
-                encoding = tiktoken.get_encoding("cl100k_base")
-            except Exception:
-                return None, "chars_per_4_fallback"
-    except Exception:
-        return None, "chars_per_4_fallback"
-    return encoding, f"tiktoken:{getattr(encoding, 'name', 'unknown')}"
 
 
 def _content_text(value: object) -> str:

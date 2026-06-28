@@ -2893,3 +2893,56 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with diagnostic section wrapper consolidation or dashboard-server factory extraction, then proceed toward store/context/parser splits.
+
+### `refactor/context-token-estimates`
+
+Goal:
+- Start `context.py` decomposition with a pure token-estimation helper split.
+- Preserve visible token estimates, serialized-evidence token estimates, and tiktoken fallback labels.
+- Keep raw context loading behavior unchanged and privacy invariants intact.
+
+Files touched:
+- `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/context_token_estimates.py`
+- `tests/test_context_token_estimates.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added public `estimate_visible_tokens()`, `token_estimate()`, and `context_encoding()` helpers.
+- Moved tiktoken lookup/cache and visible-token text joining out of `context.py`.
+- Restored string-key compatibility for `visible_token_estimate` and `raw_json_token_estimate` after the mechanical rename check caught the risk.
+- Added direct tests for encoded token counting, fallback char/4 counting, empty text, and joined visible entry text.
+- Kept existing context evidence and privacy tests passing.
+- Declared `context_token_estimates` in the context/parser `tach` boundary.
+- Ratcheted file-line baseline `2149 -> 2112`, reducing `context.py` from `1082` to `1045` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/context.py src/codex_usage_tracker/context_token_estimates.py tests/test_context_token_estimates.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/context.py src/codex_usage_tracker/context_token_estimates.py tests/test_context_token_estimates.py tests/test_context_evidence.py tests/test_privacy.py`: passed.
+- `.venv/bin/python -m pytest tests/test_context_token_estimates.py tests/test_context_evidence.py tests/test_privacy.py -q`: 13 passed.
+- `radon cc src/codex_usage_tracker/context_token_estimates.py -a -s`: average A (3.13).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/context_token_estimates.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 385 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/context-token-estimates-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2149 -> 2112`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `context.py` remains oversized at `1045` lines; serialized evidence bucketing, event summarization, action timing, and JSON value handling still need extraction.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `cli.py`, diagnostics/report modules, usage-drain modules, and persistence modules remain above eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/context-and-parser-boundaries` with serialized evidence bucketing or event summarization extraction.
