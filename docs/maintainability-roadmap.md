@@ -1544,3 +1544,45 @@ Remaining risks:
 
 Next handoff:
 - Split one `fit_usage_drain_proxy` output family or one walk-forward helper cluster into a dedicated model submodule, with usage-drain tests as the characterization gate.
+
+### `refactor/usage-drain-proxy-fit-boundary`
+
+Goal:
+- Extract the high-complexity `fit_usage_drain_proxy` implementation from `usage_drain_model.py`.
+- Preserve `codex_usage_tracker.usage_drain_model.fit_usage_drain_proxy` as the public import path.
+- Keep proxy-fit output schema and calculations unchanged.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/usage_drain_proxy_fit.py` for candidate/non-candidate proxy fit calculations.
+- Updated `usage_drain_model.py` to import `fit_usage_drain_proxy` from the new module.
+- Removed now-unused proxy-fit regression imports from `usage_drain_model.py`.
+- Added `usage_drain_proxy_fit` to the Tach usage-drain module group.
+- Ratcheted `max_file_lines` 5347 -> 5242.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_proxy_fit.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_proxy_fit.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_proxy_fit.py --dependencies --usages`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure/cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5347 -> 5242.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach map -o /tmp/usage-drain-proxy-fit-boundary-tach-map.json`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+- Walk-forward and allowance-capacity helper clusters remain high-complexity inside `usage_drain_model.py`.
+- `usage_drain_model.py` is still the largest module, now roughly 3.2k lines.
+
+Next handoff:
+- Extract one walk-forward prediction helper cluster or allowance capacity family behind usage-drain characterization tests.
