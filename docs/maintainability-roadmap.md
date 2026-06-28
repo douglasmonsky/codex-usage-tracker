@@ -2149,3 +2149,64 @@ Remaining risks:
 Next handoff:
 
 - Continue `refactor/server-routing-and-handlers` with diagnostics snapshot handler plumbing or dashboard shell/context handler extraction.
+
+### refactor/server-diagnostic-snapshot-payloads
+
+Objective:
+
+- Extract diagnostic snapshot payload construction from `_UsageDashboardHandler`.
+- Preserve diagnostic refresh auth checks, lock usage, include-archived handling, payload shapes, and existing HTTP error messages.
+- Keep HTTP response writing in `server.py` for this branch.
+
+Files touched:
+
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_diagnostic_snapshots.py`
+- `tests/test_server_diagnostic_snapshots.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+
+Completed edits:
+
+- Added `refresh_all_diagnostic_snapshots_payload()` for `/api/diagnostics/refresh`.
+- Added `diagnostic_snapshot_payload()` for ordinary diagnostic sections.
+- Added `usage_drain_snapshot_payload()` for usage-drain snapshots that need pricing, allowance, and rate-card paths.
+- Replaced inline diagnostic snapshot payload construction in `server.py` with helper calls while keeping endpoint auth and status handling unchanged.
+- Added focused tests for lock use, refresh/read behavior, usage-drain pricing path forwarding, and payload return semantics.
+- Declared `server_diagnostic_snapshots` in the dashboard/server `tach` module boundary.
+- Ratcheted max file-line baseline from 2479 to 2466 after reducing `server.py` from 1314 to 1301 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_snapshots.py tests/test_server_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_snapshots.py tests/test_server_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_diagnostic_snapshots.py tests/test_dashboard_server.py tests/test_dashboard_diagnostics_snapshots.py -q`: 24 passed.
+- `radon cc src/codex_usage_tracker/server_diagnostic_snapshots.py -a -s`: average A (1.5).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 339 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/server-diagnostic-snapshot-payloads-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch is uncommitted.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 2479 -> 2466.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `radon cc src -a -s`: ran and reported current complexity inventory.
+- `radon mi src -s`: ran and reported current maintainability inventory.
+- `xenon --max-absolute B --max-modules A --max-average A src`: failed on existing C/D/F complexity hotspots outside this diagnostic-snapshot slice.
+
+Remaining risks:
+
+- `server.py` remains oversized at 1301 lines; large remaining methods include context, call/thread handlers, diagnostics fact handlers, and usage payload generation.
+- Broad `xenon` remains red on existing parser/dashboard/usage-drain/report complexity blocks.
+- `context.py`, `cli.py`, and several diagnostics modules remain above the target file-size budget.
+
+Next handoff:
+
+- Continue `refactor/server-routing-and-handlers` with dashboard shell/context handler extraction or diagnostics fact handler payload extraction.

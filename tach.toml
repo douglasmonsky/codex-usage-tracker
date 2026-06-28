@@ -311,6 +311,7 @@ depends_on = [
 paths = [
   "codex_usage_tracker.dashboard",
   "codex_usage_tracker.server",
+  "codex_usage_tracker.server_diagnostic_snapshots",
   "codex_usage_tracker.server_live_queries",
   "codex_usage_tracker.server_live_rows",
   "codex_usage_tracker.server_responses",
@@ -351,6 +352,7 @@ depends_on = [
     "codex_usage_tracker.reports",
     "codex_usage_tracker.schema",
     "codex_usage_tracker.server",
+    "codex_usage_tracker.server_diagnostic_snapshots",
     "codex_usage_tracker.server_live_queries",
     "codex_usage_tracker.server_live_rows",
     "codex_usage_tracker.server_responses",

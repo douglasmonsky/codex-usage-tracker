@@ -42,8 +42,6 @@ from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
-    build_diagnostic_usage_drain_report,
-    refresh_diagnostic_snapshots,
 )
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
@@ -60,6 +58,11 @@ from codex_usage_tracker.reports import (
     QUERY_PRICING_STATUS_CHOICES,
     build_recommendations_report,
     build_summary_report,
+)
+from codex_usage_tracker.server_diagnostic_snapshots import (
+    diagnostic_snapshot_payload,
+    refresh_all_diagnostic_snapshots_payload,
+    usage_drain_snapshot_payload,
 )
 from codex_usage_tracker.server_live_queries import live_query_params
 from codex_usage_tracker.server_live_rows import annotate_live_rows, query_live_call_rows
@@ -946,14 +949,14 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._include_archived,
         )
         try:
-            with self._refresh_lock:
-                payload = refresh_diagnostic_snapshots(
-                    db_path=self._db_path,
-                    pricing_path=self._pricing_path,
-                    allowance_path=self._allowance_path,
-                    rate_card_path=self._rate_card_path,
-                    include_archived=include_archived,
-                )
+            payload = refresh_all_diagnostic_snapshots_payload(
+                db_path=self._db_path,
+                pricing_path=self._pricing_path,
+                allowance_path=self._allowance_path,
+                rate_card_path=self._rate_card_path,
+                include_archived=include_archived,
+                refresh_lock=self._refresh_lock,
+            )
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -1112,25 +1115,15 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._include_archived,
         )
         try:
-            if refresh:
-                with self._refresh_lock:
-                    payload = build_diagnostic_usage_drain_report(
-                        db_path=self._db_path,
-                        pricing_path=self._pricing_path,
-                        allowance_path=self._allowance_path,
-                        rate_card_path=self._rate_card_path,
-                        include_archived=include_archived,
-                        refresh=True,
-                    ).payload
-            else:
-                payload = build_diagnostic_usage_drain_report(
-                    db_path=self._db_path,
-                    pricing_path=self._pricing_path,
-                    allowance_path=self._allowance_path,
-                    rate_card_path=self._rate_card_path,
-                    include_archived=include_archived,
-                    refresh=False,
-                ).payload
+            payload = usage_drain_snapshot_payload(
+                db_path=self._db_path,
+                pricing_path=self._pricing_path,
+                allowance_path=self._allowance_path,
+                rate_card_path=self._rate_card_path,
+                include_archived=include_archived,
+                refresh=refresh,
+                refresh_lock=self._refresh_lock,
+            )
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -1159,19 +1152,13 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             self._include_archived,
         )
         try:
-            if refresh:
-                with self._refresh_lock:
-                    payload = build_report(
-                        db_path=self._db_path,
-                        include_archived=include_archived,
-                        refresh=True,
-                    ).payload
-            else:
-                payload = build_report(
-                    db_path=self._db_path,
-                    include_archived=include_archived,
-                    refresh=False,
-                ).payload
+            payload = diagnostic_snapshot_payload(
+                db_path=self._db_path,
+                include_archived=include_archived,
+                refresh=refresh,
+                refresh_lock=self._refresh_lock,
+                build_report=build_report,
+            )
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
