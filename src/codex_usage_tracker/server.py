@@ -51,7 +51,6 @@ from codex_usage_tracker.paths import (
 from codex_usage_tracker.reports import (
     QUERY_CREDIT_CONFIDENCE_CHOICES,
     QUERY_PRICING_STATUS_CHOICES,
-    build_summary_report,
 )
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
 from codex_usage_tracker.server_diagnostic_facts import (
@@ -74,6 +73,7 @@ from codex_usage_tracker.server_routes import (
     POST_ROUTE_METHODS,
     is_dashboard_shell_path,
 )
+from codex_usage_tracker.server_summary import summary_payload
 from codex_usage_tracker.server_usage_refresh import refresh_usage_payload
 from codex_usage_tracker.store import (
     query_latest_observed_usage,
@@ -743,15 +743,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_summary(self, query: str) -> None:
-        params = parse_qs(query)
         try:
-            report = build_summary_report(
+            payload = summary_payload(
+                query,
                 db_path=self._db_path,
                 pricing_path=self._pricing_path,
-                group_by=_first(params.get("group_by")) or "thread",
-                limit=_parse_report_limit(_first(params.get("limit")), 20),
-                preset=_first(params.get("preset")),
-                since=_first(params.get("since")),
                 projects_path=self._projects_path,
                 privacy_mode=self._privacy_mode,
             )
@@ -764,8 +760,6 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": f"Database error while reading summary: {exc}"},
             )
             return
-        payload = report.payload()
-        payload["raw_context_included"] = False
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_recommendations(self, query: str) -> None:
