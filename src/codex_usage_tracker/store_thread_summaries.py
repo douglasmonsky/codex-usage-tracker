@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
+from codex_usage_tracker.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.store_connection import connect
 from codex_usage_tracker.store_query_sql import (
-    _thread_key_expression,
-    _usage_where_clause,
+    normalize_limit,
+    normalize_offset,
+    normalize_sort_direction,
+    thread_key_expression,
+    usage_where_clause,
 )
+from codex_usage_tracker.store_rows import row_to_dict
+from codex_usage_tracker.store_schema import init_db
 
 
 def rebuild_thread_summaries(conn: sqlite3.Connection) -> int:
@@ -32,6 +41,64 @@ def rebuild_thread_summaries(conn: sqlite3.Connection) -> int:
     return conn.total_changes - before
 
 
+def query_thread_summaries(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    limit: int | None = 100,
+    offset: int = 0,
+    search: str | None = None,
+    include_archived: bool = False,
+    sort: str = "tokens",
+    direction: str = "desc",
+) -> list[dict[str, Any]]:
+    """Return materialized thread summaries for live dashboard APIs."""
+
+    clauses = ["is_archived_scope = ?"]
+    params: list[Any] = ["all-history" if include_archived else "active"]
+    if search:
+        like = f"%{search}%"
+        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
+        params.extend([like, like])
+    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
+    sort_map = {
+        "tokens": "total_tokens",
+        "time": "latest_event_timestamp",
+        "calls": "call_count",
+        "cache": "avg_cache_ratio",
+        "thread": "thread_label",
+    }
+    if sort not in sort_map:
+        allowed = ", ".join(sorted(sort_map))
+        raise ValueError(f"sort must be one of: {allowed}")
+    direction_sql = normalize_sort_direction(direction)
+    normalized_limit = normalize_limit(limit)
+    normalized_offset = normalize_offset(offset)
+    limit_clause = ""
+    query_params = list(params)
+    if normalized_limit is not None:
+        limit_clause = "LIMIT ?"
+        query_params.append(normalized_limit)
+        if normalized_offset:
+            limit_clause += " OFFSET ?"
+            query_params.append(normalized_offset)
+    elif normalized_offset:
+        limit_clause = "LIMIT -1 OFFSET ?"
+        query_params.append(normalized_offset)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM thread_summaries
+            {where_clause}
+            ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
+            {limit_clause}
+            """,
+            query_params,
+        ).fetchall()
+    return [row_to_dict(row) for row in rows]
+
+
 def _insert_thread_summary_scope(
     conn: sqlite3.Connection,
     *,
@@ -39,8 +106,8 @@ def _insert_thread_summary_scope(
     include_archived: bool,
     updated_at: str,
 ) -> None:
-    where_clause, params = _usage_where_clause(include_archived=include_archived)
-    thread_key_expr = _thread_key_expression()
+    where_clause, params = usage_where_clause(include_archived=include_archived)
+    thread_key_expr = thread_key_expression()
     conn.execute(
         f"""
         INSERT INTO thread_summaries (

@@ -220,6 +220,7 @@ def _normalize_offset(offset: int | None) -> int:
 normalize_limit = _normalize_limit
 normalize_offset = _normalize_offset
 normalize_sort_direction = _normalize_sort_direction
+thread_key_expression = _thread_key_expression
 usage_api_sort_expression = _usage_api_sort_expression
 usage_api_where_clause = _usage_api_where_clause
 usage_where_clause = _usage_where_clause

@@ -57,8 +57,6 @@ from codex_usage_tracker.store_diagnostic_queries import (
 from codex_usage_tracker.store_query_sql import (
     _group_expression,
     _normalize_limit,
-    _normalize_offset,
-    _normalize_sort_direction,
     _since_where_clause,
     _usage_where_clause,
 )
@@ -77,6 +75,9 @@ from codex_usage_tracker.store_sources import (
     ParsedSourceFile,
     source_logs_requiring_parse,
     upsert_source_file_metadata,
+)
+from codex_usage_tracker.store_thread_summaries import (
+    query_thread_summaries as query_thread_summaries,
 )
 from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
 from codex_usage_tracker.store_usage_api_queries import (
@@ -690,64 +691,6 @@ def query_usage_record(
 
 
 
-
-
-def query_thread_summaries(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    limit: int | None = 100,
-    offset: int = 0,
-    search: str | None = None,
-    include_archived: bool = False,
-    sort: str = "tokens",
-    direction: str = "desc",
-) -> list[dict[str, Any]]:
-    """Return materialized thread summaries for live dashboard APIs."""
-
-    clauses = ["is_archived_scope = ?"]
-    params: list[Any] = ["all-history" if include_archived else "active"]
-    if search:
-        like = f"%{search}%"
-        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
-        params.extend([like, like])
-    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
-    sort_map = {
-        "tokens": "total_tokens",
-        "time": "latest_event_timestamp",
-        "calls": "call_count",
-        "cache": "avg_cache_ratio",
-        "thread": "thread_label",
-    }
-    if sort not in sort_map:
-        allowed = ", ".join(sorted(sort_map))
-        raise ValueError(f"sort must be one of: {allowed}")
-    direction_sql = _normalize_sort_direction(direction)
-    normalized_limit = _normalize_limit(limit)
-    normalized_offset = _normalize_offset(offset)
-    limit_clause = ""
-    query_params = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT *
-            FROM thread_summaries
-            {where_clause}
-            ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
-            {limit_clause}
-            """,
-            query_params,
-        )
-        return [_row_to_dict(row) for row in rows]
 
 
 def query_most_expensive_calls(

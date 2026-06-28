@@ -1183,3 +1183,46 @@ Remaining risks:
 
 Next handoff:
 - Extract thread-summary or session/record query read models next, depending on which gives the cleaner boundary improvement without broad blast radius.
+### `refactor/store-thread-summary-query-boundary`
+
+Goal:
+- Move materialized thread-summary read query out of `store.py`.
+- Keep `store.py` as the compatibility facade for `query_thread_summaries`.
+- Replace thread-summary module private SQL helper imports with public aliases.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Moved `query_thread_summaries` into `src/codex_usage_tracker/store_thread_summaries.py`.
+- Added public `thread_key_expression` alias in `store_query_sql.py`.
+- Updated `store_thread_summaries.py` to use public `usage_where_clause`, normalizers, and `thread_key_expression`.
+- Re-exported `query_thread_summaries` from `store.py`.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json` and `.agent-maintainer/git-agent-ratchet-private-imports.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_thread_summaries.py src/codex_usage_tracker/store_query_sql.py`: passed.
+- `.venv/bin/python -m compileall src/codex_usage_tracker/store.py src/codex_usage_tracker/store_thread_summaries.py src/codex_usage_tracker/store_query_sql.py`: passed.
+- `.venv/bin/python -m pytest -q tests/test_store_dashboard_mcp.py::test_upsert_materializes_thread_summaries tests/test_store_dashboard_mcp.py::test_thread_summaries_keep_active_and_all_history_scopes_separate tests/test_dashboard_server.py::test_dashboard_server_live_sql_api_slices_are_aggregate_only`: 3 passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py tests/test_store_dashboard_mcp.py tests/test_context_evidence.py`: 38 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion warning and behavior-preserving refactor no-test-file warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5723 to 5666.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed, ratcheted baseline 8 to 4.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_thread_summaries.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-thread-summary-queries.json`: passed.
+- `.venv/bin/tach check`: expected informational failure, same 13 documented legacy boundary violations.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `store.py` still owns summary/session/record/export read functions and refresh/upsert orchestration.
+- Private SQL helper ratchet is improved but still not zero because `store.py` has legacy helper imports.
+
+Next handoff:
+- Extract session/record/evidence read models next; this should also enable moving `context.py` off the `store.py` facade later.
