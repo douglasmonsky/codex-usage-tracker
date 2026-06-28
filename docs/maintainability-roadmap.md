@@ -2739,3 +2739,56 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with open-investigator URL validation/payload extraction or another route plumbing split.
+
+### `refactor/server-open-investigator-payload`
+
+Goal:
+- Extract open-investigator URL validation, safe URL reconstruction, browser opening, and response payload construction from `_UsageDashboardHandler`.
+- Keep API-token enforcement in the HTTP handler.
+- Preserve loopback-only, same-port, dashboard-path, and `view=call&record=...` safety checks.
+
+Files touched:
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_open_investigator.py`
+- `tests/test_server_open_investigator.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `open_investigator_payload()` and `OpenInvestigatorRequestError`.
+- Replaced inline `/api/open-investigator` validation and payload construction with the helper, preserving 403 token handling in `server.py` and mapping request errors to HTTP 400.
+- Added focused tests for safe relative URLs, encoded absolute URLs with fragments, missing URL, non-dashboard schemes, non-loopback hosts, wrong ports, wrong dashboard paths, and missing call-record query shape.
+- Kept the existing live dashboard server open-investigator test passing.
+- Declared `server_open_investigator` in the dashboard/server `tach` boundary.
+- Ratcheted file-line baseline `2211 -> 2189`, reducing `server.py` from `1046` to `1024` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_open_investigator.py tests/test_server_open_investigator.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_open_investigator.py tests/test_server_open_investigator.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_open_investigator.py tests/test_dashboard_server.py::test_dashboard_server_opens_only_token_protected_investigator_urls -q`: 9 passed.
+- `radon cc src/codex_usage_tracker/server_open_investigator.py -a -s`: average A (4.67); `open_investigator_payload` is B (9), accepted for this slice.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_open_investigator.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 377 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/server-open-investigator-payload-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2211 -> 2189`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `server.py` remains oversized at `1024` lines; usage handler, diagnostic snapshot plumbing, and dashboard-server factory code still need extraction.
+- `open_investigator_payload()` is B complexity; acceptable now, but it can be split further if strict wemake/radon scope later requires it.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `context.py`, `cli.py`, diagnostics/report modules, usage-drain modules, and persistence modules remain above eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers`; likely extract diagnostic snapshot/refresh route plumbing or usage refresh handler next.

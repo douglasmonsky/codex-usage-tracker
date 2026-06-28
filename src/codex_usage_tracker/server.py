@@ -70,6 +70,10 @@ from codex_usage_tracker.server_diagnostic_snapshots import (
 )
 from codex_usage_tracker.server_live_queries import live_query_params
 from codex_usage_tracker.server_live_rows import annotate_live_rows, query_live_call_rows
+from codex_usage_tracker.server_open_investigator import (
+    OpenInvestigatorRequestError,
+    open_investigator_payload,
+)
 from codex_usage_tracker.server_recommendations import recommendations_payload
 from codex_usage_tracker.server_responses import send_html_response, send_json_response
 from codex_usage_tracker.server_routes import (
@@ -435,46 +439,20 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def _handle_open_investigator(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token is required"})
+            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token required"})
             return
-        target = _first(params.get("url"))
-        if not target:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "url is required"})
+        try:
+            payload = open_investigator_payload(
+                query,
+                request_host=self.headers.get("Host"),
+                server_port=self.server.server_port,
+                dashboard_name=self._dashboard_name,
+                open_new_tab=webbrowser.open_new_tab,
+            )
+        except OpenInvestigatorRequestError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
-        parsed_target = urlparse(target)
-        if parsed_target.scheme:
-            if parsed_target.scheme not in {"http", "https"}:
-                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only dashboard URLs can be opened"})
-                return
-            if not _allowed_loopback_host(parsed_target.hostname):
-                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only loopback dashboard URLs can be opened"})
-                return
-            if parsed_target.port not in {None, self.server.server_port}:
-                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Dashboard URL port is not allowed"})
-                return
-        if parsed_target.path != f"/{self._dashboard_name}":
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only dashboard investigator URLs can be opened"})
-            return
-        target_params = parse_qs(parsed_target.query)
-        if _first(target_params.get("view")) != "call" or not _first(target_params.get("record")):
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Investigator URL must include view=call and record"})
-            return
-        host = self.headers.get("Host") or f"127.0.0.1:{self.server.server_port}"
-        safe_url = f"http://{host}{parsed_target.path}"
-        if parsed_target.query:
-            safe_url = f"{safe_url}?{parsed_target.query}"
-        if parsed_target.fragment:
-            safe_url = f"{safe_url}#{parsed_target.fragment}"
-        opened = webbrowser.open_new_tab(safe_url)
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-open-investigator-v1",
-                "opened": bool(opened),
-                "url": safe_url,
-            },
-        )
-
+        self._send_json(HTTPStatus.OK, payload)
     def _handle_status(self, query: str) -> None:
         try:
             payload = status_payload(
