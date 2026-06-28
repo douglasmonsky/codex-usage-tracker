@@ -9,6 +9,11 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from codex_usage_tracker.context_summaries import (
+    dedupe_chat_message_echoes,
+    summarize_payload,
+    summarize_turn_context,
+)
 from codex_usage_tracker.context_token_estimates import (
     context_encoding,
     estimate_visible_tokens,
@@ -16,10 +21,7 @@ from codex_usage_tracker.context_token_estimates import (
 )
 from codex_usage_tracker.context_values import (
     compact_json,
-    content_text,
-    jsonish,
     nonnegative_float,
-    nonnegative_int,
     optional_str,
     positive_int,
     redact_json_value,
@@ -33,43 +35,6 @@ DEFAULT_CONTEXT_ENTRIES = 80
 CONTEXT_MODE_QUICK = "quick"
 CONTEXT_MODE_FULL = "full"
 CONTEXT_MODES = {CONTEXT_MODE_QUICK, CONTEXT_MODE_FULL}
-
-_OUTPUT_OMITTED = (
-    "Tool output hidden for this request. Reload with include_tool_output=true to inspect "
-    "redacted, size-limited output."
-)
-_SAFE_STRUCTURED_EVENT_TYPES = frozenset(
-    {
-        "image_generation_end",
-        "mcp_tool_call_end",
-        "patch_apply_end",
-        "skill_completed",
-        "skill_invoked",
-        "skill_selected",
-        "skill_started",
-        "skill_used",
-        "task_complete",
-        "thread_rolled_back",
-        "turn_aborted",
-        "web_search_end",
-    }
-)
-_SAFE_STRUCTURED_EVENT_FIELDS = (
-    "type",
-    "call_id",
-    "turn_id",
-    "phase",
-    "status",
-    "duration_ms",
-    "num_turns",
-    "started_at",
-    "completed_at",
-    "time_to_first_token_ms",
-    "tool_name",
-    "server_name",
-    "skill_name",
-)
-
 
 def load_call_context(
     record_id: str,
@@ -283,7 +248,7 @@ def _read_context_entries(
                             timestamp,
                             entry_type,
                             "Turn context",
-                            _summarize_turn_context(payload),
+                            summarize_turn_context(payload),
                         )
                     )
                     candidates.extend(pending_compactions)
@@ -307,7 +272,7 @@ def _read_context_entries(
                     serialized_line_count += 1
                     serialized_raw_char_count += len(line)
 
-            summarized = _summarize_payload(
+            summarized = summarize_payload(
                 entry_type=entry_type,
                 payload=payload,
                 include_tool_output=include_tool_output,
@@ -370,7 +335,7 @@ def _read_context_entries(
             parse_errors=omitted_parse_errors,
         )
     serialized_estimate_ms = _elapsed_ms(serialized_started)
-    candidates = _dedupe_chat_message_echoes(candidates)
+    candidates = dedupe_chat_message_echoes(candidates)
     action_timing = _annotate_action_timing(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
     omitted["parse_errors"] = omitted_parse_errors
@@ -472,273 +437,6 @@ def _summarized_context_entry(
         action_duration_ms=nonnegative_float(summarized.get("action_duration_ms")),
     )
 
-
-def _dedupe_chat_message_echoes(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Hide adjacent progress-message echoes when a structured chat message exists."""
-
-    deduped: list[dict[str, Any]] = []
-    for entry in entries:
-        key = _chat_message_echo_key(entry)
-        if key and deduped and _chat_message_echo_key(deduped[-1]) == key:
-            if _is_structured_chat_message(entry) and not _is_structured_chat_message(deduped[-1]):
-                deduped[-1] = entry
-            elif _is_structured_chat_message(deduped[-1]):
-                continue
-            else:
-                continue
-        else:
-            deduped.append(entry)
-    return deduped
-
-
-def _chat_message_echo_key(entry: dict[str, Any]) -> tuple[str, str] | None:
-    label = optional_str(entry.get("label")) or ""
-    role = None
-    if label == "message / user" or label == "user_message":
-        role = "user"
-    elif label == "message / assistant" or label == "agent_message":
-        role = "assistant"
-    if role is None:
-        return None
-    text = " ".join(str(entry.get("text") or "").split())
-    return (role, text) if text else None
-
-
-def _is_structured_chat_message(entry: dict[str, Any]) -> bool:
-    return (optional_str(entry.get("label")) or "") in {"message / user", "message / assistant"}
-
-
-def _summarize_payload(
-    entry_type: str,
-    payload: dict[str, Any],
-    include_tool_output: bool,
-    include_compaction_history: bool,
-) -> dict[str, Any] | None:
-    if entry_type == "response_item":
-        return _summarize_response_item(payload, include_tool_output=include_tool_output)
-    if optional_str(payload.get("type")) == "context_compacted":
-        return _summarize_compaction(
-            payload,
-            include_compaction_history=include_compaction_history,
-        )
-    if entry_type == "event_msg":
-        return _summarize_event_msg(payload, include_tool_output=include_tool_output)
-    if entry_type == "compacted":
-        return _summarize_compaction(
-            payload,
-            include_compaction_history=include_compaction_history,
-        )
-    return None
-
-
-def _summarize_compaction(
-    payload: dict[str, Any],
-    *,
-    include_compaction_history: bool,
-) -> dict[str, Any]:
-    replacement_history = payload.get("replacement_history")
-    replacement_entries = replacement_history if isinstance(replacement_history, list) else []
-    message = optional_str(payload.get("message")) or ""
-    compaction: dict[str, Any] = {
-        "replacement_history_available": bool(replacement_entries),
-        "replacement_entry_count": len(replacement_entries),
-        "replacement_history_included": include_compaction_history and bool(replacement_entries),
-        "classification": "confirmed_compaction",
-    }
-    if message:
-        text = redact_text(message)
-    elif replacement_entries:
-        text = (
-            "Compaction detected. Replacement history contains "
-            f"{len(replacement_entries)} compacted history entries."
-        )
-    else:
-        text = (
-            "Compaction marker found. This event did not include replacement history, "
-            "so there is no compacted summary to display."
-        )
-    if include_compaction_history and replacement_entries:
-        compaction["replacement_history"] = [
-            _summarize_replacement_history_item(item) for item in replacement_entries
-        ]
-    return {
-        "label": "Compaction detected",
-        "text": text,
-        "compaction": compaction,
-    }
-
-
-def _summarize_replacement_history_item(item: object) -> dict[str, Any]:
-    if not isinstance(item, dict):
-        return {
-            "label": "replacement item",
-            "role": None,
-            "type": type(item).__name__,
-            "text": redact_text(jsonish(item)),
-        }
-    item_type = optional_str(item.get("type")) or "replacement item"
-    role = optional_str(item.get("role"))
-    name = optional_str(item.get("name"))
-    label_bits = [item_type]
-    if role:
-        label_bits.append(role)
-    if name:
-        label_bits.append(name)
-    text = content_text(item.get("content")) or jsonish(
-        {key: value for key, value in item.items() if key not in {"content"}}
-    )
-    return {
-        "label": " / ".join(label_bits),
-        "role": role,
-        "type": item_type,
-        "text": redact_text(text),
-    }
-
-
-def _summarize_turn_context(payload: dict[str, Any]) -> str:
-    fields = [
-        ("turn_id", payload.get("turn_id")),
-        ("cwd", payload.get("cwd")),
-        ("model", payload.get("model")),
-        ("effort", payload.get("effort")),
-        ("current_date", payload.get("current_date")),
-        ("timezone", payload.get("timezone")),
-    ]
-    lines = [f"{key}: {value}" for key, value in fields if value not in (None, "")]
-    summary = optional_str(payload.get("summary"))
-    if summary:
-        lines.append(f"summary: {summary}")
-    return "\n".join(lines) if lines else "Turn context"
-
-
-def _summarize_response_item(
-    payload: dict[str, Any],
-    include_tool_output: bool,
-) -> dict[str, Any] | None:
-    item_type = optional_str(payload.get("type")) or "response_item"
-    role = optional_str(payload.get("role"))
-    name = optional_str(payload.get("name"))
-    label_bits = [item_type]
-    if role:
-        label_bits.append(role)
-    if name:
-        label_bits.append(name)
-    label = " / ".join(label_bits)
-
-    content = content_text(payload.get("content"))
-    if content:
-        return {"label": label, "text": content}
-
-    if "arguments" in payload:
-        return {
-            "label": label,
-            "text": f"Tool call arguments:\n{jsonish(payload.get('arguments'))}",
-        }
-
-    if "input" in payload:
-        return {
-            "label": label,
-            "text": f"Tool input:\n{jsonish(payload.get('input'))}",
-        }
-
-    if "output" in payload:
-        output = optional_str(payload.get("output")) or jsonish(payload.get("output"))
-        if include_tool_output:
-            return {"label": label, "text": output}
-        return {"label": label, "text": _OUTPUT_OMITTED, "tool_output_omitted": True}
-
-    summary = content_text(payload.get("summary"))
-    if summary:
-        return {"label": label, "text": summary}
-
-    action = payload.get("action")
-    if isinstance(action, dict):
-        return {"label": label, "text": f"Action:\n{jsonish(action)}"}
-
-    return None
-
-
-def _summarize_event_msg(
-    payload: dict[str, Any],
-    include_tool_output: bool,
-) -> dict[str, Any] | None:
-    event_type = optional_str(payload.get("type")) or "event_msg"
-    if event_type == "token_count":
-        info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
-        token_usage = _token_count_summary(info)
-        return {
-            "label": "Token count",
-            "text": jsonish(token_usage),
-            "token_usage": token_usage,
-        }
-
-    safe_structured = _summarize_safe_structured_event(event_type, payload)
-    if safe_structured is not None:
-        return safe_structured
-
-    if "message" in payload:
-        return {"label": event_type, "text": optional_str(payload.get("message")) or ""}
-
-    output_fields = [field for field in ("stdout", "stderr", "result") if field in payload]
-    if output_fields:
-        if not include_tool_output:
-            return {"label": event_type, "text": _OUTPUT_OMITTED, "tool_output_omitted": True}
-        text = "\n".join(f"{field}:\n{jsonish(payload.get(field))}" for field in output_fields)
-        return {"label": event_type, "text": text}
-
-    compact = {
-        key: payload.get(key)
-        for key in ("call_id", "turn_id", "phase", "status", "duration_ms")
-        if key in payload
-    }
-    return {"label": event_type, "text": jsonish(compact)} if compact else None
-
-
-def _summarize_safe_structured_event(
-    event_type: str,
-    payload: dict[str, Any],
-) -> dict[str, Any] | None:
-    if event_type not in _SAFE_STRUCTURED_EVENT_TYPES:
-        return None
-    compact: dict[str, Any] = {"type": event_type}
-    for key in _SAFE_STRUCTURED_EVENT_FIELDS:
-        if key == "type" or key not in payload:
-            continue
-        value = payload.get(key)
-        if _is_safe_structured_scalar(value):
-            compact[key] = value
-    summary: dict[str, Any] = {
-        "label": event_type,
-        "text": jsonish(compact),
-        "carry_into_next_turn": True,
-    }
-    duration_ms = nonnegative_float(payload.get("duration_ms"))
-    if duration_ms is not None:
-        summary["action_duration_ms"] = duration_ms
-    return summary
-
-
-def _is_safe_structured_scalar(value: object) -> bool:
-    return value is None or isinstance(value, (str, int, float, bool))
-
-
-def _token_count_summary(info: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "last_token_usage": _token_usage_summary(info.get("last_token_usage")),
-        "total_token_usage": _token_usage_summary(info.get("total_token_usage")),
-        "model_context_window": info.get("model_context_window"),
-    }
-
-
-def _token_usage_summary(value: object) -> dict[str, Any] | None:
-    if not isinstance(value, dict):
-        return None
-    usage = dict(value)
-    input_tokens = nonnegative_int(usage.get("input_tokens"))
-    cached_input_tokens = nonnegative_int(usage.get("cached_input_tokens"))
-    if input_tokens is not None and cached_input_tokens is not None:
-        usage.setdefault("uncached_input_tokens", max(input_tokens - cached_input_tokens, 0))
-    return usage
 
 
 def _context_entry(

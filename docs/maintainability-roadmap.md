@@ -3000,3 +3000,55 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/context-and-parser-boundaries` with event summarization or serialized evidence bucketing extraction.
+### `refactor/context-summaries`
+Goal:
+- Move context evidence summarization, safe structured event filtering, compaction summarization, and adjacent chat-message echo dedupe out of `context.py`.
+- Keep raw log scanning, selected-turn collection, serialized evidence estimation, and action timing assembly in `context.py`.
+- Preserve context/privacy behavior and avoid introducing raw tool-output persistence.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/context_summaries.py`
+- `tach.toml`
+- `tests/test_context_summaries.py`
+- `tests/test_context_values.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `context_summaries.py` with public helpers `dedupe_chat_message_echoes`, `summarize_payload`, and `summarize_turn_context`.
+- Split response item, event message, compaction, token-count, and safe structured event summarization into smaller private helpers.
+- Added direct characterization tests for turn-context text, default tool-output omission, token count summaries, safe structured event duration carry, optional compaction history, and chat echo dedupe.
+- Changed the redaction fixture in `tests/test_context_values.py` to build the fake OpenAI key at runtime so `scripts/check_release.py` does not flag a literal key-shaped string.
+- Added `context_summaries` to `tach.toml` context/parser boundary.
+- Ratcheted max-file baseline `2044 -> 1742`; `context.py` reduced from `977` to `675` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/context.py src/codex_usage_tracker/context_summaries.py tests/test_context_summaries.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/context.py src/codex_usage_tracker/context_summaries.py tests/test_context_summaries.py tests/test_context_evidence.py tests/test_privacy.py`: passed.
+- `.venv/bin/python -m pytest tests/test_context_summaries.py tests/test_context_evidence.py tests/test_privacy.py -q`: 16 passed.
+- `radon cc src/codex_usage_tracker/context_summaries.py -a -s`: worst block B (7), average A under xenon gate.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/context_summaries.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_release.py::test_release_check_script_passes tests/test_context_values.py -q`: 5 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/context-summaries-tach-map.json`: passed.
+- `.venv/bin/python -m pytest -q`: 395 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and large-diff warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2044 -> 1742`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `context.py` remains above the eventual 600-line target at 675 lines.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing non-context hotspots outside this slice.
+- `context.py` still owns raw scan orchestration, serialized evidence bucketing, and action timing assembly; these are the next obvious context split candidates.
+
+Next handoff:
+- Continue `refactor/context-and-parser-boundaries` with a small extraction of serialized evidence bucketing or action timing from `context.py`, then reassess whether `context.py` can drop below 600 without making the orchestration harder to read.

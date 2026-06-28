@@ -6,7 +6,7 @@ from codex_usage_tracker import context_values
 def test_redact_json_value_recurses_through_lists_and_dicts() -> None:
     redacted = context_values.redact_json_value(
         {
-            "token": "sk-proj-abcdefghijklmnopqrstuvwxyz1234567890",
+            "token": "sk-proj-" + "abcdefghijklmnopqrstuvwxyz1234567890",
             "items": ["Authorization: Bearer abc.def.ghi"],
         }
     )
