@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,22 @@ class _FakeLock:
 
     def __exit__(self, *_exc: object) -> None:
         self.exited += 1
+
+
+class _RouteSenders:
+    def __init__(self) -> None:
+        self.errors: list[tuple[HTTPStatus, str]] = []
+        self.exceptions: list[tuple[str, BaseException]] = []
+        self.json_payloads: list[tuple[HTTPStatus, dict[str, object]]] = []
+
+    def send_error(self, status: HTTPStatus, message: str) -> None:
+        self.errors.append((status, message))
+
+    def send_exception(self, prefix: str, exc: BaseException) -> None:
+        self.exceptions.append((prefix, exc))
+
+    def send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
+        self.json_payloads.append((status, payload))
 
 
 def test_refresh_usage_payload_returns_aggregate_refresh_metadata(
@@ -94,6 +111,94 @@ def _usage_kwargs(tmp_path: Path) -> dict[str, object]:
         "refresh_lock": _FakeLock(),
         "refresh_allowed": False,
     }
+
+
+def _handle_usage_kwargs(
+    tmp_path: Path,
+    senders: _RouteSenders,
+    *,
+    has_valid_api_token: server_usage_refresh.TokenValidator = lambda _params: True,
+) -> dict[str, object]:
+    kwargs = _usage_kwargs(tmp_path)
+    kwargs.pop("refresh_allowed")
+    kwargs.update(
+        {
+            "has_valid_api_token": has_valid_api_token,
+            "send_error": senders.send_error,
+            "send_exception": senders.send_exception,
+            "send_json": senders.send_json,
+        },
+    )
+    return kwargs
+
+
+def test_handle_usage_request_sends_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+    seen: dict[str, Any] = {}
+
+    def usage_payload(query: str, **kwargs: Any) -> dict[str, object]:
+        seen["query"] = query
+        seen["refresh_allowed"] = kwargs["refresh_allowed"]
+        return {"query": query}
+
+    monkeypatch.setattr(server_usage_refresh, "usage_payload", usage_payload)
+
+    server_usage_refresh.handle_usage_request(
+        "refresh=1&api_token=ok",
+        **_handle_usage_kwargs(
+            tmp_path,
+            senders,
+            has_valid_api_token=lambda params: params.get("api_token") == ["ok"],
+        ),
+    )
+
+    assert seen == {"query": "refresh=1&api_token=ok", "refresh_allowed": True}
+    assert senders.errors == []
+    assert senders.json_payloads == [
+        (HTTPStatus.OK, {"query": "refresh=1&api_token=ok"}),
+    ]
+
+
+def test_handle_usage_request_sends_refresh_auth_error(tmp_path: Path) -> None:
+    senders = _RouteSenders()
+
+    server_usage_refresh.handle_usage_request(
+        "refresh=1",
+        **_handle_usage_kwargs(
+            tmp_path,
+            senders,
+            has_valid_api_token=lambda _params: False,
+        ),
+    )
+
+    assert senders.errors == [
+        (HTTPStatus.FORBIDDEN, "Valid API token is required for refresh"),
+    ]
+    assert senders.json_payloads == []
+
+
+def test_handle_usage_request_sends_os_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def usage_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise OSError("cannot read")
+
+    monkeypatch.setattr(server_usage_refresh, "usage_payload", usage_payload)
+
+    server_usage_refresh.handle_usage_request(
+        "",
+        **_handle_usage_kwargs(tmp_path, senders),
+    )
+
+    assert senders.json_payloads == []
+    assert senders.exceptions[0][0] == "Could not read aggregate dashboard data"
+    assert str(senders.exceptions[0][1]) == "cannot read"
 
 
 def test_usage_payload_forwards_query_options_to_dashboard_payload(

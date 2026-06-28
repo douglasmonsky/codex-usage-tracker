@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -23,6 +26,69 @@ from codex_usage_tracker.store import refresh_usage_index
 
 class UsageRefreshAuthError(PermissionError):
     """Raised when a live usage refresh lacks a valid dashboard token."""
+
+
+ErrorSender = Callable[[HTTPStatus, str], None]
+ExceptionSender = Callable[[str, BaseException], None]
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+TokenValidator = Callable[[dict[str, list[str]]], bool]
+
+
+def handle_usage_request(
+    query: str,
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    rate_card_path: Path,
+    thresholds_path: Path,
+    projects_path: Path,
+    privacy_mode: str,
+    since: str | None,
+    api_token: str,
+    context_api_enabled: bool,
+    include_archived_default: bool,
+    language_default: str,
+    limit_default: int,
+    codex_home: Path,
+    refresh_lock: Any,
+    has_valid_api_token: TokenValidator,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle usage route errors and response writing."""
+    params = parse_qs(query)
+    try:
+        payload = usage_payload(
+            query,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+            projects_path=projects_path,
+            privacy_mode=privacy_mode,
+            since=since,
+            api_token=api_token,
+            context_api_enabled=context_api_enabled,
+            include_archived_default=include_archived_default,
+            language_default=language_default,
+            limit_default=limit_default,
+            codex_home=codex_home,
+            refresh_lock=refresh_lock,
+            refresh_allowed=has_valid_api_token(params),
+        )
+    except UsageRefreshAuthError as exc:
+        send_error(HTTPStatus.FORBIDDEN, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading usage data", exc)
+        return
+    except OSError as exc:
+        send_exception("Could not read aggregate dashboard data", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def refresh_usage_payload(

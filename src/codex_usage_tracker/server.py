@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from codex_usage_tracker import server_context, server_utils
+from codex_usage_tracker import server_context, server_usage_refresh, server_utils
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS
 from codex_usage_tracker.dashboard import (
     generate_dashboard,
@@ -87,7 +87,6 @@ from codex_usage_tracker.server_routes import (
 from codex_usage_tracker.server_status import handle_status_request
 from codex_usage_tracker.server_summary import handle_summary_request
 from codex_usage_tracker.server_threads import handle_threads_request
-from codex_usage_tracker.server_usage_refresh import UsageRefreshAuthError, usage_payload
 
 _first = server_utils.first_query_value
 _matches_live_derived_filters = server_utils.matches_live_derived_filters
@@ -772,37 +771,28 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_usage(self, query: str) -> None:
-        params = parse_qs(query)
-        try:
-            payload = usage_payload(
-                query,
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                allowance_path=self._allowance_path,
-                rate_card_path=self._rate_card_path,
-                thresholds_path=self._thresholds_path,
-                projects_path=self._projects_path,
-                privacy_mode=self._privacy_mode,
-                since=self._since,
-                api_token=self._api_token,
-                context_api_enabled=self._context_api_state.enabled,
-                include_archived_default=self._include_archived,
-                language_default=self._language,
-                limit_default=self._limit,
-                codex_home=self._codex_home,
-                refresh_lock=self._refresh_lock,
-                refresh_allowed=self._has_valid_api_token(params),
-            )
-        except UsageRefreshAuthError as exc:
-            self._send_error(HTTPStatus.FORBIDDEN, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading usage data", exc)
-            return
-        except OSError as exc:
-            self._send_exception("Could not read aggregate dashboard data", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        server_usage_refresh.handle_usage_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
+            since=self._since,
+            api_token=self._api_token,
+            context_api_enabled=self._context_api_state.enabled,
+            include_archived_default=self._include_archived,
+            language_default=self._language,
+            limit_default=self._limit,
+            codex_home=self._codex_home,
+            refresh_lock=self._refresh_lock,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
     def _request_origin_allowed(self) -> bool:
         return request_origin_allowed(self.headers, self.server.server_port)
 

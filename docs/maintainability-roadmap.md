@@ -3709,3 +3709,56 @@ Remaining risks:
 
 Next handoff:
 - Isolate `_handle_usage` only if it stays small enough for one branch; otherwise switch to the next roadmap module and leave usage handling for a separate design slice.
+
+### `refactor/server-usage-handler`
+
+Goal:
+- Move `/api/usage` route wrapper out of `_UsageDashboardHandler`.
+- Preserve refresh-token authorization, SQLite, and aggregate-read error response behavior.
+- Keep the oversized dashboard server test from worsening the file-length ratchet.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_usage_refresh.py`
+- `tests/test_dashboard_server.py`
+- `tests/test_server_usage_refresh.py`
+
+Completed edits:
+- Added `handle_usage_request` in `server_usage_refresh.py`.
+- Replaced `_handle_usage` with a thin delegate.
+- Kept token-query parsing and refresh authorization inside the usage route wrapper.
+- Added focused tests for successful usage responses, forbidden refresh responses, and aggregate-read error mapping.
+- Updated the dashboard SQLite-error test to patch the new usage module boundary without increasing `tests/test_dashboard_server.py`.
+- Ratcheted max-file baseline `1516 -> 1506`; `server.py` reduced `833 -> 823` lines.
+- Kept `tests/test_dashboard_server.py` at `1150` lines while expanding usage wrapper coverage in `tests/test_server_usage_refresh.py`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_usage_refresh.py tests/test_server_usage_refresh.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_usage_refresh.py tests/test_server_usage_refresh.py tests/test_dashboard_server.py`: passed after import boundary cleanup.
+- `.venv/bin/python -m pytest tests/test_server_usage_refresh.py tests/test_dashboard_server.py -q`: 18 passed.
+- `radon cc src/codex_usage_tracker/server.py src/codex_usage_tracker/server_usage_refresh.py -a -s`: usage route handler A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py src/codex_usage_tracker/server_usage_refresh.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach map -o /tmp/server-usage-handler-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- `server.py` remains oversized at `823` lines.
+- Shell/open-investigator/context/dashboard-shell handling still lives in `server.py`.
+- Broad package structure remains too flat for strict cohesion.
+
+Next handoff:
+- Stop server route-wrapper slicing here unless another route wrapper is clearly trivial; move to the next roadmap module so the branch series does not over-optimize one file.
