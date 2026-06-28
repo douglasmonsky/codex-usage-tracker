@@ -6,12 +6,12 @@
   },
   "baselines": {
     "max_file_lines": {
-      "metric_value": 2544,
+      "metric_value": 2490,
       "items": [
         {
           "path": "src/codex_usage_tracker/server.py",
-          "line_count": 1379,
-          "overage": 779
+          "line_count": 1325,
+          "overage": 725
         },
         {
           "path": "src/codex_usage_tracker/context.py",

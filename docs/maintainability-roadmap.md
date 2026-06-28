@@ -2029,3 +2029,64 @@ Remaining risks:
 Next handoff:
 
 - Continue `refactor/server-routing-and-handlers` with a narrow extraction of live row fetching/annotation or diagnostics snapshot handler plumbing.
+
+### refactor/server-live-row-queries
+
+Objective:
+
+- Extract live dashboard API row fetching and annotation from `_UsageDashboardHandler`.
+- Preserve `/api/calls`, `/api/thread-calls`, and `/api/call` annotation behavior.
+- Keep derived pricing/credit filters applied after annotation, as before.
+
+Files touched:
+
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_live_rows.py`
+- `tests/test_server_live_rows.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+
+Completed edits:
+
+- Added `query_live_call_rows()` for store-backed live row fetching and pagination.
+- Added `annotate_live_rows()` for the existing call-origin, thread-attachment, pricing, allowance, recommendation, project-identity, and privacy annotation sequence.
+- Kept `_UsageDashboardHandler._live_call_rows()` and `_annotate_live_rows()` as compatibility wrappers around the extracted helpers.
+- Added tests for normal count-backed pagination, derived-filter pagination, and empty annotation behavior.
+- Split the new module helpers so `server_live_rows.py` itself passes `xenon --max-absolute B --max-modules A --max-average A`.
+- Declared `server_live_rows` in the dashboard/server `tach` module boundary.
+- Ratcheted max file-line baseline from 2544 to 2490 after reducing `server.py` from 1379 to 1325 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_live_rows.py tests/test_server_live_rows.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_live_rows.py tests/test_server_live_rows.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_live_rows.py tests/test_dashboard_server.py -q`: 14 passed.
+- `radon cc src/codex_usage_tracker/server_live_rows.py -a -s`: average A (2.8).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_live_rows.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 334 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/server-live-row-queries-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch is uncommitted.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 2544 -> 2490.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `radon cc src -a -s`: ran and reported current complexity inventory.
+- `radon mi src -s`: ran and reported current maintainability inventory.
+- `xenon --max-absolute B --max-modules A --max-average A src`: failed on existing C/D/F complexity hotspots outside this live-row slice.
+
+Remaining risks:
+
+- `server.py` remains oversized at 1325 lines and still needs diagnostics snapshot handling and usage refresh handler extraction.
+- Broad `xenon` remains red on existing parser/dashboard/usage-drain/report complexity blocks.
+- `context.py`, `cli.py`, and several diagnostics modules remain above the target file-size budget.
+
+Next handoff:
+
+- Continue `refactor/server-routing-and-handlers` with diagnostics snapshot handler plumbing or `_handle_usage` refresh payload extraction.

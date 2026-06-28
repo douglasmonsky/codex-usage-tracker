@@ -16,8 +16,6 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker import server_utils
-from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
-from codex_usage_tracker.call_origin import ensure_call_origin
 from codex_usage_tracker.context import (
     CONTEXT_MODE_QUICK,
     CONTEXT_MODES,
@@ -57,16 +55,6 @@ from codex_usage_tracker.paths import (
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
-from codex_usage_tracker.pricing import annotate_rows_with_efficiency, load_pricing_config
-from codex_usage_tracker.projects import (
-    annotate_rows_with_project_identity,
-    apply_project_privacy_to_rows,
-    load_project_config,
-)
-from codex_usage_tracker.recommendations import (
-    annotate_rows_with_recommendations,
-    load_threshold_config,
-)
 from codex_usage_tracker.reports import (
     QUERY_CREDIT_CONFIDENCE_CHOICES,
     QUERY_PRICING_STATUS_CHOICES,
@@ -74,6 +62,7 @@ from codex_usage_tracker.reports import (
     build_summary_report,
 )
 from codex_usage_tracker.server_live_queries import live_query_params
+from codex_usage_tracker.server_live_rows import annotate_live_rows, query_live_call_rows
 from codex_usage_tracker.server_responses import send_html_response, send_json_response
 from codex_usage_tracker.server_routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
@@ -84,14 +73,11 @@ from codex_usage_tracker.server_routes import (
 from codex_usage_tracker.store import (
     query_latest_observed_usage,
     query_thread_summaries,
-    query_usage_api_event_count,
-    query_usage_api_events,
     query_usage_record,
     query_usage_status,
     refresh_metadata,
     refresh_usage_index,
 )
-from codex_usage_tracker.threads import annotate_thread_attachments
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
 _elapsed_ms = server_utils.elapsed_ms
@@ -1213,69 +1199,29 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         pricing_status: str | None,
         credit_confidence: str | None,
     ) -> tuple[list[dict[str, Any]], int]:
-        derived_filter = bool(pricing_status or credit_confidence)
-        rows = query_usage_api_events(
+        return query_live_call_rows(
             db_path=self._db_path,
-            limit=None if derived_filter else query_params["limit"],
-            offset=0 if derived_filter else query_params["offset"],
-            search=query_params["search"],
-            since=query_params["since"],
-            until=query_params["until"],
-            model=query_params["model"],
-            effort=query_params["effort"],
-            thread=query_params["thread"],
-            thread_key=query_params["thread_key"],
-            include_archived=query_params["include_archived"],
-            sort=query_params["sort"],
-            direction=query_params["direction"],
+            query_params=query_params,
+            pricing_status=pricing_status,
+            credit_confidence=credit_confidence,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
         )
-        rows = self._annotate_live_rows(rows)
-        if derived_filter:
-            rows = [
-                row
-                for row in rows
-                if _matches_live_derived_filters(
-                    row,
-                    pricing_status=pricing_status,
-                    credit_confidence=credit_confidence,
-                )
-            ]
-            total_matched = len(rows)
-            limit = query_params["limit"]
-            offset = query_params["offset"]
-            rows = rows[offset:] if limit is None else rows[offset : offset + limit]
-            return rows, total_matched
-        total_matched = query_usage_api_event_count(
-            db_path=self._db_path,
-            search=query_params["search"],
-            since=query_params["since"],
-            until=query_params["until"],
-            model=query_params["model"],
-            effort=query_params["effort"],
-            thread=query_params["thread"],
-            thread_key=query_params["thread_key"],
-            include_archived=query_params["include_archived"],
-        )
-        return rows, total_matched
 
     def _annotate_live_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        if not rows:
-            return []
-        rows = annotate_thread_attachments([ensure_call_origin(row) for row in rows])
-        pricing = load_pricing_config(self._pricing_path)
-        allowance = load_allowance_config(
-            self._allowance_path,
+        return annotate_live_rows(
+            rows,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
             rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
         )
-        thresholds = load_threshold_config(self._thresholds_path)
-        projects = load_project_config(self._projects_path)
-        rows = annotate_rows_with_allowance(
-            annotate_rows_with_efficiency(rows, pricing),
-            allowance,
-        )
-        rows = annotate_rows_with_recommendations(rows, thresholds)
-        rows = annotate_rows_with_project_identity(rows, projects)
-        return apply_project_privacy_to_rows(rows, privacy_mode=self._privacy_mode)
 
     def _handle_usage(self, query: str) -> None:
         params = parse_qs(query)
