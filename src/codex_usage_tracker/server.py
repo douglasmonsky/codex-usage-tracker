@@ -51,7 +51,6 @@ from codex_usage_tracker.paths import (
 from codex_usage_tracker.reports import (
     QUERY_CREDIT_CONFIDENCE_CHOICES,
     QUERY_PRICING_STATUS_CHOICES,
-    build_recommendations_report,
     build_summary_report,
 )
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
@@ -67,6 +66,7 @@ from codex_usage_tracker.server_diagnostic_snapshots import (
 )
 from codex_usage_tracker.server_live_queries import live_query_params
 from codex_usage_tracker.server_live_rows import annotate_live_rows, query_live_call_rows
+from codex_usage_tracker.server_recommendations import recommendations_payload
 from codex_usage_tracker.server_responses import send_html_response, send_json_response
 from codex_usage_tracker.server_routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
@@ -769,21 +769,13 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_recommendations(self, query: str) -> None:
-        params = parse_qs(query)
         try:
-            report = build_recommendations_report(
+            payload = recommendations_payload(
+                query,
                 db_path=self._db_path,
                 pricing_path=self._pricing_path,
                 allowance_path=self._allowance_path,
                 projects_path=self._projects_path,
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                project=_first(params.get("project")),
-                min_score=_parse_optional_float(_first(params.get("min_score")), "min_score"),
-                limit=_parse_report_limit(_first(params.get("limit")), 20),
                 privacy_mode=self._privacy_mode,
             )
         except ValueError as exc:
@@ -795,8 +787,6 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": f"Database error while reading recommendations: {exc}"},
             )
             return
-        payload = dict(report.payload)
-        payload["raw_context_included"] = False
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_diagnostics_summary(self, query: str) -> None:

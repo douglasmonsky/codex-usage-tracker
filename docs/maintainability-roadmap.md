@@ -2322,3 +2322,54 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with another small payload/handler extraction, likely context or recommendations handling, then commit only after the same local gate pattern.
+
+### refactor/server-recommendations-payload
+
+Objective:
+- Extract recommendations API payload construction from `_UsageDashboardHandler`.
+- Preserve query filters, min-score validation, default limit, privacy mode forwarding, raw-context suppression, and existing HTTP error mapping.
+- Keep HTTP response writing in `server.py` while moving report-builder argument assembly into a focused helper module.
+
+Files touched:
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_recommendations.py`
+- `tests/test_server_recommendations.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `recommendations_payload()` as a small payload facade around `build_recommendations_report()`.
+- Replaced inline recommendations report construction in `server.py` with a helper call and preserved `ValueError`/`sqlite3.Error` status mapping.
+- Added focused tests for query filter normalization, defaults, raw context exclusion, and invalid `min_score` validation.
+- Declared `server_recommendations` in the dashboard/server `tach` boundary.
+- Ratcheted max file-line baseline `2401 -> 2391`, reducing `server.py` from `1236` to `1226` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_recommendations.py tests/test_server_recommendations.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_recommendations.py tests/test_server_recommendations.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_recommendations.py tests/test_dashboard_server.py -q`: 14 passed.
+- `radon cc src/codex_usage_tracker/server_recommendations.py -a -s`: average A (1.0).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_recommendations.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 348 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/server-recommendations-payload-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2401 -> 2391`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `server.py` remains oversized at `1226` lines; context, call/thread, summary, and remaining route handlers still need extraction.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `context.py`, `cli.py`, diagnostics/report modules, and usage-drain modules remain above the eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with another small payload/handler extraction, likely summary payload or context handler extraction.
