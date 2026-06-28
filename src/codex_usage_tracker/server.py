@@ -73,6 +73,7 @@ from codex_usage_tracker.reports import (
     build_recommendations_report,
     build_summary_report,
 )
+from codex_usage_tracker.server_responses import send_html_response, send_json_response
 from codex_usage_tracker.store import (
     query_latest_observed_usage,
     query_thread_summaries,
@@ -90,7 +91,6 @@ _elapsed_ms = server_utils.elapsed_ms
 _first = server_utils.first_query_value
 _has_more = server_utils.has_more_rows
 _host_header_name = server_utils.host_header_name
-_json_response_body = server_utils.json_response_body
 _matches_live_derived_filters = server_utils.matches_live_derived_filters
 _next_offset = server_utils.next_row_offset
 _optional_filter = server_utils.optional_choice_filter
@@ -503,14 +503,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return None
 
     def _send_html(self, body: bytes) -> None:
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        try:
-            self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
-            return
+        send_html_response(self, body)
 
     def log_message(self, format: str, *args: object) -> None:
         if self.path.startswith("/api/usage"):
@@ -1496,13 +1489,4 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         return hmac.compare_digest(str(provided), self._api_token)
 
     def _send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
-        body = _json_response_body(payload)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        try:
-            self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
-            return
+        send_json_response(self, status, payload)

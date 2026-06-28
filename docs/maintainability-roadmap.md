@@ -1354,3 +1354,46 @@ Remaining risks:
 
 Next handoff:
 - Start splitting parser-facing refresh orchestration from store persistence, or isolate support diagnostics, now that read/export query boundaries are smaller.
+### `refactor/server-response-helper-boundary`
+
+Goal:
+- Start server split with a low-risk response-helper extraction.
+- Keep `_UsageDashboardHandler._send_json` and `_send_html` call sites stable.
+- Reduce `server.py` without changing routing or API payloads.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/server_responses.py` for JSON/HTML response writing and broken-connection handling.
+- Updated `server.py` `_send_json` and `_send_html` to delegate to response helpers.
+- Removed direct `_json_response_body` alias from `server.py`.
+- Updated `tach.toml` so `server_responses.py` belongs to the dashboard/server boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_responses.py`: passed.
+- `.venv/bin/python -m compileall src/codex_usage_tracker/server.py src/codex_usage_tracker/server_responses.py`: passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py tests/test_dashboard_status.py tests/test_dashboard_live.py`: 17 passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py tests/test_dashboard_status.py tests/test_dashboard_live.py tests/test_dashboard_payload.py tests/test_dashboard_data.py tests/test_dashboard_diagnostics_snapshots.py`: 38 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion warning and behavior-preserving refactor no-test-file warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5522 to 5506.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/server_responses.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/server.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-server-responses.json`: passed.
+- `.venv/bin/tach check`: expected informational failure, 12 documented legacy parser/support boundary violations.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `server.py` still owns routing and handler methods in one large class.
+- The next server slices should move route handlers or request parsing one endpoint family at a time.
+
+Next handoff:
+- Continue `server.py` split with an API route dispatch table or one handler family extraction after adding focused route characterization.
