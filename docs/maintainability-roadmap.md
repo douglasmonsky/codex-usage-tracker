@@ -3200,3 +3200,53 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with another low-risk server slice, likely moving repeated HTTP error mapping or diagnostic route wrapper methods.
+
+### `refactor/server-error-responses`
+
+Goal:
+- Centralize local dashboard JSON error payload construction behind response helpers.
+- Keep dashboard routes, status codes, and error message strings stable.
+- Reduce `server.py` size under the local max-file-lines ratchet.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_responses.py`
+- `tests/test_server_responses.py`
+
+Completed edits:
+- Added `send_error_response` and `send_exception_response` to `server_responses.py`.
+- Replaced repeated inline `{"error": ...}` response payloads in `server.py`.
+- Added handler-local `_send_error` and `_send_exception` delegates so call sites stay compact.
+- Added direct tests for error payload extras, headers, content length, and exception formatting.
+- Ratcheted max-file baseline `1657 -> 1620`; `server.py` reduced `974 -> 937` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_responses.py tests/test_server_responses.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_responses.py tests/test_server_responses.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_responses.py tests/test_dashboard_server.py -q`: 13 passed.
+- `radon cc src/codex_usage_tracker/server_responses.py src/codex_usage_tracker/server.py -a -s`: `server_responses.py` all A; server hotspots unchanged with `_handle_context` B.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_responses.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m pytest -q`: 408 passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/server-error-responses-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1657 -> 1620`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `server.py` remains oversized at `937` lines.
+- `_UsageDashboardHandler._handle_context` is still the server complexity hotspot.
+- `agent-maintainer verify --profile fast` still warns that the package folder is structurally large, which is the point of the ongoing branch series.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with another low-risk slice around context route handling or diagnostic route handler repetition.

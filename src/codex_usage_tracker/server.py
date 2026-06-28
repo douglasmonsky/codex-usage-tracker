@@ -76,7 +76,12 @@ from codex_usage_tracker.server_request_guards import (
     has_valid_api_token,
     request_origin_allowed,
 )
-from codex_usage_tracker.server_responses import send_html_response, send_json_response
+from codex_usage_tracker.server_responses import (
+    send_error_response,
+    send_exception_response,
+    send_html_response,
+    send_json_response,
+)
 from codex_usage_tracker.server_routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
     GET_ROUTE_METHODS,
@@ -255,7 +260,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
         parsed = urlparse(self.path)
         if not self._request_origin_allowed():
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
+            self._send_error(
+                HTTPStatus.FORBIDDEN,
+                "Request host or origin is not allowed",
+            )
             return
         route_method = GET_ROUTE_METHODS.get(parsed.path)
         if route_method is not None:
@@ -276,13 +284,16 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
         parsed = urlparse(self.path)
         if not self._request_origin_allowed():
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
+            self._send_error(
+                HTTPStatus.FORBIDDEN,
+                "Request host or origin is not allowed",
+            )
             return
         route_method = POST_ROUTE_METHODS.get(parsed.path)
         if route_method is not None:
             getattr(self, route_method)(parsed.query)
             return
-        self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
+        self._send_error(HTTPStatus.NOT_FOUND, "Unknown API endpoint")
 
     def end_headers(self) -> None:
         if self._is_dashboard_html_request():
@@ -362,16 +373,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 language_default=self._language,
             )
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while preparing dashboard shell: {exc}"},
-            )
+            self._send_exception("Database error while preparing dashboard shell", exc)
             return None
         except OSError as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Could not prepare dashboard shell: {exc}"},
-            )
+            self._send_exception("Could not prepare dashboard shell", exc)
             return None
 
     def _send_html(self, body: bytes) -> None:
@@ -385,17 +390,15 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def _handle_context(self, query: str) -> None:
         params = parse_qs(query)
         if not self._context_api_state.enabled:
-            self._send_json(
+            self._send_error(
                 HTTPStatus.FORBIDDEN,
-                {
-                    "error": "Context loading disabled for dashboard server.",
-                    "context_api_enabled": False,
-                    "can_enable_context_api": True,
-                },
+                "Context loading disabled for dashboard server.",
+                context_api_enabled=False,
+                can_enable_context_api=True,
             )
             return
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token required"})
+            self._send_error(HTTPStatus.FORBIDDEN, "Valid API token required")
             return
         try:
             payload = context_payload(
@@ -404,39 +407,33 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 default_context_chars=self._context_chars,
             )
         except ContextRequestError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while loading context: {exc}"},
-            )
+            self._send_exception("Database error while loading context", exc)
             return
         except ValueError as exc:
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            self._send_error(HTTPStatus.NOT_FOUND, str(exc))
             return
         except FileNotFoundError as exc:
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            self._send_error(HTTPStatus.NOT_FOUND, str(exc))
             return
         except OSError as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Could not read source log: {exc}"},
-            )
+            self._send_exception("Could not read source log", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_context_settings(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token required"})
+            self._send_error(HTTPStatus.FORBIDDEN, "Valid API token required")
             return
         payload = context_settings_payload(query, context_api_state=self._context_api_state)
         self._send_json(HTTPStatus.OK, payload)
     def _handle_open_investigator(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token required"})
+            self._send_error(HTTPStatus.FORBIDDEN, "Valid API token required")
             return
         try:
             payload = open_investigator_payload(
@@ -447,7 +444,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 open_new_tab=webbrowser.open_new_tab,
             )
         except OpenInvestigatorRequestError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         self._send_json(HTTPStatus.OK, payload)
     def _handle_status(self, query: str) -> None:
@@ -458,10 +455,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 include_archived_default=self._include_archived,
             )
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading status: {exc}"},
-            )
+            self._send_exception("Database error while reading status", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -473,13 +467,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 live_call_rows=self._live_call_rows,
             )
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading calls: {exc}"},
-            )
+            self._send_exception("Database error while reading calls", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -491,16 +482,13 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 annotate_rows=self._annotate_live_rows,
             )
         except MissingRecordIdError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except UsageRecordNotFoundError as exc:
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            self._send_error(HTTPStatus.NOT_FOUND, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading call: {exc}"},
-            )
+            self._send_exception("Database error while reading call", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -512,13 +500,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 include_archived_default=self._include_archived,
             )
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading threads: {exc}"},
-            )
+            self._send_exception("Database error while reading threads", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -530,16 +515,13 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 live_call_rows=self._live_call_rows,
             )
         except MissingThreadKeyError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading thread calls: {exc}"},
-            )
+            self._send_exception("Database error while reading thread calls", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -553,13 +535,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 privacy_mode=self._privacy_mode,
             )
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading summary: {exc}"},
-            )
+            self._send_exception("Database error while reading summary", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -574,13 +553,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 privacy_mode=self._privacy_mode,
             )
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading recommendations: {exc}"},
-            )
+            self._send_exception("Database error while reading recommendations", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -592,13 +568,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 include_archived_default=self._include_archived,
             )
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostics: {exc}"},
-            )
+            self._send_exception("Database error while reading diagnostics", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -619,13 +592,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 fact_group=fact_group,
             )
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostics: {exc}"},
-            )
+            self._send_exception("Database error while reading diagnostics", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -638,13 +608,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 privacy_mode=self._privacy_mode,
             )
         except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostic calls: {exc}"},
-            )
+            self._send_exception("Database error while reading diagnostic calls", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -659,9 +626,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def _handle_diagnostics_refresh(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
-            self._send_json(
+            self._send_error(
                 HTTPStatus.FORBIDDEN,
-                {"error": "Valid API token is required for diagnostic refresh"},
+                "Valid API token is required for diagnostic refresh",
             )
             return
         try:
@@ -675,10 +642,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 refresh_lock=self._refresh_lock,
             )
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while refreshing diagnostics: {exc}"},
-            )
+            self._send_exception("Database error while refreshing diagnostics", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
     def _handle_diagnostics_overview_refresh(self, query: str) -> None:
@@ -821,9 +785,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     ) -> None:
         params = parse_qs(query)
         if refresh and not self._has_valid_api_token(params):
-            self._send_json(
+            self._send_error(
                 HTTPStatus.FORBIDDEN,
-                {"error": "Valid API token is required for diagnostic refresh"},
+                "Valid API token is required for diagnostic refresh",
             )
             return
         include_archived = _parse_bool(
@@ -841,10 +805,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 refresh_lock=self._refresh_lock,
             )
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostic usage drain: {exc}"},
-            )
+            self._send_exception("Database error while reading diagnostic usage drain", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -858,9 +819,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     ) -> None:
         params = parse_qs(query)
         if refresh and not self._has_valid_api_token(params):
-            self._send_json(
+            self._send_error(
                 HTTPStatus.FORBIDDEN,
-                {"error": "Valid API token is required for diagnostic refresh"},
+                "Valid API token is required for diagnostic refresh",
             )
             return
         include_archived = _parse_bool(
@@ -876,10 +837,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 build_report=build_report,
             )
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading {label}: {exc}"},
-            )
+            self._send_exception(f"Database error while reading {label}", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
 
@@ -949,19 +907,13 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 refresh_allowed=self._has_valid_api_token(params),
             )
         except UsageRefreshAuthError as exc:
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": str(exc)})
+            self._send_error(HTTPStatus.FORBIDDEN, str(exc))
             return
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading usage data: {exc}"},
-            )
+            self._send_exception("Database error while reading usage data", exc)
             return
         except OSError as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Could not read aggregate dashboard data: {exc}"},
-            )
+            self._send_exception("Could not read aggregate dashboard data", exc)
             return
         self._send_json(HTTPStatus.OK, payload)
     def _request_origin_allowed(self) -> bool:
@@ -969,6 +921,17 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool:
         return has_valid_api_token(self.headers, params, self._api_token)
+
+    def _send_error(
+        self,
+        status: HTTPStatus,
+        message: str,
+        **extra: object,
+    ) -> None:
+        send_error_response(self, status, message, **extra)
+
+    def _send_exception(self, prefix: str, exc: BaseException) -> None:
+        send_exception_response(self, HTTPStatus.INTERNAL_SERVER_ERROR, prefix, exc)
 
     def _send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
         send_json_response(self, status, payload)

@@ -42,6 +42,26 @@ def send_json_response(
     write_response_body(handler, body)
 
 
+def send_error_response(
+    handler: ResponseHandler,
+    status: HTTPStatus,
+    message: str,
+    **extra: object,
+) -> None:
+    payload: dict[str, object] = {"error": message}
+    payload.update(extra)
+    send_json_response(handler, status, payload)
+
+
+def send_exception_response(
+    handler: ResponseHandler,
+    status: HTTPStatus,
+    prefix: str,
+    exc: BaseException,
+) -> None:
+    send_error_response(handler, status, f"{prefix}: {exc}")
+
+
 def write_response_body(handler: ResponseHandler, body: bytes) -> None:
     try:
         handler.wfile.write(body)

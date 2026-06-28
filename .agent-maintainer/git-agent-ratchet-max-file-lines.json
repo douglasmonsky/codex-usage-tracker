@@ -6,7 +6,7 @@
   },
   "baselines": {
     "max_file_lines": {
-      "metric_value": 1657,
+      "metric_value": 1620,
       "items": [
         {
           "path": "src/codex_usage_tracker/cli.py",
@@ -15,8 +15,8 @@
         },
         {
           "path": "src/codex_usage_tracker/server.py",
-          "line_count": 974,
-          "overage": 374
+          "line_count": 937,
+          "overage": 337
         },
         {
           "path": "src/codex_usage_tracker/diagnostic_snapshots.py",
