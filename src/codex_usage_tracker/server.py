@@ -28,11 +28,6 @@ from codex_usage_tracker.dashboard import (
     generate_dashboard,
     render_dashboard_html,
 )
-from codex_usage_tracker.diagnostic_reports import (
-    build_diagnostics_fact_calls_report,
-    build_diagnostics_facts_report,
-    build_diagnostics_summary_report,
-)
 from codex_usage_tracker.diagnostic_snapshots import (
     build_diagnostic_commands_report,
     build_diagnostic_concentration_report,
@@ -60,6 +55,11 @@ from codex_usage_tracker.reports import (
     build_summary_report,
 )
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
+from codex_usage_tracker.server_diagnostic_facts import (
+    diagnostic_fact_calls_payload,
+    diagnostics_facts_payload,
+    diagnostics_summary_payload,
+)
 from codex_usage_tracker.server_diagnostic_snapshots import (
     diagnostic_snapshot_payload,
     refresh_all_diagnostic_snapshots_payload,
@@ -800,27 +800,12 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_diagnostics_summary(self, query: str) -> None:
-        params = parse_qs(query)
         try:
-            payload = build_diagnostics_summary_report(
+            payload = diagnostics_summary_payload(
+                query,
                 db_path=self._db_path,
-                limit=_parse_report_limit(_first(params.get("limit")), 20),
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                min_tokens=_optional_int_query(params, "min_tokens"),
-                fact_type=_first(params.get("fact_type")),
-                fact_name=_first(params.get("fact_name")),
-                fact_category=_first(params.get("fact_category")),
-                include_archived=_parse_bool(
-                    _first(params.get("include_archived")),
-                    self._include_archived,
-                ),
-                sort=_first(params.get("sort")) or "uncached",
-                direction=_first(params.get("direction")) or "desc",
-            ).payload
+                include_archived_default=self._include_archived,
+            )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
@@ -839,29 +824,15 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         fact_type: str | None = None,
         fact_group: str | None = None,
     ) -> None:
-        params = parse_qs(query)
         try:
-            payload = build_diagnostics_facts_report(
+            payload = diagnostics_facts_payload(
+                query,
                 db_path=self._db_path,
-                limit=_parse_report_limit(_first(params.get("limit")), 50),
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                min_tokens=_optional_int_query(params, "min_tokens"),
-                fact_type=fact_type or _first(params.get("fact_type")),
-                fact_name=_first(params.get("fact_name")),
-                fact_category=_first(params.get("fact_category")),
-                include_archived=_parse_bool(
-                    _first(params.get("include_archived")),
-                    self._include_archived,
-                ),
-                sort=_first(params.get("sort")) or "uncached",
-                direction=_first(params.get("direction")) or "desc",
+                include_archived_default=self._include_archived,
+                request_path=urlparse(self.path).path,
+                fact_type=fact_type,
                 fact_group=fact_group,
-                view=urlparse(self.path).path.rsplit("/", 1)[-1],
-            ).payload
+            )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
@@ -874,36 +845,13 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_diagnostics_fact_calls(self, query: str) -> None:
-        params = parse_qs(query)
-        fact_type = _first(params.get("fact_type"))
-        fact_name = _first(params.get("fact_name"))
-        if not fact_type or not fact_name:
-            self._send_json(
-                HTTPStatus.BAD_REQUEST,
-                {"error": "fact_type and fact_name are required"},
-            )
-            return
         try:
-            payload = build_diagnostics_fact_calls_report(
+            payload = diagnostic_fact_calls_payload(
+                query,
                 db_path=self._db_path,
-                fact_type=fact_type,
-                fact_name=fact_name,
-                limit=_parse_report_limit(_first(params.get("limit")), 50),
-                offset=_parse_api_offset(_first(params.get("offset"))),
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                min_tokens=_optional_int_query(params, "min_tokens"),
-                include_archived=_parse_bool(
-                    _first(params.get("include_archived")),
-                    self._include_archived,
-                ),
-                sort=_first(params.get("sort")) or "tokens",
-                direction=_first(params.get("direction")) or "desc",
+                include_archived_default=self._include_archived,
                 privacy_mode=self._privacy_mode,
-            ).payload
+            )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return

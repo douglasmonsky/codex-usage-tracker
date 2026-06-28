@@ -2270,3 +2270,55 @@ Remaining risks:
 Next handoff:
 
 - Continue `refactor/server-routing-and-handlers` with context handler extraction or diagnostics fact handler payload extraction.
+
+### refactor/server-diagnostic-fact-payloads
+
+Objective:
+- Extract diagnostics summary, facts, and fact-call payload construction from `_UsageDashboardHandler`.
+- Preserve query parsing, default sort/limit behavior, route fact filters, privacy mode forwarding, and existing HTTP error mapping.
+- Keep HTTP response writing in `server.py` while moving report-builder argument assembly into a focused helper module.
+
+Files touched:
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_diagnostic_facts.py`
+- `tests/test_server_diagnostic_facts.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `diagnostics_summary_payload()`, `diagnostics_facts_payload()`, and `diagnostic_fact_calls_payload()`.
+- Replaced inline diagnostics fact report construction in `server.py` with helper calls and preserved `ValueError`/`sqlite3.Error` status mapping.
+- Added focused tests for summary filter normalization, route-level fact filters, required fact identity validation, paging, and privacy forwarding.
+- Declared `server_diagnostic_facts` in the dashboard/server `tach` boundary.
+- Avoided adding duplicate private-helper debt by giving the local integer parser a diagnostics-specific helper name.
+- Ratcheted max file-line baseline `2453 -> 2401`, reducing `server.py` from `1288` to `1236` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_facts.py tests/test_server_diagnostic_facts.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_facts.py tests/test_server_diagnostic_facts.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_diagnostic_facts.py tests/test_dashboard_server.py -q`: 15 passed.
+- `radon cc src/codex_usage_tracker/server_diagnostic_facts.py -a -s`: average A (3.0).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_diagnostic_facts.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 345 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/server-diagnostic-fact-payloads-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2453 -> 2401`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `server.py` remains oversized at `1236` lines; context, call/thread, recommendations, and some route handlers still need extraction.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `context.py`, `cli.py`, diagnostics/report modules, and usage-drain modules remain above the eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with another small payload/handler extraction, likely context or recommendations handling, then commit only after the same local gate pattern.
