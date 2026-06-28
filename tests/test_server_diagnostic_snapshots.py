@@ -41,6 +41,65 @@ class _RouteSenders:
         self.json_payloads.append((status, payload))
 
 
+def test_handle_diagnostic_refresh_request_rejects_missing_token(
+    tmp_path: Path,
+) -> None:
+    senders = _RouteSenders()
+    rejected_params: list[dict[str, list[str]]] = []
+
+    server_diagnostic_snapshots.handle_diagnostic_refresh_request(
+        "include_archived=false",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+        include_archived_default=True,
+        refresh_lock=_FakeLock(),
+        reject_missing_refresh_token=lambda params: rejected_params.append(params) or True,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert rejected_params == [{"include_archived": ["false"]}]
+    assert senders.json_payloads == []
+
+
+def test_handle_diagnostic_refresh_request_sends_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+    calls: dict[str, Any] = {}
+
+    def diagnostic_refresh_payload(query: str, **kwargs: Any) -> dict[str, object]:
+        calls["query"] = query
+        calls.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        server_diagnostic_snapshots,
+        "diagnostic_refresh_payload",
+        diagnostic_refresh_payload,
+    )
+
+    server_diagnostic_snapshots.handle_diagnostic_refresh_request(
+        "include_archived=false",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+        include_archived_default=True,
+        refresh_lock=_FakeLock(),
+        reject_missing_refresh_token=lambda _params: False,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert calls["query"] == "include_archived=false"
+    assert calls["db_path"] == tmp_path / "usage.sqlite3"
+    assert senders.json_payloads == [(HTTPStatus.OK, {"ok": True})]
+
+
 def test_handle_diagnostic_snapshot_request_rejects_refresh_without_token(
     tmp_path: Path,
 ) -> None:

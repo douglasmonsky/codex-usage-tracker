@@ -60,7 +60,7 @@ from codex_usage_tracker.server_diagnostic_facts import (
     diagnostics_summary_payload,
 )
 from codex_usage_tracker.server_diagnostic_snapshots import (
-    diagnostic_refresh_payload,
+    handle_diagnostic_refresh_request,
     handle_diagnostic_snapshot_request,
     handle_usage_drain_snapshot_request,
 )
@@ -600,23 +600,18 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_diagnostics_refresh(self, query: str) -> None:
-        params = parse_qs(query)
-        if self._reject_missing_diagnostic_refresh_token(params):
-            return
-        try:
-            payload = diagnostic_refresh_payload(
-                query,
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                allowance_path=self._allowance_path,
-                rate_card_path=self._rate_card_path,
-                include_archived_default=self._include_archived,
-                refresh_lock=self._refresh_lock,
-            )
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while refreshing diagnostics", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_diagnostic_refresh_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            include_archived_default=self._include_archived,
+            refresh_lock=self._refresh_lock,
+            reject_missing_refresh_token=self._reject_missing_diagnostic_refresh_token,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
     def _handle_diagnostics_overview_refresh(self, query: str) -> None:
         self._handle_diagnostic_snapshot(
             query,

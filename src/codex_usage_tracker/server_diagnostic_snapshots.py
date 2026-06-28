@@ -35,6 +35,39 @@ ExceptionSender = Callable[[str, BaseException], None]
 RefreshAuthRejector = Callable[[dict[str, list[str]]], bool]
 
 
+def handle_diagnostic_refresh_request(
+    query: str,
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    rate_card_path: Path,
+    include_archived_default: bool,
+    refresh_lock: Any,
+    reject_missing_refresh_token: RefreshAuthRejector,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle the all-diagnostics refresh route."""
+    params = parse_qs(query)
+    if reject_missing_refresh_token(params):
+        return
+    try:
+        payload = diagnostic_refresh_payload(
+            query,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            include_archived_default=include_archived_default,
+            refresh_lock=refresh_lock,
+        )
+    except sqlite3.Error as exc:
+        send_exception("Database error while refreshing diagnostics", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
+
+
 def handle_diagnostic_snapshot_request(
     query: str,
     *,
