@@ -1096,3 +1096,46 @@ Checks:
 
 Next handoff:
 - Continue store/query split with dashboard/API read queries, or attack the remaining parser-to-store boundary by moving refresh orchestration out of `store.py`.
+### `refactor/store-dashboard-query-boundary`
+
+Goal:
+- Move dashboard usage read queries out of `store.py`.
+- Preserve `codex_usage_tracker.store` facade imports for dashboard/API callers.
+- Keep query timing SQL shared without introducing a circular dependency.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_dashboard_queries.py` for dashboard usage events, counts, token summaries, usage status, latest observed usage, and observed-usage reconciliation helpers.
+- Added `src/codex_usage_tracker/store_usage_timing.py` for shared previous-call timing SQL snippets.
+- Re-exported moved dashboard query functions from `store.py`.
+- Removed stale observed-usage reconciliation constant from `store.py`.
+- Updated `tach.toml` so the new dashboard query and timing modules belong to the persistence/store boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json` and `.agent-maintainer/git-agent-ratchet-duplicate-helpers.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_dashboard_queries.py src/codex_usage_tracker/store_usage_timing.py`: passed.
+- `.venv/bin/python -m compileall src/codex_usage_tracker/store.py src/codex_usage_tracker/store_dashboard_queries.py src/codex_usage_tracker/store_usage_timing.py`: passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py tests/test_store_dashboard_mcp.py tests/test_store_migrations.py tests/test_usage_drain_reports.py`: 42 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion warning and behavior-preserving refactor change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 6203 to 5840.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed, ratcheted baseline 64 to 63.
+- `.venv/bin/tach report src/codex_usage_tracker/store_dashboard_queries.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_usage_timing.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-dashboard-queries.json`: passed.
+- `.venv/bin/tach check`: expected informational failure, same 13 documented legacy boundary violations.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `store.py` is still a large facade with refresh/upsert/export/query responsibilities and direct parser dependencies.
+- Dashboard query behavior is characterized by existing tests only; no schema contract changed.
+
+Next handoff:
+- Extract usage API read queries next, keeping `store.py` as compatibility facade and avoiding a too-large query module.
