@@ -3550,3 +3550,56 @@ Remaining risks:
 
 Next handoff:
 - Continue extracting call/thread route wrappers, or switch to store/query boundaries if server slicing becomes too granular.
+
+### `refactor/server-call-handlers`
+
+Goal:
+- Move `/api/calls` and `/api/call` route wrappers out of `_UsageDashboardHandler`.
+- Preserve bad-request, not-found, and SQLite error behavior.
+- Continue reducing `server.py` while keeping helper/test modules below file-length budgets.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_call_detail.py`
+- `src/codex_usage_tracker/server_call_lists.py`
+- `tests/test_server_call_detail.py`
+- `tests/test_server_call_lists.py`
+
+Completed edits:
+- Added `handle_calls_request` in `server_call_lists.py`.
+- Added `handle_call_detail_request` in `server_call_detail.py`.
+- Replaced `_handle_calls` and `_handle_call` bodies with delegates.
+- Added focused tests for successful call-list/detail responses, missing-record mapping, and SQLite error mapping.
+- Ratcheted max-file baseline `1555 -> 1540`; `server.py` reduced `872 -> 857` lines.
+- Kept `server_call_lists.py` at `145` lines, `server_call_detail.py` at `137` lines, and related tests below `170` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_call_lists.py src/codex_usage_tracker/server_call_detail.py tests/test_server_call_lists.py tests/test_server_call_detail.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_call_lists.py src/codex_usage_tracker/server_call_detail.py tests/test_server_call_lists.py tests/test_server_call_detail.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_call_lists.py tests/test_server_call_detail.py tests/test_dashboard_server.py -q`: 23 passed.
+- `radon cc src/codex_usage_tracker/server.py src/codex_usage_tracker/server_call_lists.py src/codex_usage_tracker/server_call_detail.py -a -s`: new route handlers A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py src/codex_usage_tracker/server_call_lists.py src/codex_usage_tracker/server_call_detail.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m pytest -q`: 428 passed.
+- `.venv/bin/tach map -o /tmp/server-call-handlers-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1555 -> 1540`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `server.py` remains oversized at `857` lines.
+- Thread list/thread calls, summary, recommendations, and usage route wrappers remain server-owned.
+- Broad package structure remains too flat for strict cohesion.
+
+Next handoff:
+- Continue with thread route wrappers or summary/recommendation wrappers as another small server branch.

@@ -40,13 +40,11 @@ from codex_usage_tracker.paths import (
     DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.server_call_detail import (
-    MissingRecordIdError,
-    UsageRecordNotFoundError,
-    call_detail_payload,
+    handle_call_detail_request,
 )
 from codex_usage_tracker.server_call_lists import (
     MissingThreadKeyError,
-    calls_payload,
+    handle_calls_request,
     thread_calls_payload,
 )
 from codex_usage_tracker.server_context_settings import (
@@ -433,37 +431,24 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_calls(self, query: str) -> None:
-        try:
-            payload = calls_payload(
-                query,
-                live_query_params=self._live_query_params,
-                live_call_rows=self._live_call_rows,
-            )
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading calls", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_calls_request(
+            query,
+            live_query_params=self._live_query_params,
+            live_call_rows=self._live_call_rows,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_call(self, query: str) -> None:
-        try:
-            payload = call_detail_payload(
-                query,
-                db_path=self._db_path,
-                annotate_rows=self._annotate_live_rows,
-            )
-        except MissingRecordIdError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except UsageRecordNotFoundError as exc:
-            self._send_error(HTTPStatus.NOT_FOUND, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading call", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_call_detail_request(
+            query,
+            db_path=self._db_path,
+            annotate_rows=self._annotate_live_rows,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_threads(self, query: str) -> None:
         try:

@@ -1,10 +1,71 @@
 from __future__ import annotations
 
+import sqlite3
+from http import HTTPStatus
 from typing import Any
 
 import pytest
 
 from codex_usage_tracker import server_call_lists
+
+
+class _RouteSenders:
+    def __init__(self) -> None:
+        self.errors: list[tuple[HTTPStatus, str]] = []
+        self.exceptions: list[tuple[str, BaseException]] = []
+        self.json_payloads: list[tuple[HTTPStatus, dict[str, object]]] = []
+
+    def send_error(self, status: HTTPStatus, message: str) -> None:
+        self.errors.append((status, message))
+
+    def send_exception(self, prefix: str, exc: BaseException) -> None:
+        self.exceptions.append((prefix, exc))
+
+    def send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
+        self.json_payloads.append((status, payload))
+
+
+def test_handle_calls_request_sends_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    senders = _RouteSenders()
+    monkeypatch.setattr(
+        server_call_lists,
+        "calls_payload",
+        lambda query, **_kwargs: {"query": query},
+    )
+
+    server_call_lists.handle_calls_request(
+        "limit=2",
+        live_query_params=lambda _params: {},
+        live_call_rows=lambda **_kwargs: ([], 0),
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == []
+    assert senders.json_payloads == [(HTTPStatus.OK, {"query": "limit=2"})]
+
+
+def test_handle_calls_request_sends_sqlite_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    senders = _RouteSenders()
+
+    def calls_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(server_call_lists, "calls_payload", calls_payload)
+
+    server_call_lists.handle_calls_request(
+        "",
+        live_query_params=lambda _params: {},
+        live_call_rows=lambda **_kwargs: ([], 0),
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.json_payloads == []
+    assert senders.exceptions[0][0] == "Database error while reading calls"
+    assert str(senders.exceptions[0][1]) == "database is locked"
 
 
 def test_calls_payload_applies_derived_filters_and_pagination() -> None:

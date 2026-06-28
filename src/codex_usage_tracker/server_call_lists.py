@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
+from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs
 
@@ -19,10 +21,38 @@ from codex_usage_tracker.server_utils import (
 
 LiveQueryParams = Callable[..., dict[str, Any]]
 LiveCallRows = Callable[..., tuple[list[dict[str, object]], int]]
+ErrorSender = Callable[[HTTPStatus, str], None]
+ExceptionSender = Callable[[str, BaseException], None]
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
 
 
 class MissingThreadKeyError(ValueError):
     """Raised when a thread-calls request omits a thread key."""
+
+
+def handle_calls_request(
+    query: str,
+    *,
+    live_query_params: LiveQueryParams,
+    live_call_rows: LiveCallRows,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle call-list route errors and response writing."""
+    try:
+        payload = calls_payload(
+            query,
+            live_query_params=live_query_params,
+            live_call_rows=live_call_rows,
+        )
+    except ValueError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading calls", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def calls_payload(

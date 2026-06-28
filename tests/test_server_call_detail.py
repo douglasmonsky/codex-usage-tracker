@@ -1,11 +1,102 @@
 from __future__ import annotations
 
+import sqlite3
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from codex_usage_tracker import server_call_detail
+
+
+class _RouteSenders:
+    def __init__(self) -> None:
+        self.errors: list[tuple[HTTPStatus, str]] = []
+        self.exceptions: list[tuple[str, BaseException]] = []
+        self.json_payloads: list[tuple[HTTPStatus, dict[str, object]]] = []
+
+    def send_error(self, status: HTTPStatus, message: str) -> None:
+        self.errors.append((status, message))
+
+    def send_exception(self, prefix: str, exc: BaseException) -> None:
+        self.exceptions.append((prefix, exc))
+
+    def send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
+        self.json_payloads.append((status, payload))
+
+
+def test_handle_call_detail_request_sends_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+    monkeypatch.setattr(
+        server_call_detail,
+        "call_detail_payload",
+        lambda query, **_kwargs: {"query": query},
+    )
+
+    server_call_detail.handle_call_detail_request(
+        "record_id=rec-1",
+        db_path=tmp_path / "usage.sqlite3",
+        annotate_rows=lambda rows: rows,
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == []
+    assert senders.json_payloads == [(HTTPStatus.OK, {"query": "record_id=rec-1"})]
+
+
+def test_handle_call_detail_request_sends_missing_record_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def call_detail_payload(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise server_call_detail.UsageRecordNotFoundError("No usage record found: missing")
+
+    monkeypatch.setattr(server_call_detail, "call_detail_payload", call_detail_payload)
+
+    server_call_detail.handle_call_detail_request(
+        "record_id=missing",
+        db_path=tmp_path / "usage.sqlite3",
+        annotate_rows=lambda rows: rows,
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == [(HTTPStatus.NOT_FOUND, "No usage record found: missing")]
+    assert senders.json_payloads == []
+
+
+def test_handle_call_detail_request_sends_sqlite_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def call_detail_payload(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(server_call_detail, "call_detail_payload", call_detail_payload)
+
+    server_call_detail.handle_call_detail_request(
+        "record_id=rec-1",
+        db_path=tmp_path / "usage.sqlite3",
+        annotate_rows=lambda rows: rows,
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.json_payloads == []
+    assert senders.exceptions[0][0] == "Database error while reading call"
+    assert str(senders.exceptions[0][1]) == "database is locked"
 
 
 def test_call_detail_payload_includes_annotated_adjacent_records(

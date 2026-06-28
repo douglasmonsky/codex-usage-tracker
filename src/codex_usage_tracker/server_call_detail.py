@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable, Iterable
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -19,6 +21,37 @@ class UsageRecordNotFoundError(LookupError):
 
 
 AnnotateRows = Callable[[list[dict[str, object]]], list[dict[str, object]]]
+ErrorSender = Callable[[HTTPStatus, str], None]
+ExceptionSender = Callable[[str, BaseException], None]
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+
+
+def handle_call_detail_request(
+    query: str,
+    *,
+    db_path: Path,
+    annotate_rows: AnnotateRows,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle call-detail route errors and response writing."""
+    try:
+        payload = call_detail_payload(
+            query,
+            db_path=db_path,
+            annotate_rows=annotate_rows,
+        )
+    except MissingRecordIdError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except UsageRecordNotFoundError as exc:
+        send_error(HTTPStatus.NOT_FOUND, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading call", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def call_detail_payload(
