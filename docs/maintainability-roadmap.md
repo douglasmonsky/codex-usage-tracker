@@ -1972,3 +1972,60 @@ Remaining risks:
 Next handoff:
 
 - Continue `refactor/server-routing-and-handlers` with a narrow extraction of live API query/row helper logic or diagnostics snapshot handler plumbing.
+
+### refactor/server-live-query-params
+
+Objective:
+
+- Extract live dashboard API query-parameter normalization from `_UsageDashboardHandler`.
+- Keep `/api/calls` and `/api/thread-calls` behavior unchanged.
+- Leave database row fetching and annotation for a later, separate branch.
+
+Files touched:
+
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_live_queries.py`
+- `tests/test_server_live_queries.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+
+Completed edits:
+
+- Added `live_query_params()` as a pure helper for limit, offset, search, filters, sort, direction, history scope, and thread-key normalization.
+- Kept `_UsageDashboardHandler._live_query_params()` as a small compatibility wrapper for existing handlers.
+- Added focused tests for normal filters, thread-key override behavior, `limit=all`, and invalid limit rejection.
+- Declared `server_live_queries` in the dashboard/server `tach` module boundary.
+- Ratcheted max file-line baseline from 2570 to 2544 after reducing `server.py` from 1405 to 1379 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_live_queries.py tests/test_server_live_queries.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_live_queries.py tests/test_server_live_queries.py`: passed.
+- `.venv/bin/python -m pytest tests/test_server_live_queries.py tests/test_dashboard_server.py -q`: 14 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 331 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch is uncommitted.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 2570 -> 2544.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach map -o /tmp/server-live-query-params-tach-map.json`: passed.
+- `radon cc src -a -s`: ran and reported current complexity inventory.
+- `radon mi src -s`: ran and reported current maintainability inventory.
+- `xenon --max-absolute B --max-modules A --max-average A src`: failed on existing C/D/F complexity hotspots outside this query-params slice.
+
+Remaining risks:
+
+- `server.py` remains oversized at 1379 lines and still needs live row fetching, diagnostics snapshot handling, and usage refresh handler extraction.
+- Broad `xenon` remains red on existing parser/dashboard/usage-drain/report complexity blocks.
+- `context.py`, `cli.py`, and several diagnostics modules remain above the target file-size budget.
+
+Next handoff:
+
+- Continue `refactor/server-routing-and-handlers` with a narrow extraction of live row fetching/annotation or diagnostics snapshot handler plumbing.

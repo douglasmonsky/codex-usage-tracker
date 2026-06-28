@@ -73,6 +73,7 @@ from codex_usage_tracker.reports import (
     build_recommendations_report,
     build_summary_report,
 )
+from codex_usage_tracker.server_live_queries import live_query_params
 from codex_usage_tracker.server_responses import send_html_response, send_json_response
 from codex_usage_tracker.server_routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
@@ -1199,38 +1200,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         *,
         thread_key: str | None = None,
     ) -> dict[str, Any]:
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
+        return live_query_params(
+            params,
+            include_archived_default=self._include_archived,
+            thread_key=thread_key,
         )
-        limit = _parse_api_limit(_first(params.get("limit")), 100)
-        offset = _parse_api_offset(_first(params.get("offset")))
-        return {
-            "limit": limit,
-            "offset": offset,
-            "search": _first(params.get("q")) or _first(params.get("search")),
-            "since": _first(params.get("since")),
-            "until": _first(params.get("until")),
-            "model": _first(params.get("model")),
-            "effort": _first(params.get("effort")),
-            "thread": _first(params.get("thread")) if thread_key is None else None,
-            "thread_key": thread_key,
-            "include_archived": include_archived,
-            "sort": _first(params.get("sort")) or "time",
-            "direction": _first(params.get("direction")) or "desc",
-            "filters": {
-                "q": _first(params.get("q")) or _first(params.get("search")),
-                "since": _first(params.get("since")),
-                "until": _first(params.get("until")),
-                "model": _first(params.get("model")),
-                "effort": _first(params.get("effort")),
-                "thread": _first(params.get("thread")) if thread_key is None else None,
-                "thread_key": thread_key,
-                "include_archived": include_archived,
-                "sort": _first(params.get("sort")) or "time",
-                "direction": _first(params.get("direction")) or "desc",
-            },
-        }
 
     def _live_call_rows(
         self,
