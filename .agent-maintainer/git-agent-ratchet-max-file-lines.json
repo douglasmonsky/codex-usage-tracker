@@ -6,17 +6,12 @@
   },
   "baselines": {
     "max_file_lines": {
-      "metric_value": 3195,
+      "metric_value": 2824,
       "items": [
         {
           "path": "src/codex_usage_tracker/server.py",
           "line_count": 1492,
           "overage": 892
-        },
-        {
-          "path": "src/codex_usage_tracker/usage_drain_model.py",
-          "line_count": 1138,
-          "overage": 538
         },
         {
           "path": "src/codex_usage_tracker/context.py",
@@ -32,6 +27,11 @@
           "path": "src/codex_usage_tracker/diagnostic_snapshots.py",
           "line_count": 823,
           "overage": 223
+        },
+        {
+          "path": "src/codex_usage_tracker/usage_drain_model.py",
+          "line_count": 767,
+          "overage": 167
         },
         {
           "path": "src/codex_usage_tracker/allowance.py",

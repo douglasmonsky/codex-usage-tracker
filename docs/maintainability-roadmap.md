@@ -1820,3 +1820,51 @@ Remaining risks:
 Next handoff:
 
 - Extract boundary-risk/basic summary helpers as the next small branch, then extract regime segment summaries.
+### refactor/usage-drain-boundary-risk-summary
+
+Objective:
+
+- Split boundary-risk and boundary-basic diagnostics out of `usage_drain_model.py`.
+- Preserve the existing piecewise boundary diagnostics payload and keep the branch under agent-maintainer change-budget limits.
+- Introduce shared regime label helpers needed by both boundary diagnostics and the remaining model code.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_boundary_summary.py` for boundary rows, context rates, transition counts, latest boundary rows, and walk-forward boundary-risk summaries.
+- Added `src/codex_usage_tracker/usage_drain_regime_labels.py` for shared delta-regime and segment-position labels.
+- Expanded `src/codex_usage_tracker/usage_drain_boundary_scopes.py` with shared boundary-risk scope starts.
+- Updated `usage_drain_model.py` to call boundary summaries and regime labels through public module namespaces.
+- Updated `tach.toml` to include the new boundary summary and regime label modules in the existing diagnostics/report boundary.
+- Ratcheted `max_file_lines` baseline 3195 -> 2824.
+- `usage_drain_model.py` is now 767 lines; new modules are 358 and 29 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_boundary_summary.py src/codex_usage_tracker/usage_drain_boundary_scopes.py src/codex_usage_tracker/usage_drain_regime_labels.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_boundary_summary.py src/codex_usage_tracker/usage_drain_boundary_scopes.py src/codex_usage_tracker/usage_drain_regime_labels.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/usage-drain-boundary-risk-summary-tach-map.json`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 3195 -> 2824.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+
+- `usage_drain_model.py` is close but still above the 600-line target.
+- Piecewise regime segment summaries remain embedded in `usage_drain_model.py`.
+
+Next handoff:
+
+- Extract the remaining piecewise regime segment/streak helpers; this should bring `usage_drain_model.py` below the 600-line target.
