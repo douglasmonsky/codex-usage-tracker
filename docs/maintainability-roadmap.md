@@ -3857,3 +3857,52 @@ Remaining risks:
 
 Next handoff:
 - Split source-log snapshot payload construction/persistence or move to another roadmap hotspot if diagnostic snapshots stop being the best payoff.
+
+### `refactor/diagnostic-source-log-snapshots`
+
+Goal:
+- Move source-log diagnostic snapshot report/read/refresh/persist helpers out of `diagnostic_snapshots.py`.
+- Get `diagnostic_snapshots.py` below the 600-line target without changing snapshot schemas.
+- Keep source-log snapshot helpers public to avoid cross-module private imports.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/diagnostic_snapshot_source_logs.py`
+- `src/codex_usage_tracker/diagnostic_snapshots.py`
+- `tach.toml`
+
+Completed edits:
+- Added `diagnostic_snapshot_source_logs.py` for source-log snapshot report, refresh, persistence, and stored-payload loading.
+- Updated `diagnostic_snapshots.py` to delegate tool-output, command, git, file-read, file-modification, and read-productivity sections.
+- Added `diagnostic_snapshot_source_logs` to `tach.toml` module path/dependency lists.
+- Ratcheted max-file baseline `1388 -> 1283`; `diagnostic_snapshots.py` reduced `705 -> 539` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_source_logs.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_source_logs.py tests/test_diagnostic_snapshots.py tach.toml`: passed after mechanical import sort.
+- `.venv/bin/python -m pytest tests/test_diagnostic_snapshots.py tests/test_server_diagnostic_snapshots.py tests/test_cli_lifecycle.py -q`: 24 passed.
+- `radon cc src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_source_logs.py -a -s`: passed; moved persistence helper remains B-rated under current ceiling.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_source_logs.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach map -o /tmp/diagnostic-source-log-snapshots-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning plus expected change-budget warning because existing tests covered this extraction.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- `server.py` remains oversized at `823` lines.
+- `diagnostic_snapshot_source_logs.persist_source_log_snapshot` is still B-complexity.
+- Overall package is still flat and triggers structure-cohesion warnings.
+
+Next handoff:
+- Move to the next high-payoff hotspot, likely `cli.py` or a narrow source-log persistence table cleanup, depending on whether the next goal is file length or complexity.

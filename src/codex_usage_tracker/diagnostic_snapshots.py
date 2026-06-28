@@ -39,6 +39,11 @@ from codex_usage_tracker.diagnostic_snapshot_payloads import (
     utc_now,
 )
 from codex_usage_tracker.diagnostic_snapshot_report import DiagnosticSnapshotReport
+from codex_usage_tracker.diagnostic_snapshot_source_logs import (
+    build_source_log_snapshot_report,
+    persist_source_log_snapshot,
+    source_log_snapshot_payload,
+)
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_DB_PATH,
@@ -85,7 +90,7 @@ def build_diagnostic_tool_output_report(
 ) -> DiagnosticSnapshotReport:
     """Return the latest tool-output snapshot, optionally recomputing it first."""
 
-    return _build_source_log_snapshot_report(
+    return build_source_log_snapshot_report(
         db_path=db_path,
         include_archived=include_archived,
         refresh=refresh,
@@ -102,7 +107,7 @@ def build_diagnostic_commands_report(
 ) -> DiagnosticSnapshotReport:
     """Return the latest commands snapshot, optionally recomputing it first."""
 
-    return _build_source_log_snapshot_report(
+    return build_source_log_snapshot_report(
         db_path=db_path,
         include_archived=include_archived,
         refresh=refresh,
@@ -119,7 +124,7 @@ def build_diagnostic_git_interactions_report(
 ) -> DiagnosticSnapshotReport:
     """Return the latest Git interaction snapshot, optionally recomputing it first."""
 
-    return _build_source_log_snapshot_report(
+    return build_source_log_snapshot_report(
         db_path=db_path,
         include_archived=include_archived,
         refresh=refresh,
@@ -136,7 +141,7 @@ def build_diagnostic_file_reads_report(
 ) -> DiagnosticSnapshotReport:
     """Return the latest file-read snapshot, optionally recomputing it first."""
 
-    return _build_source_log_snapshot_report(
+    return build_source_log_snapshot_report(
         db_path=db_path,
         include_archived=include_archived,
         refresh=refresh,
@@ -153,7 +158,7 @@ def build_diagnostic_file_modifications_report(
 ) -> DiagnosticSnapshotReport:
     """Return the latest file-modification snapshot, optionally recomputing it first."""
 
-    return _build_source_log_snapshot_report(
+    return build_source_log_snapshot_report(
         db_path=db_path,
         include_archived=include_archived,
         refresh=refresh,
@@ -170,7 +175,7 @@ def build_diagnostic_read_productivity_report(
 ) -> DiagnosticSnapshotReport:
     """Return the latest read-productivity snapshot, optionally recomputing it first."""
 
-    return _build_source_log_snapshot_report(
+    return build_source_log_snapshot_report(
         db_path=db_path,
         include_archived=include_archived,
         refresh=refresh,
@@ -195,7 +200,7 @@ def build_diagnostic_concentration_report(
             )
         )
     return DiagnosticSnapshotReport(
-        _source_log_snapshot_payload(
+        source_log_snapshot_payload(
             db_path=db_path,
             include_archived=include_archived,
             section=DIAGNOSTIC_CONCENTRATION_SECTION,
@@ -226,7 +231,7 @@ def build_diagnostic_usage_drain_report(
             )
         )
     return DiagnosticSnapshotReport(
-        _source_log_snapshot_payload(
+        source_log_snapshot_payload(
             db_path=db_path,
             include_archived=include_archived,
             section=DIAGNOSTIC_USAGE_DRAIN_SECTION,
@@ -304,7 +309,7 @@ def refresh_diagnostic_snapshots(
         DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: DIAGNOSTIC_READ_PRODUCTIVITY_SCHEMA,
     }
     source_payloads = {
-        section: _persist_source_log_snapshot(
+        section: persist_source_log_snapshot(
             db_path=db_path,
             section=section,
             schema=schema,
@@ -348,149 +353,6 @@ def refresh_diagnostic_snapshots(
             "usage_rows_scanned": analysis["meta"]["usage_rows_scanned"],
         },
     }
-
-
-def _build_source_log_snapshot_report(
-    *,
-    db_path: Path,
-    include_archived: bool,
-    refresh: bool,
-    section: str,
-    schema: str,
-) -> DiagnosticSnapshotReport:
-    if refresh:
-        return DiagnosticSnapshotReport(
-            _refresh_source_log_snapshot(
-                db_path=db_path,
-                include_archived=include_archived,
-                section=section,
-                schema=schema,
-            )
-        )
-    return DiagnosticSnapshotReport(
-        _source_log_snapshot_payload(
-            db_path=db_path,
-            include_archived=include_archived,
-            section=section,
-            schema=schema,
-        )
-    )
-
-
-def _refresh_source_log_snapshot(
-    *,
-    db_path: Path,
-    include_archived: bool,
-    section: str,
-    schema: str,
-) -> dict[str, Any]:
-    history_scope = history_scope_label(include_archived)
-    computed_at = utc_now()
-    analysis = analyze_indexed_source_logs(db_path=db_path, include_archived=include_archived)
-    return _persist_source_log_snapshot(
-        db_path=db_path,
-        section=section,
-        schema=schema,
-        history_scope=history_scope,
-        computed_at=computed_at,
-        analysis=analysis,
-    )
-
-
-def _persist_source_log_snapshot(
-    *,
-    db_path: Path,
-    section: str,
-    schema: str,
-    history_scope: str,
-    computed_at: str,
-    analysis: dict[str, Any],
-) -> dict[str, Any]:
-    snapshot = snapshot_metadata(
-        computed_at=computed_at,
-        history_scope=history_scope,
-        source_logs_scanned=analysis["meta"]["source_logs_scanned"],
-        usage_rows_scanned=analysis["meta"]["usage_rows_scanned"],
-    )
-    if section == DIAGNOSTIC_TOOL_OUTPUT_SECTION:
-        payload = ready_payload(
-            schema=schema,
-            section=section,
-            snapshot=snapshot,
-            refreshed=True,
-            summary=analysis["tool_output"]["summary"],
-            functions=analysis["tool_output"]["functions"],
-            command_roots=analysis["tool_output"]["command_roots"],
-            missing_reasons=analysis["tool_output"]["missing_reasons"],
-        )
-    elif section == DIAGNOSTIC_COMMANDS_SECTION:
-        payload = ready_payload(
-            schema=schema,
-            section=section,
-            snapshot=snapshot,
-            refreshed=True,
-            summary=analysis["commands"]["summary"],
-            commands=analysis["commands"]["commands"],
-        )
-    elif section == DIAGNOSTIC_GIT_INTERACTIONS_SECTION:
-        payload = ready_payload(
-            schema=schema,
-            section=section,
-            snapshot=snapshot,
-            refreshed=True,
-            summary=analysis["git_interactions"]["summary"],
-            interactions=analysis["git_interactions"]["interactions"],
-            categories=analysis["git_interactions"]["categories"],
-            mutability=analysis["git_interactions"]["mutability"],
-        )
-    elif section == DIAGNOSTIC_FILE_READS_SECTION:
-        payload = ready_payload(
-            schema=schema,
-            section=section,
-            snapshot=snapshot,
-            refreshed=True,
-            summary=analysis["file_reads"]["summary"],
-            by_reader=analysis["file_reads"]["by_reader"],
-            top_paths=analysis["file_reads"]["top_paths"],
-            largest_read_commands=analysis["file_reads"]["largest_read_commands"],
-            path_privacy=analysis["file_reads"]["path_privacy"],
-        )
-    elif section == DIAGNOSTIC_FILE_MODIFICATIONS_SECTION:
-        payload = ready_payload(
-            schema=schema,
-            section=section,
-            snapshot=snapshot,
-            refreshed=True,
-            summary=analysis["file_modifications"]["summary"],
-            top_paths=analysis["file_modifications"]["top_paths"],
-            by_extension=analysis["file_modifications"]["by_extension"],
-            largest_events=analysis["file_modifications"]["largest_events"],
-            path_privacy=analysis["file_modifications"]["path_privacy"],
-        )
-    elif section == DIAGNOSTIC_READ_PRODUCTIVITY_SECTION:
-        payload = ready_payload(
-            schema=schema,
-            section=section,
-            snapshot=snapshot,
-            refreshed=True,
-            summary=analysis["read_productivity"]["summary"],
-            by_reader=analysis["read_productivity"]["by_reader"],
-            top_modified_paths=analysis["read_productivity"]["top_modified_paths"],
-            path_privacy=analysis["read_productivity"]["path_privacy"],
-        )
-    else:
-        raise ValueError(f"unknown diagnostic snapshot section: {section}")
-    upsert_diagnostic_snapshot(
-        db_path=db_path,
-        section=section,
-        history_scope=history_scope,
-        payload=payload,
-        computed_at=computed_at,
-        source_logs_scanned=analysis["meta"]["source_logs_scanned"],
-        usage_rows_scanned=analysis["meta"]["usage_rows_scanned"],
-        raw_content_included=False,
-    )
-    return payload
 
 
 def _refresh_concentration_snapshot(
@@ -602,34 +464,6 @@ def diagnostic_overview_payload(
     )
     if stored is None:
         return missing_payload(history_scope=history_scope)
-    payload = dict(stored["payload"])
-    payload["status"] = "ready"
-    payload["refreshed"] = False
-    payload["snapshot"] = snapshot_metadata(
-        computed_at=str(stored["computed_at"]),
-        history_scope=str(stored["history_scope"]),
-        source_logs_scanned=int(stored["source_logs_scanned"]),
-        usage_rows_scanned=int(stored["usage_rows_scanned"]),
-    )
-    payload["raw_context_included"] = bool(stored["raw_content_included"])
-    return payload
-
-
-def _source_log_snapshot_payload(
-    *,
-    db_path: Path,
-    include_archived: bool,
-    section: str,
-    schema: str,
-) -> dict[str, Any]:
-    history_scope = history_scope_label(include_archived)
-    stored = query_diagnostic_snapshot(
-        db_path=db_path,
-        section=section,
-        history_scope=history_scope,
-    )
-    if stored is None:
-        return missing_payload(schema=schema, section=section, history_scope=history_scope)
     payload = dict(stored["payload"])
     payload["status"] = "ready"
     payload["refreshed"] = False
