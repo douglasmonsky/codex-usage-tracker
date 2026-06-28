@@ -71,6 +71,7 @@ depends_on = [
 paths = [
     "codex_usage_tracker.context",
     "codex_usage_tracker.context_token_estimates",
+    "codex_usage_tracker.context_values",
     "codex_usage_tracker.diagnostic_facts",
     "codex_usage_tracker.parser",
     "codex_usage_tracker.parser_state",
@@ -80,6 +81,7 @@ depends_on = [
     "codex_usage_tracker.call_origin",
     "codex_usage_tracker.context",
     "codex_usage_tracker.context_token_estimates",
+    "codex_usage_tracker.context_values",
     "codex_usage_tracker.costing",
     "codex_usage_tracker.diagnostic_facts",
     "codex_usage_tracker.formatting",

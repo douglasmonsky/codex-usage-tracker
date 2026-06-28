@@ -6,7 +6,7 @@
   },
   "baselines": {
     "duplicate_helpers": {
-      "metric_value": 60,
+      "metric_value": 57,
       "items": [
         {
           "name": "_allowance_segment_record",
@@ -116,7 +116,6 @@
           "name": "_optional_str",
           "occurrences": [
             "src/codex_usage_tracker/allowance.py",
-            "src/codex_usage_tracker/context.py",
             "src/codex_usage_tracker/diagnostic_facts.py",
             "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
             "src/codex_usage_tracker/threads.py"
@@ -127,13 +126,6 @@
           "occurrences": [
             "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
             "src/codex_usage_tracker/diagnostic_snapshot_events.py"
-          ]
-        },
-        {
-          "name": "_positive_int",
-          "occurrences": [
-            "src/codex_usage_tracker/context.py",
-            "src/codex_usage_tracker/diagnostic_facts.py"
           ]
         },
         {

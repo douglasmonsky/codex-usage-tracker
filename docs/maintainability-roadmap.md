@@ -2946,3 +2946,57 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/context-and-parser-boundaries` with serialized evidence bucketing or event summarization extraction.
+
+### `refactor/context-value-helpers`
+
+Goal:
+- Continue `context.py` decomposition by moving generic value conversion, JSON rendering, numeric parsing, and redaction helpers into a dedicated module.
+- Preserve raw-context evidence summaries, redaction behavior, and serialized-evidence formatting.
+
+Files touched:
+- `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/context_values.py`
+- `tests/test_context_values.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `.agent-maintainer/git-agent-ratchet-duplicate-helpers.json`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added public `context_values` helpers for redacted text/JSON, compact JSON, content text extraction, optional strings, and numeric parsing.
+- Replaced private helper calls in `context.py` with public helper imports.
+- Fixed the local `content_text` shadowing regression caught by focused context tests.
+- Added direct tests for recursive redaction, nested content extraction, numeric parsing, optional strings, compact JSON, and JSON-ish rendering.
+- Kept existing context evidence and privacy tests passing.
+- Declared `context_values` in the context/parser `tach` boundary.
+- Ratcheted file-line baseline `2112 -> 2044`, reducing `context.py` from `1045` to `977` lines.
+- Ratcheted duplicate-helper baseline `60 -> 57` by removing context-local `_optional_str` and `_positive_int` duplicates.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/context.py src/codex_usage_tracker/context_values.py tests/test_context_values.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/context.py src/codex_usage_tracker/context_values.py tests/test_context_values.py tests/test_context_evidence.py tests/test_privacy.py`: passed.
+- `.venv/bin/python -m pytest tests/test_context_values.py tests/test_context_token_estimates.py tests/test_context_evidence.py tests/test_privacy.py -q`: 17 passed.
+- `radon cc src/codex_usage_tracker/context_values.py -a -s`: average A (3.6); two helpers are B and accepted within current xenon limit.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/context_values.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 389 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed after trimming EOF whitespace.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/context-value-helpers-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `2112 -> 2044`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed, ratcheted baseline `60 -> 57`.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch uncommitted.
+
+Remaining risks:
+- `context.py` remains oversized at `977` lines; event summarization, serialized evidence bucketing, and action timing are next likely split points.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing complexity hotspots outside this slice.
+- `server.py`, `cli.py`, diagnostics/report modules, usage-drain modules, and persistence modules remain above eventual file-size/style targets.
+
+Next handoff:
+- Continue `refactor/context-and-parser-boundaries` with event summarization or serialized evidence bucketing extraction.

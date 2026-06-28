@@ -14,8 +14,18 @@ from codex_usage_tracker.context_token_estimates import (
     estimate_visible_tokens,
     token_estimate,
 )
+from codex_usage_tracker.context_values import (
+    compact_json,
+    content_text,
+    jsonish,
+    nonnegative_float,
+    nonnegative_int,
+    optional_str,
+    positive_int,
+    redact_json_value,
+    redact_text,
+)
 from codex_usage_tracker.paths import DEFAULT_DB_PATH
-from codex_usage_tracker.redaction import redact_secrets
 from codex_usage_tracker.store_usage_record_queries import query_usage_record
 
 DEFAULT_CONTEXT_CHARS = 20_000
@@ -91,11 +101,11 @@ def load_call_context(
         raise FileNotFoundError(f"Source log not found: {source_file}")
     source_file_bytes = source_file.stat().st_size
 
-    line_number = _positive_int(row.get("line_number"))
+    line_number = positive_int(row.get("line_number"))
     if line_number is None:
         raise ValueError(f"Usage record has no valid source line: {record_id}")
 
-    target_turn_id = _optional_str(row.get("turn_id"))
+    target_turn_id = optional_str(row.get("turn_id"))
     source_scan_started = perf_counter()
     (
         entries,
@@ -113,14 +123,14 @@ def load_call_context(
             max_entries=max_entries if max_entries <= 0 else max(1, max_entries),
             include_tool_output=include_tool_output,
             include_compaction_history=include_compaction_history,
-            model=_optional_str(row.get("model")),
+            model=optional_str(row.get("model")),
             context_mode=context_mode,
         )
     )
     source_scan_ms = _elapsed_ms(source_scan_started)
     if diagnostic_payload is not None:
         diagnostic_payload["source_scan_ms"] = source_scan_ms
-    visible_estimate = estimate_visible_tokens(estimate_entries, _optional_str(row.get("model")))
+    visible_estimate = estimate_visible_tokens(estimate_entries, optional_str(row.get("model")))
     if diagnostic_payload is not None:
         diagnostic_payload["serialized_estimate_ms"] = serialized_estimate_ms
         diagnostic_payload["source_file_bytes"] = source_file_bytes
@@ -236,13 +246,13 @@ def _read_context_entries(
                 continue
             if not isinstance(envelope, dict):
                 continue
-            entry_type = _optional_str(envelope.get("type")) or "unknown"
+            entry_type = optional_str(envelope.get("type")) or "unknown"
             payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
-            timestamp = _optional_str(envelope.get("timestamp"))
+            timestamp = optional_str(envelope.get("timestamp"))
 
             if entry_type == "turn_context":
                 was_collecting = collecting
-                current_turn_id = _optional_str(payload.get("turn_id"))
+                current_turn_id = optional_str(payload.get("turn_id"))
                 collecting = target_turn_id is None or current_turn_id == target_turn_id
                 if collecting:
                     raw_entries = []
@@ -395,7 +405,7 @@ def _serialized_context_estimate(
     encoding: Any | None,
     estimator: str,
 ) -> dict[str, Any]:
-    raw_json = "\n".join(_compact_json(_redact_json_value(entry)) for entry in raw_entries)
+    raw_json = "\n".join(compact_json(redact_json_value(entry)) for entry in raw_entries)
     top_buckets = sorted(
         field_buckets.values(),
         key=lambda bucket: int(bucket.get("token_estimate") or 0),
@@ -459,7 +469,7 @@ def _summarized_context_entry(
         compaction=summarized.get("compaction")
         if isinstance(summarized.get("compaction"), dict)
         else None,
-        action_duration_ms=_nonnegative_float(summarized.get("action_duration_ms")),
+        action_duration_ms=nonnegative_float(summarized.get("action_duration_ms")),
     )
 
 
@@ -482,7 +492,7 @@ def _dedupe_chat_message_echoes(entries: list[dict[str, Any]]) -> list[dict[str,
 
 
 def _chat_message_echo_key(entry: dict[str, Any]) -> tuple[str, str] | None:
-    label = _optional_str(entry.get("label")) or ""
+    label = optional_str(entry.get("label")) or ""
     role = None
     if label == "message / user" or label == "user_message":
         role = "user"
@@ -495,7 +505,7 @@ def _chat_message_echo_key(entry: dict[str, Any]) -> tuple[str, str] | None:
 
 
 def _is_structured_chat_message(entry: dict[str, Any]) -> bool:
-    return (_optional_str(entry.get("label")) or "") in {"message / user", "message / assistant"}
+    return (optional_str(entry.get("label")) or "") in {"message / user", "message / assistant"}
 
 
 def _summarize_payload(
@@ -506,7 +516,7 @@ def _summarize_payload(
 ) -> dict[str, Any] | None:
     if entry_type == "response_item":
         return _summarize_response_item(payload, include_tool_output=include_tool_output)
-    if _optional_str(payload.get("type")) == "context_compacted":
+    if optional_str(payload.get("type")) == "context_compacted":
         return _summarize_compaction(
             payload,
             include_compaction_history=include_compaction_history,
@@ -528,7 +538,7 @@ def _summarize_compaction(
 ) -> dict[str, Any]:
     replacement_history = payload.get("replacement_history")
     replacement_entries = replacement_history if isinstance(replacement_history, list) else []
-    message = _optional_str(payload.get("message")) or ""
+    message = optional_str(payload.get("message")) or ""
     compaction: dict[str, Any] = {
         "replacement_history_available": bool(replacement_entries),
         "replacement_entry_count": len(replacement_entries),
@@ -536,7 +546,7 @@ def _summarize_compaction(
         "classification": "confirmed_compaction",
     }
     if message:
-        text = _redact(message)
+        text = redact_text(message)
     elif replacement_entries:
         text = (
             "Compaction detected. Replacement history contains "
@@ -564,24 +574,24 @@ def _summarize_replacement_history_item(item: object) -> dict[str, Any]:
             "label": "replacement item",
             "role": None,
             "type": type(item).__name__,
-            "text": _redact(_jsonish(item)),
+            "text": redact_text(jsonish(item)),
         }
-    item_type = _optional_str(item.get("type")) or "replacement item"
-    role = _optional_str(item.get("role"))
-    name = _optional_str(item.get("name"))
+    item_type = optional_str(item.get("type")) or "replacement item"
+    role = optional_str(item.get("role"))
+    name = optional_str(item.get("name"))
     label_bits = [item_type]
     if role:
         label_bits.append(role)
     if name:
         label_bits.append(name)
-    text = _content_text(item.get("content")) or _jsonish(
+    text = content_text(item.get("content")) or jsonish(
         {key: value for key, value in item.items() if key not in {"content"}}
     )
     return {
         "label": " / ".join(label_bits),
         "role": role,
         "type": item_type,
-        "text": _redact(text),
+        "text": redact_text(text),
     }
 
 
@@ -595,7 +605,7 @@ def _summarize_turn_context(payload: dict[str, Any]) -> str:
         ("timezone", payload.get("timezone")),
     ]
     lines = [f"{key}: {value}" for key, value in fields if value not in (None, "")]
-    summary = _optional_str(payload.get("summary"))
+    summary = optional_str(payload.get("summary"))
     if summary:
         lines.append(f"summary: {summary}")
     return "\n".join(lines) if lines else "Turn context"
@@ -605,9 +615,9 @@ def _summarize_response_item(
     payload: dict[str, Any],
     include_tool_output: bool,
 ) -> dict[str, Any] | None:
-    item_type = _optional_str(payload.get("type")) or "response_item"
-    role = _optional_str(payload.get("role"))
-    name = _optional_str(payload.get("name"))
+    item_type = optional_str(payload.get("type")) or "response_item"
+    role = optional_str(payload.get("role"))
+    name = optional_str(payload.get("name"))
     label_bits = [item_type]
     if role:
         label_bits.append(role)
@@ -615,35 +625,35 @@ def _summarize_response_item(
         label_bits.append(name)
     label = " / ".join(label_bits)
 
-    content_text = _content_text(payload.get("content"))
-    if content_text:
-        return {"label": label, "text": content_text}
+    content = content_text(payload.get("content"))
+    if content:
+        return {"label": label, "text": content}
 
     if "arguments" in payload:
         return {
             "label": label,
-            "text": f"Tool call arguments:\n{_jsonish(payload.get('arguments'))}",
+            "text": f"Tool call arguments:\n{jsonish(payload.get('arguments'))}",
         }
 
     if "input" in payload:
         return {
             "label": label,
-            "text": f"Tool input:\n{_jsonish(payload.get('input'))}",
+            "text": f"Tool input:\n{jsonish(payload.get('input'))}",
         }
 
     if "output" in payload:
-        output = _optional_str(payload.get("output")) or _jsonish(payload.get("output"))
+        output = optional_str(payload.get("output")) or jsonish(payload.get("output"))
         if include_tool_output:
             return {"label": label, "text": output}
         return {"label": label, "text": _OUTPUT_OMITTED, "tool_output_omitted": True}
 
-    summary = _content_text(payload.get("summary"))
+    summary = content_text(payload.get("summary"))
     if summary:
         return {"label": label, "text": summary}
 
     action = payload.get("action")
     if isinstance(action, dict):
-        return {"label": label, "text": f"Action:\n{_jsonish(action)}"}
+        return {"label": label, "text": f"Action:\n{jsonish(action)}"}
 
     return None
 
@@ -652,13 +662,13 @@ def _summarize_event_msg(
     payload: dict[str, Any],
     include_tool_output: bool,
 ) -> dict[str, Any] | None:
-    event_type = _optional_str(payload.get("type")) or "event_msg"
+    event_type = optional_str(payload.get("type")) or "event_msg"
     if event_type == "token_count":
         info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
         token_usage = _token_count_summary(info)
         return {
             "label": "Token count",
-            "text": _jsonish(token_usage),
+            "text": jsonish(token_usage),
             "token_usage": token_usage,
         }
 
@@ -667,13 +677,13 @@ def _summarize_event_msg(
         return safe_structured
 
     if "message" in payload:
-        return {"label": event_type, "text": _optional_str(payload.get("message")) or ""}
+        return {"label": event_type, "text": optional_str(payload.get("message")) or ""}
 
     output_fields = [field for field in ("stdout", "stderr", "result") if field in payload]
     if output_fields:
         if not include_tool_output:
             return {"label": event_type, "text": _OUTPUT_OMITTED, "tool_output_omitted": True}
-        text = "\n".join(f"{field}:\n{_jsonish(payload.get(field))}" for field in output_fields)
+        text = "\n".join(f"{field}:\n{jsonish(payload.get(field))}" for field in output_fields)
         return {"label": event_type, "text": text}
 
     compact = {
@@ -681,7 +691,7 @@ def _summarize_event_msg(
         for key in ("call_id", "turn_id", "phase", "status", "duration_ms")
         if key in payload
     }
-    return {"label": event_type, "text": _jsonish(compact)} if compact else None
+    return {"label": event_type, "text": jsonish(compact)} if compact else None
 
 
 def _summarize_safe_structured_event(
@@ -699,10 +709,10 @@ def _summarize_safe_structured_event(
             compact[key] = value
     summary: dict[str, Any] = {
         "label": event_type,
-        "text": _jsonish(compact),
+        "text": jsonish(compact),
         "carry_into_next_turn": True,
     }
-    duration_ms = _nonnegative_float(payload.get("duration_ms"))
+    duration_ms = nonnegative_float(payload.get("duration_ms"))
     if duration_ms is not None:
         summary["action_duration_ms"] = duration_ms
     return summary
@@ -724,8 +734,8 @@ def _token_usage_summary(value: object) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     usage = dict(value)
-    input_tokens = _nonnegative_int(usage.get("input_tokens"))
-    cached_input_tokens = _nonnegative_int(usage.get("cached_input_tokens"))
+    input_tokens = nonnegative_int(usage.get("input_tokens"))
+    cached_input_tokens = nonnegative_int(usage.get("cached_input_tokens"))
     if input_tokens is not None and cached_input_tokens is not None:
         usage.setdefault("uncached_input_tokens", max(input_tokens - cached_input_tokens, 0))
     return usage
@@ -748,7 +758,7 @@ def _context_entry(
         "timestamp": timestamp,
         "type": entry_type,
         "label": label,
-        "text": _redact(text),
+        "text": redact_text(text),
         "truncated": False,
     }
     if tool_output_omitted:
@@ -879,12 +889,12 @@ def _collect_serialized_field_buckets(
     payload: dict[str, Any],
     encoding: Any | None,
 ) -> None:
-    payload_type = _optional_str(payload.get("type")) or ""
+    payload_type = optional_str(payload.get("type")) or ""
     for key, value in payload.items():
         if key == "type":
             continue
         bucket_key, label, note = _serialized_bucket_label(entry_type, payload_type, key)
-        rendered = _compact_json({key: _redact_json_value(value)})
+        rendered = compact_json({key: redact_json_value(value)})
         stats = buckets.setdefault(
             bucket_key,
             {
@@ -965,81 +975,3 @@ def _serialized_bucket_label(
         "Other serialized metadata",
         "Additional local JSONL fields not separately categorized.",
     )
-
-
-
-def _redact_json_value(value: object) -> object:
-    if isinstance(value, str):
-        return _redact(value)
-    if isinstance(value, list):
-        return [_redact_json_value(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _redact_json_value(item) for key, item in value.items()}
-    return value
-
-
-def _compact_json(value: object) -> str:
-    try:
-        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-    except TypeError:
-        return str(value)
-
-
-
-def _content_text(value: object) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, list):
-        pieces: list[str] = []
-        for item in value:
-            if isinstance(item, str):
-                pieces.append(item)
-            elif isinstance(item, dict):
-                text = item.get("text") or item.get("content")
-                if isinstance(text, str):
-                    pieces.append(text)
-        return "\n".join(piece for piece in pieces if piece)
-    return _jsonish(value)
-
-
-def _jsonish(value: object) -> str:
-    if isinstance(value, str):
-        return value
-    try:
-        return json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True)
-    except TypeError:
-        return str(value)
-
-
-def _redact(text: str) -> str:
-    return redact_secrets(text)
-
-
-def _positive_int(value: object) -> int | None:
-    try:
-        number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    return number if number > 0 else None
-
-
-def _nonnegative_int(value: object) -> int | None:
-    try:
-        number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    return number if number >= 0 else None
-
-
-def _nonnegative_float(value: object) -> float | None:
-    try:
-        number = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    return number if number >= 0 else None
-
-
-def _optional_str(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None
