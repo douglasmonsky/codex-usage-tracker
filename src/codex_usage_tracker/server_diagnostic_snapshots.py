@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import parse_qs
@@ -25,6 +28,84 @@ class SnapshotReportBuilder(Protocol):
         include_archived: bool,
         refresh: bool,
     ) -> SnapshotReport: ...
+
+
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+ExceptionSender = Callable[[str, BaseException], None]
+RefreshAuthRejector = Callable[[dict[str, list[str]]], bool]
+
+
+def handle_diagnostic_snapshot_request(
+    query: str,
+    *,
+    db_path: Path,
+    include_archived_default: bool,
+    refresh: bool,
+    refresh_lock: Any,
+    build_report: SnapshotReportBuilder,
+    label: str,
+    reject_missing_refresh_token: RefreshAuthRejector,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle one persisted diagnostic snapshot route."""
+    params = parse_qs(query)
+    if refresh and reject_missing_refresh_token(params):
+        return
+    include_archived = parse_bool_query_value(
+        first_query_value(params.get("include_archived")),
+        include_archived_default,
+    )
+    try:
+        payload = diagnostic_snapshot_payload(
+            db_path=db_path,
+            include_archived=include_archived,
+            refresh=refresh,
+            refresh_lock=refresh_lock,
+            build_report=build_report,
+        )
+    except sqlite3.Error as exc:
+        send_exception(f"Database error while reading {label}", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
+
+
+def handle_usage_drain_snapshot_request(
+    query: str,
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    rate_card_path: Path,
+    include_archived_default: bool,
+    refresh: bool,
+    refresh_lock: Any,
+    reject_missing_refresh_token: RefreshAuthRejector,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle diagnostic usage-drain snapshot route."""
+    params = parse_qs(query)
+    if refresh and reject_missing_refresh_token(params):
+        return
+    include_archived = parse_bool_query_value(
+        first_query_value(params.get("include_archived")),
+        include_archived_default,
+    )
+    try:
+        payload = usage_drain_snapshot_payload(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            include_archived=include_archived,
+            refresh=refresh,
+            refresh_lock=refresh_lock,
+        )
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading diagnostic usage drain", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def refresh_all_diagnostic_snapshots_payload(

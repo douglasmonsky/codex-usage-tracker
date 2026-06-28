@@ -61,8 +61,8 @@ from codex_usage_tracker.server_diagnostic_facts import (
 )
 from codex_usage_tracker.server_diagnostic_snapshots import (
     diagnostic_refresh_payload,
-    diagnostic_snapshot_payload,
-    usage_drain_snapshot_payload,
+    handle_diagnostic_snapshot_request,
+    handle_usage_drain_snapshot_request,
 )
 from codex_usage_tracker.server_live_queries import live_query_params
 from codex_usage_tracker.server_live_rows import annotate_live_rows, query_live_call_rows
@@ -755,27 +755,19 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         *,
         refresh: bool,
     ) -> None:
-        params = parse_qs(query)
-        if refresh and self._reject_missing_diagnostic_refresh_token(params):
-            return
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
+        handle_usage_drain_snapshot_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            include_archived_default=self._include_archived,
+            refresh=refresh,
+            refresh_lock=self._refresh_lock,
+            reject_missing_refresh_token=self._reject_missing_diagnostic_refresh_token,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
-        try:
-            payload = usage_drain_snapshot_payload(
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                allowance_path=self._allowance_path,
-                rate_card_path=self._rate_card_path,
-                include_archived=include_archived,
-                refresh=refresh,
-                refresh_lock=self._refresh_lock,
-            )
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading diagnostic usage drain", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_diagnostic_snapshot(
         self,
@@ -785,25 +777,18 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         refresh: bool,
         label: str,
     ) -> None:
-        params = parse_qs(query)
-        if refresh and self._reject_missing_diagnostic_refresh_token(params):
-            return
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
+        handle_diagnostic_snapshot_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            refresh=refresh,
+            refresh_lock=self._refresh_lock,
+            build_report=build_report,
+            label=label,
+            reject_missing_refresh_token=self._reject_missing_diagnostic_refresh_token,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
-        try:
-            payload = diagnostic_snapshot_payload(
-                db_path=self._db_path,
-                include_archived=include_archived,
-                refresh=refresh,
-                refresh_lock=self._refresh_lock,
-                build_report=build_report,
-            )
-        except sqlite3.Error as exc:
-            self._send_exception(f"Database error while reading {label}", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
 
     def _live_query_params(
         self,
