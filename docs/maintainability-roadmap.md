@@ -3150,3 +3150,53 @@ Remaining risks:
 
 Next handoff:
 - Decide whether to split `_read_context_entries` state handling next, or switch back to larger roadmap targets now that `context.py` is below the local file-length target.
+### `refactor/server-request-guards`
+Goal:
+- Move local dashboard request-origin and API-token guard logic out of `_UsageDashboardHandler`.
+- Preserve loopback Host/Origin enforcement and header/query-token behavior.
+- Keep response handling and route dispatch unchanged.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_request_guards.py`
+- `tach.toml`
+- `tests/test_server_request_guards.py`
+
+Completed edits:
+- Added `server_request_guards.py` with `request_origin_allowed` and `has_valid_api_token`.
+- Replaced handler-local guard implementations with thin delegates.
+- Preserved other `server.py` uses of `_first` after an initial focused-test catch.
+- Added direct tests for loopback host allowance, external host rejection, loopback origin same-port enforcement, external origin rejection, header token priority, and query token fallback.
+- Added `server_request_guards` to the server `tach` boundary.
+- Ratcheted max-file baseline `1667 -> 1657`; `server.py` reduced from `984` to `974` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_request_guards.py tests/test_server_request_guards.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_request_guards.py tests/test_server_request_guards.py tests/test_dashboard_server.py`: passed after restoring the still-needed `_first` alias.
+- `.venv/bin/python -m pytest tests/test_server_request_guards.py tests/test_dashboard_server.py -q`: 16 passed.
+- `radon cc src/codex_usage_tracker/server_request_guards.py src/codex_usage_tracker/server.py -a -s`: `server_request_guards.py` worst block B (6); server handler hotspots unchanged.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server_request_guards.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/tach map -o /tmp/server-request-guards-tach-map.json`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m pytest -q`: 406 passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1667 -> 1657`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `server.py` remains oversized at `974` lines.
+- `_UsageDashboardHandler._handle_context` and route dispatch still contain mixed HTTP/payload concerns.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing non-server-request-guard hotspots.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` with another low-risk server slice, likely moving repeated HTTP error mapping or diagnostic route wrapper methods.

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hmac
 import secrets
 import sqlite3
 import threading
@@ -73,6 +72,10 @@ from codex_usage_tracker.server_open_investigator import (
     open_investigator_payload,
 )
 from codex_usage_tracker.server_recommendations import recommendations_payload
+from codex_usage_tracker.server_request_guards import (
+    has_valid_api_token,
+    request_origin_allowed,
+)
 from codex_usage_tracker.server_responses import send_html_response, send_json_response
 from codex_usage_tracker.server_routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
@@ -85,9 +88,7 @@ from codex_usage_tracker.server_summary import summary_payload
 from codex_usage_tracker.server_threads import threads_payload
 from codex_usage_tracker.server_usage_refresh import UsageRefreshAuthError, usage_payload
 
-_allowed_loopback_host = server_utils.allowed_loopback_host
 _first = server_utils.first_query_value
-_host_header_name = server_utils.host_header_name
 _matches_live_derived_filters = server_utils.matches_live_derived_filters
 _parse_api_limit = server_utils.parse_api_limit
 _parse_api_offset = server_utils.parse_api_offset
@@ -964,21 +965,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         self._send_json(HTTPStatus.OK, payload)
     def _request_origin_allowed(self) -> bool:
-        if not _allowed_loopback_host(_host_header_name(self.headers.get("Host"))):
-            return False
-        origin = self.headers.get("Origin")
-        if not origin:
-            return True
-        parsed = urlparse(origin)
-        if parsed.scheme not in {"http", "https"}:
-            return False
-        if not _allowed_loopback_host(parsed.hostname):
-            return False
-        return parsed.port is None or parsed.port == self.server.server_port
+        return request_origin_allowed(self.headers, self.server.server_port)
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool:
-        provided = self.headers.get("X-Codex-Usage-Token") or _first(params.get("api_token")) or ""
-        return hmac.compare_digest(str(provided), self._api_token)
+        return has_valid_api_token(self.headers, params, self._api_token)
 
     def _send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
         send_json_response(self, status, payload)
