@@ -48,14 +48,15 @@ from codex_usage_tracker.paths import (
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
-from codex_usage_tracker.reports import (
-    QUERY_CREDIT_CONFIDENCE_CHOICES,
-    QUERY_PRICING_STATUS_CHOICES,
-)
 from codex_usage_tracker.server_call_detail import (
     MissingRecordIdError,
     UsageRecordNotFoundError,
     call_detail_payload,
+)
+from codex_usage_tracker.server_call_lists import (
+    MissingThreadKeyError,
+    calls_payload,
+    thread_calls_payload,
 )
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
 from codex_usage_tracker.server_diagnostic_facts import (
@@ -86,11 +87,8 @@ from codex_usage_tracker.server_usage_refresh import refresh_usage_payload
 _allowed_loopback_host = server_utils.allowed_loopback_host
 _elapsed_ms = server_utils.elapsed_ms
 _first = server_utils.first_query_value
-_has_more = server_utils.has_more_rows
 _host_header_name = server_utils.host_header_name
 _matches_live_derived_filters = server_utils.matches_live_derived_filters
-_next_offset = server_utils.next_row_offset
-_optional_filter = server_utils.optional_choice_filter
 _parse_api_limit = server_utils.parse_api_limit
 _parse_api_offset = server_utils.parse_api_offset
 _parse_bool = server_utils.parse_bool_query_value
@@ -544,23 +542,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_calls(self, query: str) -> None:
-        params = parse_qs(query)
         try:
-            query_params = self._live_query_params(params)
-            pricing_status = _optional_filter(
-                _first(params.get("pricing_status")),
-                QUERY_PRICING_STATUS_CHOICES,
-                "pricing_status",
-            )
-            credit_confidence = _optional_filter(
-                _first(params.get("credit_confidence")),
-                QUERY_CREDIT_CONFIDENCE_CHOICES,
-                "credit_confidence",
-            )
-            rows, total_matched = self._live_call_rows(
-                query_params=query_params,
-                pricing_status=pricing_status,
-                credit_confidence=credit_confidence,
+            payload = calls_payload(
+                query,
+                live_query_params=self._live_query_params,
+                live_call_rows=self._live_call_rows,
             )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -571,25 +557,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": f"Database error while reading calls: {exc}"},
             )
             return
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-calls-v1",
-                "rows": rows,
-                "row_count": len(rows),
-                "total_matched_rows": total_matched,
-                "limit": query_params["limit"],
-                "offset": query_params["offset"],
-                "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "next_offset": _next_offset(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "filters": {
-                    **query_params["filters"],
-                    "pricing_status": pricing_status,
-                    "credit_confidence": credit_confidence,
-                },
-                "raw_context_included": False,
-            },
-        )
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_call(self, query: str) -> None:
         try:
@@ -631,18 +599,15 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_json(HTTPStatus.OK, payload)
 
     def _handle_thread_calls(self, query: str) -> None:
-        params = parse_qs(query)
-        thread_key = _first(params.get("thread_key")) or _first(params.get("thread"))
-        if not thread_key:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "thread_key is required"})
-            return
         try:
-            query_params = self._live_query_params(params, thread_key=thread_key)
-            rows, total_matched = self._live_call_rows(
-                query_params=query_params,
-                pricing_status=None,
-                credit_confidence=None,
+            payload = thread_calls_payload(
+                query,
+                live_query_params=self._live_query_params,
+                live_call_rows=self._live_call_rows,
             )
+        except MissingThreadKeyError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
@@ -652,21 +617,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": f"Database error while reading thread calls: {exc}"},
             )
             return
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-thread-calls-v1",
-                "thread_key": thread_key,
-                "rows": rows,
-                "row_count": len(rows),
-                "total_matched_rows": total_matched,
-                "limit": query_params["limit"],
-                "offset": query_params["offset"],
-                "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "next_offset": _next_offset(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "raw_context_included": False,
-            },
-        )
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_summary(self, query: str) -> None:
         try:
