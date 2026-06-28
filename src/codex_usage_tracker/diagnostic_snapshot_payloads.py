@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -24,6 +25,73 @@ from codex_usage_tracker.diagnostic_snapshot_constants import (
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
     DIAGNOSTIC_USAGE_DRAIN_SECTION,
 )
+
+MissingFieldValue = object | Callable[[], object]
+
+
+def _empty_thread_cost_curves() -> dict[str, list[object]]:
+    return {"threads": []}
+
+
+_MISSING_SECTION_DEFAULTS: dict[str, dict[str, MissingFieldValue]] = {
+    DIAGNOSTIC_OVERVIEW_SECTION: {
+        "overview": None,
+    },
+    DIAGNOSTIC_TOOL_OUTPUT_SECTION: {
+        "summary": None,
+        "functions": list,
+        "command_roots": list,
+        "missing_reasons": list,
+    },
+    DIAGNOSTIC_COMMANDS_SECTION: {
+        "summary": None,
+        "commands": list,
+    },
+    DIAGNOSTIC_GIT_INTERACTIONS_SECTION: {
+        "summary": None,
+        "interactions": list,
+        "categories": list,
+        "mutability": list,
+    },
+    DIAGNOSTIC_FILE_READS_SECTION: {
+        "summary": None,
+        "by_reader": list,
+        "top_paths": list,
+        "largest_read_commands": list,
+        "path_privacy": path_privacy_metadata,
+    },
+    DIAGNOSTIC_FILE_MODIFICATIONS_SECTION: {
+        "summary": None,
+        "top_paths": list,
+        "by_extension": list,
+        "largest_events": list,
+        "path_privacy": path_privacy_metadata,
+    },
+    DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: {
+        "summary": None,
+        "by_reader": list,
+        "top_modified_paths": list,
+        "path_privacy": path_privacy_metadata,
+    },
+    DIAGNOSTIC_CONCENTRATION_SECTION: {
+        "summary": None,
+        "metrics": list,
+        "dimensions": list,
+        "largest_impact_rows": list,
+        "privacy": concentration_privacy_metadata,
+    },
+    DIAGNOSTIC_USAGE_DRAIN_SECTION: {
+        "summary": None,
+        "thread_cost_curves": _empty_thread_cost_curves,
+        "time_series": dict,
+        "model_highlights": dict,
+        "pricing": dict,
+    },
+}
+
+
+def _resolve_missing_field(value: MissingFieldValue) -> object:
+    return value() if callable(value) else value
 
 
 def ready_payload(
@@ -65,50 +133,8 @@ def missing_payload(
         "history_scope": history_scope,
         "notes": list(DIAGNOSTIC_SNAPSHOT_NOTES),
     }
-    if section == DIAGNOSTIC_OVERVIEW_SECTION:
-        payload["overview"] = None
-    elif section == DIAGNOSTIC_TOOL_OUTPUT_SECTION:
-        payload["summary"] = None
-        payload["functions"] = []
-        payload["command_roots"] = []
-        payload["missing_reasons"] = []
-    elif section == DIAGNOSTIC_COMMANDS_SECTION:
-        payload["summary"] = None
-        payload["commands"] = []
-    elif section == DIAGNOSTIC_GIT_INTERACTIONS_SECTION:
-        payload["summary"] = None
-        payload["interactions"] = []
-        payload["categories"] = []
-        payload["mutability"] = []
-    elif section == DIAGNOSTIC_FILE_READS_SECTION:
-        payload["summary"] = None
-        payload["by_reader"] = []
-        payload["top_paths"] = []
-        payload["largest_read_commands"] = []
-        payload["path_privacy"] = path_privacy_metadata()
-    elif section == DIAGNOSTIC_FILE_MODIFICATIONS_SECTION:
-        payload["summary"] = None
-        payload["top_paths"] = []
-        payload["by_extension"] = []
-        payload["largest_events"] = []
-        payload["path_privacy"] = path_privacy_metadata()
-    elif section == DIAGNOSTIC_READ_PRODUCTIVITY_SECTION:
-        payload["summary"] = None
-        payload["by_reader"] = []
-        payload["top_modified_paths"] = []
-        payload["path_privacy"] = path_privacy_metadata()
-    elif section == DIAGNOSTIC_CONCENTRATION_SECTION:
-        payload["summary"] = None
-        payload["metrics"] = []
-        payload["dimensions"] = []
-        payload["largest_impact_rows"] = []
-        payload["privacy"] = concentration_privacy_metadata()
-    elif section == DIAGNOSTIC_USAGE_DRAIN_SECTION:
-        payload["summary"] = None
-        payload["thread_cost_curves"] = {"threads": []}
-        payload["time_series"] = {}
-        payload["model_highlights"] = {}
-        payload["pricing"] = {}
+    for key, value in _MISSING_SECTION_DEFAULTS.get(section, {}).items():
+        payload[key] = _resolve_missing_field(value)
     return payload
 
 

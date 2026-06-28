@@ -3814,3 +3814,46 @@ Remaining risks:
 
 Next handoff:
 - Continue diagnostic snapshot reduction with a narrow table-driven `missing_payload` cleanup or split source-log refresh persistence from `diagnostic_snapshots.py`.
+
+### `refactor/diagnostic-missing-payload-table`
+
+Goal:
+- Reduce `missing_payload` complexity after extracting diagnostic snapshot payload helpers.
+- Preserve missing snapshot schemas and fresh mutable defaults for lists/dicts.
+
+Files touched:
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/diagnostic_snapshot_payloads.py`
+
+Completed edits:
+- Replaced the `missing_payload` conditional ladder with `_MISSING_SECTION_DEFAULTS`.
+- Added `_resolve_missing_field` and `_empty_thread_cost_curves` so callable defaults produce fresh payload values.
+- Reduced `missing_payload` radon complexity from B to A.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostic_snapshot_payloads.py src/codex_usage_tracker/diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostic_snapshot_payloads.py src/codex_usage_tracker/diagnostic_snapshots.py tests/test_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m pytest tests/test_diagnostic_snapshots.py tests/test_server_diagnostic_snapshots.py tests/test_cli_lifecycle.py -q`: 24 passed.
+- `radon cc src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_payloads.py -a -s`: `missing_payload` now A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/diagnostic_snapshots.py src/codex_usage_tracker/diagnostic_snapshot_payloads.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach map -o /tmp/diagnostic-missing-payload-table-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning plus expected change-budget warning because existing tests covered this refactor.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- `diagnostic_snapshots.py` remains above target at `705` lines.
+- Source-log snapshot refresh and persistence remain coupled in `diagnostic_snapshots.py`.
+
+Next handoff:
+- Split source-log snapshot payload construction/persistence or move to another roadmap hotspot if diagnostic snapshots stop being the best payoff.
