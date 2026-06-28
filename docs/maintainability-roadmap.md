@@ -1586,3 +1586,49 @@ Remaining risks:
 
 Next handoff:
 - Extract one walk-forward prediction helper cluster or allowance capacity family behind usage-drain characterization tests.
+### refactor/usage-drain-boundary-delta-prediction
+
+Objective:
+
+- Extract boundary-delta model signatures, boundary-risk helpers, walk-forward delta prediction rows, and adaptive risk-gate threshold helpers from `usage_drain_model.py`.
+- Keep public report behavior and CLI/API schemas unchanged.
+- Preserve Tach boundaries and avoid new private cross-module imports.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_boundary_delta.py` for the boundary-delta prediction helper cluster.
+- Updated `usage_drain_model.py` to call the new module through a public module namespace.
+- Updated `tach.toml` so the new usage-drain module is included in the existing diagnostics/report boundary.
+- Ratcheted `max_file_lines` baseline 5242 -> 4862; `usage_drain_model.py` is now 2805 lines and the extracted module is 407 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_boundary_delta.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_boundary_delta.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/usage-drain-boundary-delta-prediction-tach-map.json`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5242 -> 4862.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+
+- `usage_drain_model.py` remains the largest module by a wide margin.
+- Allowance-capacity walk-forward prediction and summary-table formatting are still candidates for focused extraction.
+- Agent-maintainer still warns that the package folder is large and that this refactor branch changes Python source without adding new tests; existing characterization tests are covering behavior for now.
+
+Next handoff:
+
+- Continue splitting the remaining allowance-capacity prediction helpers or summary row-formatting helpers into another narrow usage-drain module.
