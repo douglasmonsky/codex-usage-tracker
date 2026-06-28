@@ -6,7 +6,11 @@ import math
 from typing import Any
 
 from codex_usage_tracker.usage_drain_feature_history import is_one_percent_delta
+from codex_usage_tracker.usage_drain_grace import REGIME_GRACE_STREAK_THRESHOLD
 from codex_usage_tracker.usage_drain_state_buckets import (
+    TRANSITION_RISK_MODEL_SIGNATURES,
+    state_bucket_transition_risk,
+    transition_rate,
     transition_risk_detail_diagnostics,
 )
 from codex_usage_tracker.usage_drain_utils import number, rounded
@@ -132,3 +136,94 @@ def average_precision(actual: list[int], scores: list[float]) -> float | None:
         seen_positive += 1
         precision_sum += seen_positive / rank
     return precision_sum / positive_count
+
+
+def transition_risk_predictions(
+    previous_state_rows: list[dict[str, Any]],
+    state: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    prior_rate = transition_rate(previous_state_rows)
+    risks: dict[str, float] = {
+        "overall_prior_rate": prior_rate,
+        "stable_one_percent_rule": (
+            0.0
+            if int(state.get("one_percent_streak_count") or 0)
+            >= REGIME_GRACE_STREAK_THRESHOLD
+            else prior_rate
+        ),
+    }
+    details: dict[str, dict[str, Any]] = {
+        "overall_prior_rate": {
+            "source": "all_prior_spans",
+            "support": len(previous_state_rows),
+        },
+        "stable_one_percent_rule": {
+            "source": "long_one_percent_streak"
+            if int(state.get("one_percent_streak_count") or 0)
+            >= REGIME_GRACE_STREAK_THRESHOLD
+            else "fallback_prior_rate",
+            "support": len(previous_state_rows),
+        },
+    }
+    for model_name, signatures in TRANSITION_RISK_MODEL_SIGNATURES.items():
+        risk, detail = state_bucket_transition_risk(
+            previous_state_rows,
+            state,
+            signatures=signatures,
+            fallback_rate=prior_rate,
+        )
+        risks[model_name] = risk
+        details[model_name] = detail
+    return risks, details
+
+
+def transition_risk_summary(
+    rows: list[dict[str, Any]], scopes: dict[str, int]
+) -> dict[str, Any]:
+    target_definitions = {
+        "non_one_percent_delta": (
+            "Next visible positive delta is not exactly 1%, across all scoped spans."
+        ),
+        "break_after_long_one_percent_run": (
+            "Scoped to rows whose prior state has at least the configured long "
+            "1% streak; target is whether the next delta breaks away from 1%."
+        ),
+    }
+    return {
+        "risk_models": {
+            "overall_prior_rate": "Historical non-1% rate before the current span.",
+            "stable_one_percent_rule": (
+                "Predicts zero break risk after the configured long 1% streak; "
+                "otherwise uses the historical prior rate."
+            ),
+            "history_state_risk": "Empirical non-1% rate for matching history/streak buckets.",
+            "calendar_state_risk": "Empirical non-1% rate for matching calendar buckets.",
+            "reset_state_risk": "Empirical non-1% rate for matching reset/window buckets.",
+            "previous_work_state_risk": (
+                "Empirical non-1% rate for matching previous-span work-duration buckets."
+            ),
+        },
+        "target_definitions": target_definitions,
+        "scopes": {
+            scope_name: transition_risk_scope(rows, start_index=start_index)
+            for scope_name, start_index in scopes.items()
+        },
+    }
+
+
+def transition_risk_scope(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> dict[str, Any]:
+    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
+    long_run_rows = [
+        row
+        for row in scope_rows
+        if int((row.get("metadata") or {}).get("one_percent_streak_count") or 0)
+        >= REGIME_GRACE_STREAK_THRESHOLD
+    ]
+    return {
+        "non_one_percent_delta": transition_target_metrics(scope_rows),
+        "break_after_long_one_percent_run": transition_target_metrics(
+            long_run_rows
+        ),
+    }

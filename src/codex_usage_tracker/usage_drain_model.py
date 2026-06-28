@@ -127,7 +127,6 @@ from codex_usage_tracker.usage_drain_spans import (
 from codex_usage_tracker.usage_drain_state_buckets import (
     STATE_BUCKET_MIN_SUPPORT,
     STATE_BUCKET_MODEL_SIGNATURES,
-    TRANSITION_RISK_MODEL_SIGNATURES,
 )
 from codex_usage_tracker.usage_drain_state_buckets import (
     state_bucket_model_diagnostics as _state_bucket_model_diagnostics,
@@ -137,12 +136,6 @@ from codex_usage_tracker.usage_drain_state_buckets import (
 )
 from codex_usage_tracker.usage_drain_state_buckets import (
     state_bucket_predictions as _state_bucket_predictions,
-)
-from codex_usage_tracker.usage_drain_state_buckets import (
-    state_bucket_transition_risk as _state_bucket_transition_risk,
-)
-from codex_usage_tracker.usage_drain_state_buckets import (
-    transition_rate as _transition_rate,
 )
 from codex_usage_tracker.usage_drain_state_diagnostics import (
     state_ambiguity_summary as _state_ambiguity_summary,
@@ -196,7 +189,10 @@ from codex_usage_tracker.usage_drain_transition_metrics import (
     binary_risk_metrics as _binary_risk_metrics,
 )
 from codex_usage_tracker.usage_drain_transition_metrics import (
-    transition_target_metrics as _transition_target_metrics,
+    transition_risk_predictions as _transition_risk_predictions,
+)
+from codex_usage_tracker.usage_drain_transition_metrics import (
+    transition_risk_summary as _transition_risk_summary,
 )
 from codex_usage_tracker.usage_drain_types import (
     DEFAULT_PROXY_NAMES,
@@ -3357,43 +3353,6 @@ def _walk_forward_scope_metrics(
 
 
 
-def _transition_risk_predictions(
-    previous_state_rows: list[dict[str, Any]],
-    state: dict[str, Any],
-) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
-    prior_rate = _transition_rate(previous_state_rows)
-    risks: dict[str, float] = {
-        "overall_prior_rate": prior_rate,
-        "stable_one_percent_rule": (
-            0.0
-            if int(state.get("one_percent_streak_count") or 0)
-            >= REGIME_GRACE_STREAK_THRESHOLD
-            else prior_rate
-        ),
-    }
-    details: dict[str, dict[str, Any]] = {
-        "overall_prior_rate": {
-            "source": "all_prior_spans",
-            "support": len(previous_state_rows),
-        },
-        "stable_one_percent_rule": {
-            "source": "long_one_percent_streak"
-            if int(state.get("one_percent_streak_count") or 0)
-            >= REGIME_GRACE_STREAK_THRESHOLD
-            else "fallback_prior_rate",
-            "support": len(previous_state_rows),
-        },
-    }
-    for model_name, signatures in TRANSITION_RISK_MODEL_SIGNATURES.items():
-        risk, detail = _state_bucket_transition_risk(
-            previous_state_rows,
-            state,
-            signatures=signatures,
-            fallback_rate=prior_rate,
-        )
-        risks[model_name] = risk
-        details[model_name] = detail
-    return risks, details
 
 
 
@@ -3408,56 +3367,8 @@ def _transition_risk_predictions(
 
 
 
-def _transition_risk_summary(
-    rows: list[dict[str, Any]], scopes: dict[str, int]
-) -> dict[str, Any]:
-    target_definitions = {
-        "non_one_percent_delta": (
-            "Next visible positive delta is not exactly 1%, across all scoped spans."
-        ),
-        "break_after_long_one_percent_run": (
-            "Scoped to rows whose prior state has at least the configured long "
-            "1% streak; target is whether the next delta breaks away from 1%."
-        ),
-    }
-    return {
-        "risk_models": {
-            "overall_prior_rate": "Historical non-1% rate before the current span.",
-            "stable_one_percent_rule": (
-                "Predicts zero break risk after the configured long 1% streak; "
-                "otherwise uses the historical prior rate."
-            ),
-            "history_state_risk": "Empirical non-1% rate for matching history/streak buckets.",
-            "calendar_state_risk": "Empirical non-1% rate for matching calendar buckets.",
-            "reset_state_risk": "Empirical non-1% rate for matching reset/window buckets.",
-            "previous_work_state_risk": (
-                "Empirical non-1% rate for matching previous-span work-duration buckets."
-            ),
-        },
-        "target_definitions": target_definitions,
-        "scopes": {
-            scope_name: _transition_risk_scope(rows, start_index=start_index)
-            for scope_name, start_index in scopes.items()
-        },
-    }
 
 
-def _transition_risk_scope(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> dict[str, Any]:
-    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
-    long_run_rows = [
-        row
-        for row in scope_rows
-        if int((row.get("metadata") or {}).get("one_percent_streak_count") or 0)
-        >= REGIME_GRACE_STREAK_THRESHOLD
-    ]
-    return {
-        "non_one_percent_delta": _transition_target_metrics(scope_rows),
-        "break_after_long_one_percent_run": _transition_target_metrics(
-            long_run_rows
-        ),
-    }
 
 
 
