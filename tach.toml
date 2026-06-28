@@ -106,6 +106,7 @@ paths = [
   "codex_usage_tracker.store_schema",
     "codex_usage_tracker.store_sources",
   "codex_usage_tracker.store_thread_summaries",
+  "codex_usage_tracker.store_usage_api_queries",
   "codex_usage_tracker.store_usage_timing",
     "codex_usage_tracker.threads",
 ]
@@ -135,6 +136,7 @@ depends_on = [
   "codex_usage_tracker.store_schema",
     "codex_usage_tracker.store_sources",
   "codex_usage_tracker.store_thread_summaries",
+  "codex_usage_tracker.store_usage_api_queries",
   "codex_usage_tracker.store_usage_timing",
     "codex_usage_tracker.threads",
 ]

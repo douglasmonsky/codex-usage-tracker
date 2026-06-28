@@ -1139,3 +1139,47 @@ Remaining risks:
 
 Next handoff:
 - Extract usage API read queries next, keeping `store.py` as compatibility facade and avoiding a too-large query module.
+
+### `refactor/store-usage-api-query-boundary`
+
+Goal:
+- Move live dashboard `/api/calls` read queries out of `store.py`.
+- Preserve `codex_usage_tracker.store.query_usage_api_events` and `query_usage_api_event_count` facade imports.
+- Replace cross-module private SQL helper usage with public aliases.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_usage_api_queries.py` for live usage API row and count queries.
+- Added public `usage_api_where_clause` and `usage_api_sort_expression` aliases in `store_query_sql.py`.
+- Re-exported moved live API query functions from `store.py`.
+- Updated `tach.toml` so the new usage API query module belongs to the persistence/store boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json` and `.agent-maintainer/git-agent-ratchet-private-imports.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_usage_api_queries.py src/codex_usage_tracker/store_query_sql.py`: passed.
+- `.venv/bin/python -m compileall src/codex_usage_tracker/store.py src/codex_usage_tracker/store_usage_api_queries.py src/codex_usage_tracker/store_query_sql.py`: passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py::test_dashboard_server_live_sql_api_slices_are_aggregate_only tests/test_store_dashboard_mcp.py::test_dashboard_event_query_uses_sql_prefilters tests/test_store_dashboard_mcp.py::test_large_history_query_prefilter_uses_sql_indexes tests/test_store_dashboard_mcp.py::test_dashboard_query_limit_zero_loads_all_rows`: 4 passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py tests/test_store_dashboard_mcp.py tests/test_context_evidence.py`: 38 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion warning and behavior-preserving refactor no-test-file warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5840 to 5723.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed, ratcheted baseline 10 to 8.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_usage_api_queries.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_query_sql.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-usage-api-queries.json`: passed.
+- `.venv/bin/tach check`: expected informational failure, same 13 documented legacy boundary violations.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `store.py` still imports private SQL helpers for legacy summary/thread/export query functions.
+- `store_thread_summaries.py` still has private helper imports; private-import ratchet improved but is not yet zero.
+
+Next handoff:
+- Extract thread-summary or session/record query read models next, depending on which gives the cleaner boundary improvement without broad blast radius.

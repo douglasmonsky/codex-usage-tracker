@@ -6,53 +6,41 @@
   },
   "baselines": {
     "cross_module_private_imports": {
-      "metric_value": 10,
+      "metric_value": 8,
       "items": [
         {
           "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
+          "line": 57,
           "name": "_group_expression",
           "source_module": "codex_usage_tracker.store_query_sql"
         },
         {
           "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
+          "line": 57,
           "name": "_normalize_limit",
           "source_module": "codex_usage_tracker.store_query_sql"
         },
         {
           "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
+          "line": 57,
           "name": "_normalize_offset",
           "source_module": "codex_usage_tracker.store_query_sql"
         },
         {
           "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
+          "line": 57,
           "name": "_normalize_sort_direction",
           "source_module": "codex_usage_tracker.store_query_sql"
         },
         {
           "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
+          "line": 57,
           "name": "_since_where_clause",
           "source_module": "codex_usage_tracker.store_query_sql"
         },
         {
           "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
-          "name": "_usage_api_sort_expression",
-          "source_module": "codex_usage_tracker.store_query_sql"
-        },
-        {
-          "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
-          "name": "_usage_api_where_clause",
-          "source_module": "codex_usage_tracker.store_query_sql"
-        },
-        {
-          "file": "src/codex_usage_tracker/store.py",
-          "line": 30,
+          "line": 57,
           "name": "_usage_where_clause",
           "source_module": "codex_usage_tracker.store_query_sql"
         },
