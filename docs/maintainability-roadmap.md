@@ -945,3 +945,40 @@ Checks:
 
 Next handoff:
 - Continue with another narrow helper cluster only if it has a clean dependency map; otherwise move to the next roadmap milestone rather than forcing a risky usage-drain split.
+
+### `refactor/usage-drain-capacity-specs`
+
+Goal:
+- Move capacity-model specification construction out of `usage_drain_model.py`.
+- Avoid creating a new oversized file while preserving predictive model behavior.
+- Keep the model facade responsible for orchestration only.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/usage_drain_capacity_specs.py` for capacity-model `PredictiveModelSpec` construction.
+- Replaced the local `_capacity_model_specs` definition in `usage_drain_model.py` with a compatibility import.
+- Registered the new module in `tach.toml`.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+- Corrected an initial placement that made `usage_drain_predictive_specs.py` exceed the source-line budget by isolating capacity specs into their own module.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_predictive_specs.py src/codex_usage_tracker/usage_drain_capacity_specs.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and no-test-file change-budget warning for behavior-preserving refactor.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline from 6913 to 6722.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_capacity_specs.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-capacity-specs.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+- Consider moving from usage-drain split work to store/query boundary characterization, because further usage-drain orchestration moves are higher-risk and should be handled only with more targeted tests.
