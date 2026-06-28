@@ -66,6 +66,18 @@ from codex_usage_tracker.usage_drain_grace import (
 from codex_usage_tracker.usage_drain_grace import (
     one_percent_regime_grace_prediction as _one_percent_regime_grace_prediction,
 )
+from codex_usage_tracker.usage_drain_history_state import (
+    delta_bucket as _delta_bucket,
+)
+from codex_usage_tracker.usage_drain_history_state import (
+    history_state_for_span as _history_state_for_span,
+)
+from codex_usage_tracker.usage_drain_history_state import (
+    previous_call_duration_bucket as _previous_call_duration_bucket,
+)
+from codex_usage_tracker.usage_drain_history_state import (
+    previous_span_wall_time_bucket as _previous_span_wall_time_bucket,
+)
 from codex_usage_tracker.usage_drain_predictive import (
     baseline_predictions as _baseline_predictions,
 )
@@ -214,9 +226,6 @@ from codex_usage_tracker.usage_drain_utils import (
 )
 from codex_usage_tracker.usage_drain_utils import (
     second_bucket as _second_bucket,
-)
-from codex_usage_tracker.usage_drain_utils import (
-    span_wall_time_seconds as _span_wall_time_seconds,
 )
 from codex_usage_tracker.usage_drain_utils import (
     value_mode as _value_mode,
@@ -3344,43 +3353,6 @@ def _walk_forward_scope_metrics(
 
 
 
-def _history_state_for_span(
-    spans: list[UsageDeltaSpan],
-    index: int,
-    metadata: dict[str, Any],
-    previous_deltas: list[float],
-) -> dict[str, Any]:
-    if previous_deltas:
-        one_percent_streak = _tail_streak(
-            previous_deltas, predicate=_is_one_percent_delta
-        )
-        low_delta_streak = _tail_streak(
-            previous_deltas, predicate=lambda value: value <= 1.0
-        )
-        same_delta_streak = _same_value_tail_streak(previous_deltas)
-        previous_delta_value = previous_deltas[-1]
-        previous_delta_bucket = _delta_bucket(previous_deltas[-1])
-    else:
-        one_percent_streak = 0
-        low_delta_streak = 0
-        same_delta_streak = 0
-        previous_delta_value = 0.0
-        previous_delta_bucket = "missing"
-    return {
-        **metadata,
-        "previous_delta_value": previous_delta_value,
-        "previous_delta_bucket": previous_delta_bucket,
-        "one_percent_streak_count": one_percent_streak,
-        "one_percent_streak_bucket": _streak_bucket(one_percent_streak),
-        "low_delta_streak_count": low_delta_streak,
-        "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
-        "same_delta_streak_count": same_delta_streak,
-        "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
-        "previous_span_wall_time_bucket": _previous_span_wall_time_bucket(
-            spans, index
-        ),
-        "previous_call_duration_bucket": _previous_call_duration_bucket(spans, index),
-    }
 
 
 
@@ -3500,39 +3472,10 @@ def _transition_risk_scope(
 
 
 
-def _previous_span_wall_time_bucket(spans: list[UsageDeltaSpan], index: int) -> str:
-    if index <= 0:
-        return "missing"
-    return _second_bucket(_span_wall_time_seconds(spans[index - 1]))
 
 
-def _previous_call_duration_bucket(spans: list[UsageDeltaSpan], index: int) -> str:
-    if index <= 0:
-        return "missing"
-    return _second_bucket(
-        spans[index - 1].timing_totals.get("call_duration_seconds", 0.0)
-    )
 
 
-def _delta_bucket(value: float) -> str:
-    rounded = round(value, 6)
-    if rounded == 1.0:
-        return "1_pct"
-    if rounded == 2.0:
-        return "2_pct"
-    if rounded == 3.0:
-        return "3_pct"
-    if rounded <= 0:
-        return "0_pct"
-    if rounded < 1.0:
-        return "0_1_pct"
-    if rounded < 5.0:
-        return "3_5_pct"
-    if rounded < 10.0:
-        return "5_10_pct"
-    if rounded < 25.0:
-        return "10_25_pct"
-    return "25_plus_pct"
 
 
 

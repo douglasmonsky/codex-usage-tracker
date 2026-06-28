@@ -871,3 +871,42 @@ Checks:
 
 Next handoff:
 - Continue with remaining walk-forward orchestration helpers or start the store-query-boundary roadmap item once the usage-drain hotspot is small enough for review.
+
+### `refactor/usage-drain-history-state`
+
+Goal:
+- Move walk-forward history-state bucket helpers out of `usage_drain_model.py`.
+- Preserve existing report schemas and private call-site aliases.
+- Keep the split small enough to verify with existing usage-drain characterization tests.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/usage_drain_history_state.py` for previous-delta buckets, streak buckets, previous-span wall-time buckets, and previous-call-duration buckets.
+- Replaced local helper definitions in `usage_drain_model.py` with compatibility imports.
+- Updated `tach.toml` so `usage_drain_history_state.py` belongs to the diagnostics/reporting boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_history_state.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and no-test-file change-budget warning for behavior-preserving refactor.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline from 7059 to 7002.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/usage_drain_history_state.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-history-state.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+- `.venv/bin/radon cc src -a -s`: completed; average complexity remains A.
+- `.venv/bin/radon mi src -s`: completed; legacy large-file maintainability index warnings remain visible.
+- `.venv/bin/xenon --max-absolute B --max-modules A --max-average A src`: expected baseline failure on legacy hotspots outside this slice plus existing usage-drain modules not yet refactored.
+
+Next handoff:
+- Continue one small usage-drain orchestration extraction at a time, likely around walk-forward prediction row assembly or transition-risk summary helpers only if the dependency map stays clean.
