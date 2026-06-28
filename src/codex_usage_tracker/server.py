@@ -73,14 +73,12 @@ from codex_usage_tracker.server_routes import (
     POST_ROUTE_METHODS,
     is_dashboard_shell_path,
 )
+from codex_usage_tracker.server_status import status_payload
 from codex_usage_tracker.server_summary import summary_payload
 from codex_usage_tracker.server_usage_refresh import refresh_usage_payload
 from codex_usage_tracker.store import (
-    query_latest_observed_usage,
     query_thread_summaries,
     query_usage_record,
-    query_usage_status,
-    refresh_metadata,
 )
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
@@ -529,43 +527,19 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_status(self, query: str) -> None:
-        params = parse_qs(query)
-        include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
         try:
-            counts = query_usage_status(
+            payload = status_payload(
+                query,
                 db_path=self._db_path,
-                include_archived=include_archived,
+                include_archived_default=self._include_archived,
             )
-            observed_usage = query_latest_observed_usage(
-                db_path=self._db_path,
-                include_archived=include_archived,
-            )
-            metadata = refresh_metadata(self._db_path)
         except sqlite3.Error as exc:
             self._send_json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"error": f"Database error while reading status: {exc}"},
             )
             return
-        parser_diagnostics = {
-            key.removeprefix("parser_"): _safe_int(value)
-            for key, value in metadata.items()
-            if key.startswith("parser_") and _safe_int(value)
-        }
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-status-v1",
-                "payload_schema": "codex-usage-tracker-live-api-v1",
-                "latest_refresh_at": metadata.get("latest_refresh_at"),
-                "include_archived": include_archived,
-                "row_counts": counts,
-                "max_event_timestamp": counts.get("max_event_timestamp"),
-                "observed_usage": observed_usage,
-                "parser_adapter": metadata.get("parser_adapter"),
-                "parser_diagnostics": parser_diagnostics,
-            },
-        )
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_calls(self, query: str) -> None:
         params = parse_qs(query)
