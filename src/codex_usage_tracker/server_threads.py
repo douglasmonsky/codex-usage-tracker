@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -12,6 +15,35 @@ from codex_usage_tracker.server_utils import (
     parse_bool_query_value,
 )
 from codex_usage_tracker.store import query_thread_summaries
+
+ErrorSender = Callable[[HTTPStatus, str], None]
+ExceptionSender = Callable[[str, BaseException], None]
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+
+
+def handle_threads_request(
+    query: str,
+    *,
+    db_path: Path,
+    include_archived_default: bool,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle thread-list route errors and response writing."""
+    try:
+        payload = threads_payload(
+            query,
+            db_path=db_path,
+            include_archived_default=include_archived_default,
+        )
+    except ValueError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading threads", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def threads_payload(

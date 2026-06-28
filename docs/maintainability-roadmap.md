@@ -3603,3 +3603,56 @@ Remaining risks:
 
 Next handoff:
 - Continue with thread route wrappers or summary/recommendation wrappers as another small server branch.
+
+### `refactor/server-thread-handlers`
+
+Goal:
+- Move `/api/threads` and `/api/thread-calls` route wrappers out of `_UsageDashboardHandler`.
+- Preserve bad-request and SQLite error response behavior.
+- Continue reducing `server.py` without changing route URLs or JSON payload schemas.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_call_lists.py`
+- `src/codex_usage_tracker/server_threads.py`
+- `tests/test_server_call_lists.py`
+- `tests/test_server_threads.py`
+
+Completed edits:
+- Added `handle_threads_request` in `server_threads.py`.
+- Added `handle_thread_calls_request` in `server_call_lists.py`.
+- Replaced `_handle_threads` and `_handle_thread_calls` bodies with thin delegates.
+- Added focused tests for successful thread-list/thread-call responses plus SQLite and missing-thread error mapping.
+- Ratcheted max-file baseline `1540 -> 1526`; `server.py` reduced `857 -> 843` lines.
+- Kept `server_threads.py` `80` lines, `server_call_lists.py` `170` lines, `tests/test_server_threads.py` `141` lines, and `tests/test_server_call_lists.py` `197` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_threads.py src/codex_usage_tracker/server_call_lists.py tests/test_server_threads.py tests/test_server_call_lists.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_threads.py src/codex_usage_tracker/server_call_lists.py tests/test_server_threads.py tests/test_server_call_lists.py tests/test_dashboard_server.py`: passed after mechanical import sort.
+- `.venv/bin/python -m pytest tests/test_server_threads.py tests/test_server_call_lists.py tests/test_dashboard_server.py -q`: 24 passed.
+- `radon cc src/codex_usage_tracker/server.py src/codex_usage_tracker/server_threads.py src/codex_usage_tracker/server_call_lists.py -a -s`: new route handlers A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py src/codex_usage_tracker/server_threads.py src/codex_usage_tracker/server_call_lists.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 432 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/tach map -o /tmp/server-thread-handlers-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- `server.py` remains oversized at `843` lines.
+- Summary, recommendation, and usage route wrappers remain server-owned.
+- Broad package structure remains too flat for strict cohesion.
+
+Next handoff:
+- Continue with summary/recommendation wrappers as the next small server branch, then isolate `_handle_usage` separately if still worth doing before switching roadmap modules.

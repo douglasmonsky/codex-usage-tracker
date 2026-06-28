@@ -43,9 +43,8 @@ from codex_usage_tracker.server_call_detail import (
     handle_call_detail_request,
 )
 from codex_usage_tracker.server_call_lists import (
-    MissingThreadKeyError,
     handle_calls_request,
-    thread_calls_payload,
+    handle_thread_calls_request,
 )
 from codex_usage_tracker.server_context_settings import (
     ContextApiState,
@@ -87,7 +86,7 @@ from codex_usage_tracker.server_routes import (
 )
 from codex_usage_tracker.server_status import handle_status_request
 from codex_usage_tracker.server_summary import summary_payload
-from codex_usage_tracker.server_threads import threads_payload
+from codex_usage_tracker.server_threads import handle_threads_request
 from codex_usage_tracker.server_usage_refresh import UsageRefreshAuthError, usage_payload
 
 _first = server_utils.first_query_value
@@ -451,37 +450,24 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_threads(self, query: str) -> None:
-        try:
-            payload = threads_payload(
-                query,
-                db_path=self._db_path,
-                include_archived_default=self._include_archived,
-            )
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading threads", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_threads_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_thread_calls(self, query: str) -> None:
-        try:
-            payload = thread_calls_payload(
-                query,
-                live_query_params=self._live_query_params,
-                live_call_rows=self._live_call_rows,
-            )
-        except MissingThreadKeyError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading thread calls", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_thread_calls_request(
+            query,
+            live_query_params=self._live_query_params,
+            live_call_rows=self._live_call_rows,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_summary(self, query: str) -> None:
         try:

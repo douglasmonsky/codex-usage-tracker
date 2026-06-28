@@ -55,6 +55,31 @@ def handle_calls_request(
     send_json(HTTPStatus.OK, payload)
 
 
+def handle_thread_calls_request(
+    query: str,
+    *,
+    live_query_params: LiveQueryParams,
+    live_call_rows: LiveCallRows,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle thread-call route errors and response writing."""
+    try:
+        payload = thread_calls_payload(
+            query,
+            live_query_params=live_query_params,
+            live_call_rows=live_call_rows,
+        )
+    except (MissingThreadKeyError, ValueError) as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading thread calls", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
+
+
 def calls_payload(
     query: str,
     *,

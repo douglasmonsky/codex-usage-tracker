@@ -68,6 +68,54 @@ def test_handle_calls_request_sends_sqlite_error(monkeypatch: pytest.MonkeyPatch
     assert str(senders.exceptions[0][1]) == "database is locked"
 
 
+def test_handle_thread_calls_request_sends_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+    monkeypatch.setattr(
+        server_call_lists,
+        "thread_calls_payload",
+        lambda query, **_kwargs: {"query": query},
+    )
+
+    server_call_lists.handle_thread_calls_request(
+        "thread_key=thread-1",
+        live_query_params=lambda _params, **_kwargs: {},
+        live_call_rows=lambda **_kwargs: ([], 0),
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == []
+    assert senders.json_payloads == [
+        (HTTPStatus.OK, {"query": "thread_key=thread-1"}),
+    ]
+
+
+def test_handle_thread_calls_request_sends_missing_thread_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def thread_calls_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise server_call_lists.MissingThreadKeyError("thread_key required")
+
+    monkeypatch.setattr(server_call_lists, "thread_calls_payload", thread_calls_payload)
+
+    server_call_lists.handle_thread_calls_request(
+        "",
+        live_query_params=lambda _params, **_kwargs: {},
+        live_call_rows=lambda **_kwargs: ([], 0),
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == [(HTTPStatus.BAD_REQUEST, "thread_key required")]
+    assert senders.json_payloads == []
+
+
 def test_calls_payload_applies_derived_filters_and_pagination() -> None:
     calls: dict[str, Any] = {}
 
