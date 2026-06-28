@@ -2,11 +2,47 @@
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
 from codex_usage_tracker.reports import build_summary_report
 from codex_usage_tracker.server_utils import first_query_value, parse_report_limit
+
+ErrorSender = Callable[[HTTPStatus, str], None]
+ExceptionSender = Callable[[str, BaseException], None]
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+
+
+def handle_summary_request(
+    query: str,
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    projects_path: Path,
+    privacy_mode: str,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle summary route errors and response writing."""
+    try:
+        payload = summary_payload(
+            query,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            projects_path=projects_path,
+            privacy_mode=privacy_mode,
+        )
+    except ValueError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading summary", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def summary_payload(

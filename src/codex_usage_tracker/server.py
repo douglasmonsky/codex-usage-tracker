@@ -67,7 +67,7 @@ from codex_usage_tracker.server_open_investigator import (
     OpenInvestigatorRequestError,
     open_investigator_payload,
 )
-from codex_usage_tracker.server_recommendations import recommendations_payload
+from codex_usage_tracker.server_recommendations import handle_recommendations_request
 from codex_usage_tracker.server_request_guards import (
     has_valid_api_token,
     request_origin_allowed,
@@ -85,7 +85,7 @@ from codex_usage_tracker.server_routes import (
     is_dashboard_shell_path,
 )
 from codex_usage_tracker.server_status import handle_status_request
-from codex_usage_tracker.server_summary import summary_payload
+from codex_usage_tracker.server_summary import handle_summary_request
 from codex_usage_tracker.server_threads import handle_threads_request
 from codex_usage_tracker.server_usage_refresh import UsageRefreshAuthError, usage_payload
 
@@ -470,39 +470,29 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_summary(self, query: str) -> None:
-        try:
-            payload = summary_payload(
-                query,
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                projects_path=self._projects_path,
-                privacy_mode=self._privacy_mode,
-            )
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading summary", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_summary_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_recommendations(self, query: str) -> None:
-        try:
-            payload = recommendations_payload(
-                query,
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                allowance_path=self._allowance_path,
-                projects_path=self._projects_path,
-                privacy_mode=self._privacy_mode,
-            )
-        except ValueError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading recommendations", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_recommendations_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_diagnostics_summary(self, query: str) -> None:
         handle_diagnostics_summary_request(
