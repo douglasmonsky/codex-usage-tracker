@@ -1868,3 +1868,49 @@ Remaining risks:
 Next handoff:
 
 - Extract the remaining piecewise regime segment/streak helpers; this should bring `usage_drain_model.py` below the 600-line target.
+### refactor/usage-drain-regime-segment-summary
+
+Objective:
+
+- Split remaining piecewise regime segment and one-percent streak helpers out of `usage_drain_model.py`.
+- Bring `usage_drain_model.py` below the 600-line file-size target.
+- Preserve existing `delta_regimes`, `regime_streaks`, and `piecewise_regime_segments` payloads.
+
+Status:
+
+- Complete locally.
+
+Completed edits:
+
+- Added `src/codex_usage_tracker/usage_drain_regime_segments.py` for delta-regime summaries, streak/run records, piecewise segment summaries, position-bucket adaptation, and segment prediction metrics.
+- Updated `usage_drain_model.py` to call regime segment summaries through a public module namespace.
+- Updated `tach.toml` to include the regime segment module in the existing diagnostics/report boundary.
+- Ratcheted `max_file_lines` baseline 2824 -> 2657.
+- `usage_drain_model.py` is now 446 lines; the new regime segment module is 336 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_regime_segments.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py src/codex_usage_tracker/usage_drain_regime_segments.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_usage_drain_model.py tests/test_usage_drain_reports.py`: 20 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/usage-drain-regime-segment-summary-tach-map.json`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 2824 -> 2657.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+
+- `usage_drain_model.py` now meets the file-size target, but `server.py`, `context.py`, `cli.py`, and several diagnostics modules remain oversized.
+- The broader roadmap still needs subsequent server/context/parser/store boundary work.
+
+Next handoff:
+
+- Move from usage-drain-model split work to the next large module family, likely `server.py` routing/handlers or `context.py` parser/context boundaries.
