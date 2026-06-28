@@ -1,11 +1,74 @@
 from __future__ import annotations
 
+import sqlite3
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from codex_usage_tracker import server_status
+
+
+class _RouteSenders:
+    def __init__(self) -> None:
+        self.exceptions: list[tuple[str, BaseException]] = []
+        self.json_payloads: list[tuple[HTTPStatus, dict[str, object]]] = []
+
+    def send_exception(self, prefix: str, exc: BaseException) -> None:
+        self.exceptions.append((prefix, exc))
+
+    def send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
+        self.json_payloads.append((status, payload))
+
+
+def test_handle_status_request_sends_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+    monkeypatch.setattr(
+        server_status,
+        "status_payload",
+        lambda query, **kwargs: {"query": query, "archived": kwargs["include_archived_default"]},
+    )
+
+    server_status.handle_status_request(
+        "include_archived=true",
+        db_path=tmp_path / "usage.sqlite3",
+        include_archived_default=False,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.exceptions == []
+    assert senders.json_payloads == [
+        (HTTPStatus.OK, {"query": "include_archived=true", "archived": False}),
+    ]
+
+
+def test_handle_status_request_sends_sqlite_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def status_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(server_status, "status_payload", status_payload)
+
+    server_status.handle_status_request(
+        "",
+        db_path=tmp_path / "usage.sqlite3",
+        include_archived_default=True,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.json_payloads == []
+    assert senders.exceptions[0][0] == "Database error while reading status"
+    assert str(senders.exceptions[0][1]) == "database is locked"
 
 
 def test_status_payload_normalizes_include_archived_and_metadata(

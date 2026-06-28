@@ -87,7 +87,7 @@ from codex_usage_tracker.server_routes import (
     POST_ROUTE_METHODS,
     is_dashboard_shell_path,
 )
-from codex_usage_tracker.server_status import status_payload
+from codex_usage_tracker.server_status import handle_status_request
 from codex_usage_tracker.server_summary import summary_payload
 from codex_usage_tracker.server_threads import threads_payload
 from codex_usage_tracker.server_usage_refresh import UsageRefreshAuthError, usage_payload
@@ -424,16 +424,13 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             return
         self._send_json(HTTPStatus.OK, payload)
     def _handle_status(self, query: str) -> None:
-        try:
-            payload = status_payload(
-                query,
-                db_path=self._db_path,
-                include_archived_default=self._include_archived,
-            )
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while reading status", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        handle_status_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_calls(self, query: str) -> None:
         try:

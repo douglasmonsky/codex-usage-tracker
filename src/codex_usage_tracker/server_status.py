@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -15,6 +18,30 @@ from codex_usage_tracker.store import (
     query_usage_status,
     refresh_metadata,
 )
+
+ExceptionSender = Callable[[str, BaseException], None]
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+
+
+def handle_status_request(
+    query: str,
+    *,
+    db_path: Path,
+    include_archived_default: bool,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle status route errors and response writing."""
+    try:
+        payload = status_payload(
+            query,
+            db_path=db_path,
+            include_archived_default=include_archived_default,
+        )
+    except sqlite3.Error as exc:
+        send_exception("Database error while reading status", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def status_payload(

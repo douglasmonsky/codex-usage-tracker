@@ -3500,3 +3500,53 @@ Remaining risks:
 
 Next handoff:
 - Continue server route wrapper extraction with call/thread/list/status routes, or switch to store/query boundaries if the next route family looks too coupled.
+
+### `refactor/server-status-handler`
+
+Goal:
+- Move `/api/status` route wrapper out of `_UsageDashboardHandler`.
+- Preserve status payload response and SQLite error behavior.
+- Continue reducing `server.py` with a small low-risk branch.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_status.py`
+- `tests/test_server_status.py`
+
+Completed edits:
+- Added `handle_status_request` in `server_status.py`.
+- Replaced `_handle_status` body with a thin delegate.
+- Added focused tests for successful status response and SQLite error mapping.
+- Ratcheted max-file baseline `1558 -> 1555`; `server.py` reduced `875 -> 872` lines.
+- Kept `server_status.py` at `83` lines and `tests/test_server_status.py` at `139` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_status.py tests/test_server_status.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_status.py tests/test_server_status.py tests/test_dashboard_server.py`: passed after mechanical Ruff import fix.
+- `.venv/bin/python -m pytest tests/test_server_status.py tests/test_dashboard_server.py -q`: 15 passed.
+- `radon cc src/codex_usage_tracker/server.py src/codex_usage_tracker/server_status.py -a -s`: status handler A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py src/codex_usage_tracker/server_status.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m pytest -q`: 423 passed.
+- `.venv/bin/tach map -o /tmp/server-status-handler-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1558 -> 1555`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; also warned verify-log metadata was stale/missing after the fast profile, but `verify --profile fast` itself passed.
+
+Remaining risks:
+- `server.py` remains oversized at `872` lines.
+- Calls, threads, summary, recommendations, and usage route wrappers remain server-owned.
+- Broad package structure remains too flat for strict cohesion.
+
+Next handoff:
+- Continue extracting call/thread route wrappers, or switch to store/query boundaries if server slicing becomes too granular.
