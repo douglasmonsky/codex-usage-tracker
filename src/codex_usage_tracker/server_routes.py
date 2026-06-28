@@ -1,0 +1,52 @@
+"""Pure route tables for the local dashboard server."""
+
+from __future__ import annotations
+
+GET_ROUTE_METHODS: dict[str, str] = {
+    "/api/context": "_handle_context",
+    "/api/context-settings": "_handle_context_settings",
+    "/api/open-investigator": "_handle_open_investigator",
+    "/api/status": "_handle_status",
+    "/api/calls": "_handle_calls",
+    "/api/call": "_handle_call",
+    "/api/threads": "_handle_threads",
+    "/api/thread-calls": "_handle_thread_calls",
+    "/api/summary": "_handle_summary",
+    "/api/recommendations": "_handle_recommendations",
+    "/api/diagnostics/summary": "_handle_diagnostics_summary",
+    "/api/diagnostics/facts": "_handle_diagnostics_facts",
+    "/api/diagnostics/fact-calls": "_handle_diagnostics_fact_calls",
+    "/api/diagnostics/overview": "_handle_diagnostics_overview",
+    "/api/diagnostics/tool-output": "_handle_diagnostics_tool_output",
+    "/api/diagnostics/commands": "_handle_diagnostics_commands",
+    "/api/diagnostics/git-interactions": "_handle_diagnostics_git_interactions",
+    "/api/diagnostics/file-reads": "_handle_diagnostics_file_reads",
+    "/api/diagnostics/file-modifications": "_handle_diagnostics_file_modifications",
+    "/api/diagnostics/read-productivity": "_handle_diagnostics_read_productivity",
+    "/api/diagnostics/concentration": "_handle_diagnostics_concentration",
+    "/api/diagnostics/usage-drain": "_handle_diagnostics_usage_drain",
+    "/api/usage": "_handle_usage",
+}
+
+GET_DIAGNOSTIC_FACT_ROUTES: dict[str, dict[str, str]] = {
+    "/api/diagnostics/compactions": {"fact_type": "compaction"},
+    "/api/diagnostics/tools": {"fact_group": "tools"},
+}
+
+POST_ROUTE_METHODS: dict[str, str] = {
+    "/api/diagnostics/refresh": "_handle_diagnostics_refresh",
+    "/api/diagnostics/overview/refresh": "_handle_diagnostics_overview_refresh",
+    "/api/diagnostics/tool-output/refresh": "_handle_diagnostics_tool_output_refresh",
+    "/api/diagnostics/commands/refresh": "_handle_diagnostics_commands_refresh",
+    "/api/diagnostics/git-interactions/refresh": "_handle_diagnostics_git_interactions_refresh",
+    "/api/diagnostics/file-reads/refresh": "_handle_diagnostics_file_reads_refresh",
+    "/api/diagnostics/file-modifications/refresh": "_handle_diagnostics_file_modifications_refresh",
+    "/api/diagnostics/read-productivity/refresh": "_handle_diagnostics_read_productivity_refresh",
+    "/api/diagnostics/concentration/refresh": "_handle_diagnostics_concentration_refresh",
+    "/api/diagnostics/usage-drain/refresh": "_handle_diagnostics_usage_drain_refresh",
+}
+
+
+def is_dashboard_shell_path(path: str, dashboard_name: str) -> bool:
+    """Return whether a path should render the dashboard shell."""
+    return path in {"/", f"/{dashboard_name}"}

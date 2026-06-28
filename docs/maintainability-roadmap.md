@@ -1914,3 +1914,61 @@ Remaining risks:
 Next handoff:
 
 - Move from usage-drain-model split work to the next large module family, likely `server.py` routing/handlers or `context.py` parser/context boundaries.
+
+### refactor/server-route-boundary
+
+Objective:
+
+- Extract pure dashboard server route tables from `_UsageDashboardHandler`.
+- Keep existing handler methods and response payload behavior unchanged.
+- Make future server handler splits smaller and easier to test.
+
+Files touched:
+
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_routes.py`
+- `tests/test_server_routes.py`
+- `tach.toml`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+
+Completed edits:
+
+- Added `GET_ROUTE_METHODS`, `GET_DIAGNOSTIC_FACT_ROUTES`, `POST_ROUTE_METHODS`, and `is_dashboard_shell_path`.
+- Replaced long `do_GET` and `do_POST` route condition chains with table-driven dispatch.
+- Preserved special diagnostics fact filtering for compactions (`fact_type=compaction`) and tools (`fact_group=tools`).
+- Added server route characterization tests.
+- Declared `server_routes` in the dashboard/server `tach` module boundary.
+- Ratcheted max file-line baseline from 2657 to 2570 after reducing `server.py` from 1492 to 1405 lines.
+
+Checks:
+
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_routes.py tests/test_server_routes.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_routes.py tests/test_server_routes.py`: passed.
+- `.venv/bin/python -m pytest -q tests/test_server_routes.py tests/test_dashboard_server.py tests/test_dashboard_diagnostics_snapshots.py`: 23 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 328 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach map -o /tmp/server-route-boundary-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected beta false-positive `repo-root` failure remains; also reports changed paths while branch is uncommitted.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 2657 -> 2570.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `radon cc src -a -s`: ran and reported current complexity inventory.
+- `radon mi src -s`: ran and reported current maintainability inventory.
+- `xenon --max-absolute B --max-modules A --max-average A src`: failed on existing C/D/F complexity hotspots outside this routing slice.
+- `git diff --check`: passed.
+
+Remaining risks:
+
+- `server.py` remains oversized at 1405 lines and still needs handler/body extraction.
+- Broad `xenon` remains red on existing parser/dashboard/usage-drain/report complexity blocks.
+- `context.py`, `cli.py`, and several diagnostics modules remain above the target file-size budget.
+
+Next handoff:
+
+- Continue `refactor/server-routing-and-handlers` with a narrow extraction of live API query/row helper logic or diagnostics snapshot handler plumbing.

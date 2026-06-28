@@ -74,6 +74,12 @@ from codex_usage_tracker.reports import (
     build_summary_report,
 )
 from codex_usage_tracker.server_responses import send_html_response, send_json_response
+from codex_usage_tracker.server_routes import (
+    GET_DIAGNOSTIC_FACT_ROUTES,
+    GET_ROUTE_METHODS,
+    POST_ROUTE_METHODS,
+    is_dashboard_shell_path,
+)
 from codex_usage_tracker.store import (
     query_latest_observed_usage,
     query_thread_summaries,
@@ -278,85 +284,18 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if not self._request_origin_allowed():
             self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
             return
-        if parsed.path == "/api/context":
-            self._handle_context(parsed.query)
+        route_method = GET_ROUTE_METHODS.get(parsed.path)
+        if route_method is not None:
+            getattr(self, route_method)(parsed.query)
             return
-        if parsed.path == "/api/context-settings":
-            self._handle_context_settings(parsed.query)
-            return
-        if parsed.path == "/api/open-investigator":
-            self._handle_open_investigator(parsed.query)
-            return
-        if parsed.path == "/api/status":
-            self._handle_status(parsed.query)
-            return
-        if parsed.path == "/api/calls":
-            self._handle_calls(parsed.query)
-            return
-        if parsed.path == "/api/call":
-            self._handle_call(parsed.query)
-            return
-        if parsed.path == "/api/threads":
-            self._handle_threads(parsed.query)
-            return
-        if parsed.path == "/api/thread-calls":
-            self._handle_thread_calls(parsed.query)
-            return
-        if parsed.path == "/api/summary":
-            self._handle_summary(parsed.query)
-            return
-        if parsed.path == "/api/recommendations":
-            self._handle_recommendations(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/summary":
-            self._handle_diagnostics_summary(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/facts":
-            self._handle_diagnostics_facts(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/fact-calls":
-            self._handle_diagnostics_fact_calls(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/compactions":
-            self._handle_diagnostics_facts(parsed.query, fact_type="compaction")
-            return
-        if parsed.path == "/api/diagnostics/tools":
-            self._handle_diagnostics_facts(parsed.query, fact_group="tools")
-            return
-        if parsed.path == "/api/diagnostics/overview":
-            self._handle_diagnostics_overview(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/tool-output":
-            self._handle_diagnostics_tool_output(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/commands":
-            self._handle_diagnostics_commands(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/git-interactions":
-            self._handle_diagnostics_git_interactions(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-reads":
-            self._handle_diagnostics_file_reads(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-modifications":
-            self._handle_diagnostics_file_modifications(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/read-productivity":
-            self._handle_diagnostics_read_productivity(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/concentration":
-            self._handle_diagnostics_concentration(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/usage-drain":
-            self._handle_diagnostics_usage_drain(parsed.query)
-            return
-        if parsed.path == "/api/usage":
-            self._handle_usage(parsed.query)
+        fact_filters = GET_DIAGNOSTIC_FACT_ROUTES.get(parsed.path)
+        if fact_filters is not None:
+            self._handle_diagnostics_facts(parsed.query, **fact_filters)
             return
         if self._is_investigator_dashboard_request(parsed.path, parsed.query):
             self._handle_investigator_dashboard(parsed.query)
             return
-        if parsed.path in {"/", f"/{self._dashboard_name}"}:
+        if is_dashboard_shell_path(parsed.path, self._dashboard_name):
             self._handle_dashboard_shell(parsed.query)
             return
         super().do_GET()
@@ -366,35 +305,9 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         if not self._request_origin_allowed():
             self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
             return
-        if parsed.path == "/api/diagnostics/refresh":
-            self._handle_diagnostics_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/overview/refresh":
-            self._handle_diagnostics_overview_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/tool-output/refresh":
-            self._handle_diagnostics_tool_output_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/commands/refresh":
-            self._handle_diagnostics_commands_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/git-interactions/refresh":
-            self._handle_diagnostics_git_interactions_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-reads/refresh":
-            self._handle_diagnostics_file_reads_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-modifications/refresh":
-            self._handle_diagnostics_file_modifications_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/read-productivity/refresh":
-            self._handle_diagnostics_read_productivity_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/concentration/refresh":
-            self._handle_diagnostics_concentration_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/usage-drain/refresh":
-            self._handle_diagnostics_usage_drain_refresh(parsed.query)
+        route_method = POST_ROUTE_METHODS.get(parsed.path)
+        if route_method is not None:
+            getattr(self, route_method)(parsed.query)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
 
