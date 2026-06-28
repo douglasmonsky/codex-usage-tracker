@@ -3298,3 +3298,55 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/server-routing-and-handlers` with another small server branch, preferably extracting context route handling or diagnostic snapshot dispatch into tested helpers.
+
+### `refactor/server-context-request-handler`
+
+Goal:
+- Move context endpoint auth/error mapping out of `_UsageDashboardHandler`.
+- Keep `/api/context` status codes, JSON payloads, and SQLite/OSError handling stable.
+- Reduce `server.py` complexity and line count without worsening the oversized dashboard test file.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_context.py`
+- `tests/test_dashboard_server.py`
+- `tests/test_server_context.py`
+
+Completed edits:
+- Added `handle_context_request` in `server_context.py` with typed sender callbacks.
+- Replaced `_UsageDashboardHandler._handle_context` body with a thin dispatcher.
+- Added focused tests for disabled context API, missing token, and successful context payload forwarding.
+- Updated existing dashboard SQLite-error test to patch `server_module.server_context.context_payload`.
+- Ratcheted max-file baseline `1618 -> 1593`; `server.py` reduced `935 -> 910` lines.
+- Removed `_handle_context` from the server Radon hotspot list; the extracted route helper is B-rated in the focused context module.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_context.py tests/test_server_context.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_context.py tests/test_server_context.py tests/test_dashboard_server.py`: passed after mechanical Ruff import fix.
+- `.venv/bin/python -m pytest tests/test_server_context.py tests/test_dashboard_server.py -q`: 18 passed.
+- `radon cc src/codex_usage_tracker/server.py src/codex_usage_tracker/server_context.py -a -s`: server `_handle_context` removed from hotspot list; `handle_context_request` B.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py src/codex_usage_tracker/server_context.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m pytest -q`: 413 passed.
+- `.venv/bin/tach map -o /tmp/server-context-request-handler-tach-map.json`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1618 -> 1593`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `server.py` remains oversized at `910` lines.
+- `handle_context_request` is still B complexity, though now isolated and directly tested.
+- Broad package structure remains too flat for the eventual strict cohesion target.
+
+Next handoff:
+- Continue `refactor/server-routing-and-handlers` by extracting another route family, likely diagnostic snapshot dispatch, then revisit `server.py` once it is below the largest-file ratchet target.

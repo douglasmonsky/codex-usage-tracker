@@ -1,11 +1,101 @@
 from __future__ import annotations
 
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from codex_usage_tracker import server_context
+
+
+class _ContextSenders:
+    def __init__(self) -> None:
+        self.errors: list[tuple[HTTPStatus, str, dict[str, object]]] = []
+        self.exceptions: list[tuple[str, BaseException]] = []
+        self.json_payloads: list[tuple[HTTPStatus, dict[str, object]]] = []
+
+    def send_error(
+        self,
+        status: HTTPStatus,
+        message: str,
+        **extra: object,
+    ) -> None:
+        self.errors.append((status, message, extra))
+
+    def send_exception(self, prefix: str, exc: BaseException) -> None:
+        self.exceptions.append((prefix, exc))
+
+    def send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
+        self.json_payloads.append((status, payload))
+
+
+def test_handle_context_request_rejects_disabled_context_api(tmp_path: Path) -> None:
+    senders = _ContextSenders()
+
+    server_context.handle_context_request(
+        "record_id=rec-1",
+        db_path=tmp_path / "usage.sqlite3",
+        default_context_chars=999,
+        context_api_enabled=False,
+        has_valid_api_token=lambda _params: True,
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == [
+        (
+            HTTPStatus.FORBIDDEN,
+            "Context loading disabled for dashboard server.",
+            {"context_api_enabled": False, "can_enable_context_api": True},
+        ),
+    ]
+    assert senders.json_payloads == []
+
+
+def test_handle_context_request_rejects_missing_token(tmp_path: Path) -> None:
+    senders = _ContextSenders()
+
+    server_context.handle_context_request(
+        "record_id=rec-1",
+        db_path=tmp_path / "usage.sqlite3",
+        default_context_chars=999,
+        context_api_enabled=True,
+        has_valid_api_token=lambda _params: False,
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == [(HTTPStatus.FORBIDDEN, "Valid API token required", {})]
+    assert senders.json_payloads == []
+
+
+def test_handle_context_request_sends_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _ContextSenders()
+    monkeypatch.setattr(
+        server_context,
+        "context_payload",
+        lambda *_args, **_kwargs: {"record_id": "rec-1"},
+    )
+
+    server_context.handle_context_request(
+        "record_id=rec-1",
+        db_path=tmp_path / "usage.sqlite3",
+        default_context_chars=999,
+        context_api_enabled=True,
+        has_valid_api_token=lambda _params: True,
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == []
+    assert senders.json_payloads == [(HTTPStatus.OK, {"record_id": "rec-1"})]
 
 
 def test_context_payload_normalizes_query_parameters(

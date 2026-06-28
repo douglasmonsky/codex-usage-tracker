@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from codex_usage_tracker import server_utils
+from codex_usage_tracker import server_context, server_utils
 from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS
 from codex_usage_tracker.dashboard import (
     generate_dashboard,
@@ -49,7 +49,6 @@ from codex_usage_tracker.server_call_lists import (
     calls_payload,
     thread_calls_payload,
 )
-from codex_usage_tracker.server_context import ContextRequestError, context_payload
 from codex_usage_tracker.server_context_settings import (
     ContextApiState,
     context_settings_payload,
@@ -389,40 +388,16 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         super().log_message(format, *args)
 
     def _handle_context(self, query: str) -> None:
-        params = parse_qs(query)
-        if not self._context_api_state.enabled:
-            self._send_error(
-                HTTPStatus.FORBIDDEN,
-                "Context loading disabled for dashboard server.",
-                context_api_enabled=False,
-                can_enable_context_api=True,
-            )
-            return
-        if not self._has_valid_api_token(params):
-            self._send_error(HTTPStatus.FORBIDDEN, "Valid API token required")
-            return
-        try:
-            payload = context_payload(
-                query,
-                db_path=self._db_path,
-                default_context_chars=self._context_chars,
-            )
-        except ContextRequestError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-            return
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while loading context", exc)
-            return
-        except ValueError as exc:
-            self._send_error(HTTPStatus.NOT_FOUND, str(exc))
-            return
-        except FileNotFoundError as exc:
-            self._send_error(HTTPStatus.NOT_FOUND, str(exc))
-            return
-        except OSError as exc:
-            self._send_exception("Could not read source log", exc)
-            return
-        self._send_json(HTTPStatus.OK, payload)
+        server_context.handle_context_request(
+            query,
+            db_path=self._db_path,
+            default_context_chars=self._context_chars,
+            context_api_enabled=self._context_api_state.enabled,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_context_settings(self, query: str) -> None:
         params = parse_qs(query)

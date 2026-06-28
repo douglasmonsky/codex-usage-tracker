@@ -1018,7 +1018,7 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
         raise sqlite3.OperationalError("database is locked")
 
     monkeypatch.setattr(server_module, "usage_payload", broken_dashboard_payload)
-    monkeypatch.setattr(server_module, "context_payload", broken_context)
+    monkeypatch.setattr(server_module.server_context, "context_payload", broken_context)
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),

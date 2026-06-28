@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
+from typing import Protocol
 from urllib.parse import parse_qs
 
 from codex_usage_tracker.context import (
@@ -21,6 +25,68 @@ from codex_usage_tracker.server_utils import (
 
 class ContextRequestError(ValueError):
     """Raised for invalid context API request parameters."""
+
+
+class ErrorSender(Protocol):
+    def __call__(
+        self,
+        status: HTTPStatus,
+        message: str,
+        **extra: object,
+    ) -> None: ...
+
+
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+ExceptionSender = Callable[[str, BaseException], None]
+TokenValidator = Callable[[dict[str, list[str]]], bool]
+
+
+def handle_context_request(
+    query: str,
+    *,
+    db_path: Path,
+    default_context_chars: int,
+    context_api_enabled: bool,
+    has_valid_api_token: TokenValidator,
+    send_error: ErrorSender,
+    send_exception: ExceptionSender,
+    send_json: JsonSender,
+) -> None:
+    """Handle the context route while keeping server.py as a thin dispatcher."""
+    params = parse_qs(query)
+    if not context_api_enabled:
+        send_error(
+            HTTPStatus.FORBIDDEN,
+            "Context loading disabled for dashboard server.",
+            context_api_enabled=False,
+            can_enable_context_api=True,
+        )
+        return
+    if not has_valid_api_token(params):
+        send_error(HTTPStatus.FORBIDDEN, "Valid API token required")
+        return
+    try:
+        payload = context_payload(
+            query,
+            db_path=db_path,
+            default_context_chars=default_context_chars,
+        )
+    except ContextRequestError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
+    except sqlite3.Error as exc:
+        send_exception("Database error while loading context", exc)
+        return
+    except ValueError as exc:
+        send_error(HTTPStatus.NOT_FOUND, str(exc))
+        return
+    except FileNotFoundError as exc:
+        send_error(HTTPStatus.NOT_FOUND, str(exc))
+        return
+    except OSError as exc:
+        send_exception("Could not read source log", exc)
+        return
+    send_json(HTTPStatus.OK, payload)
 
 
 def context_payload(
