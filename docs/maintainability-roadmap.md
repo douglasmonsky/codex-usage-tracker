@@ -1462,3 +1462,45 @@ Remaining risks:
 
 Next handoff:
 - Extract refresh orchestration out of `store.py` into a service module allowed to depend on both parser and store persistence, while preserving the `store.refresh_usage_index`/`rebuild_usage_index` public facade.
+
+### `refactor/store-refresh-orchestration-boundary`
+
+Goal:
+- Remove the remaining direct parser dependency from `store.py`.
+- Move log scanning/parsing refresh orchestration into an application-service module.
+- Preserve `store.refresh_usage_index` and `store.rebuild_usage_index` as public compatibility facades.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_refresh.py` for refresh/rebuild orchestration.
+- Left persistence helpers in `store.py` and replaced refresh/rebuild implementations with thin local-import wrappers.
+- Preserved the existing `codex_usage_tracker.store.parse_usage_events_from_file_with_state` monkeypatch seam by publishing and consulting the parser callable through the store facade from `store_refresh.py`.
+- Updated `tach.toml` to classify `store_refresh` with application/report services and allow persistence facades to depend on it.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/store.py src/codex_usage_tracker/store_refresh.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_refresh.py --fix`: passed.
+- `.venv/bin/python -m pytest -q tests/test_store_dashboard_mcp.py::test_refresh_indexes_only_appended_token_events_when_source_grows tests/test_store_dashboard_mcp.py::test_refresh_reparses_source_when_parser_adapter_changes`: 2 passed.
+- `.venv/bin/python -m pytest -q tests/test_store_migrations.py tests/test_context_evidence.py tests/test_dashboard_payload.py tests/test_privacy.py`: 21 passed.
+- `.venv/bin/tach check`: passed, all modules validated.
+- `.venv/bin/tach report src/codex_usage_tracker/store_refresh.py --dependencies --usages`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure/cohesion and change-budget warnings.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach map -o /tmp/store-refresh-orchestration-boundary-tach-map.json`: passed.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `store.py` still contains persistence responsibilities that can be split further, but it no longer owns parser refresh orchestration.
+- The compatibility monkeypatch seam is intentionally preserved for existing tests/callers; a later public API cleanup should deprecate it deliberately instead of removing it as incidental refactor fallout.
+
+Next handoff:
+- Move to smaller store persistence slices or server route-handler extraction now that Tach passes for the current boundary map.

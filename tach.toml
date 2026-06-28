@@ -142,6 +142,7 @@ depends_on = [
   "codex_usage_tracker.store_query_sql",
   "codex_usage_tracker.store_rows",
   "codex_usage_tracker.store_schema",
+  "codex_usage_tracker.store_refresh",
   "codex_usage_tracker.store_sources",
   "codex_usage_tracker.store_summary_queries",
   "codex_usage_tracker.store_thread_summaries",
@@ -156,6 +157,7 @@ paths = [
     "codex_usage_tracker.api_payloads",
     "codex_usage_tracker.recommendations",
     "codex_usage_tracker.reports",
+    "codex_usage_tracker.store_refresh",
     "codex_usage_tracker.support",
 ]
 depends_on = [
@@ -171,6 +173,7 @@ depends_on = [
     "codex_usage_tracker.json_contracts",
     "codex_usage_tracker.models",
     "codex_usage_tracker.parser",
+    "codex_usage_tracker.parser_state",
     "codex_usage_tracker.paths",
     "codex_usage_tracker.pricing",
     "codex_usage_tracker.pricing_config",
@@ -182,6 +185,8 @@ depends_on = [
     "codex_usage_tracker.reports",
     "codex_usage_tracker.schema",
     "codex_usage_tracker.store",
+    "codex_usage_tracker.store_connection",
+    "codex_usage_tracker.store_refresh",
     "codex_usage_tracker.store_query_sql",
     "codex_usage_tracker.store_schema",
     "codex_usage_tracker.store_sources",
