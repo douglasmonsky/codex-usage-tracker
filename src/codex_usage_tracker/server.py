@@ -75,11 +75,9 @@ from codex_usage_tracker.server_routes import (
 )
 from codex_usage_tracker.server_status import status_payload
 from codex_usage_tracker.server_summary import summary_payload
+from codex_usage_tracker.server_threads import threads_payload
 from codex_usage_tracker.server_usage_refresh import refresh_usage_payload
-from codex_usage_tracker.store import (
-    query_thread_summaries,
-    query_usage_record,
-)
+from codex_usage_tracker.store import query_usage_record
 
 _allowed_loopback_host = server_utils.allowed_loopback_host
 _elapsed_ms = server_utils.elapsed_ms
@@ -640,21 +638,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_threads(self, query: str) -> None:
-        params = parse_qs(query)
         try:
-            limit = _parse_api_limit(_first(params.get("limit")), 100)
-            offset = _parse_api_offset(_first(params.get("offset")))
-            include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
-            sort = _first(params.get("sort")) or "tokens"
-            direction = _first(params.get("direction")) or "desc"
-            rows = query_thread_summaries(
+            payload = threads_payload(
+                query,
                 db_path=self._db_path,
-                limit=limit,
-                offset=offset,
-                search=_first(params.get("q")) or _first(params.get("search")),
-                include_archived=include_archived,
-                sort=sort,
-                direction=direction,
+                include_archived_default=self._include_archived,
             )
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -665,18 +653,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 {"error": f"Database error while reading threads: {exc}"},
             )
             return
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-threads-v1",
-                "rows": rows,
-                "row_count": len(rows),
-                "limit": limit,
-                "offset": offset,
-                "include_archived": include_archived,
-                "raw_context_included": False,
-            },
-        )
+        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_thread_calls(self, query: str) -> None:
         params = parse_qs(query)
