@@ -3052,3 +3052,52 @@ Remaining risks:
 
 Next handoff:
 - Continue `refactor/context-and-parser-boundaries` with a small extraction of serialized evidence bucketing or action timing from `context.py`, then reassess whether `context.py` can drop below 600 without making the orchestration harder to read.
+### `refactor/context-action-timing`
+Goal:
+- Move selected-turn action timing annotation out of `context.py`.
+- Keep action timing payload shape unchanged.
+- Add direct tests for elapsed time, previous-entry gaps, invalid timestamps, and millisecond normalization.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `docs/maintainability-roadmap.md`
+- `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/context_action_timing.py`
+- `tach.toml`
+- `tests/test_context_action_timing.py`
+
+Completed edits:
+- Added `context_action_timing.py` with public helpers `annotate_action_timing` and `normalize_millisecond_value`.
+- Removed timestamp parsing, gap calculation, and duration normalization helpers from `context.py`.
+- Preserved the action timing summary keys and per-entry `action_timing` metadata.
+- Added `context_action_timing` to the context/parser `tach` boundary.
+- Ratcheted max-file baseline `1742 -> 1680`; `context.py` reduced from `675` to `613` lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/context.py src/codex_usage_tracker/context_action_timing.py tests/test_context_action_timing.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/context.py src/codex_usage_tracker/context_action_timing.py tests/test_context_action_timing.py tests/test_context_evidence.py tests/test_privacy.py`: passed.
+- `.venv/bin/python -m pytest tests/test_context_action_timing.py tests/test_context_summaries.py tests/test_context_evidence.py tests/test_privacy.py -q`: 19 passed.
+- `radon cc src/codex_usage_tracker/context_action_timing.py src/codex_usage_tracker/context.py -a -s`: `context_action_timing.py` worst block B (6); `context.py` still has existing `_read_context_entries` E and `_serialized_bucket_label` C.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/context_action_timing.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m pytest -q`: 398 passed.
+- `.venv/bin/tach map -o /tmp/context-action-timing-tach-map.json`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning; warning about changed Python source before staging expected.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline `1742 -> 1680`.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected `agent-maintainer 0.1.0b1` repo-root false positive remains; changed-path warning expected before commit.
+
+Remaining risks:
+- `context.py` remains above the eventual 600-line target at `613` lines.
+- `_read_context_entries` remains high complexity and still owns scan orchestration plus serialized evidence accumulation.
+- Broad `xenon --max-absolute B --max-modules A --max-average A src` remains red on existing non-context hotspots outside this slice.
+
+Next handoff:
+- Continue with serialized evidence helper extraction from `context.py`; this should likely bring `context.py` below 600 and reduce the context module average, while leaving the selected-turn scan loop as the facade.

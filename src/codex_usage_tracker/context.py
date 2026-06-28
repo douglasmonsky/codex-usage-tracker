@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from math import ceil
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from codex_usage_tracker.context_action_timing import (
+    annotate_action_timing,
+    normalize_millisecond_value,
+)
 from codex_usage_tracker.context_summaries import (
     dedupe_chat_message_echoes,
     summarize_payload,
@@ -336,7 +339,7 @@ def _read_context_entries(
         )
     serialized_estimate_ms = _elapsed_ms(serialized_started)
     candidates = dedupe_chat_message_echoes(candidates)
-    action_timing = _annotate_action_timing(candidates)
+    action_timing = annotate_action_timing(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
     omitted["parse_errors"] = omitted_parse_errors
     omitted["target_turn_id"] = target_turn_id
@@ -467,75 +470,10 @@ def _context_entry(
         entry["compaction"] = compaction
     if action_duration_ms is not None:
         entry["action_timing"] = {
-            "reported_duration_ms": _normalize_millisecond_value(action_duration_ms),
+            "reported_duration_ms": normalize_millisecond_value(action_duration_ms),
             "duration_source": "event.duration_ms",
         }
     return entry
-
-
-def _annotate_action_timing(entries: list[dict[str, Any]]) -> dict[str, Any]:
-    first_ms: float | None = None
-    previous_ms: float | None = None
-    last_ms: float | None = None
-    timed_entries = 0
-    slowest_gap_ms = 0.0
-
-    for entry in entries:
-        timestamp_ms = _timestamp_epoch_ms(entry.get("timestamp"))
-        if timestamp_ms is None:
-            continue
-        if first_ms is None:
-            first_ms = timestamp_ms
-        existing_timing = entry.get("action_timing")
-        action_timing = dict(existing_timing) if isinstance(existing_timing, dict) else {}
-        action_timing["since_turn_start_ms"] = _duration_between_ms(first_ms, timestamp_ms)
-        if previous_ms is not None:
-            gap_ms = _duration_between_ms(previous_ms, timestamp_ms)
-            action_timing["since_previous_entry_ms"] = gap_ms
-            slowest_gap_ms = max(slowest_gap_ms, float(gap_ms))
-        action_timing["timestamp_source"] = "entry.timestamp"
-        entry["action_timing"] = action_timing
-        previous_ms = timestamp_ms
-        last_ms = timestamp_ms
-        timed_entries += 1
-
-    total_elapsed_ms = (
-        _duration_between_ms(first_ms, last_ms)
-        if first_ms is not None and last_ms is not None
-        else 0
-    )
-    return {
-        "available": timed_entries > 1,
-        "scope": "selected_turn_evidence_entries",
-        "source": "entry_timestamps",
-        "timed_entry_count": timed_entries,
-        "total_elapsed_ms": total_elapsed_ms,
-        "slowest_gap_ms": _normalize_millisecond_value(slowest_gap_ms),
-    }
-
-
-def _timestamp_epoch_ms(value: object) -> float | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    normalized = value.strip()
-    if normalized.endswith("Z"):
-        normalized = f"{normalized[:-1]}+00:00"
-    try:
-        parsed = datetime.fromisoformat(normalized)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.timestamp() * 1000
-
-
-def _duration_between_ms(start_ms: float, end_ms: float) -> int | float:
-    return _normalize_millisecond_value(max(0.0, end_ms - start_ms))
-
-
-def _normalize_millisecond_value(value: float) -> int | float:
-    rounded = round(value, 3)
-    return int(rounded) if rounded.is_integer() else rounded
 
 
 def _limit_entries(

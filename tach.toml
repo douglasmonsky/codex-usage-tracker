@@ -70,6 +70,7 @@ depends_on = [
 [[modules]]
 paths = [
     "codex_usage_tracker.context",
+    "codex_usage_tracker.context_action_timing",
     "codex_usage_tracker.context_summaries",
     "codex_usage_tracker.context_token_estimates",
     "codex_usage_tracker.context_values",
@@ -81,6 +82,7 @@ depends_on = [
     "codex_usage_tracker.allowance",
     "codex_usage_tracker.call_origin",
     "codex_usage_tracker.context",
+    "codex_usage_tracker.context_action_timing",
     "codex_usage_tracker.context_summaries",
     "codex_usage_tracker.context_token_estimates",
     "codex_usage_tracker.context_values",
