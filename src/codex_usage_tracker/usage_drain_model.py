@@ -14,6 +14,8 @@ from typing import Any
 
 from codex_usage_tracker import usage_drain_allowance_breakpoints as allowance_breakpoints
 from codex_usage_tracker import usage_drain_boundary_delta as boundary_delta
+from codex_usage_tracker import usage_drain_boundary_delta_summary as boundary_delta_summary
+from codex_usage_tracker import usage_drain_boundary_scopes as boundary_scopes
 from codex_usage_tracker import usage_drain_token_components as token_components
 from codex_usage_tracker import usage_drain_walk_forward as walk_forward
 from codex_usage_tracker.usage_drain_capacity_specs import (
@@ -77,9 +79,6 @@ from codex_usage_tracker.usage_drain_regression import (
 from codex_usage_tracker.usage_drain_spans import (
     build_usage_delta_spans,
     load_fast_proxy_annotations,  # noqa: F401
-)
-from codex_usage_tracker.usage_drain_state_buckets import (
-    state_bucket_model_diagnostics as _state_bucket_model_diagnostics,
 )
 from codex_usage_tracker.usage_drain_summary_metrics import (
     SPAN_CAPACITY_CORRELATION_FEATURES,
@@ -166,29 +165,6 @@ BOUNDARY_CONTEXT_FIELDS = (
     "previous_call_duration_bucket",
     "rate_limit_plan_type",
     "rate_limit_limit_id",
-)
-BOUNDARY_DELTA_RESIDUAL_MODELS = (
-    "previous_delta",
-    "risk_weighted_label_segment_age_mode",
-    "risk_weighted_boundary_conditioned_mode",
-    "adaptive_mae_gate_label_segment_age_mode",
-)
-BOUNDARY_DELTA_ERROR_CONTEXT_FIELDS = (
-    "boundary_state",
-    "transition",
-    "previous_label",
-    "current_label",
-    "previous_segment_position_bucket",
-    "previous_segment_wall_time_bucket",
-    "window_elapsed_bucket",
-    "reset_remaining_bucket",
-    "day_of_week",
-    "hour_bucket",
-    "previous_span_wall_time_bucket",
-    "previous_call_duration_bucket",
-    "one_percent_streak_bucket",
-    "same_delta_streak_bucket",
-    "low_delta_streak_bucket",
 )
 BOUNDARY_RISK_SCOPE_STARTS = {
     "all_after_first": 1,
@@ -560,7 +536,7 @@ def _piecewise_boundary_diagnostics(
             for field_name in BOUNDARY_CONTEXT_FIELDS
         },
         "walk_forward_risk": _boundary_walk_forward_risk_summary(rows),
-        "walk_forward_delta_prediction": _boundary_walk_forward_delta_prediction_summary(
+        "walk_forward_delta_prediction": boundary_delta_summary.boundary_walk_forward_delta_prediction_summary(
             rows
         ),
         "latest_boundaries": _latest_piecewise_boundaries(rows),
@@ -716,21 +692,13 @@ def _boundary_walk_forward_risk_summary(rows: list[dict[str, Any]]) -> dict[str,
         "scopes": {
             scope_name: _boundary_risk_scope(
                 risk_rows,
-                start_index=_boundary_scope_start_index(rows, start),
+                start_index=boundary_scopes.boundary_scope_start_index(rows, start),
             )
             for scope_name, start in BOUNDARY_RISK_SCOPE_STARTS.items()
         },
     }
 
 
-def _boundary_scope_start_index(rows: list[dict[str, Any]], start: int | float) -> int:
-    if not rows:
-        return 0
-    if isinstance(start, float):
-        return max(1, min(len(rows) - 1, int(len(rows) * start)))
-    if start < 0:
-        return max(len(rows) + start, 1)
-    return start
 
 
 def _boundary_walk_forward_risk_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -847,294 +815,6 @@ def _boundary_risk_detail_diagnostics(
             )[:8]
         ],
     }
-
-
-def _boundary_walk_forward_delta_prediction_summary(
-    rows: list[dict[str, Any]],
-) -> dict[str, Any]:
-    prediction_rows = boundary_delta.boundary_walk_forward_delta_prediction_rows(rows)
-    return {
-        "target": "next_visible_usage_delta_percent",
-        "prediction_models": {
-            "previous_delta": "Predicts the previous visible usage delta.",
-            "prior_mode_delta": "Predicts the modal prior next-span delta.",
-            "segment_age_mode": (
-                "Uses the modal prior next-span delta from matching segment age."
-            ),
-            "label_segment_age_mode": (
-                "Uses the modal prior next-span delta from matching previous label "
-                "plus segment-position age."
-            ),
-            "reset_segment_age_mode": (
-                "Uses the modal prior next-span delta from matching segment age "
-                "plus reset-window context."
-            ),
-            "calendar_segment_age_mode": (
-                "Uses the modal prior next-span delta from matching segment age "
-                "plus day/hour context."
-            ),
-            "risk_gated_label_segment_age_mode": (
-                "Uses previous delta unless previous-label plus segment-age boundary "
-                "risk is at least 50%, then uses the matched label/segment-age mode."
-            ),
-            "risk_weighted_label_segment_age_mode": (
-                "Blends previous delta with matched label/segment-age mode according "
-                "to the prior boundary-risk estimate."
-            ),
-            "adaptive_mae_gate_label_segment_age_mode": (
-                "Selects the prior-best boundary-risk threshold by MAE, then gates "
-                "between previous delta and matched label/segment-age mode."
-            ),
-            "adaptive_rmse_gate_label_segment_age_mode": (
-                "Selects the prior-best boundary-risk threshold by RMSE, then gates "
-                "between previous delta and matched label/segment-age mode."
-            ),
-            "boundary_conditioned_label_segment_age_mode": (
-                "Uses the modal prior next-span delta from matching prior boundary "
-                "rows only."
-            ),
-            "risk_weighted_boundary_conditioned_mode": (
-                "Blends previous delta with the boundary-conditioned mode according "
-                "to the prior boundary-risk estimate."
-            ),
-        },
-        "scopes": {
-            scope_name: _boundary_delta_prediction_scope(
-                prediction_rows,
-                start_index=_boundary_scope_start_index(rows, start),
-            )
-            for scope_name, start in BOUNDARY_RISK_SCOPE_STARTS.items()
-        },
-    }
-
-
-
-def _boundary_delta_prediction_scope(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> dict[str, Any]:
-    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
-    actual = [_number(row.get("delta_percent")) for row in scope_rows]
-    model_names = _boundary_delta_model_names(scope_rows)
-    return {
-        "start_index": start_index,
-        "n": len(scope_rows),
-        "actual": _value_distribution(actual),
-        "models": {
-            model_name: _regression_metrics(
-                actual,
-                [
-                    _number(
-                        (row.get("boundary_delta_predictions") or {}).get(model_name)
-                    )
-                    for row in scope_rows
-                ],
-            )
-            for model_name in model_names
-        },
-        "prediction_detail_diagnostics": {
-            model_name: _state_bucket_model_diagnostics(scope_rows, model_name)
-            for model_name in model_names
-            if model_name in boundary_delta.BOUNDARY_DELTA_MODEL_SIGNATURES
-            or model_name in boundary_delta.BOUNDARY_CONDITIONED_DELTA_MODEL_SIGNATURES
-        },
-        "risk_gate_diagnostics": {
-            model_name: _boundary_delta_risk_gate_diagnostics(scope_rows, model_name)
-            for model_name in (
-                "risk_gated_label_segment_age_mode",
-                "risk_weighted_label_segment_age_mode",
-                "risk_weighted_boundary_conditioned_mode",
-                "adaptive_mae_gate_label_segment_age_mode",
-                "adaptive_rmse_gate_label_segment_age_mode",
-            )
-            if model_name in model_names
-        },
-        "residual_diagnostics": {
-            model_name: _boundary_delta_residual_diagnostics(scope_rows, model_name)
-            for model_name in BOUNDARY_DELTA_RESIDUAL_MODELS
-            if model_name in model_names
-        },
-    }
-
-
-def _boundary_delta_model_names(rows: list[dict[str, Any]]) -> list[str]:
-    names: list[str] = []
-    for row in rows:
-        for name in row.get("boundary_delta_predictions") or {}:
-            if name not in names:
-                names.append(str(name))
-    return names
-
-
-
-
-
-def _boundary_delta_risk_gate_diagnostics(
-    rows: list[dict[str, Any]], model_name: str
-) -> dict[str, Any]:
-    details = [
-        (row.get("boundary_delta_prediction_details") or {}).get(model_name) or {}
-        for row in rows
-    ]
-    if not details:
-        return {
-            "n": 0,
-            "override_share": None,
-            "mean_risk": None,
-            "mean_support": None,
-            "mean_threshold": None,
-            "source_counts": [],
-        }
-    source_counts: dict[str, int] = {}
-    risks: list[float] = []
-    supports: list[int] = []
-    thresholds: list[float] = []
-    for detail in details:
-        source = str(detail.get("source") or "missing")
-        source_counts[source] = source_counts.get(source, 0) + 1
-        risks.append(_number(detail.get("risk")))
-        supports.append(int(detail.get("support") or 0))
-        thresholds.append(_number(detail.get("risk_threshold")))
-    override_count = sum(
-        count for source, count in source_counts.items() if source.endswith("_override")
-    )
-    return {
-        "n": len(details),
-        "override_share": _rounded(override_count / len(details)),
-        "mean_risk": _rounded(sum(risks) / len(risks)),
-        "mean_support": _rounded(sum(supports) / len(supports)),
-        "mean_threshold": _rounded(sum(thresholds) / len(thresholds)),
-        "source_counts": [
-            {
-                "source": source,
-                "count": count,
-                "share": _rounded(count / len(details)),
-            }
-            for source, count in sorted(
-                source_counts.items(), key=lambda item: (-item[1], item[0])
-            )
-        ],
-    }
-
-
-def _boundary_delta_residual_diagnostics(
-    rows: list[dict[str, Any]], model_name: str
-) -> dict[str, Any]:
-    errors: list[dict[str, Any]] = []
-    for row in rows:
-        predicted = _number((row.get("boundary_delta_predictions") or {}).get(model_name))
-        actual = _number(row.get("delta_percent"))
-        error = predicted - actual
-        errors.append(
-            {
-                "index": int(row["index"]),
-                "actual": actual,
-                "predicted": predicted,
-                "previous_delta_percent": _number(row.get("previous_delta_percent")),
-                "error": error,
-                "abs_error": abs(error),
-                "metadata": row,
-            }
-        )
-    if not errors:
-        return {
-            "n": 0,
-            "total_abs_error": None,
-            "exact_match_share": None,
-            "within_one_point_share": None,
-            "large_error_share": None,
-            "top_error_groups": {},
-            "largest_errors": [],
-        }
-    total_abs_error = sum(item["abs_error"] for item in errors)
-    return {
-        "n": len(errors),
-        "total_abs_error": _rounded(total_abs_error),
-        "exact_match_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] == 0) / len(errors)
-        ),
-        "within_one_point_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] <= 1.0) / len(errors)
-        ),
-        "large_error_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] >= 5.0) / len(errors)
-        ),
-        "top_error_groups": {
-            field_name: _boundary_delta_top_error_groups(errors, field_name)
-            for field_name in BOUNDARY_DELTA_ERROR_CONTEXT_FIELDS
-        },
-        "largest_errors": _largest_boundary_delta_errors(errors),
-    }
-
-
-def _boundary_delta_top_error_groups(
-    errors: list[dict[str, Any]], field_name: str
-) -> list[dict[str, Any]]:
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for item in errors:
-        metadata = item.get("metadata", {})
-        if field_name == "boundary_state":
-            key = "boundary" if metadata.get("is_boundary") else "same_label"
-        else:
-            key = str(metadata.get(field_name) or "missing")
-        grouped.setdefault(key, []).append(item)
-    total_abs_error = sum(item["abs_error"] for item in errors)
-    rows = [
-        {
-            field_name: key,
-            "count": len(items),
-            "count_share": _rounded(len(items) / len(errors)),
-            "share_abs_error": _rounded(
-                sum(item["abs_error"] for item in items) / total_abs_error
-                if total_abs_error
-                else None
-            ),
-            "mean_abs_error": _rounded(
-                sum(item["abs_error"] for item in items) / len(items)
-            ),
-            "rmse": _rounded(
-                math.sqrt(sum(item["error"] * item["error"] for item in items) / len(items))
-            ),
-            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
-            "mean_actual": _rounded(sum(item["actual"] for item in items) / len(items)),
-            "mean_predicted": _rounded(
-                sum(item["predicted"] for item in items) / len(items)
-            ),
-        }
-        for key, items in grouped.items()
-    ]
-    rows.sort(
-        key=lambda row: (
-            -_number(row["share_abs_error"]),
-            -_number(row["mean_abs_error"]),
-            -int(_number(row.get("count"))),
-            str(row.get(field_name) or ""),
-        )
-    )
-    return rows[:10]
-
-
-def _largest_boundary_delta_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    rows = sorted(errors, key=lambda item: item["abs_error"], reverse=True)[:10]
-    return [
-        {
-            "index": item["index"],
-            "date": item["metadata"].get("date"),
-            "day_of_week": item["metadata"].get("day_of_week"),
-            "hour_bucket": item["metadata"].get("hour_bucket"),
-            "transition": item["metadata"].get("transition"),
-            "previous_segment_position_bucket": item["metadata"].get(
-                "previous_segment_position_bucket"
-            ),
-            "boundary_state": "boundary"
-            if item["metadata"].get("is_boundary")
-            else "same_label",
-            "previous_delta_percent": _rounded(item["previous_delta_percent"]),
-            "actual_delta_percent": _rounded(item["actual"]),
-            "predicted_delta_percent": _rounded(item["predicted"]),
-            "abs_error": _rounded(item["abs_error"]),
-        }
-        for item in rows
-    ]
 
 
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
