@@ -215,3 +215,8 @@ def _normalize_offset(offset: int | None) -> int:
     if offset is None or offset <= 0:
         return 0
     return int(offset)
+
+
+normalize_limit = _normalize_limit
+normalize_sort_direction = _normalize_sort_direction
+usage_where_clause = _usage_where_clause

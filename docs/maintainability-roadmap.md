@@ -1018,3 +1018,41 @@ Checks:
 
 Next handoff:
 - Extract diagnostic read queries into a store query module now that they can import `store_connection.connect` and `store_schema.init_db` without circularly depending on `store.py`.
+
+### `refactor/store-diagnostic-query-boundary`
+
+Goal:
+- Move aggregate diagnostic fact read queries out of `store.py`.
+- Preserve `codex_usage_tracker.store.query_diagnostic_facts` and `query_diagnostic_summary` as facade imports.
+- Avoid adding new private cross-module imports while sharing SQL helpers and row conversion.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_diagnostic_queries.py` for aggregate diagnostic fact and diagnostic summary read models.
+- Added `src/codex_usage_tracker/store_rows.py` for shared SQLite row-to-dict conversion.
+- Re-exported moved diagnostic query functions from `store.py` and kept the shared diagnostic fact filter available to the remaining per-call query path.
+- Added public SQL helper aliases in `store_query_sql.py` for the new query module.
+- Updated `tach.toml` so the new store read modules belong to the persistence/store boundary group.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_diagnostic_queries.py src/codex_usage_tracker/store_rows.py src/codex_usage_tracker/store_query_sql.py`: passed.
+- `.venv/bin/python -m pytest tests/test_store_dashboard_mcp.py tests/test_privacy.py tests/test_context_evidence.py tests/test_diagnostic_snapshots.py`: 39 passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and large-diff/no-test-file change-budget warnings for behavior-preserving refactor.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline from 6706 to 6406.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_diagnostic_queries.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-diagnostic-queries.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed.
+
+Next handoff:
+- Extract diagnostic fact per-call query/count helpers next, likely together with usage-row timing conversion helpers so the new module does not import back from `store.py`.
