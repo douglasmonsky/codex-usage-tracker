@@ -12,7 +12,7 @@ from typing import Any
 
 from codex_usage_tracker.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.redaction import redact_secrets
-from codex_usage_tracker.store import query_usage_record
+from codex_usage_tracker.store_usage_record_queries import query_usage_record
 
 DEFAULT_CONTEXT_CHARS = 20_000
 DEFAULT_CONTEXT_ENTRIES = 80

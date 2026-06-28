@@ -63,8 +63,8 @@ depends_on = [
     "codex_usage_tracker.pricing_estimates",
     "codex_usage_tracker.pricing_openai",
     "codex_usage_tracker.projects",
-    "codex_usage_tracker.redaction",
-    "codex_usage_tracker.schema",
+  "codex_usage_tracker.redaction",
+  "codex_usage_tracker.schema",
 ]
 
 [[modules]]
@@ -88,10 +88,11 @@ depends_on = [
     "codex_usage_tracker.pricing",
     "codex_usage_tracker.pricing_config",
     "codex_usage_tracker.pricing_estimates",
-    "codex_usage_tracker.pricing_openai",
-    "codex_usage_tracker.projects",
-    "codex_usage_tracker.redaction",
-    "codex_usage_tracker.schema",
+  "codex_usage_tracker.pricing_openai",
+  "codex_usage_tracker.projects",
+  "codex_usage_tracker.redaction",
+  "codex_usage_tracker.schema",
+  "codex_usage_tracker.store_usage_record_queries",
 ]
 
 [[modules]]
@@ -107,6 +108,7 @@ paths = [
     "codex_usage_tracker.store_sources",
   "codex_usage_tracker.store_thread_summaries",
   "codex_usage_tracker.store_usage_api_queries",
+  "codex_usage_tracker.store_usage_record_queries",
   "codex_usage_tracker.store_usage_timing",
     "codex_usage_tracker.threads",
 ]
@@ -137,6 +139,7 @@ depends_on = [
     "codex_usage_tracker.store_sources",
   "codex_usage_tracker.store_thread_summaries",
   "codex_usage_tracker.store_usage_api_queries",
+  "codex_usage_tracker.store_usage_record_queries",
   "codex_usage_tracker.store_usage_timing",
     "codex_usage_tracker.threads",
 ]

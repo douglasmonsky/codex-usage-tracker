@@ -1226,3 +1226,46 @@ Remaining risks:
 
 Next handoff:
 - Extract session/record/evidence read models next; this should also enable moving `context.py` off the `store.py` facade later.
+### `refactor/store-usage-record-query-boundary`
+
+Goal:
+- Move usage detail read models out of `store.py`.
+- Preserve `store.py` compatibility facade imports for session, record, and expensive-call callers.
+- Point context evidence loading at the narrower read-model module instead of the broad store facade.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_usage_record_queries.py` for `query_session_usage`, `query_usage_record`, and `query_most_expensive_calls`.
+- Re-exported moved detail query functions from `store.py`.
+- Updated `context.py` to import `query_usage_record` from the narrower usage-record query module.
+- Updated `tach.toml` to place the new query module in the store boundary and allow the context/parser group to depend on that read model.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json` and `.agent-maintainer/git-agent-ratchet-private-imports.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_usage_record_queries.py src/codex_usage_tracker/context.py`: passed.
+- `.venv/bin/python -m compileall src/codex_usage_tracker/store.py src/codex_usage_tracker/store_usage_record_queries.py src/codex_usage_tracker/context.py`: passed.
+- `.venv/bin/python -m pytest -q tests/test_context_evidence.py tests/test_privacy.py tests/test_mcp_integration.py tests/test_dashboard_server.py::test_dashboard_server_can_enable_context_api_at_runtime`: 13 passed.
+- `.venv/bin/python -m pytest -q tests/test_dashboard_server.py tests/test_store_dashboard_mcp.py tests/test_context_evidence.py tests/test_privacy.py tests/test_mcp_integration.py tests/test_usage_drain_reports.py tests/test_dashboard_payload.py tests/test_dashboard_data.py`: 61 passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m pytest -q`: 325 passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion warning and behavior-preserving refactor no-test-file warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline 5666 to 5544.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed, ratcheted baseline 4 to 3.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_usage_record_queries.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/context.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-usage-record-queries.json`: passed.
+- `.venv/bin/tach check`: expected informational failure now reduced to 12 documented legacy parser/support boundary violations.
+- `git diff --check`: passed.
+
+Remaining risks:
+- `store.py` still owns summary/export and refresh/upsert orchestration.
+- Parser dependencies remain the dominant Tach blocker for the store boundary.
+
+Next handoff:
+- Extract summary/export read models or split refresh orchestration from parser-facing ingestion, depending on desired next risk slice.

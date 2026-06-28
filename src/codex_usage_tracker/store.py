@@ -58,13 +58,9 @@ from codex_usage_tracker.store_query_sql import (
     _group_expression,
     _normalize_limit,
     _since_where_clause,
-    _usage_where_clause,
 )
 from codex_usage_tracker.store_rows import (
     row_to_dict as _row_to_dict,
-)
-from codex_usage_tracker.store_rows import (
-    usage_row_to_dict as _usage_row_to_dict,
 )
 from codex_usage_tracker.store_schema import (
     SCHEMA_VERSION,
@@ -86,9 +82,14 @@ from codex_usage_tracker.store_usage_api_queries import (
 from codex_usage_tracker.store_usage_api_queries import (
     query_usage_api_events as query_usage_api_events,
 )
-from codex_usage_tracker.store_usage_timing import (
-    USAGE_TIMING_JOIN_SQL,
-    USAGE_TIMING_SELECT_SQL,
+from codex_usage_tracker.store_usage_record_queries import (
+    query_most_expensive_calls as query_most_expensive_calls,
+)
+from codex_usage_tracker.store_usage_record_queries import (
+    query_session_usage as query_session_usage,
+)
+from codex_usage_tracker.store_usage_record_queries import (
+    query_usage_record as query_usage_record,
 )
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
@@ -592,129 +593,6 @@ def query_summary(
     with connect(db_path) as conn:
         init_db(conn)
         return [_row_to_dict(row) for row in conn.execute(sql, params)]
-
-
-def query_session_usage(
-    db_path: Path = DEFAULT_DB_PATH,
-    session_id: str | None = None,
-    limit: int = 200,
-) -> list[dict[str, Any]]:
-    with connect(db_path) as conn:
-        init_db(conn)
-        if session_id is None:
-            row = conn.execute(
-                """
-                SELECT session_id
-                FROM usage_events
-                GROUP BY session_id
-                ORDER BY MAX(event_timestamp) DESC
-                LIMIT 1
-                """
-            ).fetchone()
-            if row is None:
-                return []
-            session_id = str(row["session_id"])
-        rows = conn.execute(
-            """
-            SELECT
-                usage_events.*,
-                previous_usage.event_timestamp AS previous_call_event_timestamp,
-                previous_usage.session_id AS previous_call_session_id,
-                previous_usage.turn_id AS previous_call_turn_id
-            FROM usage_events
-            LEFT JOIN usage_events AS previous_usage
-            ON previous_usage.record_id = usage_events.previous_record_id
-            WHERE usage_events.session_id = ?
-            ORDER BY usage_events.event_timestamp, usage_events.cumulative_total_tokens
-            LIMIT ?
-            """,
-            (session_id, limit),
-        )
-        return [_usage_row_to_dict(row) for row in rows]
-
-
-def query_usage_record(
-    db_path: Path = DEFAULT_DB_PATH,
-    record_id: str | None = None,
-) -> dict[str, Any] | None:
-    """Return one aggregate usage row by stable record id."""
-
-    if not record_id:
-        return None
-    with connect(db_path) as conn:
-        init_db(conn)
-        row = conn.execute(
-            """
-            SELECT
-                usage_events.*,
-                previous_usage.event_timestamp AS previous_call_event_timestamp,
-                previous_usage.session_id AS previous_call_session_id,
-                previous_usage.turn_id AS previous_call_turn_id
-            FROM usage_events
-            LEFT JOIN usage_events AS previous_usage
-            ON previous_usage.record_id = usage_events.previous_record_id
-            WHERE usage_events.record_id = ?
-            LIMIT 1
-            """,
-            (record_id,),
-        ).fetchone()
-        return _usage_row_to_dict(row) if row is not None else None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def query_most_expensive_calls(
-    db_path: Path = DEFAULT_DB_PATH, limit: int = 20, since: str | None = None
-) -> list[dict[str, Any]]:
-    """Return the largest aggregate model calls by last-call token count."""
-
-    where_clause, params = _usage_where_clause(since=since, table_alias="usage_events")
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
-                {USAGE_TIMING_SELECT_SQL}
-            FROM usage_events
-            {USAGE_TIMING_JOIN_SQL}
-            {where_clause}
-            ORDER BY usage_events.total_tokens DESC, usage_events.event_timestamp DESC
-            LIMIT ?
-            """,
-            (*params, limit),
-        )
-        return [_usage_row_to_dict(row) for row in rows]
 
 
 def export_usage_csv(

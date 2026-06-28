@@ -6,7 +6,7 @@
   },
   "baselines": {
     "cross_module_private_imports": {
-      "metric_value": 4,
+      "metric_value": 3,
       "items": [
         {
           "file": "src/codex_usage_tracker/store.py",
@@ -24,12 +24,6 @@
           "file": "src/codex_usage_tracker/store.py",
           "line": 57,
           "name": "_since_where_clause",
-          "source_module": "codex_usage_tracker.store_query_sql"
-        },
-        {
-          "file": "src/codex_usage_tracker/store.py",
-          "line": 57,
-          "name": "_usage_where_clause",
           "source_module": "codex_usage_tracker.store_query_sql"
         }
       ]
