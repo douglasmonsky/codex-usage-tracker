@@ -27,8 +27,11 @@ from codex_usage_tracker.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 from codex_usage_tracker.store_connection import connect
-from codex_usage_tracker.store_diagnostic_queries import (
-    append_diagnostic_fact_filters as _append_diagnostic_fact_filters,
+from codex_usage_tracker.store_diagnostic_call_queries import (
+    query_diagnostic_fact_call_count as query_diagnostic_fact_call_count,
+)
+from codex_usage_tracker.store_diagnostic_call_queries import (
+    query_diagnostic_fact_calls as query_diagnostic_fact_calls,
 )
 from codex_usage_tracker.store_diagnostic_queries import (
     query_diagnostic_facts as query_diagnostic_facts,
@@ -46,7 +49,12 @@ from codex_usage_tracker.store_query_sql import (
     _usage_api_where_clause,
     _usage_where_clause,
 )
-from codex_usage_tracker.store_rows import row_to_dict as _row_to_dict
+from codex_usage_tracker.store_rows import (
+    row_to_dict as _row_to_dict,
+)
+from codex_usage_tracker.store_rows import (
+    usage_row_to_dict as _usage_row_to_dict,
+)
 from codex_usage_tracker.store_schema import (
     SCHEMA_VERSION,
     SchemaMigrationError,
@@ -645,179 +653,14 @@ def query_usage_record(
 
 
 
-def query_diagnostic_fact_calls(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    fact_type: str,
-    fact_name: str,
-    limit: int | None = 50,
-    offset: int = 0,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    include_archived: bool = False,
-    sort: str = "tokens",
-    direction: str = "desc",
-) -> list[dict[str, Any]]:
-    """Return usage calls associated with one diagnostic fact."""
-
-    where_clause, params = _diagnostic_fact_call_where(
-        fact_type=fact_type,
-        fact_name=fact_name,
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        include_archived=include_archived,
-    )
-    order_expr = _diagnostic_fact_call_order_expression(sort)
-    direction_sql = _normalize_sort_direction(direction)
-    normalized_limit = _normalize_limit(limit)
-    normalized_offset = _normalize_offset(offset)
-    limit_clause = ""
-    query_params = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
-                previous_usage.event_timestamp AS previous_call_event_timestamp,
-                previous_usage.session_id AS previous_call_session_id,
-                previous_usage.turn_id AS previous_call_turn_id,
-                f.fact_type,
-                f.fact_name,
-                f.fact_category,
-                f.event_count AS diagnostic_event_count,
-                f.confidence AS diagnostic_confidence,
-                f.first_event_timestamp AS diagnostic_first_event_timestamp,
-                f.last_event_timestamp AS diagnostic_last_event_timestamp,
-                f.first_source_line AS diagnostic_first_source_line,
-                f.last_source_line AS diagnostic_last_source_line,
-                f.evidence_scope AS diagnostic_evidence_scope,
-                f.raw_content_included AS raw_content_included
-            FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
-            LEFT JOIN usage_events AS previous_usage
-            ON previous_usage.record_id = usage_events.previous_record_id
-            {where_clause}
-            ORDER BY {order_expr} {direction_sql},
-                usage_events.event_timestamp DESC,
-                usage_events.cumulative_total_tokens DESC
-            {limit_clause}
-            """,
-            query_params,
-        )
-        return [_usage_row_to_dict(row) for row in rows]
-
-
-def query_diagnostic_fact_call_count(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    fact_type: str,
-    fact_name: str,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    include_archived: bool = False,
-) -> int:
-    """Return the number of calls associated with one diagnostic fact."""
-
-    where_clause, params = _diagnostic_fact_call_where(
-        fact_type=fact_type,
-        fact_name=fact_name,
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        include_archived=include_archived,
-    )
-    with connect(db_path) as conn:
-        init_db(conn)
-        row = conn.execute(
-            f"""
-            SELECT COUNT(DISTINCT usage_events.record_id) AS row_count
-            FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
-            {where_clause}
-            """,
-            params,
-        ).fetchone()
-        return int(row["row_count"] if row is not None else 0)
-
-
-def _diagnostic_fact_call_where(
-    *,
-    fact_type: str,
-    fact_name: str,
-    since: str | None,
-    until: str | None,
-    model: str | None,
-    effort: str | None,
-    thread: str | None,
-    min_tokens: int | None,
-    include_archived: bool,
-) -> tuple[str, list[Any]]:
-    where_clause, params = _usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        table_alias="usage_events",
-        include_archived=include_archived,
-    )
-    return _append_diagnostic_fact_filters(
-        where_clause,
-        params,
-        fact_type=fact_type,
-        fact_name=fact_name,
-        fact_category=None,
-        table_alias="f",
-    )
 
 
 
 
-def _diagnostic_fact_call_order_expression(sort: str) -> str:
-    sort_map = {
-        "time": "usage_events.event_timestamp",
-        "tokens": "usage_events.total_tokens",
-        "input": "usage_events.input_tokens",
-        "cached": "usage_events.cached_input_tokens",
-        "uncached": "usage_events.uncached_input_tokens",
-        "output": "usage_events.output_tokens",
-        "reasoning": "usage_events.reasoning_output_tokens",
-        "cache": "usage_events.cache_ratio",
-        "model": "usage_events.model",
-        "effort": "usage_events.effort",
-        "thread": "coalesce(usage_events.thread_name, usage_events.parent_thread_name, usage_events.session_id)",
-    }
-    try:
-        return sort_map[sort]
-    except KeyError as exc:
-        allowed = ", ".join(sorted(sort_map))
-        raise ValueError(f"sort must be one of: {allowed}") from exc
+
+
+
+
 
 
 def query_dashboard_events(
@@ -1426,59 +1269,3 @@ def export_usage_csv(
         for row in rows:
             writer.writerow({column: row.get(column) for column in EVENT_COLUMNS})
     return len(rows)
-
-
-
-
-
-def _usage_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return _annotate_usage_row_timing(_row_to_dict(row))
-
-
-def _annotate_usage_row_timing(row: dict[str, Any]) -> dict[str, Any]:
-    previous_timestamp = _optional_text(row.get("previous_call_event_timestamp"))
-    previous_session_id = row.pop("previous_call_session_id", None)
-    previous_turn_id = row.pop("previous_call_turn_id", None)
-    event_timestamp = _optional_text(row.get("event_timestamp"))
-    turn_timestamp = _optional_text(row.get("turn_timestamp"))
-    same_turn_previous = (
-        previous_timestamp is not None
-        and previous_session_id == row.get("session_id")
-        and previous_turn_id is not None
-        and previous_turn_id == row.get("turn_id")
-    )
-    call_started_at = previous_timestamp if same_turn_previous else turn_timestamp
-
-    row["previous_call_event_timestamp"] = previous_timestamp
-    row["call_started_at"] = call_started_at
-    row["call_duration_seconds"] = _seconds_between(call_started_at, event_timestamp)
-    row["previous_call_delta_seconds"] = _seconds_between(previous_timestamp, event_timestamp)
-    return row
-
-
-def _seconds_between(start: str | None, end: str | None) -> float | None:
-    start_time = _parse_timestamp(start)
-    end_time = _parse_timestamp(end)
-    if start_time is None or end_time is None:
-        return None
-    seconds = (end_time - start_time).total_seconds()
-    if seconds < 0:
-        return None
-    return round(seconds, 3)
-
-
-def _parse_timestamp(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
-    try:
-        parsed = datetime.fromisoformat(normalized)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed
-
-
-def _optional_text(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None

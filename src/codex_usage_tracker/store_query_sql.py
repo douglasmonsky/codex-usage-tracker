@@ -218,5 +218,6 @@ def _normalize_offset(offset: int | None) -> int:
 
 
 normalize_limit = _normalize_limit
+normalize_offset = _normalize_offset
 normalize_sort_direction = _normalize_sort_direction
 usage_where_clause = _usage_where_clause

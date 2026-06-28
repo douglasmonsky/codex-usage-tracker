@@ -1056,3 +1056,43 @@ Checks:
 
 Next handoff:
 - Extract diagnostic fact per-call query/count helpers next, likely together with usage-row timing conversion helpers so the new module does not import back from `store.py`.
+
+### `refactor/store-diagnostic-call-query-boundary`
+
+Goal:
+- Move diagnostic fact per-call query/count helpers out of `store.py`.
+- Move usage-row timing conversion helpers into a shared row module.
+- Keep `codex_usage_tracker.store` as the compatibility facade for existing imports.
+
+Status:
+- Complete locally.
+
+Completed edits:
+- Added `src/codex_usage_tracker/store_diagnostic_call_queries.py` for per-call diagnostic fact read models.
+- Extended `src/codex_usage_tracker/store_rows.py` with usage-row timing enrichment helpers.
+- Re-exported moved per-call diagnostic query functions from `store.py`.
+- Added a public `normalize_offset` alias in `store_query_sql.py` for read-model modules.
+- Updated `tach.toml` so the new call-query module belongs to the persistence/store boundary group.
+- Split the per-call query path out of `store_diagnostic_queries.py` after `agent-maintainer fast` caught that combining aggregate and per-call queries exceeded the source-line budget.
+- Ratcheted `.agent-maintainer/git-agent-ratchet-max-file-lines.json`.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py src/codex_usage_tracker/store_diagnostic_call_queries.py src/codex_usage_tracker/store_diagnostic_queries.py src/codex_usage_tracker/store_rows.py src/codex_usage_tracker/store_query_sql.py`: passed.
+- `.venv/bin/python -m pytest tests/test_context_evidence.py tests/test_store_dashboard_mcp.py tests/test_dashboard_server.py`: 38 passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m pytest`: 325 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning and no-test-file change-budget warning.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed, ratcheted baseline from 6406 to 6203.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_diagnostic_call_queries.py --dependencies --usages`: passed.
+- `.venv/bin/tach report src/codex_usage_tracker/store_rows.py --dependencies --usages`: passed.
+- `.venv/bin/tach map -o /tmp/codex-usage-tracker-tach-map-store-diagnostic-call-queries.json`: passed.
+- `.venv/bin/tach check`: expected informational failure same 13 documented boundary violations.
+- `git diff --check`: passed after trimming EOF whitespace.
+
+Next handoff:
+- Continue store/query split with dashboard/API read queries, or attack the remaining parser-to-store boundary by moving refresh orchestration out of `store.py`.
