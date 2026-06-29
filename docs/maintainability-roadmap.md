@@ -5604,3 +5604,54 @@ Checks:
 
 Remaining risks / next handoff:
 - Next C(15) targets are `usage_drain_allowance_fits.py::allowance_online_capacity_credit_to_delta_fit`, `threads.py::_resolve_thread_attachment`, and `diagnostic_reports.py::_action_hint`.
+
+### `refactor/diagnostic-action-hints`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce diagnostic action-hint complexity without changing the diagnostic report payload text.
+- Keep `diagnostic_reports.py` under its file-length ratchet baseline.
+
+Files touched:
+- `src/codex_usage_tracker/diagnostic_action_hints.py`
+- `src/codex_usage_tracker/diagnostic_reports.py`
+- `tests/test_diagnostic_reports.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added focused action-hint characterization tests for compaction, unknown command-family, command-family fallback, specific fact names, and generic fallback.
+- Moved action-hint constants and lookup logic into `diagnostic_action_hints.py`.
+- Kept `diagnostic_reports._action_hint` as an imported compatibility name for existing report code and tests.
+- Reworked `_action_hint` into table lookup plus small compaction/command-family helpers.
+
+Metrics:
+- `_action_hint`: C(15) -> A(5), now implemented as `diagnostic_action_hints.action_hint`.
+- `diagnostic_reports.py`: 507 baseline physical lines -> 478 physical lines after split.
+- `diagnostic_action_hints.py`: 80 lines.
+- Global C-or-worse blocks: 42 -> 41.
+- Remaining C(15) targets: allowance fits and thread attachment resolution.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_diagnostic_reports.py -q`: 3 passed before refactor.
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostic_reports.py src/codex_usage_tracker/diagnostic_action_hints.py tests/test_diagnostic_reports.py`: passed.
+- `.venv/bin/python -m pytest tests/test_diagnostic_reports.py tests/test_cli_parser_diagnostics.py tests/test_server_diagnostic_facts.py -q`: 11 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostic_reports.py src/codex_usage_tracker/diagnostic_action_hints.py tests/test_diagnostic_reports.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/diagnostic_reports.py src/codex_usage_tracker/diagnostic_action_hints.py -a -s`: passed, target now A-rated.
+- `.venv/bin/python -m pytest -q`: 461 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Remaining top C(15) targets are `usage_drain_allowance_fits.py::allowance_online_capacity_credit_to_delta_fit` and `threads.py::_resolve_thread_attachment`.
+- `diagnostic_reports.py::_filter_fact_group` remains B(6), below the current hotspot threshold.
