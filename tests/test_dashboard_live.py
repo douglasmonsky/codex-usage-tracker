@@ -45,6 +45,52 @@ const factory = context.window.CodexUsageDashboardLive;
     return json.loads(result.stdout)
 
 
+def test_dashboard_live_reports_available_rows_for_shell_only_views() -> None:
+    payload = _run_dashboard_live_script(
+        """
+        const runtime = factory.create({
+          activeView: () => 'diagnostics',
+          apiToken: () => 'test-token',
+          applyDashboardPayload: () => {},
+          autoRefreshEl: { checked: false },
+          backgroundHydrationChunkSize: 2000,
+          formatTimestamp: value => value,
+          getArchivedAvailableRows: () => 0,
+          getData: () => [],
+          getIncludeArchived: () => true,
+          getLoadedLimit: () => null,
+          getTotalAvailableRows: () => 44481,
+          historyScopeEl: { value: 'all', parentElement: {} },
+          i18n: { currentLanguage: 'en' },
+          initialHydrationChunkSize: 500,
+          latestRefreshAt: () => '',
+          limitValue: value => value === null ? 'all' : String(value),
+          liveRefreshIntervalMs: 10000,
+          liveRefreshSupported: true,
+          loadLimitEl: { value: 'all', options: [], lastElementChild: null, insertBefore: () => {} },
+          number: new Intl.NumberFormat('en-US'),
+          payloadRows: payload => payload.rows || [],
+          rebuildDashboardIndexes: () => {},
+          rebuildFilterOptions: () => {},
+          refreshDashboardEl: { disabled: false },
+          render: () => {},
+          resetRowsForHydration: () => {},
+          rowLoadProgressBarEl: { style: {} },
+          rowLoadProgressCountEl: { textContent: '' },
+          rowLoadProgressEl: { hidden: true },
+          rowLoadProgressLabelEl: { textContent: '' },
+          setFastTooltip: () => {},
+          t: key => key,
+          tf: (key, values = {}) => key === 'caption.loaded' ? `${values.loaded} calls loaded` : `${key}:${JSON.stringify(values)}`,
+          updateLiveStatus: () => {},
+        });
+        console.log(JSON.stringify({ text: runtime.loadedRowsDescription() }));
+        """
+    )
+
+    assert payload["text"] == "44,481 calls loaded"
+
+
 def test_dashboard_live_allows_diagnostics_bootstrap_refresh() -> None:
     payload = _run_dashboard_live_script(
         """

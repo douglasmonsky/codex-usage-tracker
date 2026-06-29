@@ -50,10 +50,14 @@
 
     function loadedRowsDescription() {
       const data = getData();
-      const loaded = number.format(data.length);
-      const available = number.format(getTotalAvailableRows() || data.length);
+      const totalAvailableRows = Number(getTotalAvailableRows() || 0);
+      const visibleLoadedRows = (!isUsageRefreshView() && data.length === 0 && totalAvailableRows > 0)
+        ? totalAvailableRows
+        : data.length;
+      const loaded = number.format(visibleLoadedRows);
+      const available = number.format(totalAvailableRows || visibleLoadedRows);
       const loadedLimit = getLoadedLimit();
-      const capped = loadedLimit !== null && getTotalAvailableRows() > data.length;
+      const capped = loadedLimit !== null && totalAvailableRows > visibleLoadedRows;
       return capped
         ? tf('caption.loaded_capped', { loaded, available })
         : tf('caption.loaded', { loaded });
