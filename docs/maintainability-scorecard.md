@@ -75,6 +75,7 @@ git diff --check
 Current passing evidence:
 
 - `PYTHONPATH=src .venv/bin/python -m pytest -q`: 531 passed.
+- `PYTHONPATH=src .venv/bin/python -m pytest --cov=codex_usage_tracker --cov-report=term-missing -q`: 531 passed, 86% total coverage.
 - `.venv/bin/python -m mypy`: passed for the configured 8 source files.
 - `.venv/bin/python -m compileall src`: passed.
 - `.venv/bin/tach check`: passed.
@@ -83,6 +84,10 @@ Current passing evidence:
 - `.venv/bin/python scripts/check_release.py`: passed.
 - `git diff --check`: passed.
 - Git-agent-ratchet file length, private import, and duplicate helper checks passed.
+- Temporary detached-worktree package gates passed:
+  - `.venv/bin/python -m build <worktree> --outdir <worktree>/dist`
+  - `.venv/bin/python -m twine check <worktree>/dist/*`
+  - `.venv/bin/python scripts/check_release.py --dist`
 
 ## Local Architecture Status
 
@@ -118,6 +123,7 @@ they pass without broad ignores.
 - `agent_maintainer doctor --strict` still reports a known beta repo-root false positive for `src/agent_maintainer/__main__.py`.
 - `agent_maintainer doctor --strict` also reports missing optional integration files such as remote CI, pre-commit config, and Codex hooks. Those are intentionally not added during the local-only series.
 - `agent_maintainer verify --profile precommit` is not yet a blocking gate. It currently fails on existing formatter drift, pyright findings, and xenon module-level strictness.
+- `agent_maintainer verify --profile full` is not yet a blocking gate. It currently reports the precommit findings plus broader optional/audit tools including pylint, deptry, vulture, bandit, actionlint, zizmor, markdownlint, yamllint, taplo, and check-jsonschema.
 - `xenon --max-absolute B --max-modules A --max-average A src` still fails because five modules are rank B at module level:
   - `src/codex_usage_tracker/store_diagnostic_queries.py`
   - `src/codex_usage_tracker/pricing_config.py`

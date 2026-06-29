@@ -7621,6 +7621,7 @@ Status:
 
 Checks recorded in scorecard:
 - `PYTHONPATH=src .venv/bin/python -m pytest -q`: 531 passed.
+- `PYTHONPATH=src .venv/bin/python -m pytest --cov=codex_usage_tracker --cov-report=term-missing -q`: 531 passed, 86% total coverage.
 - `.venv/bin/python -m mypy`: passed.
 - `.venv/bin/python -m compileall src`: passed.
 - `.venv/bin/tach check`: passed.
@@ -7629,10 +7630,12 @@ Checks recorded in scorecard:
 - `.venv/bin/python scripts/check_release.py`: passed.
 - `git diff --check`: passed.
 - Git-agent-ratchet file length, private import, and duplicate helper checks passed.
+- Temporary detached-worktree package gates passed: `python -m build`, `python -m twine check`, and `python scripts/check_release.py --dist`.
 
 Accepted exceptions:
 - `agent_maintainer doctor --strict` still has the known beta repo-root false positive and intentionally missing optional local integration files.
 - `agent_maintainer verify --profile precommit` remains non-blocking because formatter drift, pyright findings, and five B-ranked xenon modules remain.
+- `agent_maintainer verify --profile full` remains non-blocking because broader optional/audit tools still report existing debt or missing local tools.
 - Global wemake remains disabled; the ratcheted local baseline covers selected passing modules only.
 
 Remaining risks / next handoff:
