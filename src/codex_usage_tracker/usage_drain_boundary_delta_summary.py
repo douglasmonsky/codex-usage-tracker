@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import Any
 
 from codex_usage_tracker import usage_drain_boundary_delta as boundary_delta
@@ -269,50 +270,85 @@ def _boundary_delta_risk_gate_diagnostics(
 def _boundary_delta_residual_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
-    errors: list[dict[str, Any]] = []
-    for row in rows:
-        predicted = _number((row.get("boundary_delta_predictions") or {}).get(model_name))
-        actual = _number(row.get("delta_percent"))
-        error = predicted - actual
-        errors.append(
-            {
-                "index": int(row["index"]),
-                "actual": actual,
-                "predicted": predicted,
-                "previous_delta_percent": _number(row.get("previous_delta_percent")),
-                "error": error,
-                "abs_error": abs(error),
-                "metadata": row,
-            }
-        )
+    errors = _boundary_delta_residual_error_rows(rows, model_name)
     if not errors:
-        return {
-            "n": 0,
-            "total_abs_error": None,
-            "exact_match_share": None,
-            "within_one_point_share": None,
-            "large_error_share": None,
-            "top_error_groups": {},
-            "largest_errors": [],
-        }
-    total_abs_error = sum(item["abs_error"] for item in errors)
+        return _empty_boundary_delta_residual_diagnostics()
+    total_abs_error = _boundary_delta_abs_error_sum(errors)
+    summary = _boundary_delta_residual_error_summary(errors, total_abs_error)
+    return {
+        **summary,
+        "top_error_groups": _boundary_delta_residual_error_groups(errors),
+        "largest_errors": _largest_boundary_delta_errors(errors),
+    }
+
+
+def _boundary_delta_residual_error_rows(
+    rows: list[dict[str, Any]], model_name: str
+) -> list[dict[str, Any]]:
+    return [_boundary_delta_residual_error_row(row, model_name) for row in rows]
+
+
+def _boundary_delta_residual_error_row(
+    row: dict[str, Any], model_name: str
+) -> dict[str, Any]:
+    predicted = _number((row.get("boundary_delta_predictions") or {}).get(model_name))
+    actual = _number(row.get("delta_percent"))
+    error = predicted - actual
+    return {
+        "index": int(row["index"]),
+        "actual": actual,
+        "predicted": predicted,
+        "previous_delta_percent": _number(row.get("previous_delta_percent")),
+        "error": error,
+        "abs_error": abs(error),
+        "metadata": row,
+    }
+
+
+def _empty_boundary_delta_residual_diagnostics() -> dict[str, Any]:
+    return {
+        "n": 0,
+        "total_abs_error": None,
+        "exact_match_share": None,
+        "within_one_point_share": None,
+        "large_error_share": None,
+        "top_error_groups": {},
+        "largest_errors": [],
+    }
+
+
+def _boundary_delta_residual_error_summary(
+    errors: list[dict[str, Any]], total_abs_error: float
+) -> dict[str, Any]:
     return {
         "n": len(errors),
         "total_abs_error": _rounded(total_abs_error),
-        "exact_match_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] == 0) / len(errors)
+        "exact_match_share": _boundary_delta_error_share(
+            errors, lambda item: item["abs_error"] == 0
         ),
-        "within_one_point_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] <= 1.0) / len(errors)
+        "within_one_point_share": _boundary_delta_error_share(
+            errors, lambda item: item["abs_error"] <= 1.0
         ),
-        "large_error_share": _rounded(
-            sum(1 for item in errors if item["abs_error"] >= 5.0) / len(errors)
+        "large_error_share": _boundary_delta_error_share(
+            errors, lambda item: item["abs_error"] >= 5.0
         ),
-        "top_error_groups": {
-            field_name: _boundary_delta_top_error_groups(errors, field_name)
-            for field_name in BOUNDARY_DELTA_ERROR_CONTEXT_FIELDS
-        },
-        "largest_errors": _largest_boundary_delta_errors(errors),
+    }
+
+
+def _boundary_delta_error_share(
+    errors: list[dict[str, Any]], predicate: Callable[[dict[str, Any]], bool]
+) -> float | None:
+    if not errors:
+        return None
+    return _rounded(sum(1 for item in errors if predicate(item)) / len(errors))
+
+
+def _boundary_delta_residual_error_groups(
+    errors: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    return {
+        field_name: _boundary_delta_top_error_groups(errors, field_name)
+        for field_name in BOUNDARY_DELTA_ERROR_CONTEXT_FIELDS
     }
 
 
