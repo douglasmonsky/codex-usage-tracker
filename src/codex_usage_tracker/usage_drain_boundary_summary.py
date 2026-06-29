@@ -281,29 +281,67 @@ def _boundary_walk_forward_risk_rows(rows: list[dict[str, Any]]) -> list[dict[st
 def _boundary_risk_scope(
     rows: list[dict[str, Any]], *, start_index: int
 ) -> dict[str, Any]:
-    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
-    actual = [1 if row.get("is_boundary") else 0 for row in scope_rows]
+    scope_rows = _boundary_scope_rows(rows, start_index=start_index)
+    actual = _boundary_actuals(scope_rows)
     model_names = _boundary_risk_model_names(scope_rows)
     return {
         "start_index": start_index,
         "n": len(scope_rows),
         "boundary_count": sum(actual),
-        "boundary_rate": _rounded(sum(actual) / len(actual) if actual else None),
-        "models": {
-            model_name: _binary_risk_metrics(
-                actual,
-                [
-                    _number((row.get("boundary_risks") or {}).get(model_name))
-                    for row in scope_rows
-                ],
-            )
-            for model_name in model_names
-        },
-        "risk_detail_diagnostics": {
-            model_name: _boundary_risk_detail_diagnostics(scope_rows, model_name)
-            for model_name in model_names
-            if model_name != "overall_prior_rate"
-        },
+        "boundary_rate": _boundary_rate(actual),
+        "models": _boundary_risk_model_metrics(scope_rows, actual, model_names),
+        "risk_detail_diagnostics": _boundary_risk_scope_detail_diagnostics(
+            scope_rows, model_names
+        ),
+    }
+
+
+def _boundary_scope_rows(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> list[dict[str, Any]]:
+    return [row for row in rows if int(row["index"]) >= start_index]
+
+
+def _boundary_actuals(rows: list[dict[str, Any]]) -> list[int]:
+    return [1 if row.get("is_boundary") else 0 for row in rows]
+
+
+def _boundary_rate(actual: list[int]) -> float | None:
+    if not actual:
+        return None
+    return _rounded(sum(actual) / len(actual))
+
+
+def _boundary_risk_model_metrics(
+    rows: list[dict[str, Any]],
+    actual: list[int],
+    model_names: list[str],
+) -> dict[str, dict[str, Any]]:
+    return {
+        model_name: _binary_risk_metrics(
+            actual,
+            _boundary_risk_scores(rows, model_name),
+        )
+        for model_name in model_names
+    }
+
+
+def _boundary_risk_scores(
+    rows: list[dict[str, Any]], model_name: str
+) -> list[float]:
+    return [
+        _number((row.get("boundary_risks") or {}).get(model_name))
+        for row in rows
+    ]
+
+
+def _boundary_risk_scope_detail_diagnostics(
+    rows: list[dict[str, Any]], model_names: list[str]
+) -> dict[str, dict[str, Any]]:
+    return {
+        model_name: _boundary_risk_detail_diagnostics(rows, model_name)
+        for model_name in model_names
+        if model_name != "overall_prior_rate"
     }
 
 

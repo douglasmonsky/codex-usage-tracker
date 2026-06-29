@@ -7354,3 +7354,48 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue the C(11) ratchet in boundary/parser helpers.
+
+### `refactor/boundary-risk-scope`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Reduce the C-grade boundary risk scope helper while preserving boundary risk metrics and detail diagnostics.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_boundary_summary.py`
+- `tests/test_usage_drain_boundary_summary.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added a synthetic characterization test for scoped boundary risk metrics and detail diagnostics.
+- Split scope row filtering, actual flags, boundary rate, model scores, model metrics, and detail diagnostics into focused helpers.
+- Preserved model names, overall prior handling, and risk-detail output shape.
+
+Metrics:
+- `_boundary_risk_scope`: C(11) -> A(1).
+- `usage_drain_boundary_summary.py` maximum complexity: B(8); no C-grade functions remain in module.
+- Expected global C-or-worse blocks after this branch: 3 -> 2.
+- No C(12+) or D/E/F complexity blocks expected.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_boundary_summary.py -q`: 2 passed before refactor.
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_boundary_summary.py tests/test_usage_drain_model.py -q`: 16 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_boundary_summary.py tests/test_usage_drain_boundary_summary.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_boundary_summary.py -a -s`: target now A(1), module max B(8).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 529 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+
+Remaining risks / next handoff:
+- Continue the C(11) ratchet in allowance online and parser helpers.
