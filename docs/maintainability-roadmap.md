@@ -4945,3 +4945,43 @@ Checks:
 Remaining risks / next handoff:
 - `format_calls` remains C(13) in `formatting.py`.
 - Global Xenon still fails on remaining C-rated blocks in usage-drain feature history/time series/allowance fits, store, diagnostics MCP, recommendations, dashboard payload, and diagnostic snapshot analysis.
+
+### `refactor/usage-drain-feature-history`
+
+Objective:
+- Reduce the walk-forward causal history feature function complexity while preserving causal-only feature semantics.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_feature_history.py`
+- `tests/test_usage_drain_feature_history.py`
+
+Completed edits:
+- Added focused characterization proving history features only use prior rows and matching prior bucket/date/hour/day rows.
+- Introduced `_CausalHistoryState` and `_HistoryKeys` to hold mutable walk-forward state explicitly.
+- Split global rolling features, streak features, capacity features, same-period features, EWMA features, and state updates into focused helpers.
+
+Metrics:
+- `add_causal_history_features`: C(20) -> A(2).
+- `usage_drain_feature_history.py` remains A-rated on average.
+- New helper ceiling: B(6) for `_history_keys` and existing `streak_bucket`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_feature_history.py tests/test_usage_drain_feature_history.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_feature_history.py tests/test_usage_drain_feature_history.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_feature_history.py -q`: 1 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_feature_history.py tests/test_usage_drain_model.py tests/test_usage_drain_reports.py tests/test_usage_drain_thread_curves.py -q`: 22 passed.
+- `.venv/bin/python -m radon cc src/codex_usage_tracker/usage_drain_feature_history.py -a -s`: passed, target function now A(2).
+- `.venv/bin/python -m pytest -q`: 447 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Global Xenon still fails on remaining C-rated blocks in usage-drain time series/allowance fits/boundary rows, store, diagnostics MCP, recommendations, dashboard payload, formatting calls, and diagnostic snapshot analysis.
