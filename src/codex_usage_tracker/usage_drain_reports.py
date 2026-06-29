@@ -28,6 +28,22 @@ from codex_usage_tracker.usage_drain_thread_curves import (
 )
 from codex_usage_tracker.usage_drain_time_series import usage_time_series
 
+TOKEN_ACCOUNTING_FEATURES = (
+    "uncached_input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+)
+TOKEN_ACCOUNTING_TOTAL_FIELDS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "uncached_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+    "usage_credits",
+)
+
 
 def build_usage_drain_dashboard_report(
     *,
@@ -220,9 +236,7 @@ def _mean_absolute_error(errors: list[float]) -> float | None:
     return sum(errors) / len(errors)
 
 
-def _root_mean_square_error(
-    actual: list[float], predicted: list[float]
-) -> float | None:
+def _root_mean_square_error(actual: list[float], predicted: list[float]) -> float | None:
     if not actual:
         return None
     squared_error = sum(
@@ -231,9 +245,7 @@ def _root_mean_square_error(
     return (squared_error / len(actual)) ** 0.5
 
 
-def _within_error_share(
-    errors: list[float], *, threshold: float
-) -> float | None:
+def _within_error_share(errors: list[float], *, threshold: float) -> float | None:
     if not errors:
         return None
     return sum(1 for error in errors if error <= threshold) / len(errors)
@@ -243,35 +255,34 @@ def _token_accounting_highlights(
     rows: list[dict[str, Any]],
     spans: list[UsageDeltaSpan],
 ) -> dict[str, Any]:
-    totals = {
-        "input_tokens": sum(_number(row.get("input_tokens")) for row in rows),
-        "cached_input_tokens": sum(_number(row.get("cached_input_tokens")) for row in rows),
-        "uncached_input_tokens": sum(_number(row.get("uncached_input_tokens")) for row in rows),
-        "output_tokens": sum(_number(row.get("output_tokens")) for row in rows),
-        "reasoning_output_tokens": sum(
-            _number(row.get("reasoning_output_tokens")) for row in rows
-        ),
-        "total_tokens": sum(_number(row.get("total_tokens")) for row in rows),
-        "usage_credits": sum(_number(row.get("usage_credits")) for row in rows),
+    totals = _token_accounting_totals(rows)
+    credits_to_visible_delta = _credits_to_visible_delta_fit(spans)
+    return {
+        "feature_units": "tokens",
+        "features": list(TOKEN_ACCOUNTING_FEATURES),
+        "totals": totals,
+        "credits_to_visible_delta": credits_to_visible_delta,
+        "unweighted": {},
+        "high_medium_fast_weighted": {},
     }
+
+
+def _token_accounting_totals(rows: list[dict[str, Any]]) -> dict[str, float | None]:
+    return {
+        field_name: _rounded(
+            sum(_number(row.get(field_name)) for row in rows)
+        )
+        for field_name in TOKEN_ACCOUNTING_TOTAL_FIELDS
+    }
+
+
+def _credits_to_visible_delta_fit(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
     span_credits = [span.standard_usage_credits for span in spans]
     span_delta = [span.delta_usage_percent for span in spans]
     return {
-        "feature_units": "tokens",
-        "features": [
-            "uncached_input_tokens",
-            "cached_input_tokens",
-            "output_tokens",
-            "reasoning_output_tokens",
-        ],
-        "totals": {key: _rounded(value) for key, value in totals.items()},
-        "credits_to_visible_delta": {
-            "span_count": len(spans),
-            "r2": _rounded(_r2(span_delta, _credit_slope_predictions(spans))),
-            "pearson": _rounded(_pearson(span_credits, span_delta)),
-        },
-        "unweighted": {},
-        "high_medium_fast_weighted": {},
+        "span_count": len(spans),
+        "r2": _rounded(_r2(span_delta, _credit_slope_predictions(spans))),
+        "pearson": _rounded(_pearson(span_credits, span_delta)),
     }
 
 

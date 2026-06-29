@@ -7218,3 +7218,49 @@ Checks:
 Remaining risks / next handoff:
 - Run broad local gates before commit.
 - Continue the C(11) ratchet, likely with `_token_accounting_highlights`.
+
+### `refactor/report-token-accounting-highlights`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Reduce the C-grade token-accounting report helper while preserving compact dashboard report totals and credit-to-visible-delta fields.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_reports.py`
+- `tests/test_usage_drain_report_records.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added a synthetic characterization test for token totals and credit-fit report output.
+- Added explicit token-accounting feature and total-field ordering constants.
+- Split token totals and credits-to-visible-delta fit calculations into focused helpers.
+- Kept report keys and placeholder weighted sections unchanged.
+
+Metrics:
+- `_token_accounting_highlights`: C(11) -> A(1).
+- `usage_drain_reports.py` maximum complexity: B(10); no C-grade functions remain in module.
+- Expected global C-or-worse blocks after this branch: 6 -> 5.
+- No C(12+) or D/E/F complexity blocks expected.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_report_records.py -q`: 3 passed before refactor.
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_report_records.py tests/test_usage_drain_reports.py -q`: 8 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_reports.py tests/test_usage_drain_report_records.py`: passed after Ruff import ordering fix.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_reports.py -a -s`: target now A(1), module max B(10).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 524 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed after keeping `usage_drain_reports.py` at 599 lines.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+
+Remaining risks / next handoff:
+- Continue the C(11) ratchet in predictive/error/boundary/parser helpers.
