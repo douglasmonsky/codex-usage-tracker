@@ -159,41 +159,70 @@ def inspect_log(
 
     stats = empty_parser_diagnostics()
     events = parse_usage_events_from_file(path, session_index=session_index, stats=stats)
-    session_ids = sorted({event.session_id for event in events})
-    models = sorted({event.model for event in events if event.model})
-    efforts = sorted({event.effort for event in events if event.effort})
-    first_event = events[0] if events else None
-    last_event = events[-1] if events else None
+    return _inspect_log_payload(path, stats=stats, events=events)
+
+
+def _inspect_log_payload(
+    path: Path,
+    *,
+    stats: MutableMapping[str, int],
+    events: list[UsageEvent],
+) -> dict[str, object]:
     return {
         "path": str(path),
         "adapter": DEFAULT_PARSER_ADAPTER.version,
         "file_session_id": session_id_from_path(path),
         "event_count": len(events),
-        "session_ids": session_ids,
-        "models": models,
-        "efforts": efforts,
-        "first_event_timestamp": first_event.event_timestamp if first_event else None,
-        "last_event_timestamp": last_event.event_timestamp if last_event else None,
+        "session_ids": _inspect_log_session_ids(events),
+        "models": _inspect_log_models(events),
+        "efforts": _inspect_log_efforts(events),
+        "first_event_timestamp": _first_event_timestamp(events),
+        "last_event_timestamp": _last_event_timestamp(events),
         "diagnostics": compact_parser_diagnostics(stats),
-        "events": [
-            {
-                "record_id": event.record_id,
-                "line_number": event.line_number,
-                "event_timestamp": event.event_timestamp,
-                "session_id": event.session_id,
-                "turn_id": event.turn_id,
-                "model": event.model,
-                "effort": event.effort,
-                "input_tokens": event.input_tokens,
-                "cached_input_tokens": event.cached_input_tokens,
-                "uncached_input_tokens": event.uncached_input_tokens,
-                "output_tokens": event.output_tokens,
-                "reasoning_output_tokens": event.reasoning_output_tokens,
-                "total_tokens": event.total_tokens,
-                "cumulative_total_tokens": event.cumulative_total_tokens,
-                "is_archived": event.is_archived,
-                "thread_key": event.thread_key,
-            }
-            for event in events
-        ],
+        "events": [_inspect_log_event_row(event) for event in events],
+    }
+
+
+def _inspect_log_session_ids(events: list[UsageEvent]) -> list[str]:
+    return sorted({event.session_id for event in events})
+
+
+def _inspect_log_models(events: list[UsageEvent]) -> list[str]:
+    return sorted({event.model for event in events if event.model})
+
+
+def _inspect_log_efforts(events: list[UsageEvent]) -> list[str]:
+    return sorted({event.effort for event in events if event.effort})
+
+
+def _first_event_timestamp(events: list[UsageEvent]) -> str | None:
+    if not events:
+        return None
+    return events[0].event_timestamp
+
+
+def _last_event_timestamp(events: list[UsageEvent]) -> str | None:
+    if not events:
+        return None
+    return events[-1].event_timestamp
+
+
+def _inspect_log_event_row(event: UsageEvent) -> dict[str, object]:
+    return {
+        "record_id": event.record_id,
+        "line_number": event.line_number,
+        "event_timestamp": event.event_timestamp,
+        "session_id": event.session_id,
+        "turn_id": event.turn_id,
+        "model": event.model,
+        "effort": event.effort,
+        "input_tokens": event.input_tokens,
+        "cached_input_tokens": event.cached_input_tokens,
+        "uncached_input_tokens": event.uncached_input_tokens,
+        "output_tokens": event.output_tokens,
+        "reasoning_output_tokens": event.reasoning_output_tokens,
+        "total_tokens": event.total_tokens,
+        "cumulative_total_tokens": event.cumulative_total_tokens,
+        "is_archived": event.is_archived,
+        "thread_key": event.thread_key,
     }

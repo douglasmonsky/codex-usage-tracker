@@ -7444,3 +7444,52 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue the C(11) ratchet with `parser.py::inspect_log`.
+
+### `refactor/parser-inspect-log`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Reduce the final C-grade parser inspection helper while preserving aggregate-only inspect-log output.
+
+Files touched:
+- `src/codex_usage_tracker/parser.py`
+- `tests/test_parser_inspect_log.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added focused `inspect_log` coverage with direct event-row assertions in a new small parser inspect-log test file.
+- Split inspect-log payload assembly, session/model/effort extraction, timestamp extraction, and event-row formatting into focused helpers.
+- Preserved aggregate-only behavior and raw-content privacy invariant.
+
+Metrics:
+- `inspect_log`: C(11) -> A(1).
+- `_inspect_log_payload`: A(2).
+- `parser.py` maximum complexity: A(5); no C-grade functions remain in module.
+- Expected global C-or-worse blocks after this branch: 1 -> 0.
+- No C(12+) or D/E/F complexity blocks expected.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_parser.py::test_inspect_log_reports_aggregate_diagnostics_without_db_writes -q`: 1 passed before refactor.
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_parser.py -q`: 12 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/parser.py tests/test_parser.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/parser.py -a -s`: target now A(1), module max A(5).
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_parser.py tests/test_parser_inspect_log.py -q`: 13 passed after moving extra coverage out of oversized `tests/test_parser.py`.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 531 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning before staging; rerun after staging before commit.
+- `.venv/bin/python - <<'PY' ... radon JSON C-count ... PY`: `C_or_worse 0`.
+
+Remaining risks / next handoff:
+- Stage exact files and rerun `agent_maintainer verify --profile fast` before commit.
+- Start the next roadmap phase now that C-grade complexity is eliminated from `src`.
