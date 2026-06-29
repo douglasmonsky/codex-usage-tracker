@@ -3906,3 +3906,62 @@ Remaining risks:
 
 Next handoff:
 - Move to the next high-payoff hotspot, likely `cli.py` or a narrow source-log persistence table cleanup, depending on whether the next goal is file length or complexity.
+
+### `refactor/cli-diagnostics-runner`
+
+Goal:
+- Move diagnostics CLI command routing out of oversized `cli.py`.
+- Reduce the moved diagnostics runner from a C-rated branch ladder to small A-rated builders.
+- Preserve diagnostics CLI JSON/text output and command dispatch behavior.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `src/codex_usage_tracker/cli.py`
+- `src/codex_usage_tracker/cli_diagnostics.py`
+- `src/codex_usage_tracker/cli_output.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline and metric notes:
+- `cli.py` line count fell from `976` to `827`.
+- Max file-line ratchet fell from `1283` to `1134`.
+- `cli_diagnostics.py` is `160` lines; `cli_output.py` is `11` lines.
+- `run_diagnostics` is now A-rated complexity `3`; `cli_diagnostics.py` average complexity is A `1.5`.
+- `diagnostic_snapshots.py` remains below target at `539` lines; `server.py` remains oversized at `823` lines.
+
+Completed edits:
+- Added `cli_diagnostics.run_diagnostics` and changed the CLI command handler table to dispatch to it.
+- Moved diagnostics report/snapshot imports out of `cli.py`.
+- Added shared `cli_output.print_json` so diagnostics and the main CLI use the same JSON formatting behavior.
+- Collapsed repeated diagnostic snapshot command wrappers into a snapshot builder table.
+- Kept existing diagnostics CLI characterization coverage through `tests/test_cli_lifecycle.py::test_diagnostics_cli_returns_aggregate_json`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_diagnostics.py src/codex_usage_tracker/cli_output.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_diagnostics.py src/codex_usage_tracker/cli_output.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_lifecycle.py::test_diagnostics_cli_returns_aggregate_json tests/test_cli_release.py::test_cli_reference_documents_only_existing_stable_commands -q`: 2 passed.
+- `radon cc src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_diagnostics.py src/codex_usage_tracker/cli_output.py -a -s`: passed; moved diagnostics runner is A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_diagnostics.py src/codex_usage_tracker/cli_output.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning plus expected change-budget warning because existing tests covered the extraction.
+- `.venv/bin/python -m agent_maintainer verify --profile precommit`: diagnostics-only failure; broad existing repo ruff-format, pyright, and xenon findings remain outside this slice.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings. New CLI modules are now explicitly assigned in `tach.toml`.
+
+Remaining risks:
+- `cli.py` is still oversized at `827` lines.
+- `server.py` remains oversized at `823` lines.
+- Overall package still triggers structure-cohesion warnings because the package is intentionally still flat during ratchet setup.
+- Precommit profile is useful as diagnostics but not yet a clean gate for this repo.
+
+Next handoff:
+- Continue reducing `cli.py` with another narrow runner extraction or move back to `server.py` once the CLI slices stop being the highest payoff.
