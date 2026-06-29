@@ -29,64 +29,17 @@ def fit_usage_drain_proxy(
 ) -> UsageDrainModelResult:
     """Fit usage-drain deltas against candidate and non-candidate credits."""
 
-    y_values = [span.delta_usage_percent for span in spans]
-    candidate_values = [span.candidate_standard_credits.get(proxy, 0.0) for span in spans]
-    non_candidate_values = [
-        span.non_candidate_standard_credits.get(proxy, 0.0) for span in spans
-    ]
+    y_values, candidate_values, non_candidate_values = _proxy_credit_vectors(spans, proxy)
     candidate_spans = sum(1 for value in candidate_values if value > 0)
-    beta_non, beta_candidate = _fit_two_feature_no_intercept(
-        non_candidate_values, candidate_values, y_values
+    beta_non, beta_candidate, implied_multiplier, y_hat = _two_feature_fit(
+        y_values,
+        candidate_values,
+        non_candidate_values,
     )
-    implied_multiplier = (
-        beta_candidate / beta_non
-        if beta_non is not None and beta_candidate is not None and beta_non > 0
-        else None
-    )
-    y_hat = (
-        [
-            (beta_non or 0.0) * non_candidate
-            + (beta_candidate or 0.0) * candidate
-            for non_candidate, candidate in zip(
-                non_candidate_values, candidate_values, strict=True
-            )
-        ]
-        if beta_non is not None and beta_candidate is not None
-        else None
-    )
-    grid = [
-        _fit_grid_multiplier(spans, proxy=proxy, multiplier=multiplier)
-        for multiplier in grid_multipliers
-    ]
-    valid_grid = [item for item in grid if item.get("r2_slope") is not None]
-    best_grid = max(
-        valid_grid,
-        key=lambda item: _number(item.get("r2_slope")),
-        default=None,
-    )
-    best_grid_multiplier = (
-        _number(best_grid.get("multiplier")) if best_grid is not None else None
-    )
-    with_candidates = _drain_stats(
-        [
-            span
-            for span, candidate in zip(spans, candidate_values, strict=True)
-            if candidate > 0 and span.standard_usage_credits > 0
-        ]
-    )
-    without_candidates = _drain_stats(
-        [
-            span
-            for span, candidate in zip(spans, candidate_values, strict=True)
-            if candidate <= 0 and span.standard_usage_credits > 0
-        ]
-    )
-    median_ratio = (
-        float(with_candidates["median_drain_per_standard_credit"])
-        / float(without_candidates["median_drain_per_standard_credit"])
-        if with_candidates["median_drain_per_standard_credit"]
-        and without_candidates["median_drain_per_standard_credit"]
-        else None
+    grid, best_grid_multiplier = _proxy_grid_fit(spans, proxy, grid_multipliers)
+    with_candidates, without_candidates, median_ratio = _candidate_drain_comparison(
+        spans,
+        candidate_values,
     )
     documented_multiplier = _documented_weighted_multiplier(spans, proxy)
     return UsageDrainModelResult(
@@ -108,3 +61,86 @@ def fit_usage_drain_proxy(
         spans_without_candidates=without_candidates,
         with_vs_without_median_drain_ratio=_rounded(median_ratio),
     )
+
+
+def _proxy_credit_vectors(
+    spans: list[UsageDeltaSpan],
+    proxy: str,
+) -> tuple[list[float], list[float], list[float]]:
+    return (
+        [span.delta_usage_percent for span in spans],
+        [span.candidate_standard_credits.get(proxy, 0.0) for span in spans],
+        [span.non_candidate_standard_credits.get(proxy, 0.0) for span in spans],
+    )
+
+
+def _two_feature_fit(
+    y_values: list[float],
+    candidate_values: list[float],
+    non_candidate_values: list[float],
+) -> tuple[float | None, float | None, float | None, list[float] | None]:
+    beta_non, beta_candidate = _fit_two_feature_no_intercept(
+        non_candidate_values, candidate_values, y_values
+    )
+    implied_multiplier = (
+        beta_candidate / beta_non
+        if beta_non is not None and beta_candidate is not None and beta_non > 0
+        else None
+    )
+    if beta_non is None or beta_candidate is None:
+        return beta_non, beta_candidate, implied_multiplier, None
+    y_hat = [
+        (beta_non * non_candidate) + (beta_candidate * candidate)
+        for non_candidate, candidate in zip(
+            non_candidate_values, candidate_values, strict=True
+        )
+    ]
+    return beta_non, beta_candidate, implied_multiplier, y_hat
+
+
+def _proxy_grid_fit(
+    spans: list[UsageDeltaSpan],
+    proxy: str,
+    grid_multipliers: tuple[float, ...],
+) -> tuple[list[dict[str, float | None]], float | None]:
+    grid = [
+        _fit_grid_multiplier(spans, proxy=proxy, multiplier=multiplier)
+        for multiplier in grid_multipliers
+    ]
+    valid_grid = [item for item in grid if item.get("r2_slope") is not None]
+    best_grid = max(
+        valid_grid,
+        key=lambda item: _number(item.get("r2_slope")),
+        default=None,
+    )
+    return grid, (
+        _number(best_grid.get("multiplier")) if best_grid is not None else None
+    )
+
+
+def _candidate_drain_comparison(
+    spans: list[UsageDeltaSpan],
+    candidate_values: list[float],
+) -> tuple[dict[str, float | int | None], dict[str, float | int | None], float | None]:
+    with_candidates = _drain_stats(
+        [
+            span
+            for span, candidate in zip(spans, candidate_values, strict=True)
+            if candidate > 0 and span.standard_usage_credits > 0
+        ]
+    )
+    without_candidates = _drain_stats(
+        [
+            span
+            for span, candidate in zip(spans, candidate_values, strict=True)
+            if candidate <= 0 and span.standard_usage_credits > 0
+        ]
+    )
+    median_ratio = (
+        float(with_candidates["median_drain_per_standard_credit"])
+        / float(without_candidates["median_drain_per_standard_credit"])
+        if with_candidates["median_drain_per_standard_credit"]
+        and without_candidates["median_drain_per_standard_credit"]
+        else None
+    )
+    return with_candidates, without_candidates, median_ratio

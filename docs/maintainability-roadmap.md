@@ -4826,3 +4826,42 @@ Checks:
 Remaining risks / next handoff:
 - `load_call_context` remains C(13) in `context.py`.
 - Global Xenon still fails on remaining C-rated blocks in usage-drain, store, diagnostics MCP, recommendations, formatting, and project config modules.
+
+### `refactor/usage-drain-proxy-fit`
+
+Objective:
+- Reduce the worst remaining usage-drain modeling complexity hotspot, `fit_usage_drain_proxy`, without changing the `UsageDrainModelResult` contract.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_proxy_fit.py`
+
+Completed edits:
+- Split proxy vector extraction, two-feature no-intercept fit, grid fit selection, and candidate/non-candidate drain comparison into focused helpers.
+- Preserved existing proxy-fit return fields, rounding behavior, grid rows, and documented multiplier logic.
+- Reused the existing multiplier recovery characterization test for behavior coverage.
+
+Metrics:
+- `fit_usage_drain_proxy`: D(28) -> A(5).
+- `usage_drain_proxy_fit.py` average complexity: D(28.0) -> B(6.0).
+- New helper ceiling: B(9) for `_candidate_drain_comparison`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_proxy_fit.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_proxy_fit.py`: passed.
+- `.venv/bin/python -m radon cc src/codex_usage_tracker/usage_drain_proxy_fit.py -a -s`: passed, target function now A(5).
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py::test_fit_usage_drain_proxy_recovers_documented_multiplier -q`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py tests/test_usage_drain_thread_curves.py -q`: 21 passed.
+- `.venv/bin/python -m pytest -q`: 443 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Global Xenon still fails on C/D-rated blocks in projects, usage-drain feature history/time series/allowance fits, store, diagnostics MCP, recommendations, formatting, and diagnostic snapshot analysis.
