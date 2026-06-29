@@ -5108,3 +5108,46 @@ Checks:
 Remaining risks / next handoff:
 - Global Xenon still fails on remaining C-rated blocks in allowance fits, store upserts, recommendations, usage-drain spans/state summaries, dashboard payload, and diagnostic snapshot analysis.
 - Next high-impact target is likely `usage_drain_allowance_fits.py::allowance_piecewise_credit_to_delta_fit` or `store.py::upsert_usage_events`.
+### `refactor/usage-drain-allowance-fits`
+
+Objective:
+- Reduce piecewise allowance credit-to-delta fit complexity while preserving breakpoint diagnostics schema and metrics.
+- Add direct characterization around segment model records and piecewise model names.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_allowance_fits.py`
+- `tests/test_usage_drain_allowance_fits.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added a focused direct test for `allowance_piecewise_credit_to_delta_fit`.
+- Split empty response, no-intercept slope fitting, prediction-list construction, segment extraction, leave-one-out denominator calculation, prediction accumulation, and segment model formatting into helpers.
+- Preserved existing output keys and downstream `allowance_breakpoint_analysis` behavior.
+
+Metrics:
+- `allowance_piecewise_credit_to_delta_fit`: C(18) -> B(6).
+- `usage_drain_allowance_fits.py` average complexity: A(4.75).
+- Global C-or-worse blocks: 54 -> 53.
+- New largest remaining hotspots: `store.py::upsert_usage_events` C(18) and `recommendations.py::action_recommendations` C(18).
+- `usage_drain_allowance_fits.py`: 481 physical lines, 450 source lines; still within the active source-line ratchet.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_allowance_fits.py tests/test_usage_drain_allowance_fits.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_allowance_fits.py tests/test_usage_drain_allowance_fits.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_allowance_fits.py tests/test_usage_drain_model.py::test_allowance_breakpoint_analysis_detects_capacity_denominator_change -q`: 2 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_allowance_fits.py -a -s`: passed, target now B-rated.
+- `.venv/bin/python -m pytest -q`: 449 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `allowance_online_capacity_credit_to_delta_fit` remains C(15), but this branch kept scope to the highest piecewise-fit hotspot.
+- Next likely targets are `store.py::upsert_usage_events`, `recommendations.py::action_recommendations`, or a follow-up allowance-online branch.

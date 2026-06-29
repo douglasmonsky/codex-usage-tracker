@@ -25,80 +25,149 @@ from codex_usage_tracker.usage_drain_utils import (
 )
 
 
+def _empty_allowance_piecewise_fit() -> dict[str, Any]:
+    return {
+        "target": "visible_delta_percent",
+        "models": {},
+        "notes": [
+            "No piecewise fit is available without breakpoint segments.",
+        ],
+    }
+
+
+def _no_intercept_credit_slope(credits: list[float], delta: list[float]) -> float:
+    coefficients = _fit_linear_regression_coefficients(
+        [[credit] for credit in credits],
+        delta,
+        intercept=False,
+    )
+    return coefficients[0] if coefficients else 0.0
+
+
+def _piecewise_prediction_lists() -> dict[str, list[float]]:
+    return {
+        "global_slope_ceiling": [],
+        "mean_capacity": [],
+        "mean_capacity_ceiling": [],
+        "leave_one_out_capacity": [],
+        "slope": [],
+        "slope_ceiling": [],
+    }
+
+
+def _segment_fit_values(segment_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    capacities = [
+        _number(row.get("credits_per_visible_percent")) for row in segment_rows
+    ]
+    credits = [_number(row.get("standard_usage_credits")) for row in segment_rows]
+    delta = [_number(row.get("delta_usage_percent")) for row in segment_rows]
+    mean_capacity = sum(capacities) / len(capacities) if capacities else 0.0
+    return {
+        "capacities": capacities,
+        "credits": credits,
+        "mean_capacity": mean_capacity,
+        "slope": _no_intercept_credit_slope(credits, delta),
+    }
+
+
+def _leave_one_out_capacity(
+    capacities: list[float],
+    *,
+    capacity_sum: float,
+    offset: int,
+    fallback: float,
+) -> float:
+    if len(capacities) <= 1:
+        return fallback
+    return (capacity_sum - capacities[offset]) / (len(capacities) - 1)
+
+
+def _append_piecewise_predictions(
+    predictions: dict[str, list[float]],
+    *,
+    credits: list[float],
+    capacities: list[float],
+    mean_capacity: float,
+    slope: float,
+    global_slope: float,
+) -> None:
+    capacity_sum = sum(capacities)
+    for offset, credit in enumerate(credits):
+        global_prediction = global_slope * credit
+        mean_prediction = credit / mean_capacity if mean_capacity > 0 else 0.0
+        slope_prediction = slope * credit
+        loo_capacity = _leave_one_out_capacity(
+            capacities,
+            capacity_sum=capacity_sum,
+            offset=offset,
+            fallback=mean_capacity,
+        )
+        predictions["global_slope_ceiling"].append(
+            _ceil_to_visible_tick(global_prediction)
+        )
+        predictions["mean_capacity"].append(mean_prediction)
+        predictions["mean_capacity_ceiling"].append(
+            _ceil_to_visible_tick(mean_prediction)
+        )
+        predictions["leave_one_out_capacity"].append(
+            credit / loo_capacity if loo_capacity > 0 else 0.0
+        )
+        predictions["slope"].append(slope_prediction)
+        predictions["slope_ceiling"].append(_ceil_to_visible_tick(slope_prediction))
+
+
+def _piecewise_segment_model(
+    *,
+    segment_index: int,
+    segment_rows: list[dict[str, Any]],
+    mean_capacity: float,
+    slope: float,
+) -> dict[str, Any]:
+    return {
+        "segment_index": segment_index,
+        "n": len(segment_rows),
+        "mean_credits_per_visible_percent": _rounded(mean_capacity),
+        "no_intercept_slope_delta_percent_per_credit": _rounded(slope),
+        "no_intercept_implied_credits_per_percent": _rounded(
+            1 / slope if slope > 0 else None
+        ),
+    }
+
+
 def allowance_piecewise_credit_to_delta_fit(
     rows: list[dict[str, Any]],
     segments: list[tuple[int, int]],
 ) -> dict[str, Any]:
     actual = [_number(row.get("delta_usage_percent")) for row in rows]
     if not rows or not segments:
-        return {
-            "target": "visible_delta_percent",
-            "models": {},
-            "notes": [
-                "No piecewise fit is available without breakpoint segments.",
-            ],
-        }
+        return _empty_allowance_piecewise_fit()
 
-    mean_capacity_predictions: list[float] = []
-    mean_capacity_ceiling_predictions: list[float] = []
-    leave_one_out_predictions: list[float] = []
-    slope_predictions: list[float] = []
-    slope_ceiling_predictions: list[float] = []
-    global_slope_ceiling_predictions: list[float] = []
+    predictions = _piecewise_prediction_lists()
     segment_models: list[dict[str, Any]] = []
-    global_coefficients = _fit_linear_regression_coefficients(
-        [[_number(row.get("standard_usage_credits"))] for row in rows],
+    global_slope = _no_intercept_credit_slope(
+        [_number(row.get("standard_usage_credits")) for row in rows],
         actual,
-        intercept=False,
     )
-    global_slope = global_coefficients[0] if global_coefficients else 0.0
     for segment_index, (start, end) in enumerate(segments, start=1):
         segment_rows = rows[start:end]
-        capacities = [
-            _number(row.get("credits_per_visible_percent")) for row in segment_rows
-        ]
-        credits = [_number(row.get("standard_usage_credits")) for row in segment_rows]
-        delta = [_number(row.get("delta_usage_percent")) for row in segment_rows]
-        mean_capacity = sum(capacities) / len(capacities) if capacities else 0.0
-        segment_coefficients = _fit_linear_regression_coefficients(
-            [[credit] for credit in credits],
-            delta,
-            intercept=False,
+        segment_values = _segment_fit_values(segment_rows)
+        mean_capacity = _number(segment_values.get("mean_capacity"))
+        slope = _number(segment_values.get("slope"))
+        _append_piecewise_predictions(
+            predictions,
+            credits=segment_values["credits"],
+            capacities=segment_values["capacities"],
+            mean_capacity=mean_capacity,
+            slope=slope,
+            global_slope=global_slope,
         )
-        slope = segment_coefficients[0] if segment_coefficients else 0.0
-        capacity_sum = sum(capacities)
-        for offset, credit in enumerate(credits):
-            global_prediction = global_slope * credit
-            mean_prediction = credit / mean_capacity if mean_capacity > 0 else 0.0
-            slope_prediction = slope * credit
-            global_slope_ceiling_predictions.append(
-                _ceil_to_visible_tick(global_prediction)
-            )
-            mean_capacity_predictions.append(mean_prediction)
-            mean_capacity_ceiling_predictions.append(
-                _ceil_to_visible_tick(mean_prediction)
-            )
-            slope_predictions.append(slope_prediction)
-            slope_ceiling_predictions.append(_ceil_to_visible_tick(slope_prediction))
-            if len(capacities) > 1:
-                loo_capacity = (capacity_sum - capacities[offset]) / (
-                    len(capacities) - 1
-                )
-            else:
-                loo_capacity = mean_capacity
-            leave_one_out_predictions.append(
-                credit / loo_capacity if loo_capacity > 0 else 0.0
-            )
         segment_models.append(
-            {
-                "segment_index": segment_index,
-                "n": len(segment_rows),
-                "mean_credits_per_visible_percent": _rounded(mean_capacity),
-                "no_intercept_slope_delta_percent_per_credit": _rounded(slope),
-                "no_intercept_implied_credits_per_percent": _rounded(
-                    1 / slope if slope > 0 else None
-                ),
-            }
+            _piecewise_segment_model(
+                segment_index=segment_index,
+                segment_rows=segment_rows,
+                mean_capacity=mean_capacity,
+                slope=slope,
+            )
         )
 
     return {
@@ -112,7 +181,7 @@ def allowance_piecewise_credit_to_delta_fit(
                 ),
                 "metrics": _regression_metrics(
                     actual,
-                    global_slope_ceiling_predictions,
+                    predictions["global_slope_ceiling"],
                 ),
             },
             "piecewise_mean_capacity_denominator": {
@@ -120,7 +189,7 @@ def allowance_piecewise_credit_to_delta_fit(
                     "Predicts visible delta as credits divided by the detected "
                     "segment mean credits per visible percent."
                 ),
-                "metrics": _regression_metrics(actual, mean_capacity_predictions),
+                "metrics": _regression_metrics(actual, predictions["mean_capacity"]),
             },
             "piecewise_ceiling_mean_capacity_denominator": {
                 "description": (
@@ -130,7 +199,7 @@ def allowance_piecewise_credit_to_delta_fit(
                 ),
                 "metrics": _regression_metrics(
                     actual,
-                    mean_capacity_ceiling_predictions,
+                    predictions["mean_capacity_ceiling"],
                 ),
             },
             "piecewise_leave_one_out_capacity_denominator": {
@@ -138,14 +207,17 @@ def allowance_piecewise_credit_to_delta_fit(
                     "Predicts visible delta as credits divided by the detected "
                     "segment mean after excluding the current row from that mean."
                 ),
-                "metrics": _regression_metrics(actual, leave_one_out_predictions),
+                "metrics": _regression_metrics(
+                    actual,
+                    predictions["leave_one_out_capacity"],
+                ),
             },
             "piecewise_no_intercept_credit_slope": {
                 "description": (
                     "Fits a no-intercept credit-to-delta slope separately inside "
                     "each detected segment."
                 ),
-                "metrics": _regression_metrics(actual, slope_predictions),
+                "metrics": _regression_metrics(actual, predictions["slope"]),
             },
             "piecewise_ceiling_no_intercept_credit_slope": {
                 "description": (
@@ -153,7 +225,7 @@ def allowance_piecewise_credit_to_delta_fit(
                     "detected segment, then rounds positive predictions up to "
                     "the next visible 1% tick."
                 ),
-                "metrics": _regression_metrics(actual, slope_ceiling_predictions),
+                "metrics": _regression_metrics(actual, predictions["slope_ceiling"]),
             },
         },
         "segment_models": segment_models,
