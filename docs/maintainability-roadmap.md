@@ -4493,3 +4493,54 @@ Remaining risks / next handoff:
 - `diagnostic_facts.diagnostic_facts_from_envelope` and
   `diagnostic_fact_from_json` remain B(8), acceptable for now.
 - Global Xenon still fails on unrelated C-rated hotspots.
+### `refactor/cli-parser-diagnostics`
+
+Objective:
+- Reduce the largest remaining source file by moving only diagnostics CLI
+  parser construction into a dedicated module.
+- Preserve public `build_parser()` behavior and nested diagnostics subcommand
+  argument parsing.
+- Keep all parser builder functions A-rated.
+
+Baseline metrics:
+- `cli_parser.py`: 742 lines.
+- `cli_parser.py` functions: A-rated, but file length exceeded the current
+  ratchet threshold.
+- Max-file ratchet overage before branch completion: 326.
+
+Completed edits:
+- Added `cli_parser_diagnostics.py` for diagnostics subparser construction and
+  diagnostics-specific filter/sort parser helpers.
+- Replaced the in-file diagnostics parser call with
+  `add_diagnostics_parser(subparsers)`.
+- Removed diagnostics sort-choice imports from `cli_parser.py`.
+- Added `tests/test_cli_parser_diagnostics.py` to lock nested diagnostics
+  parser behavior without making `tests/test_cli_release.py` larger.
+
+Metrics edits:
+- `cli_parser.py`: 550 lines.
+- `cli_parser_diagnostics.py`: 201 lines.
+- `tests/test_cli_parser_diagnostics.py`: 36 lines.
+- Combined CLI parser complexity remains A(1.0).
+- Max-file ratchet overage tightened from 326 to 184.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/cli_parser.py src/codex_usage_tracker/cli_parser_diagnostics.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/cli_parser.py src/codex_usage_tracker/cli_parser_diagnostics.py tests/test_cli_parser_diagnostics.py tests/test_cli_release.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_parser_diagnostics.py tests/test_cli_release.py -q`: 18 passed.
+- `.venv/bin/python -m pytest -q`: 441 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted baseline.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `usage_drain_reports.py`, `dashboard.py`, and `diagnostics.py` are now the
+  largest remaining source files over 600 lines.
+- Global Xenon still fails on unrelated C-rated hotspots.
