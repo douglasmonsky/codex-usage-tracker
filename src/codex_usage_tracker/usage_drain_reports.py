@@ -193,27 +193,50 @@ def _prediction_model_record(
     actual: list[float],
     predicted: list[float],
 ) -> dict[str, Any]:
-    errors = [abs(left - right) for left, right in zip(actual, predicted, strict=False)]
+    errors = _absolute_errors(actual, predicted)
     return {
         "name": name,
         "kind": "compact_dashboard_baseline",
         "validation": "same_series_compact",
-        "mae": _rounded(sum(errors) / len(errors) if errors else None),
-        "rmse": _rounded(
-            (sum((left - right) ** 2 for left, right in zip(actual, predicted, strict=False)) / len(actual))
-            ** 0.5
-            if actual
-            else None
-        ),
+        "mae": _rounded(_mean_absolute_error(errors)),
+        "rmse": _rounded(_root_mean_square_error(actual, predicted)),
         "r2": _rounded(_r2(actual, predicted)),
         "pearson": _rounded(_pearson(actual, predicted)),
-        "within_1pt": _rounded(
-            sum(1 for error in errors if error <= 1.0) / len(errors) if errors else None
-        ),
-        "within_5pts": _rounded(
-            sum(1 for error in errors if error <= 5.0) / len(errors) if errors else None
-        ),
+        "within_1pt": _rounded(_within_error_share(errors, threshold=1.0)),
+        "within_5pts": _rounded(_within_error_share(errors, threshold=5.0)),
     }
+
+
+def _absolute_errors(actual: list[float], predicted: list[float]) -> list[float]:
+    return [
+        abs(left - right)
+        for left, right in zip(actual, predicted, strict=False)
+    ]
+
+
+def _mean_absolute_error(errors: list[float]) -> float | None:
+    if not errors:
+        return None
+    return sum(errors) / len(errors)
+
+
+def _root_mean_square_error(
+    actual: list[float], predicted: list[float]
+) -> float | None:
+    if not actual:
+        return None
+    squared_error = sum(
+        (left - right) ** 2 for left, right in zip(actual, predicted, strict=False)
+    )
+    return (squared_error / len(actual)) ** 0.5
+
+
+def _within_error_share(
+    errors: list[float], *, threshold: float
+) -> float | None:
+    if not errors:
+        return None
+    return sum(1 for error in errors if error <= threshold) / len(errors)
 
 
 def _token_accounting_highlights(

@@ -7183,3 +7183,38 @@ Checks:
 Remaining risks / next handoff:
 - Run broad local gates before commit.
 - Continue the C(11) ratchet after commit.
+
+### `refactor/report-prediction-model-record`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Reduce the C-grade compact prediction model record formatter while preserving dashboard report metrics and empty-series behavior.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_reports.py`
+- `tests/test_usage_drain_report_records.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added synthetic characterization tests for populated and empty prediction model records.
+- Extracted absolute error, MAE, RMSE, and threshold-share calculations into focused helpers.
+- Kept public report keys, rounding, and validation labels unchanged.
+
+Metrics:
+- `_prediction_model_record`: C(11) -> A(1).
+- `usage_drain_reports.py` now has one remaining C-grade helper, `_token_accounting_highlights`.
+- Expected global C-or-worse blocks after this branch: 7 -> 6.
+- No C(12+) or D/E/F complexity blocks expected.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_report_records.py -q`: 2 passed before refactor.
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_report_records.py tests/test_usage_drain_reports.py -q`: 7 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_reports.py tests/test_usage_drain_report_records.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_reports.py -a -s`: target now A(1), module max C(11).
+
+Remaining risks / next handoff:
+- Run broad local gates before commit.
+- Continue the C(11) ratchet, likely with `_token_accounting_highlights`.
