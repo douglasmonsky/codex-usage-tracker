@@ -6325,3 +6325,50 @@ Checks so far:
 
 Remaining risks / next handoff:
 - Next likely branch is `context.py::load_call_context`; treat it carefully because it touches raw-context privacy behavior.
+
+### `refactor/context-load-call-context`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `load_call_context` complexity while preserving on-demand raw-context privacy behavior and the public context payload schema.
+- Keep raw JSONL scanning internals behavior-preserving and avoid broad context-reader rewrites.
+
+Files touched:
+- `src/codex_usage_tracker/context.py`
+- `src/codex_usage_tracker/context_loader.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split record lookup, source-location validation, context bounds, payload assembly, record payload formatting, diagnostics attachment, and JSON-byte counting into `context_loader.py`.
+- Kept raw JSONL scanning and entry collection in `context.py`.
+- Preserved diagnostics timing fields, source metadata, visible-token estimates, serialized evidence, action timing, entries, omitted counts, and raw-context on-demand behavior.
+
+Metrics:
+- `context.py::load_call_context`: C(13) -> A(2).
+- `context.py` maximum complexity: B(9).
+- `context.py`: 525 -> 515 physical lines.
+- New `context_loader.py`: 144 physical lines.
+- Global C-or-worse blocks: 26 -> 25.
+- No C(13) or D/E/F complexity blocks remain.
+- Current top complexity targets are C(12), led by `usage_drain_summary_metrics.py::model_family_attribution`.
+
+Checks so far:
+- `.venv/bin/python -m pytest tests/test_context_evidence.py tests/test_context_scan.py tests/test_context_serialized.py tests/test_context_action_timing.py tests/test_context_token_estimates.py tests/test_context_values.py -q`: 20 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/context.py src/codex_usage_tracker/context_loader.py tests/test_context_evidence.py tests/test_context_scan.py tests/test_context_action_timing.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/context.py src/codex_usage_tracker/context_loader.py -a -s`: target now A(2), modules max B(9).
+- `.venv/bin/python -m pytest -q`: 486 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging; existing structure-cohesion warning plus source-only change-budget warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Next branch can ratchet C(12) hotspots, starting with either `model_family_attribution` or `state_signature_ambiguity`.

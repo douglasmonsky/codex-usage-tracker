@@ -12,6 +12,16 @@ from codex_usage_tracker.context_action_timing import (
     annotate_action_timing,
     normalize_millisecond_value,
 )
+from codex_usage_tracker.context_loader import (
+    LoadedContextData,
+    attach_context_diagnostics,
+    bounded_context_chars,
+    bounded_context_entries,
+    context_response_payload,
+    context_source_location,
+    elapsed_ms,
+    load_context_usage_record,
+)
 from codex_usage_tracker.context_serialized import (
     collect_serialized_envelope,
     quick_serialized_context_estimate,
@@ -29,11 +39,9 @@ from codex_usage_tracker.context_token_estimates import (
 from codex_usage_tracker.context_values import (
     nonnegative_float,
     optional_str,
-    positive_int,
     redact_text,
 )
 from codex_usage_tracker.paths import DEFAULT_DB_PATH
-from codex_usage_tracker.store_usage_record_queries import query_usage_record
 
 DEFAULT_CONTEXT_CHARS = 20_000
 DEFAULT_CONTEXT_ENTRIES = 80
@@ -51,31 +59,66 @@ def load_call_context(
     diagnostics: bool = False,
     mode: str = CONTEXT_MODE_QUICK,
 ) -> dict[str, Any]:
-    """Load logged turn context for one model call from the source JSONL file.
+    """Load logged turn context for one model call from its source JSONL file.
 
-    This intentionally reads raw transcript-like data only on demand. The returned
-    context is not written back to SQLite or embedded in dashboard HTML.
+    This intentionally reads raw transcript-like content only on demand. The returned
+    context is not written back to SQLite or embedded in the dashboard HTML.
     """
 
     context_mode = _normalize_context_mode(mode)
     diagnostic_payload: dict[str, Any] | None = {} if diagnostics else None
-    db_lookup_started = perf_counter()
-    row = query_usage_record(db_path=db_path, record_id=record_id)
-    if diagnostic_payload is not None:
-        diagnostic_payload["db_lookup_ms"] = _elapsed_ms(db_lookup_started)
-    if row is None:
-        raise ValueError(f"No usage record found for record_id: {record_id}")
+    row = load_context_usage_record(
+        db_path=db_path,
+        record_id=record_id,
+        diagnostic_payload=diagnostic_payload,
+    )
+    source_file, source_file_bytes, line_number = context_source_location(
+        row, record_id=record_id
+    )
+    loaded = _read_context_for_usage_record(
+        row=row,
+        source_file=source_file,
+        line_number=line_number,
+        max_chars=max_chars,
+        max_entries=max_entries,
+        include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
+        context_mode=context_mode,
+    )
+    visible_estimate = estimate_visible_tokens(
+        loaded.estimate_entries, optional_str(row.get("model"))
+    )
+    payload = context_response_payload(
+        row=row,
+        source_file=source_file,
+        line_number=line_number,
+        context_mode=context_mode,
+        include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
+        visible_estimate=visible_estimate,
+        loaded=loaded,
+    )
+    attach_context_diagnostics(
+        payload=payload,
+        diagnostic_payload=diagnostic_payload,
+        loaded=loaded,
+        source_file_bytes=source_file_bytes,
+        line_number=line_number,
+    )
+    return payload
 
-    source_file = Path(str(row.get("source_file") or ""))
-    if not source_file.exists():
-        raise FileNotFoundError(f"Source log not found: {source_file}")
-    source_file_bytes = source_file.stat().st_size
 
-    line_number = positive_int(row.get("line_number"))
-    if line_number is None:
-        raise ValueError(f"Usage record has no valid source line: {record_id}")
-
-    target_turn_id = optional_str(row.get("turn_id"))
+def _read_context_for_usage_record(
+    *,
+    row: dict[str, Any],
+    source_file: Path,
+    line_number: int,
+    max_chars: int,
+    max_entries: int,
+    include_tool_output: bool,
+    include_compaction_history: bool,
+    context_mode: str,
+) -> LoadedContextData:
     source_scan_started = perf_counter()
     (
         entries,
@@ -84,65 +127,26 @@ def load_call_context(
         serialized_estimate,
         serialized_estimate_ms,
         action_timing,
-    ) = (
-        _read_context_entries(
-            path=source_file,
-            token_line=line_number,
-            target_turn_id=target_turn_id,
-            max_chars=max_chars if max_chars <= 0 else max(1_000, max_chars),
-            max_entries=max_entries if max_entries <= 0 else max(1, max_entries),
-            include_tool_output=include_tool_output,
-            include_compaction_history=include_compaction_history,
-            model=optional_str(row.get("model")),
-            context_mode=context_mode,
-        )
+    ) = _read_context_entries(
+        path=source_file,
+        token_line=line_number,
+        target_turn_id=optional_str(row.get("turn_id")),
+        max_chars=bounded_context_chars(max_chars),
+        max_entries=bounded_context_entries(max_entries),
+        include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
+        model=optional_str(row.get("model")),
+        context_mode=context_mode,
     )
-    source_scan_ms = _elapsed_ms(source_scan_started)
-    if diagnostic_payload is not None:
-        diagnostic_payload["source_scan_ms"] = source_scan_ms
-    visible_estimate = estimate_visible_tokens(estimate_entries, optional_str(row.get("model")))
-    if diagnostic_payload is not None:
-        diagnostic_payload["serialized_estimate_ms"] = serialized_estimate_ms
-        diagnostic_payload["source_file_bytes"] = source_file_bytes
-        diagnostic_payload["source_line_number"] = line_number
-        diagnostic_payload["entries_before_limit"] = int(omitted.get("total_entries") or 0)
-        diagnostic_payload["entries_returned"] = len(entries)
-    payload = {
-        "schema": "codex-usage-tracker-context-v1",
-        "loaded_on_demand": True,
-        "raw_context_persisted": False,
-        "context_mode": context_mode,
-        "include_tool_output": include_tool_output,
-        "include_compaction_history": include_compaction_history,
-        "visible_char_count": visible_estimate["visible_char_count"],
-        "visible_token_estimate": visible_estimate["visible_token_estimate"],
-        "visible_token_estimator": visible_estimate["visible_token_estimator"],
-        "serialized_evidence": serialized_estimate,
-        "action_timing": action_timing,
-        "record": {
-            "record_id": row.get("record_id"),
-            "session_id": row.get("session_id"),
-            "thread_name": row.get("thread_name"),
-            "turn_id": row.get("turn_id"),
-            "event_timestamp": row.get("event_timestamp"),
-            "model": row.get("model"),
-            "effort": row.get("effort"),
-            "parent_session_id": row.get("parent_session_id"),
-            "parent_thread_name": row.get("parent_thread_name"),
-            "total_tokens": row.get("total_tokens"),
-            "cumulative_total_tokens": row.get("cumulative_total_tokens"),
-        },
-        "source": {
-            "file": str(source_file),
-            "line_number": line_number,
-        },
-        "entries": entries,
-        "omitted": omitted,
-    }
-    if diagnostic_payload is not None:
-        payload["diagnostics"] = diagnostic_payload
-        diagnostic_payload["json_bytes"] = _json_byte_count(payload)
-    return payload
+    return LoadedContextData(
+        entries=entries,
+        omitted=omitted,
+        estimate_entries=estimate_entries,
+        serialized_estimate=serialized_estimate,
+        serialized_estimate_ms=serialized_estimate_ms,
+        action_timing=action_timing,
+        source_scan_ms=elapsed_ms(source_scan_started),
+    )
 
 
 def _normalize_context_mode(mode: str) -> str:
@@ -153,21 +157,6 @@ def _normalize_context_mode(mode: str) -> str:
             f"{', '.join(sorted(CONTEXT_MODES))}"
         )
     return normalized
-
-
-def _elapsed_ms(started_at: float) -> float:
-    return round((perf_counter() - started_at) * 1000, 3)
-
-
-def _json_byte_count(payload: dict[str, Any]) -> int:
-    previous_size: int | None = None
-    diagnostics = payload.get("diagnostics")
-    while True:
-        size = len(json.dumps(payload, ensure_ascii=True).encode("utf-8"))
-        if size == previous_size or not isinstance(diagnostics, dict):
-            return size
-        diagnostics["json_bytes"] = size
-        previous_size = size
 
 
 @dataclass
@@ -416,7 +405,7 @@ def _context_read_result(
             raw_json_char_count=state.serialized_raw_char_count,
             parse_errors=state.omitted_parse_errors,
         )
-    serialized_estimate_ms = _elapsed_ms(serialized_started)
+    serialized_estimate_ms = elapsed_ms(serialized_started)
     candidates = dedupe_chat_message_echoes(state.candidates)
     action_timing = annotate_action_timing(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
