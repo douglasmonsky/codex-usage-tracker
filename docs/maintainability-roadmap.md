@@ -67,6 +67,36 @@ xenon --max-absolute B --max-modules A --max-average A src
 
 ## Branch Ledger
 
+### `chore/reset-maintainability-baseline`
+
+Goal:
+
+- Reset the Agent Maintainer file-length baseline after the package-domain
+  boundary migration so future branches fail only when they worsen current
+  oversized-file debt.
+- Keep file-length thresholds unchanged.
+
+Completed:
+
+- Regenerated `.agent-maintainer/file-length-baseline.json` against the current
+  domain-package layout.
+- Removed stale pre-refactor flat-module entries from the baseline and recorded
+  current oversized source/test files by their new package paths.
+- Confirmed no threshold loosening was required: `file_length_max_physical`
+  remains `600`, and `file_length_max_source` remains `450`.
+
+Checks:
+
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with
+  non-blocking structure-cohesion warnings for `server` and `usage_drain`.
+
+Remaining risks / next handoff:
+
+- The baseline intentionally accepts existing oversized files as current debt.
+- Continue cleanly from this baseline with small branches that reduce
+  `dashboard/api.py`, `store/api.py`, `usage_drain/reports.py`,
+  `diagnostics/snapshots.py`, CLI parser/main, and the largest tests.
+
 ### `refactor/split-oversized-modules`
 
 Goal:
