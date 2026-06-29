@@ -253,12 +253,34 @@ def _check_parser_diagnostics(db_path: Path) -> DoctorCheck:
             "No parser diagnostics are available yet.",
             "Run: codex-usage-tracker refresh",
         )
-    diagnostics = {
+    drift_parts = _parser_diagnostic_drift_parts(metadata)
+    if drift_parts:
+        return _parser_diagnostic_warning(drift_parts)
+    return _parser_diagnostic_pass(metadata)
+
+
+def _parser_diagnostic_drift_parts(metadata: dict[str, object]) -> list[str]:
+    diagnostics = _parser_diagnostic_counts(metadata)
+    parts = _skipped_event_parts(metadata)
+    parts.extend(f"{key}={diagnostics[key]}" for key in _parser_diagnostic_drift_keys(diagnostics))
+    return parts
+
+
+def _parser_diagnostic_counts(metadata: dict[str, object]) -> dict[str, int]:
+    return {
         key.removeprefix("parser_"): _safe_int(value)
         for key, value in metadata.items()
         if key.startswith("parser_")
     }
-    drift_keys = [
+
+
+def _skipped_event_parts(metadata: dict[str, object]) -> list[str]:
+    skipped = _safe_int(metadata.get("skipped_events"))
+    return [f"skipped_events={skipped}"] if skipped else []
+
+
+def _parser_diagnostic_drift_keys(diagnostics: dict[str, int]) -> list[str]:
+    return [
         key
         for key in (
             "missing_last_token_usage",
@@ -270,16 +292,18 @@ def _check_parser_diagnostics(db_path: Path) -> DoctorCheck:
         )
         if diagnostics.get(key, 0)
     ]
-    skipped = _safe_int(metadata.get("skipped_events"))
-    if skipped or drift_keys:
-        parts = [f"skipped_events={skipped}"] if skipped else []
-        parts.extend(f"{key}={diagnostics[key]}" for key in drift_keys)
-        return DoctorCheck(
-            "Parser diagnostics",
-            "warn",
-            "Schema drift detected in latest refresh: " + ", ".join(parts) + ".",
-            "Run: codex-usage-tracker inspect-log <path> on a skipped log, then rebuild-index after updating parser support.",
-        )
+
+
+def _parser_diagnostic_warning(parts: list[str]) -> DoctorCheck:
+    return DoctorCheck(
+        "Parser diagnostics",
+        "warn",
+        "Schema drift detected in latest refresh: " + ", ".join(parts) + ".",
+        "Run: codex-usage-tracker inspect-log <path> on a skipped log, then rebuild-index after updating parser support.",
+    )
+
+
+def _parser_diagnostic_pass(metadata: dict[str, object]) -> DoctorCheck:
     parsed = metadata.get("parsed_events", "0")
     scanned = metadata.get("scanned_files", "0")
     return DoctorCheck(
