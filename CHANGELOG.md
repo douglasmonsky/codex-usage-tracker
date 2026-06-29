@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.12.0 - 2026-06-29
+
+- Refactor CLI, dashboard server routing, SQLite store/query boundaries, context parsing, diagnostics, and usage-drain modeling into smaller modules with compatibility facades.
+- Add local Agent Maintainer ratchet configuration, strict local `tach check`, maintainability boundary docs, and a maintainability scorecard for future cleanup work.
+- Harden Diagnostics dashboard behavior for projected weekly credits charts, command expansion, live row status, and desktop/mobile smoke coverage.
+- Clean up warning-sensitive tests so the full suite runs without SQLite/resource-handle `ResourceWarning` noise.
+- Validate the refactor against a frozen local JSONL rebuild comparison before release.
+
 ## 0.11.4 - 2026-06-27
 
 - Fix `codex-usage-tracker setup` on large local histories by batching stale diagnostic-fact deletes so SQLite does not exceed bound-variable limits during usage index refresh.
