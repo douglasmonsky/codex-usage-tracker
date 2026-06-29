@@ -5151,3 +5151,46 @@ Checks:
 Remaining risks / next handoff:
 - `allowance_online_capacity_credit_to_delta_fit` remains C(15), but this branch kept scope to the highest piecewise-fit hotspot.
 - Next likely targets are `store.py::upsert_usage_events`, `recommendations.py::action_recommendations`, or a follow-up allowance-online branch.
+### `refactor/recommendation-action-tree`
+
+Objective:
+- Reduce recommendation decision-tree complexity while preserving recommendation order, keys, severity, and text.
+- Add coverage for estimated-pricing, high-cost, elevated-context, and reasoning-spike branches.
+
+Files touched:
+- `src/codex_usage_tracker/recommendations.py`
+- `tests/test_recommendations.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split pricing, high-cost, context, low-cache, reasoning, low-output, large-thread, and subagent checks into focused helpers.
+- Kept `action_recommendations` as an ordered candidate aggregator.
+- Added direct characterization for the estimated-pricing/high-cost/elevated-context/reasoning branch combination.
+
+Metrics:
+- `action_recommendations`: C(18) -> A(4).
+- `recommendations.py` average complexity: A(3.81).
+- Global C-or-worse blocks: 53 -> 52.
+- New largest remaining hotspot: `store.py::upsert_usage_events` C(18).
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/recommendations.py tests/test_recommendations.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/recommendations.py tests/test_recommendations.py`: passed.
+- `.venv/bin/python -m pytest tests/test_recommendations.py -q`: 3 passed.
+- `.venv/bin/python -m pytest tests/test_recommendations.py tests/test_server_recommendations.py tests/test_mcp_integration.py tests/test_cli_lifecycle.py -q`: 15 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/recommendations.py -a -s`: passed, target now A-rated.
+- `.venv/bin/python -m pytest -q`: 450 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `store.py::upsert_usage_events` is now the highest remaining C-rated block.
+- Several usage-drain span/state/dashboard diagnostics functions remain C-rated and need subsequent small branches.
