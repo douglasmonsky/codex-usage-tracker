@@ -4297,3 +4297,53 @@ Remaining risks:
 
 Next handoff:
 - Split or simplify `_project_summary_rows` separately, or move to the next larger file if report project summaries are lower risk than parser/dashboard work.
+
+### `refactor/reports-project-summary`
+
+Goal:
+- Remove the remaining C-rated project-summary helper from `reports.py`.
+- Preserve `summary --group-by project` and `summary --group-by project_tag` payload behavior.
+- Keep the project-summary bucket lifecycle readable and independently testable.
+
+Files touched:
+- `src/codex_usage_tracker/reports.py`
+- `src/codex_usage_tracker/report_project_summary.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline metric notes:
+- `reports.py` line count fell from `569` to `498`.
+- Added `report_project_summary.py` at `128` lines.
+- `reports.py` now has no C-rated functions; highest remaining function is `build_query_report` B(10).
+- `report_project_summary.py` is A-rated throughout.
+
+Completed edits:
+- Extracted project/project-tag summary aggregation to `report_project_summary.project_summary_rows`.
+- Split project row annotation, group-key selection, bucket creation, bucket updates, token totals, ratio totals, and final rendering into focused helpers.
+- Added `report_project_summary` to the application/report-services architecture group in `tach.toml`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_project_summary.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_project_summary.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_release.py tests/test_mcp_integration.py -q`: 19 passed.
+- `radon cc src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_project_summary.py -a -s`: passed; no C-rated functions.
+- `radon mi src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_project_summary.py -s`: both A.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_project_summary.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected flat-package structure warning and Python-source-without-test-change warning.
+
+Remaining risks:
+- `build_query_report` remains B(10), just under the current ceiling.
+- Package-wide structure-cohesion warning remains while decomposition continues.
+
+Next handoff:
+- Move to the next largest files: `cli_parser.py`, `parser.py`, `usage_drain_reports.py`, `dashboard.py`, `diagnostics.py`, or `diagnostic_facts.py`.
