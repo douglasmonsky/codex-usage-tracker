@@ -5655,3 +5655,51 @@ Checks:
 Remaining risks / next handoff:
 - Remaining top C(15) targets are `usage_drain_allowance_fits.py::allowance_online_capacity_credit_to_delta_fit` and `threads.py::_resolve_thread_attachment`.
 - `diagnostic_reports.py::_filter_fact_group` remains B(6), below the current hotspot threshold.
+### `refactor/allowance-online-capacity-fit`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `allowance_online_capacity_credit_to_delta_fit` complexity while preserving the existing online-capacity model contract and known-breakpoint diagnostics.
+- Keep the public import surface stable for existing allowance breakpoint callers.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_allowance_fits.py`
+- `src/codex_usage_tracker/usage_drain_allowance_online.py`
+- `tests/test_usage_drain_allowance_fits.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added a characterization test for the online-capacity fit model set, prediction row counts, skipped initial rows, and known-breakpoint diagnostics.
+- Extracted online-capacity model descriptions, prediction allocation, estimate construction, model record formatting, and residual diagnostics behind small helpers.
+- Split the online-capacity fit into `usage_drain_allowance_online.py` and kept `usage_drain_allowance_fits.py` as the compatibility facade.
+
+Metrics:
+- `allowance_online_capacity_credit_to_delta_fit`: C(15) -> B(7).
+- `usage_drain_allowance_fits.py`: 481 -> 281 physical lines.
+- `usage_drain_allowance_online.py`: new focused module, 287 physical lines.
+- Global C-or-worse blocks: 41 -> 40.
+- No D/E/F complexity blocks remain.
+- Remaining top C target: `threads.py::_resolve_thread_attachment` C(15).
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_allowance_fits.py tests/test_usage_drain_model.py -q`: 17 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_allowance_fits.py src/codex_usage_tracker/usage_drain_allowance_online.py -a -s`: target now B(7); new module top helper C(11).
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_allowance_fits.py src/codex_usage_tracker/usage_drain_allowance_online.py tests/test_usage_drain_allowance_fits.py`: passed.
+- `.venv/bin/python -m pytest -q`: 462 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning only.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `usage_drain_allowance_online.py::_allowance_online_capacity_error_diagnostics` remains C(11), but the branch objective was the larger C(15) public fit function.
+- Next branch should target `threads.py::_resolve_thread_attachment` C(15) with attachment-resolution characterization tests.
