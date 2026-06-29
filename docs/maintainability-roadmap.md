@@ -6419,3 +6419,50 @@ Checks so far:
 
 Remaining risks / next handoff:
 - Continue C(12) ratchet with `state_signature_ambiguity` or another isolated pure-report helper before touching store/source-log code.
+
+### `refactor/state-signature-ambiguity`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `state_signature_ambiguity` complexity while preserving repeated/ambiguous state diagnostic output.
+- Add direct characterization coverage for repeated groups, ambiguous groups, row shares, and top ambiguous state ordering.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_state_diagnostics.py`
+- `tests/test_usage_drain_state_diagnostics.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split state signature grouping, group analysis, ambiguity-result assembly, value flattening, row counting, and ambiguous-record sorting helpers.
+- Preserved `signature`, `fields`, group/row counts, shares, oracle metrics, repeated oracle metrics, and `top_ambiguous_states` shape.
+
+Metrics:
+- `state_signature_ambiguity`: C(12) -> A(2).
+- `usage_drain_state_diagnostics.py` maximum complexity: B(7).
+- `usage_drain_state_diagnostics.py`: 246 -> 302 physical lines.
+- `tests/test_usage_drain_state_diagnostics.py`: 35 -> 64 physical lines.
+- Global C-or-worse blocks: 24 -> 23.
+- No C(13) or D/E/F complexity blocks remain.
+- Current top complexity target is `usage_drain_regression.py::prepare_design` at C(12).
+
+Checks so far:
+- `.venv/bin/python -m pytest tests/test_usage_drain_state_diagnostics.py -q`: 2 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_state_diagnostics.py tests/test_usage_drain_model.py tests/test_usage_drain_regime_segments.py tests/test_usage_drain_reports.py -q`: 22 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_state_diagnostics.py tests/test_usage_drain_state_diagnostics.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_state_diagnostics.py -a -s`: target now A(2), module max B(7).
+- `.venv/bin/python -m pytest -q`: 488 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Continue C(12) ratchet with pure helpers before touching store/source-log code.

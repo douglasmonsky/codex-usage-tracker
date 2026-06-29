@@ -1,6 +1,35 @@
 from codex_usage_tracker.usage_drain_state_diagnostics import (
     state_ambiguous_group_record,
+    state_signature_ambiguity,
 )
+
+
+def test_state_signature_ambiguity_reports_repeated_and_ambiguous_states() -> None:
+    rows = [
+        {"actual": 1.0, "metadata": {"bucket": "A"}},
+        {"actual": 2.0, "metadata": {"bucket": "A"}},
+        {"actual": 2.0, "metadata": {"bucket": "A"}},
+        {"actual": 5.0, "metadata": {"bucket": "B"}},
+        {"actual": 3.0, "metadata": {"bucket": "C"}},
+        {"actual": 3.0, "metadata": {"bucket": "C"}},
+    ]
+
+    result = state_signature_ambiguity(rows, "bucket_only", ("bucket",))
+
+    assert result["signature"] == "bucket_only"
+    assert result["fields"] == ["bucket"]
+    assert result["n"] == 6
+    assert result["group_count"] == 3
+    assert result["repeated_group_count"] == 2
+    assert result["repeated_row_count"] == 5
+    assert result["repeated_row_share"] == 0.833333
+    assert result["ambiguous_group_count"] == 1
+    assert result["ambiguous_row_count"] == 3
+    assert result["ambiguous_row_share"] == 0.5
+    assert result["oracle_mode_metrics"]["mae"] < result["repeated_oracle_mode_metrics"]["mae"]
+    assert result["top_ambiguous_states"][0]["state"] == {"bucket": "A"}
+    assert result["top_ambiguous_states"][0]["mode_delta_percent"] == 2.0
+    assert result["top_ambiguous_states"][0]["total_abs_error"] == 1.0
 
 
 def test_state_ambiguous_group_record_preserves_summary_contract() -> None:

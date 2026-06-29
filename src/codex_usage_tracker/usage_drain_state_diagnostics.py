@@ -94,62 +94,90 @@ def state_signature_ambiguity(
     signature_name: str,
     signature: tuple[str, ...],
 ) -> dict[str, Any]:
+    groups = _state_signature_groups(rows, signature)
+    analyses = [
+        _state_ambiguity_group_analysis(key, items, signature=signature)
+        for key, items in groups.items()
+    ]
+    return _state_signature_ambiguity_result(
+        rows=rows,
+        groups=groups,
+        analyses=analyses,
+        signature_name=signature_name,
+        signature=signature,
+    )
+
+
+def _state_signature_groups(
+    rows: list[dict[str, Any]], signature: tuple[str, ...]
+) -> dict[tuple[str, ...], list[dict[str, Any]]]:
     groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
     for row in rows:
         key = state_signature(row.get("metadata") or {}, signature)
         groups.setdefault(key, []).append(row)
-    actual: list[float] = []
-    predicted: list[float] = []
-    repeated_actual: list[float] = []
-    repeated_predicted: list[float] = []
-    ambiguous_groups: list[dict[str, Any]] = []
-    repeated_group_count = 0
-    repeated_row_count = 0
-    ambiguous_group_count = 0
-    ambiguous_row_count = 0
-    for key, items in groups.items():
-        values = [number(item.get("actual")) for item in items]
-        mode_value = value_mode(values)
-        unique_values = sorted({round(value, 6) for value in values})
-        actual.extend(values)
-        predicted.extend([mode_value] * len(values))
-        if len(items) > 1:
-            repeated_group_count += 1
-            repeated_row_count += len(items)
-            repeated_actual.extend(values)
-            repeated_predicted.extend([mode_value] * len(values))
-        if len(unique_values) > 1:
-            ambiguous_group_count += 1
-            ambiguous_row_count += len(items)
-            ambiguous_groups.append(
-                state_ambiguous_group_record(
-                    key,
-                    items,
-                    signature=signature,
-                    mode_value=mode_value,
-                )
+    return groups
+
+
+def _state_ambiguity_group_analysis(
+    key: tuple[str, ...],
+    items: list[dict[str, Any]],
+    *,
+    signature: tuple[str, ...],
+) -> dict[str, Any]:
+    values = [number(item.get("actual")) for item in items]
+    mode_value = value_mode(values)
+    is_ambiguous = _state_group_is_ambiguous(values)
+    return {
+        "values": values,
+        "predicted": [mode_value] * len(values),
+        "repeated": len(items) > 1,
+        "ambiguous": is_ambiguous,
+        "ambiguous_record": (
+            state_ambiguous_group_record(
+                key,
+                items,
+                signature=signature,
+                mode_value=mode_value,
             )
-    ambiguous_groups.sort(
-        key=lambda row: (
-            -number(row.get("total_abs_error")),
-            -int(row.get("n") or 0),
-            str(row.get("state") or ""),
-        )
-    )
+            if is_ambiguous
+            else None
+        ),
+    }
+
+
+def _state_group_is_ambiguous(values: list[float]) -> bool:
+    return len({round(value, 6) for value in values}) > 1
+
+
+def _state_signature_ambiguity_result(
+    *,
+    rows: list[dict[str, Any]],
+    groups: dict[tuple[str, ...], list[dict[str, Any]]],
+    analyses: list[dict[str, Any]],
+    signature_name: str,
+    signature: tuple[str, ...],
+) -> dict[str, Any]:
+    repeated = [analysis for analysis in analyses if analysis["repeated"]]
+    ambiguous = [analysis for analysis in analyses if analysis["ambiguous"]]
+    actual = _state_analysis_values(analyses, "values")
+    predicted = _state_analysis_values(analyses, "predicted")
+    repeated_actual = _state_analysis_values(repeated, "values")
+    repeated_predicted = _state_analysis_values(repeated, "predicted")
+    ambiguous_groups = _state_ambiguous_records(ambiguous)
     return {
         "signature": signature_name,
         "fields": list(signature),
         "n": len(rows),
         "group_count": len(groups),
-        "repeated_group_count": repeated_group_count,
-        "repeated_row_count": repeated_row_count,
+        "repeated_group_count": len(repeated),
+        "repeated_row_count": _state_analysis_row_count(repeated),
         "repeated_row_share": rounded(
-            repeated_row_count / len(rows) if rows else None
+            _state_analysis_row_count(repeated) / len(rows) if rows else None
         ),
-        "ambiguous_group_count": ambiguous_group_count,
-        "ambiguous_row_count": ambiguous_row_count,
+        "ambiguous_group_count": len(ambiguous),
+        "ambiguous_row_count": _state_analysis_row_count(ambiguous),
         "ambiguous_row_share": rounded(
-            ambiguous_row_count / len(rows) if rows else None
+            _state_analysis_row_count(ambiguous) / len(rows) if rows else None
         ),
         "oracle_mode_metrics": regression_metrics(actual, predicted),
         "repeated_oracle_mode_metrics": regression_metrics(
@@ -158,6 +186,38 @@ def state_signature_ambiguity(
         ),
         "top_ambiguous_states": ambiguous_groups[:8],
     }
+
+
+def _state_analysis_values(
+    analyses: list[dict[str, Any]], field: str
+) -> list[float]:
+    values: list[float] = []
+    for analysis in analyses:
+        values.extend(analysis[field])
+    return values
+
+
+def _state_analysis_row_count(analyses: list[dict[str, Any]]) -> int:
+    return sum(len(analysis["values"]) for analysis in analyses)
+
+
+def _state_ambiguous_records(
+    analyses: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    records = [
+        analysis["ambiguous_record"]
+        for analysis in analyses
+        if analysis["ambiguous_record"] is not None
+    ]
+    return sorted(records, key=_state_ambiguous_record_sort_key)
+
+
+def _state_ambiguous_record_sort_key(row: dict[str, Any]) -> tuple[float, int, str]:
+    return (
+        -number(row.get("total_abs_error")),
+        -int(row.get("n") or 0),
+        str(row.get("state") or ""),
+    )
 
 def state_ambiguous_group_record(
     key: tuple[str, ...],
