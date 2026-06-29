@@ -6226,3 +6226,51 @@ Checks:
 Remaining risks / next handoff:
 - `_piecewise_adaptation_by_position` remains C(12) in this module.
 - The remaining C(13) targets are broader: `_one_percent_capacity_modeling`, `load_call_context`, and `validate_json_payload_contract`.
+
+### `refactor/json-payload-contract-validator`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `validate_json_payload_contract` complexity while preserving public CLI/MCP JSON contract validation errors.
+- Add nested optional-field characterization coverage so `int | null` error wording stays stable.
+
+Files touched:
+- `src/codex_usage_tracker/json_contracts.py`
+- `src/codex_usage_tracker/json_contract_validation.py`
+- `tests/test_json_contracts.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Moved validation implementation helpers into `json_contract_validation.py`.
+- Kept `json_contracts.py` as the public facade with existing schema registry ownership.
+- Preserved non-object payload, missing schema, unknown schema, required field, nested required field, and optional `null` wording semantics.
+
+Metrics:
+- `json_contracts.py::validate_json_payload_contract`: C(13) -> A(1).
+- `json_contract_validation.py` maximum complexity: B(9), average A(3.67).
+- `json_contracts.py`: 574 -> 515 physical lines.
+- New `json_contract_validation.py`: 112 physical lines.
+- Global C-or-worse blocks: 29 -> 27.
+- No D/E/F complexity blocks remain.
+- Remaining C(13) targets: `usage_drain_model.py::_one_percent_capacity_modeling`, `context.py::load_call_context`.
+
+Checks so far:
+- `.venv/bin/python -m pytest tests/test_json_contracts.py tests/test_cli_lifecycle.py tests/test_cli_release.py -q`: 28 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/json_contracts.py src/codex_usage_tracker/json_contract_validation.py -a -s`: target now A(1), extracted helper max B(9).
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/json_contracts.py src/codex_usage_tracker/json_contract_validation.py tests/test_json_contracts.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 485 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Next complexity targets are broader and should stay separate slices.
