@@ -6,7 +6,7 @@
   },
   "baselines": {
     "duplicate_helpers": {
-      "metric_value": 49,
+      "metric_value": 47,
       "items": [
         {
           "name": "_allowance_segment_record",
@@ -16,24 +16,10 @@
           ]
         },
         {
-          "name": "_chronological_key",
-          "occurrences": [
-            "src/codex_usage_tracker/usage_drain_reports.py",
-            "src/codex_usage_tracker/usage_drain_time_series.py"
-          ]
-        },
-        {
           "name": "_command_tokens",
           "occurrences": [
-            "src/codex_usage_tracker/diagnostic_facts.py",
+            "src/codex_usage_tracker/diagnostic_fact_classifiers.py",
             "src/codex_usage_tracker/diagnostic_snapshot_events.py"
-          ]
-        },
-        {
-          "name": "_copy_resource_tree",
-          "occurrences": [
-            "src/codex_usage_tracker/dashboard.py",
-            "src/codex_usage_tracker/plugin_installer.py"
           ]
         },
         {
@@ -53,7 +39,7 @@
         {
           "name": "_looks_like_assignment",
           "occurrences": [
-            "src/codex_usage_tracker/diagnostic_facts.py",
+            "src/codex_usage_tracker/diagnostic_fact_classifiers.py",
             "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
             "src/codex_usage_tracker/diagnostic_snapshot_events.py"
           ]
@@ -63,6 +49,13 @@
           "occurrences": [
             "src/codex_usage_tracker/usage_drain_reports.py",
             "src/codex_usage_tracker/usage_drain_time_series.py"
+          ]
+        },
+        {
+          "name": "_new_thread_bucket",
+          "occurrences": [
+            "src/codex_usage_tracker/report_recommendations.py",
+            "src/codex_usage_tracker/usage_drain_thread_curves.py"
           ]
         },
         {
@@ -143,7 +136,7 @@
         {
           "name": "_sample_curve_points",
           "occurrences": [
-            "src/codex_usage_tracker/usage_drain_reports.py",
+            "src/codex_usage_tracker/usage_drain_thread_curves.py",
             "src/codex_usage_tracker/usage_drain_time_series.py"
           ]
         },
@@ -158,7 +151,7 @@
         {
           "name": "_strip_command_wrappers",
           "occurrences": [
-            "src/codex_usage_tracker/diagnostic_facts.py",
+            "src/codex_usage_tracker/diagnostic_fact_classifiers.py",
             "src/codex_usage_tracker/diagnostic_snapshot_events.py"
           ]
         }

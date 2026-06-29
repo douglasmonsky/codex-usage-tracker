@@ -4597,3 +4597,55 @@ Remaining risks / next handoff:
   600 lines.
 - `usage_drain_reports.py` still has C-rated modeling helpers; split those in
   later report-model branches if prioritizing global Xenon cleanup.
+### `refactor/dashboard-asset-helpers`
+
+Objective:
+- Reduce `dashboard.py` below the current file-length ratchet by moving static
+  asset, docs, versioned href, and template rendering helpers into a dedicated
+  module.
+- Preserve public `generate_dashboard()` and `render_dashboard_html()` APIs.
+- Remove one duplicate private helper name from the dashboard module.
+
+Baseline metrics:
+- `dashboard.py`: 667 lines.
+- `dashboard_payload`: C(16), left for later behavior-focused cleanup.
+- `_copy_resource_tree` duplicated a helper name from plugin installation.
+- Max-file ratchet overage before branch completion: 107.
+- Duplicate-helper ratchet debt before branch completion: 49.
+
+Completed edits:
+- Added `dashboard_assets.py` for dashboard stylesheet/script constants,
+  docs/assets copying, versioned asset hrefs, script source mapping, body
+  attribute formatting, dashboard template rendering, and asset reads.
+- Kept `dashboard.py` focused on payload generation, static dashboard output,
+  pricing snapshots, previous-payload parsing, and summary helpers.
+- Preserved the public `render_dashboard_html()` name used by the live server.
+- Renamed the copied-resource helper to `_copy_dashboard_resource_tree`.
+
+Metrics edits:
+- `dashboard.py`: 525 lines.
+- `dashboard_assets.py`: 169 lines.
+- `dashboard_assets.py` average complexity: A-rated.
+- Max-file ratchet overage tightened from 107 to 40.
+- Duplicate-helper ratchet debt tightened from 49 to 47.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/dashboard.py src/codex_usage_tracker/dashboard_assets.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/dashboard.py src/codex_usage_tracker/dashboard_assets.py`: passed.
+- `.venv/bin/python -m pytest tests/test_dashboard_server.py tests/test_dashboard_data.py tests/test_dashboard_state.py tests/test_dashboard_status.py tests/test_dashboard_live.py -q`: 24 passed.
+- `.venv/bin/python -m pytest -q`: 442 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted baseline.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed and ratcheted baseline.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `diagnostics.py` is the only remaining source file over 600 lines.
+- `dashboard_payload` and `_pricing_snapshot_warning` remain C-rated and should
+  be addressed in later dashboard-payload cleanup branches.
