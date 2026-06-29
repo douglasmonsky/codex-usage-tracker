@@ -1,7 +1,32 @@
 from codex_usage_tracker.usage_drain_regression import (
     fit_linear_coefficients,
     predict_linear,
+    prepare_design,
 )
+from codex_usage_tracker.usage_drain_types import PredictiveModelSpec
+
+
+def test_prepare_design_returns_none_for_empty_rows() -> None:
+    spec = PredictiveModelSpec("fixture", ("tokens",), ("mode",))
+
+    assert prepare_design([], spec) is None
+
+
+def test_prepare_design_standardizes_numeric_and_filters_sparse_categories() -> None:
+    spec = PredictiveModelSpec("fixture", ("tokens", "duration"), ("mode",))
+    rows = [
+        {"tokens": 2.0, "duration": 1.0, "mode": "A"},
+        {"tokens": 4.0, "duration": 3.0, "mode": "A"},
+        {"tokens": 6.0, "duration": 5.0, "mode": "B"},
+    ]
+
+    feature_names, means, stddevs, category_levels = prepare_design(rows, spec)
+
+    assert feature_names == ["tokens", "duration", "mode=A"]
+    assert means == {"tokens": 4.0, "duration": 3.0}
+    assert round(stddevs["tokens"], 6) == 1.632993
+    assert round(stddevs["duration"], 6) == 1.632993
+    assert category_levels == {"mode": ["A"]}
 
 
 def test_fit_linear_coefficients_with_intercept() -> None:

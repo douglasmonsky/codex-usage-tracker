@@ -15,27 +15,53 @@ def prepare_design(
 ) -> tuple[list[str], dict[str, float], dict[str, float], dict[str, list[str]]] | None:
     if not rows:
         return None
+    numeric_features, means, stddevs = _numeric_design_features(
+        rows, spec.numeric_features
+    )
+    categorical_features, category_levels = _categorical_design_features(
+        rows, spec.categorical_features
+    )
+    feature_names = [*numeric_features, *categorical_features]
+    return feature_names, means, stddevs, category_levels
+
+
+def _numeric_design_features(
+    rows: list[dict[str, Any]], features: tuple[str, ...]
+) -> tuple[list[str], dict[str, float], dict[str, float]]:
     means: dict[str, float] = {}
     stddevs: dict[str, float] = {}
+    for feature in features:
+        means[feature], stddevs[feature] = _numeric_feature_stats(rows, feature)
+    return list(features), means, stddevs
+
+
+def _numeric_feature_stats(
+    rows: list[dict[str, Any]], feature: str
+) -> tuple[float, float]:
+    values = [number(row.get(feature)) for row in rows]
+    mean = sum(values) / len(values)
+    variance = sum((value - mean) ** 2 for value in values) / len(values)
+    return mean, math.sqrt(variance) or 1.0
+
+
+def _categorical_design_features(
+    rows: list[dict[str, Any]], features: tuple[str, ...]
+) -> tuple[list[str], dict[str, list[str]]]:
     feature_names: list[str] = []
-    for feature in spec.numeric_features:
-        values = [number(row.get(feature)) for row in rows]
-        mean = sum(values) / len(values)
-        variance = sum((value - mean) ** 2 for value in values) / len(values)
-        stddev = math.sqrt(variance) or 1.0
-        means[feature] = mean
-        stddevs[feature] = stddev
-        feature_names.append(feature)
     category_levels: dict[str, list[str]] = {}
-    for feature in spec.categorical_features:
-        counts: dict[str, int] = {}
-        for row in rows:
-            value = str(row.get(feature) or "missing")
-            counts[value] = counts.get(value, 0) + 1
-        levels = [value for value, count in sorted(counts.items()) if count >= 2]
+    for feature in features:
+        levels = _categorical_feature_levels(rows, feature)
         category_levels[feature] = levels
         feature_names.extend(f"{feature}={value}" for value in levels)
-    return feature_names, means, stddevs, category_levels
+    return feature_names, category_levels
+
+
+def _categorical_feature_levels(rows: list[dict[str, Any]], feature: str) -> list[str]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        value = str(row.get(feature) or "missing")
+        counts[value] = counts.get(value, 0) + 1
+    return [value for value, count in sorted(counts.items()) if count >= 2]
 
 
 def design_matrix(
