@@ -6704,3 +6704,49 @@ Checks:
 
 Remaining risks / next handoff:
 - Move next to source-log/store C(12) functions or continue low-risk C(11) diagnostic/report functions in usage-drain modules.
+
+### `refactor/shell-command-payload-diagnostics`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `shell_command_from_payload` complexity while preserving supported command payload shapes.
+- Add direct characterization coverage for JSON-string arguments, dict arguments, top-level fallback, invalid JSON fallback, and non-shell function rejection.
+
+Files touched:
+- `src/codex_usage_tracker/diagnostic_snapshot_events.py`
+- `tests/test_diagnostic_snapshot_events.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split shell-command extraction into argument dispatch, JSON argument parsing, and command field selection helpers.
+- Preserved command extraction behavior used by command diagnostics and safe aggregate labels.
+
+Metrics:
+- `shell_command_from_payload`: C(12) -> A(3).
+- `diagnostic_snapshot_events.py` maximum complexity: B(10), now `_non_option_operands`.
+- `diagnostic_snapshot_events.py`: 518 -> 528 physical lines.
+- New `tests/test_diagnostic_snapshot_events.py`: 37 physical lines.
+- Global C-or-worse blocks: 18 -> 17.
+- No C(13) or D/E/F complexity blocks remain.
+- Current C(12) targets include `store_sources.py::source_logs_requiring_parse` and `store_sources.py::upsert_source_file_metadata`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_diagnostic_snapshots.py -q`: 9 passed.
+- `.venv/bin/python -m pytest tests/test_diagnostic_snapshot_events.py tests/test_diagnostic_snapshots.py -q`: 9 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostic_snapshot_events.py tests/test_diagnostic_snapshot_events.py tests/test_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/diagnostic_snapshot_events.py -a -s`: target now A(3), module max B(10).
+- `.venv/bin/python -m pytest -q`: 495 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+
+Remaining risks / next handoff:
+- Move next to `store_sources.py` C(12) functions with focused source-log store tests before refactoring persistence-adjacent behavior.
