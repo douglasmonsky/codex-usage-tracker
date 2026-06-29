@@ -186,6 +186,7 @@ def _weekly_projection_point(
     return {
         "week_key": key,
         "label": _week_label(usable[0], key),
+        "reset_timestamp": usable[0].get("reset_timestamp"),
         "start_event_timestamp": start,
         "end_event_timestamp": end,
         "span_count": len(usable),

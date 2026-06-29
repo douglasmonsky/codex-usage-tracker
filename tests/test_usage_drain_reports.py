@@ -47,6 +47,7 @@ def test_usage_drain_dashboard_report_builds_bounded_thread_curves(tmp_path: Pat
     weekly_point = time_series["weekly_credit_projection"]["points"][0]
     assert weekly_point["projected_weekly_credits"] > 0
     assert weekly_point["confidence"] == "low"
+    assert weekly_point["reset_timestamp"] == "2026-06-08T00:00:00Z"
     payload_text = json.dumps(report)
     assert "SECRET RAW PROMPT" not in payload_text
     assert "source_file" not in payload_text

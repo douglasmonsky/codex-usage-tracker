@@ -464,7 +464,7 @@
           <line x1="${(center - 5).toFixed(1)}" y1="${low.toFixed(1)}" x2="${(center + 5).toFixed(1)}" y2="${low.toFixed(1)}" class="diagnostics-confidence-bar"></line>
         `;
       }).join('');
-      const xTicks = indexedChartTicks(chartPoints, layout.tickLimit);
+      const xTicks = readableChartTicks(indexedChartTicks(chartPoints, layout.tickLimit), x, 72);
       return `
         <div class="diagnostics-chart-card">
           <div class="${chartWidthClass('diagnostics-chart-title', layout.classSuffix)}">
@@ -554,8 +554,13 @@
     }
 
     function weeklyProjectionPointTimestamp(point) {
-      const timestamp = Date.parse(point.start_event_timestamp || point.end_event_timestamp || '');
+      const timestamp = Date.parse(point.reset_timestamp || weeklyProjectionWeekKeyDate(point.week_key) || point.start_event_timestamp || point.end_event_timestamp || '');
       return Number.isFinite(timestamp) ? timestamp : Number.NaN;
+    }
+
+    function weeklyProjectionWeekKeyDate(weekKey) {
+      const match = String(weekKey || '').match(/(\d{4}-\d{2}-\d{2})$/);
+      return match ? `${match[1]}T00:00:00Z` : '';
     }
 
     function isKnownProjectionPlan(point) {
@@ -719,6 +724,30 @@
       return Array.from(indexes)
         .sort((left, right) => left - right)
         .map(index => ({ point: points[index], index }));
+    }
+
+    function readableChartTicks(ticks, x, minGap) {
+      const readable = [];
+      let previousX = Number.NEGATIVE_INFINITY;
+      ticks.forEach((tick, offset) => {
+        const currentX = Number(x(tick.index));
+        const isLast = offset === ticks.length - 1;
+        if (!Number.isFinite(currentX)) return;
+        if (!readable.length || currentX - previousX >= minGap) {
+          readable.push(tick);
+          previousX = currentX;
+          return;
+        }
+        if (isLast && readable.length > 1) {
+          const previousTick = readable[readable.length - 1];
+          const previousTickX = Number(x(previousTick.index));
+          if (currentX - previousTickX < minGap) {
+            readable[readable.length - 1] = tick;
+            previousX = currentX;
+          }
+        }
+      });
+      return readable;
     }
 
     function renderUsageDrainCostChart(threads) {
