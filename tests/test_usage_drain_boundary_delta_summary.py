@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from codex_usage_tracker.usage_drain_boundary_delta_summary import (
+    _boundary_delta_prediction_scope,
     _boundary_delta_top_error_groups,
 )
 
@@ -79,3 +80,75 @@ def test_boundary_delta_top_error_groups_maps_boundary_state() -> None:
     result = _boundary_delta_top_error_groups(errors, "boundary_state")
 
     assert [row["boundary_state"] for row in result] == ["boundary", "same_label"]
+
+
+def test_boundary_delta_prediction_scope_summarizes_models_and_filters_rows() -> None:
+    rows = [
+        {
+            "index": 0,
+            "delta_percent": 2.0,
+            "boundary_delta_predictions": {
+                "previous_delta": 1.0,
+                "risk_gated_label_segment_age_mode": 2.0,
+            },
+            "boundary_delta_prediction_details": {
+                "risk_gated_label_segment_age_mode": {
+                    "risk": 0.7,
+                    "threshold": 0.5,
+                    "mode": "matched",
+                }
+            },
+            "boundary_state": "same",
+            "transition": "same_to_boundary",
+            "is_boundary": True,
+        },
+        {
+            "index": 1,
+            "delta_percent": 4.0,
+            "boundary_delta_predictions": {
+                "previous_delta": 5.0,
+                "risk_gated_label_segment_age_mode": 3.0,
+            },
+            "boundary_delta_prediction_details": {
+                "risk_gated_label_segment_age_mode": {
+                    "risk": 0.2,
+                    "threshold": 0.5,
+                    "mode": "previous",
+                }
+            },
+            "boundary_state": "boundary",
+            "transition": "boundary_to_same",
+            "is_boundary": False,
+        },
+    ]
+
+    result = _boundary_delta_prediction_scope(rows, start_index=0)
+
+    assert result["start_index"] == 0
+    assert result["n"] == 2
+    assert result["actual"] == {
+        "n": 2,
+        "mean": 3.0,
+        "stddev": 1.0,
+        "min": 2.0,
+        "max": 4.0,
+    }
+    assert sorted(result["models"]) == [
+        "previous_delta",
+        "risk_gated_label_segment_age_mode",
+    ]
+    assert result["models"]["previous_delta"]["mae"] == 1.0
+    assert sorted(result["risk_gate_diagnostics"]) == [
+        "risk_gated_label_segment_age_mode"
+    ]
+    assert result["risk_gate_diagnostics"]["risk_gated_label_segment_age_mode"][
+        "mean_risk"
+    ] == 0.45
+    assert sorted(result["residual_diagnostics"]) == ["previous_delta"]
+
+    filtered = _boundary_delta_prediction_scope(rows, start_index=1)
+
+    assert filtered["start_index"] == 1
+    assert filtered["n"] == 1
+    assert filtered["actual"]["mean"] == 4.0
+    assert filtered["models"]["previous_delta"]["mean_predicted"] == 5.0

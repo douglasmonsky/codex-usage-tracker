@@ -5799,3 +5799,51 @@ Checks:
 Remaining risks / next handoff:
 - `prepare_design` remains C(12) in the regression module, below the current top hotspot threshold.
 - Next branch should target either `usage_drain_boundary_delta_summary.py::_boundary_delta_prediction_scope` or `store_dashboard_queries.py::observed_usage_reconciliation`.
+
+### `refactor/boundary-delta-prediction-scope`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `_boundary_delta_prediction_scope` complexity while preserving scope filtering, model metrics, prediction-detail diagnostics, risk-gate diagnostics, and residual diagnostics.
+- Add direct characterization for the scope helper before refactoring.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_boundary_delta_summary.py`
+- `tests/test_usage_drain_boundary_delta_summary.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added a compact boundary-delta scope test covering row filtering, actual value distribution, model metric keys, risk-gate diagnostics, and residual diagnostics.
+- Split scope filtering, actual extraction, model metric generation, prediction-detail diagnostics, risk-gate diagnostics, and residual diagnostics into named helpers.
+- Preserved the `boundary_walk_forward_delta_prediction_summary` payload structure.
+
+Metrics:
+- `_boundary_delta_prediction_scope`: C(14) -> A(1).
+- `usage_drain_boundary_delta_summary.py`: 373 -> 421 physical lines.
+- `usage_drain_boundary_delta_summary.py` average complexity: A(3.84).
+- Global C-or-worse blocks: 38 -> 37.
+- No D/E/F complexity blocks remain.
+- Remaining top C target: `store_dashboard_queries.py::observed_usage_reconciliation` C(14).
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_boundary_delta_summary.py -q`: 3 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_boundary_delta_summary.py tests/test_usage_drain_boundary_delta.py tests/test_usage_drain_model.py -q`: 19 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_boundary_delta_summary.py -a -s`: target now A(1).
+- `.venv/bin/python -m pytest -q`: 473 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning only.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `_boundary_delta_residual_diagnostics` remains C(12), below the current top hotspot threshold.
+- Next branch should target `store_dashboard_queries.py::observed_usage_reconciliation` C(14).

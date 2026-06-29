@@ -114,47 +114,95 @@ def boundary_walk_forward_delta_prediction_summary(
 def _boundary_delta_prediction_scope(
     rows: list[dict[str, Any]], *, start_index: int
 ) -> dict[str, Any]:
-    scope_rows = [row for row in rows if int(row["index"]) >= start_index]
-    actual = [_number(row.get("delta_percent")) for row in scope_rows]
+    scope_rows = _boundary_delta_scope_rows(rows, start_index=start_index)
+    actual = _boundary_delta_actual_values(scope_rows)
     model_names = _boundary_delta_model_names(scope_rows)
     return {
         "start_index": start_index,
         "n": len(scope_rows),
         "actual": _value_distribution(actual),
-        "models": {
-            model_name: _regression_metrics(
-                actual,
-                [
-                    _number(
-                        (row.get("boundary_delta_predictions") or {}).get(model_name)
-                    )
-                    for row in scope_rows
-                ],
-            )
-            for model_name in model_names
-        },
-        "prediction_detail_diagnostics": {
-            model_name: _state_bucket_model_diagnostics(scope_rows, model_name)
-            for model_name in model_names
-            if model_name in boundary_delta.BOUNDARY_DELTA_MODEL_SIGNATURES
-            or model_name in boundary_delta.BOUNDARY_CONDITIONED_DELTA_MODEL_SIGNATURES
-        },
-        "risk_gate_diagnostics": {
-            model_name: _boundary_delta_risk_gate_diagnostics(scope_rows, model_name)
-            for model_name in (
-                "risk_gated_label_segment_age_mode",
-                "risk_weighted_label_segment_age_mode",
-                "risk_weighted_boundary_conditioned_mode",
-                "adaptive_mae_gate_label_segment_age_mode",
-                "adaptive_rmse_gate_label_segment_age_mode",
-            )
-            if model_name in model_names
-        },
-        "residual_diagnostics": {
-            model_name: _boundary_delta_residual_diagnostics(scope_rows, model_name)
-            for model_name in BOUNDARY_DELTA_RESIDUAL_MODELS
-            if model_name in model_names
-        },
+        "models": _boundary_delta_scope_model_metrics(
+            scope_rows,
+            actual,
+            model_names,
+        ),
+        "prediction_detail_diagnostics": _boundary_delta_prediction_details(
+            scope_rows,
+            model_names,
+        ),
+        "risk_gate_diagnostics": _boundary_delta_risk_gate_model_diagnostics(
+            scope_rows,
+            model_names,
+        ),
+        "residual_diagnostics": _boundary_delta_residual_model_diagnostics(
+            scope_rows,
+            model_names,
+        ),
+    }
+
+
+def _boundary_delta_scope_rows(
+    rows: list[dict[str, Any]], *, start_index: int
+) -> list[dict[str, Any]]:
+    return [row for row in rows if int(row["index"]) >= start_index]
+
+
+def _boundary_delta_actual_values(rows: list[dict[str, Any]]) -> list[float]:
+    return [_number(row.get("delta_percent")) for row in rows]
+
+
+def _boundary_delta_scope_model_metrics(
+    rows: list[dict[str, Any]],
+    actual: list[float],
+    model_names: list[str],
+) -> dict[str, dict[str, Any]]:
+    return {
+        model_name: _regression_metrics(
+            actual,
+            [
+                _number((row.get("boundary_delta_predictions") or {}).get(model_name))
+                for row in rows
+            ],
+        )
+        for model_name in model_names
+    }
+
+
+def _boundary_delta_prediction_details(
+    rows: list[dict[str, Any]], model_names: list[str]
+) -> dict[str, dict[str, Any]]:
+    return {
+        model_name: _state_bucket_model_diagnostics(rows, model_name)
+        for model_name in model_names
+        if model_name in boundary_delta.BOUNDARY_DELTA_MODEL_SIGNATURES
+        or model_name in boundary_delta.BOUNDARY_CONDITIONED_DELTA_MODEL_SIGNATURES
+    }
+
+
+def _boundary_delta_risk_gate_model_diagnostics(
+    rows: list[dict[str, Any]], model_names: list[str]
+) -> dict[str, dict[str, Any]]:
+    risk_gate_models = {
+        "risk_gated_label_segment_age_mode",
+        "risk_weighted_label_segment_age_mode",
+        "risk_weighted_boundary_conditioned_mode",
+        "adaptive_mae_gate_label_segment_age_mode",
+        "adaptive_rmse_gate_label_segment_age_mode",
+    }
+    return {
+        model_name: _boundary_delta_risk_gate_diagnostics(rows, model_name)
+        for model_name in risk_gate_models
+        if model_name in model_names
+    }
+
+
+def _boundary_delta_residual_model_diagnostics(
+    rows: list[dict[str, Any]], model_names: list[str]
+) -> dict[str, dict[str, Any]]:
+    return {
+        model_name: _boundary_delta_residual_diagnostics(rows, model_name)
+        for model_name in BOUNDARY_DELTA_RESIDUAL_MODELS
+        if model_name in model_names
     }
 
 
