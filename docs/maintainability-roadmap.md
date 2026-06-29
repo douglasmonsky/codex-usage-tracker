@@ -6038,3 +6038,50 @@ Checks:
 Remaining risks / next handoff:
 - `state_signature_ambiguity` remains C(12) and is a natural follow-up if continuing in this module.
 - The top C(13) targets are now outside this module.
+
+### `refactor/binary-risk-metrics`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `binary_risk_metrics` complexity while preserving transition-risk metric output.
+- Add direct characterization coverage for valid, empty, and length-mismatched inputs.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_transition_metrics.py`
+- `tests/test_usage_drain_transition_metrics.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split binary risk metrics into helpers for empty payloads, score clipping, positive/negative score grouping, top-risk rows, top positive counts, Brier score, and mean score.
+- Preserved metric keys and rounded values for Brier, AUC, average precision, top-decile precision/recall/rate, and positive/negative mean scores.
+
+Metrics:
+- `binary_risk_metrics`: C(13) -> A(4).
+- `usage_drain_transition_metrics.py` average complexity: A(3.87).
+- `usage_drain_transition_metrics.py`: 229 -> 259 physical lines.
+- Global C-or-worse blocks: 33 -> 32.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are C(13), led by `usage_drain_model.py::_one_percent_capacity_modeling`, `formatting.py::format_calls`, and `context.py::load_call_context`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_transition_metrics.py -q`: 2 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_transition_metrics.py tests/test_usage_drain_model.py tests/test_usage_drain_boundary_summary.py tests/test_usage_drain_walk_forward.py -q`: 20 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_transition_metrics.py -a -s`: target now A(4).
+- `.venv/bin/python -m pytest -q`: 481 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, with only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Remaining C(13) hotspots include `_one_percent_capacity_modeling`, `format_calls`, `load_call_context`, `validate_json_payload_contract`, `transition_delta_gate_diagnostics`, and `regime_streak_summary`.
+- Prefer the next branch by isolating one of those with existing or newly added characterization tests.

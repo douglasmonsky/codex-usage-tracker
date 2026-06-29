@@ -55,37 +55,16 @@ def transition_risk_model_names(rows: list[dict[str, Any]]) -> list[str]:
 
 def binary_risk_metrics(actual: list[int], scores: list[float]) -> dict[str, Any]:
     if not actual or len(actual) != len(scores):
-        return {
-            "n": len(actual),
-            "brier": None,
-            "auc": None,
-            "average_precision": None,
-            "precision_at_top_10pct": None,
-            "recall_at_top_10pct": None,
-            "top_10pct_positive_rate": None,
-            "mean_score_positive": None,
-            "mean_score_negative": None,
-        }
-    clipped_scores = [min(max(score, 0.0), 1.0) for score in scores]
-    positives = [score for value, score in zip(actual, clipped_scores, strict=True) if value]
-    negatives = [
-        score for value, score in zip(actual, clipped_scores, strict=True) if not value
-    ]
-    top_count = max(1, math.ceil(len(actual) * 0.1))
-    ranked = sorted(
-        zip(actual, clipped_scores, strict=True),
-        key=lambda item: item[1],
-        reverse=True,
-    )
-    top = ranked[:top_count]
+        return _empty_binary_risk_metrics(len(actual))
+
+    clipped_scores = _clipped_scores(scores)
+    positives, negatives = _score_groups(actual, clipped_scores)
+    top = _top_risk_rows(actual, clipped_scores)
     positive_count = sum(actual)
-    top_positive_count = sum(value for value, _score in top)
+    top_positive_count = _top_positive_count(top)
     return {
         "n": len(actual),
-        "brier": rounded(
-            sum((score - value) ** 2 for value, score in zip(actual, clipped_scores, strict=True))
-            / len(actual)
-        ),
+        "brier": rounded(_brier_score(actual, clipped_scores)),
         "auc": rounded(binary_auc(actual, clipped_scores)),
         "average_precision": rounded(average_precision(actual, clipped_scores)),
         "precision_at_top_10pct": rounded(top_positive_count / len(top)),
@@ -93,13 +72,64 @@ def binary_risk_metrics(actual: list[int], scores: list[float]) -> dict[str, Any
             top_positive_count / positive_count if positive_count else None
         ),
         "top_10pct_positive_rate": rounded(top_positive_count / len(top)),
-        "mean_score_positive": rounded(
-            sum(positives) / len(positives) if positives else None
-        ),
-        "mean_score_negative": rounded(
-            sum(negatives) / len(negatives) if negatives else None
-        ),
+        "mean_score_positive": _mean_score(positives),
+        "mean_score_negative": _mean_score(negatives),
     }
+
+
+def _empty_binary_risk_metrics(actual_count: int) -> dict[str, Any]:
+    return {
+        "n": actual_count,
+        "brier": None,
+        "auc": None,
+        "average_precision": None,
+        "precision_at_top_10pct": None,
+        "recall_at_top_10pct": None,
+        "top_10pct_positive_rate": None,
+        "mean_score_positive": None,
+        "mean_score_negative": None,
+    }
+
+
+def _clipped_scores(scores: list[float]) -> list[float]:
+    return [min(max(score, 0.0), 1.0) for score in scores]
+
+
+def _score_groups(
+    actual: list[int], scores: list[float]
+) -> tuple[list[float], list[float]]:
+    positives: list[float] = []
+    negatives: list[float] = []
+    for value, score in zip(actual, scores, strict=True):
+        if value:
+            positives.append(score)
+        else:
+            negatives.append(score)
+    return positives, negatives
+
+
+def _top_risk_rows(actual: list[int], scores: list[float]) -> list[tuple[int, float]]:
+    top_count = max(1, math.ceil(len(actual) * 0.1))
+    ranked = sorted(
+        zip(actual, scores, strict=True), key=lambda item: item[1], reverse=True
+    )
+    return ranked[:top_count]
+
+
+def _top_positive_count(top_rows: list[tuple[int, float]]) -> int:
+    return sum(value for value, _score in top_rows)
+
+
+def _brier_score(actual: list[int], scores: list[float]) -> float:
+    return sum(
+        (score - value) ** 2 for value, score in zip(actual, scores, strict=True)
+    ) / len(actual)
+
+
+def _mean_score(scores: list[float]) -> float | None:
+    if not scores:
+        return None
+    return rounded(sum(scores) / len(scores))
 
 def binary_auc(actual: list[int], scores: list[float]) -> float | None:
     positive_count = sum(actual)
