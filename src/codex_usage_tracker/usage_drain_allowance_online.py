@@ -216,7 +216,38 @@ def _allowance_online_capacity_error_diagnostics(
     *,
     segment_start_indexes: set[int],
 ) -> dict[str, Any]:
-    errors = [
+    errors = _allowance_online_error_rows(
+        row_indexes,
+        actual,
+        predicted,
+        segment_start_indexes=segment_start_indexes,
+    )
+    breakpoint_errors = _allowance_online_abs_errors(
+        errors, is_known_breakpoint=True
+    )
+    non_breakpoint_errors = _allowance_online_abs_errors(
+        errors, is_known_breakpoint=False
+    )
+    return {
+        "known_breakpoint_row_count": len(breakpoint_errors),
+        "non_breakpoint_row_count": len(non_breakpoint_errors),
+        "known_breakpoint_abs_error_share": _known_breakpoint_abs_error_share(
+            errors, breakpoint_errors
+        ),
+        "known_breakpoint_mae": _mean_abs_error(breakpoint_errors),
+        "non_breakpoint_mae": _mean_abs_error(non_breakpoint_errors),
+        "largest_errors": _largest_allowance_online_errors(rows, errors),
+    }
+
+
+def _allowance_online_error_rows(
+    row_indexes: list[int],
+    actual: list[float],
+    predicted: list[float],
+    *,
+    segment_start_indexes: set[int],
+) -> list[dict[str, Any]]:
+    return [
         {
             "row_index": row_index,
             "actual": actual_value,
@@ -231,44 +262,56 @@ def _allowance_online_capacity_error_diagnostics(
             strict=True,
         )
     ]
-    breakpoint_errors = [row["abs_error"] for row in errors if row["is_known_breakpoint"]]
-    non_breakpoint_errors = [row["abs_error"] for row in errors if not row["is_known_breakpoint"]]
+
+
+def _allowance_online_abs_errors(
+    errors: list[dict[str, Any]], *, is_known_breakpoint: bool
+) -> list[float]:
+    return [
+        row["abs_error"]
+        for row in errors
+        if row["is_known_breakpoint"] is is_known_breakpoint
+    ]
+
+
+def _known_breakpoint_abs_error_share(
+    errors: list[dict[str, Any]], breakpoint_errors: list[float]
+) -> float | None:
     total_abs_error = sum(row["abs_error"] for row in errors)
+    return _rounded(sum(breakpoint_errors) / total_abs_error if total_abs_error > 0 else 0.0)
+
+
+def _mean_abs_error(errors: list[float]) -> float | None:
+    return _rounded(sum(errors) / len(errors) if errors else None)
+
+
+def _largest_allowance_online_errors(
+    rows: list[dict[str, Any]], errors: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     largest = sorted(
         errors,
         key=lambda row: (-_number(row.get("abs_error")), int(row["row_index"])),
     )[:8]
+    return [_allowance_online_error_record(rows, item) for item in largest]
+
+
+def _allowance_online_error_record(
+    rows: list[dict[str, Any]], item: dict[str, Any]
+) -> dict[str, Any]:
+    row = rows[int(item["row_index"])]
     return {
-        "known_breakpoint_row_count": len(breakpoint_errors),
-        "non_breakpoint_row_count": len(non_breakpoint_errors),
-        "known_breakpoint_abs_error_share": _rounded(
-            sum(breakpoint_errors) / total_abs_error if total_abs_error > 0 else 0.0
+        "row_index": int(item["row_index"]),
+        "span_index": int(row["span_index"]),
+        "is_known_breakpoint": bool(item["is_known_breakpoint"]),
+        "actual_delta_percent": _rounded(_number(item["actual"])),
+        "predicted_delta_percent": _rounded(_number(item["predicted"])),
+        "abs_error": _rounded(_number(item["abs_error"])),
+        "credits_per_visible_percent": _rounded(
+            _number(row.get("credits_per_visible_percent"))
         ),
-        "known_breakpoint_mae": _rounded(
-            sum(breakpoint_errors) / len(breakpoint_errors) if breakpoint_errors else None
+        "standard_usage_credits": _rounded(
+            _number(row.get("standard_usage_credits"))
         ),
-        "non_breakpoint_mae": _rounded(
-            sum(non_breakpoint_errors) / len(non_breakpoint_errors)
-            if non_breakpoint_errors
-            else None
-        ),
-        "largest_errors": [
-            {
-                "row_index": int(item["row_index"]),
-                "span_index": int(rows[int(item["row_index"])]["span_index"]),
-                "is_known_breakpoint": bool(item["is_known_breakpoint"]),
-                "actual_delta_percent": _rounded(_number(item["actual"])),
-                "predicted_delta_percent": _rounded(_number(item["predicted"])),
-                "abs_error": _rounded(_number(item["abs_error"])),
-                "credits_per_visible_percent": _rounded(
-                    _number(rows[int(item["row_index"])].get("credits_per_visible_percent"))
-                ),
-                "standard_usage_credits": _rounded(
-                    _number(rows[int(item["row_index"])].get("standard_usage_credits"))
-                ),
-                "start_event_timestamp": rows[int(item["row_index"])].get("start_event_timestamp"),
-                "end_event_timestamp": rows[int(item["row_index"])].get("end_event_timestamp"),
-            }
-            for item in largest
-        ],
+        "start_event_timestamp": row.get("start_event_timestamp"),
+        "end_event_timestamp": row.get("end_event_timestamp"),
     }

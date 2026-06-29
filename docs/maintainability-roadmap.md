@@ -7399,3 +7399,48 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue the C(11) ratchet in allowance online and parser helpers.
+
+### `refactor/allowance-online-error-diagnostics`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Reduce the C-grade online allowance capacity error diagnostics helper while preserving breakpoint diagnostics payloads.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_allowance_online.py`
+- `tests/test_usage_drain_allowance_fits.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added a direct synthetic characterization test for allowance online capacity error diagnostics and largest-error rows.
+- Split error row construction, breakpoint/non-breakpoint error lists, breakpoint share, MAE, largest-error selection, and row formatting into focused helpers.
+- Preserved public model record payload keys and rounding behavior.
+
+Metrics:
+- `_allowance_online_capacity_error_diagnostics`: C(11) -> A(1).
+- `usage_drain_allowance_online.py` maximum complexity: B(7); no C-grade functions remain in module.
+- Expected global C-or-worse blocks after this branch: 2 -> 1.
+- No C(12+) or D/E/F complexity blocks expected.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_allowance_fits.py -q`: 3 passed before refactor.
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_allowance_fits.py tests/test_usage_drain_model.py -q`: 17 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_allowance_online.py tests/test_usage_drain_allowance_fits.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_allowance_online.py -a -s`: target now A(1), module max B(7).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 530 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+
+Remaining risks / next handoff:
+- Continue the C(11) ratchet with `parser.py::inspect_log`.
