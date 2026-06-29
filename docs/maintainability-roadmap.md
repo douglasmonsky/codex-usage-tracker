@@ -5364,3 +5364,52 @@ Checks:
 Remaining risks / next handoff:
 - `diagnostic_snapshot_source_scan.py::record_function_call` is still C(11), but below the current C(15)+ hotspot threshold.
 - Next best small branch is one of the C(16) report-diagnostic helpers in `usage_drain_state_buckets.py` or `usage_drain_boundary_summary.py`.
+
+### `refactor/usage-drain-state-bucket-diagnostics`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce the two C(16) state-bucket diagnostic summary helpers without changing walk-forward or transition-risk JSON payloads.
+- Add direct characterization tests for the public summary helpers before refactoring the shared aggregation behavior.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_state_buckets.py`
+- `tests/test_usage_drain_state_buckets.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added direct tests for `state_bucket_model_diagnostics` and `transition_risk_detail_diagnostics` covering matched-state shares, fallback share, mean support, missing signatures, and top-signature ordering.
+- Replaced duplicate detail extraction, matched-state filtering, support averaging, and top-signature construction with focused helpers.
+- Kept public function names and payload keys unchanged.
+
+Metrics:
+- `state_bucket_model_diagnostics`: C(16) -> A(2).
+- `transition_risk_detail_diagnostics`: C(16) -> A(2).
+- `usage_drain_state_buckets.py` average complexity: A(3.33).
+- Global C-or-worse blocks: 48 -> 46.
+- Largest remaining hotspot after this branch: `usage_drain_boundary_summary.py::_boundary_risk_detail_diagnostics` C(16).
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_state_buckets.py -q`: 2 passed before refactor.
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_state_buckets.py tests/test_usage_drain_state_buckets.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_state_buckets.py tests/test_usage_drain_model.py tests/test_usage_drain_boundary_delta.py -q`: 18 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_state_buckets.py tests/test_usage_drain_state_buckets.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_state_buckets.py -a -s`: passed, targets now A-rated.
+- `.venv/bin/python -m pytest -q`: 452 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `usage_drain_boundary_summary.py::_boundary_risk_detail_diagnostics` and `dashboard.py::dashboard_payload` are the next C(16) hotspots.
+- The new helpers return a `fallback_share` field that transition-risk diagnostics intentionally omit from their public payload.

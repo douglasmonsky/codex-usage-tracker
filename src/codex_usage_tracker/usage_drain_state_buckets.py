@@ -161,10 +161,7 @@ def state_bucket_prediction(
 def state_bucket_model_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
-    details = [
-        (row.get("prediction_details") or {}).get(model_name) or {}
-        for row in rows
-    ]
+    details = _details_for_model(rows, model_name, field_name="prediction_details")
     if not details:
         return {
             "n": 0,
@@ -172,64 +169,78 @@ def state_bucket_model_diagnostics(
             "mean_support": None,
             "top_signatures": [],
         }
-    matched = [detail for detail in details if detail.get("source") == "matched_state"]
-    signature_counts: dict[str, int] = {}
-    for detail in matched:
-        label = ",".join(str(item) for item in detail.get("signature") or [])
-        signature_counts[label or "missing"] = signature_counts.get(label or "missing", 0) + 1
-    top_signatures = [
-        {"signature": signature, "count": count, "share": rounded(count / len(details))}
-        for signature, count in sorted(
-            signature_counts.items(), key=lambda item: (-item[1], item[0])
-        )[:8]
-    ]
+    summary = _matched_state_detail_summary(details)
     return {
         "n": len(details),
-        "matched_state_share": rounded(len(matched) / len(details)),
-        "mean_support": rounded(
-            sum(int(detail.get("support") or 0) for detail in matched) / len(matched)
-            if matched
-            else None
-        ),
-        "fallback_share": rounded((len(details) - len(matched)) / len(details)),
-        "top_signatures": top_signatures,
+        "matched_state_share": summary["matched_state_share"],
+        "mean_support": summary["mean_support"],
+        "fallback_share": summary["fallback_share"],
+        "top_signatures": summary["top_signatures"],
     }
+
 
 def transition_risk_detail_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
-    details = [
-        (row.get("transition_risk_details") or {}).get(model_name) or {}
-        for row in rows
-    ]
+    details = _details_for_model(rows, model_name, field_name="transition_risk_details")
     if not details:
         return {
             "matched_state_share": None,
             "mean_support": None,
             "top_signatures": [],
         }
-    matched = [detail for detail in details if detail.get("source") == "matched_state"]
-    signature_counts: dict[str, int] = {}
-    for detail in matched:
-        label = ",".join(str(item) for item in detail.get("signature") or [])
-        signature_counts[label or "missing"] = (
-            signature_counts.get(label or "missing", 0) + 1
-        )
+    summary = _matched_state_detail_summary(details)
+    return {
+        "matched_state_share": summary["matched_state_share"],
+        "mean_support": summary["mean_support"],
+        "top_signatures": summary["top_signatures"],
+    }
+
+
+def _details_for_model(
+    rows: list[dict[str, Any]], model_name: str, *, field_name: str
+) -> list[dict[str, Any]]:
+    return [
+        (row.get(field_name) or {}).get(model_name) or {}
+        for row in rows
+    ]
+
+
+def _matched_state_detail_summary(details: list[dict[str, Any]]) -> dict[str, Any]:
+    matched = _matched_state_details(details)
     return {
         "matched_state_share": rounded(len(matched) / len(details)),
-        "mean_support": rounded(
-            sum(int(detail.get("support") or 0) for detail in matched) / len(matched)
-            if matched
-            else None
-        ),
-        "top_signatures": [
-            {
-                "signature": signature,
-                "count": count,
-                "share": rounded(count / len(details)),
-            }
-            for signature, count in sorted(
-                signature_counts.items(), key=lambda item: (-item[1], item[0])
-            )[:8]
-        ],
+        "mean_support": _mean_detail_support(matched),
+        "fallback_share": rounded((len(details) - len(matched)) / len(details)),
+        "top_signatures": _top_detail_signatures(matched, denominator=len(details)),
     }
+
+
+def _matched_state_details(details: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [detail for detail in details if detail.get("source") == "matched_state"]
+
+
+def _mean_detail_support(details: list[dict[str, Any]]) -> float | None:
+    if not details:
+        return None
+    return rounded(sum(int(detail.get("support") or 0) for detail in details) / len(details))
+
+
+def _top_detail_signatures(
+    details: list[dict[str, Any]], *, denominator: int
+) -> list[dict[str, Any]]:
+    signature_counts: dict[str, int] = {}
+    for detail in details:
+        label = _detail_signature_label(detail)
+        signature_counts[label] = signature_counts.get(label, 0) + 1
+    return [
+        {"signature": signature, "count": count, "share": rounded(count / denominator)}
+        for signature, count in sorted(
+            signature_counts.items(), key=lambda item: (-item[1], item[0])
+        )[:8]
+    ]
+
+
+def _detail_signature_label(detail: dict[str, Any]) -> str:
+    label = ",".join(str(item) for item in detail.get("signature") or [])
+    return label or "missing"
