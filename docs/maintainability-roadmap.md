@@ -7264,3 +7264,48 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue the C(11) ratchet in predictive/error/boundary/parser helpers.
+
+### `refactor/capacity-residual-diagnostics`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Reduce the C-grade capacity residual diagnostics helper while preserving holdout error diagnostics payloads.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_predictive.py`
+- `tests/test_usage_drain_predictive.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added synthetic characterization tests for populated and empty capacity residual diagnostics.
+- Split residual error-row construction, empty payload, summary metrics, error-share calculation, and top-group dispatch into focused helpers.
+- Preserved diagnostic keys, grouping fields, rounded metrics, and largest-error metadata.
+
+Metrics:
+- `capacity_residual_diagnostics`: C(11) -> A(2).
+- `usage_drain_predictive.py` maximum complexity: B(9); no C-grade functions remain in module.
+- Expected global C-or-worse blocks after this branch: 5 -> 4.
+- No C(12+) or D/E/F complexity blocks expected.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_predictive.py -q`: 2 passed.
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_one_percent_capacity.py -q`: 2 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_predictive.py tests/test_usage_drain_predictive.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_predictive.py -a -s`: target now A(2), module max B(9).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 526 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning before staging; rerun after staging before commit.
+
+Remaining risks / next handoff:
+- Continue the C(11) ratchet in error/boundary/parser helpers.

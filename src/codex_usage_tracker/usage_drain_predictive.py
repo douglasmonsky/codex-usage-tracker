@@ -39,7 +39,16 @@ CAPACITY_RESIDUAL_GROUP_FIELDS = (
 def capacity_residual_diagnostics(
     rows: list[dict[str, Any]], actual: list[float], predicted: list[float]
 ) -> dict[str, Any]:
-    errors: list[dict[str, Any]] = [
+    errors = capacity_residual_error_rows(rows, actual, predicted)
+    if not errors:
+        return empty_capacity_residual_diagnostics()
+    return capacity_residual_summary(errors)
+
+
+def capacity_residual_error_rows(
+    rows: list[dict[str, Any]], actual: list[float], predicted: list[float]
+) -> list[dict[str, Any]]:
+    return [
         {
             "actual": actual_value,
             "predicted": predicted_value,
@@ -49,35 +58,58 @@ def capacity_residual_diagnostics(
         }
         for row, actual_value, predicted_value in zip(rows, actual, predicted, strict=True)
     ]
-    if not errors:
-        return {
-            "n": 0,
-            "mean_error": None,
-            "within_5_credits_share": None,
-            "within_10_credits_share": None,
-            "large_error_share": None,
-            "top_error_groups": {},
-            "largest_errors": [],
-        }
+
+
+def empty_capacity_residual_diagnostics() -> dict[str, Any]:
+    return {
+        "n": 0,
+        "mean_error": None,
+        "within_5_credits_share": None,
+        "within_10_credits_share": None,
+        "large_error_share": None,
+        "top_error_groups": {},
+        "largest_errors": [],
+    }
+
+
+def capacity_residual_summary(errors: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "n": len(errors),
         "mean_error": rounded(
             sum(item["error"] for item in errors) / len(errors)
         ),
-        "within_5_credits_share": rounded(
-            sum(1 for item in errors if item["abs_error"] <= 5.0) / len(errors)
-        ),
-        "within_10_credits_share": rounded(
-            sum(1 for item in errors if item["abs_error"] <= 10.0) / len(errors)
-        ),
-        "large_error_share": rounded(
-            sum(1 for item in errors if item["abs_error"] >= 25.0) / len(errors)
-        ),
-        "top_error_groups": {
-            field_name: capacity_top_error_groups(errors, field_name)
-            for field_name in CAPACITY_RESIDUAL_GROUP_FIELDS
-        },
+        "within_5_credits_share": capacity_error_share(errors, max_error=5.0),
+        "within_10_credits_share": capacity_error_share(errors, max_error=10.0),
+        "large_error_share": capacity_error_share(errors, min_error=25.0),
+        "top_error_groups": capacity_residual_top_error_groups(errors),
         "largest_errors": largest_capacity_residual_errors(errors),
+    }
+
+
+def capacity_error_share(
+    errors: list[dict[str, Any]],
+    *,
+    min_error: float | None = None,
+    max_error: float | None = None,
+) -> float | None:
+    if not errors:
+        return None
+    matching = 0
+    for item in errors:
+        abs_error = item["abs_error"]
+        above_min = min_error is None or abs_error >= min_error
+        below_max = max_error is None or abs_error <= max_error
+        if above_min and below_max:
+            matching += 1
+    return rounded(matching / len(errors))
+
+
+def capacity_residual_top_error_groups(
+    errors: list[dict[str, Any]]
+) -> dict[str, list[dict[str, Any]]]:
+    return {
+        field_name: capacity_top_error_groups(errors, field_name)
+        for field_name in CAPACITY_RESIDUAL_GROUP_FIELDS
     }
 
 
