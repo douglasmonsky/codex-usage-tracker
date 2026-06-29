@@ -91,7 +91,8 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
             assert sentinel not in output
 
     strict_row = strict_payload["rows"][0]
-    csv_rows = list(csv.DictReader(csv_path.open(encoding="utf-8", newline="")))
+    with csv_path.open(encoding="utf-8", newline="") as handle:
+        csv_rows = list(csv.DictReader(handle))
     assert strict_payload["privacy_mode"] == "strict"
     assert strict_row["cwd"].startswith("[redacted cwd:")
     assert strict_row["source_file"].startswith("[redacted source:")
@@ -228,15 +229,15 @@ def test_context_loading_is_explicit_redacted_and_not_static_html(tmp_path: Path
 
 
 def test_context_server_requires_loopback_origin_token_and_enablement(tmp_path: Path) -> None:
-    from codex_usage_tracker.server import _ContextApiState, _UsageDashboardHandler
+    from codex_usage_tracker import server as server_module
 
     fixture = _make_privacy_fixture(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=fixture.codex_home, db_path=db_path)
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
-    context_api_state = _ContextApiState(False)
+    context_api_state = server_module.ContextApiState(False)
     handler = partial(
-        _UsageDashboardHandler,
+        server_module._UsageDashboardHandler,
         directory=str(tmp_path),
         db_path=db_path,
         pricing_path=tmp_path / "pricing.json",
@@ -441,8 +442,10 @@ def _http_error_json(url: str, headers: dict[str, str] | None = None) -> dict[st
     try:
         urllib.request.urlopen(request, timeout=5)  # noqa: S310 - local test server only
     except urllib.error.HTTPError as exc:
+        with exc:
+            payload = json.loads(exc.read().decode("utf-8"))
         return {
             "status": exc.code,
-            "payload": json.loads(exc.read().decode("utf-8")),
+            "payload": payload,
         }
     raise AssertionError("expected HTTPError")

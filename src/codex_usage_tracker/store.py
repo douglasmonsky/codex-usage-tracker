@@ -2,40 +2,55 @@
 
 from __future__ import annotations
 
-import csv
 import json
 import sqlite3
-from collections.abc import Iterable, Iterator
-from contextlib import contextmanager, suppress
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.models import DiagnosticFact, RefreshResult, UsageEvent
-from codex_usage_tracker.parser import (
+from codex_usage_tracker.parser_state import (
     PARSER_ADAPTER_VERSION,
     PARSER_DIAGNOSTIC_KEYS,
-    compact_parser_diagnostics,
-    find_session_logs,
-    load_session_index,
-    parse_usage_events_from_file_with_state,
 )
 from codex_usage_tracker.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
-from codex_usage_tracker.projects import apply_project_privacy_to_rows, validate_privacy_mode
 from codex_usage_tracker.schema import (
     DIAGNOSTIC_FACT_COLUMN_NAMES,
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
-from codex_usage_tracker.store_query_sql import (
-    _group_expression,
-    _normalize_limit,
-    _normalize_offset,
-    _normalize_sort_direction,
-    _since_where_clause,
-    _usage_api_sort_expression,
-    _usage_api_where_clause,
-    _usage_where_clause,
+from codex_usage_tracker.store_connection import connect
+from codex_usage_tracker.store_dashboard_queries import (
+    query_dashboard_event_count as query_dashboard_event_count,
+)
+from codex_usage_tracker.store_dashboard_queries import (
+    query_dashboard_events as query_dashboard_events,
+)
+from codex_usage_tracker.store_dashboard_queries import (
+    query_dashboard_token_summary as query_dashboard_token_summary,
+)
+from codex_usage_tracker.store_dashboard_queries import (
+    query_latest_observed_usage as query_latest_observed_usage,
+)
+from codex_usage_tracker.store_dashboard_queries import (
+    query_usage_status as query_usage_status,
+)
+from codex_usage_tracker.store_diagnostic_call_queries import (
+    query_diagnostic_fact_call_count as query_diagnostic_fact_call_count,
+)
+from codex_usage_tracker.store_diagnostic_call_queries import (
+    query_diagnostic_fact_calls as query_diagnostic_fact_calls,
+)
+from codex_usage_tracker.store_diagnostic_queries import (
+    query_diagnostic_facts as query_diagnostic_facts,
+)
+from codex_usage_tracker.store_diagnostic_queries import (
+    query_diagnostic_summary as query_diagnostic_summary,
+)
+from codex_usage_tracker.store_exports import export_usage_csv as export_usage_csv
+from codex_usage_tracker.store_rows import (
+    row_to_dict as _row_to_dict,
 )
 from codex_usage_tracker.store_schema import (
     SCHEMA_VERSION,
@@ -44,27 +59,33 @@ from codex_usage_tracker.store_schema import (
 )
 from codex_usage_tracker.store_sources import (
     ParsedSourceFile,
-    source_logs_requiring_parse,
     upsert_source_file_metadata,
 )
+from codex_usage_tracker.store_summary_queries import query_summary as query_summary
+from codex_usage_tracker.store_thread_summaries import (
+    query_thread_summaries as query_thread_summaries,
+)
 from codex_usage_tracker.store_thread_summaries import rebuild_thread_summaries
+from codex_usage_tracker.store_usage_api_queries import (
+    query_usage_api_event_count as query_usage_api_event_count,
+)
+from codex_usage_tracker.store_usage_api_queries import (
+    query_usage_api_events as query_usage_api_events,
+)
+from codex_usage_tracker.store_usage_record_queries import (
+    query_most_expensive_calls as query_most_expensive_calls,
+)
+from codex_usage_tracker.store_usage_record_queries import (
+    query_session_usage as query_session_usage,
+)
+from codex_usage_tracker.store_usage_record_queries import (
+    query_usage_record as query_usage_record,
+)
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
-OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
 SQLITE_VARIABLE_BATCH_SIZE = 500
-USAGE_TIMING_SELECT_SQL = """
-    previous_usage.event_timestamp AS previous_call_event_timestamp,
-    previous_usage.session_id AS previous_call_session_id,
-    previous_usage.turn_id AS previous_call_turn_id
-"""
-USAGE_TIMING_JOIN_SQL = """
-    LEFT JOIN usage_events AS previous_usage
-    ON previous_usage.record_id = usage_events.previous_record_id
-"""
-
-
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
@@ -72,57 +93,14 @@ def refresh_usage_index(
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
-    logs = find_session_logs(codex_home=codex_home, include_archived=include_archived)
-    session_index = load_session_index(codex_home)
-    with connect(db_path) as conn:
-        init_db(conn)
-        parse_plans = source_logs_requiring_parse(conn, logs)
-    stats: dict[str, int] = {}
-    events: list[UsageEvent] = []
-    diagnostic_facts: list[DiagnosticFact] = []
-    parsed_files: list[ParsedSourceFile] = []
-    for plan in parse_plans:
-        file_stats: dict[str, int] = {}
-        parsed_file = parse_usage_events_from_file_with_state(
-            plan.path,
-            session_index=session_index,
-            stats=file_stats,
-            start_byte=plan.start_byte,
-            start_line=plan.start_line,
-            initial_state=plan.initial_state,
-        )
-        file_events = parsed_file.events
-        events.extend(file_events)
-        diagnostic_facts.extend(parsed_file.diagnostic_facts)
-        parsed_files.append((plan.path, file_events, file_stats, parsed_file.state))
-        for key, value in file_stats.items():
-            stats[key] = stats.get(key, 0) + int(value)
-    inserted = upsert_usage_events(
-        events,
-        db_path=db_path,
-        replace_source_files=(plan.path for plan in parse_plans if plan.replace_existing),
-        diagnostic_facts=diagnostic_facts,
+    from codex_usage_tracker.store_refresh import (
+        refresh_usage_index as _refresh_usage_index,
     )
-    record_source_file_metadata(db_path=db_path, parsed_files=parsed_files)
-    skipped_events = stats.get("skipped_events", 0)
-    diagnostics = compact_parser_diagnostics(stats)
-    record_refresh_metadata(
+
+    return _refresh_usage_index(
+        codex_home=codex_home,
         db_path=db_path,
-        scanned_files=len(logs),
-        parsed_events=len(events),
-        skipped_events=skipped_events,
-        inserted_or_updated_events=inserted,
-        parser_diagnostics=diagnostics,
-        parsed_source_files=len(parse_plans),
-        skipped_source_files=len(logs) - len(parse_plans),
-    )
-    return RefreshResult(
-        scanned_files=len(logs),
-        parsed_events=len(events),
-        inserted_or_updated_events=inserted,
-        db_path=str(db_path),
-        skipped_events=skipped_events,
-        parser_diagnostics=diagnostics,
+        include_archived=include_archived,
     )
 
 
@@ -131,17 +109,13 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
 ) -> RefreshResult:
-    """Clear aggregate rows and rescan local Codex logs."""
+    """Drop and rebuild the usage index from all selected Codex logs."""
 
-    with connect(db_path) as conn:
-        init_db(conn)
-        conn.execute("DELETE FROM call_diagnostic_facts")
-        conn.execute("DELETE FROM diagnostic_snapshots")
-        conn.execute("DELETE FROM usage_events")
-        conn.execute("DELETE FROM thread_summaries")
-        conn.execute("DELETE FROM source_files")
-        conn.execute("DELETE FROM refresh_meta")
-    return refresh_usage_index(
+    from codex_usage_tracker.store_refresh import (
+        rebuild_usage_index as _rebuild_usage_index,
+    )
+
+    return _rebuild_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
@@ -164,22 +138,6 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
 
-@contextmanager
-def connect(db_path: Path = DEFAULT_DB_PATH) -> Iterator[sqlite3.Connection]:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path, timeout=5.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
-    with suppress(sqlite3.DatabaseError):
-        conn.execute("PRAGMA journal_mode = WAL")
-    try:
-        yield conn
-        conn.commit()
-    except BaseException:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
 
 
 def record_refresh_metadata(
@@ -381,54 +339,111 @@ def upsert_usage_events(
     replace_source_files: Iterable[Path] | None = None,
     diagnostic_facts: Iterable[DiagnosticFact] | None = None,
 ) -> int:
-    rows = [event.to_row() for event in events]
-    fact_rows = [fact.to_row() for fact in diagnostic_facts or []]
-    source_files_to_replace = [str(path) for path in replace_source_files or []]
+    rows = _usage_event_rows(events)
+    fact_rows = _diagnostic_fact_rows(diagnostic_facts)
+    source_files_to_replace = _source_file_strings(replace_source_files)
     with connect(db_path) as conn:
         init_db(conn)
-        if source_files_to_replace:
-            placeholders = ", ".join("?" for _source in source_files_to_replace)
-            conn.execute(
-                f"""
-                DELETE FROM call_diagnostic_facts
-                WHERE record_id IN (
-                    SELECT record_id
-                    FROM usage_events
-                    WHERE source_file IN ({placeholders})
-                )
-                """,
-                source_files_to_replace,
-            )
-            conn.execute(
-                f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
-                source_files_to_replace,
-            )
+        _delete_usage_events_for_source_files(conn, source_files_to_replace)
         if not rows:
-            if source_files_to_replace and refresh_links:
-                _refresh_usage_event_links(conn)
-                rebuild_thread_summaries(conn)
+            _refresh_after_empty_source_replacement(
+                conn,
+                refresh_links=refresh_links,
+                source_files_to_replace=source_files_to_replace,
+            )
             return 0
-        placeholders = ", ".join("?" for _ in EVENT_COLUMNS)
-        update_clause = ", ".join(
-            f"{column}=excluded.{column}"
-            for column in EVENT_COLUMNS
-            if column != "record_id"
-        )
-        sql = (
-            f"INSERT INTO usage_events ({', '.join(EVENT_COLUMNS)}) "
-            f"VALUES ({placeholders}) "
-            f"ON CONFLICT(record_id) DO UPDATE SET {update_clause}"
-        )
-        _delete_diagnostic_facts_for_record_ids(
-            conn,
-            [str(row["record_id"]) for row in rows],
-        )
-        conn.executemany(sql, [[row[column] for column in EVENT_COLUMNS] for row in rows])
+        _delete_diagnostic_facts_for_record_ids(conn, _usage_event_record_ids(rows))
+        _insert_usage_event_rows(conn, rows)
         _insert_diagnostic_facts(conn, fact_rows)
-        if refresh_links:
-            _refresh_usage_event_links(conn)
-            rebuild_thread_summaries(conn)
+        _refresh_after_usage_event_upsert(conn, refresh_links=refresh_links)
         return len(rows)
+
+
+def _usage_event_rows(events: Iterable[UsageEvent]) -> list[dict[str, object]]:
+    return [event.to_row() for event in events]
+
+
+def _diagnostic_fact_rows(
+    diagnostic_facts: Iterable[DiagnosticFact] | None,
+) -> list[dict[str, object]]:
+    return [fact.to_row() for fact in diagnostic_facts or []]
+
+
+def _source_file_strings(replace_source_files: Iterable[Path] | None) -> list[str]:
+    return [str(path) for path in replace_source_files or []]
+
+
+def _delete_usage_events_for_source_files(
+    conn: sqlite3.Connection,
+    source_files_to_replace: list[str],
+) -> None:
+    if not source_files_to_replace:
+        return
+    placeholders = ", ".join("?" for _source in source_files_to_replace)
+    conn.execute(
+        f"""
+        DELETE FROM call_diagnostic_facts
+        WHERE record_id IN (
+            SELECT record_id
+            FROM usage_events
+            WHERE source_file IN ({placeholders})
+        )
+        """,
+        source_files_to_replace,
+    )
+    conn.execute(
+        f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
+        source_files_to_replace,
+    )
+
+
+def _refresh_after_empty_source_replacement(
+    conn: sqlite3.Connection,
+    *,
+    refresh_links: bool,
+    source_files_to_replace: list[str],
+) -> None:
+    if source_files_to_replace and refresh_links:
+        _refresh_usage_event_links(conn)
+        rebuild_thread_summaries(conn)
+
+
+def _usage_event_record_ids(rows: list[dict[str, object]]) -> list[str]:
+    return [str(row["record_id"]) for row in rows]
+
+
+def _usage_event_upsert_sql() -> str:
+    placeholders = ", ".join("?" for _column in EVENT_COLUMNS)
+    update_clause = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in EVENT_COLUMNS
+        if column != "record_id"
+    )
+    return (
+        f"INSERT INTO usage_events ({', '.join(EVENT_COLUMNS)}) "
+        f"VALUES ({placeholders}) "
+        f"ON CONFLICT(record_id) DO UPDATE SET {update_clause}"
+    )
+
+
+def _insert_usage_event_rows(
+    conn: sqlite3.Connection,
+    rows: list[dict[str, object]],
+) -> None:
+    conn.executemany(
+        _usage_event_upsert_sql(),
+        [[row[column] for column in EVENT_COLUMNS] for row in rows],
+    )
+
+
+def _refresh_after_usage_event_upsert(
+    conn: sqlite3.Connection,
+    *,
+    refresh_links: bool,
+) -> None:
+    if refresh_links:
+        _refresh_usage_event_links(conn)
+        rebuild_thread_summaries(conn)
 
 
 def _delete_diagnostic_facts_for_record_ids(
@@ -541,1260 +556,3 @@ def refresh_thread_summaries(db_path: Path = DEFAULT_DB_PATH) -> int:
     with connect(db_path) as conn:
         init_db(conn)
         return rebuild_thread_summaries(conn)
-
-
-def query_summary(
-    db_path: Path = DEFAULT_DB_PATH,
-    group_by: str = "thread",
-    limit: int = 20,
-    since: str | None = None,
-) -> list[dict[str, Any]]:
-    group_expr = _group_expression(group_by)
-    where_clause, raw_params = _since_where_clause(since)
-    params: list[Any] = list(raw_params)
-    sql = f"""
-        SELECT
-            {group_expr} AS group_key,
-            COUNT(*) AS model_calls,
-            COUNT(DISTINCT session_id) AS sessions,
-            COUNT(DISTINCT turn_id) AS turns,
-            SUM(input_tokens) AS input_tokens,
-            SUM(cached_input_tokens) AS cached_input_tokens,
-            SUM(uncached_input_tokens) AS uncached_input_tokens,
-            SUM(output_tokens) AS output_tokens,
-            SUM(reasoning_output_tokens) AS reasoning_output_tokens,
-            SUM(total_tokens) AS total_tokens,
-            AVG(cache_ratio) AS avg_cache_ratio,
-            AVG(reasoning_output_ratio) AS avg_reasoning_output_ratio,
-            AVG(context_window_percent) AS avg_context_window_percent,
-            MAX(event_timestamp) AS latest_event
-        FROM usage_events
-        {where_clause}
-        GROUP BY group_key
-        ORDER BY total_tokens DESC
-        LIMIT ?
-    """
-    params.append(limit)
-    with connect(db_path) as conn:
-        init_db(conn)
-        return [_row_to_dict(row) for row in conn.execute(sql, params)]
-
-
-def query_session_usage(
-    db_path: Path = DEFAULT_DB_PATH,
-    session_id: str | None = None,
-    limit: int = 200,
-) -> list[dict[str, Any]]:
-    with connect(db_path) as conn:
-        init_db(conn)
-        if session_id is None:
-            row = conn.execute(
-                """
-                SELECT session_id
-                FROM usage_events
-                GROUP BY session_id
-                ORDER BY MAX(event_timestamp) DESC
-                LIMIT 1
-                """
-            ).fetchone()
-            if row is None:
-                return []
-            session_id = str(row["session_id"])
-        rows = conn.execute(
-            """
-            SELECT
-                usage_events.*,
-                previous_usage.event_timestamp AS previous_call_event_timestamp,
-                previous_usage.session_id AS previous_call_session_id,
-                previous_usage.turn_id AS previous_call_turn_id
-            FROM usage_events
-            LEFT JOIN usage_events AS previous_usage
-            ON previous_usage.record_id = usage_events.previous_record_id
-            WHERE usage_events.session_id = ?
-            ORDER BY usage_events.event_timestamp, usage_events.cumulative_total_tokens
-            LIMIT ?
-            """,
-            (session_id, limit),
-        )
-        return [_usage_row_to_dict(row) for row in rows]
-
-
-def query_usage_record(
-    db_path: Path = DEFAULT_DB_PATH,
-    record_id: str | None = None,
-) -> dict[str, Any] | None:
-    """Return one aggregate usage row by stable record id."""
-
-    if not record_id:
-        return None
-    with connect(db_path) as conn:
-        init_db(conn)
-        row = conn.execute(
-            """
-            SELECT
-                usage_events.*,
-                previous_usage.event_timestamp AS previous_call_event_timestamp,
-                previous_usage.session_id AS previous_call_session_id,
-                previous_usage.turn_id AS previous_call_turn_id
-            FROM usage_events
-            LEFT JOIN usage_events AS previous_usage
-            ON previous_usage.record_id = usage_events.previous_record_id
-            WHERE usage_events.record_id = ?
-            LIMIT 1
-            """,
-            (record_id,),
-        ).fetchone()
-        return _usage_row_to_dict(row) if row is not None else None
-
-
-def query_diagnostic_facts(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    limit: int | None = 50,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    fact_type: str | None = None,
-    fact_name: str | None = None,
-    fact_category: str | None = None,
-    include_archived: bool = False,
-    sort: str = "uncached",
-    direction: str = "desc",
-) -> list[dict[str, Any]]:
-    """Return aggregate diagnostic fact summaries joined to usage events."""
-
-    sort_map = {
-        "uncached": "associated_uncached_input_tokens",
-        "tokens": "associated_total_tokens",
-        "cached": "associated_cached_input_tokens",
-        "output": "associated_output_tokens",
-        "cache": "avg_cache_ratio",
-        "largest": "largest_call_tokens",
-        "calls": "associated_calls",
-        "occurrences": "occurrences",
-        "time": "latest_event_timestamp",
-        "fact": "f.fact_name",
-    }
-    if sort not in sort_map:
-        allowed = ", ".join(sorted(sort_map))
-        raise ValueError(f"sort must be one of: {allowed}")
-    direction_sql = _normalize_sort_direction(direction)
-    where_clause, params = _usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        table_alias="usage_events",
-        include_archived=include_archived,
-    )
-    where_clause, params = _append_diagnostic_fact_filters(
-        where_clause,
-        params,
-        fact_type=fact_type,
-        fact_name=fact_name,
-        fact_category=fact_category,
-        table_alias="f",
-    )
-    sub_where_clause, sub_params = _usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        table_alias="u2",
-        include_archived=include_archived,
-    )
-    sub_where_clause, sub_params = _append_diagnostic_fact_filters(
-        sub_where_clause,
-        sub_params,
-        fact_type=fact_type,
-        fact_name=fact_name,
-        fact_category=fact_category,
-        table_alias="f2",
-    )
-    sub_conditions = [
-        "f2.fact_type = f.fact_type",
-        "f2.fact_name = f.fact_name",
-    ]
-    if sub_where_clause:
-        sub_conditions.append(sub_where_clause.removeprefix("WHERE "))
-    sub_where_sql = "WHERE " + " AND ".join(f"({condition})" for condition in sub_conditions)
-    normalized_limit = _normalize_limit(limit)
-    limit_clause = ""
-    query_params: list[Any] = [*sub_params, *params]
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                f.fact_type,
-                f.fact_name,
-                f.fact_category,
-                coalesce(SUM(f.event_count), 0) AS occurrences,
-                COUNT(DISTINCT usage_events.record_id) AS associated_calls,
-                coalesce(SUM(usage_events.input_tokens), 0) AS associated_input_tokens,
-                coalesce(SUM(usage_events.cached_input_tokens), 0)
-                    AS associated_cached_input_tokens,
-                coalesce(SUM(usage_events.uncached_input_tokens), 0)
-                    AS associated_uncached_input_tokens,
-                coalesce(SUM(usage_events.output_tokens), 0) AS associated_output_tokens,
-                coalesce(SUM(usage_events.reasoning_output_tokens), 0)
-                    AS associated_reasoning_output_tokens,
-                coalesce(SUM(usage_events.total_tokens), 0) AS associated_total_tokens,
-                AVG(usage_events.cache_ratio) AS avg_cache_ratio,
-                MAX(usage_events.total_tokens) AS largest_call_tokens,
-                MAX(usage_events.event_timestamp) AS latest_event_timestamp,
-                MIN(f.first_source_line) AS first_source_line,
-                MAX(f.last_source_line) AS last_source_line,
-                MAX(f.raw_content_included) AS raw_content_included,
-                (
-                    SELECT u2.record_id
-                    FROM call_diagnostic_facts AS f2
-                    JOIN usage_events AS u2 ON u2.record_id = f2.record_id
-                    {sub_where_sql}
-                    ORDER BY u2.total_tokens DESC, u2.event_timestamp DESC, u2.record_id
-                    LIMIT 1
-                ) AS largest_record_id
-            FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
-            {where_clause}
-            GROUP BY f.fact_type, f.fact_name, f.fact_category
-            ORDER BY {sort_map[sort]} {direction_sql},
-                associated_total_tokens DESC,
-                f.fact_type,
-                f.fact_name
-            {limit_clause}
-            """,
-            query_params,
-        )
-        return [_row_to_dict(row) for row in rows]
-
-
-def query_diagnostic_summary(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    limit: int | None = 20,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    fact_type: str | None = None,
-    fact_name: str | None = None,
-    fact_category: str | None = None,
-    include_archived: bool = False,
-    sort: str = "uncached",
-    direction: str = "desc",
-) -> list[dict[str, Any]]:
-    """Return aggregate diagnostic summaries grouped by fact type."""
-
-    sort_map = {
-        "uncached": "associated_uncached_input_tokens",
-        "tokens": "associated_total_tokens",
-        "cached": "associated_cached_input_tokens",
-        "output": "associated_output_tokens",
-        "cache": "avg_cache_ratio",
-        "largest": "largest_call_tokens",
-        "calls": "associated_calls",
-        "occurrences": "occurrences",
-        "time": "latest_event_timestamp",
-        "fact": "type_counts.fact_type",
-    }
-    if sort not in sort_map:
-        allowed = ", ".join(sorted(sort_map))
-        raise ValueError(f"sort must be one of: {allowed}")
-    direction_sql = _normalize_sort_direction(direction)
-    where_clause, params = _usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        table_alias="usage_events",
-        include_archived=include_archived,
-    )
-    where_clause, params = _append_diagnostic_fact_filters(
-        where_clause,
-        params,
-        fact_type=fact_type,
-        fact_name=fact_name,
-        fact_category=fact_category,
-        table_alias="f",
-    )
-    normalized_limit = _normalize_limit(limit)
-    limit_clause = ""
-    query_params: list[Any] = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            WITH scoped AS (
-                SELECT
-                    f.fact_type,
-                    f.fact_name,
-                    f.event_count,
-                    usage_events.record_id,
-                    usage_events.input_tokens,
-                    usage_events.cached_input_tokens,
-                    usage_events.uncached_input_tokens,
-                    usage_events.output_tokens,
-                    usage_events.reasoning_output_tokens,
-                    usage_events.total_tokens,
-                    usage_events.cache_ratio,
-                    usage_events.event_timestamp
-                FROM call_diagnostic_facts AS f
-                JOIN usage_events ON usage_events.record_id = f.record_id
-                {where_clause}
-            ),
-            type_counts AS (
-                SELECT
-                    fact_type,
-                    coalesce(SUM(event_count), 0) AS occurrences,
-                    COUNT(DISTINCT record_id) AS associated_calls,
-                    COUNT(DISTINCT fact_name) AS fact_names
-                FROM scoped
-                GROUP BY fact_type
-            ),
-            distinct_calls AS (
-                SELECT
-                    fact_type,
-                    record_id,
-                    MAX(input_tokens) AS input_tokens,
-                    MAX(cached_input_tokens) AS cached_input_tokens,
-                    MAX(uncached_input_tokens) AS uncached_input_tokens,
-                    MAX(output_tokens) AS output_tokens,
-                    MAX(reasoning_output_tokens) AS reasoning_output_tokens,
-                    MAX(total_tokens) AS total_tokens,
-                    MAX(cache_ratio) AS cache_ratio,
-                    MAX(event_timestamp) AS event_timestamp
-                FROM scoped
-                GROUP BY fact_type, record_id
-            ),
-            call_sums AS (
-                SELECT
-                    fact_type,
-                    coalesce(SUM(input_tokens), 0) AS associated_input_tokens,
-                    coalesce(SUM(cached_input_tokens), 0) AS associated_cached_input_tokens,
-                    coalesce(SUM(uncached_input_tokens), 0)
-                        AS associated_uncached_input_tokens,
-                    coalesce(SUM(output_tokens), 0) AS associated_output_tokens,
-                    coalesce(SUM(reasoning_output_tokens), 0)
-                        AS associated_reasoning_output_tokens,
-                    coalesce(SUM(total_tokens), 0) AS associated_total_tokens,
-                    AVG(cache_ratio) AS avg_cache_ratio,
-                    MAX(total_tokens) AS largest_call_tokens,
-                    MAX(event_timestamp) AS latest_event_timestamp
-                FROM distinct_calls
-                GROUP BY fact_type
-            )
-            SELECT
-                type_counts.fact_type,
-                type_counts.occurrences,
-                type_counts.associated_calls,
-                type_counts.fact_names,
-                call_sums.associated_input_tokens,
-                call_sums.associated_cached_input_tokens,
-                call_sums.associated_uncached_input_tokens,
-                call_sums.associated_output_tokens,
-                call_sums.associated_reasoning_output_tokens,
-                call_sums.associated_total_tokens,
-                call_sums.avg_cache_ratio,
-                call_sums.largest_call_tokens,
-                call_sums.latest_event_timestamp,
-                (
-                    SELECT s2.fact_name
-                    FROM scoped AS s2
-                    WHERE s2.fact_type = type_counts.fact_type
-                    GROUP BY s2.fact_name
-                    ORDER BY SUM(s2.event_count) DESC, SUM(s2.uncached_input_tokens) DESC
-                    LIMIT 1
-                ) AS top_fact_name
-            FROM type_counts
-            JOIN call_sums ON call_sums.fact_type = type_counts.fact_type
-            ORDER BY {sort_map[sort]} {direction_sql},
-                associated_total_tokens DESC,
-                type_counts.fact_type
-            {limit_clause}
-            """,
-            query_params,
-        )
-        return [_row_to_dict(row) for row in rows]
-
-
-def query_diagnostic_fact_calls(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    fact_type: str,
-    fact_name: str,
-    limit: int | None = 50,
-    offset: int = 0,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    include_archived: bool = False,
-    sort: str = "tokens",
-    direction: str = "desc",
-) -> list[dict[str, Any]]:
-    """Return usage calls associated with one diagnostic fact."""
-
-    where_clause, params = _diagnostic_fact_call_where(
-        fact_type=fact_type,
-        fact_name=fact_name,
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        include_archived=include_archived,
-    )
-    order_expr = _diagnostic_fact_call_order_expression(sort)
-    direction_sql = _normalize_sort_direction(direction)
-    normalized_limit = _normalize_limit(limit)
-    normalized_offset = _normalize_offset(offset)
-    limit_clause = ""
-    query_params = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
-                previous_usage.event_timestamp AS previous_call_event_timestamp,
-                previous_usage.session_id AS previous_call_session_id,
-                previous_usage.turn_id AS previous_call_turn_id,
-                f.fact_type,
-                f.fact_name,
-                f.fact_category,
-                f.event_count AS diagnostic_event_count,
-                f.confidence AS diagnostic_confidence,
-                f.first_event_timestamp AS diagnostic_first_event_timestamp,
-                f.last_event_timestamp AS diagnostic_last_event_timestamp,
-                f.first_source_line AS diagnostic_first_source_line,
-                f.last_source_line AS diagnostic_last_source_line,
-                f.evidence_scope AS diagnostic_evidence_scope,
-                f.raw_content_included AS raw_content_included
-            FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
-            LEFT JOIN usage_events AS previous_usage
-            ON previous_usage.record_id = usage_events.previous_record_id
-            {where_clause}
-            ORDER BY {order_expr} {direction_sql},
-                usage_events.event_timestamp DESC,
-                usage_events.cumulative_total_tokens DESC
-            {limit_clause}
-            """,
-            query_params,
-        )
-        return [_usage_row_to_dict(row) for row in rows]
-
-
-def query_diagnostic_fact_call_count(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    fact_type: str,
-    fact_name: str,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    include_archived: bool = False,
-) -> int:
-    """Return the number of calls associated with one diagnostic fact."""
-
-    where_clause, params = _diagnostic_fact_call_where(
-        fact_type=fact_type,
-        fact_name=fact_name,
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        include_archived=include_archived,
-    )
-    with connect(db_path) as conn:
-        init_db(conn)
-        row = conn.execute(
-            f"""
-            SELECT COUNT(DISTINCT usage_events.record_id) AS row_count
-            FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
-            {where_clause}
-            """,
-            params,
-        ).fetchone()
-        return int(row["row_count"] if row is not None else 0)
-
-
-def _diagnostic_fact_call_where(
-    *,
-    fact_type: str,
-    fact_name: str,
-    since: str | None,
-    until: str | None,
-    model: str | None,
-    effort: str | None,
-    thread: str | None,
-    min_tokens: int | None,
-    include_archived: bool,
-) -> tuple[str, list[Any]]:
-    where_clause, params = _usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        table_alias="usage_events",
-        include_archived=include_archived,
-    )
-    return _append_diagnostic_fact_filters(
-        where_clause,
-        params,
-        fact_type=fact_type,
-        fact_name=fact_name,
-        fact_category=None,
-        table_alias="f",
-    )
-
-
-def _append_diagnostic_fact_filters(
-    where_clause: str,
-    params: list[Any],
-    *,
-    fact_type: str | None,
-    fact_name: str | None,
-    fact_category: str | None,
-    table_alias: str,
-) -> tuple[str, list[Any]]:
-    clauses = [where_clause.removeprefix("WHERE ")] if where_clause else []
-    updated_params = list(params)
-    prefix = f"{table_alias}."
-    if fact_type:
-        clauses.append(f"{prefix}fact_type = ?")
-        updated_params.append(fact_type)
-    if fact_name:
-        clauses.append(f"{prefix}fact_name = ?")
-        updated_params.append(fact_name)
-    if fact_category:
-        clauses.append(f"{prefix}fact_category = ?")
-        updated_params.append(fact_category)
-    if not clauses:
-        return "", updated_params
-    return "WHERE " + " AND ".join(f"({clause})" for clause in clauses), updated_params
-
-
-def _diagnostic_fact_call_order_expression(sort: str) -> str:
-    sort_map = {
-        "time": "usage_events.event_timestamp",
-        "tokens": "usage_events.total_tokens",
-        "input": "usage_events.input_tokens",
-        "cached": "usage_events.cached_input_tokens",
-        "uncached": "usage_events.uncached_input_tokens",
-        "output": "usage_events.output_tokens",
-        "reasoning": "usage_events.reasoning_output_tokens",
-        "cache": "usage_events.cache_ratio",
-        "model": "usage_events.model",
-        "effort": "usage_events.effort",
-        "thread": "coalesce(usage_events.thread_name, usage_events.parent_thread_name, usage_events.session_id)",
-    }
-    try:
-        return sort_map[sort]
-    except KeyError as exc:
-        allowed = ", ".join(sorted(sort_map))
-        raise ValueError(f"sort must be one of: {allowed}") from exc
-
-
-def query_dashboard_events(
-    db_path: Path = DEFAULT_DB_PATH,
-    limit: int | None = 5000,
-    offset: int = 0,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    include_archived: bool = True,
-) -> list[dict[str, Any]]:
-    where_clause, params = _usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        table_alias="usage_events",
-        include_archived=include_archived,
-    )
-    parent_where_clause, parent_params = _usage_where_clause(include_archived=include_archived)
-    parent_thread_filter = (
-        f"{parent_where_clause} AND thread_name IS NOT NULL"
-        if parent_where_clause
-        else "WHERE thread_name IS NOT NULL"
-    )
-    normalized_limit = _normalize_limit(limit)
-    normalized_offset = _normalize_offset(offset)
-    limit_clause = ""
-    query_params = [*parent_params, *params]
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
-                {USAGE_TIMING_SELECT_SQL},
-                coalesce(
-                    usage_events.parent_thread_name,
-                    parent_threads.thread_name
-                ) AS resolved_parent_thread_name,
-                coalesce(
-                    usage_events.parent_session_updated_at,
-                    parent_threads.session_updated_at
-                ) AS resolved_parent_session_updated_at
-            FROM usage_events
-            {USAGE_TIMING_JOIN_SQL}
-            LEFT JOIN (
-                SELECT
-                    session_id,
-                    max(thread_name) AS thread_name,
-                    max(session_updated_at) AS session_updated_at
-                FROM usage_events
-                {parent_thread_filter}
-                GROUP BY session_id
-            ) AS parent_threads
-            ON usage_events.parent_session_id = parent_threads.session_id
-            {where_clause}
-            ORDER BY usage_events.event_timestamp DESC, usage_events.cumulative_total_tokens DESC
-            {limit_clause}
-            """,
-            query_params,
-        )
-        return [_usage_row_to_dict(row) for row in rows]
-
-
-def query_dashboard_event_count(
-    db_path: Path = DEFAULT_DB_PATH,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    min_tokens: int | None = None,
-    include_archived: bool = True,
-) -> int:
-    """Return total aggregate usage rows available for the dashboard window."""
-
-    where_clause, params = _usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        include_archived=include_archived,
-    )
-    with connect(db_path) as conn:
-        init_db(conn)
-        row = conn.execute(
-            f"""
-            SELECT COUNT(*) AS row_count
-            FROM usage_events
-            {where_clause}
-            """,
-            params,
-        ).fetchone()
-        return int(row["row_count"] if row is not None else 0)
-
-
-def query_dashboard_token_summary(
-    db_path: Path = DEFAULT_DB_PATH,
-    since: str | None = None,
-    include_archived: bool = True,
-) -> dict[str, Any]:
-    """Return cheap aggregate token totals for the dashboard shell."""
-
-    where_clause, params = _usage_where_clause(
-        since=since,
-        include_archived=include_archived,
-    )
-    with connect(db_path) as conn:
-        init_db(conn)
-        total_row = conn.execute(
-            f"""
-            SELECT
-                COUNT(*) AS row_count,
-                coalesce(SUM(input_tokens), 0) AS input_tokens,
-                coalesce(SUM(cached_input_tokens), 0) AS cached_input_tokens,
-                coalesce(SUM(uncached_input_tokens), 0) AS uncached_input_tokens,
-                coalesce(SUM(output_tokens), 0) AS output_tokens,
-                coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
-                coalesce(SUM(total_tokens), 0) AS total_tokens
-            FROM usage_events
-            {where_clause}
-            """,
-            params,
-        ).fetchone()
-        model_rows = [
-            _row_to_dict(row)
-            for row in conn.execute(
-                f"""
-                SELECT
-                    coalesce(model, 'Unknown model') AS model,
-                    COUNT(*) AS row_count,
-                    coalesce(SUM(input_tokens), 0) AS input_tokens,
-                    coalesce(SUM(cached_input_tokens), 0) AS cached_input_tokens,
-                    coalesce(SUM(uncached_input_tokens), 0) AS uncached_input_tokens,
-                    coalesce(SUM(output_tokens), 0) AS output_tokens,
-                    coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
-                    coalesce(SUM(total_tokens), 0) AS total_tokens
-                FROM usage_events
-                {where_clause}
-                GROUP BY coalesce(model, 'Unknown model')
-                """,
-                params,
-            )
-        ]
-    summary = _row_to_dict(total_row) if total_row is not None else {}
-    return {
-        "row_count": int(summary.get("row_count") or 0),
-        "input_tokens": int(summary.get("input_tokens") or 0),
-        "cached_input_tokens": int(summary.get("cached_input_tokens") or 0),
-        "uncached_input_tokens": int(summary.get("uncached_input_tokens") or 0),
-        "output_tokens": int(summary.get("output_tokens") or 0),
-        "reasoning_output_tokens": int(summary.get("reasoning_output_tokens") or 0),
-        "total_tokens": int(summary.get("total_tokens") or 0),
-        "model_rows": model_rows,
-    }
-
-
-def query_usage_status(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    include_archived: bool = False,
-) -> dict[str, Any]:
-    """Return cheap row-count metadata for live dashboard status checks."""
-
-    scoped_where, scoped_params = _usage_where_clause(include_archived=include_archived)
-    active_where, active_params = _usage_where_clause(include_archived=False)
-    with connect(db_path) as conn:
-        init_db(conn)
-        total_row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
-        active_row = conn.execute(
-            f"SELECT COUNT(*) AS count FROM usage_events {active_where}",
-            active_params,
-        ).fetchone()
-        scoped_row = conn.execute(
-            f"SELECT COUNT(*) AS count FROM usage_events {scoped_where}",
-            scoped_params,
-        ).fetchone()
-        max_row = conn.execute(
-            f"SELECT MAX(event_timestamp) AS max_event_timestamp FROM usage_events {scoped_where}",
-            scoped_params,
-        ).fetchone()
-    return {
-        "total_rows": int(total_row["count"] if total_row is not None else 0),
-        "active_rows": int(active_row["count"] if active_row is not None else 0),
-        "scoped_rows": int(scoped_row["count"] if scoped_row is not None else 0),
-        "max_event_timestamp": (
-            max_row["max_event_timestamp"] if max_row is not None else None
-        ),
-    }
-
-
-def query_latest_observed_usage(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    include_archived: bool = False,
-) -> dict[str, Any]:
-    """Return the latest passive usage-limit snapshot from token-count rows."""
-
-    where_clause, params = _usage_where_clause(include_archived=include_archived)
-    observed_clause = (
-        "rate_limit_primary_used_percent IS NOT NULL "
-        "OR rate_limit_secondary_used_percent IS NOT NULL"
-    )
-    scoped_where = (
-        f"{where_clause} AND ({observed_clause})"
-        if where_clause
-        else f"WHERE {observed_clause}"
-    )
-    with connect(db_path) as conn:
-        init_db(conn)
-        row = conn.execute(
-            f"""
-            SELECT
-                record_id,
-                event_timestamp,
-                line_number,
-                rate_limit_plan_type,
-                rate_limit_limit_id,
-                rate_limit_primary_used_percent,
-                rate_limit_primary_window_minutes,
-                rate_limit_primary_resets_at,
-                rate_limit_secondary_used_percent,
-                rate_limit_secondary_window_minutes,
-                rate_limit_secondary_resets_at
-            FROM usage_events
-            {scoped_where}
-            ORDER BY
-                CASE WHEN rate_limit_limit_id = 'codex' THEN 0 ELSE 1 END,
-                event_timestamp DESC,
-                cumulative_total_tokens DESC
-            LIMIT 1
-            """,
-            params,
-        ).fetchone()
-        reconciliation = _observed_usage_reconciliation(
-            conn,
-            scoped_where=scoped_where,
-            params=params,
-            selected_row=row,
-        )
-    if row is None:
-        return {"available": False, "windows": [], "reconciliation": reconciliation}
-    data = _row_to_dict(row)
-    return {
-        "available": True,
-        "record_id": data.get("record_id"),
-        "observed_at": data.get("event_timestamp"),
-        "line_number": data.get("line_number"),
-        "plan_type": data.get("rate_limit_plan_type"),
-        "limit_id": data.get("rate_limit_limit_id"),
-        "source": "token_count.rate_limits",
-        "windows": [
-            window
-            for window in (
-                _observed_usage_window(data, "primary"),
-                _observed_usage_window(data, "secondary"),
-            )
-            if window is not None
-        ],
-        "reconciliation": reconciliation,
-    }
-
-
-def _observed_usage_reconciliation(
-    conn: sqlite3.Connection,
-    *,
-    scoped_where: str,
-    params: list[Any],
-    selected_row: sqlite3.Row | None,
-) -> dict[str, Any]:
-    recent_rows = [
-        _row_to_dict(row)
-        for row in conn.execute(
-            f"""
-            SELECT
-                record_id,
-                event_timestamp,
-                rate_limit_plan_type,
-                rate_limit_limit_id
-            FROM usage_events
-            {scoped_where}
-            ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
-            LIMIT ?
-            """,
-            [*params, OBSERVED_USAGE_RECONCILIATION_THRESHOLD],
-        ).fetchall()
-    ]
-    consecutive_alternate_rows = 0
-    latest_alternate: dict[str, Any] | None = None
-    for row in recent_rows:
-        limit_id = row.get("rate_limit_limit_id")
-        if not _is_alternate_codex_limit(limit_id):
-            break
-        consecutive_alternate_rows += 1
-        if latest_alternate is None:
-            latest_alternate = row
-    selected = _row_to_dict(selected_row) if selected_row is not None else {}
-    selected_record_id = selected.get("record_id")
-    latest_record_id = latest_alternate.get("record_id") if latest_alternate else None
-    recommended = (
-        consecutive_alternate_rows >= OBSERVED_USAGE_RECONCILIATION_THRESHOLD
-        and latest_alternate is not None
-        and latest_record_id != selected_record_id
-    )
-    return {
-        "recommended": recommended,
-        "reason": "latest_alternate_codex_limit_rows" if recommended else None,
-        "suggested_action": "live_usage_check" if recommended else None,
-        "consecutive_alternate_rows": consecutive_alternate_rows,
-        "threshold": OBSERVED_USAGE_RECONCILIATION_THRESHOLD,
-        "latest_limit_id": latest_alternate.get("rate_limit_limit_id")
-        if latest_alternate
-        else None,
-        "latest_plan_type": latest_alternate.get("rate_limit_plan_type")
-        if latest_alternate
-        else None,
-        "latest_observed_at": latest_alternate.get("event_timestamp")
-        if latest_alternate
-        else None,
-        "selected_observed_at": selected.get("event_timestamp"),
-        "selected_limit_id": selected.get("rate_limit_limit_id"),
-    }
-
-
-def _is_alternate_codex_limit(limit_id: object) -> bool:
-    if not isinstance(limit_id, str):
-        return False
-    return limit_id.startswith("codex_") and limit_id != "codex"
-
-
-def _observed_usage_window(row: dict[str, Any], key: str) -> dict[str, Any] | None:
-    used_percent = row.get(f"rate_limit_{key}_used_percent")
-    window_minutes = row.get(f"rate_limit_{key}_window_minutes")
-    resets_at = row.get(f"rate_limit_{key}_resets_at")
-    if used_percent is None and window_minutes is None and resets_at is None:
-        return None
-    return {
-        "key": key,
-        "label": _observed_usage_window_label(window_minutes),
-        "used_percent": used_percent,
-        "window_minutes": window_minutes,
-        "resets_at": resets_at,
-    }
-
-
-def _observed_usage_window_label(window_minutes: object) -> str:
-    if not isinstance(window_minutes, (int, float, str)):
-        return "Usage"
-    try:
-        minutes = int(window_minutes)
-    except (TypeError, ValueError):
-        return "Usage"
-    if minutes == 300:
-        return "5h"
-    if minutes == 10080:
-        return "Weekly"
-    if minutes % 1440 == 0:
-        return f"{minutes // 1440}d"
-    if minutes % 60 == 0:
-        return f"{minutes // 60}h"
-    return f"{minutes}m"
-
-
-def query_usage_api_events(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    limit: int | None = 100,
-    offset: int = 0,
-    search: str | None = None,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    thread_key: str | None = None,
-    include_archived: bool = False,
-    sort: str = "time",
-    direction: str = "desc",
-) -> list[dict[str, Any]]:
-    """Return a SQL-backed slice for live dashboard call APIs."""
-
-    where_clause, params = _usage_api_where_clause(
-        search=search,
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        thread_key=thread_key,
-        include_archived=include_archived,
-        table_alias="usage_events",
-    )
-    order_expr = _usage_api_sort_expression(sort)
-    direction_sql = _normalize_sort_direction(direction)
-    normalized_limit = _normalize_limit(limit)
-    normalized_offset = _normalize_offset(offset)
-    limit_clause = ""
-    query_params = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
-    parent_where_clause, parent_params = _usage_where_clause(include_archived=include_archived)
-    parent_thread_filter = (
-        f"{parent_where_clause} AND thread_name IS NOT NULL"
-        if parent_where_clause
-        else "WHERE thread_name IS NOT NULL"
-    )
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
-                {USAGE_TIMING_SELECT_SQL},
-                coalesce(
-                    usage_events.parent_thread_name,
-                    parent_threads.thread_name
-                ) AS resolved_parent_thread_name,
-                coalesce(
-                    usage_events.parent_session_updated_at,
-                    parent_threads.session_updated_at
-                ) AS resolved_parent_session_updated_at
-            FROM usage_events
-            {USAGE_TIMING_JOIN_SQL}
-            LEFT JOIN (
-                SELECT
-                    session_id,
-                    max(thread_name) AS thread_name,
-                    max(session_updated_at) AS session_updated_at
-                FROM usage_events
-                {parent_thread_filter}
-                GROUP BY session_id
-            ) AS parent_threads
-            ON usage_events.parent_session_id = parent_threads.session_id
-            {where_clause}
-            ORDER BY {order_expr} {direction_sql},
-                usage_events.event_timestamp DESC,
-                usage_events.cumulative_total_tokens DESC
-            {limit_clause}
-            """,
-            [*parent_params, *query_params],
-        )
-        return [_usage_row_to_dict(row) for row in rows]
-
-
-def query_usage_api_event_count(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    search: str | None = None,
-    since: str | None = None,
-    until: str | None = None,
-    model: str | None = None,
-    effort: str | None = None,
-    thread: str | None = None,
-    thread_key: str | None = None,
-    include_archived: bool = False,
-) -> int:
-    """Return count for SQL-backed live dashboard call APIs."""
-
-    where_clause, params = _usage_api_where_clause(
-        search=search,
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        thread_key=thread_key,
-        include_archived=include_archived,
-    )
-    with connect(db_path) as conn:
-        init_db(conn)
-        row = conn.execute(
-            f"SELECT COUNT(*) AS row_count FROM usage_events {where_clause}",
-            params,
-        ).fetchone()
-        return int(row["row_count"] if row is not None else 0)
-
-
-def query_thread_summaries(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    limit: int | None = 100,
-    offset: int = 0,
-    search: str | None = None,
-    include_archived: bool = False,
-    sort: str = "tokens",
-    direction: str = "desc",
-) -> list[dict[str, Any]]:
-    """Return materialized thread summaries for live dashboard APIs."""
-
-    clauses = ["is_archived_scope = ?"]
-    params: list[Any] = ["all-history" if include_archived else "active"]
-    if search:
-        like = f"%{search}%"
-        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
-        params.extend([like, like])
-    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
-    sort_map = {
-        "tokens": "total_tokens",
-        "time": "latest_event_timestamp",
-        "calls": "call_count",
-        "cache": "avg_cache_ratio",
-        "thread": "thread_label",
-    }
-    if sort not in sort_map:
-        allowed = ", ".join(sorted(sort_map))
-        raise ValueError(f"sort must be one of: {allowed}")
-    direction_sql = _normalize_sort_direction(direction)
-    normalized_limit = _normalize_limit(limit)
-    normalized_offset = _normalize_offset(offset)
-    limit_clause = ""
-    query_params = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT *
-            FROM thread_summaries
-            {where_clause}
-            ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
-            {limit_clause}
-            """,
-            query_params,
-        )
-        return [_row_to_dict(row) for row in rows]
-
-
-def query_most_expensive_calls(
-    db_path: Path = DEFAULT_DB_PATH, limit: int = 20, since: str | None = None
-) -> list[dict[str, Any]]:
-    """Return the largest aggregate model calls by last-call token count."""
-
-    where_clause, params = _usage_where_clause(since=since, table_alias="usage_events")
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
-                {USAGE_TIMING_SELECT_SQL}
-            FROM usage_events
-            {USAGE_TIMING_JOIN_SQL}
-            {where_clause}
-            ORDER BY usage_events.total_tokens DESC, usage_events.event_timestamp DESC
-            LIMIT ?
-            """,
-            (*params, limit),
-        )
-        return [_usage_row_to_dict(row) for row in rows]
-
-
-def export_usage_csv(
-    output_path: Path,
-    db_path: Path = DEFAULT_DB_PATH,
-    limit: int | None = None,
-    privacy_mode: str = "normal",
-) -> int:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    privacy_mode = validate_privacy_mode(privacy_mode)
-    sql = "SELECT * FROM usage_events ORDER BY event_timestamp, cumulative_total_tokens"
-    params: tuple[int, ...] = ()
-    normalized_limit = _normalize_limit(limit)
-    if normalized_limit is not None:
-        sql += " LIMIT ?"
-        params = (normalized_limit,)
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = [_row_to_dict(row) for row in conn.execute(sql, params)]
-    rows = apply_project_privacy_to_rows(rows, privacy_mode=privacy_mode)
-
-    with output_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=EVENT_COLUMNS)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({column: row.get(column) for column in EVENT_COLUMNS})
-    return len(rows)
-
-
-
-def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return dict(row)
-
-
-def _usage_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return _annotate_usage_row_timing(_row_to_dict(row))
-
-
-def _annotate_usage_row_timing(row: dict[str, Any]) -> dict[str, Any]:
-    previous_timestamp = _optional_text(row.get("previous_call_event_timestamp"))
-    previous_session_id = row.pop("previous_call_session_id", None)
-    previous_turn_id = row.pop("previous_call_turn_id", None)
-    event_timestamp = _optional_text(row.get("event_timestamp"))
-    turn_timestamp = _optional_text(row.get("turn_timestamp"))
-    same_turn_previous = (
-        previous_timestamp is not None
-        and previous_session_id == row.get("session_id")
-        and previous_turn_id is not None
-        and previous_turn_id == row.get("turn_id")
-    )
-    call_started_at = previous_timestamp if same_turn_previous else turn_timestamp
-
-    row["previous_call_event_timestamp"] = previous_timestamp
-    row["call_started_at"] = call_started_at
-    row["call_duration_seconds"] = _seconds_between(call_started_at, event_timestamp)
-    row["previous_call_delta_seconds"] = _seconds_between(previous_timestamp, event_timestamp)
-    return row
-
-
-def _seconds_between(start: str | None, end: str | None) -> float | None:
-    start_time = _parse_timestamp(start)
-    end_time = _parse_timestamp(end)
-    if start_time is None or end_time is None:
-        return None
-    seconds = (end_time - start_time).total_seconds()
-    if seconds < 0:
-        return None
-    return round(seconds, 3)
-
-
-def _parse_timestamp(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
-    try:
-        parsed = datetime.fromisoformat(normalized)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed
-
-
-def _optional_text(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None

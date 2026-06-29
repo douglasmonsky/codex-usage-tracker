@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hmac
 import secrets
 import sqlite3
 import threading
@@ -11,41 +10,14 @@ from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from time import perf_counter
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from codex_usage_tracker import server_utils
-from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
-from codex_usage_tracker.call_origin import ensure_call_origin
-from codex_usage_tracker.context import (
-    CONTEXT_MODE_QUICK,
-    CONTEXT_MODES,
-    DEFAULT_CONTEXT_CHARS,
-    DEFAULT_CONTEXT_ENTRIES,
-    load_call_context,
-)
+from codex_usage_tracker import server_context, server_usage_refresh, server_utils
+from codex_usage_tracker.context import DEFAULT_CONTEXT_CHARS
 from codex_usage_tracker.dashboard import (
-    dashboard_payload,
     generate_dashboard,
     render_dashboard_html,
-)
-from codex_usage_tracker.diagnostic_reports import (
-    build_diagnostics_fact_calls_report,
-    build_diagnostics_facts_report,
-    build_diagnostics_summary_report,
-)
-from codex_usage_tracker.diagnostic_snapshots import (
-    build_diagnostic_commands_report,
-    build_diagnostic_concentration_report,
-    build_diagnostic_file_modifications_report,
-    build_diagnostic_file_reads_report,
-    build_diagnostic_git_interactions_report,
-    build_diagnostic_overview_report,
-    build_diagnostic_read_productivity_report,
-    build_diagnostic_tool_output_report,
-    build_diagnostic_usage_drain_report,
-    refresh_diagnostic_snapshots,
 )
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
@@ -57,47 +29,51 @@ from codex_usage_tracker.paths import (
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
-from codex_usage_tracker.pricing import annotate_rows_with_efficiency, load_pricing_config
-from codex_usage_tracker.projects import (
-    annotate_rows_with_project_identity,
-    apply_project_privacy_to_rows,
-    load_project_config,
+from codex_usage_tracker.server_call_detail import (
+    handle_call_detail_request,
 )
-from codex_usage_tracker.recommendations import (
-    annotate_rows_with_recommendations,
-    load_threshold_config,
+from codex_usage_tracker.server_call_lists import (
+    handle_calls_request,
+    handle_thread_calls_request,
 )
-from codex_usage_tracker.reports import (
-    QUERY_CREDIT_CONFIDENCE_CHOICES,
-    QUERY_PRICING_STATUS_CHOICES,
-    build_recommendations_report,
-    build_summary_report,
+from codex_usage_tracker.server_context_settings import (
+    ContextApiState,
+    context_settings_payload,
 )
-from codex_usage_tracker.store import (
-    query_latest_observed_usage,
-    query_thread_summaries,
-    query_usage_api_event_count,
-    query_usage_api_events,
-    query_usage_record,
-    query_usage_status,
-    refresh_metadata,
-    refresh_usage_index,
+from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
+from codex_usage_tracker.server_diagnostic_routes import DiagnosticRouteMixin
+from codex_usage_tracker.server_live_queries import live_query_params
+from codex_usage_tracker.server_live_rows import annotate_live_rows, query_live_call_rows
+from codex_usage_tracker.server_open_investigator import (
+    OpenInvestigatorRequestError,
+    open_investigator_payload,
 )
-from codex_usage_tracker.threads import annotate_thread_attachments
+from codex_usage_tracker.server_recommendations import handle_recommendations_request
+from codex_usage_tracker.server_request_guards import (
+    has_valid_api_token,
+    request_origin_allowed,
+)
+from codex_usage_tracker.server_responses import (
+    send_error_response,
+    send_exception_response,
+    send_html_response,
+    send_json_response,
+)
+from codex_usage_tracker.server_routes import (
+    GET_DIAGNOSTIC_FACT_ROUTES,
+    GET_ROUTE_METHODS,
+    POST_ROUTE_METHODS,
+    is_dashboard_shell_path,
+)
+from codex_usage_tracker.server_status import handle_status_request
+from codex_usage_tracker.server_summary import handle_summary_request
+from codex_usage_tracker.server_threads import handle_threads_request
 
-_allowed_loopback_host = server_utils.allowed_loopback_host
-_elapsed_ms = server_utils.elapsed_ms
 _first = server_utils.first_query_value
-_has_more = server_utils.has_more_rows
-_host_header_name = server_utils.host_header_name
-_json_response_body = server_utils.json_response_body
 _matches_live_derived_filters = server_utils.matches_live_derived_filters
-_next_offset = server_utils.next_row_offset
-_optional_filter = server_utils.optional_choice_filter
 _parse_api_limit = server_utils.parse_api_limit
 _parse_api_offset = server_utils.parse_api_offset
 _parse_bool = server_utils.parse_bool_query_value
-_parse_context_limit = server_utils.parse_context_limit
 _parse_limit = server_utils.parse_dashboard_limit
 _parse_offset = server_utils.parse_dashboard_offset
 _parse_optional_float = server_utils.parse_optional_float
@@ -105,7 +81,6 @@ _parse_report_limit = server_utils.parse_report_limit
 _safe_int = server_utils.safe_int
 _truthy = server_utils.truthy_query_value
 _url_host = server_utils.url_host
-_utc_now = server_utils.utc_now
 _validate_context_api_mode = server_utils.validate_context_api_mode
 _validate_loopback_host = server_utils.validate_loopback_host
 
@@ -115,26 +90,9 @@ _DASHBOARD_ASSET_MIME_TYPES = {
     ".json": "application/json; charset=utf-8",
     ".svg": "image/svg+xml",
 }
-
-
 def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
     value = _first(params.get(key))
     return None if value is None else _safe_int(value)
-
-
-class _ContextApiState:
-    def __init__(self, enabled: bool) -> None:
-        self._enabled = enabled
-        self._lock = threading.Lock()
-
-    @property
-    def enabled(self) -> bool:
-        with self._lock:
-            return self._enabled
-
-    def set_enabled(self, enabled: bool) -> None:
-        with self._lock:
-            self._enabled = enabled
 
 
 def serve_dashboard(
@@ -164,7 +122,7 @@ def serve_dashboard(
     api_token = secrets.token_urlsafe(32)
     context_api_enabled = context_api != "disabled"
     selected_language = normalize_language(language)
-    context_api_state = _ContextApiState(context_api_enabled)
+    context_api_state = ContextApiState(context_api_enabled)
     output = generate_dashboard(
         db_path=db_path,
         output_path=output_path,
@@ -224,7 +182,7 @@ def serve_dashboard(
         server.server_close()
 
 
-class _UsageDashboardHandler(SimpleHTTPRequestHandler):
+class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
     def __init__(
         self,
         *args: object,
@@ -243,7 +201,7 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         refresh_lock: threading.Lock,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
-        context_api_state: _ContextApiState | None = None,
+        context_api_state: ContextApiState | None = None,
         privacy_mode: str = "normal",
         rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
         language: str = "en",
@@ -269,94 +227,30 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         )
         self._context_chars = context_chars
         self._api_token = api_token
-        self._context_api_state = context_api_state or _ContextApiState(context_api_enabled)
+        self._context_api_state = context_api_state or ContextApiState(context_api_enabled)
         self._refresh_lock = refresh_lock
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
         parsed = urlparse(self.path)
         if not self._request_origin_allowed():
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
+            self._send_error(
+                HTTPStatus.FORBIDDEN,
+                "Request host or origin is not allowed",
+            )
             return
-        if parsed.path == "/api/context":
-            self._handle_context(parsed.query)
+        route_method = GET_ROUTE_METHODS.get(parsed.path)
+        if route_method is not None:
+            getattr(self, route_method)(parsed.query)
             return
-        if parsed.path == "/api/context-settings":
-            self._handle_context_settings(parsed.query)
-            return
-        if parsed.path == "/api/open-investigator":
-            self._handle_open_investigator(parsed.query)
-            return
-        if parsed.path == "/api/status":
-            self._handle_status(parsed.query)
-            return
-        if parsed.path == "/api/calls":
-            self._handle_calls(parsed.query)
-            return
-        if parsed.path == "/api/call":
-            self._handle_call(parsed.query)
-            return
-        if parsed.path == "/api/threads":
-            self._handle_threads(parsed.query)
-            return
-        if parsed.path == "/api/thread-calls":
-            self._handle_thread_calls(parsed.query)
-            return
-        if parsed.path == "/api/summary":
-            self._handle_summary(parsed.query)
-            return
-        if parsed.path == "/api/recommendations":
-            self._handle_recommendations(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/summary":
-            self._handle_diagnostics_summary(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/facts":
-            self._handle_diagnostics_facts(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/fact-calls":
-            self._handle_diagnostics_fact_calls(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/compactions":
-            self._handle_diagnostics_facts(parsed.query, fact_type="compaction")
-            return
-        if parsed.path == "/api/diagnostics/tools":
-            self._handle_diagnostics_facts(parsed.query, fact_group="tools")
-            return
-        if parsed.path == "/api/diagnostics/overview":
-            self._handle_diagnostics_overview(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/tool-output":
-            self._handle_diagnostics_tool_output(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/commands":
-            self._handle_diagnostics_commands(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/git-interactions":
-            self._handle_diagnostics_git_interactions(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-reads":
-            self._handle_diagnostics_file_reads(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-modifications":
-            self._handle_diagnostics_file_modifications(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/read-productivity":
-            self._handle_diagnostics_read_productivity(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/concentration":
-            self._handle_diagnostics_concentration(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/usage-drain":
-            self._handle_diagnostics_usage_drain(parsed.query)
-            return
-        if parsed.path == "/api/usage":
-            self._handle_usage(parsed.query)
+        fact_filters = GET_DIAGNOSTIC_FACT_ROUTES.get(parsed.path)
+        if fact_filters is not None:
+            self._handle_diagnostics_facts(parsed.query, **fact_filters)
             return
         if self._is_investigator_dashboard_request(parsed.path, parsed.query):
             self._handle_investigator_dashboard(parsed.query)
             return
-        if parsed.path in {"/", f"/{self._dashboard_name}"}:
+        if is_dashboard_shell_path(parsed.path, self._dashboard_name):
             self._handle_dashboard_shell(parsed.query)
             return
         super().do_GET()
@@ -364,39 +258,16 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
         parsed = urlparse(self.path)
         if not self._request_origin_allowed():
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Request host or origin is not allowed"})
+            self._send_error(
+                HTTPStatus.FORBIDDEN,
+                "Request host or origin is not allowed",
+            )
             return
-        if parsed.path == "/api/diagnostics/refresh":
-            self._handle_diagnostics_refresh(parsed.query)
+        route_method = POST_ROUTE_METHODS.get(parsed.path)
+        if route_method is not None:
+            getattr(self, route_method)(parsed.query)
             return
-        if parsed.path == "/api/diagnostics/overview/refresh":
-            self._handle_diagnostics_overview_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/tool-output/refresh":
-            self._handle_diagnostics_tool_output_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/commands/refresh":
-            self._handle_diagnostics_commands_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/git-interactions/refresh":
-            self._handle_diagnostics_git_interactions_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-reads/refresh":
-            self._handle_diagnostics_file_reads_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/file-modifications/refresh":
-            self._handle_diagnostics_file_modifications_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/read-productivity/refresh":
-            self._handle_diagnostics_read_productivity_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/concentration/refresh":
-            self._handle_diagnostics_concentration_refresh(parsed.query)
-            return
-        if parsed.path == "/api/diagnostics/usage-drain/refresh":
-            self._handle_diagnostics_usage_drain_refresh(parsed.query)
-            return
-        self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown API endpoint"})
+        self._send_error(HTTPStatus.NOT_FOUND, "Unknown API endpoint")
 
     def end_headers(self) -> None:
         if self._is_dashboard_html_request():
@@ -459,23 +330,10 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         self._send_html(body)
 
     def _dashboard_shell_payload(self, query: str) -> dict[str, object] | None:
-        params = parse_qs(query)
-        include_archived = self._include_archived
-        history_scope = _first(params.get("history"))
-        if history_scope == "all":
-            include_archived = True
-        elif history_scope == "active":
-            include_archived = False
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            include_archived,
-        )
-        language = normalize_language(_first(params.get("lang")) or self._language)
         try:
-            return dashboard_payload(
+            return dashboard_shell_payload(
+                query,
                 db_path=self._db_path,
-                limit=0,
-                offset=0,
                 pricing_path=self._pricing_path,
                 allowance_path=self._allowance_path,
                 rate_card_path=self._rate_card_path,
@@ -485,32 +343,18 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
                 since=self._since,
                 api_token=self._api_token,
                 context_api_enabled=self._context_api_state.enabled,
-                include_archived=include_archived,
-                language=language,
-                include_rows=False,
+                include_archived_default=self._include_archived,
+                language_default=self._language,
             )
         except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while preparing dashboard shell: {exc}"},
-            )
+            self._send_exception("Database error while preparing dashboard shell", exc)
             return None
         except OSError as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Could not prepare dashboard shell: {exc}"},
-            )
+            self._send_exception("Could not prepare dashboard shell", exc)
             return None
 
     def _send_html(self, body: bytes) -> None:
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        try:
-            self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
-            return
+        send_html_response(self, body)
 
     def log_message(self, format: str, *args: object) -> None:
         if self.path.startswith("/api/usage"):
@@ -518,774 +362,114 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         super().log_message(format, *args)
 
     def _handle_context(self, query: str) -> None:
-        params = parse_qs(query)
-        if not self._context_api_state.enabled:
-            self._send_json(
-                HTTPStatus.FORBIDDEN,
-                {
-                    "error": "Context loading is disabled for this dashboard server.",
-                    "context_api_enabled": False,
-                    "can_enable_context_api": True,
-                },
-            )
-            return
-        if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token is required"})
-            return
-        record_id = _first(params.get("record_id"))
-        if not record_id:
-            self._send_json(
-                HTTPStatus.BAD_REQUEST,
-                {"error": "record_id is required"},
-            )
-            return
-        include_tool_output = _truthy(_first(params.get("include_tool_output")))
-        include_compaction_history = _truthy(_first(params.get("include_compaction_history")))
-        diagnostics = _parse_bool(_first(params.get("diagnostics")), False)
-        context_mode = (_first(params.get("mode")) or CONTEXT_MODE_QUICK).strip().lower()
-        if context_mode not in CONTEXT_MODES:
-            self._send_json(
-                HTTPStatus.BAD_REQUEST,
-                {
-                    "error": "mode must be one of: " + ", ".join(sorted(CONTEXT_MODES)),
-                },
-            )
-            return
-        max_chars = _parse_context_limit(_first(params.get("max_chars")), self._context_chars)
-        max_entries = _parse_context_limit(
-            _first(params.get("max_entries")), DEFAULT_CONTEXT_ENTRIES
+        server_context.handle_context_request(
+            query,
+            db_path=self._db_path,
+            default_context_chars=self._context_chars,
+            context_api_enabled=self._context_api_state.enabled,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
-        try:
-            payload = load_call_context(
-                record_id=record_id,
-                db_path=self._db_path,
-                max_chars=max_chars,
-                max_entries=max_entries,
-                include_tool_output=include_tool_output,
-                include_compaction_history=include_compaction_history,
-                diagnostics=diagnostics,
-                mode=context_mode,
-            )
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while loading context: {exc}"},
-            )
-            return
-        except ValueError as exc:
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
-            return
-        except FileNotFoundError as exc:
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
-            return
-        except OSError as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Could not read source log: {exc}"},
-            )
-            return
-        self._send_json(HTTPStatus.OK, payload)
 
     def _handle_context_settings(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token is required"})
+            self._send_error(HTTPStatus.FORBIDDEN, "Valid API token required")
             return
-        enabled = _parse_bool(_first(params.get("enabled")), True)
-        self._context_api_state.set_enabled(enabled)
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-context-settings-v1",
-                "context_api_enabled": self._context_api_state.enabled,
-                "raw_context_persisted": False,
-            },
-        )
-
+        payload = context_settings_payload(query, context_api_state=self._context_api_state)
+        self._send_json(HTTPStatus.OK, payload)
     def _handle_open_investigator(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
-            self._send_json(HTTPStatus.FORBIDDEN, {"error": "Valid API token is required"})
+            self._send_error(HTTPStatus.FORBIDDEN, "Valid API token required")
             return
-        target = _first(params.get("url"))
-        if not target:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "url is required"})
-            return
-        parsed_target = urlparse(target)
-        if parsed_target.scheme:
-            if parsed_target.scheme not in {"http", "https"}:
-                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only dashboard URLs can be opened"})
-                return
-            if not _allowed_loopback_host(parsed_target.hostname):
-                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only loopback dashboard URLs can be opened"})
-                return
-            if parsed_target.port not in {None, self.server.server_port}:
-                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Dashboard URL port is not allowed"})
-                return
-        if parsed_target.path != f"/{self._dashboard_name}":
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Only dashboard investigator URLs can be opened"})
-            return
-        target_params = parse_qs(parsed_target.query)
-        if _first(target_params.get("view")) != "call" or not _first(target_params.get("record")):
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Investigator URL must include view=call and record"})
-            return
-        host = self.headers.get("Host") or f"127.0.0.1:{self.server.server_port}"
-        safe_url = f"http://{host}{parsed_target.path}"
-        if parsed_target.query:
-            safe_url = f"{safe_url}?{parsed_target.query}"
-        if parsed_target.fragment:
-            safe_url = f"{safe_url}#{parsed_target.fragment}"
-        opened = webbrowser.open_new_tab(safe_url)
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-open-investigator-v1",
-                "opened": bool(opened),
-                "url": safe_url,
-            },
-        )
-
-    def _handle_status(self, query: str) -> None:
-        params = parse_qs(query)
-        include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
         try:
-            counts = query_usage_status(
-                db_path=self._db_path,
-                include_archived=include_archived,
+            payload = open_investigator_payload(
+                query,
+                request_host=self.headers.get("Host"),
+                server_port=self.server.server_port,
+                dashboard_name=self._dashboard_name,
+                open_new_tab=webbrowser.open_new_tab,
             )
-            observed_usage = query_latest_observed_usage(
-                db_path=self._db_path,
-                include_archived=include_archived,
-            )
-            metadata = refresh_metadata(self._db_path)
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading status: {exc}"},
-            )
+        except OpenInvestigatorRequestError as exc:
+            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
-        parser_diagnostics = {
-            key.removeprefix("parser_"): _safe_int(value)
-            for key, value in metadata.items()
-            if key.startswith("parser_") and _safe_int(value)
-        }
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-status-v1",
-                "payload_schema": "codex-usage-tracker-live-api-v1",
-                "latest_refresh_at": metadata.get("latest_refresh_at"),
-                "include_archived": include_archived,
-                "row_counts": counts,
-                "max_event_timestamp": counts.get("max_event_timestamp"),
-                "observed_usage": observed_usage,
-                "parser_adapter": metadata.get("parser_adapter"),
-                "parser_diagnostics": parser_diagnostics,
-            },
+        self._send_json(HTTPStatus.OK, payload)
+    def _handle_status(self, query: str) -> None:
+        handle_status_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
 
     def _handle_calls(self, query: str) -> None:
-        params = parse_qs(query)
-        try:
-            query_params = self._live_query_params(params)
-            pricing_status = _optional_filter(
-                _first(params.get("pricing_status")),
-                QUERY_PRICING_STATUS_CHOICES,
-                "pricing_status",
-            )
-            credit_confidence = _optional_filter(
-                _first(params.get("credit_confidence")),
-                QUERY_CREDIT_CONFIDENCE_CHOICES,
-                "credit_confidence",
-            )
-            rows, total_matched = self._live_call_rows(
-                query_params=query_params,
-                pricing_status=pricing_status,
-                credit_confidence=credit_confidence,
-            )
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading calls: {exc}"},
-            )
-            return
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-calls-v1",
-                "rows": rows,
-                "row_count": len(rows),
-                "total_matched_rows": total_matched,
-                "limit": query_params["limit"],
-                "offset": query_params["offset"],
-                "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "next_offset": _next_offset(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "filters": {
-                    **query_params["filters"],
-                    "pricing_status": pricing_status,
-                    "credit_confidence": credit_confidence,
-                },
-                "raw_context_included": False,
-            },
+        handle_calls_request(
+            query,
+            live_query_params=self._live_query_params,
+            live_call_rows=self._live_call_rows,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
 
     def _handle_call(self, query: str) -> None:
-        params = parse_qs(query)
-        record_id = _first(params.get("record_id")) or _first(params.get("record"))
-        if not record_id:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "record_id is required"})
-            return
-        try:
-            row = query_usage_record(db_path=self._db_path, record_id=record_id)
-            if row is None:
-                self._send_json(HTTPStatus.NOT_FOUND, {"error": f"No usage record found: {record_id}"})
-                return
-            adjacent_raw_rows = [
-                query_usage_record(db_path=self._db_path, record_id=adjacent_id)
-                for adjacent_id in (row.get("previous_record_id"), row.get("next_record_id"))
-                if adjacent_id
-            ]
-            rows_by_id = {
-                candidate["record_id"]: candidate
-                for candidate in self._annotate_live_rows(
-                    [candidate for candidate in [row, *adjacent_raw_rows] if candidate]
-                )
-                if candidate.get("record_id")
-            }
-            selected_row = rows_by_id.get(record_id, row)
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading call: {exc}"},
-            )
-            return
-        previous_record = rows_by_id.get(str(row.get("previous_record_id") or ""))
-        next_record = rows_by_id.get(str(row.get("next_record_id") or ""))
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-call-v1",
-                "record": selected_row,
-                "previous_record": previous_record,
-                "next_record": next_record,
-                "adjacent_records": [
-                    candidate
-                    for candidate in (previous_record, selected_row, next_record)
-                    if candidate
-                ],
-                "previous_record_id": row.get("previous_record_id"),
-                "next_record_id": row.get("next_record_id"),
-                "raw_context_included": False,
-            },
+        handle_call_detail_request(
+            query,
+            db_path=self._db_path,
+            annotate_rows=self._annotate_live_rows,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
 
     def _handle_threads(self, query: str) -> None:
-        params = parse_qs(query)
-        try:
-            limit = _parse_api_limit(_first(params.get("limit")), 100)
-            offset = _parse_api_offset(_first(params.get("offset")))
-            include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
-            sort = _first(params.get("sort")) or "tokens"
-            direction = _first(params.get("direction")) or "desc"
-            rows = query_thread_summaries(
-                db_path=self._db_path,
-                limit=limit,
-                offset=offset,
-                search=_first(params.get("q")) or _first(params.get("search")),
-                include_archived=include_archived,
-                sort=sort,
-                direction=direction,
-            )
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading threads: {exc}"},
-            )
-            return
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-threads-v1",
-                "rows": rows,
-                "row_count": len(rows),
-                "limit": limit,
-                "offset": offset,
-                "include_archived": include_archived,
-                "raw_context_included": False,
-            },
+        handle_threads_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
 
     def _handle_thread_calls(self, query: str) -> None:
-        params = parse_qs(query)
-        thread_key = _first(params.get("thread_key")) or _first(params.get("thread"))
-        if not thread_key:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "thread_key is required"})
-            return
-        try:
-            query_params = self._live_query_params(params, thread_key=thread_key)
-            rows, total_matched = self._live_call_rows(
-                query_params=query_params,
-                pricing_status=None,
-                credit_confidence=None,
-            )
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading thread calls: {exc}"},
-            )
-            return
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "schema": "codex-usage-tracker-thread-calls-v1",
-                "thread_key": thread_key,
-                "rows": rows,
-                "row_count": len(rows),
-                "total_matched_rows": total_matched,
-                "limit": query_params["limit"],
-                "offset": query_params["offset"],
-                "has_more": _has_more(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "next_offset": _next_offset(query_params["limit"], query_params["offset"], len(rows), total_matched),
-                "raw_context_included": False,
-            },
+        handle_thread_calls_request(
+            query,
+            live_query_params=self._live_query_params,
+            live_call_rows=self._live_call_rows,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
 
     def _handle_summary(self, query: str) -> None:
-        params = parse_qs(query)
-        try:
-            report = build_summary_report(
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                group_by=_first(params.get("group_by")) or "thread",
-                limit=_parse_report_limit(_first(params.get("limit")), 20),
-                preset=_first(params.get("preset")),
-                since=_first(params.get("since")),
-                projects_path=self._projects_path,
-                privacy_mode=self._privacy_mode,
-            )
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading summary: {exc}"},
-            )
-            return
-        payload = report.payload()
-        payload["raw_context_included"] = False
-        self._send_json(HTTPStatus.OK, payload)
+        handle_summary_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_recommendations(self, query: str) -> None:
-        params = parse_qs(query)
-        try:
-            report = build_recommendations_report(
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                allowance_path=self._allowance_path,
-                projects_path=self._projects_path,
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                project=_first(params.get("project")),
-                min_score=_parse_optional_float(_first(params.get("min_score")), "min_score"),
-                limit=_parse_report_limit(_first(params.get("limit")), 20),
-                privacy_mode=self._privacy_mode,
-            )
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading recommendations: {exc}"},
-            )
-            return
-        payload = dict(report.payload)
-        payload["raw_context_included"] = False
-        self._send_json(HTTPStatus.OK, payload)
-
-    def _handle_diagnostics_summary(self, query: str) -> None:
-        params = parse_qs(query)
-        try:
-            payload = build_diagnostics_summary_report(
-                db_path=self._db_path,
-                limit=_parse_report_limit(_first(params.get("limit")), 20),
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                min_tokens=_optional_int_query(params, "min_tokens"),
-                fact_type=_first(params.get("fact_type")),
-                fact_name=_first(params.get("fact_name")),
-                fact_category=_first(params.get("fact_category")),
-                include_archived=_parse_bool(
-                    _first(params.get("include_archived")),
-                    self._include_archived,
-                ),
-                sort=_first(params.get("sort")) or "uncached",
-                direction=_first(params.get("direction")) or "desc",
-            ).payload
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostics: {exc}"},
-            )
-            return
-        self._send_json(HTTPStatus.OK, payload)
-
-    def _handle_diagnostics_facts(
-        self,
-        query: str,
-        *,
-        fact_type: str | None = None,
-        fact_group: str | None = None,
-    ) -> None:
-        params = parse_qs(query)
-        try:
-            payload = build_diagnostics_facts_report(
-                db_path=self._db_path,
-                limit=_parse_report_limit(_first(params.get("limit")), 50),
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                min_tokens=_optional_int_query(params, "min_tokens"),
-                fact_type=fact_type or _first(params.get("fact_type")),
-                fact_name=_first(params.get("fact_name")),
-                fact_category=_first(params.get("fact_category")),
-                include_archived=_parse_bool(
-                    _first(params.get("include_archived")),
-                    self._include_archived,
-                ),
-                sort=_first(params.get("sort")) or "uncached",
-                direction=_first(params.get("direction")) or "desc",
-                fact_group=fact_group,
-                view=urlparse(self.path).path.rsplit("/", 1)[-1],
-            ).payload
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostics: {exc}"},
-            )
-            return
-        self._send_json(HTTPStatus.OK, payload)
-
-    def _handle_diagnostics_fact_calls(self, query: str) -> None:
-        params = parse_qs(query)
-        fact_type = _first(params.get("fact_type"))
-        fact_name = _first(params.get("fact_name"))
-        if not fact_type or not fact_name:
-            self._send_json(
-                HTTPStatus.BAD_REQUEST,
-                {"error": "fact_type and fact_name are required"},
-            )
-            return
-        try:
-            payload = build_diagnostics_fact_calls_report(
-                db_path=self._db_path,
-                fact_type=fact_type,
-                fact_name=fact_name,
-                limit=_parse_report_limit(_first(params.get("limit")), 50),
-                offset=_parse_api_offset(_first(params.get("offset"))),
-                since=_first(params.get("since")),
-                until=_first(params.get("until")),
-                model=_first(params.get("model")),
-                effort=_first(params.get("effort")),
-                thread=_first(params.get("thread")),
-                min_tokens=_optional_int_query(params, "min_tokens"),
-                include_archived=_parse_bool(
-                    _first(params.get("include_archived")),
-                    self._include_archived,
-                ),
-                sort=_first(params.get("sort")) or "tokens",
-                direction=_first(params.get("direction")) or "desc",
-                privacy_mode=self._privacy_mode,
-            ).payload
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostic calls: {exc}"},
-            )
-            return
-        self._send_json(HTTPStatus.OK, payload)
-
-    def _handle_diagnostics_overview(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
+        handle_recommendations_request(
             query,
-            build_report=build_diagnostic_overview_report,
-            refresh=False,
-            label="diagnostic overview",
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
         )
-
-    def _handle_diagnostics_refresh(self, query: str) -> None:
-        params = parse_qs(query)
-        if not self._has_valid_api_token(params):
-            self._send_json(
-                HTTPStatus.FORBIDDEN,
-                {"error": "Valid API token is required for diagnostic refresh"},
-            )
-            return
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
-        )
-        try:
-            with self._refresh_lock:
-                payload = refresh_diagnostic_snapshots(
-                    db_path=self._db_path,
-                    pricing_path=self._pricing_path,
-                    allowance_path=self._allowance_path,
-                    rate_card_path=self._rate_card_path,
-                    include_archived=include_archived,
-                )
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while refreshing diagnostics: {exc}"},
-            )
-            return
-        self._send_json(HTTPStatus.OK, payload)
-
-    def _handle_diagnostics_overview_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_overview_report,
-            refresh=True,
-            label="diagnostic overview",
-        )
-
-    def _handle_diagnostics_tool_output(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_tool_output_report,
-            refresh=False,
-            label="diagnostic tool output",
-        )
-
-    def _handle_diagnostics_tool_output_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_tool_output_report,
-            refresh=True,
-            label="diagnostic tool output",
-        )
-
-    def _handle_diagnostics_commands(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_commands_report,
-            refresh=False,
-            label="diagnostic commands",
-        )
-
-    def _handle_diagnostics_commands_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_commands_report,
-            refresh=True,
-            label="diagnostic commands",
-        )
-
-    def _handle_diagnostics_git_interactions(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_git_interactions_report,
-            refresh=False,
-            label="diagnostic git interactions",
-        )
-
-    def _handle_diagnostics_git_interactions_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_git_interactions_report,
-            refresh=True,
-            label="diagnostic git interactions",
-        )
-
-    def _handle_diagnostics_file_reads(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_reads_report,
-            refresh=False,
-            label="diagnostic file reads",
-        )
-
-    def _handle_diagnostics_file_reads_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_reads_report,
-            refresh=True,
-            label="diagnostic file reads",
-        )
-
-    def _handle_diagnostics_file_modifications(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_modifications_report,
-            refresh=False,
-            label="diagnostic file modifications",
-        )
-
-    def _handle_diagnostics_file_modifications_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_modifications_report,
-            refresh=True,
-            label="diagnostic file modifications",
-        )
-
-    def _handle_diagnostics_read_productivity(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_read_productivity_report,
-            refresh=False,
-            label="diagnostic read productivity",
-        )
-
-    def _handle_diagnostics_read_productivity_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_read_productivity_report,
-            refresh=True,
-            label="diagnostic read productivity",
-        )
-
-    def _handle_diagnostics_concentration(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_concentration_report,
-            refresh=False,
-            label="diagnostic concentration",
-        )
-
-    def _handle_diagnostics_concentration_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_concentration_report,
-            refresh=True,
-            label="diagnostic concentration",
-        )
-
-    def _handle_diagnostics_usage_drain(self, query: str) -> None:
-        self._handle_diagnostic_usage_drain_snapshot(
-            query,
-            refresh=False,
-        )
-
-    def _handle_diagnostics_usage_drain_refresh(self, query: str) -> None:
-        self._handle_diagnostic_usage_drain_snapshot(
-            query,
-            refresh=True,
-        )
-
-    def _handle_diagnostic_usage_drain_snapshot(
-        self,
-        query: str,
-        *,
-        refresh: bool,
-    ) -> None:
-        params = parse_qs(query)
-        if refresh and not self._has_valid_api_token(params):
-            self._send_json(
-                HTTPStatus.FORBIDDEN,
-                {"error": "Valid API token is required for diagnostic refresh"},
-            )
-            return
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
-        )
-        try:
-            if refresh:
-                with self._refresh_lock:
-                    payload = build_diagnostic_usage_drain_report(
-                        db_path=self._db_path,
-                        pricing_path=self._pricing_path,
-                        allowance_path=self._allowance_path,
-                        rate_card_path=self._rate_card_path,
-                        include_archived=include_archived,
-                        refresh=True,
-                    ).payload
-            else:
-                payload = build_diagnostic_usage_drain_report(
-                    db_path=self._db_path,
-                    pricing_path=self._pricing_path,
-                    allowance_path=self._allowance_path,
-                    rate_card_path=self._rate_card_path,
-                    include_archived=include_archived,
-                    refresh=False,
-                ).payload
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading diagnostic usage drain: {exc}"},
-            )
-            return
-        self._send_json(HTTPStatus.OK, payload)
-
-    def _handle_diagnostic_snapshot(
-        self,
-        query: str,
-        *,
-        build_report: Any,
-        refresh: bool,
-        label: str,
-    ) -> None:
-        params = parse_qs(query)
-        if refresh and not self._has_valid_api_token(params):
-            self._send_json(
-                HTTPStatus.FORBIDDEN,
-                {"error": "Valid API token is required for diagnostic refresh"},
-            )
-            return
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
-        )
-        try:
-            if refresh:
-                with self._refresh_lock:
-                    payload = build_report(
-                        db_path=self._db_path,
-                        include_archived=include_archived,
-                        refresh=True,
-                    ).payload
-            else:
-                payload = build_report(
-                    db_path=self._db_path,
-                    include_archived=include_archived,
-                    refresh=False,
-                ).payload
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading {label}: {exc}"},
-            )
-            return
-        self._send_json(HTTPStatus.OK, payload)
 
     def _live_query_params(
         self,
@@ -1293,38 +477,11 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         *,
         thread_key: str | None = None,
     ) -> dict[str, Any]:
-        include_archived = _parse_bool(
-            _first(params.get("include_archived")),
-            self._include_archived,
+        return live_query_params(
+            params,
+            include_archived_default=self._include_archived,
+            thread_key=thread_key,
         )
-        limit = _parse_api_limit(_first(params.get("limit")), 100)
-        offset = _parse_api_offset(_first(params.get("offset")))
-        return {
-            "limit": limit,
-            "offset": offset,
-            "search": _first(params.get("q")) or _first(params.get("search")),
-            "since": _first(params.get("since")),
-            "until": _first(params.get("until")),
-            "model": _first(params.get("model")),
-            "effort": _first(params.get("effort")),
-            "thread": _first(params.get("thread")) if thread_key is None else None,
-            "thread_key": thread_key,
-            "include_archived": include_archived,
-            "sort": _first(params.get("sort")) or "time",
-            "direction": _first(params.get("direction")) or "desc",
-            "filters": {
-                "q": _first(params.get("q")) or _first(params.get("search")),
-                "since": _first(params.get("since")),
-                "until": _first(params.get("until")),
-                "model": _first(params.get("model")),
-                "effort": _first(params.get("effort")),
-                "thread": _first(params.get("thread")) if thread_key is None else None,
-                "thread_key": thread_key,
-                "include_archived": include_archived,
-                "sort": _first(params.get("sort")) or "time",
-                "direction": _first(params.get("direction")) or "desc",
-            },
-        }
 
     def _live_call_rows(
         self,
@@ -1333,176 +490,69 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
         pricing_status: str | None,
         credit_confidence: str | None,
     ) -> tuple[list[dict[str, Any]], int]:
-        derived_filter = bool(pricing_status or credit_confidence)
-        rows = query_usage_api_events(
+        return query_live_call_rows(
             db_path=self._db_path,
-            limit=None if derived_filter else query_params["limit"],
-            offset=0 if derived_filter else query_params["offset"],
-            search=query_params["search"],
-            since=query_params["since"],
-            until=query_params["until"],
-            model=query_params["model"],
-            effort=query_params["effort"],
-            thread=query_params["thread"],
-            thread_key=query_params["thread_key"],
-            include_archived=query_params["include_archived"],
-            sort=query_params["sort"],
-            direction=query_params["direction"],
+            query_params=query_params,
+            pricing_status=pricing_status,
+            credit_confidence=credit_confidence,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
         )
-        rows = self._annotate_live_rows(rows)
-        if derived_filter:
-            rows = [
-                row
-                for row in rows
-                if _matches_live_derived_filters(
-                    row,
-                    pricing_status=pricing_status,
-                    credit_confidence=credit_confidence,
-                )
-            ]
-            total_matched = len(rows)
-            limit = query_params["limit"]
-            offset = query_params["offset"]
-            rows = rows[offset:] if limit is None else rows[offset : offset + limit]
-            return rows, total_matched
-        total_matched = query_usage_api_event_count(
-            db_path=self._db_path,
-            search=query_params["search"],
-            since=query_params["since"],
-            until=query_params["until"],
-            model=query_params["model"],
-            effort=query_params["effort"],
-            thread=query_params["thread"],
-            thread_key=query_params["thread_key"],
-            include_archived=query_params["include_archived"],
-        )
-        return rows, total_matched
 
     def _annotate_live_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        if not rows:
-            return []
-        rows = annotate_thread_attachments([ensure_call_origin(row) for row in rows])
-        pricing = load_pricing_config(self._pricing_path)
-        allowance = load_allowance_config(
-            self._allowance_path,
+        return annotate_live_rows(
+            rows,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
             rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
         )
-        thresholds = load_threshold_config(self._thresholds_path)
-        projects = load_project_config(self._projects_path)
-        rows = annotate_rows_with_allowance(
-            annotate_rows_with_efficiency(rows, pricing),
-            allowance,
-        )
-        rows = annotate_rows_with_recommendations(rows, thresholds)
-        rows = annotate_rows_with_project_identity(rows, projects)
-        return apply_project_privacy_to_rows(rows, privacy_mode=self._privacy_mode)
 
     def _handle_usage(self, query: str) -> None:
-        params = parse_qs(query)
-        limit = _parse_limit(_first(params.get("limit")), self._limit)
-        offset = _parse_offset(_first(params.get("offset")))
-        include_archived = _parse_bool(_first(params.get("include_archived")), self._include_archived)
-        language = normalize_language(_first(params.get("lang")) or self._language)
-        diagnostics_enabled = _parse_bool(_first(params.get("diagnostics")), False)
-        shell_only = _parse_bool(_first(params.get("shell")), False)
-        refresh_result = None
-        refresh_ms: float | None = None
-        try:
-            if _truthy(_first(params.get("refresh"))):
-                if not self._has_valid_api_token(params):
-                    self._send_json(
-                        HTTPStatus.FORBIDDEN,
-                        {"error": "Valid API token is required for refresh"},
-                    )
-                    return
-                refresh_started = perf_counter()
-                with self._refresh_lock:
-                    result = refresh_usage_index(
-                        codex_home=self._codex_home,
-                        db_path=self._db_path,
-                        include_archived=include_archived,
-                    )
-                refresh_ms = _elapsed_ms(refresh_started)
-                refresh_result = {
-                    "scanned_files": result.scanned_files,
-                    "parsed_events": result.parsed_events,
-                    "skipped_events": result.skipped_events,
-                    "inserted_or_updated_events": result.inserted_or_updated_events,
-                    "db_path": result.db_path,
-                    "parser_diagnostics": result.parser_diagnostics,
-                    "include_archived": include_archived,
-                }
-            payload_started = perf_counter()
-            payload = dashboard_payload(
-                db_path=self._db_path,
-                limit=limit,
-                offset=offset,
-                pricing_path=self._pricing_path,
-                allowance_path=self._allowance_path,
-                rate_card_path=self._rate_card_path,
-                thresholds_path=self._thresholds_path,
-                projects_path=self._projects_path,
-                privacy_mode=self._privacy_mode,
-                since=self._since,
-                api_token=self._api_token,
-                context_api_enabled=self._context_api_state.enabled,
-                include_archived=include_archived,
-                language=language,
-                include_rows=not shell_only,
-            )
-            dashboard_payload_ms = _elapsed_ms(payload_started)
-        except sqlite3.Error as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Database error while reading usage data: {exc}"},
-            )
-            return
-        except OSError as exc:
-            self._send_json(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"Could not read aggregate dashboard data: {exc}"},
-            )
-            return
-        payload["refreshed_at"] = _utc_now()
-        payload["refresh_result"] = refresh_result
-        if diagnostics_enabled:
-            diagnostic_payload: dict[str, object] = {
-                "dashboard_payload_ms": dashboard_payload_ms,
-                "rows_returned": len(payload.get("rows") or []),
-                "include_archived": include_archived,
-                "limit": limit,
-                "offset": offset,
-            }
-            if refresh_ms is not None:
-                diagnostic_payload["refresh_ms"] = refresh_ms
-            payload["diagnostics"] = diagnostic_payload
-        self._send_json(HTTPStatus.OK, payload)
-
+        server_usage_refresh.handle_usage_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
+            projects_path=self._projects_path,
+            privacy_mode=self._privacy_mode,
+            since=self._since,
+            api_token=self._api_token,
+            context_api_enabled=self._context_api_state.enabled,
+            include_archived_default=self._include_archived,
+            language_default=self._language,
+            limit_default=self._limit,
+            codex_home=self._codex_home,
+            refresh_lock=self._refresh_lock,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
     def _request_origin_allowed(self) -> bool:
-        if not _allowed_loopback_host(_host_header_name(self.headers.get("Host"))):
-            return False
-        origin = self.headers.get("Origin")
-        if not origin:
-            return True
-        parsed = urlparse(origin)
-        if parsed.scheme not in {"http", "https"}:
-            return False
-        if not _allowed_loopback_host(parsed.hostname):
-            return False
-        return parsed.port is None or parsed.port == self.server.server_port
+        return request_origin_allowed(self.headers, self.server.server_port)
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool:
-        provided = self.headers.get("X-Codex-Usage-Token") or _first(params.get("api_token")) or ""
-        return hmac.compare_digest(str(provided), self._api_token)
+        return has_valid_api_token(self.headers, params, self._api_token)
+
+    def _send_error(
+        self,
+        status: HTTPStatus,
+        message: str,
+        **extra: object,
+    ) -> None:
+        send_error_response(self, status, message, **extra)
+
+    def _send_exception(self, prefix: str, exc: BaseException) -> None:
+        send_exception_response(self, HTTPStatus.INTERNAL_SERVER_ERROR, prefix, exc)
 
     def _send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
-        body = _json_response_body(payload)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        try:
-            self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
-            return
+        send_json_response(self, status, payload)

@@ -1011,14 +1011,14 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
     from codex_usage_tracker import server as server_module
     from codex_usage_tracker.server import _UsageDashboardHandler
 
-    def broken_dashboard_payload(**kwargs):
+    def broken_dashboard_payload(*args, **kwargs):
         raise sqlite3.OperationalError("database is locked")
 
-    def broken_context(**kwargs):
+    def broken_context(*args, **kwargs):
         raise sqlite3.OperationalError("database is locked")
 
-    monkeypatch.setattr(server_module, "dashboard_payload", broken_dashboard_payload)
-    monkeypatch.setattr(server_module, "load_call_context", broken_context)
+    monkeypatch.setattr(server_module.server_usage_refresh, "usage_payload", broken_dashboard_payload)
+    monkeypatch.setattr(server_module.server_context, "context_payload", broken_context)
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
@@ -1060,16 +1060,16 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
 
 
 def test_dashboard_server_can_enable_context_api_at_runtime(tmp_path: Path) -> None:
-    from codex_usage_tracker.server import _ContextApiState, _UsageDashboardHandler
+    from codex_usage_tracker import server as server_module
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
-    context_api_state = _ContextApiState(False)
+    context_api_state = server_module.ContextApiState(False)
 
     handler = partial(
-        _UsageDashboardHandler,
+        server_module._UsageDashboardHandler,
         directory=str(tmp_path),
         db_path=db_path,
         pricing_path=tmp_path / "pricing.json",

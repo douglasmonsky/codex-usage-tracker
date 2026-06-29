@@ -5,12 +5,15 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import shutil
-import subprocess
-from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.diagnostics_mcp import (
+    check_mcp_config,
+    check_mcp_import,
+    check_mcp_runtime,
+)
+from codex_usage_tracker.diagnostics_types import DoctorCheck
 from codex_usage_tracker.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
@@ -25,17 +28,6 @@ from codex_usage_tracker.store import SchemaMigrationError, refresh_metadata, sc
 PLUGIN_NAME = "codex-usage-tracker"
 
 
-@dataclass(frozen=True)
-class DoctorCheck:
-    name: str
-    status: str
-    detail: str
-    remediation: str | None = None
-
-    def to_dict(self) -> dict[str, str | None]:
-        return asdict(self)
-
-
 def run_doctor(
     *,
     codex_home: Path = DEFAULT_CODEX_HOME,
@@ -47,10 +39,31 @@ def run_doctor(
     repo_root: Path | None = None,
     suggest_repair: bool = False,
 ) -> dict[str, Any]:
-    """Run read-only setup checks and return a structured report."""
-
+    """Run read-only checks and return a structured report."""
     root = repo_root or _resolve_plugin_root(plugin_link) or find_project_root()
-    checks = [
+    checks = _doctor_checks(
+        codex_home=codex_home,
+        db_path=db_path,
+        dashboard_path=dashboard_path,
+        pricing_path=pricing_path,
+        plugin_link=plugin_link,
+        marketplace_path=marketplace_path,
+        root=root,
+    )
+    return _doctor_report(checks, suggest_repair=suggest_repair)
+
+
+def _doctor_checks(
+    *,
+    codex_home: Path,
+    db_path: Path,
+    dashboard_path: Path,
+    pricing_path: Path,
+    plugin_link: Path,
+    marketplace_path: Path,
+    root: Path | None,
+) -> list[DoctorCheck]:
+    return [
         _check_package_import(),
         _check_codex_sessions(codex_home),
         _check_database(db_path),
@@ -61,26 +74,45 @@ def run_doctor(
         _check_project_root(root),
         _check_plugin_link(plugin_link, root),
         _check_marketplace(marketplace_path),
-        _check_mcp_config(root),
-        _check_mcp_runtime(root),
-        _check_mcp_import(),
+        check_mcp_config(root),
+        check_mcp_runtime(root),
+        check_mcp_import(),
     ]
-    fail_count = sum(1 for check in checks if check.status == "fail")
-    warn_count = sum(1 for check in checks if check.status == "warn")
+
+
+def _doctor_report(checks: list[DoctorCheck], *, suggest_repair: bool) -> dict[str, Any]:
+    fail_count = _count_check_status(checks, "fail")
+    warn_count = _count_check_status(checks, "warn")
     report: dict[str, Any] = {
         "schema": "codex-usage-tracker-doctor-v1",
-        "status": "fail" if fail_count else "warn" if warn_count else "pass",
+        "status": _doctor_status(fail_count=fail_count, warn_count=warn_count),
         "failures": fail_count,
         "warnings": warn_count,
         "checks": [check.to_dict() for check in checks],
     }
     if suggest_repair:
-        report["repair_suggestions"] = [
-            check.remediation
-            for check in checks
-            if check.status in {"warn", "fail"} and check.remediation
-        ]
+        report["repair_suggestions"] = _doctor_repair_suggestions(checks)
     return report
+
+
+def _count_check_status(checks: list[DoctorCheck], status: str) -> int:
+    return sum(1 for check in checks if check.status == status)
+
+
+def _doctor_status(*, fail_count: int, warn_count: int) -> str:
+    if fail_count:
+        return "fail"
+    if warn_count:
+        return "warn"
+    return "pass"
+
+
+def _doctor_repair_suggestions(checks: list[DoctorCheck]) -> list[str]:
+    return [
+        check.remediation
+        for check in checks
+        if check.status in {"warn", "fail"} and check.remediation
+    ]
 
 
 def find_project_root() -> Path | None:
@@ -221,12 +253,34 @@ def _check_parser_diagnostics(db_path: Path) -> DoctorCheck:
             "No parser diagnostics are available yet.",
             "Run: codex-usage-tracker refresh",
         )
-    diagnostics = {
+    drift_parts = _parser_diagnostic_drift_parts(metadata)
+    if drift_parts:
+        return _parser_diagnostic_warning(drift_parts)
+    return _parser_diagnostic_pass(metadata)
+
+
+def _parser_diagnostic_drift_parts(metadata: dict[str, object]) -> list[str]:
+    diagnostics = _parser_diagnostic_counts(metadata)
+    parts = _skipped_event_parts(metadata)
+    parts.extend(f"{key}={diagnostics[key]}" for key in _parser_diagnostic_drift_keys(diagnostics))
+    return parts
+
+
+def _parser_diagnostic_counts(metadata: dict[str, object]) -> dict[str, int]:
+    return {
         key.removeprefix("parser_"): _safe_int(value)
         for key, value in metadata.items()
         if key.startswith("parser_")
     }
-    drift_keys = [
+
+
+def _skipped_event_parts(metadata: dict[str, object]) -> list[str]:
+    skipped = _safe_int(metadata.get("skipped_events"))
+    return [f"skipped_events={skipped}"] if skipped else []
+
+
+def _parser_diagnostic_drift_keys(diagnostics: dict[str, int]) -> list[str]:
+    return [
         key
         for key in (
             "missing_last_token_usage",
@@ -238,16 +292,18 @@ def _check_parser_diagnostics(db_path: Path) -> DoctorCheck:
         )
         if diagnostics.get(key, 0)
     ]
-    skipped = _safe_int(metadata.get("skipped_events"))
-    if skipped or drift_keys:
-        parts = [f"skipped_events={skipped}"] if skipped else []
-        parts.extend(f"{key}={diagnostics[key]}" for key in drift_keys)
-        return DoctorCheck(
-            "Parser diagnostics",
-            "warn",
-            "Schema drift detected in latest refresh: " + ", ".join(parts) + ".",
-            "Run: codex-usage-tracker inspect-log <path> on a skipped log, then rebuild-index after updating parser support.",
-        )
+
+
+def _parser_diagnostic_warning(parts: list[str]) -> DoctorCheck:
+    return DoctorCheck(
+        "Parser diagnostics",
+        "warn",
+        "Schema drift detected in latest refresh: " + ", ".join(parts) + ".",
+        "Run: codex-usage-tracker inspect-log <path> on a skipped log, then rebuild-index after updating parser support.",
+    )
+
+
+def _parser_diagnostic_pass(metadata: dict[str, object]) -> DoctorCheck:
     parsed = metadata.get("parsed_events", "0")
     scanned = metadata.get("scanned_files", "0")
     return DoctorCheck(
@@ -385,252 +441,22 @@ def _check_marketplace(marketplace_path: Path) -> DoctorCheck:
     )
 
 
-def _check_mcp_config(repo_root: Path | None) -> DoctorCheck:
-    if repo_root is None:
-        return DoctorCheck(
-            "MCP config",
-            "warn",
-            "Cannot check .mcp.json without a detected project root.",
-            "Run from the codex-usage-tracker repo, or install with: codex-usage-tracker install-plugin",
-        )
-    config_path = repo_root / ".mcp.json"
-    if not config_path.exists():
-        return DoctorCheck(
-            "MCP config",
-            "fail",
-            f"Missing MCP config: {config_path}",
-            "Restore .mcp.json from the repo.",
-        )
-    try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return DoctorCheck(
-            "MCP config",
-            "fail",
-            f"MCP config is invalid JSON: {exc}",
-            "Fix .mcp.json.",
-        )
-    servers = data.get("mcpServers") if isinstance(data, dict) else None
-    server = servers.get(PLUGIN_NAME) if isinstance(servers, dict) else None
-    if not isinstance(server, dict):
-        return DoctorCheck(
-            "MCP config",
-            "fail",
-            f"No {PLUGIN_NAME} MCP server entry found.",
-            "Restore the server entry in .mcp.json.",
-        )
-    command = server.get("command")
-    if not isinstance(command, str) or not command:
-        return DoctorCheck(
-            "MCP config",
-            "fail",
-            "MCP server command is missing.",
-            "Set the command to a Python executable that can import codex_usage_tracker.",
-        )
-    command_path = (repo_root / command).resolve() if command.startswith(".") else Path(command)
-    if command.startswith(".") and not command_path.exists():
-        return DoctorCheck(
-            "MCP config",
-            "warn",
-            f"MCP command does not exist yet: {command_path}",
-            "Create the venv and install the package.",
-        )
-    env = server.get("env")
-    env_detail = (
-        " with PYTHONPATH override"
-        if isinstance(env, dict) and isinstance(env.get("PYTHONPATH"), str)
-        else ""
-    )
-    return DoctorCheck(
-        "MCP config",
-        "pass",
-        f"MCP server command is configured: {command}{env_detail}.",
-    )
 
 
-def _check_mcp_runtime(repo_root: Path | None) -> DoctorCheck:
-    if repo_root is None:
-        return DoctorCheck(
-            "MCP runtime",
-            "warn",
-            "Cannot validate the MCP runtime without a detected plugin root.",
-            "Run from the codex-usage-tracker repo, or install with: codex-usage-tracker install-plugin",
-        )
-    config_path = repo_root / ".mcp.json"
-    try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return DoctorCheck(
-            "MCP runtime",
-            "warn",
-            "Cannot validate the MCP runtime until .mcp.json is readable and valid.",
-            "Fix .mcp.json, then rerun: codex-usage-tracker doctor --suggest-repair",
-        )
-    servers = data.get("mcpServers") if isinstance(data, dict) else None
-    server = servers.get(PLUGIN_NAME) if isinstance(servers, dict) else None
-    if not isinstance(server, dict):
-        return DoctorCheck(
-            "MCP runtime",
-            "warn",
-            "Cannot validate the MCP runtime until the codex-usage-tracker server is configured.",
-            "Restore the server entry in .mcp.json.",
-        )
-    args = server.get("args")
-    if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
-        return DoctorCheck(
-            "MCP runtime",
-            "warn",
-            "MCP server args are missing or not a string list.",
-            "Restore the generated plugin wrapper with: codex-usage-tracker install-plugin --force",
-        )
-    if _uses_bootstrap_launcher(args):
-        return _check_mcp_launcher(repo_root, args)
-    if not _uses_direct_mcp_module(args):
-        return DoctorCheck(
-            "MCP runtime",
-            "warn",
-            "MCP server does not use the expected module or launcher form, so import validation was skipped.",
-            "Restore the generated plugin wrapper with: codex-usage-tracker install-plugin --force",
-        )
-    command = _resolve_mcp_command(server.get("command"), repo_root)
-    if command is None:
-        return DoctorCheck(
-            "MCP runtime",
-            "fail",
-            f"MCP server command is not executable: {server.get('command')!r}.",
-            "Reinstall the plugin with a working Python: codex-usage-tracker install-plugin --force",
-        )
-    env = os.environ.copy()
-    configured_env = server.get("env")
-    if isinstance(configured_env, dict):
-        env.update({str(key): str(value) for key, value in configured_env.items()})
-    cwd = _resolve_mcp_cwd(server.get("cwd"), repo_root)
-    check = "import codex_usage_tracker.mcp_server; import mcp.server.fastmcp"
-    try:
-        result = subprocess.run(
-            [command, "-c", check],
-            cwd=cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=20,
-        )
-    except subprocess.TimeoutExpired:
-        return DoctorCheck(
-            "MCP runtime",
-            "fail",
-            f"MCP Python timed out while importing the server: {command}",
-            "Reinstall the plugin with a Python environment that can import codex_usage_tracker and mcp.",
-        )
-    except OSError as exc:
-        return DoctorCheck(
-            "MCP runtime",
-            "fail",
-            f"MCP Python could not be executed: {exc}",
-            "Reinstall the plugin with a working Python: codex-usage-tracker install-plugin --force",
-        )
-    if result.returncode:
-        stderr = _first_error_line(result.stderr) or _first_error_line(result.stdout)
-        detail = f"MCP Python cannot import the server: {command}"
-        if stderr:
-            detail += f" ({stderr})"
-        return DoctorCheck(
-            "MCP runtime",
-            "fail",
-            detail,
-            (
-                "If this is a source checkout, rerun: codex-usage-tracker install-plugin "
-                "--python .venv/bin/python --force. Otherwise reinstall with pipx and rerun setup."
-            ),
-        )
-    return DoctorCheck(
-        "MCP runtime",
-        "pass",
-        f"MCP Python can import codex_usage_tracker.mcp_server: {command}",
-    )
 
 
-def _uses_direct_mcp_module(args: list[str]) -> bool:
-    return "-m" in args and "codex_usage_tracker.mcp_server" in args
 
 
-def _uses_bootstrap_launcher(args: list[str]) -> bool:
-    return any(arg.endswith("skills/codex-usage-tracker/scripts/run_mcp.py") for arg in args)
 
 
-def _check_mcp_launcher(repo_root: Path, args: list[str]) -> DoctorCheck:
-    script_args = [
-        (repo_root / arg).resolve()
-        for arg in args
-        if arg.endswith("skills/codex-usage-tracker/scripts/run_mcp.py")
-    ]
-    if not script_args:
-        return DoctorCheck(
-            "MCP runtime",
-            "warn",
-            "MCP launcher script could not be resolved.",
-            "Restore the bundled launcher path in .mcp.json.",
-        )
-    script_path = script_args[0]
-    if not script_path.exists():
-        return DoctorCheck(
-            "MCP runtime",
-            "fail",
-            f"MCP launcher script is missing: {script_path}",
-            "Restore skills/codex-usage-tracker/scripts/run_mcp.py.",
-        )
-    return DoctorCheck(
-        "MCP runtime",
-        "pass",
-        "MCP bootstrap launcher is present; it validates or installs the runtime on startup.",
-    )
 
 
-def _resolve_mcp_command(command: object, repo_root: Path) -> str | None:
-    if not isinstance(command, str) or not command:
-        return None
-    command_path = Path(command)
-    if command_path.is_absolute():
-        return str(command_path) if command_path.exists() else None
-    if command.startswith("."):
-        resolved = (repo_root / command_path).resolve()
-        return str(resolved) if resolved.exists() else None
-    return shutil.which(command)
 
 
-def _resolve_mcp_cwd(cwd: object, repo_root: Path) -> Path:
-    if not isinstance(cwd, str) or not cwd:
-        return repo_root
-    cwd_path = Path(cwd)
-    return cwd_path if cwd_path.is_absolute() else (repo_root / cwd_path).resolve()
 
 
-def _first_error_line(text: str) -> str:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return ""
 
 
-def _check_mcp_import() -> DoctorCheck:
-    module_spec = importlib.util.find_spec("codex_usage_tracker.mcp_server")
-    if module_spec is None:
-        return DoctorCheck(
-            "MCP module",
-            "fail",
-            "MCP server module could not be found.",
-            'Install dependencies with: python -m pip install ".[dev]"',
-        )
-    sdk_spec = importlib.util.find_spec("mcp.server.fastmcp")
-    if sdk_spec is None:
-        return DoctorCheck(
-            "MCP module",
-            "fail",
-            "FastMCP SDK dependency could not be found.",
-            'Install dependencies with: python -m pip install ".[dev]"',
-        )
-    return DoctorCheck("MCP module", "pass", "MCP server module is discoverable.")
 
 
 def _safe_int(value: object) -> int:

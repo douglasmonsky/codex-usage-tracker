@@ -4,27 +4,18 @@ from __future__ import annotations
 
 import json
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.diagnostic_snapshot_events import (
     READ_PRODUCTIVITY_NOTE,
-    allocate_token_count,
-    command_root_and_child,
-    git_interaction_from_command,
     int_value,
-    is_shell_tool,
     modified_path_refs,
-    optional_str,
-    original_output_count,
     path_privacy_metadata,
     ratio,
-    read_path_refs_from_command,
-    read_reader,
     safe_label,
-    shell_command_from_payload,
     simple_rows,
-    unique_path_rows,
 )
 from codex_usage_tracker.diagnostic_snapshot_rows import (
     command_output_rows,
@@ -38,6 +29,12 @@ from codex_usage_tracker.diagnostic_snapshot_rows import (
     read_productivity_path_rows,
     read_productivity_reader_rows,
     read_reader_rows,
+)
+from codex_usage_tracker.diagnostic_snapshot_source_scan import (
+    mark_later_modifications,
+    record_file_modification_refs,
+    record_function_call,
+    record_function_output,
 )
 from codex_usage_tracker.store import connect
 from codex_usage_tracker.store_schema import init_db
@@ -120,13 +117,20 @@ def _empty_counters() -> dict[str, Any]:
     }
 
 
+@dataclass
+class _SourceLogScanState:
+    call_names: dict[str, str] = field(default_factory=dict)
+    call_roots: dict[str, str] = field(default_factory=dict)
+    call_git_interactions: dict[str, tuple[str, str, str, str]] = field(default_factory=dict)
+    call_read_events: dict[str, list[int]] = field(default_factory=dict)
+    source_read_events: list[int] = field(default_factory=list)
+    modified_orders_by_path: defaultdict[str, list[int]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+
+
 def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counter[str]) -> None:
-    call_names: dict[str, str] = {}
-    call_roots: dict[str, str] = {}
-    call_git_interactions: dict[str, tuple[str, str, str, str]] = {}
-    call_read_events: dict[str, list[int]] = {}
-    source_read_events: list[int] = []
-    modified_orders_by_path: dict[str, list[int]] = defaultdict(list)
+    state = _SourceLogScanState()
     try:
         lines = source_log.open(encoding="utf-8")
     except OSError:
@@ -135,64 +139,140 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
 
     with lines:
         for order, line in enumerate(lines):
-            if '"response_item"' not in line and '"patch_apply_end"' not in line:
-                continue
-            envelope = _json_envelope(line, meta=meta)
-            if envelope is None:
-                continue
-            payload = envelope.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            if envelope.get("type") == "event_msg":
-                path_refs = modified_path_refs(payload)
-                if path_refs:
-                    _record_file_modification_refs(
-                        path_refs,
-                        counters=counters,
-                        event_kind=safe_label(payload.get("type")) or "file_modification",
-                    )
-                for path_ref in path_refs:
-                    modified_orders_by_path[path_ref["path_key"]].append(order)
-                continue
-            if envelope.get("type") != "response_item":
-                continue
-            path_refs = modified_path_refs(payload)
-            if path_refs:
-                _record_file_modification_refs(
-                    path_refs,
-                    counters=counters,
-                    event_kind=safe_label(payload.get("name")) or "file_modification",
-                )
-                for path_ref in path_refs:
-                    modified_orders_by_path[path_ref["path_key"]].append(order)
-                continue
-            if payload.get("type") == "function_call":
-                _record_function_call(
-                    payload,
-                    order=order,
-                    counters=counters,
-                    meta=meta,
-                    call_names=call_names,
-                    call_roots=call_roots,
-                    call_git_interactions=call_git_interactions,
-                    call_read_events=call_read_events,
-                    source_read_events=source_read_events,
-                )
-            elif payload.get("type") == "function_call_output":
-                _record_function_output(
-                    payload,
-                    counters=counters,
-                    call_names=call_names,
-                    call_roots=call_roots,
-                    call_git_interactions=call_git_interactions,
-                    call_read_events=call_read_events,
-                )
+            _scan_source_log_line(
+                line,
+                order=order,
+                counters=counters,
+                meta=meta,
+                state=state,
+            )
 
-    _mark_later_modifications(
+    mark_later_modifications(
         counters=counters,
-        source_read_events=source_read_events,
-        modified_orders_by_path=modified_orders_by_path,
+        source_read_events=state.source_read_events,
+        modified_orders_by_path=state.modified_orders_by_path,
     )
+
+
+def _scan_source_log_line(
+    line: str,
+    *,
+    order: int,
+    counters: dict[str, Any],
+    meta: Counter[str],
+    state: _SourceLogScanState,
+) -> None:
+    if not _source_log_line_may_have_diagnostic_payload(line):
+        return
+    envelope = _json_envelope(line, meta=meta)
+    if envelope is None:
+        return
+    payload = envelope.get("payload")
+    if not isinstance(payload, dict):
+        return
+    _scan_source_log_payload(
+        envelope,
+        payload,
+        order=order,
+        counters=counters,
+        meta=meta,
+        state=state,
+    )
+
+
+def _source_log_line_may_have_diagnostic_payload(line: str) -> bool:
+    return '"response_item"' in line or '"patch_apply_end"' in line
+
+
+def _scan_source_log_payload(
+    envelope: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    order: int,
+    counters: dict[str, Any],
+    meta: Counter[str],
+    state: _SourceLogScanState,
+) -> None:
+    envelope_type = envelope.get("type")
+    if envelope_type == "event_msg":
+        _record_source_log_modification(
+            payload,
+            counters=counters,
+            event_kind=safe_label(payload.get("type")) or "file_modification",
+            order=order,
+            state=state,
+        )
+        return
+    if envelope_type != "response_item":
+        return
+    if _record_source_log_modification(
+        payload,
+        counters=counters,
+        event_kind=safe_label(payload.get("name")) or "file_modification",
+        order=order,
+        state=state,
+    ):
+        return
+    _record_source_log_response_item(
+        payload,
+        order=order,
+        counters=counters,
+        meta=meta,
+        state=state,
+    )
+
+
+def _record_source_log_modification(
+    payload: dict[str, Any],
+    *,
+    counters: dict[str, Any],
+    event_kind: str,
+    order: int,
+    state: _SourceLogScanState,
+) -> bool:
+    path_refs = modified_path_refs(payload)
+    if not path_refs:
+        return False
+    record_file_modification_refs(
+        path_refs,
+        counters=counters,
+        event_kind=event_kind,
+    )
+    for path_ref in path_refs:
+        state.modified_orders_by_path[path_ref["path_key"]].append(order)
+    return True
+
+
+def _record_source_log_response_item(
+    payload: dict[str, Any],
+    *,
+    order: int,
+    counters: dict[str, Any],
+    meta: Counter[str],
+    state: _SourceLogScanState,
+) -> None:
+    payload_type = payload.get("type")
+    if payload_type == "function_call":
+        record_function_call(
+            payload,
+            order=order,
+            counters=counters,
+            meta=meta,
+            call_names=state.call_names,
+            call_roots=state.call_roots,
+            call_git_interactions=state.call_git_interactions,
+            call_read_events=state.call_read_events,
+            source_read_events=state.source_read_events,
+        )
+    elif payload_type == "function_call_output":
+        record_function_output(
+            payload,
+            counters=counters,
+            call_names=state.call_names,
+            call_roots=state.call_roots,
+            call_git_interactions=state.call_git_interactions,
+            call_read_events=state.call_read_events,
+        )
 
 
 def _json_envelope(line: str, *, meta: Counter[str]) -> dict[str, Any] | None:
@@ -202,230 +282,6 @@ def _json_envelope(line: str, *, meta: Counter[str]) -> dict[str, Any] | None:
         meta["invalid_json"] += 1
         return None
     return envelope if isinstance(envelope, dict) else None
-
-
-def _record_function_call(
-    payload: dict[str, Any],
-    *,
-    order: int,
-    counters: dict[str, Any],
-    meta: Counter[str],
-    call_names: dict[str, str],
-    call_roots: dict[str, str],
-    call_git_interactions: dict[str, tuple[str, str, str, str]],
-    call_read_events: dict[str, list[int]],
-    source_read_events: list[int],
-) -> None:
-    call_id = optional_str(payload.get("call_id") or payload.get("id"))
-    function_name = safe_label(payload.get("name")) or "unknown_function"
-    counters["function_calls"][function_name] += 1
-    if call_id:
-        call_names[call_id] = function_name
-    command = shell_command_from_payload(payload, function_name=function_name)
-    if command is None:
-        if is_shell_tool(function_name):
-            meta["missing_command"] += 1
-        return
-    root, child = command_root_and_child(command)
-    counters["command_calls"][root] += 1
-    counters["command_children"].setdefault(root, Counter())[child] += 1
-    if call_id:
-        call_roots[call_id] = root
-    interaction = git_interaction_from_command(command, root=root)
-    if interaction is not None:
-        interaction_key = (
-            interaction["root"],
-            interaction["operation"],
-            interaction["category"],
-            interaction["mutability"],
-        )
-        counters["git_interaction_calls"][interaction_key] += 1
-        counters["git_interactions_by_category"][interaction["category"]] += 1
-        counters["git_interactions_by_mutability"][interaction["mutability"]] += 1
-        counters["git_interactions_by_root"][interaction["root"]] += 1
-        if call_id:
-            call_git_interactions[call_id] = interaction_key
-    read_refs = read_path_refs_from_command(command, root=root)
-    if read_refs:
-        counters["read_command_count"] += 1
-        read_event_indexes = _record_read_refs(
-            read_refs,
-            root=root,
-            order=order,
-            counters=counters,
-            source_read_events=source_read_events,
-        )
-        if call_id:
-            call_read_events[call_id] = read_event_indexes
-
-
-def _record_read_refs(
-    read_refs: list[dict[str, str]],
-    *,
-    root: str,
-    order: int,
-    counters: dict[str, Any],
-    source_read_events: list[int],
-) -> list[int]:
-    indexes: list[int] = []
-    reader = read_reader(root)
-    for path_ref in read_refs:
-        path_key = path_ref["path_key"]
-        counters["read_path_refs"][path_key] = path_ref
-        event_index = len(counters["read_events"])
-        counters["read_events"].append(
-            {
-                "reader": reader,
-                "root": root,
-                "path_key": path_key,
-                "path_label": path_ref["path_label"],
-                "path_hash": path_ref["path_hash"],
-                "order": order,
-                "modified_later": False,
-            }
-        )
-        source_read_events.append(event_index)
-        indexes.append(event_index)
-        counters["read_events_by_reader"][reader] += 1
-        counters["read_events_by_path"][path_key] += 1
-    return indexes
-
-
-def _record_file_modification_refs(
-    path_refs: list[dict[str, str]],
-    *,
-    counters: dict[str, Any],
-    event_kind: str,
-) -> None:
-    counters["file_modification_events"] += 1
-    event_paths: list[dict[str, str]] = []
-    for path_ref in path_refs:
-        path_key = path_ref["path_key"]
-        path_label = path_ref["path_label"]
-        counters["file_modification_path_refs"][path_key] = path_ref
-        counters["file_modification_path_events"][path_key] += 1
-        counters["file_modification_extensions"][_extension_label(path_label)] += 1
-        event_paths.append({"path_label": path_label, "path_hash": path_ref["path_hash"]})
-    counters["largest_file_modification_events"].append(
-        {
-            "event_kind": event_kind,
-            "modified_path_count": len(path_refs),
-            "paths": unique_path_rows(event_paths),
-        }
-    )
-
-
-def _record_function_output(
-    payload: dict[str, Any],
-    *,
-    counters: dict[str, Any],
-    call_names: dict[str, str],
-    call_roots: dict[str, str],
-    call_git_interactions: dict[str, tuple[str, str, str, str]],
-    call_read_events: dict[str, list[int]],
-) -> None:
-    call_id = optional_str(payload.get("call_id"))
-    function_name = call_names.get(call_id or "", "unknown_function")
-    counters["function_outputs"][function_name] += 1
-    output = payload.get("output")
-    count = original_output_count(output)
-    read_indexes = call_read_events.get(call_id or "", [])
-    git_interaction = call_git_interactions.get(call_id or "")
-    if count is None:
-        _record_missing_output_count(
-            output,
-            counters=counters,
-            function_name=function_name,
-            root=call_roots.get(call_id or ""),
-            git_interaction=git_interaction,
-            read_indexes=read_indexes,
-        )
-        return
-    _record_output_count(
-        int(count),
-        counters=counters,
-        function_name=function_name,
-        root=call_roots.get(call_id or ""),
-        git_interaction=git_interaction,
-        read_indexes=read_indexes,
-    )
-
-
-def _record_missing_output_count(
-    output: object,
-    *,
-    counters: dict[str, Any],
-    function_name: str,
-    root: str | None,
-    git_interaction: tuple[str, str, str, str] | None,
-    read_indexes: list[int],
-) -> None:
-    counters["output_missing_count"][function_name] += 1
-    counters["missing_reasons"]["string_no_header" if isinstance(output, str) else "non_string_output"] += 1
-    if root:
-        counters["command_missing_count"][root] += 1
-    if git_interaction:
-        counters["git_interaction_missing_count"][git_interaction] += 1
-    for event_index in read_indexes:
-        reader = str(counters["read_events"][event_index]["reader"])
-        counters["read_events_missing_count_by_reader"][reader] += 1
-
-
-def _record_output_count(
-    count: int,
-    *,
-    counters: dict[str, Any],
-    function_name: str,
-    root: str | None,
-    git_interaction: tuple[str, str, str, str] | None,
-    read_indexes: list[int],
-) -> None:
-    counters["output_with_count"][function_name] += 1
-    counters["output_token_sum"][function_name] += count
-    if root:
-        counters["command_with_count"][root] += 1
-        counters["command_token_sum"][root] += count
-    if git_interaction:
-        counters["git_interaction_with_count"][git_interaction] += 1
-        counters["git_interaction_token_sum"][git_interaction] += count
-    if not read_indexes:
-        return
-    paths: list[dict[str, str]] = []
-    readers: Counter[str] = Counter()
-    allocations = allocate_token_count(count, len(read_indexes))
-    for event_index, allocated in zip(read_indexes, allocations, strict=True):
-        event = counters["read_events"][event_index]
-        reader = str(event["reader"])
-        path_key = str(event["path_key"])
-        counters["read_events_with_count_by_reader"][reader] += 1
-        counters["read_tokens_by_reader"][reader] += allocated
-        counters["read_tokens_by_path"][path_key] += allocated
-        readers[reader] += 1
-        paths.append({"path_label": str(event["path_label"]), "path_hash": str(event["path_hash"])})
-    counters["largest_read_commands"].append(
-        {
-            "root": root or "unknown_command",
-            "read_event_count": len(read_indexes),
-            "original_token_count": int(count),
-            "readers": simple_rows(readers, key_name="reader"),
-            "paths": unique_path_rows(paths),
-        }
-    )
-
-
-def _mark_later_modifications(
-    *,
-    counters: dict[str, Any],
-    source_read_events: list[int],
-    modified_orders_by_path: dict[str, list[int]],
-) -> None:
-    for event_index in source_read_events:
-        event = counters["read_events"][event_index]
-        path_key = str(event["path_key"])
-        if any(order > int(event["order"]) for order in modified_orders_by_path.get(path_key, [])):
-            event["modified_later"] = True
-            counters["read_modified_by_reader"][str(event["reader"])] += 1
-            counters["read_modified_by_path"][path_key] += 1
 
 
 def _analysis_payload(*, counters: dict[str, Any], meta: Counter[str]) -> dict[str, Any]:
@@ -583,8 +439,3 @@ def _read_productivity_payload(counters: dict[str, Any]) -> dict[str, Any]:
         ),
         "path_privacy": path_privacy_metadata(),
     }
-
-
-def _extension_label(path_label: str) -> str:
-    suffix = Path(path_label).suffix.lower()
-    return suffix if suffix else "<none>"

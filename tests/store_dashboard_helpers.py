@@ -370,9 +370,11 @@ def _http_error_json(
     try:
         urllib.request.urlopen(request, timeout=5)  # noqa: S310 - local test server only
     except urllib.error.HTTPError as exc:
+        with exc:
+            payload = json.loads(exc.read().decode("utf-8"))
         return {
             "status": exc.code,
-            "payload": json.loads(exc.read().decode("utf-8")),
+            "payload": payload,
         }
     raise AssertionError("expected HTTPError")
 

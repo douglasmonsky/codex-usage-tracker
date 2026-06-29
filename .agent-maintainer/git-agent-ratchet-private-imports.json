@@ -1,0 +1,13 @@
+{
+  "$schema": "https://git-agent-ratchet.org/schemas/v1.json",
+  "ratchet_meta": {
+    "repo_signature": "",
+    "last_updated_by": "git-agent-ratchet-core"
+  },
+  "baselines": {
+    "cross_module_private_imports": {
+      "metric_value": 0,
+      "items": []
+    }
+  }
+}

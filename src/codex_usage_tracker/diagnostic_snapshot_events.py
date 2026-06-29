@@ -96,21 +96,31 @@ ORIGINAL_OUTPUT_RE = re.compile(
 def shell_command_from_payload(payload: dict[str, Any], *, function_name: str) -> str | None:
     if not is_shell_tool(function_name):
         return None
-    arguments = payload.get("arguments")
+    return _shell_command_from_arguments(payload.get("arguments")) or _command_from_mapping(
+        payload
+    )
+
+
+def _shell_command_from_arguments(arguments: object) -> str | None:
     if isinstance(arguments, str):
-        try:
-            loaded = json.loads(arguments)
-        except json.JSONDecodeError:
-            loaded = {}
-        if isinstance(loaded, dict):
-            command = loaded.get("cmd") or loaded.get("command")
-            if isinstance(command, str):
-                return command
+        return _shell_command_from_json_arguments(arguments)
     if isinstance(arguments, dict):
-        command = arguments.get("cmd") or arguments.get("command")
-        if isinstance(command, str):
-            return command
-    command = payload.get("cmd") or payload.get("command")
+        return _command_from_mapping(arguments)
+    return None
+
+
+def _shell_command_from_json_arguments(arguments: str) -> str | None:
+    try:
+        loaded = json.loads(arguments)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(loaded, dict):
+        return _command_from_mapping(loaded)
+    return None
+
+
+def _command_from_mapping(mapping: dict[str, Any]) -> str | None:
+    command = mapping.get("cmd") or mapping.get("command")
     return command if isinstance(command, str) else None
 
 

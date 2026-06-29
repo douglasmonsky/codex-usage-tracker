@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
+
+from codex_usage_tracker.json_contract_validation import (
+    validate_json_payload_contract as _validate_json_payload_contract,
+)
 
 NoneType = type(None)
 Number = (int, float)
@@ -509,66 +512,4 @@ def known_json_schemas() -> tuple[str, ...]:
 
 def validate_json_payload_contract(payload: object) -> list[str]:
     """Return contract validation errors for one CLI or MCP JSON payload."""
-
-    if not isinstance(payload, Mapping):
-        return ["payload must be a JSON object"]
-    schema = payload.get("schema")
-    if not isinstance(schema, str) or not schema:
-        return ["payload.schema must be a non-empty string"]
-    contract = JSON_PAYLOAD_CONTRACTS.get(schema)
-    if contract is None:
-        return [f"payload.schema is not tracked: {schema}"]
-
-    errors: list[str] = []
-    for field, expected in contract.get("required", {}).items():
-        if field not in payload:
-            errors.append(f"{schema}.{field} is required")
-            continue
-        if not _matches_type(payload[field], expected):
-            errors.append(
-                f"{schema}.{field} must be {_describe_type(expected)}, "
-                f"got {type(payload[field]).__name__}"
-            )
-
-    for field, nested in contract.get("nested", {}).items():
-        value = payload.get(field)
-        if not isinstance(value, Mapping):
-            continue
-        for nested_field, expected in nested.items():
-            if nested_field not in value:
-                errors.append(f"{schema}.{field}.{nested_field} is required")
-                continue
-            if not _matches_type(value[nested_field], expected):
-                errors.append(
-                    f"{schema}.{field}.{nested_field} must be {_describe_type(expected)}, "
-                    f"got {type(value[nested_field]).__name__}"
-                )
-    return errors
-
-
-def _matches_type(value: object, expected: object) -> bool:
-    if expected is Number:
-        return isinstance(value, int | float) and not isinstance(value, bool)
-    if isinstance(expected, tuple):
-        return any(_matches_type(value, item) for item in expected)
-    if expected is int:
-        return isinstance(value, int) and not isinstance(value, bool)
-    if expected is float:
-        return isinstance(value, float) and not isinstance(value, bool)
-    if expected is bool:
-        return isinstance(value, bool)
-    if isinstance(expected, type):
-        return isinstance(value, expected)
-    return False
-
-
-def _describe_type(expected: object) -> str:
-    if expected is Number:
-        return "number"
-    if isinstance(expected, tuple):
-        return " or ".join(_describe_type(item) for item in expected)
-    if expected is NoneType:
-        return "null"
-    if isinstance(expected, type):
-        return expected.__name__
-    return str(expected)
+    return _validate_json_payload_contract(payload, JSON_PAYLOAD_CONTRACTS)

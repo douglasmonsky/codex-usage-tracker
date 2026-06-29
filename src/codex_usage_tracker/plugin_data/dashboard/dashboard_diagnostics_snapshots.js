@@ -426,7 +426,9 @@
       const innerHeight = height - margin.top - margin.bottom;
       const yTicks = niceAxisTicks(Math.max(1, ...chartPoints.map(point => Number(point.ci_high || point.projected_weekly_credits || 0))));
       const maxY = yTicks[yTicks.length - 1] || 1;
-      const x = index => margin.left + (chartPoints.length === 1 ? innerWidth / 2 : (index / (chartPoints.length - 1)) * innerWidth);
+      const positions = weeklyProjectionPointPositions(chartPoints, margin.left, innerWidth);
+      const x = index => positions[index]?.x ?? margin.left;
+      const xValue = index => positions[index]?.domainValue ?? index;
       const y = value => {
         const numeric = Math.max(0, Math.min(maxY, Number(value || 0)));
         return margin.top + innerHeight - (numeric / maxY) * innerHeight;
@@ -437,7 +439,7 @@
       const colors = diagnosticsChartColors();
       const series = weeklyProjectionPlanSeries(chartPoints);
       const colorForPlan = key => colors[Math.max(series.findIndex(group => group.key === key), 0) % colors.length];
-      const trendLines = weeklyProjectionTrendLines(series, x, y, colorForPlan);
+      const trendLines = weeklyProjectionTrendLines(series, x, xValue, y, colorForPlan);
       const hasTrendLines = trendLines.trim().length > 0;
       const seriesLines = series.map(group => {
         if (group.points.length < 2) return '';
@@ -462,7 +464,7 @@
           <line x1="${(center - 5).toFixed(1)}" y1="${low.toFixed(1)}" x2="${(center + 5).toFixed(1)}" y2="${low.toFixed(1)}" class="diagnostics-confidence-bar"></line>
         `;
       }).join('');
-      const xTicks = indexedChartTicks(chartPoints, layout.tickLimit);
+      const xTicks = readableChartTicks(indexedChartTicks(chartPoints, layout.tickLimit), x, 72);
       return `
         <div class="diagnostics-chart-card">
           <div class="${chartWidthClass('diagnostics-chart-title', layout.classSuffix)}">
@@ -531,6 +533,36 @@
       });
     }
 
+    function weeklyProjectionPointPositions(points, left, width) {
+      const positioned = points.map((point, index) => ({
+        index,
+        ts: weeklyProjectionPointTimestamp(point),
+      }));
+      const timestamped = positioned.filter(item => Number.isFinite(item.ts));
+      const minTs = Math.min(...timestamped.map(item => item.ts));
+      const maxTs = Math.max(...timestamped.map(item => item.ts));
+      const hasTimeDomain = timestamped.length >= 2 && Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs > minTs;
+      const indexSpan = Math.max(points.length - 1, 1);
+      return positioned.map(item => {
+        const fallbackRatio = points.length === 1 ? 0.5 : item.index / indexSpan;
+        const timeRatio = hasTimeDomain && Number.isFinite(item.ts) ? (item.ts - minTs) / (maxTs - minTs) : fallbackRatio;
+        return {
+          x: left + (Math.max(0, Math.min(1, timeRatio)) * width),
+          domainValue: hasTimeDomain && Number.isFinite(item.ts) ? item.ts : item.index,
+        };
+      });
+    }
+
+    function weeklyProjectionPointTimestamp(point) {
+      const timestamp = Date.parse(point.reset_timestamp || weeklyProjectionWeekKeyDate(point.week_key) || point.start_event_timestamp || point.end_event_timestamp || '');
+      return Number.isFinite(timestamp) ? timestamp : Number.NaN;
+    }
+
+    function weeklyProjectionWeekKeyDate(weekKey) {
+      const match = String(weekKey || '').match(/(\d{4}-\d{2}-\d{2})$/);
+      return match ? `${match[1]}T00:00:00Z` : '';
+    }
+
     function isKnownProjectionPlan(point) {
       const key = weeklyProjectionPlanKey(point);
       return key !== 'unknown' && key !== 'missing';
@@ -578,26 +610,26 @@
       `).join('');
     }
 
-    function weeklyProjectionTrendLines(series, x, y, colorForPlan) {
-      return series.map(group => weeklyProjectionTrendLine(group, x, y, colorForPlan(group.key))).join('');
+    function weeklyProjectionTrendLines(series, x, xValue, y, colorForPlan) {
+      return series.map(group => weeklyProjectionTrendLine(group, x, xValue, y, colorForPlan(group.key))).join('');
     }
 
-    function weeklyProjectionTrendLine(group, x, y, color) {
+    function weeklyProjectionTrendLine(group, x, xValue, y, color) {
       const trendPoints = group.points
         .filter(item => item.point.confidence === 'medium' || item.point.confidence === 'high');
       if (trendPoints.length < 3) return '';
       const values = trendPoints.map(item => Number(item.point.projected_weekly_credits || 0));
-      const indexes = trendPoints.map(item => item.index);
-      const xMean = indexes.reduce((total, value) => total + value, 0) / indexes.length;
+      const xValues = trendPoints.map(item => Number(xValue(item.index)));
+      const xMean = xValues.reduce((total, value) => total + value, 0) / xValues.length;
       const yMean = values.reduce((total, value) => total + value, 0) / values.length;
-      const denom = indexes.reduce((total, index) => total + Math.pow(index - xMean, 2), 0);
+      const denom = xValues.reduce((total, value) => total + Math.pow(value - xMean, 2), 0);
       if (!denom) return '';
-      const slope = values.reduce((total, value, offset) => total + ((indexes[offset] - xMean) * (value - yMean)), 0) / denom;
+      const slope = values.reduce((total, value, offset) => total + ((xValues[offset] - xMean) * (value - yMean)), 0) / denom;
       const intercept = yMean - slope * xMean;
-      const firstIndex = indexes[0];
-      const lastIndex = indexes[indexes.length - 1];
-      const first = intercept + slope * firstIndex;
-      const last = intercept + slope * lastIndex;
+      const firstIndex = trendPoints[0].index;
+      const lastIndex = trendPoints[trendPoints.length - 1].index;
+      const first = intercept + slope * xValue(firstIndex);
+      const last = intercept + slope * xValue(lastIndex);
       return `<line x1="${x(firstIndex).toFixed(1)}" y1="${y(first).toFixed(1)}" x2="${x(lastIndex).toFixed(1)}" y2="${y(last).toFixed(1)}" class="diagnostics-trend-line" stroke="${color}"></line>`;
     }
 
@@ -692,6 +724,30 @@
       return Array.from(indexes)
         .sort((left, right) => left - right)
         .map(index => ({ point: points[index], index }));
+    }
+
+    function readableChartTicks(ticks, x, minGap) {
+      const readable = [];
+      let previousX = Number.NEGATIVE_INFINITY;
+      ticks.forEach((tick, offset) => {
+        const currentX = Number(x(tick.index));
+        const isLast = offset === ticks.length - 1;
+        if (!Number.isFinite(currentX)) return;
+        if (!readable.length || currentX - previousX >= minGap) {
+          readable.push(tick);
+          previousX = currentX;
+          return;
+        }
+        if (isLast && readable.length > 1) {
+          const previousTick = readable[readable.length - 1];
+          const previousTickX = Number(x(previousTick.index));
+          if (currentX - previousTickX < minGap) {
+            readable[readable.length - 1] = tick;
+            previousX = currentX;
+          }
+        }
+      });
+      return readable;
     }
 
     function renderUsageDrainCostChart(threads) {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,26 +27,21 @@ class DiagnosticSnapshotReport:
 
     def render(self) -> str:
         if self.payload.get("status") != "ready":
-            section = str(self.payload.get("section") or "snapshot")
-            return f"No diagnostic {section} snapshot. Run diagnostics {section} --refresh first."
+            return _unavailable_snapshot_message(self.payload)
         section = self.payload.get("section")
-        if section == DIAGNOSTIC_TOOL_OUTPUT_SECTION:
-            return self._render_tool_output()
-        if section == DIAGNOSTIC_COMMANDS_SECTION:
-            return self._render_commands()
-        if section == DIAGNOSTIC_GIT_INTERACTIONS_SECTION:
-            return self._render_git_interactions()
-        if section == DIAGNOSTIC_FILE_READS_SECTION:
-            return self._render_file_reads()
-        if section == DIAGNOSTIC_FILE_MODIFICATIONS_SECTION:
-            return self._render_file_modifications()
-        if section == DIAGNOSTIC_READ_PRODUCTIVITY_SECTION:
-            return self._render_read_productivity()
-        if section == DIAGNOSTIC_CONCENTRATION_SECTION:
-            return self._render_concentration()
-        if section == DIAGNOSTIC_USAGE_DRAIN_SECTION:
-            return self._render_usage_drain()
-        return self._render_overview()
+        return self._section_renderers().get(section, self._render_overview)()
+
+    def _section_renderers(self) -> dict[object, Callable[[], str]]:
+        return {
+            DIAGNOSTIC_TOOL_OUTPUT_SECTION: self._render_tool_output,
+            DIAGNOSTIC_COMMANDS_SECTION: self._render_commands,
+            DIAGNOSTIC_GIT_INTERACTIONS_SECTION: self._render_git_interactions,
+            DIAGNOSTIC_FILE_READS_SECTION: self._render_file_reads,
+            DIAGNOSTIC_FILE_MODIFICATIONS_SECTION: self._render_file_modifications,
+            DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: self._render_read_productivity,
+            DIAGNOSTIC_CONCENTRATION_SECTION: self._render_concentration,
+            DIAGNOSTIC_USAGE_DRAIN_SECTION: self._render_usage_drain,
+        }
 
     def _render_overview(self) -> str:
         snapshot = self.payload.get("snapshot") or {}
@@ -189,6 +185,11 @@ class DiagnosticSnapshotReport:
 
 def _int_text(value: object) -> str:
     return f"{int_value(value):,}"
+
+
+def _unavailable_snapshot_message(payload: dict[str, Any]) -> str:
+    section = str(payload.get("section") or "snapshot")
+    return f"No diagnostic {section} snapshot. Run diagnostics {section} --refresh first."
 
 
 def _pct_text(value: object) -> str:

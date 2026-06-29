@@ -67,6 +67,31 @@ def test_project_template_ignored_paths_and_row_annotation(tmp_path: Path) -> No
     assert rows[0]["project_name"] == "nested"
 
 
+def test_load_project_config_discards_malformed_sections(tmp_path: Path) -> None:
+    config_path = tmp_path / "projects.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "aliases": {"project-key": "Project Alias", "bad-value": 7},
+                "ignored_paths": [str(tmp_path / "ignored"), 42],
+                "tags": {
+                    "Project Alias": ["alpha", 7, "beta"],
+                    "bad-tags": "not-list",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_project_config(config_path)
+
+    assert config.loaded is True
+    assert config.error is None
+    assert config.aliases == {"project-key": "Project Alias"}
+    assert config.ignored_paths == [str(tmp_path / "ignored")]
+    assert config.tags == {"Project Alias": ["alpha", "beta"]}
+
+
 def test_project_privacy_modes_redact_sensitive_metadata(tmp_path: Path) -> None:
     repo = tmp_path / "client-project"
     nested = repo / "private" / "workflow"

@@ -5,7 +5,10 @@ from pathlib import Path
 
 from store_dashboard_helpers import _usage_event, _write_pricing
 
-from codex_usage_tracker.store import upsert_usage_events
+from codex_usage_tracker.allowance import annotate_rows_with_allowance, load_allowance_config
+from codex_usage_tracker.pricing import annotate_rows_with_efficiency, load_pricing_config
+from codex_usage_tracker.store import query_dashboard_events, upsert_usage_events
+from codex_usage_tracker.usage_drain_model import summarize_usage_drain_model
 from codex_usage_tracker.usage_drain_reports import build_usage_drain_dashboard_report
 
 
@@ -44,6 +47,7 @@ def test_usage_drain_dashboard_report_builds_bounded_thread_curves(tmp_path: Pat
     weekly_point = time_series["weekly_credit_projection"]["points"][0]
     assert weekly_point["projected_weekly_credits"] > 0
     assert weekly_point["confidence"] == "low"
+    assert weekly_point["reset_timestamp"] == "2026-06-08T00:00:00Z"
     payload_text = json.dumps(report)
     assert "SECRET RAW PROMPT" not in payload_text
     assert "source_file" not in payload_text
@@ -163,6 +167,51 @@ def test_weekly_projection_keeps_separate_plan_windows(tmp_path: Path) -> None:
     assert trend["direction"] == "insufficient_data"
     assert trend["basis"] == "latest_plan_insufficient_same_plan_windows"
     assert trend["rate_limit_plan_type"] == "pro"
+
+
+def test_usage_drain_model_summary_characterizes_synthetic_spans(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    events = [
+        _event("base", "thread:Alpha", "2026-06-01T00:00:00Z", 100, 10.0),
+        _event("unchanged", "thread:Alpha", "2026-06-01T00:01:00Z", 180, 10.0),
+        _event("span-1", "thread:Alpha", "2026-06-01T00:02:00Z", 260, 11.0),
+        _event("span-2", "thread:Beta", "2026-06-01T00:03:00Z", 380, 12.0),
+        _event("span-3", "thread:Beta", "2026-06-01T00:04:00Z", 520, 14.0),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+
+    rows = query_dashboard_events(db_path=db_path, limit=0)
+    pricing = load_pricing_config(pricing_path)
+    allowance = load_allowance_config(
+        tmp_path / "allowance.json",
+        rate_card_path=tmp_path / "rate-card.json",
+    )
+    rows = annotate_rows_with_allowance(annotate_rows_with_efficiency(rows, pricing), allowance)
+
+    summary = summarize_usage_drain_model(rows)
+
+    assert summary["schema"] == "codex-usage-tracker-usage-drain-model-v1"
+    assert summary["source_rows"] == 5
+    assert summary["span_stats"]["positive_usage_spans"] == 3
+    assert summary["span_stats"]["five_hour_usage_window_rows"] == 5
+    assert summary["model_mix"] == {"gpt-5.5": 5}
+    assert summary["rate_limit_plan_type_mix"] == {"pro": 5}
+    assert summary["rate_limit_limit_id_mix"] == {"codex": 5}
+    assert summary["delta_regimes"]["all_spans"]["spans"] == 3
+    assert summary["regime_streaks"]["one_percent_runs"]["count"] == 1
+    assert summary["one_percent_capacity_modeling"]["span_count"] == 2
+    assert summary["token_component_regression"]["features"] == [
+        "uncached_input_tokens",
+        "cached_input_tokens",
+        "reasoning_output_tokens",
+        "nonreasoning_output_tokens",
+    ]
+    assert len(summary["results"]) == 4
+    assert summary["predictive_modeling"]["proxy"] == "all_candidates"
+    assert "models" in summary["predictive_modeling"]
 
 
 def _event(

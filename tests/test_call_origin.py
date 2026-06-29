@@ -74,6 +74,30 @@ def test_call_origin_falls_back_to_subagent_metadata_for_migrated_rows() -> None
     assert normal_fields == _origin("unknown", "missing_origin", "low")
 
 
+def test_event_flags_from_envelope_detects_event_message_user_shape() -> None:
+    flags = event_flags_from_envelope(
+        {"type": "event_msg", "payload": {"type": "user_message"}}
+    )
+
+    assert flags.user_message
+
+
+def test_event_flags_from_envelope_detects_mcp_tool_result_shape() -> None:
+    flags = event_flags_from_envelope(
+        {"type": "event_msg", "payload": {"type": "mcp_tool_call_end"}}
+    )
+
+    assert flags.tool_result
+
+
+def test_event_flags_from_envelope_detects_agent_event_activity_shape() -> None:
+    flags = event_flags_from_envelope(
+        {"type": "event_msg", "payload": {"type": "agent_message"}}
+    )
+
+    assert flags.codex_activity
+
+
 def _origin(initiator: str, reason: str, confidence: str) -> dict[str, str]:
     return {
         "call_initiator": initiator,

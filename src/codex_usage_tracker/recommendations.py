@@ -114,118 +114,170 @@ def action_recommendations(
     """Return ranked recommendations for one aggregate usage row."""
 
     limits = thresholds or DEFAULT_THRESHOLDS
-    recommendations: list[dict[str, Any]] = []
-    total_tokens = _number(row.get("total_tokens"))
-    output_tokens = _number(row.get("output_tokens"))
-    uncached_input = _number(row.get("uncached_input_tokens"))
+    candidates = [
+        _pricing_recommendation(row),
+        _high_cost_recommendation(row, limits),
+        _context_recommendation(row, limits),
+        _low_cache_recommendation(row, limits),
+        _reasoning_recommendation(row, limits),
+        _low_output_recommendation(row, limits),
+        _large_thread_recommendation(row, limits),
+        _subagent_recommendation(row),
+    ]
+    return [
+        recommendation
+        for recommendation in candidates
+        if recommendation is not None
+    ]
+
+
+def _pricing_recommendation(row: dict[str, Any]) -> dict[str, Any] | None:
+    if not row.get("pricing_model"):
+        return _recommendation(
+            "pricing-gap",
+            "review",
+            "Pricing gap",
+            "This model call has no configured price, so cost totals understate visible usage.",
+            "Update pricing or add a local alias before trusting cost totals.",
+        )
+    if row.get("pricing_estimated"):
+        return _recommendation(
+            "estimated-pricing",
+            "review",
+            "Estimated pricing",
+            "This cost uses an inferred model mapping rather than a direct pricing row.",
+            "Review pricing coverage and pin or override the model rate if this call matters.",
+        )
+    return None
+
+
+def _high_cost_recommendation(
+    row: dict[str, Any],
+    limits: dict[str, float],
+) -> dict[str, Any] | None:
+    cost = row.get("estimated_cost_usd")
+    if not isinstance(cost, int | float) or cost < limits["high_cost_usd"]:
+        return None
+    return _recommendation(
+        "high-cost",
+        "high",
+        "High estimated cost",
+        "This call crossed the configured high-cost threshold.",
+        "Open the thread timeline and inspect the preceding turn before continuing.",
+    )
+
+
+def _context_recommendation(
+    row: dict[str, Any],
+    limits: dict[str, float],
+) -> dict[str, Any] | None:
+    context = _number(row.get("context_window_percent"))
+    if context >= limits["high_context_percent"]:
+        return _recommendation(
+            "context-bloat",
+            "high",
+            "High context pressure",
+            "This call is using a large share of the model context window.",
+            "Consider starting a fresh Codex thread if older context is no longer relevant.",
+        )
+    if context >= limits["elevated_context_percent"]:
+        return _recommendation(
+            "elevated-context",
+            "medium",
+            "Elevated context pressure",
+            "Context use is elevated and may become costly in later turns.",
+            "Check whether the thread can be narrowed before adding more work.",
+        )
+    return None
+
+
+def _low_cache_recommendation(
+    row: dict[str, Any],
+    limits: dict[str, float],
+) -> dict[str, Any] | None:
     input_tokens = _number(row.get("input_tokens"))
     cache_ratio = _number(row.get("cache_ratio"))
-    context = _number(row.get("context_window_percent"))
-    reasoning = _number(row.get("reasoning_output_ratio"))
-    cumulative = _number(row.get("cumulative_total_tokens"))
-    cost = row.get("estimated_cost_usd")
+    uncached_input = _number(row.get("uncached_input_tokens"))
+    if (
+        input_tokens <= 0
+        or cache_ratio >= limits["low_cache_ratio"]
+        or uncached_input < limits["high_uncached_input_tokens"]
+    ):
+        return None
+    return _recommendation(
+        "low-cache",
+        "medium",
+        "Low cache reuse",
+        "Fresh uncached input is high while cache reuse is low.",
+        "Check whether files, tool output, or broad context were reintroduced unnecessarily.",
+    )
 
-    if not row.get("pricing_model"):
-        recommendations.append(
-            _recommendation(
-                "pricing-gap",
-                "review",
-                "Pricing gap",
-                "This model call has no configured price, so cost totals understate visible usage.",
-                "Update pricing or add a local alias before trusting cost totals.",
-            )
-        )
-    elif row.get("pricing_estimated"):
-        recommendations.append(
-            _recommendation(
-                "estimated-pricing",
-                "review",
-                "Estimated pricing",
-                "This cost uses an inferred model mapping rather than a direct pricing row.",
-                "Review pricing coverage and pin or override the model rate if this call matters.",
-            )
-        )
-    if isinstance(cost, int | float) and cost >= limits["high_cost_usd"]:
-        recommendations.append(
-            _recommendation(
-                "high-cost",
-                "high",
-                "High estimated cost",
-                "This call crossed the configured high-cost threshold.",
-                "Open the thread timeline and inspect the preceding turn before continuing.",
-            )
-        )
-    if context >= limits["high_context_percent"]:
-        recommendations.append(
-            _recommendation(
-                "context-bloat",
-                "high",
-                "High context pressure",
-                "This call is using a large share of the model context window.",
-                "Consider starting a fresh Codex thread if older context is no longer relevant.",
-            )
-        )
-    elif context >= limits["elevated_context_percent"]:
-        recommendations.append(
-            _recommendation(
-                "elevated-context",
-                "medium",
-                "Elevated context pressure",
-                "Context use is elevated and may become costly in later turns.",
-                "Check whether the thread can be narrowed before adding more work.",
-            )
-        )
-    if input_tokens > 0 and cache_ratio < limits["low_cache_ratio"] and uncached_input >= limits["high_uncached_input_tokens"]:
-        recommendations.append(
-            _recommendation(
-                "low-cache",
-                "medium",
-                "Low cache reuse",
-                "Fresh uncached input is high while cache reuse is low.",
-                "Check whether files, tool output, or broad context were reintroduced unnecessarily.",
-            )
-        )
-    if reasoning >= limits["high_reasoning_ratio"] and output_tokens >= limits["reasoning_min_output_tokens"]:
-        recommendations.append(
-            _recommendation(
-                "reasoning-spike",
-                "medium",
-                "High reasoning share",
-                "Reasoning output dominates visible output for this call.",
-                "Review whether this task needs the selected reasoning effort.",
-            )
-        )
-    if total_tokens >= limits["expensive_low_output_total_tokens"] and output_tokens <= limits["low_output_tokens"]:
-        recommendations.append(
-            _recommendation(
-                "low-output",
-                "medium",
-                "Large low-output call",
-                "The call consumed many tokens but produced little output.",
-                "Inspect aggregate context first; load raw context only if the cause is unclear.",
-            )
-        )
-    if cumulative >= limits["large_cumulative_tokens"]:
-        recommendations.append(
-            _recommendation(
-                "large-thread",
-                "medium",
-                "Large cumulative thread",
-                "The session cumulative total is high enough to make later turns expensive.",
-                "Prefer a new thread for unrelated follow-up work.",
-            )
-        )
-    if row.get("thread_source") == "subagent" or row.get("parent_session_id"):
-        recommendations.append(
-            _recommendation(
-                "subagent-attribution",
-                "review",
-                "Subagent attribution",
-                "This call is attached to delegated work and may explain parent-thread growth.",
-                "Compare direct calls with attached subagent or review calls before changing workflow.",
-            )
-        )
-    return recommendations
+
+def _reasoning_recommendation(
+    row: dict[str, Any],
+    limits: dict[str, float],
+) -> dict[str, Any] | None:
+    reasoning = _number(row.get("reasoning_output_ratio"))
+    output_tokens = _number(row.get("output_tokens"))
+    if (
+        reasoning < limits["high_reasoning_ratio"]
+        or output_tokens < limits["reasoning_min_output_tokens"]
+    ):
+        return None
+    return _recommendation(
+        "reasoning-spike",
+        "medium",
+        "High reasoning share",
+        "Reasoning output dominates visible output for this call.",
+        "Review whether this task needs the selected reasoning effort.",
+    )
+
+
+def _low_output_recommendation(
+    row: dict[str, Any],
+    limits: dict[str, float],
+) -> dict[str, Any] | None:
+    total_tokens = _number(row.get("total_tokens"))
+    output_tokens = _number(row.get("output_tokens"))
+    if (
+        total_tokens < limits["expensive_low_output_total_tokens"]
+        or output_tokens > limits["low_output_tokens"]
+    ):
+        return None
+    return _recommendation(
+        "low-output",
+        "medium",
+        "Large low-output call",
+        "The call consumed many tokens but produced little output.",
+        "Inspect aggregate context first; load raw context only if the cause is unclear.",
+    )
+
+
+def _large_thread_recommendation(
+    row: dict[str, Any],
+    limits: dict[str, float],
+) -> dict[str, Any] | None:
+    if _number(row.get("cumulative_total_tokens")) < limits["large_cumulative_tokens"]:
+        return None
+    return _recommendation(
+        "large-thread",
+        "medium",
+        "Large cumulative thread",
+        "The session cumulative total is high enough to make later turns expensive.",
+        "Prefer a new thread for unrelated follow-up work.",
+    )
+
+
+def _subagent_recommendation(row: dict[str, Any]) -> dict[str, Any] | None:
+    if row.get("thread_source") != "subagent" and not row.get("parent_session_id"):
+        return None
+    return _recommendation(
+        "subagent-attribution",
+        "review",
+        "Subagent attribution",
+        "This call is attached to delegated work and may explain parent-thread growth.",
+        "Compare direct calls with attached subagent or review calls before changing workflow.",
+    )
 
 
 def recommendation_severity_score(

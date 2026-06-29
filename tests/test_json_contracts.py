@@ -72,6 +72,29 @@ def test_json_contract_validation_reports_schema_and_type_errors() -> None:
     assert "codex-usage-tracker-query-v1.filters.since is required" in errors
 
 
+    nested_type_payload = {
+        **payload,
+        "row_count": 0,
+        "filters": {
+            "since": "2026-06-01",
+            "until": None,
+            "model": "gpt-5.5",
+            "effort": None,
+            "thread": None,
+            "project": None,
+            "pricing_status": None,
+            "credit_confidence": None,
+            "min_tokens": "100",
+            "min_credits": None,
+            "limit": 10,
+            "privacy_mode": "strict",
+        },
+    }
+    assert validate_json_payload_contract(nested_type_payload) == [
+        "codex-usage-tracker-query-v1.filters.min_tokens must be int or null, got str"
+    ]
+
+
 def test_documented_schema_table_matches_tracked_contracts() -> None:
     documented = _documented_schema_ids()
 

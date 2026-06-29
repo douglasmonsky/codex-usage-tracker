@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.models import UsageEvent
-from codex_usage_tracker.parser import (
+from codex_usage_tracker.parser_state import (
     PARSER_ADAPTER_VERSION,
     ParserState,
     compact_parser_diagnostics,
@@ -40,53 +40,76 @@ def source_logs_requiring_parse(
     paths = list(logs)
     if not paths:
         return []
-    changed: list[SourceParsePlan] = []
-    for path in paths:
-        metadata = _source_file_metadata(path)
-        if metadata is None:
-            continue
-        row = conn.execute(
-            """
-            SELECT size_bytes, mtime_ns, parsed_until_line
-                , parsed_until_byte, parser_adapter, parser_state_json
-            FROM source_files
-            WHERE source_file = ?
-            """,
-            (str(path),),
-        ).fetchone()
-        if row is None:
-            changed.append(SourceParsePlan(path=path))
-            continue
-        previous_size = int(row["size_bytes"])
-        previous_mtime_ns = int(row["mtime_ns"])
-        previous_byte = int(row["parsed_until_byte"])
-        previous_line = int(row["parsed_until_line"])
-        previous_state = parser_state_from_json(row["parser_state_json"])
-        previous_adapter = str(row["parser_adapter"] or "")
-        if previous_adapter != PARSER_ADAPTER_VERSION:
-            changed.append(SourceParsePlan(path=path))
-            continue
-        if previous_state is None:
-            changed.append(SourceParsePlan(path=path))
-            continue
-        if (
-            previous_size == metadata["size_bytes"]
-            and previous_mtime_ns == metadata["mtime_ns"]
-        ):
-            continue
-        if metadata["size_bytes"] > previous_size and 0 < previous_byte <= previous_size:
-            changed.append(
-                SourceParsePlan(
-                    path=path,
-                    start_byte=previous_byte,
-                    start_line=previous_line,
-                    initial_state=previous_state,
-                    replace_existing=False,
-                )
-            )
-            continue
-        changed.append(SourceParsePlan(path=path))
-    return changed
+    return [
+        plan
+        for plan in (_source_parse_plan(conn, path) for path in paths)
+        if plan is not None
+    ]
+
+
+def _source_parse_plan(
+    conn: sqlite3.Connection, path: Path
+) -> SourceParsePlan | None:
+    metadata = _source_file_metadata(path)
+    if metadata is None:
+        return None
+    row = _source_file_parse_row(conn, path)
+    if row is None:
+        return SourceParsePlan(path=path)
+    return _source_parse_plan_from_row(path, metadata, row)
+
+
+def _source_file_parse_row(conn: sqlite3.Connection, path: Path) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT size_bytes, mtime_ns, parsed_until_line
+             , parsed_until_byte, parser_adapter, parser_state_json
+        FROM source_files
+        WHERE source_file = ?
+        """,
+        (str(path),),
+    ).fetchone()
+
+
+def _source_parse_plan_from_row(
+    path: Path, metadata: dict[str, int], row: sqlite3.Row
+) -> SourceParsePlan | None:
+    previous_state = parser_state_from_json(row["parser_state_json"])
+    if _requires_full_source_parse(row, previous_state):
+        return SourceParsePlan(path=path)
+    if _source_metadata_matches(row, metadata):
+        return None
+    if _can_incrementally_parse_source(metadata, row):
+        return SourceParsePlan(
+            path=path,
+            start_byte=int(row["parsed_until_byte"]),
+            start_line=int(row["parsed_until_line"]),
+            initial_state=previous_state,
+            replace_existing=False,
+        )
+    return SourceParsePlan(path=path)
+
+
+def _requires_full_source_parse(
+    row: sqlite3.Row, previous_state: ParserState | None
+) -> bool:
+    previous_adapter = str(row["parser_adapter"] or "")
+    return previous_adapter != PARSER_ADAPTER_VERSION or previous_state is None
+
+
+def _source_metadata_matches(row: sqlite3.Row, metadata: dict[str, int]) -> bool:
+    return (
+        int(row["size_bytes"]) == metadata["size_bytes"]
+        and int(row["mtime_ns"]) == metadata["mtime_ns"]
+    )
+
+
+def _can_incrementally_parse_source(
+    metadata: dict[str, int], row: sqlite3.Row
+) -> bool:
+    previous_size = int(row["size_bytes"])
+    previous_byte = int(row["parsed_until_byte"])
+    return metadata["size_bytes"] > previous_size and 0 < previous_byte <= previous_size
 
 
 def upsert_source_file_metadata(
@@ -102,48 +125,15 @@ def upsert_source_file_metadata(
     indexed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     rows: list[dict[str, Any]] = []
     for path, events, diagnostics, parser_state in parsed:
-        metadata = _source_file_metadata(path)
-        if metadata is None:
-            continue
-        latest_event = max(
-            events,
-            key=lambda event: (
-                event.event_timestamp,
-                event.cumulative_total_tokens,
-                event.line_number,
-                event.record_id,
-            ),
-            default=None,
+        row = _source_file_metadata_row(
+            path=path,
+            events=events,
+            diagnostics=diagnostics,
+            parser_state=parser_state,
+            indexed_at=indexed_at,
         )
-        rows.append(
-            {
-                "source_file_id": _source_file_id(path),
-                "source_file": str(path),
-                "source_file_hash": _source_file_hash(path),
-                "is_archived": int(metadata["is_archived"]),
-                "size_bytes": int(metadata["size_bytes"]),
-                "mtime_ns": int(metadata["mtime_ns"]),
-                "parsed_until_line": _count_lines(path),
-                "parsed_until_byte": int(metadata["size_bytes"]),
-                "latest_record_id": (
-                    latest_event.record_id
-                    if latest_event
-                    else parser_state.latest_record_id
-                ),
-                "latest_event_timestamp": (
-                    latest_event.event_timestamp
-                    if latest_event
-                    else parser_state.latest_event_timestamp
-                ),
-                "parser_adapter": PARSER_ADAPTER_VERSION,
-                "parser_diagnostics_json": json.dumps(
-                    compact_parser_diagnostics(diagnostics),
-                    sort_keys=True,
-                ),
-                "parser_state_json": parser_state_to_json(parser_state),
-                "last_indexed_at": indexed_at,
-            }
-        )
+        if row is not None:
+            rows.append(row)
     if not rows:
         return
     columns = [
@@ -173,6 +163,70 @@ def upsert_source_file_metadata(
             f"ON CONFLICT(source_file_id) DO UPDATE SET {update_clause}"
         ),
         [[row[column] for column in columns] for row in rows],
+    )
+
+
+def _source_file_metadata_row(
+    *,
+    path: Path,
+    events: list[UsageEvent],
+    diagnostics: dict[str, int],
+    parser_state: ParserState,
+    indexed_at: str,
+) -> dict[str, Any] | None:
+    metadata = _source_file_metadata(path)
+    if metadata is None:
+        return None
+    latest_event = _latest_source_usage_event(events)
+    return {
+        "source_file_id": _source_file_id(path),
+        "source_file": str(path),
+        "source_file_hash": _source_file_hash(path),
+        "is_archived": int(metadata["is_archived"]),
+        "size_bytes": int(metadata["size_bytes"]),
+        "mtime_ns": int(metadata["mtime_ns"]),
+        "parsed_until_line": _count_lines(path),
+        "parsed_until_byte": int(metadata["size_bytes"]),
+        "latest_record_id": _latest_source_record_id(latest_event, parser_state),
+        "latest_event_timestamp": _latest_source_event_timestamp(
+            latest_event, parser_state
+        ),
+        "parser_adapter": PARSER_ADAPTER_VERSION,
+        "parser_diagnostics_json": json.dumps(
+            compact_parser_diagnostics(diagnostics),
+            sort_keys=True,
+        ),
+        "parser_state_json": parser_state_to_json(parser_state),
+        "last_indexed_at": indexed_at,
+    }
+
+
+def _latest_source_record_id(
+    latest_event: UsageEvent | None, parser_state: ParserState
+) -> str | None:
+    return latest_event.record_id if latest_event else parser_state.latest_record_id
+
+
+def _latest_source_event_timestamp(
+    latest_event: UsageEvent | None, parser_state: ParserState
+) -> str | None:
+    return (
+        latest_event.event_timestamp
+        if latest_event
+        else parser_state.latest_event_timestamp
+    )
+
+
+def _latest_source_usage_event(events: list[UsageEvent]) -> UsageEvent | None:
+    return max(
+        events,
+        key=lambda event: (
+            event.event_timestamp,
+            event.cumulative_total_tokens,
+            event.line_number,
+            event.record_id,
+        ),
+        default=None,
     )
 
 

@@ -31,38 +31,57 @@ def event_flags_from_envelope(envelope: object) -> CallOriginFlags:
 
     if not isinstance(envelope, dict):
         return CallOriginFlags()
-    payload = envelope.get("payload")
-    if not isinstance(payload, dict):
-        payload = {}
+    payload = _payload_mapping(envelope)
     entry_type = envelope.get("type")
     payload_type = payload.get("type")
     role = payload.get("role")
 
-    user_message = (
+    return CallOriginFlags(
+        user_message=_is_user_message_event(entry_type, payload_type, role),
+        compaction=_is_compaction_event(entry_type, payload_type),
+        tool_result=_is_tool_result_event(entry_type, payload_type),
+        codex_activity=_is_codex_activity_event(entry_type, payload_type, role),
+    )
+
+
+def _payload_mapping(envelope: Mapping[str, Any]) -> Mapping[str, Any]:
+    payload = envelope.get("payload")
+    return payload if isinstance(payload, dict) else {}
+
+
+def _is_user_message_event(
+    entry_type: object, payload_type: object, role: object
+) -> bool:
+    return (
         entry_type == "event_msg"
         and payload_type == "user_message"
         or entry_type == "response_item"
         and payload_type == "message"
         and role == "user"
     )
-    compaction = entry_type == "compacted" or (
+
+
+def _is_compaction_event(entry_type: object, payload_type: object) -> bool:
+    return entry_type == "compacted" or (
         entry_type == "event_msg" and payload_type == "context_compacted"
     )
-    tool_result = payload_type in {"function_call_output", "tool_search_output"} or (
+
+
+def _is_tool_result_event(entry_type: object, payload_type: object) -> bool:
+    return payload_type in {"function_call_output", "tool_search_output"} or (
         entry_type == "event_msg" and payload_type in {"mcp_tool_call_end"}
     )
-    codex_activity = (
+
+
+def _is_codex_activity_event(
+    entry_type: object, payload_type: object, role: object
+) -> bool:
+    return (
         entry_type == "event_msg"
         and payload_type in {"agent_message", "mcp_tool_call_begin"}
         or entry_type == "response_item"
         and payload_type in {"message", "reasoning", "function_call", "tool_search_call"}
         and role != "user"
-    )
-    return CallOriginFlags(
-        user_message=user_message,
-        compaction=compaction,
-        tool_result=tool_result,
-        codex_activity=codex_activity,
     )
 
 

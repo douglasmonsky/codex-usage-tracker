@@ -21,10 +21,28 @@ from codex_usage_tracker.usage_drain_model import (
     UsageDeltaSpan,
     build_usage_delta_spans,
 )
+from codex_usage_tracker.usage_drain_thread_curves import (
+    MAX_CURVE_POINTS_PER_THREAD,
+    MAX_THREAD_CURVES,
+    thread_cost_curves,
+)
 from codex_usage_tracker.usage_drain_time_series import usage_time_series
 
-MAX_THREAD_CURVES = 12
-MAX_CURVE_POINTS_PER_THREAD = 120
+TOKEN_ACCOUNTING_FEATURES = (
+    "uncached_input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+)
+TOKEN_ACCOUNTING_TOTAL_FIELDS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "uncached_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+    "usage_credits",
+)
 
 
 def build_usage_drain_dashboard_report(
@@ -56,7 +74,7 @@ def build_usage_drain_dashboard_report(
         allowance,
     )
     spans, span_stats = build_usage_delta_spans(rows) if rows else ([], _empty_span_stats())
-    curves = _thread_cost_curves(
+    curves = thread_cost_curves(
         rows,
         max_threads=max_threads,
         max_curve_points=max_curve_points,
@@ -122,87 +140,8 @@ def _report_summary(
     }
 
 
-def _thread_cost_curves(
-    rows: list[dict[str, Any]],
-    *,
-    max_threads: int,
-    max_curve_points: int,
-) -> dict[str, Any]:
-    buckets: dict[str, dict[str, Any]] = {}
-    for row in sorted(rows, key=_chronological_key):
-        key = str(row.get("thread_key") or row.get("session_id") or "unknown")
-        bucket = buckets.setdefault(
-            key,
-            {
-                "thread_key": key,
-                "thread": _thread_label(row),
-                "calls": [],
-            },
-        )
-        bucket["calls"].append(row)
-        if bucket["thread"] == "Unknown thread":
-            bucket["thread"] = _thread_label(row)
-
-    thread_rows = [
-        _thread_curve_record(bucket, max_curve_points=max_curve_points)
-        for bucket in buckets.values()
-    ]
-    thread_rows.sort(
-        key=lambda row: (
-            -_number(row.get("estimated_cost_usd")),
-            -int(row.get("call_count") or 0),
-            str(row.get("thread") or ""),
-        )
-    )
-    total_cost = sum(_number(row.get("estimated_cost_usd")) for row in thread_rows)
-    top_cost = _number(thread_rows[0].get("estimated_cost_usd")) if thread_rows else 0.0
-    return {
-        "total_threads": len(thread_rows),
-        "shown_threads": min(len(thread_rows), max_threads),
-        "max_points_per_thread": max_curve_points,
-        "estimated_cost_usd": round(total_cost, 6),
-        "top_thread_share": round(top_cost / total_cost, 6) if total_cost else 0.0,
-        "threads": thread_rows[:max_threads],
-    }
 
 
-def _thread_curve_record(
-    bucket: dict[str, Any],
-    *,
-    max_curve_points: int,
-) -> dict[str, Any]:
-    calls = list(bucket["calls"])
-    cumulative = 0.0
-    points: list[dict[str, Any]] = []
-    call_costs: list[float] = []
-    first_half_cutoff = max(len(calls) // 2, 1)
-    first_half_cost = 0.0
-    for index, row in enumerate(calls, start=1):
-        call_cost = _number(row.get("estimated_cost_usd"))
-        call_costs.append(call_cost)
-        cumulative += call_cost
-        if index <= first_half_cutoff:
-            first_half_cost += call_cost
-        points.append(
-            {
-                "call_index": index,
-                "cumulative_cost_usd": round(cumulative, 6),
-            }
-        )
-    largest_call_cost = max(call_costs, default=0.0)
-    first_half_share = first_half_cost / cumulative if cumulative else 0.0
-    largest_share = largest_call_cost / cumulative if cumulative else 0.0
-    return {
-        "thread_key": bucket["thread_key"],
-        "thread": bucket["thread"],
-        "call_count": len(calls),
-        "estimated_cost_usd": round(cumulative, 6),
-        "avg_cost_usd": round(cumulative / len(calls), 6) if calls else 0.0,
-        "first_half_cost_share": round(first_half_share, 6),
-        "largest_call_cost_share": round(largest_share, 6),
-        "shape": _curve_shape(first_half_share, largest_share),
-        "points": _sample_curve_points(points, max_points=max_curve_points),
-    }
 
 
 def _model_highlights(rows: list[dict[str, Any]], spans: list[UsageDeltaSpan]) -> dict[str, Any]:
@@ -270,62 +209,80 @@ def _prediction_model_record(
     actual: list[float],
     predicted: list[float],
 ) -> dict[str, Any]:
-    errors = [abs(left - right) for left, right in zip(actual, predicted, strict=False)]
+    errors = _absolute_errors(actual, predicted)
     return {
         "name": name,
         "kind": "compact_dashboard_baseline",
         "validation": "same_series_compact",
-        "mae": _rounded(sum(errors) / len(errors) if errors else None),
-        "rmse": _rounded(
-            (sum((left - right) ** 2 for left, right in zip(actual, predicted, strict=False)) / len(actual))
-            ** 0.5
-            if actual
-            else None
-        ),
+        "mae": _rounded(_mean_absolute_error(errors)),
+        "rmse": _rounded(_root_mean_square_error(actual, predicted)),
         "r2": _rounded(_r2(actual, predicted)),
         "pearson": _rounded(_pearson(actual, predicted)),
-        "within_1pt": _rounded(
-            sum(1 for error in errors if error <= 1.0) / len(errors) if errors else None
-        ),
-        "within_5pts": _rounded(
-            sum(1 for error in errors if error <= 5.0) / len(errors) if errors else None
-        ),
+        "within_1pt": _rounded(_within_error_share(errors, threshold=1.0)),
+        "within_5pts": _rounded(_within_error_share(errors, threshold=5.0)),
     }
+
+
+def _absolute_errors(actual: list[float], predicted: list[float]) -> list[float]:
+    return [
+        abs(left - right)
+        for left, right in zip(actual, predicted, strict=False)
+    ]
+
+
+def _mean_absolute_error(errors: list[float]) -> float | None:
+    if not errors:
+        return None
+    return sum(errors) / len(errors)
+
+
+def _root_mean_square_error(actual: list[float], predicted: list[float]) -> float | None:
+    if not actual:
+        return None
+    squared_error = sum(
+        (left - right) ** 2 for left, right in zip(actual, predicted, strict=False)
+    )
+    return (squared_error / len(actual)) ** 0.5
+
+
+def _within_error_share(errors: list[float], *, threshold: float) -> float | None:
+    if not errors:
+        return None
+    return sum(1 for error in errors if error <= threshold) / len(errors)
 
 
 def _token_accounting_highlights(
     rows: list[dict[str, Any]],
     spans: list[UsageDeltaSpan],
 ) -> dict[str, Any]:
-    totals = {
-        "input_tokens": sum(_number(row.get("input_tokens")) for row in rows),
-        "cached_input_tokens": sum(_number(row.get("cached_input_tokens")) for row in rows),
-        "uncached_input_tokens": sum(_number(row.get("uncached_input_tokens")) for row in rows),
-        "output_tokens": sum(_number(row.get("output_tokens")) for row in rows),
-        "reasoning_output_tokens": sum(
-            _number(row.get("reasoning_output_tokens")) for row in rows
-        ),
-        "total_tokens": sum(_number(row.get("total_tokens")) for row in rows),
-        "usage_credits": sum(_number(row.get("usage_credits")) for row in rows),
+    totals = _token_accounting_totals(rows)
+    credits_to_visible_delta = _credits_to_visible_delta_fit(spans)
+    return {
+        "feature_units": "tokens",
+        "features": list(TOKEN_ACCOUNTING_FEATURES),
+        "totals": totals,
+        "credits_to_visible_delta": credits_to_visible_delta,
+        "unweighted": {},
+        "high_medium_fast_weighted": {},
     }
+
+
+def _token_accounting_totals(rows: list[dict[str, Any]]) -> dict[str, float | None]:
+    return {
+        field_name: _rounded(
+            sum(_number(row.get(field_name)) for row in rows)
+        )
+        for field_name in TOKEN_ACCOUNTING_TOTAL_FIELDS
+    }
+
+
+def _credits_to_visible_delta_fit(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
     span_credits = [span.standard_usage_credits for span in spans]
     span_delta = [span.delta_usage_percent for span in spans]
     return {
-        "feature_units": "tokens",
-        "features": [
-            "uncached_input_tokens",
-            "cached_input_tokens",
-            "output_tokens",
-            "reasoning_output_tokens",
-        ],
-        "totals": {key: _rounded(value) for key, value in totals.items()},
-        "credits_to_visible_delta": {
-            "span_count": len(spans),
-            "r2": _rounded(_r2(span_delta, _credit_slope_predictions(spans))),
-            "pearson": _rounded(_pearson(span_credits, span_delta)),
-        },
-        "unweighted": {},
-        "high_medium_fast_weighted": {},
+        "span_count": len(spans),
+        "r2": _rounded(_r2(span_delta, _credit_slope_predictions(spans))),
+        "pearson": _rounded(_pearson(span_credits, span_delta)),
     }
 
 
@@ -509,47 +466,12 @@ def _range_sse(
     return square_total - (total * total / n)
 
 
-def _sample_curve_points(
-    points: list[dict[str, Any]],
-    *,
-    max_points: int,
-) -> list[dict[str, Any]]:
-    if max_points <= 0 or len(points) <= max_points:
-        return points
-    last_index = len(points) - 1
-    selected_indexes = {
-        round(index * last_index / (max_points - 1)) for index in range(max_points)
-    }
-    return [points[index] for index in sorted(selected_indexes)]
 
 
-def _curve_shape(first_half_share: float, largest_call_share: float) -> str:
-    if largest_call_share >= 0.2:
-        return "spiky"
-    if first_half_share < 0.4:
-        return "back-loaded"
-    if first_half_share > 0.6:
-        return "front-loaded"
-    return "near-linear"
 
 
-def _thread_label(row: dict[str, Any]) -> str:
-    return str(
-        row.get("thread_attachment_label")
-        or row.get("thread_name")
-        or row.get("resolved_parent_thread_name")
-        or row.get("parent_thread_name")
-        or row.get("session_id")
-        or "Unknown thread"
-    )
 
 
-def _chronological_key(row: dict[str, Any]) -> tuple[str, int, str]:
-    return (
-        str(row.get("event_timestamp") or ""),
-        int(_number(row.get("cumulative_total_tokens"))),
-        str(row.get("record_id") or ""),
-    )
 
 
 def _count_values(rows: list[dict[str, Any]], field: str) -> dict[str, int]:

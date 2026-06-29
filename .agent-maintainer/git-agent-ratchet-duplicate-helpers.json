@@ -1,0 +1,161 @@
+{
+  "$schema": "https://git-agent-ratchet.org/schemas/v1.json",
+  "ratchet_meta": {
+    "repo_signature": "",
+    "last_updated_by": "git-agent-ratchet-core"
+  },
+  "baselines": {
+    "duplicate_helpers": {
+      "metric_value": 47,
+      "items": [
+        {
+          "name": "_allowance_segment_record",
+          "occurrences": [
+            "src/codex_usage_tracker/usage_drain_allowance_breakpoints.py",
+            "src/codex_usage_tracker/usage_drain_reports.py"
+          ]
+        },
+        {
+          "name": "_command_tokens",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_fact_classifiers.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_events.py"
+          ]
+        },
+        {
+          "name": "_is_alternate_codex_limit",
+          "occurrences": [
+            "src/codex_usage_tracker/usage_drain_reports.py",
+            "src/codex_usage_tracker/usage_drain_time_series.py"
+          ]
+        },
+        {
+          "name": "_is_shell_separator",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_events.py"
+          ]
+        },
+        {
+          "name": "_looks_like_assignment",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_fact_classifiers.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_events.py"
+          ]
+        },
+        {
+          "name": "_mean",
+          "occurrences": [
+            "src/codex_usage_tracker/usage_drain_reports.py",
+            "src/codex_usage_tracker/usage_drain_time_series.py"
+          ]
+        },
+        {
+          "name": "_new_thread_bucket",
+          "occurrences": [
+            "src/codex_usage_tracker/report_recommendations.py",
+            "src/codex_usage_tracker/usage_drain_thread_curves.py"
+          ]
+        },
+        {
+          "name": "_normalize_limit",
+          "occurrences": [
+            "src/codex_usage_tracker/dashboard.py",
+            "src/codex_usage_tracker/diagnostic_reports.py",
+            "src/codex_usage_tracker/store_query_sql.py"
+          ]
+        },
+        {
+          "name": "_normalize_offset",
+          "occurrences": [
+            "src/codex_usage_tracker/dashboard.py",
+            "src/codex_usage_tracker/store_query_sql.py"
+          ]
+        },
+        {
+          "name": "_number",
+          "occurrences": [
+            "src/codex_usage_tracker/costing.py",
+            "src/codex_usage_tracker/pricing_config.py",
+            "src/codex_usage_tracker/recommendations.py",
+            "src/codex_usage_tracker/usage_drain_reports.py",
+            "src/codex_usage_tracker/usage_drain_time_series.py"
+          ]
+        },
+        {
+          "name": "_number_or_none",
+          "occurrences": [
+            "src/codex_usage_tracker/usage_drain_reports.py",
+            "src/codex_usage_tracker/usage_drain_time_series.py"
+          ]
+        },
+        {
+          "name": "_optional_str",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_facts.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
+            "src/codex_usage_tracker/threads.py"
+          ]
+        },
+        {
+          "name": "_path_ref_from_token",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_events.py"
+          ]
+        },
+        {
+          "name": "_required_rate",
+          "occurrences": [
+            "src/codex_usage_tracker/allowance_rate_card.py",
+            "src/codex_usage_tracker/pricing_config.py"
+          ]
+        },
+        {
+          "name": "_rounded",
+          "occurrences": [
+            "src/codex_usage_tracker/usage_drain_reports.py",
+            "src/codex_usage_tracker/usage_drain_time_series.py"
+          ]
+        },
+        {
+          "name": "_safe_int",
+          "occurrences": [
+            "src/codex_usage_tracker/dashboard.py",
+            "src/codex_usage_tracker/diagnostics.py"
+          ]
+        },
+        {
+          "name": "_safe_path_label",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_events.py"
+          ]
+        },
+        {
+          "name": "_sample_curve_points",
+          "occurrences": [
+            "src/codex_usage_tracker/usage_drain_thread_curves.py",
+            "src/codex_usage_tracker/usage_drain_time_series.py"
+          ]
+        },
+        {
+          "name": "_stable_hash",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_snapshot_concentration.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_events.py",
+            "src/codex_usage_tracker/projects.py"
+          ]
+        },
+        {
+          "name": "_strip_command_wrappers",
+          "occurrences": [
+            "src/codex_usage_tracker/diagnostic_fact_classifiers.py",
+            "src/codex_usage_tracker/diagnostic_snapshot_events.py"
+          ]
+        }
+      ]
+    }
+  }
+}

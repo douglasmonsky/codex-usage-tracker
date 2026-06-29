@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.diagnostic_action_hints import action_hint as _action_hint
 from codex_usage_tracker.projects import apply_project_privacy_to_rows, validate_privacy_mode
 from codex_usage_tracker.store import (
     query_diagnostic_fact_call_count,
@@ -367,36 +368,6 @@ def _filters(
         "offset": offset,
         "privacy_mode": privacy_mode,
     }
-
-
-def _action_hint(*, fact_type: str, fact_name: str) -> str:
-    if fact_type == "compaction" or fact_name == "post_compaction":
-        return "Review associated calls to see whether compaction reduced context or a fresh handoff would be cleaner."
-    if fact_type == "command_family":
-        if fact_name == "unknown_command":
-            return "Open associated calls when shell activity is high; command text is intentionally not stored."
-        return "Review repeated validation or command loops when associated uncached input is high."
-    if fact_type in {"mcp_server", "mcp_tool"}:
-        return "Inspect repeated MCP activity and narrow tool result scope when associated costs are high."
-    if fact_type == "skill":
-        return "Skill use is detected only from structured events; inspect associated calls for repeated workflow cost."
-    if fact_name in {"search_read_command", "search_read_loop"}:
-        return "Inspect repeated search/read loops or narrow the task before loading more source context."
-    if fact_name == "retry_or_abort_loop":
-        return "Inspect associated calls for interrupted work, rollback, or retry loops."
-    if fact_name == "function_call_output":
-        return "Inspect repeated large tool results when associated uncached input is high."
-    if fact_type == "function":
-        return "Check whether repeated function calls are carrying more context forward than needed."
-    if fact_type == "tool":
-        return "Check whether repeated tool activity is carrying forward more context than needed."
-    if fact_name == "patch_applied":
-        return "Likely productive work; verify tests or commit state captured the change."
-    if fact_name == "task_complete":
-        return "Consider archiving or writing a handoff before reviving the thread later."
-    if fact_name == "turn_aborted":
-        return "Inspect associated calls for interrupted work or retry loops."
-    return "Open associated high-cost calls when the pattern needs more context."
 
 
 def _render_facts(rows: list[dict[str, Any]]) -> str:

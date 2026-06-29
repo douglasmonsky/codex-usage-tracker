@@ -63,6 +63,31 @@ def test_recommendations_explain_aggregate_usage_flags() -> None:
         assert recommendation["action_key"] == f"recommendation.{prefix}.action"
 
 
+def test_recommendations_cover_estimated_pricing_cost_and_reasoning_paths() -> None:
+    row = {
+        "pricing_model": "gpt-5.5",
+        "pricing_estimated": True,
+        "estimated_cost_usd": 1.5,
+        "input_tokens": 2_000,
+        "uncached_input_tokens": 200,
+        "cache_ratio": 0.90,
+        "output_tokens": 150,
+        "reasoning_output_ratio": 0.90,
+        "total_tokens": 2_150,
+        "context_window_percent": 0.55,
+        "cumulative_total_tokens": 50_000,
+    }
+
+    recommendations = action_recommendations(row)
+
+    assert [recommendation["key"] for recommendation in recommendations] == [
+        "estimated-pricing",
+        "high-cost",
+        "elevated-context",
+        "reasoning-spike",
+    ]
+
+
 def test_threshold_template_and_overrides(tmp_path: Path) -> None:
     path = tmp_path / "thresholds.json"
 
