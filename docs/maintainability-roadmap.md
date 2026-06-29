@@ -4020,3 +4020,58 @@ Remaining risks:
 
 Next handoff:
 - Continue reducing `cli.py`; the setup/plugin/pricing sections are now the biggest remaining CLI chunks.
+
+### `refactor/cli-config-runners`
+
+Goal:
+- Move pricing, allowance, rate-card, threshold, and project-template CLI runners out of `cli.py`.
+- Preserve CLI JSON schemas and text output for local config commands.
+- Bring `cli.py` under the 600-line target.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `src/codex_usage_tracker/cli.py`
+- `src/codex_usage_tracker/cli_config.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline and metric notes:
+- `cli.py` line count fell from `700` to `530`.
+- Max file-line ratchet fell from `1007` to `907`.
+- `cli_config.py` is `196` lines.
+- `cli_config.py` average complexity is A `3.22`; update-pricing and update-rate-card remain B-rated but below the current ceiling.
+- `server.py` remains oversized at `823` lines.
+
+Completed edits:
+- Added `cli_config.py` with init/update/pin pricing, allowance parsing, rate-card update, threshold template, and project template runners.
+- Updated `_COMMAND_HANDLERS` to point at public config runner functions.
+- Removed config-specific imports and command implementations from `cli.py`.
+- Added `cli_config` to the CLI adapter module group in `tach.toml`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_config.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_config.py`: passed after mechanical import sort.
+- `.venv/bin/python -m pytest tests/test_cli_lifecycle.py::test_setup_support_bundle_and_reset_db_cli tests/test_cli_lifecycle.py::test_rate_card_allowance_and_pricing_snapshot_cli tests/test_cli_release.py::test_cli_reference_documents_only_existing_stable_commands -q`: 3 passed.
+- `radon cc src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_config.py -a -s`: passed.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_config.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning plus expected change-budget warning because existing tests covered the extraction.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- `server.py` remains oversized at `823` lines and is now the largest clear file-length target.
+- Overall package still triggers structure-cohesion warnings because the package is intentionally still flat during ratchet setup.
+- `cli.py` still has B-complexity setup and inspect-log runners, but it is below the file-length target now.
+
+Next handoff:
+- Shift back to `server.py` or targeted B-complexity functions now that the CLI file-length ratchet goal is met.

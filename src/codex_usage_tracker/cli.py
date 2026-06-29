@@ -7,11 +7,6 @@ import json
 import sys
 from typing import Any
 
-from codex_usage_tracker.allowance import (
-    update_rate_card,
-    write_allowance_from_text,
-    write_allowance_template,
-)
 from codex_usage_tracker.api_payloads import (
     error_code,
     path_payload,
@@ -19,6 +14,16 @@ from codex_usage_tracker.api_payloads import (
     plugin_uninstall_payload,
     refresh_result_payload,
     session_payload,
+)
+from codex_usage_tracker.cli_config import (
+    run_init_allowance,
+    run_init_pricing,
+    run_init_projects,
+    run_init_thresholds,
+    run_parse_allowance,
+    run_pin_pricing,
+    run_update_pricing,
+    run_update_rate_card,
 )
 from codex_usage_tracker.cli_dashboard import (
     run_dashboard,
@@ -36,16 +41,8 @@ from codex_usage_tracker.formatting import (
 )
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.plugin_installer import install_plugin, uninstall_plugin
-from codex_usage_tracker.pricing import (
-    pin_pricing_snapshot,
-    update_pricing_from_openai_docs,
-    write_pricing_template,
-)
-from codex_usage_tracker.projects import (
-    apply_project_privacy_to_rows,
-    write_project_template,
-)
-from codex_usage_tracker.recommendations import write_threshold_template
+from codex_usage_tracker.pricing import update_pricing_from_openai_docs, write_pricing_template
+from codex_usage_tracker.projects import apply_project_privacy_to_rows
 from codex_usage_tracker.reports import (
     build_expensive_calls_report,
     build_pricing_coverage_report,
@@ -464,173 +461,6 @@ def _run_export(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_init_pricing(args: argparse.Namespace) -> int:
-    output = write_pricing_template(args.output, force=args.force)
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-init-pricing-v1",
-                "pricing_path": path_payload(output),
-                "created": True,
-            }
-        )
-        return 0
-    print(f"Wrote local pricing template to {output}")
-    return 0
-
-
-def _run_update_pricing(args: argparse.Namespace) -> int:
-    output = args.output or args.pricing
-    result = update_pricing_from_openai_docs(
-        output,
-        tier=args.tier,
-        source_url=args.source_url,
-        include_estimates=not args.no_estimates,
-    )
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-update-pricing-v1",
-                "pricing_path": path_payload(result.path),
-                "source_url": result.source_url,
-                "tier": result.tier,
-                "fetched_at": result.fetched_at,
-                "model_count": result.model_count,
-                "estimated_model_count": result.estimated_model_count,
-                "backup_path": path_payload(result.backup_path) if result.backup_path else None,
-            }
-        )
-        return 0
-    estimate_suffix = (
-        f", including {result.estimated_model_count} estimated internal model"
-        f"{'' if result.estimated_model_count == 1 else 's'}"
-        if result.estimated_model_count
-        else ""
-    )
-    print(
-        f"Wrote {result.model_count} {result.tier} pricing entries from "
-        f"{result.source_url} to {result.path}{estimate_suffix}"
-        + (f" (backup: {result.backup_path})" if result.backup_path else "")
-    )
-    return 0
-
-
-def _run_pin_pricing(args: argparse.Namespace) -> int:
-    output = pin_pricing_snapshot(
-        source_path=args.pricing,
-        output_path=args.output,
-        force=args.force,
-    )
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-pin-pricing-v1",
-                "pricing_path": path_payload(output),
-                "source_pricing_path": path_payload(args.pricing),
-            }
-        )
-        return 0
-    print(f"Pinned pricing snapshot to {output}")
-    print("Use this file with --pricing for reproducible historical reports.")
-    return 0
-
-
-def _run_init_allowance(args: argparse.Namespace) -> int:
-    output = write_allowance_template(args.output or args.allowance, force=args.force)
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-init-allowance-v1",
-                "allowance_path": path_payload(output),
-                "created": True,
-            }
-        )
-        return 0
-    print(f"Wrote allowance template to {output}")
-    return 0
-
-
-def _run_parse_allowance(args: argparse.Namespace) -> int:
-    text = " ".join(args.text).strip()
-    if not text:
-        if sys.stdin.isatty():
-            raise ValueError("provide pasted usage text or pipe it on stdin")
-        text = sys.stdin.read().strip()
-    output = write_allowance_from_text(
-        text,
-        path=args.output or args.allowance,
-        force=args.force,
-    )
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-parse-allowance-v1",
-                "allowance_path": path_payload(output),
-                "updated": True,
-            }
-        )
-        return 0
-    print(f"Updated allowance windows from pasted usage text at {output}")
-    return 0
-
-
-def _run_update_rate_card(args: argparse.Namespace) -> int:
-    result = update_rate_card(
-        args.output or args.rate_card,
-        source_file=args.source_file,
-    )
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-update-rate-card-v1",
-                "rate_card_path": path_payload(result.path),
-                "source_url": result.source_url,
-                "fetched_at": result.fetched_at,
-                "model_count": result.model_count,
-                "alias_count": result.alias_count,
-                "backup_path": path_payload(result.backup_path) if result.backup_path else None,
-            }
-        )
-        return 0
-    print(
-        f"Wrote {result.model_count} Codex credit rates and {result.alias_count} aliases "
-        f"to {result.path}"
-        + (f" from {result.source_url}" if result.source_url else "")
-        + (f" (backup: {result.backup_path})" if result.backup_path else "")
-    )
-    return 0
-
-
-def _run_init_thresholds(args: argparse.Namespace) -> int:
-    output = write_threshold_template(args.output or args.thresholds, force=args.force)
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-init-thresholds-v1",
-                "thresholds_path": path_payload(output),
-                "created": True,
-            }
-        )
-        return 0
-    print(f"Wrote recommendation threshold template to {output}")
-    return 0
-
-
-def _run_init_projects(args: argparse.Namespace) -> int:
-    output = write_project_template(args.output or args.projects, force=args.force)
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-init-projects-v1",
-                "projects_path": path_payload(output),
-                "created": True,
-            }
-        )
-        return 0
-    print(f"Wrote project attribution template to {output}")
-    return 0
-
-
 def _run_support_bundle(args: argparse.Namespace) -> int:
     output = build_support_bundle(
         output_path=args.output,
@@ -685,14 +515,14 @@ _COMMAND_HANDLERS = {
     "expensive": _run_expensive,
     "pricing-coverage": _run_pricing_coverage,
     "export": _run_export,
-    "init-pricing": _run_init_pricing,
-    "update-pricing": _run_update_pricing,
-    "pin-pricing": _run_pin_pricing,
-    "init-allowance": _run_init_allowance,
-    "parse-allowance": _run_parse_allowance,
-    "update-rate-card": _run_update_rate_card,
-    "init-thresholds": _run_init_thresholds,
-    "init-projects": _run_init_projects,
+    "init-pricing": run_init_pricing,
+    "update-pricing": run_update_pricing,
+    "pin-pricing": run_pin_pricing,
+    "init-allowance": run_init_allowance,
+    "parse-allowance": run_parse_allowance,
+    "update-rate-card": run_update_rate_card,
+    "init-thresholds": run_init_thresholds,
+    "init-projects": run_init_projects,
     "support-bundle": _run_support_bundle,
 }
 
