@@ -40,53 +40,76 @@ def source_logs_requiring_parse(
     paths = list(logs)
     if not paths:
         return []
-    changed: list[SourceParsePlan] = []
-    for path in paths:
-        metadata = _source_file_metadata(path)
-        if metadata is None:
-            continue
-        row = conn.execute(
-            """
-            SELECT size_bytes, mtime_ns, parsed_until_line
-                , parsed_until_byte, parser_adapter, parser_state_json
-            FROM source_files
-            WHERE source_file = ?
-            """,
-            (str(path),),
-        ).fetchone()
-        if row is None:
-            changed.append(SourceParsePlan(path=path))
-            continue
-        previous_size = int(row["size_bytes"])
-        previous_mtime_ns = int(row["mtime_ns"])
-        previous_byte = int(row["parsed_until_byte"])
-        previous_line = int(row["parsed_until_line"])
-        previous_state = parser_state_from_json(row["parser_state_json"])
-        previous_adapter = str(row["parser_adapter"] or "")
-        if previous_adapter != PARSER_ADAPTER_VERSION:
-            changed.append(SourceParsePlan(path=path))
-            continue
-        if previous_state is None:
-            changed.append(SourceParsePlan(path=path))
-            continue
-        if (
-            previous_size == metadata["size_bytes"]
-            and previous_mtime_ns == metadata["mtime_ns"]
-        ):
-            continue
-        if metadata["size_bytes"] > previous_size and 0 < previous_byte <= previous_size:
-            changed.append(
-                SourceParsePlan(
-                    path=path,
-                    start_byte=previous_byte,
-                    start_line=previous_line,
-                    initial_state=previous_state,
-                    replace_existing=False,
-                )
-            )
-            continue
-        changed.append(SourceParsePlan(path=path))
-    return changed
+    return [
+        plan
+        for plan in (_source_parse_plan(conn, path) for path in paths)
+        if plan is not None
+    ]
+
+
+def _source_parse_plan(
+    conn: sqlite3.Connection, path: Path
+) -> SourceParsePlan | None:
+    metadata = _source_file_metadata(path)
+    if metadata is None:
+        return None
+    row = _source_file_parse_row(conn, path)
+    if row is None:
+        return SourceParsePlan(path=path)
+    return _source_parse_plan_from_row(path, metadata, row)
+
+
+def _source_file_parse_row(conn: sqlite3.Connection, path: Path) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT size_bytes, mtime_ns, parsed_until_line
+             , parsed_until_byte, parser_adapter, parser_state_json
+        FROM source_files
+        WHERE source_file = ?
+        """,
+        (str(path),),
+    ).fetchone()
+
+
+def _source_parse_plan_from_row(
+    path: Path, metadata: dict[str, int], row: sqlite3.Row
+) -> SourceParsePlan | None:
+    previous_state = parser_state_from_json(row["parser_state_json"])
+    if _requires_full_source_parse(row, previous_state):
+        return SourceParsePlan(path=path)
+    if _source_metadata_matches(row, metadata):
+        return None
+    if _can_incrementally_parse_source(metadata, row):
+        return SourceParsePlan(
+            path=path,
+            start_byte=int(row["parsed_until_byte"]),
+            start_line=int(row["parsed_until_line"]),
+            initial_state=previous_state,
+            replace_existing=False,
+        )
+    return SourceParsePlan(path=path)
+
+
+def _requires_full_source_parse(
+    row: sqlite3.Row, previous_state: ParserState | None
+) -> bool:
+    previous_adapter = str(row["parser_adapter"] or "")
+    return previous_adapter != PARSER_ADAPTER_VERSION or previous_state is None
+
+
+def _source_metadata_matches(row: sqlite3.Row, metadata: dict[str, int]) -> bool:
+    return (
+        int(row["size_bytes"]) == metadata["size_bytes"]
+        and int(row["mtime_ns"]) == metadata["mtime_ns"]
+    )
+
+
+def _can_incrementally_parse_source(
+    metadata: dict[str, int], row: sqlite3.Row
+) -> bool:
+    previous_size = int(row["size_bytes"])
+    previous_byte = int(row["parsed_until_byte"])
+    return metadata["size_bytes"] > previous_size and 0 < previous_byte <= previous_size
 
 
 def upsert_source_file_metadata(

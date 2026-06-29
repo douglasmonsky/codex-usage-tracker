@@ -6750,3 +6750,48 @@ Checks:
 
 Remaining risks / next handoff:
 - Move next to `store_sources.py` C(12) functions with focused source-log store tests before refactoring persistence-adjacent behavior.
+
+### `refactor/source-logs-parse-planning`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `source_logs_requiring_parse` complexity while preserving new, unchanged, missing, and append-only grown source-log planning behavior.
+- Add focused source-store characterization coverage with the real SQLite schema.
+
+Files touched:
+- `src/codex_usage_tracker/store_sources.py`
+- `tests/test_store_sources.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split source-log parse planning into per-path planning, source row lookup, row-based plan selection, full-parse checks, metadata match checks, and incremental-parse eligibility.
+- Added direct source-log planning coverage for new files, unchanged files, missing files, and append-only incremental parsing with preserved parser state.
+
+Metrics:
+- `source_logs_requiring_parse`: C(12) -> A(5).
+- `store_sources.py` maximum complexity: C(12), now `upsert_source_file_metadata`.
+- `store_sources.py`: 178 -> 232 physical lines.
+- New `tests/test_store_sources.py`: 99 physical lines.
+- Global C-or-worse blocks: 17 -> 16.
+- No C(13) or D/E/F complexity blocks remain.
+- Current C(12) target: `store_sources.py::upsert_source_file_metadata`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_store_sources.py -q`: 1 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store_sources.py tests/test_store_sources.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/store_sources.py -a -s`: target now A(5), module max C(12).
+- `.venv/bin/python -m pytest -q`: 496 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+
+Remaining risks / next handoff:
+- Continue with `store_sources.py::upsert_source_file_metadata`, using focused metadata upsert tests before changing write behavior.
