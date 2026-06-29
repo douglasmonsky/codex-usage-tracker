@@ -2,7 +2,7 @@
 
 import sys
 
-from codex_usage_tracker.cli import main
+from codex_usage_tracker.cli.main import main
 
 if __name__ == "__main__":
     sys.exit(main())

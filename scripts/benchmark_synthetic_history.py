@@ -20,15 +20,15 @@ SRC_PATH = REPO_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from codex_usage_tracker.context import load_call_context  # noqa: E402
-from codex_usage_tracker.dashboard import dashboard_payload  # noqa: E402
-from codex_usage_tracker.models import UsageEvent  # noqa: E402
-from codex_usage_tracker.reports import (  # noqa: E402
+from codex_usage_tracker.context.api import load_call_context  # noqa: E402
+from codex_usage_tracker.core.models import UsageEvent  # noqa: E402
+from codex_usage_tracker.dashboard.api import dashboard_payload  # noqa: E402
+from codex_usage_tracker.reports.api import (  # noqa: E402
     build_pricing_coverage_report,
     build_recommendations_report,
     build_summary_report,
 )
-from codex_usage_tracker.store import (  # noqa: E402
+from codex_usage_tracker.store.api import (  # noqa: E402
     connect,
     init_db,
     query_dashboard_event_count,

@@ -67,6 +67,38 @@ xenon --max-absolute B --max-modules A --max-average A src
 
 ## Branch Ledger
 
+### `refactor/package-domain-boundaries`
+
+Goal:
+- Move the flat `codex_usage_tracker` package into responsibility folders.
+- Move tests into matching responsibility folders.
+- Preserve stable CLI, MCP launcher, and compatibility import behavior.
+- Adopt Tach domain configs now that the installed Agent Maintainer/Tach stack supports them.
+
+Completed:
+- Installed Agent Maintainer from `douglasmonsky/agent-maintainer@main`, resolving locally to `0.1.0b4`.
+- Relaxed the PyPI dev extra pin so the GitHub-installed tool is not downgraded by normal editable dev installs.
+- Added `requirements/agent-maintainer-github.txt` for the local repo-source maintainer install path.
+- Added per-domain packages and `tach.domain.toml` files for `core`, `pricing`, `parser`, `context`, `store`, `diagnostics`, `usage_drain`, `server`, `cli`, `dashboard`, and `reports`.
+- Kept compatibility wrappers/facades for stable imports including `codex_usage_tracker.cli`, `codex_usage_tracker.store`, `codex_usage_tracker.server`, `codex_usage_tracker.mcp_server`, `codex_usage_tracker.plugin_installer`, `codex_usage_tracker.allowance`, and `codex_usage_tracker.support`.
+- Split the moved context reader, server handler, and JSON contract modules enough to avoid new oversized-file failures for those specific moved files.
+- Moved tests under matching domain folders and updated repo-root/helper imports.
+
+Checks:
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: passed, 534 tests.
+- `.venv/bin/python -m pytest --cov=codex_usage_tracker --cov-report=term-missing -q`: passed, 534 tests, 86% total coverage.
+- `.venv/bin/python -m compileall -q src tests`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Agent Maintainer `verify --profile fast` still flags several moved legacy modules and moved tests as new oversized files because their paths changed. This branch reduced three immediate moved-file violations but did not try to split every existing large module/test in the same commit.
+- The next branch should continue splitting remaining large files, with highest-value candidates: `dashboard/api.py`, `store/api.py`, `usage_drain/reports.py`, `diagnostics/snapshots.py`, `cli/parser.py`, `cli/main.py`, and the largest dashboard/store tests.
+- The parser/diagnostics/store Tach cycle is documented in `docs/architecture/decisions/0001-package-domain-boundaries.md` and should be reduced in a focused later branch.
+
 ### `chore/maintainability-agent-maintainer-baseline`
 
 Goal:

@@ -10,8 +10,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from codex_usage_tracker.paths import DEFAULT_MARKETPLACE_PATH, DEFAULT_PLUGIN_LINK  # noqa: E402
-from codex_usage_tracker.plugin_installer import install_plugin  # noqa: E402
+from codex_usage_tracker.cli.plugin_installer import install_plugin  # noqa: E402
+from codex_usage_tracker.core.paths import (  # noqa: E402
+    DEFAULT_MARKETPLACE_PATH,
+    DEFAULT_PLUGIN_LINK,
+)
 
 
 def main() -> int:

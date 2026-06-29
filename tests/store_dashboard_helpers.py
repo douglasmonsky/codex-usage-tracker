@@ -5,9 +5,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from codex_usage_tracker.json_contracts import validate_json_payload_contract
-from codex_usage_tracker.models import UsageEvent
-from codex_usage_tracker.pricing import PricingUpdateResult
+from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
+from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.pricing.api import PricingUpdateResult
 
 SESSION_ID = "019e374d-c19f-7da3-a44f-8de043a7a64e"
 SECOND_SESSION_ID = "019e37d4-c1f1-71aa-b154-2d5d837af92c"

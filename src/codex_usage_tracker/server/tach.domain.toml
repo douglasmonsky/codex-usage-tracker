@@ -1,0 +1,10 @@
+[root]
+depends_on = [
+    "//codex_usage_tracker.context",
+    "//codex_usage_tracker.core",
+    "//codex_usage_tracker.dashboard",
+    "//codex_usage_tracker.diagnostics",
+    "//codex_usage_tracker.pricing",
+    "//codex_usage_tracker.reports",
+    "//codex_usage_tracker.store",
+]

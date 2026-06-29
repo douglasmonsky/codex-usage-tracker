@@ -42,7 +42,7 @@ Changelog = "https://github.com/douglasmonsky/codex-usage-tracker/blob/main/CHAN
 
 [project.optional-dependencies]
 dev = [
-    "agent-maintainer[core]==0.1.0b1; python_version >= '3.11'",
+    "agent-maintainer[core]>=0.1.0b1; python_version >= '3.11'",
     "actionlint-py>=1.7.12.24; python_version >= '3.11'",
     "build>=1.2",
     "git-agent-ratchet>=1.3.0; python_version >= '3.11'",
@@ -148,12 +148,12 @@ log_dir = ".verify-logs"
 python_version = "3.10"
 warn_unused_configs = true
 files = [
-  "src/codex_usage_tracker/json_contracts.py",
-  "src/codex_usage_tracker/models.py",
-  "src/codex_usage_tracker/recommendations.py",
-  "src/codex_usage_tracker/reports.py",
-  "src/codex_usage_tracker/schema.py",
-  "src/codex_usage_tracker/store.py",
-  "src/codex_usage_tracker/usage_drain_reports.py",
-  "src/codex_usage_tracker/usage_drain_time_series.py",
+  "src/codex_usage_tracker/core/json_contracts.py",
+  "src/codex_usage_tracker/core/models.py",
+  "src/codex_usage_tracker/reports/recommendations.py",
+  "src/codex_usage_tracker/reports/api.py",
+  "src/codex_usage_tracker/core/schema.py",
+  "src/codex_usage_tracker/store/api.py",
+  "src/codex_usage_tracker/usage_drain/reports.py",
+  "src/codex_usage_tracker/usage_drain/time_series.py",
 ]

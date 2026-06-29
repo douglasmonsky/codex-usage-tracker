@@ -363,7 +363,7 @@ def _check_issue_templates() -> list[str]:
 
 def _check_packaging_metadata() -> list[str]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
-    from codex_usage_tracker.plugin_installer import plugin_manifest
+    from codex_usage_tracker.cli.plugin_installer import plugin_manifest
 
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = pyproject["project"]
