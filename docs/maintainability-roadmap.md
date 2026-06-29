@@ -4347,3 +4347,51 @@ Remaining risks:
 
 Next handoff:
 - Move to the next largest files: `cli_parser.py`, `parser.py`, `usage_drain_reports.py`, `dashboard.py`, `diagnostics.py`, or `diagnostic_facts.py`.
+### Branch: `refactor/parser-jsonl-v1-events`
+
+Objective:
+- Split Codex JSONL v1 event parsing out of the parser facade while preserving aggregate-only parser behavior and cursor state.
+
+Baseline metrics:
+- `parser.py` from current local `main`: 852 lines.
+- Branch base before this slice: `parser.py` 726 lines after prior parser-state boundary work.
+- Before this slice, `_parse_codex_jsonl_v1` remained the parser hotspot.
+
+Completed edits:
+- Added `parser_jsonl_v1.py` as the dedicated JSONL v1 aggregate parser state machine.
+- Added `parser_jsonl_values.py` for low-level usage event construction, session metadata, rate-limit field parsing, and parser diagnostic counters.
+- Kept `parser.py` as the public facade for adapter, session-index loading, file discovery, parse entrypoints, and inspect-log reporting.
+- Split JSONL parsing into parse-state construction, per-line dispatch, session-meta handling, token-count handling, diagnostic-fact assignment, usage payload validation, and event construction helpers.
+- Moved parser-private session id extraction, token field parsing, rate-limit observation, thread-key derivation, and parser diagnostic counters into parser JSONL helper modules.
+- Added `parser_jsonl_v1` and `parser_jsonl_values` to the context/parser boundary in `tach.toml`.
+
+Metrics after edits:
+- `parser.py`: 199 lines.
+- `parser_jsonl_v1.py`: 418 lines.
+- `parser_jsonl_values.py`: 326 lines.
+- Combined parser facade plus JSONL implementation/value helpers: 943 lines, +217 versus the immediate branch base but with parser responsibilities separated and no new oversized parser file.
+- `parse_codex_jsonl_v1`: B(7).
+- `_handle_jsonl_line`: B(7).
+- `parser.py` still has `inspect_log` C(11), left as the next parser-facade complexity target.
+- Max-file and agent-maintainer fast file-length gates passed without weakening the baseline; max-file overage ratcheted from 488 to 362.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/parser.py src/codex_usage_tracker/parser_jsonl_v1.py src/codex_usage_tracker/parser_jsonl_values.py`: passed.
+- `.venv/bin/python -m mypy src/codex_usage_tracker/parser.py src/codex_usage_tracker/parser_jsonl_v1.py src/codex_usage_tracker/parser_jsonl_values.py`: passed.
+- `.venv/bin/python -m pytest tests/test_parser.py tests/test_store_dashboard_mcp.py tests/test_dashboard_payload.py -q`: 39 passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted baseline 488 -> 362.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure/change-budget warnings only.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected local-only/beta failure remains `repo-root` missing `src/agent_maintainer/__main__.py`, plus non-blocking local integration warnings.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Next parser slice should reduce `inspect_log` C(11) and consider whether the facade should delegate inspect-log row formatting to a smaller report helper.
+- Global Xenon still fails on known C/F-rated hotspots outside this branch.
