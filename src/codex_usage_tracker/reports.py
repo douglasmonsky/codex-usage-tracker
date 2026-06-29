@@ -32,6 +32,11 @@ from codex_usage_tracker.projects import (
     validate_privacy_mode,
 )
 from codex_usage_tracker.recommendations import annotate_rows_with_recommendations
+from codex_usage_tracker.report_filters import query_row_matches
+from codex_usage_tracker.report_recommendations import (
+    recommendation_sort_key,
+    thread_recommendation_rows,
+)
 from codex_usage_tracker.store import (
     query_dashboard_events,
     query_most_expensive_calls,
@@ -303,7 +308,7 @@ def build_query_report(
     rows = [
         row
         for row in rows
-        if _query_row_matches(
+        if query_row_matches(
             row,
             until=until,
             model=model,
@@ -363,41 +368,30 @@ def build_recommendations_report(
     """Build ranked aggregate recommendations for usage investigations."""
 
     privacy_mode = validate_privacy_mode(privacy_mode)
-    rows = annotate_thread_attachments(
-        query_dashboard_events(
-            db_path,
-            limit=0,
-            since=since,
-            until=until,
-            model=model,
-            effort=effort,
-            thread=thread,
-        )
+    rows = _recommendation_source_rows(
+        db_path=db_path,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
     )
-    pricing = load_pricing_config(pricing_path)
-    allowance = load_allowance_config(allowance_path)
-    rows = annotate_rows_with_allowance(annotate_rows_with_efficiency(rows, pricing), allowance)
-    rows = annotate_rows_with_recommendations(rows)
-    rows = annotate_rows_with_project_identity(rows, load_project_config(projects_path))
-    scored_rows = [
-        row
-        for row in rows
-        if row.get("action_recommendations")
-        and (min_score is None or float(row.get("recommendation_score") or 0) >= min_score)
-        and _query_row_matches(
-            row,
-            until=until,
-            model=model,
-            effort=effort,
-            thread=thread,
-            project=project,
-            pricing_status=None,
-            credit_confidence=None,
-            min_tokens=None,
-            min_credits=None,
-        )
-    ]
-    scored_rows.sort(key=_recommendation_sort_key)
+    rows = _annotated_recommendation_rows(
+        rows,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+    )
+    scored_rows = _recommendation_filtered_rows(
+        rows,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        project=project,
+        min_score=min_score,
+    )
+    scored_rows.sort(key=recommendation_sort_key)
     normalized_limit = None if limit <= 0 else limit
     limited_rows = scored_rows if normalized_limit is None else scored_rows[:normalized_limit]
     private_rows = apply_project_privacy_to_rows(limited_rows, privacy_mode=privacy_mode)
@@ -418,149 +412,87 @@ def build_recommendations_report(
             "row_count": len(private_rows),
             "total_matched_rows": len(scored_rows),
             "truncated": normalized_limit is not None and len(scored_rows) > normalized_limit,
-            "threads": _thread_recommendation_rows(scored_rows, limit=normalized_limit or 20),
+            "threads": thread_recommendation_rows(scored_rows, limit=normalized_limit or 20),
             "rows": private_rows,
         }
     )
 
 
-def _recommendation_sort_key(row: dict[str, Any]) -> tuple[float, int, str, str]:
-    return (
-        -float(row.get("recommendation_score") or 0),
-        -int(row.get("total_tokens") or 0),
-        str(row.get("event_timestamp") or ""),
-        str(row.get("record_id") or ""),
+def _recommendation_source_rows(
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    model: str | None,
+    effort: str | None,
+    thread: str | None,
+) -> list[dict[str, Any]]:
+    return annotate_thread_attachments(
+        query_dashboard_events(
+            db_path,
+            limit=0,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+        )
     )
 
 
-def _thread_recommendation_rows(
+def _annotated_recommendation_rows(
     rows: list[dict[str, Any]],
     *,
-    limit: int,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path,
 ) -> list[dict[str, Any]]:
-    buckets: dict[str, dict[str, Any]] = {}
-    for row in rows:
-        label = str(
-            row.get("thread_attachment_label")
-            or row.get("thread_name")
-            or row.get("resolved_parent_thread_name")
-            or row.get("parent_thread_name")
-            or row.get("session_id")
-            or "Unknown thread"
-        )
-        bucket = buckets.setdefault(
-            label,
-            {
-                "thread": label,
-                "call_count": 0,
-                "session_count": set(),
-                "total_tokens": 0,
-                "estimated_cost_usd": 0.0,
-                "usage_credits": 0.0,
-                "recommendation_score": 0.0,
-                "max_recommendation_score": 0.0,
-                "primary_recommendation": None,
-                "secondary_signals": set(),
-                "latest_event": "",
-            },
-        )
-        bucket["call_count"] += 1
-        bucket["session_count"].add(row.get("session_id"))
-        bucket["total_tokens"] += int(row.get("total_tokens") or 0)
-        bucket["estimated_cost_usd"] += float(row.get("estimated_cost_usd") or 0)
-        bucket["usage_credits"] += float(row.get("usage_credits") or 0)
-        score = float(row.get("recommendation_score") or 0)
-        bucket["recommendation_score"] += score
-        if score > float(bucket["max_recommendation_score"] or 0):
-            bucket["max_recommendation_score"] = score
-            bucket["primary_recommendation"] = row.get("primary_recommendation")
-        if str(row.get("event_timestamp") or "") > str(bucket["latest_event"] or ""):
-            bucket["latest_event"] = str(row.get("event_timestamp") or "")
-        for signal in row.get("secondary_signals") or []:
-            bucket["secondary_signals"].add(signal)
-        primary_signal = row.get("primary_signal")
-        if primary_signal:
-            bucket["secondary_signals"].add(primary_signal)
-    summaries: list[dict[str, Any]] = []
-    for bucket in buckets.values():
-        primary = bucket.get("primary_recommendation")
-        primary_key = primary.get("key") if isinstance(primary, dict) else None
-        secondary = sorted(str(signal) for signal in bucket["secondary_signals"] if signal)
-        if primary_key in secondary:
-            secondary.remove(primary_key)
-        summaries.append(
-            {
-                "thread": bucket["thread"],
-                "call_count": int(bucket["call_count"]),
-                "session_count": len(bucket["session_count"]),
-                "total_tokens": int(bucket["total_tokens"]),
-                "estimated_cost_usd": round(float(bucket["estimated_cost_usd"]), 6),
-                "usage_credits": round(float(bucket["usage_credits"]), 6),
-                "recommendation_score": round(float(bucket["recommendation_score"]), 2),
-                "max_recommendation_score": round(float(bucket["max_recommendation_score"]), 2),
-                "primary_recommendation": primary,
-                "secondary_signals": secondary,
-                "latest_event": bucket["latest_event"],
-            }
-        )
-    summaries.sort(
-        key=lambda row: (
-            -float(row["recommendation_score"]),
-            -int(row["total_tokens"]),
-            str(row["thread"]),
-        )
-    )
-    return summaries[:limit]
+    pricing = load_pricing_config(pricing_path)
+    allowance = load_allowance_config(allowance_path)
+    rows = annotate_rows_with_allowance(annotate_rows_with_efficiency(rows, pricing), allowance)
+    rows = annotate_rows_with_recommendations(rows)
+    return annotate_rows_with_project_identity(rows, load_project_config(projects_path))
 
 
-def _query_row_matches(
-    row: dict[str, Any],
+def _recommendation_filtered_rows(
+    rows: list[dict[str, Any]],
     *,
     until: str | None,
     model: str | None,
     effort: str | None,
     thread: str | None,
     project: str | None,
-    pricing_status: str | None,
-    credit_confidence: str | None,
-    min_tokens: int | None,
-    min_credits: float | None,
-) -> bool:
-    if until and str(row.get("event_timestamp") or "") > until:
+    min_score: float | None,
+) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in rows
+        if _has_actionable_recommendation(row, min_score)
+        and query_row_matches(
+            row,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            project=project,
+            pricing_status=None,
+            credit_confidence=None,
+            min_tokens=None,
+            min_credits=None,
+        )
+    ]
+
+
+def _has_actionable_recommendation(row: dict[str, Any], min_score: float | None) -> bool:
+    if not row.get("action_recommendations"):
         return False
-    if model and str(row.get("model") or "") != model:
-        return False
-    if effort and str(row.get("effort") or "") != effort:
-        return False
-    if thread:
-        thread_values = {
-            str(row.get("thread_name") or ""),
-            str(row.get("parent_thread_name") or ""),
-            str(row.get("resolved_parent_thread_name") or ""),
-            str(row.get("thread_attachment_label") or ""),
-            str(row.get("session_id") or ""),
-        }
-        if thread not in thread_values:
-            return False
-    if project:
-        project_values = {
-            str(row.get("project_name") or ""),
-            str(row.get("project_key") or ""),
-            str(row.get("project_relative_cwd") or ""),
-        }
-        if project not in project_values and project not in (row.get("project_tags") or []):
-            return False
-    if pricing_status == "priced" and not row.get("pricing_model"):
-        return False
-    if pricing_status == "estimated" and not row.get("pricing_estimated"):
-        return False
-    if pricing_status == "unpriced" and row.get("pricing_model"):
-        return False
-    if credit_confidence and row.get("usage_credit_confidence") != credit_confidence:
-        return False
-    if min_tokens is not None and int(row.get("total_tokens") or 0) < min_tokens:
-        return False
-    return not (min_credits is not None and float(row.get("usage_credits") or 0) < min_credits)
+    return min_score is None or float(row.get("recommendation_score") or 0) >= min_score
+
+
+
+
+
+
 
 
 def _project_summary_rows(

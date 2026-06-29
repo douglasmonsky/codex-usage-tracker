@@ -4240,3 +4240,60 @@ Remaining risks:
 
 Next handoff:
 - Move to the next current file-length hotspot (`cli_parser.py`, `parser.py`, `usage_drain_reports.py`, `dashboard.py`, `diagnostics.py`, `reports.py`, or `diagnostic_facts.py`) depending on the roadmap priority and risk.
+
+### `refactor/reports-query-helpers`
+
+Goal:
+- Reduce `reports.py` file length and the worst query/recommendation report complexity hotspots.
+- Extract reusable query-row predicates and recommendation thread rollups without changing CLI/MCP report JSON schemas.
+- Keep newly extracted report modules under the Xenon B/A/A threshold.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `src/codex_usage_tracker/reports.py`
+- `src/codex_usage_tracker/report_filters.py`
+- `src/codex_usage_tracker/report_recommendations.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline metric notes:
+- `reports.py` line count fell from `637` to `569`.
+- Added `report_filters.py` at `88` lines and `report_recommendations.py` at `127` lines.
+- Max file-line ratchet fell from `525` to `488`.
+- Removed the prior E/D query/recommendation helper hotspots from `reports.py`.
+- `build_recommendations_report` fell to A(5); the new report helper modules pass Xenon B/A/A.
+
+Completed edits:
+- Extracted report row predicates to `report_filters.query_row_matches`.
+- Extracted recommendation sorting and per-thread rollups to `report_recommendations`.
+- Split recommendation report orchestration into source-row loading, annotation, filtering, and final payload construction helpers.
+- Renamed a branch-local helper to avoid introducing a duplicate-helper ratchet regression.
+- Added both new modules to the application/report-services architecture group in `tach.toml`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_filters.py src/codex_usage_tracker/report_recommendations.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_filters.py src/codex_usage_tracker/report_recommendations.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_release.py tests/test_mcp_integration.py -q`: 19 passed.
+- `radon cc src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_filters.py src/codex_usage_tracker/report_recommendations.py -a -s`: passed; remaining C-rated function is `_project_summary_rows`, outside this branch's query/recommendation helper slice.
+- `radon mi src/codex_usage_tracker/reports.py src/codex_usage_tracker/report_filters.py src/codex_usage_tracker/report_recommendations.py -s`: all A.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/report_filters.py src/codex_usage_tracker/report_recommendations.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed after renaming the duplicate helper.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected flat-package structure warning and Python-source-without-test-change warning.
+
+Remaining risks:
+- `reports.py` still has `_project_summary_rows` C(17), which should be a separate project-summary report slice.
+- `build_query_report` is still B(10), just under the current ceiling.
+- Package-wide structure-cohesion warning remains while the flat package is being gradually decomposed.
+
+Next handoff:
+- Split or simplify `_project_summary_rows` separately, or move to the next larger file if report project summaries are lower risk than parser/dashboard work.
