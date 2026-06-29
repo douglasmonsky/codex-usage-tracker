@@ -7527,3 +7527,35 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue to wemake baseline only after this strict-local architecture checkpoint is committed.
+
+### `chore/wemake-baseline-local`
+
+Goal:
+- Add `wemake-python-styleguide` as Python 3.11+ dev-only tooling.
+- Keep global `agent-maintainer` wemake integration disabled until the tree has a useful passing scope.
+- Establish the first local wemake ratchet on already-clean modules only.
+
+Acceptance:
+- A local wemake command passes for selected modules.
+- Existing fast maintainer and project checks still pass.
+- No remote CI, PR, tag, or publish activity.
+
+Status:
+- Branch created locally from the current repair stack.
+- Added `wemake-python-styleguide>=1.6.2; python_version >= '3.11'` to the dev extras.
+- Added `scripts/check_wemake_baseline.py` as the narrow local gate.
+- Initial selected modules:
+  - `src/codex_usage_tracker/diagnostics_types.py`
+  - `src/codex_usage_tracker/paths.py`
+  - `src/codex_usage_tracker/store_usage_timing.py`
+
+Checks:
+- `.venv/bin/python scripts/check_wemake_baseline.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- This is intentionally narrow. Most modules still fail wemake under current style.
+- Keep expanding by module group in `chore/wemake-ratchet-up`, not by broad ignores.
