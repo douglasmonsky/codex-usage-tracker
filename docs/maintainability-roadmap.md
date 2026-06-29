@@ -4395,3 +4395,43 @@ Checks:
 Remaining risks / next handoff:
 - Next parser slice should reduce `inspect_log` C(11) and consider whether the facade should delegate inspect-log row formatting to a smaller report helper.
 - Global Xenon still fails on known C/F-rated hotspots outside this branch.
+### Branch: `refactor/usage-drain-span-feature-row`
+
+Objective:
+- Reduce the worst remaining usage-drain feature construction hotspot while preserving the predictive model row schema.
+
+Baseline metrics:
+- `usage_drain_features.py`: 198 lines at branch start.
+- `span_feature_row`: F(41).
+- Module average complexity: D(25.0).
+
+Completed edits:
+- Split `span_feature_row` into feature groups for time, credits/tokens, turns, effort, usage-window buckets, and timing buckets.
+- Added small shared helpers for safe division, cyclic time encodings, turn fallbacks, and usage-window elapsed calculations.
+- Preserved existing output keys and kept `add_days_since_first_span` behavior unchanged.
+
+Metrics after edits:
+- `usage_drain_features.py`: 304 lines.
+- `span_feature_row`: A(3).
+- Highest remaining function in module: `add_days_since_first_span` B(9).
+- Module average complexity: A(2.62).
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/usage_drain_features.py`: passed.
+
+Checks:
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy src/codex_usage_tracker/usage_drain_features.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py -q`: 15 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_server_diagnostic_snapshots.py -q`: 26 passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure/change-budget warnings only.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `add_days_since_first_span` remains B(9) but within current Xenon ceiling.
+- Global Xenon still fails on other known C/F-rated usage-drain, store, diagnostic, and doctor hotspots.
