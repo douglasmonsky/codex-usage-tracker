@@ -4130,3 +4130,59 @@ Remaining risks:
 
 Next handoff:
 - Move to the next file-length hotspot, likely `allowance.py`, or reduce remaining B-complexity hotspots if file-length progress pauses.
+### `refactor/allowance-rate-card-module`
+
+Goal:
+- Move Codex rate-card loading, update-result metadata, parser helpers, and numeric/string helpers out of `allowance.py`.
+- Keep `codex_usage_tracker.allowance` as the public compatibility facade for existing CLI/API/test imports.
+- Reduce file-length and duplicate-helper ratchets without changing allowance JSON schemas or dashboard payload behavior.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-duplicate-helpers.json`
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `src/codex_usage_tracker/allowance.py`
+- `src/codex_usage_tracker/allowance_rate_card.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline metric notes:
+- `allowance.py` line count fell from `759` to `591`.
+- Added `allowance_rate_card.py` at `279` lines.
+- Max file-line ratchet fell from `684` to `525`.
+- Duplicate-helper ratchet fell from `51` to `49`.
+- `allowance_rate_card.py` has no C-rated functions; its highest functions are B-rated parser/update helpers.
+- Remaining `allowance.py` complexity is pre-existing allowance-window logic: `_allowance_line_matches` C(18), `summarize_allowance_usage` C(15), and `resolve_credit_rate` C(13).
+
+Completed edits:
+- Extracted rate-card constants, bundled-card loading, rate-card update writing, credit-rate parsing, alias parsing, metadata parsing, and shared helper coercions to `allowance_rate_card.py`.
+- Re-exported the stable public names from `allowance.py` through an explicit `__all__`.
+- Split extracted metadata parser branches into row-level helpers so the new module stays below the Xenon absolute B ceiling.
+- Added `allowance_rate_card` to the pricing/allowance architecture group in `tach.toml`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_rate_card.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_rate_card.py`: passed.
+- `.venv/bin/python -m pytest tests/test_allowance.py tests/test_cli_lifecycle.py::test_rate_card_allowance_and_pricing_snapshot_cli -q`: 9 passed.
+- `radon cc src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_rate_card.py -a -s`: passed; new module has no C-rated functions.
+- `radon mi src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_rate_card.py -s`: `allowance.py` B, `allowance_rate_card.py` A.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/allowance_rate_card.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed and ratcheted.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected flat-package structure warning and branch-size warning.
+
+Remaining risks:
+- `allowance.py` is below the local 600-line target but still has C-rated allowance-window functions.
+- Full Xenon across both allowance files still fails because those pre-existing `allowance.py` functions remain C-rated; this branch only made the extracted rate-card module clean under the B ceiling.
+- Overall package still triggers structure-cohesion warnings because the project is intentionally being decomposed gradually from a flat package.
+
+Next handoff:
+- Start a separate allowance-window parser/summary complexity branch instead of mixing it into the rate-card extraction.

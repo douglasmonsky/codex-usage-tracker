@@ -43,6 +43,7 @@ depends_on = [
 [[modules]]
 paths = [
     "codex_usage_tracker.allowance",
+    "codex_usage_tracker.allowance_rate_card",
     "codex_usage_tracker.costing",
     "codex_usage_tracker.pricing",
     "codex_usage_tracker.pricing_config",
@@ -51,6 +52,7 @@ paths = [
 ]
 depends_on = [
     "codex_usage_tracker.allowance",
+    "codex_usage_tracker.allowance_rate_card",
     "codex_usage_tracker.call_origin",
     "codex_usage_tracker.costing",
     "codex_usage_tracker.formatting",

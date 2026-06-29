@@ -4,27 +4,61 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.allowance_rate_card import (
+    CODEX_PRICING_URL,
+    CODEX_RATE_CARD_URL,
+    DEFAULT_SOURCE,
+    RATE_CARD_SCHEMA,
+    RateCardUpdateResult,
+    load_bundled_rate_card,
+    load_json_file,
+    normalize_model,
+    number_value,
+    optional_positive_number,
+    optional_str,
+    parse_alias_metadata,
+    parse_aliases,
+    parse_credit_rate_metadata,
+    parse_credit_rates,
+    parse_rate_card_source,
+    update_rate_card,
+)
 from codex_usage_tracker.paths import DEFAULT_ALLOWANCE_PATH, DEFAULT_RATE_CARD_PATH
 
+__all__ = (
+    "ALLOWANCE_SCHEMA",
+    "CODEX_PRICING_URL",
+    "CODEX_RATE_CARD_URL",
+    "DEFAULT_SOURCE",
+    "RATE_CARD_SCHEMA",
+    "ALLOWANCE_TEMPLATE",
+    "AllowanceWindow",
+    "UsageAllowanceConfig",
+    "RateCardUpdateResult",
+    "annotate_rows_with_allowance",
+    "estimate_usage_credits",
+    "load_allowance_config",
+    "load_bundled_rate_card",
+    "parse_alias_metadata",
+    "parse_aliases",
+    "parse_allowance_text",
+    "parse_credit_rate_metadata",
+    "parse_credit_rates",
+    "parse_rate_card_source",
+    "parse_windows",
+    "resolve_credit_rate",
+    "summarize_allowance_usage",
+    "update_rate_card",
+    "write_allowance_from_text",
+    "write_allowance_template",
+)
+
 ALLOWANCE_SCHEMA = "codex-usage-tracker-allowance-v1"
-RATE_CARD_SCHEMA = "codex-usage-tracker-codex-rate-card-v1"
-CODEX_RATE_CARD_URL = "https://help.openai.com/en/articles/20001106-codex-rate-card"
-CODEX_PRICING_URL = "https://developers.openai.com/codex/pricing"
-DEFAULT_SOURCE = {
-    "name": "OpenAI Codex rate card",
-    "url": CODEX_RATE_CARD_URL,
-    "pricing_url": CODEX_PRICING_URL,
-    "fetched_at": "2026-06-03",
-    "basis": "credits per 1M input, cached input, and output tokens",
-    "tier": "standard",
-}
 
 ALLOWANCE_TEMPLATE = {
     "schema": ALLOWANCE_SCHEMA,
@@ -91,18 +125,6 @@ class UsageAllowanceConfig:
     rate_card_error: str | None = None
 
 
-@dataclass(frozen=True)
-class RateCardUpdateResult:
-    """Result from writing a local Codex credit rate-card snapshot."""
-
-    path: Path
-    source_url: str | None
-    fetched_at: str | None
-    model_count: int
-    alias_count: int
-    backup_path: Path | None = None
-
-
 def load_allowance_config(
     path: Path = DEFAULT_ALLOWANCE_PATH,
     *,
@@ -115,7 +137,7 @@ def load_allowance_config(
     rate_card_error = None
     if rate_card_path.expanduser().exists():
         try:
-            base_card = _load_json_file(rate_card_path)
+            base_card = load_json_file(rate_card_path)
             rate_card_loaded = True
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
             rate_card_error = str(exc)
@@ -144,7 +166,7 @@ def load_allowance_config(
         )
 
     try:
-        raw = _load_json_file(path)
+        raw = load_json_file(path)
         local_rates = parse_credit_rates(raw.get("credit_rates", {}))
         credit_rates.update(local_rates)
         rate_metadata.update(
@@ -214,54 +236,8 @@ def write_allowance_template(
     return path
 
 
-def load_bundled_rate_card() -> dict[str, Any]:
-    """Load the package-bundled Codex credit rate-card snapshot."""
-
-    rate_card = (
-        resources.files("codex_usage_tracker.plugin_data")
-        .joinpath("rate_cards")
-        .joinpath("codex-credit-rates.json")
-    )
-    with rate_card.open("r", encoding="utf-8") as handle:
-        raw = json.load(handle)
-    if not isinstance(raw, dict):
-        raise ValueError("bundled Codex rate card must be a JSON object")
-    return raw
 
 
-def update_rate_card(
-    path: Path = DEFAULT_RATE_CARD_PATH,
-    *,
-    source_file: Path | None = None,
-) -> RateCardUpdateResult:
-    """Write a validated Codex credit rate-card snapshot to the local config directory."""
-
-    raw = _load_json_file(source_file) if source_file is not None else load_bundled_rate_card()
-    schema = raw.get("schema") or raw.get("_schema")
-    if schema and schema != RATE_CARD_SCHEMA:
-        raise ValueError(f"unsupported Codex rate-card schema: {schema}")
-    source = parse_rate_card_source(raw)
-    credit_rates = parse_credit_rates(raw.get("credit_rates", {}))
-    aliases = parse_aliases(raw.get("aliases", {}))
-    if not credit_rates:
-        raise ValueError("rate card must contain at least one credit rate")
-    parse_credit_rate_metadata(raw.get("credit_rates", {}), source=source)
-    parse_alias_metadata(raw.get("aliases", {}), source=source)
-
-    path = path.expanduser()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    backup_path = _backup_existing_rate_card(path)
-    tmp_path = path.with_name(f"{path.name}.tmp")
-    tmp_path.write_text(json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-    return RateCardUpdateResult(
-        path=path,
-        source_url=_optional_str(source.get("url")),
-        fetched_at=_optional_str(source.get("fetched_at")),
-        model_count=len(credit_rates),
-        alias_count=len(aliases),
-        backup_path=backup_path,
-    )
 
 
 def parse_allowance_text(
@@ -302,7 +278,7 @@ def write_allowance_from_text(
     path = path.expanduser()
     if path.exists():
         try:
-            payload = _load_json_file(path)
+            payload = load_json_file(path)
         except (OSError, TypeError, json.JSONDecodeError, ValueError):
             if not force:
                 raise
@@ -375,29 +351,29 @@ def summarize_allowance_usage(
     """Summarize Codex credit usage and configured allowance windows."""
 
     resolved = config or load_allowance_config()
-    total_tokens = sum(_number(row.get("total_tokens")) for row in rows)
+    total_tokens = sum(number_value(row.get("total_tokens")) for row in rows)
     rated_tokens = sum(
-        _number(row.get("total_tokens"))
+        number_value(row.get("total_tokens"))
         for row in rows
         if row.get("usage_credits") is not None
     )
     usage_credits = sum(
-        _number(row.get("usage_credits"))
+        number_value(row.get("usage_credits"))
         for row in rows
         if row.get("usage_credits") is not None
     )
     estimated_credits = sum(
-        _number(row.get("usage_credits"))
+        number_value(row.get("usage_credits"))
         for row in rows
         if row.get("usage_credit_confidence") == "estimated"
     )
     override_credits = sum(
-        _number(row.get("usage_credits"))
+        number_value(row.get("usage_credits"))
         for row in rows
         if row.get("usage_credit_confidence") == "user_override"
     )
     exact_credits = sum(
-        _number(row.get("usage_credits"))
+        number_value(row.get("usage_credits"))
         for row in rows
         if row.get("usage_credit_confidence") == "exact"
     )
@@ -423,14 +399,14 @@ def resolve_credit_rate(
 ) -> tuple[str, dict[str, float], str, str, dict[str, Any]] | None:
     """Resolve a model label into a credit rate, confidence, and note."""
 
-    normalized = _normalize_model(model)
+    normalized = normalize_model(model)
     if not normalized:
         return None
     direct = config.credit_rates.get(normalized)
     if direct is not None:
         metadata = config.rate_metadata.get(normalized, {})
-        confidence = _optional_str(metadata.get("confidence")) or "exact"
-        note = _optional_str(metadata.get("note")) or (
+        confidence = optional_str(metadata.get("confidence")) or "exact"
+        note = optional_str(metadata.get("note")) or (
             "Direct match to Codex credit rates."
             if confidence != "user_override"
             else "Direct match to local user-provided Codex credit rate."
@@ -440,15 +416,15 @@ def resolve_credit_rate(
     alias = config.aliases.get(normalized)
     if not alias:
         return None
-    target = _normalize_model(alias.get("model"))
+    target = normalize_model(alias.get("model"))
     if not target:
         return None
     rates = config.credit_rates.get(target)
     if rates is None:
         return None
     metadata = {**config.rate_metadata.get(target, {}), **config.alias_metadata.get(normalized, {})}
-    confidence = alias.get("confidence") or _optional_str(metadata.get("confidence")) or "estimated"
-    note = alias.get("note") or _optional_str(metadata.get("note")) or (
+    confidence = alias.get("confidence") or optional_str(metadata.get("confidence")) or "estimated"
+    note = alias.get("note") or optional_str(metadata.get("note")) or (
         f"Mapped from {normalized} to {target} by local alias."
     )
     return target, rates, confidence, note, metadata
@@ -460,11 +436,11 @@ def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> floa
     input_rate = rates["input_per_million"]
     cached_rate = rates["cached_input_per_million"]
     output_rate = rates["output_per_million"]
-    cached_input = _number(row.get("cached_input_tokens"))
-    uncached_input = _number(row.get("uncached_input_tokens"))
+    cached_input = number_value(row.get("cached_input_tokens"))
+    uncached_input = number_value(row.get("uncached_input_tokens"))
     if uncached_input <= 0:
-        uncached_input = max(_number(row.get("input_tokens")) - cached_input, 0.0)
-    output_tokens = _number(row.get("output_tokens"))
+        uncached_input = max(number_value(row.get("input_tokens")) - cached_input, 0.0)
+    output_tokens = number_value(row.get("output_tokens"))
     return (
         (uncached_input * input_rate)
         + (cached_input * cached_rate)
@@ -472,120 +448,14 @@ def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> floa
     ) / 1_000_000
 
 
-def parse_credit_rates(raw: object) -> dict[str, dict[str, float]]:
-    if not isinstance(raw, dict):
-        return {}
-    parsed: dict[str, dict[str, float]] = {}
-    for model, rates in raw.items():
-        normalized = _normalize_model(model)
-        if not normalized or not isinstance(rates, dict):
-            continue
-        parsed[normalized] = {
-            "input_per_million": _required_rate(rates, "input_per_million", normalized),
-            "cached_input_per_million": _required_rate(
-                rates, "cached_input_per_million", normalized
-            ),
-            "output_per_million": _required_rate(rates, "output_per_million", normalized),
-        }
-    return parsed
 
 
-def parse_aliases(raw: object) -> dict[str, dict[str, str]]:
-    if not isinstance(raw, dict):
-        return {}
-    parsed: dict[str, dict[str, str]] = {}
-    for source, target in raw.items():
-        source_model = _normalize_model(source)
-        if not source_model:
-            continue
-        if isinstance(target, str):
-            parsed[source_model] = {
-                "model": _normalize_model(target) or target,
-                "confidence": "estimated",
-                "note": f"Mapped from {source_model} by local allowance config.",
-            }
-        elif isinstance(target, dict):
-            target_model = _normalize_model(target.get("model"))
-            if not target_model:
-                continue
-            parsed[source_model] = {
-                "model": target_model,
-                "confidence": _optional_str(target.get("confidence")) or "estimated",
-                "note": _optional_str(target.get("note"))
-                or f"Mapped from {source_model} by local allowance config.",
-            }
-    return parsed
 
 
-def parse_rate_card_source(raw: object) -> dict[str, Any]:
-    if not isinstance(raw, dict):
-        return dict(DEFAULT_SOURCE)
-    source = raw.get("source") or raw.get("_source")
-    if not isinstance(source, dict):
-        return dict(DEFAULT_SOURCE)
-    return {**DEFAULT_SOURCE, **source}
 
 
-def parse_credit_rate_metadata(
-    raw: object,
-    *,
-    source: dict[str, Any],
-    default_confidence: str = "exact",
-) -> dict[str, dict[str, Any]]:
-    if not isinstance(raw, dict):
-        return {}
-    parsed: dict[str, dict[str, Any]] = {}
-    for model, rates in raw.items():
-        normalized = _normalize_model(model)
-        if not normalized or not isinstance(rates, dict):
-            continue
-        parsed[normalized] = {
-            "confidence": _optional_str(rates.get("confidence")) or default_confidence,
-            "source_name": _optional_str(rates.get("source_name"))
-            or _optional_str(source.get("name"))
-            or "Codex credit rates",
-            "source_url": _optional_str(rates.get("source_url"))
-            or _optional_str(source.get("url")),
-            "fetched_at": _optional_str(rates.get("fetched_at"))
-            or _optional_str(source.get("fetched_at")),
-            "tier": _optional_str(rates.get("tier")) or _optional_str(source.get("tier")),
-            "note": _optional_str(rates.get("note")),
-        }
-    return parsed
 
 
-def parse_alias_metadata(raw: object, *, source: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    if not isinstance(raw, dict):
-        return {}
-    parsed: dict[str, dict[str, Any]] = {}
-    for alias, target in raw.items():
-        normalized = _normalize_model(alias)
-        if not normalized:
-            continue
-        if isinstance(target, str):
-            parsed[normalized] = {
-                "confidence": "estimated",
-                "source_name": _optional_str(source.get("name")) or "Codex credit rates",
-                "source_url": _optional_str(source.get("url")),
-                "fetched_at": _optional_str(source.get("fetched_at")),
-                "tier": _optional_str(source.get("tier")),
-                "note": f"Mapped from {normalized} by local allowance config.",
-            }
-        elif isinstance(target, dict):
-            parsed[normalized] = {
-                "confidence": _optional_str(target.get("confidence")) or "estimated",
-                "source_name": _optional_str(target.get("source_name"))
-                or _optional_str(source.get("name"))
-                or "Codex credit rates",
-                "source_url": _optional_str(target.get("source_url"))
-                or _optional_str(source.get("url")),
-                "fetched_at": _optional_str(target.get("fetched_at"))
-                or _optional_str(source.get("fetched_at")),
-                "tier": _optional_str(target.get("tier")) or _optional_str(source.get("tier")),
-                "note": _optional_str(target.get("note")),
-                "alias_reason": _optional_str(target.get("alias_reason")),
-            }
-    return parsed
 
 
 def parse_windows(raw: object) -> list[AllowanceWindow]:
@@ -598,38 +468,26 @@ def parse_windows(raw: object) -> list[AllowanceWindow]:
 
     windows: list[AllowanceWindow] = []
     for row in rows:
-        key = _optional_str(row.get("key"))
+        key = optional_str(row.get("key"))
         if not key:
             continue
-        label = _optional_str(row.get("label")) or key.replace("_", " ").title()
+        label = optional_str(row.get("label")) or key.replace("_", " ").title()
         windows.append(
             AllowanceWindow(
                 key=key,
                 label=label,
-                total_credits=_optional_positive_number(row.get("total_credits")),
-                remaining_credits=_optional_positive_number(row.get("remaining_credits")),
+            total_credits=optional_positive_number(row.get("total_credits")),
+            remaining_credits=optional_positive_number(row.get("remaining_credits")),
                 remaining_percent=_optional_percent(row.get("remaining_percent")),
-                reset_at=_optional_str(row.get("reset_at")),
-                captured_at=_optional_str(row.get("captured_at")),
+                reset_at=optional_str(row.get("reset_at")),
+                captured_at=optional_str(row.get("captured_at")),
             )
         )
     return windows
 
 
-def _load_json_file(path: Path) -> dict[str, Any]:
-    raw = json.loads(path.expanduser().read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"JSON config must be an object: {path}")
-    return raw
 
 
-def _backup_existing_rate_card(path: Path) -> Path | None:
-    if not path.exists():
-        return None
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    backup_path = path.with_name(f"{path.name}.{stamp}.bak")
-    shutil.copy2(path, backup_path)
-    return backup_path
 
 
 def _allowance_line_matches(text: str) -> list[tuple[str, str, str, str | None]]:
@@ -702,47 +560,21 @@ def _allowance_window_key(label: str) -> str | None:
     return None
 
 
-def _normalize_model(value: object) -> str | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    return value.strip().lower().replace("_", "-")
 
 
-def _required_rate(raw: dict[str, Any], key: str, model: str) -> float:
-    parsed = _optional_positive_number(raw.get(key))
-    if parsed is None:
-        raise ValueError(f"missing {key} for Codex credit model {model}")
-    return parsed
 
 
-def _optional_positive_number(value: object) -> float | None:
-    if value is None or value == "":
-        return None
-    number = _number(value)
-    if number < 0:
-        raise ValueError("allowance values cannot be negative")
-    return number
 
 
 def _optional_percent(value: object) -> float | None:
-    parsed = _optional_positive_number(value)
+    parsed = optional_positive_number(value)
     if parsed is None:
         return None
     return parsed / 100 if parsed > 1 else parsed
 
 
-def _optional_str(value: object) -> str | None:
-    return value if isinstance(value, str) and value.strip() else None
 
 
-def _number(value: object) -> float:
-    if isinstance(value, bool):
-        return float(int(value))
-    if isinstance(value, int | float):
-        return float(value)
-    if isinstance(value, str) and value.strip():
-        return float(value)
-    return 0.0
 
 
 def _utc_now() -> str:
