@@ -7559,3 +7559,44 @@ Checks:
 Remaining risks / next handoff:
 - This is intentionally narrow. Most modules still fail wemake under current style.
 - Keep expanding by module group in `chore/wemake-ratchet-up`, not by broad ignores.
+
+### `chore/wemake-ratchet-up`
+
+Goal:
+- Expand the narrow wemake baseline without broad ignores.
+- Make only low-risk behavior-preserving style cleanup in small modules.
+- Keep the local ratchet explicit through `scripts/check_wemake_baseline.py`.
+
+Acceptance:
+- Every newly added module passes the wemake baseline command.
+- Runtime behavior touched by immutable constants and route maps remains covered by focused tests.
+- Existing local gates still pass.
+
+Status:
+- Expanded wemake baseline from 3 to 7 modules.
+- Added modules:
+  - `src/codex_usage_tracker/__main__.py`
+  - `src/codex_usage_tracker/diagnostic_snapshot_constants.py`
+  - `src/codex_usage_tracker/server_routes.py`
+  - `src/codex_usage_tracker/usage_drain_boundary_scopes.py`
+- Replaced mutable module-level constants in selected modules with tuples or mapping proxies.
+- Replaced `raise SystemExit(main())` with `sys.exit(main())` in the package entrypoint.
+- Split a dense boundary-scope index expression into named steps.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_server_routes.py -q`: 3 passed.
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_diagnostic_snapshots.py tests/test_usage_drain_boundary_summary.py tests/test_usage_drain_boundary_delta_summary.py -q`: 15 passed.
+- `.venv/bin/python scripts/check_wemake_baseline.py`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning and expected source-without-test warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `PYTHONPATH=src .venv/bin/python -m pytest -q`: 531 passed.
+
+Remaining risks / next handoff:
+- Continue expanding wemake by small module groups only.
+- Avoid fighting intentional project patterns such as CLI printing, public `__all__`, and package metadata until policy is explicit.
+- The structure-cohesion warning remains until package directories are split by responsibility.

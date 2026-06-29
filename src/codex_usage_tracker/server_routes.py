@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-GET_ROUTE_METHODS: dict[str, str] = {
+from collections.abc import Mapping
+from types import MappingProxyType
+
+GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType({
     "/api/context": "_handle_context",
     "/api/context-settings": "_handle_context_settings",
     "/api/open-investigator": "_handle_open_investigator",
@@ -26,14 +29,14 @@ GET_ROUTE_METHODS: dict[str, str] = {
     "/api/diagnostics/concentration": "_handle_diagnostics_concentration",
     "/api/diagnostics/usage-drain": "_handle_diagnostics_usage_drain",
     "/api/usage": "_handle_usage",
-}
+})
 
-GET_DIAGNOSTIC_FACT_ROUTES: dict[str, dict[str, str]] = {
-    "/api/diagnostics/compactions": {"fact_type": "compaction"},
-    "/api/diagnostics/tools": {"fact_group": "tools"},
-}
+GET_DIAGNOSTIC_FACT_ROUTES: Mapping[str, Mapping[str, str]] = MappingProxyType({
+    "/api/diagnostics/compactions": MappingProxyType({"fact_type": "compaction"}),
+    "/api/diagnostics/tools": MappingProxyType({"fact_group": "tools"}),
+})
 
-POST_ROUTE_METHODS: dict[str, str] = {
+POST_ROUTE_METHODS: Mapping[str, str] = MappingProxyType({
     "/api/diagnostics/refresh": "_handle_diagnostics_refresh",
     "/api/diagnostics/overview/refresh": "_handle_diagnostics_overview_refresh",
     "/api/diagnostics/tool-output/refresh": "_handle_diagnostics_tool_output_refresh",
@@ -44,7 +47,7 @@ POST_ROUTE_METHODS: dict[str, str] = {
     "/api/diagnostics/read-productivity/refresh": "_handle_diagnostics_read_productivity_refresh",
     "/api/diagnostics/concentration/refresh": "_handle_diagnostics_concentration_refresh",
     "/api/diagnostics/usage-drain/refresh": "_handle_diagnostics_usage_drain_refresh",
-}
+})
 
 
 def is_dashboard_shell_path(path: str, dashboard_name: str) -> bool:

@@ -21,7 +21,7 @@ DIAGNOSTIC_CONCENTRATION_SECTION = "concentration"
 DIAGNOSTIC_USAGE_DRAIN_SECTION = "usage-drain"
 DIAGNOSTIC_HISTORY_ACTIVE = "active"
 DIAGNOSTIC_HISTORY_ALL = "all"
-DIAGNOSTIC_SNAPSHOT_NOTES = [
+DIAGNOSTIC_SNAPSHOT_NOTES = (
     "Diagnostic snapshots are recomputed only by explicit diagnostic refresh.",
     "Snapshot totals are aggregate-only and do not include raw context.",
-]
+)

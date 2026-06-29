@@ -10,9 +10,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAX_LINE_LENGTH = "100"
 BASELINE_FILES = (
+    "src/codex_usage_tracker/__main__.py",
+    "src/codex_usage_tracker/diagnostic_snapshot_constants.py",
     "src/codex_usage_tracker/diagnostics_types.py",
     "src/codex_usage_tracker/paths.py",
+    "src/codex_usage_tracker/server_routes.py",
     "src/codex_usage_tracker/store_usage_timing.py",
+    "src/codex_usage_tracker/usage_drain_boundary_scopes.py",
 )
 
 
