@@ -4700,3 +4700,46 @@ Remaining risks / next handoff:
   `_check_parser_diagnostics` remain C-rated complexity cleanup targets.
 - Next branches should shift from file-size repair to complexity reduction and
   then stricter local gates.
+### `refactor/diagnostics-doctor-orchestration`
+
+Objective:
+- Reduce `run_doctor` orchestration complexity without changing doctor report
+  schema or check ordering.
+- Keep the split close to existing diagnostics behavior and tests.
+
+Baseline metrics:
+- `run_doctor`: C(14).
+- `diagnostics.py` module average: B before this split.
+
+Completed edits:
+- Split `run_doctor` into root resolution, `_doctor_checks`, `_doctor_report`,
+  `_count_check_status`, `_doctor_status`, and `_doctor_repair_suggestions`.
+- Preserved check order, status precedence, failure/warning counts, and repair
+  suggestion filtering.
+
+Metrics edits:
+- `run_doctor`: A(3).
+- `diagnostics.py` average complexity: A(4.15).
+- `diagnostics.py`: 442 lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostics.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostics.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_release.py tests/test_mcp_integration.py tests/test_support.py -q`: 21 passed.
+- `.venv/bin/python -m pytest -q`: 442 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `_check_parser_diagnostics` remains C(11) in `diagnostics.py`.
+- MCP runtime/config checks remain C-rated in `diagnostics_mcp.py`.
+- Global Xenon still fails on unrelated usage-drain, store, parser-state,
+  costing, and diagnostic snapshot hotspots.

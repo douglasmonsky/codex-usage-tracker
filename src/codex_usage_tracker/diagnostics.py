@@ -39,10 +39,31 @@ def run_doctor(
     repo_root: Path | None = None,
     suggest_repair: bool = False,
 ) -> dict[str, Any]:
-    """Run read-only setup checks and return a structured report."""
-
+    """Run read-only checks and return a structured report."""
     root = repo_root or _resolve_plugin_root(plugin_link) or find_project_root()
-    checks = [
+    checks = _doctor_checks(
+        codex_home=codex_home,
+        db_path=db_path,
+        dashboard_path=dashboard_path,
+        pricing_path=pricing_path,
+        plugin_link=plugin_link,
+        marketplace_path=marketplace_path,
+        root=root,
+    )
+    return _doctor_report(checks, suggest_repair=suggest_repair)
+
+
+def _doctor_checks(
+    *,
+    codex_home: Path,
+    db_path: Path,
+    dashboard_path: Path,
+    pricing_path: Path,
+    plugin_link: Path,
+    marketplace_path: Path,
+    root: Path | None,
+) -> list[DoctorCheck]:
+    return [
         _check_package_import(),
         _check_codex_sessions(codex_home),
         _check_database(db_path),
@@ -57,22 +78,41 @@ def run_doctor(
         check_mcp_runtime(root),
         check_mcp_import(),
     ]
-    fail_count = sum(1 for check in checks if check.status == "fail")
-    warn_count = sum(1 for check in checks if check.status == "warn")
+
+
+def _doctor_report(checks: list[DoctorCheck], *, suggest_repair: bool) -> dict[str, Any]:
+    fail_count = _count_check_status(checks, "fail")
+    warn_count = _count_check_status(checks, "warn")
     report: dict[str, Any] = {
         "schema": "codex-usage-tracker-doctor-v1",
-        "status": "fail" if fail_count else "warn" if warn_count else "pass",
+        "status": _doctor_status(fail_count=fail_count, warn_count=warn_count),
         "failures": fail_count,
         "warnings": warn_count,
         "checks": [check.to_dict() for check in checks],
     }
     if suggest_repair:
-        report["repair_suggestions"] = [
-            check.remediation
-            for check in checks
-            if check.status in {"warn", "fail"} and check.remediation
-        ]
+        report["repair_suggestions"] = _doctor_repair_suggestions(checks)
     return report
+
+
+def _count_check_status(checks: list[DoctorCheck], status: str) -> int:
+    return sum(1 for check in checks if check.status == status)
+
+
+def _doctor_status(*, fail_count: int, warn_count: int) -> str:
+    if fail_count:
+        return "fail"
+    if warn_count:
+        return "warn"
+    return "pass"
+
+
+def _doctor_repair_suggestions(checks: list[DoctorCheck]) -> list[str]:
+    return [
+        check.remediation
+        for check in checks
+        if check.status in {"warn", "fail"} and check.remediation
+    ]
 
 
 def find_project_root() -> Path | None:
