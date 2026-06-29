@@ -1,14 +1,31 @@
 import sqlite3
+from contextlib import suppress
+from typing import Any
 
 from codex_usage_tracker.store_dashboard_queries import observed_usage_reconciliation
 from codex_usage_tracker.store_schema import init_db
 
 
-def _usage_db() -> sqlite3.Connection:
+class _AutoClosingConnection:
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._conn, name)
+
+    def close(self) -> None:
+        self._conn.close()
+
+    def __del__(self) -> None:
+        with suppress(Exception):
+            self.close()
+
+
+def _usage_db() -> _AutoClosingConnection:
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_db(conn)
-    return conn
+    return _AutoClosingConnection(conn)
 
 
 def _insert_observed_usage_row(

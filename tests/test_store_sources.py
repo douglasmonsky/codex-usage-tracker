@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import suppress
 from pathlib import Path
+from typing import Any
 
 from store_dashboard_helpers import _usage_event
 
@@ -18,12 +20,32 @@ from codex_usage_tracker.store_sources import (
 )
 
 
-def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
-    tmp_path: Path,
-) -> None:
+class _AutoClosingConnection:
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._conn, name)
+
+    def close(self) -> None:
+        self._conn.close()
+
+    def __del__(self) -> None:
+        with suppress(Exception):
+            self.close()
+
+
+def _memory_db() -> _AutoClosingConnection:
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_db(conn)
+    return _AutoClosingConnection(conn)
+
+
+def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
+    tmp_path: Path,
+) -> None:
+    conn = _memory_db()
     new_path = tmp_path / "new.jsonl"
     unchanged_path = tmp_path / "unchanged.jsonl"
     grown_path = tmp_path / "grown.jsonl"
@@ -57,9 +79,7 @@ def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
 def test_upsert_source_file_metadata_records_latest_event_and_parser_state(
     tmp_path: Path,
 ) -> None:
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    init_db(conn)
+    conn = _memory_db()
     source_path = tmp_path / "events.jsonl"
     source_path.write_text("{}\n{}\n", encoding="utf-8")
     state = ParserState(
@@ -101,9 +121,7 @@ def test_upsert_source_file_metadata_records_latest_event_and_parser_state(
 def test_upsert_source_file_metadata_uses_parser_state_when_no_events(
     tmp_path: Path,
 ) -> None:
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    init_db(conn)
+    conn = _memory_db()
     source_path = tmp_path / "empty.jsonl"
     source_path.write_text("{}\n", encoding="utf-8")
     state = ParserState(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -49,8 +49,20 @@ def test_upsert_usage_events_batches_diagnostic_fact_deletes(
 
     @contextmanager
     def limited_connect(db_path: Path) -> Iterator[_LimitedVariableConnection]:
-        with connect(db_path) as conn:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db_path, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 5000")
+        with suppress(sqlite3.DatabaseError):
+            conn.execute("PRAGMA journal_mode = WAL")
+        try:
             yield _LimitedVariableConnection(conn, max_variables=600)
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     monkeypatch.setattr(store, "connect", limited_connect)
 
