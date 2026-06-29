@@ -7149,3 +7149,37 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue C(11) ratchet. Remaining targets are mostly usage-drain diagnostics/report helpers plus `parser.py::inspect_log`.
+
+### `refactor/token-component-regression-variant`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Reduce the remaining C-grade token-component regression variant helper while preserving the public usage-drain report contract.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_token_components.py`
+- `tests/test_usage_drain_token_components.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added a synthetic characterization test for weighted-proxy metadata in `token_component_regression_summary`.
+- Split `_token_component_regression_variant` into focused row, target, and candidate-count helpers.
+- Kept report keys and target labels unchanged.
+
+Metrics:
+- `_token_component_regression_variant`: C(11) -> A(2).
+- `usage_drain_token_components.py` maximum complexity: B(10).
+- Expected global C-or-worse blocks after this branch: 8 -> 7.
+- No C(12+) or D/E/F complexity blocks expected.
+
+Checks:
+- `PYTHONPATH=src .venv/bin/python -m pytest tests/test_usage_drain_token_components.py tests/test_usage_drain_model.py::test_token_component_regression_recovers_rate_card_and_fast_weighting -q`: 2 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_token_components.py tests/test_usage_drain_token_components.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_token_components.py -a -s`: target now A(2), module max B(10).
+
+Remaining risks / next handoff:
+- Run broad local gates before commit.
+- Continue the C(11) ratchet after commit.

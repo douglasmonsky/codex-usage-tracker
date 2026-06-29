@@ -47,7 +47,30 @@ def _token_component_regression_variant(
     weighted_proxy: str | None,
     credit_target_label: str,
 ) -> dict[str, Any]:
-    x_rows = [
+    x_rows = _token_component_x_rows(spans, weighted_proxy=weighted_proxy)
+    visible_target = [span.delta_usage_percent for span in spans]
+    credit_target = _token_component_credit_target(
+        spans, weighted_proxy=weighted_proxy
+    )
+    candidate_counts = _weighted_proxy_candidate_counts(
+        spans, weighted_proxy=weighted_proxy
+    )
+    return {
+        "weighted_proxy": weighted_proxy,
+        **candidate_counts,
+        "visible_drain": _token_component_target_regression(
+            x_rows, visible_target, target="delta_usage_percent"
+        ),
+        "credit_accounting": _token_component_target_regression(
+            x_rows, credit_target, target=credit_target_label
+        ),
+    }
+
+
+def _token_component_x_rows(
+    spans: list[UsageDeltaSpan], *, weighted_proxy: str | None
+) -> list[list[float]]:
+    return [
         [
             value / 1_000_000.0
             for value in _span_token_components(
@@ -56,32 +79,32 @@ def _token_component_regression_variant(
         ]
         for span in spans
     ]
-    visible_target = [span.delta_usage_percent for span in spans]
-    credit_target = [
+
+
+def _token_component_credit_target(
+    spans: list[UsageDeltaSpan], *, weighted_proxy: str | None
+) -> list[float]:
+    if weighted_proxy is None:
+        return [span.standard_usage_credits for span in spans]
+    return [
         span.documented_fast_weighted_credits.get(weighted_proxy, 0.0)
-        if weighted_proxy
-        else span.standard_usage_credits
         for span in spans
     ]
-    candidate_rows = (
-        sum(span.candidate_row_counts.get(weighted_proxy, 0) for span in spans)
-        if weighted_proxy
-        else 0
-    )
-    candidate_spans = (
-        sum(1 for span in spans if span.candidate_row_counts.get(weighted_proxy, 0) > 0)
-        if weighted_proxy
-        else 0
-    )
+
+
+def _weighted_proxy_candidate_counts(
+    spans: list[UsageDeltaSpan], *, weighted_proxy: str | None
+) -> dict[str, int]:
+    if weighted_proxy is None:
+        return {"candidate_rows": 0, "candidate_spans": 0}
     return {
-        "weighted_proxy": weighted_proxy,
-        "candidate_rows": candidate_rows,
-        "candidate_spans": candidate_spans,
-        "visible_drain": _token_component_target_regression(
-            x_rows, visible_target, target="delta_usage_percent"
+        "candidate_rows": sum(
+            span.candidate_row_counts.get(weighted_proxy, 0) for span in spans
         ),
-        "credit_accounting": _token_component_target_regression(
-            x_rows, credit_target, target=credit_target_label
+        "candidate_spans": sum(
+            1
+            for span in spans
+            if span.candidate_row_counts.get(weighted_proxy, 0) > 0
         ),
     }
 
