@@ -1,7 +1,10 @@
 import pytest
 
 from codex_usage_tracker.usage_drain_types import UsageDeltaSpan
-from codex_usage_tracker.usage_drain_walk_forward import walk_forward_prediction_rows
+from codex_usage_tracker.usage_drain_walk_forward import (
+    walk_forward_prediction_rows,
+    walk_forward_prediction_summary,
+)
 
 
 def _span(index: int, delta: float) -> UsageDeltaSpan:
@@ -40,3 +43,19 @@ def test_walk_forward_prediction_rows_preserves_public_row_contract() -> None:
     assert "one_percent_streak_count" in rows[0]["metadata"]
     assert "empirical_history_state_mode" in rows[0]["prediction_details"]
     assert "history_state_risk" in rows[0]["transition_risks"]
+
+
+def test_walk_forward_summary_preserves_scope_metric_contract() -> None:
+    summary = walk_forward_prediction_summary(
+        [_span(0, 1.0), _span(1, 1.0), _span(2, 2.0), _span(3, 1.0)]
+    )
+
+    all_scope = summary["scopes"]["all_after_first"]
+    assert all_scope["start_index"] == 1
+    assert all_scope["actual"]["n"] == 3
+    assert "previous_delta" in all_scope["models"]
+    assert "previous_delta" in all_scope["error_diagnostics"]
+    assert "transition_gated_history_state_mode" in all_scope[
+        "transition_gate_diagnostics"
+    ]
+    assert "empirical_history_state_mode" in all_scope["state_bucket_diagnostics"]

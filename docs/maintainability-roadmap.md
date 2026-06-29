@@ -5944,3 +5944,50 @@ Checks:
 Remaining risks / next handoff:
 - `_walk_forward_scope_metrics` remains C(13) in `usage_drain_walk_forward.py`.
 - Next branch should target `_walk_forward_scope_metrics` while keeping the walk-forward summary payload stable.
+
+### `refactor/usage-drain-walk-forward-scope`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `_walk_forward_scope_metrics` complexity while preserving walk-forward summary scope payloads.
+- Add characterization coverage for scope names, actual distributions, model metrics, error diagnostics, transition gate diagnostics, and state-bucket diagnostics.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_walk_forward.py`
+- `tests/test_usage_drain_walk_forward.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split scope row filtering, actual extraction, model-name selection, model metrics, error diagnostics, transition gate diagnostics, and state-bucket diagnostics into named helpers.
+- Lifted scope diagnostic model groups into module constants.
+- Preserved `walk_forward_prediction_summary` scope output shape.
+
+Metrics:
+- `_walk_forward_scope_metrics`: C(13) -> A(1).
+- `usage_drain_walk_forward.py` average complexity: A(2.08).
+- `usage_drain_walk_forward.py`: 180 -> 236 physical lines.
+- Global C-or-worse blocks: 35 -> 34.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are C(13), led by `usage_drain_state_diagnostics.py::state_ambiguous_group_record`, `usage_drain_model.py::_one_percent_capacity_modeling`, and `usage_drain_transition_metrics.py::binary_risk_metrics`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_walk_forward.py -q`: 2 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_walk_forward.py tests/test_usage_drain_model.py tests/test_usage_drain_regression.py tests/test_usage_drain_allowance_fits.py -q`: 23 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_walk_forward.py -a -s`: target now A(1).
+- `.venv/bin/python -m pytest -q`: 478 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning only.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Next branch should target a remaining C(13) hotspot. Prefer `usage_drain_state_diagnostics.py::state_ambiguous_group_record` because it is isolated and testable.
