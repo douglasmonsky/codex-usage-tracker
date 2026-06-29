@@ -4435,3 +4435,61 @@ Checks:
 Remaining risks / next handoff:
 - `add_days_since_first_span` remains B(9) but within current Xenon ceiling.
 - Global Xenon still fails on other known C/F-rated usage-drain, store, diagnostic, and doctor hotspots.
+### `refactor/diagnostic-fact-structured-classifier`
+
+Objective:
+- Finish the diagnostic-fact classifier split after the in-file refactor made
+  `diagnostic_facts.py` too large for the file-length ratchet.
+- Keep aggregate/privacy behavior unchanged for function, MCP, skill, command,
+  search/read, and derived loop facts.
+- Add a focused characterization test for the extracted classifier entrypoint.
+
+Baseline metrics:
+- `diagnostic_facts.py`: 636 lines on branch base, temporarily 743 lines after
+  in-file helper extraction.
+- `_structured_tool_and_skill_facts`: D(23) before helper split.
+- `_with_derived_loop_facts`: C(12) before derived-loop helper split.
+- Max-file ratchet overage before branch completion: 362.
+
+Completed edits:
+- Added `diagnostic_fact_classifiers.py` for structured function/MCP/skill and
+  command/search classifier helpers.
+- Kept `diagnostic_facts.py` focused on envelope orchestration, derived loop
+  facts, persistence row conversion, merge, confidence, and timestamp helpers.
+- Passed the `_fact` factory into the classifier module so no private helper
+  import is needed across modules.
+- Added `tests/test_diagnostic_fact_classifiers.py` to assert safe aggregate
+  command-family and search/read labels without raw command argument leakage.
+
+Metrics edits:
+- `diagnostic_facts.py`: 393 lines.
+- `diagnostic_fact_classifiers.py`: 383 lines.
+- `tests/test_diagnostic_fact_classifiers.py`: 65 lines.
+- `_with_derived_loop_facts`: A(3).
+- `structured_tool_and_skill_facts`: A(2).
+- `diagnostic_fact_classifiers.py` average complexity: A(3.55).
+- Targeted Xenon B/A/A passed for both diagnostic fact modules.
+- Max-file ratchet overage tightened from 362 to 326.
+
+Checks:
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostic_facts.py src/codex_usage_tracker/diagnostic_fact_classifiers.py tests/test_diagnostic_fact_classifiers.py tests/test_parser.py`: passed.
+- `.venv/bin/python -m mypy src/codex_usage_tracker/diagnostic_facts.py src/codex_usage_tracker/diagnostic_fact_classifiers.py`: passed.
+- `.venv/bin/python -m pytest tests/test_diagnostic_fact_classifiers.py tests/test_parser.py tests/test_store_dashboard_mcp.py tests/test_server_diagnostic_facts.py -q`: 41 passed.
+- `.venv/bin/python -m pytest -q`: 440 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted baseline.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `diagnostic_fact_classifiers._mcp_event_facts` is still B(10), within current
+  ceiling but a good later cleanup target.
+- `diagnostic_facts.diagnostic_facts_from_envelope` and
+  `diagnostic_fact_from_json` remain B(8), acceptable for now.
+- Global Xenon still fails on unrelated C-rated hotspots.
