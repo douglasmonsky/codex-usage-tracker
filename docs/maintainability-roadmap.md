@@ -4075,3 +4075,58 @@ Remaining risks:
 
 Next handoff:
 - Shift back to `server.py` or targeted B-complexity functions now that the CLI file-length ratchet goal is met.
+
+### `refactor/server-diagnostic-route-mixin`
+
+Goal:
+- Move diagnostic server route wrappers out of `server.py`.
+- Preserve existing route method names used by `server_routes.py`.
+- Bring `server.py` under the 600-line target without changing diagnostic JSON schemas.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `src/codex_usage_tracker/server.py`
+- `src/codex_usage_tracker/server_diagnostic_routes.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline and metric notes:
+- `server.py` line count fell from `823` to `558`.
+- Max file-line ratchet fell from `907` to `684`.
+- `server_diagnostic_routes.py` is `227` lines.
+- Server and diagnostic route modules remain A average complexity; `server.py` keeps only one B-rated stdlib route hook, `do_GET`.
+- `cli.py` remains below target at `530` lines.
+
+Completed edits:
+- Added `DiagnosticRouteMixin` with diagnostics summary, facts, snapshots, usage-drain, refresh, and diagnostic refresh auth route methods.
+- Made `_UsageDashboardHandler` inherit the mixin while preserving all route method names.
+- Removed diagnostic route wrappers and diagnostic snapshot imports from `server.py`.
+- Added `server_diagnostic_routes` to the server/dashboard architecture module group in `tach.toml`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_routes.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_routes.py`: passed after mechanical import sort.
+- `.venv/bin/python -m pytest tests/test_server_diagnostic_snapshots.py tests/test_server_diagnostic_refresh_auth.py tests/test_dashboard_server.py -q`: 24 passed.
+- `radon cc src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_routes.py -a -s`: passed.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/server.py src/codex_usage_tracker/server_diagnostic_routes.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning plus expected change-budget warning because existing tests covered the extraction.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- File-length ratchet is now led by `allowance.py` at `759` lines, then `usage_drain_boundary_delta_summary.py` at `726` lines.
+- Overall package still triggers structure-cohesion warnings because the package is intentionally still flat during ratchet setup.
+- Route methods in `server_diagnostic_routes.py` intentionally rely on `_UsageDashboardHandler` attributes by mixin convention.
+
+Next handoff:
+- Move to the next file-length hotspot, likely `allowance.py`, or reduce remaining B-complexity hotspots if file-length progress pauses.

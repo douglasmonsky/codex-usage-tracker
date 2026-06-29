@@ -19,16 +19,6 @@ from codex_usage_tracker.dashboard import (
     generate_dashboard,
     render_dashboard_html,
 )
-from codex_usage_tracker.diagnostic_snapshots import (
-    build_diagnostic_commands_report,
-    build_diagnostic_concentration_report,
-    build_diagnostic_file_modifications_report,
-    build_diagnostic_file_reads_report,
-    build_diagnostic_git_interactions_report,
-    build_diagnostic_overview_report,
-    build_diagnostic_read_productivity_report,
-    build_diagnostic_tool_output_report,
-)
 from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -51,16 +41,7 @@ from codex_usage_tracker.server_context_settings import (
     context_settings_payload,
 )
 from codex_usage_tracker.server_dashboard_shell import dashboard_shell_payload
-from codex_usage_tracker.server_diagnostic_facts import (
-    handle_diagnostics_fact_calls_request,
-    handle_diagnostics_facts_request,
-    handle_diagnostics_summary_request,
-)
-from codex_usage_tracker.server_diagnostic_snapshots import (
-    handle_diagnostic_refresh_request,
-    handle_diagnostic_snapshot_request,
-    handle_usage_drain_snapshot_request,
-)
+from codex_usage_tracker.server_diagnostic_routes import DiagnosticRouteMixin
 from codex_usage_tracker.server_live_queries import live_query_params
 from codex_usage_tracker.server_live_rows import annotate_live_rows, query_live_call_rows
 from codex_usage_tracker.server_open_investigator import (
@@ -109,9 +90,6 @@ _DASHBOARD_ASSET_MIME_TYPES = {
     ".json": "application/json; charset=utf-8",
     ".svg": "image/svg+xml",
 }
-_DIAGNOSTIC_REFRESH_AUTH_ERROR = "Valid API token is required for diagnostic refresh"
-
-
 def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
     value = _first(params.get(key))
     return None if value is None else _safe_int(value)
@@ -204,7 +182,7 @@ def serve_dashboard(
         server.server_close()
 
 
-class _UsageDashboardHandler(SimpleHTTPRequestHandler):
+class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
     def __init__(
         self,
         *args: object,
@@ -493,240 +471,6 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
             send_json=self._send_json,
         )
 
-    def _handle_diagnostics_summary(self, query: str) -> None:
-        handle_diagnostics_summary_request(
-            query,
-            db_path=self._db_path,
-            include_archived_default=self._include_archived,
-            send_error=self._send_error,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
-
-    def _handle_diagnostics_facts(
-        self,
-        query: str,
-        *,
-        fact_type: str | None = None,
-        fact_group: str | None = None,
-    ) -> None:
-        handle_diagnostics_facts_request(
-            query,
-            db_path=self._db_path,
-            include_archived_default=self._include_archived,
-            request_path=urlparse(self.path).path,
-            fact_type=fact_type,
-            fact_group=fact_group,
-            send_error=self._send_error,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
-
-    def _handle_diagnostics_fact_calls(self, query: str) -> None:
-        handle_diagnostics_fact_calls_request(
-            query,
-            db_path=self._db_path,
-            include_archived_default=self._include_archived,
-            privacy_mode=self._privacy_mode,
-            send_error=self._send_error,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
-
-    def _handle_diagnostics_overview(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_overview_report,
-            refresh=False,
-            label="diagnostic overview",
-        )
-
-    def _handle_diagnostics_refresh(self, query: str) -> None:
-        handle_diagnostic_refresh_request(
-            query,
-            db_path=self._db_path,
-            pricing_path=self._pricing_path,
-            allowance_path=self._allowance_path,
-            rate_card_path=self._rate_card_path,
-            include_archived_default=self._include_archived,
-            refresh_lock=self._refresh_lock,
-            reject_missing_refresh_token=self._reject_missing_diagnostic_refresh_token,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
-    def _handle_diagnostics_overview_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_overview_report,
-            refresh=True,
-            label="diagnostic overview",
-        )
-
-    def _handle_diagnostics_tool_output(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_tool_output_report,
-            refresh=False,
-            label="diagnostic tool output",
-        )
-
-    def _handle_diagnostics_tool_output_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_tool_output_report,
-            refresh=True,
-            label="diagnostic tool output",
-        )
-
-    def _handle_diagnostics_commands(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_commands_report,
-            refresh=False,
-            label="diagnostic commands",
-        )
-
-    def _handle_diagnostics_commands_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_commands_report,
-            refresh=True,
-            label="diagnostic commands",
-        )
-
-    def _handle_diagnostics_git_interactions(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_git_interactions_report,
-            refresh=False,
-            label="diagnostic git interactions",
-        )
-
-    def _handle_diagnostics_git_interactions_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_git_interactions_report,
-            refresh=True,
-            label="diagnostic git interactions",
-        )
-
-    def _handle_diagnostics_file_reads(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_reads_report,
-            refresh=False,
-            label="diagnostic file reads",
-        )
-
-    def _handle_diagnostics_file_reads_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_reads_report,
-            refresh=True,
-            label="diagnostic file reads",
-        )
-
-    def _handle_diagnostics_file_modifications(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_modifications_report,
-            refresh=False,
-            label="diagnostic file modifications",
-        )
-
-    def _handle_diagnostics_file_modifications_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_file_modifications_report,
-            refresh=True,
-            label="diagnostic file modifications",
-        )
-
-    def _handle_diagnostics_read_productivity(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_read_productivity_report,
-            refresh=False,
-            label="diagnostic read productivity",
-        )
-
-    def _handle_diagnostics_read_productivity_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_read_productivity_report,
-            refresh=True,
-            label="diagnostic read productivity",
-        )
-
-    def _handle_diagnostics_concentration(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_concentration_report,
-            refresh=False,
-            label="diagnostic concentration",
-        )
-
-    def _handle_diagnostics_concentration_refresh(self, query: str) -> None:
-        self._handle_diagnostic_snapshot(
-            query,
-            build_report=build_diagnostic_concentration_report,
-            refresh=True,
-            label="diagnostic concentration",
-        )
-
-    def _handle_diagnostics_usage_drain(self, query: str) -> None:
-        self._handle_diagnostic_usage_drain_snapshot(
-            query,
-            refresh=False,
-        )
-
-    def _handle_diagnostics_usage_drain_refresh(self, query: str) -> None:
-        self._handle_diagnostic_usage_drain_snapshot(
-            query,
-            refresh=True,
-        )
-
-    def _handle_diagnostic_usage_drain_snapshot(
-        self,
-        query: str,
-        *,
-        refresh: bool,
-    ) -> None:
-        handle_usage_drain_snapshot_request(
-            query,
-            db_path=self._db_path,
-            pricing_path=self._pricing_path,
-            allowance_path=self._allowance_path,
-            rate_card_path=self._rate_card_path,
-            include_archived_default=self._include_archived,
-            refresh=refresh,
-            refresh_lock=self._refresh_lock,
-            reject_missing_refresh_token=self._reject_missing_diagnostic_refresh_token,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
-
-    def _handle_diagnostic_snapshot(
-        self,
-        query: str,
-        *,
-        build_report: Any,
-        refresh: bool,
-        label: str,
-    ) -> None:
-        handle_diagnostic_snapshot_request(
-            query,
-            db_path=self._db_path,
-            include_archived_default=self._include_archived,
-            refresh=refresh,
-            refresh_lock=self._refresh_lock,
-            build_report=build_report,
-            label=label,
-            reject_missing_refresh_token=self._reject_missing_diagnostic_refresh_token,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
-
     def _live_query_params(
         self,
         params: dict[str, list[str]],
@@ -798,15 +542,6 @@ class _UsageDashboardHandler(SimpleHTTPRequestHandler):
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool:
         return has_valid_api_token(self.headers, params, self._api_token)
-
-    def _reject_missing_diagnostic_refresh_token(
-        self,
-        params: dict[str, list[str]],
-    ) -> bool:
-        if self._has_valid_api_token(params):
-            return False
-        self._send_error(HTTPStatus.FORBIDDEN, _DIAGNOSTIC_REFRESH_AUTH_ERROR)
-        return True
 
     def _send_error(
         self,
