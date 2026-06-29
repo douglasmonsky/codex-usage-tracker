@@ -35,41 +35,64 @@ def load_project_config(path: Path = DEFAULT_PROJECTS_PATH) -> ProjectConfig:
 
     path = path.expanduser()
     if not path.exists():
-        return ProjectConfig(path=path, aliases={}, ignored_paths=[], tags={})
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return ProjectConfig(path=path, aliases={}, ignored_paths=[], tags={}, error=str(exc))
+        return _empty_project_config(path)
+    payload, error = _read_project_config_payload(path)
+    if error is not None:
+        return _empty_project_config(path, error=error)
     if not isinstance(payload, dict):
-        return ProjectConfig(
-            path=path,
-            aliases={},
-            ignored_paths=[],
-            tags={},
-            error="Project config must be a JSON object.",
-        )
-    aliases = {
-        str(key): str(value)
-        for key, value in (payload.get("aliases") or {}).items()
-        if isinstance(key, str) and isinstance(value, str)
-    } if isinstance(payload.get("aliases") or {}, dict) else {}
-    ignored_paths = [
-        str(value)
-        for value in payload.get("ignored_paths") or []
-        if isinstance(value, str)
-    ] if isinstance(payload.get("ignored_paths") or [], list) else []
-    tags = {
-        str(key): [str(tag) for tag in value if isinstance(tag, str)]
-        for key, value in (payload.get("tags") or {}).items()
-        if isinstance(key, str) and isinstance(value, list)
-    } if isinstance(payload.get("tags") or {}, dict) else {}
+        return _empty_project_config(path, error="Project config must be a JSON object.")
     return ProjectConfig(
         path=path,
-        aliases=aliases,
-        ignored_paths=ignored_paths,
-        tags=tags,
+        aliases=_project_aliases(payload),
+        ignored_paths=_project_ignored_paths(payload),
+        tags=_project_tags(payload),
         loaded=True,
     )
+
+
+def _empty_project_config(path: Path, error: str | None = None) -> ProjectConfig:
+    return ProjectConfig(path=path, aliases={}, ignored_paths=[], tags={}, error=error)
+
+
+def _read_project_config_payload(path: Path) -> tuple[Any, str | None]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8")), None
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, str(exc)
+
+
+def _project_aliases(payload: dict[str, Any]) -> dict[str, str]:
+    return {
+        str(key): str(value)
+        for key, value in _dict_section(payload, "aliases").items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+
+
+def _project_ignored_paths(payload: dict[str, Any]) -> list[str]:
+    return [
+        str(value)
+        for value in _list_section(payload, "ignored_paths")
+        if isinstance(value, str)
+    ]
+
+
+def _project_tags(payload: dict[str, Any]) -> dict[str, list[str]]:
+    return {
+        str(key): [str(tag) for tag in value if isinstance(tag, str)]
+        for key, value in _dict_section(payload, "tags").items()
+        if isinstance(key, str) and isinstance(value, list)
+    }
+
+
+def _dict_section(payload: dict[str, Any], key: str) -> dict[Any, Any]:
+    value = payload.get(key) or {}
+    return value if isinstance(value, dict) else {}
+
+
+def _list_section(payload: dict[str, Any], key: str) -> list[Any]:
+    value = payload.get(key) or []
+    return value if isinstance(value, list) else []
 
 
 def write_project_template(path: Path = DEFAULT_PROJECTS_PATH, force: bool = False) -> Path:

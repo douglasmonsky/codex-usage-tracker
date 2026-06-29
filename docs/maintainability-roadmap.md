@@ -4865,3 +4865,42 @@ Checks:
 
 Remaining risks / next handoff:
 - Global Xenon still fails on C/D-rated blocks in projects, usage-drain feature history/time series/allowance fits, store, diagnostics MCP, recommendations, formatting, and diagnostic snapshot analysis.
+
+### `refactor/project-config-loader`
+
+Objective:
+- Reduce the project config loader complexity while preserving permissive local-config parsing behavior.
+
+Files touched:
+- `src/codex_usage_tracker/projects.py`
+- `tests/test_projects.py`
+
+Completed edits:
+- Split missing/error config construction, JSON payload loading, aliases, ignored paths, tags, and section normalization into focused helpers.
+- Added a malformed-section characterization test proving invalid aliases, ignored paths, and tag values are discarded while valid values are retained.
+
+Metrics:
+- `load_project_config`: D(23) -> A(4).
+- `projects.py` average complexity remains A-rated.
+- New helper ceiling in this module: B(8) for existing `project_identity_for_cwd`; config loader helpers are B(6) or better.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/projects.py tests/test_projects.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/projects.py tests/test_projects.py`: passed.
+- `.venv/bin/python -m pytest tests/test_projects.py -q`: 5 passed.
+- `.venv/bin/python -m pytest tests/test_projects.py tests/test_privacy.py tests/test_server_summary.py tests/test_server_recommendations.py -q`: 18 passed.
+- `.venv/bin/python -m radon cc src/codex_usage_tracker/projects.py -a -s`: passed, loader now A(4).
+- `.venv/bin/python -m pytest -q`: 444 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Global Xenon still fails on remaining C-rated blocks in usage-drain feature history/time series/allowance fits, store, diagnostics MCP, recommendations, formatting, dashboard payload, and diagnostic snapshot analysis.
