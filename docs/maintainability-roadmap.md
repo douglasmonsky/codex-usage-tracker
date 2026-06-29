@@ -6085,3 +6085,50 @@ Checks:
 Remaining risks / next handoff:
 - Remaining C(13) hotspots include `_one_percent_capacity_modeling`, `format_calls`, `load_call_context`, `validate_json_payload_contract`, `transition_delta_gate_diagnostics`, and `regime_streak_summary`.
 - Prefer the next branch by isolating one of those with existing or newly added characterization tests.
+
+### `refactor/format-calls-output`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `format_calls` complexity while preserving human-readable call output.
+- Add characterization coverage for thread fallback labels, cost suffixes, pricing-estimated marker, efficiency flags, action suffixes, and empty defaults.
+
+Files touched:
+- `src/codex_usage_tracker/formatting.py`
+- `tests/test_formatting.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split formatted call line construction into helpers for call rows, thread labels, combined suffixes, flag suffixes, and action suffixes.
+- Preserved existing output text and fallback behavior.
+
+Metrics:
+- `format_calls`: C(13) -> A(3).
+- `formatting.py` average complexity: A(3.95).
+- `formatting.py`: 228 -> 272 physical lines.
+- Global C-or-worse blocks: 32 -> 31.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are C(13), led by `usage_drain_model.py::_one_percent_capacity_modeling`, `context.py::load_call_context`, `json_contracts.py::validate_json_payload_contract`, `usage_drain_transition_gates.py::transition_delta_gate_diagnostics`, and `usage_drain_regime_segments.py::regime_streak_summary`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_formatting.py -q`: 3 passed.
+- `.venv/bin/python -m pytest tests/test_formatting.py tests/test_recommendations.py tests/test_diagnostic_reports.py tests/test_usage_drain_reports.py -q`: 14 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/formatting.py -a -s`: target now A(3).
+- `.venv/bin/python -m pytest -q`: 482 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning only.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Remaining C(13) hotspots are now concentrated in usage-drain capacity modeling, context loading, JSON contract validation, transition gate diagnostics, and regime streak summaries.
+- Pick the next branch based on which of those has the narrowest characterization surface.

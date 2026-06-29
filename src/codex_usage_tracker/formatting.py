@@ -64,28 +64,52 @@ def format_calls(rows: list[dict[str, Any]], title: str = "Most expensive Codex 
 
     lines = [title, ""]
     for index, row in enumerate(rows, 1):
-        thread = (
-            row.get("thread_name")
-            or row.get("parent_thread_name")
-            or row.get("resolved_parent_thread_name")
-            or row.get("session_id")
-            or "Unknown"
-        )
-        flags = row.get("efficiency_flags") or []
-        flag_suffix = f" | flags: {', '.join(flags)}" if flags else ""
-        cost = _cost_suffix(row, prefix=" | estimated cost ")
-        action = row.get("recommended_action")
-        action_suffix = f" | action: {action}" if action else ""
-        lines.append(
-            f"{index}. {row.get('event_timestamp') or 'Unknown time'} | "
-            f"{thread} | {row.get('model') or 'unknown'} "
-            f"({row.get('effort') or 'unknown'}) | "
-            f"last call {_fmt_int(row.get('total_tokens'))} tokens | "
-            f"cache {_fmt_pct(row.get('cache_ratio'))} | "
-            f"context {_fmt_pct(row.get('context_window_percent'))}"
-            f"{cost}{flag_suffix}{action_suffix}"
-        )
+        lines.append(_formatted_call_line(index, row))
     return "\n".join(lines)
+
+
+def _formatted_call_line(index: int, row: dict[str, Any]) -> str:
+    return (
+        f"{index}. {row.get('event_timestamp') or 'Unknown time'} | "
+        f"{_call_thread_label(row)} | {row.get('model') or 'unknown'} "
+        f"({row.get('effort') or 'unknown'}) | "
+        f"last call {_fmt_int(row.get('total_tokens'))} tokens | "
+        f"cache {_fmt_pct(row.get('cache_ratio'))} | "
+        f"context {_fmt_pct(row.get('context_window_percent'))}"
+        f"{_call_suffixes(row)}"
+    )
+
+
+def _call_thread_label(row: dict[str, Any]) -> object:
+    return (
+        row.get("thread_name")
+        or row.get("parent_thread_name")
+        or row.get("resolved_parent_thread_name")
+        or row.get("session_id")
+        or "Unknown"
+    )
+
+
+def _call_suffixes(row: dict[str, Any]) -> str:
+    return (
+        f"{_cost_suffix(row, prefix=' | estimated cost ')}"
+        f"{_call_flags_suffix(row)}"
+        f"{_call_action_suffix(row)}"
+    )
+
+
+def _call_flags_suffix(row: dict[str, Any]) -> str:
+    flags = row.get("efficiency_flags") or []
+    if not flags:
+        return ""
+    return f" | flags: {', '.join(flags)}"
+
+
+def _call_action_suffix(row: dict[str, Any]) -> str:
+    action = row.get("recommended_action")
+    if not action:
+        return ""
+    return f" | action: {action}"
 
 
 def format_recommendations(payload: dict[str, Any]) -> str:
