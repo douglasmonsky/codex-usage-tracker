@@ -5703,3 +5703,51 @@ Checks:
 Remaining risks / next handoff:
 - `usage_drain_allowance_online.py::_allowance_online_capacity_error_diagnostics` remains C(11), but the branch objective was the larger C(15) public fit function.
 - Next branch should target `threads.py::_resolve_thread_attachment` C(15) with attachment-resolution characterization tests.
+
+### `refactor/thread-attachment-resolution`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `_resolve_thread_attachment` complexity while preserving dashboard thread attachment metadata.
+- Characterize direct threads, explicit parent threads, parent-session matching, unmatched parent sessions, auto-review fallback, and generic session/subagent fallback behavior.
+
+Files touched:
+- `src/codex_usage_tracker/threads.py`
+- `tests/test_threads.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added focused tests for every resolver branch not previously covered.
+- Split direct, parent, auto-review, and session fallback attachment decisions into named helpers.
+- Preserved the public `annotate_thread_attachments` behavior and dashboard row keys.
+
+Metrics:
+- `_resolve_thread_attachment`: C(15) -> A(4).
+- `threads.py`: 183 -> 210 physical lines.
+- `threads.py` average complexity: A(3.50).
+- Global C-or-worse blocks: 40 -> 39.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets: `usage_drain_regression.py::fit_linear_coefficients`, `usage_drain_boundary_delta_summary.py::_boundary_delta_prediction_scope`, and `store_dashboard_queries.py::observed_usage_reconciliation` at C(14).
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_threads.py -q`: 8 passed.
+- `.venv/bin/python -m pytest tests/test_threads.py tests/test_dashboard_payload.py tests/test_server_threads.py tests/test_dashboard_data.py -q`: 25 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/threads.py -a -s`: target now A(4).
+- `.venv/bin/python -m pytest -q`: 468 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning only.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `_build_parent_candidates` remains B(10), below the current C hotspot threshold.
+- Next branch should target one of the C(14) hotspots, preferably `usage_drain_regression.py::fit_linear_coefficients` if we want to keep reducing modeling core risk.

@@ -75,13 +75,37 @@ def _resolve_thread_attachment(
     row: dict[str, Any],
     candidates: dict[str, dict[str, Any]],
 ) -> dict[str, str | None]:
-    thread_name = _optional_str(row.get("thread_name"))
-    if thread_name:
-        return {"key": f"thread:{thread_name}", "label": thread_name, "relation": "direct"}
+    direct = _direct_thread_attachment(row)
+    if direct:
+        return direct
 
+    parent = _parent_thread_attachment(row, candidates["by_session"])
+    if parent:
+        return parent
+
+    if _is_auto_review(row):
+        return _auto_review_attachment(row, candidates["by_cwd"])
+
+    return _session_thread_attachment(row)
+
+
+def _direct_thread_attachment(row: dict[str, Any]) -> dict[str, str | None] | None:
+    thread_name = _optional_str(row.get("thread_name"))
+    if not thread_name:
+        return None
+    return {"key": f"thread:{thread_name}", "label": thread_name, "relation": "direct"}
+
+
+def _parent_thread_attachment(
+    row: dict[str, Any],
+    by_session: dict[str, ParentCandidate],
+) -> dict[str, str | None] | None:
     parent_session_id = _optional_str(row.get("parent_session_id"))
+    if not parent_session_id:
+        return None
+
     parent_thread_name = _resolved_parent_thread_name(row)
-    if parent_session_id and parent_thread_name:
+    if parent_thread_name:
         return {
             "key": f"thread:{parent_thread_name}",
             "label": parent_thread_name,
@@ -89,9 +113,8 @@ def _resolve_thread_attachment(
             "parent_session_id": parent_session_id,
         }
 
-    by_session: dict[str, ParentCandidate] = candidates["by_session"]
-    if parent_session_id and parent_session_id in by_session:
-        parent = by_session[parent_session_id]
+    parent = by_session.get(parent_session_id)
+    if parent:
         return {
             "key": parent.key,
             "label": parent.label,
@@ -99,31 +122,35 @@ def _resolve_thread_attachment(
             "parent_session_id": parent_session_id,
         }
 
-    if parent_session_id:
+    return {
+        "key": f"session:{parent_session_id}",
+        "label": f"Parent {parent_session_id}",
+        "relation": "explicit parent",
+        "parent_session_id": parent_session_id,
+    }
+
+
+def _auto_review_attachment(
+    row: dict[str, Any],
+    by_cwd: dict[str, list[ParentCandidate]],
+) -> dict[str, str | None]:
+    cwd = _optional_str(row.get("cwd"))
+    if cwd and by_cwd.get(cwd):
+        parent = min(by_cwd[cwd], key=lambda candidate: _candidate_distance(row, candidate))
         return {
-            "key": f"session:{parent_session_id}",
-            "label": f"Parent {parent_session_id}",
-            "relation": "explicit parent",
-            "parent_session_id": parent_session_id,
+            "key": parent.key,
+            "label": parent.label,
+            "relation": "inferred by cwd/time",
         }
 
-    if _is_auto_review(row):
-        cwd = _optional_str(row.get("cwd"))
-        by_cwd: dict[str, list[ParentCandidate]] = candidates["by_cwd"]
-        cwd_candidates = by_cwd.get(cwd or "", [])
-        if cwd_candidates:
-            nearest = min(cwd_candidates, key=lambda candidate: _candidate_distance(row, candidate))
-            return {
-                "key": nearest.key,
-                "label": nearest.label,
-                "relation": "inferred by cwd/time",
-            }
-        return {
-            "key": f"auto:{cwd or _optional_str(row.get('session_id')) or 'unknown'}",
-            "label": f"Auto-review: {_basename_path(cwd)}",
-            "relation": "unmatched auto-review",
-        }
+    return {
+        "key": f"auto:{cwd or _optional_str(row.get('session_id')) or 'unknown'}",
+        "label": f"Auto-review: {_basename_path(cwd)}",
+        "relation": "unmatched auto-review",
+    }
 
+
+def _session_thread_attachment(row: dict[str, Any]) -> dict[str, str | None]:
     session_id = _optional_str(row.get("session_id")) or "unknown"
     return {
         "key": f"session:{session_id}",
