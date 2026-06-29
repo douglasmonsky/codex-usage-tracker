@@ -271,48 +271,82 @@ def _boundary_delta_residual_diagnostics(
 def _boundary_delta_top_error_groups(
     errors: list[dict[str, Any]], field_name: str
 ) -> list[dict[str, Any]]:
+    grouped = _group_boundary_delta_errors(errors, field_name)
+    total_abs_error = _boundary_delta_abs_error_sum(errors)
+    rows = [
+        _boundary_delta_error_group_row(
+            field_name=field_name,
+            key=key,
+            items=items,
+            total_count=len(errors),
+            total_abs_error=total_abs_error,
+        )
+        for key, items in grouped.items()
+    ]
+    rows.sort(key=lambda row: _boundary_delta_error_group_sort_key(row, field_name))
+    return rows[:10]
+
+
+def _group_boundary_delta_errors(
+    errors: list[dict[str, Any]], field_name: str
+) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in errors:
         metadata = item.get("metadata", {})
-        if field_name == "boundary_state":
-            key = "boundary" if metadata.get("is_boundary") else "same_label"
-        else:
-            key = str(metadata.get(field_name) or "missing")
+        key = _boundary_delta_error_group_key(metadata, field_name)
         grouped.setdefault(key, []).append(item)
-    total_abs_error = sum(item["abs_error"] for item in errors)
-    rows = [
-        {
-            field_name: key,
-            "count": len(items),
-            "count_share": _rounded(len(items) / len(errors)),
-            "share_abs_error": _rounded(
-                sum(item["abs_error"] for item in items) / total_abs_error
-                if total_abs_error
-                else None
-            ),
-            "mean_abs_error": _rounded(
-                sum(item["abs_error"] for item in items) / len(items)
-            ),
-            "rmse": _rounded(
-                math.sqrt(sum(item["error"] * item["error"] for item in items) / len(items))
-            ),
-            "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
-            "mean_actual": _rounded(sum(item["actual"] for item in items) / len(items)),
-            "mean_predicted": _rounded(
-                sum(item["predicted"] for item in items) / len(items)
-            ),
-        }
-        for key, items in grouped.items()
-    ]
-    rows.sort(
-        key=lambda row: (
-            -_number(row["share_abs_error"]),
-            -_number(row["mean_abs_error"]),
-            -int(_number(row.get("count"))),
-            str(row.get(field_name) or ""),
-        )
+    return grouped
+
+
+def _boundary_delta_error_group_key(metadata: object, field_name: str) -> str:
+    if not isinstance(metadata, dict):
+        metadata = {}
+    if field_name == "boundary_state":
+        return "boundary" if metadata.get("is_boundary") else "same_label"
+    return str(metadata.get(field_name) or "missing")
+
+
+def _boundary_delta_error_group_row(
+    *,
+    field_name: str,
+    key: str,
+    items: list[dict[str, Any]],
+    total_count: int,
+    total_abs_error: float,
+) -> dict[str, Any]:
+    abs_error_sum = _boundary_delta_abs_error_sum(items)
+    return {
+        field_name: key,
+        "count": len(items),
+        "count_share": _rounded(len(items) / total_count),
+        "share_abs_error": _rounded(
+            abs_error_sum / total_abs_error if total_abs_error else None
+        ),
+        "mean_abs_error": _rounded(abs_error_sum / len(items)),
+        "rmse": _rounded(_boundary_delta_rmse(items)),
+        "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
+        "mean_actual": _rounded(sum(item["actual"] for item in items) / len(items)),
+        "mean_predicted": _rounded(sum(item["predicted"] for item in items) / len(items)),
+    }
+
+
+def _boundary_delta_abs_error_sum(items: list[dict[str, Any]]) -> float:
+    return sum(float(item["abs_error"]) for item in items)
+
+
+def _boundary_delta_rmse(items: list[dict[str, Any]]) -> float:
+    return math.sqrt(sum(item["error"] * item["error"] for item in items) / len(items))
+
+
+def _boundary_delta_error_group_sort_key(
+    row: dict[str, Any], field_name: str
+) -> tuple[float, float, int, str]:
+    return (
+        -_number(row["share_abs_error"]),
+        -_number(row["mean_abs_error"]),
+        -int(_number(row.get("count"))),
+        str(row.get(field_name) or ""),
     )
-    return rows[:10]
 
 
 def _largest_boundary_delta_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
