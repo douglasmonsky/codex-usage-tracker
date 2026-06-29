@@ -7493,3 +7493,37 @@ Checks:
 Remaining risks / next handoff:
 - Stage exact files and rerun `agent_maintainer verify --profile fast` before commit.
 - Start the next roadmap phase now that C-grade complexity is eliminated from `src`.
+
+### `chore/tach-strict-local`
+
+Status:
+- Local-only branch.
+- Not pushed.
+
+Objective:
+- Make the architecture map a passing local blocking gate and tighten safe `tach` strictness without touching remote CI.
+
+Files touched:
+- `tach.toml`
+- `docs/architecture-boundary-map.md`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Enabled `layers_explicit_depends_on = true`; this passes with the current dependency map.
+- Replaced the stale boundary note that described 13 old violations with current gate status.
+- Documented that `tach check` is now a local blocking gate.
+- Documented that `forbid_circular_dependencies` remains deferred because the coarse module groups still trigger broad circular-dependency reports when it is enabled.
+
+Metrics:
+- `tach check`: passing locally with explicit dependency layers enabled.
+- `forbid_circular_dependencies = true`: tested and not enabled; it currently fails broadly and needs a later boundary-grouping branch.
+
+Checks:
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Continue to wemake baseline only after this strict-local architecture checkpoint is committed.

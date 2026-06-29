@@ -10,7 +10,7 @@ exclude = [
 source_roots = ["src"]
 root_module = "ignore"
 forbid_circular_dependencies = false
-layers_explicit_depends_on = false
+layers_explicit_depends_on = true
 
 [[modules]]
 paths = [
