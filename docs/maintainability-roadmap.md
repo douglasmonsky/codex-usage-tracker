@@ -5895,3 +5895,52 @@ Checks:
 Remaining risks / next handoff:
 - `_observed_usage_reconciliation_payload` remains B(6), below the current C hotspot threshold.
 - Next branch should target one of the C(13) hotspots, starting with `usage_drain_walk_forward.py::walk_forward_prediction_rows`.
+
+### `refactor/usage-drain-walk-forward-rows`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `walk_forward_prediction_rows` complexity while preserving the public walk-forward row contract and transition prediction detail payloads.
+- Add direct characterization coverage for row indexes, actual values, base predictions, metadata, prediction details, and transition-risk fields.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_walk_forward.py`
+- `src/codex_usage_tracker/usage_drain_walk_forward_rows.py`
+- `tests/test_usage_drain_walk_forward.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Moved walk-forward row construction into `usage_drain_walk_forward_rows.py`.
+- Kept `usage_drain_walk_forward.py` as the summary/scope module with a compatibility facade for `walk_forward_prediction_rows`.
+- Split row construction into helpers for history metrics, state construction, base predictions, state-bucket prediction attachment, transition prediction values, and transition prediction details.
+
+Metrics:
+- `walk_forward_prediction_rows`: C(13) -> A(1) facade in `usage_drain_walk_forward.py`; implementation A(3) in `usage_drain_walk_forward_rows.py`.
+- `usage_drain_walk_forward.py`: 579 -> 180 physical lines after moving the row builder.
+- `usage_drain_walk_forward_rows.py`: 408 physical lines, under the 450 source-line agent-maintainer budget.
+- Global C-or-worse blocks: 36 -> 35.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are C(13), led by `usage_drain_walk_forward.py::_walk_forward_scope_metrics`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_walk_forward.py -q`: 1 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_walk_forward.py tests/test_usage_drain_model.py tests/test_usage_drain_regression.py tests/test_usage_drain_allowance_fits.py -q`: 22 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_walk_forward.py src/codex_usage_tracker/usage_drain_walk_forward_rows.py -a -s`: row target now A-grade; `_walk_forward_scope_metrics` remains C(13).
+- `.venv/bin/python -m pytest -q`: 477 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, with only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `_walk_forward_scope_metrics` remains C(13) in `usage_drain_walk_forward.py`.
+- Next branch should target `_walk_forward_scope_metrics` while keeping the walk-forward summary payload stable.
