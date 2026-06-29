@@ -34,47 +34,117 @@ def record_function_call(
     call_read_events: dict[str, list[int]],
     source_read_events: list[int],
 ) -> None:
+    call_id, function_name = _record_function_identity(
+        payload,
+        counters=counters,
+        call_names=call_names,
+    )
+    command = shell_command_from_payload(payload, function_name=function_name)
+    if command is None:
+        _record_missing_shell_command(function_name, meta=meta)
+        return
+
+    root = _record_shell_command(command, counters=counters)
+    if call_id:
+        call_roots[call_id] = root
+    _record_git_command_interaction(
+        command,
+        root=root,
+        call_id=call_id,
+        counters=counters,
+        call_git_interactions=call_git_interactions,
+    )
+    _record_read_command(
+        command,
+        root=root,
+        order=order,
+        counters=counters,
+        call_id=call_id,
+        call_read_events=call_read_events,
+        source_read_events=source_read_events,
+    )
+
+
+def _record_function_identity(
+    payload: dict[str, Any],
+    *,
+    counters: dict[str, Any],
+    call_names: dict[str, str],
+) -> tuple[str | None, str]:
     call_id = optional_str(payload.get("call_id") or payload.get("id"))
     function_name = safe_label(payload.get("name")) or "unknown_function"
     counters["function_calls"][function_name] += 1
     if call_id:
         call_names[call_id] = function_name
-    command = shell_command_from_payload(payload, function_name=function_name)
-    if command is None:
-        if is_shell_tool(function_name):
-            meta["missing_command"] += 1
-        return
+    return call_id, function_name
+
+
+def _record_missing_shell_command(
+    function_name: str,
+    *,
+    meta: Counter[str],
+) -> None:
+    if is_shell_tool(function_name):
+        meta["missing_command"] += 1
+
+
+def _record_shell_command(command: str, *, counters: dict[str, Any]) -> str:
     root, child = command_root_and_child(command)
     counters["command_calls"][root] += 1
     counters["command_children"].setdefault(root, Counter())[child] += 1
-    if call_id:
-        call_roots[call_id] = root
+    return root
+
+
+def _record_git_command_interaction(
+    command: str,
+    *,
+    root: str,
+    call_id: str | None,
+    counters: dict[str, Any],
+    call_git_interactions: dict[str, tuple[str, str, str, str]],
+) -> None:
     interaction = git_interaction_from_command(command, root=root)
-    if interaction is not None:
-        interaction_key = (
-            interaction["root"],
-            interaction["operation"],
-            interaction["category"],
-            interaction["mutability"],
-        )
-        counters["git_interaction_calls"][interaction_key] += 1
-        counters["git_interactions_by_category"][interaction["category"]] += 1
-        counters["git_interactions_by_mutability"][interaction["mutability"]] += 1
-        counters["git_interactions_by_root"][interaction["root"]] += 1
-        if call_id:
-            call_git_interactions[call_id] = interaction_key
+    if interaction is None:
+        return
+
+    interaction_key = (
+        interaction["root"],
+        interaction["operation"],
+        interaction["category"],
+        interaction["mutability"],
+    )
+    counters["git_interaction_calls"][interaction_key] += 1
+    counters["git_interactions_by_category"][interaction["category"]] += 1
+    counters["git_interactions_by_mutability"][interaction["mutability"]] += 1
+    counters["git_interactions_by_root"][interaction["root"]] += 1
+    if call_id:
+        call_git_interactions[call_id] = interaction_key
+
+
+def _record_read_command(
+    command: str,
+    *,
+    root: str,
+    order: int,
+    counters: dict[str, Any],
+    call_id: str | None,
+    call_read_events: dict[str, list[int]],
+    source_read_events: list[int],
+) -> None:
     read_refs = read_path_refs_from_command(command, root=root)
-    if read_refs:
-        counters["read_command_count"] += 1
-        read_event_indexes = record_read_refs(
-            read_refs,
-            root=root,
-            order=order,
-            counters=counters,
-            source_read_events=source_read_events,
-        )
-        if call_id:
-            call_read_events[call_id] = read_event_indexes
+    if not read_refs:
+        return
+
+    counters["read_command_count"] += 1
+    read_event_indexes = record_read_refs(
+        read_refs,
+        root=root,
+        order=order,
+        counters=counters,
+        source_read_events=source_read_events,
+    )
+    if call_id:
+        call_read_events[call_id] = read_event_indexes
 
 
 def record_read_refs(

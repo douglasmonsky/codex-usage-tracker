@@ -6883,3 +6883,47 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue C(11) ratchet. Candidate targets: `diagnostic_snapshot_source_scan.py::record_function_call`, `usage_drain_predictive.py::capacity_residual_diagnostics`, or report rendering helpers.
+
+### `refactor/source-scan-function-call-recorder`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `diagnostic_snapshot_source_scan.py::record_function_call` below the C-grade complexity threshold without changing aggregate diagnostic behavior.
+- Add focused coverage for function-call source-scan behavior before the refactor.
+
+Files touched:
+- `src/codex_usage_tracker/diagnostic_snapshot_source_scan.py`
+- `tests/test_diagnostic_snapshot_source_scan.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added focused characterization tests for read command event linking, git interaction counters, and missing shell-command metadata.
+- Split function-call scanning into focused helpers for function identity, missing shell command metadata, shell command counters, git interaction counters, and read command event recording.
+- Kept the public recorder signature and aggregate privacy-safe labels unchanged.
+
+Metrics:
+- `record_function_call`: C(11) -> A(3).
+- `diagnostic_snapshot_source_scan.py` maximum complexity: B(7); no C-grade functions remain in module.
+- Global C-or-worse blocks: 14 -> 13.
+- No C(12+) or D/E/F complexity blocks remain.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_diagnostic_snapshot_source_scan.py -q`: 3 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostic_snapshot_source_scan.py tests/test_diagnostic_snapshot_source_scan.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/diagnostic_snapshot_source_scan.py -a -s`: target now A(3), module max B(7).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 503 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+
+Remaining risks / next handoff:
+- Continue C(11) ratchet. Candidate targets: `usage_drain_predictive.py::capacity_residual_diagnostics`, `usage_drain_error_diagnostics.py::prediction_error_diagnostics`, `diagnostic_snapshot_report.py::DiagnosticSnapshotReport.render`, or `dashboard.py::_pricing_snapshot_warning`.
