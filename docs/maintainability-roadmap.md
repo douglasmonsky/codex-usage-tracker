@@ -7015,3 +7015,49 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue C(11) ratchet. Candidate targets: `usage_drain_predictive.py::capacity_residual_diagnostics`, `usage_drain_error_diagnostics.py::prediction_error_diagnostics`, `dashboard.py::_pricing_snapshot_warning`, `parser.py::inspect_log`, or store/query schema helpers.
+
+### `refactor/dashboard-pricing-warning`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce dashboard pricing snapshot warning complexity below the C-grade threshold without changing dashboard payload warning behavior.
+- Preserve max-file-line ratchets by moving the extracted helper and direct tests into focused files.
+
+Files touched:
+- `src/codex_usage_tracker/dashboard.py`
+- `src/codex_usage_tracker/dashboard_pricing_snapshot.py`
+- `tests/test_dashboard_pricing_snapshot.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added direct tests for missing previous payloads, missing fingerprints, unchanged fingerprints, and timestamp label preference.
+- Extracted dashboard pricing snapshot comparison into `dashboard_pricing_snapshot.py`.
+- Kept `dashboard.py` under the 600-line ratchet and moved direct tests out of the already-large payload test module.
+
+Metrics:
+- `_pricing_snapshot_warning`: C(11) -> `pricing_snapshot_warning`: A(5).
+- `dashboard.py` maximum complexity: B(10); no C-grade functions remain in module.
+- `dashboard.py`: 565 physical lines after extraction, below the 600-line limit.
+- Global C-or-worse blocks: 11 -> 10.
+- No C(12+) or D/E/F complexity blocks remain.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_dashboard_pricing_snapshot.py tests/test_dashboard_payload.py::test_dashboard_and_csv_are_aggregate_only -q`: 3 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/dashboard.py src/codex_usage_tracker/dashboard_pricing_snapshot.py tests/test_dashboard_payload.py tests/test_dashboard_pricing_snapshot.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/dashboard.py src/codex_usage_tracker/dashboard_pricing_snapshot.py -a -s`: target now A(5), module max B(10).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 516 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+
+Remaining risks / next handoff:
+- Continue C(11) ratchet. Candidate targets: `parser.py::inspect_log`, `store_query_sql.py::_usage_where_clause`, `store_schema.py::init_db`, or the remaining usage-drain diagnostic/report helpers.

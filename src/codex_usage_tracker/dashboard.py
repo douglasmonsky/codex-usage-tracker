@@ -24,6 +24,7 @@ from codex_usage_tracker.dashboard_assets import (
     render_dashboard_template,
     versioned_asset_href,
 )
+from codex_usage_tracker.dashboard_pricing_snapshot import pricing_snapshot_warning
 from codex_usage_tracker.i18n import dashboard_i18n_payload, language_direction
 from codex_usage_tracker.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -299,7 +300,7 @@ def generate_dashboard(
         language=language,
         include_rows=include_rows,
     )
-    payload_dict["pricing_snapshot_warning"] = _pricing_snapshot_warning(
+    payload_dict["pricing_snapshot_warning"] = pricing_snapshot_warning(
         previous_payload, payload_dict
     )
     output_path.write_text(
@@ -516,26 +517,6 @@ def _payload_cache_key(
         ]
     )
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:24]
-
-
-def _pricing_snapshot_warning(
-    previous_payload: dict[str, Any] | None, current_payload: dict[str, object]
-) -> str | None:
-    if not previous_payload:
-        return None
-    previous = previous_payload.get("pricing_snapshot")
-    current = current_payload.get("pricing_snapshot")
-    if not isinstance(previous, dict) or not isinstance(current, dict):
-        return None
-    previous_fingerprint = previous.get("fingerprint")
-    current_fingerprint = current.get("fingerprint")
-    if not previous_fingerprint or not current_fingerprint:
-        return None
-    if previous_fingerprint == current_fingerprint:
-        return None
-    previous_label = previous.get("fetched_at") or previous.get("pinned_at") or previous_fingerprint
-    current_label = current.get("fetched_at") or current.get("pinned_at") or current_fingerprint
-    return f"Pricing snapshot changed since the previous dashboard render: {previous_label} -> {current_label}."
 
 
 def _previous_dashboard_payload(output_path: Path) -> dict[str, Any] | None:
