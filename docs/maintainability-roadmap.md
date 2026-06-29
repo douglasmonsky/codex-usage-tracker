@@ -6179,3 +6179,50 @@ Checks:
 Remaining risks / next handoff:
 - Remaining C(13) targets now include `_one_percent_capacity_modeling`, `load_call_context`, `validate_json_payload_contract`, and `regime_streak_summary`.
 - Choose the next branch based on strongest existing coverage or smallest synthetic fixture cost.
+
+### `refactor/regime-streak-summary`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `regime_streak_summary` complexity while preserving one-percent run and long-run break summaries.
+- Add direct characterization coverage for run counts, latest/current run behavior, top run ordering, and break records.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_regime_segments.py`
+- `tests/test_usage_drain_regime_segments.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split regime streak summary into helpers for one-percent run summary, long-run count, max run length, current run selection, top run ranking, and breaks after long runs.
+- Preserved the existing top-run limit, long-run threshold, current streak behavior, and break ordering.
+
+Metrics:
+- `regime_streak_summary`: C(13) -> A(1).
+- `usage_drain_regime_segments.py` average complexity: A(3.65).
+- `usage_drain_regime_segments.py`: 324 -> 369 physical lines.
+- Global C-or-worse blocks: 30 -> 29.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are C(13), led by `usage_drain_model.py::_one_percent_capacity_modeling`, `context.py::load_call_context`, and `json_contracts.py::validate_json_payload_contract`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_regime_segments.py -q`: 1 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_regime_segments.py tests/test_usage_drain_model.py tests/test_usage_drain_reports.py -q`: 21 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_regime_segments.py -a -s`: target now A(1).
+- `.venv/bin/python -m pytest -q`: 485 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, with only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `_piecewise_adaptation_by_position` remains C(12) in this module.
+- The remaining C(13) targets are broader: `_one_percent_capacity_modeling`, `load_call_context`, and `validate_json_payload_contract`.

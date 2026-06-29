@@ -51,31 +51,64 @@ def delta_regime_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
 
 def regime_streak_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
     one_percent_runs = _one_percent_runs(spans)
-    top_runs = sorted(one_percent_runs, key=lambda run: -run["span_count"])[:10]
+    return {
+        "one_percent_runs": _one_percent_run_summary(one_percent_runs, spans),
+        "breaks_after_long_one_percent_runs": _breaks_after_long_one_percent_runs(
+            spans, one_percent_runs
+        ),
+    }
+
+
+def _one_percent_run_summary(
+    one_percent_runs: list[dict[str, Any]], spans: list[UsageDeltaSpan]
+) -> dict[str, Any]:
+    current_run = _current_one_percent_run(one_percent_runs, span_count=len(spans))
+    return {
+        "count": len(one_percent_runs),
+        "long_run_min_length": 3,
+        "long_run_count": _long_one_percent_run_count(one_percent_runs),
+        "max_span_count": _max_one_percent_run_length(one_percent_runs),
+        "current_streak": int(current_run["span_count"]) if current_run else 0,
+        "latest_run": one_percent_runs[-1] if one_percent_runs else None,
+        "top_runs": _top_one_percent_runs(one_percent_runs),
+    }
+
+
+def _long_one_percent_run_count(one_percent_runs: list[dict[str, Any]]) -> int:
+    return sum(1 for run in one_percent_runs if run["span_count"] >= 3)
+
+
+def _max_one_percent_run_length(one_percent_runs: list[dict[str, Any]]) -> int:
+    return max((int(run["span_count"]) for run in one_percent_runs), default=0)
+
+
+def _current_one_percent_run(
+    one_percent_runs: list[dict[str, Any]], *, span_count: int
+) -> dict[str, Any] | None:
+    if not one_percent_runs or not span_count:
+        return None
+    current_run = one_percent_runs[-1]
+    if current_run["end_index"] != span_count - 1:
+        return None
+    return current_run
+
+
+def _top_one_percent_runs(
+    one_percent_runs: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    return sorted(one_percent_runs, key=lambda run: -run["span_count"])[:10]
+
+
+def _breaks_after_long_one_percent_runs(
+    spans: list[UsageDeltaSpan], one_percent_runs: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     breaks = [
         _run_break_record(spans, run)
         for run in one_percent_runs
         if run["span_count"] >= 3 and run["end_index"] + 1 < len(spans)
     ]
     breaks.sort(key=lambda item: (-int(item["preceding_span_count"]), item["break_index"]))
-    latest_run = one_percent_runs[-1] if one_percent_runs else None
-    current_run = one_percent_runs[-1] if one_percent_runs and spans else None
-    if current_run and current_run["end_index"] != len(spans) - 1:
-        current_run = None
-    return {
-        "one_percent_runs": {
-            "count": len(one_percent_runs),
-            "long_run_min_length": 3,
-            "long_run_count": sum(1 for run in one_percent_runs if run["span_count"] >= 3),
-            "max_span_count": max(
-                (int(run["span_count"]) for run in one_percent_runs), default=0
-            ),
-            "current_streak": int(current_run["span_count"]) if current_run else 0,
-            "latest_run": latest_run,
-            "top_runs": top_runs,
-        },
-        "breaks_after_long_one_percent_runs": breaks[:10],
-    }
+    return breaks[:10]
 
 
 def piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
