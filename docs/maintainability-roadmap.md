@@ -5847,3 +5847,51 @@ Checks:
 Remaining risks / next handoff:
 - `_boundary_delta_residual_diagnostics` remains C(12), below the current top hotspot threshold.
 - Next branch should target `store_dashboard_queries.py::observed_usage_reconciliation` C(14).
+
+### `refactor/store-dashboard-usage-reconciliation`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `observed_usage_reconciliation` complexity while preserving live-usage reconciliation behavior for alternate Codex limit rows.
+- Add direct SQLite-backed characterization tests for recommendation, interrupted streak, and selected-latest-alternate cases.
+
+Files touched:
+- `src/codex_usage_tracker/store_dashboard_queries.py`
+- `tests/test_store_dashboard_queries.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added focused in-memory SQLite tests for observed usage reconciliation decisions.
+- Split recent observed row loading, alternate-limit streak counting, recommendation decision, and payload formatting into named helpers.
+- Preserved `query_latest_observed_usage` reconciliation payload shape.
+
+Metrics:
+- `observed_usage_reconciliation`: C(14) -> A(2).
+- `store_dashboard_queries.py`: 401 -> 446 physical lines.
+- `store_dashboard_queries.py` average complexity: A(4.54).
+- Global C-or-worse blocks: 37 -> 36.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are now C(13), led by `usage_drain_walk_forward.py::walk_forward_prediction_rows`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_store_dashboard_queries.py -q`: 3 passed.
+- `.venv/bin/python -m pytest tests/test_store_dashboard_queries.py tests/test_dashboard_payload.py tests/test_dashboard_server.py tests/test_server_status.py -q`: 24 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/store_dashboard_queries.py -a -s`: target now A(2).
+- `.venv/bin/python -m pytest -q`: 476 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning after staging.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `_observed_usage_reconciliation_payload` remains B(6), below the current C hotspot threshold.
+- Next branch should target one of the C(13) hotspots, starting with `usage_drain_walk_forward.py::walk_forward_prediction_rows`.

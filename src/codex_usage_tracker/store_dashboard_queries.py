@@ -308,40 +308,85 @@ def observed_usage_reconciliation(
     params: list[Any],
     selected_row: sqlite3.Row | None,
 ) -> dict[str, Any]:
-    recent_rows = [
+    recent_rows = _recent_observed_usage_rows(
+        conn,
+        scoped_where=scoped_where,
+        params=params,
+    )
+    consecutive_alternate_rows, latest_alternate = _alternate_usage_limit_streak(
+        recent_rows
+    )
+    selected = row_to_dict(selected_row) if selected_row is not None else {}
+    recommended = _observed_usage_reconciliation_recommended(
+        consecutive_alternate_rows=consecutive_alternate_rows,
+        latest_alternate=latest_alternate,
+        selected=selected,
+    )
+    return _observed_usage_reconciliation_payload(
+        recommended=recommended,
+        consecutive_alternate_rows=consecutive_alternate_rows,
+        latest_alternate=latest_alternate,
+        selected=selected,
+    )
+
+
+def _recent_observed_usage_rows(
+    conn: sqlite3.Connection,
+    *,
+    scoped_where: str,
+    params: list[Any],
+) -> list[dict[str, Any]]:
+    return [
         row_to_dict(row)
         for row in conn.execute(
             f"""
-            SELECT
-                record_id,
-                event_timestamp,
-                rate_limit_plan_type,
-                rate_limit_limit_id
+            SELECT record_id, event_timestamp, rate_limit_plan_type, rate_limit_limit_id
             FROM usage_events
+
             {scoped_where}
+
             ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
             LIMIT ?
             """,
             [*params, OBSERVED_USAGE_RECONCILIATION_THRESHOLD],
         ).fetchall()
     ]
-    consecutive_alternate_rows = 0
+
+
+def _alternate_usage_limit_streak(
+    rows: list[dict[str, Any]],
+) -> tuple[int, dict[str, Any] | None]:
+    consecutive_rows = 0
     latest_alternate: dict[str, Any] | None = None
-    for row in recent_rows:
-        limit_id = row.get("rate_limit_limit_id")
-        if not is_alternate_codex_limit(limit_id):
+    for row in rows:
+        if not is_alternate_codex_limit(row.get("rate_limit_limit_id")):
             break
-        consecutive_alternate_rows += 1
+        consecutive_rows += 1
         if latest_alternate is None:
             latest_alternate = row
-    selected = row_to_dict(selected_row) if selected_row is not None else {}
-    selected_record_id = selected.get("record_id")
-    latest_record_id = latest_alternate.get("record_id") if latest_alternate else None
-    recommended = (
-        consecutive_alternate_rows >= OBSERVED_USAGE_RECONCILIATION_THRESHOLD
-        and latest_alternate is not None
-        and latest_record_id != selected_record_id
-    )
+    return consecutive_rows, latest_alternate
+
+
+def _observed_usage_reconciliation_recommended(
+    *,
+    consecutive_alternate_rows: int,
+    latest_alternate: dict[str, Any] | None,
+    selected: dict[str, Any],
+) -> bool:
+    if consecutive_alternate_rows < OBSERVED_USAGE_RECONCILIATION_THRESHOLD:
+        return False
+    if latest_alternate is None:
+        return False
+    return latest_alternate.get("record_id") != selected.get("record_id")
+
+
+def _observed_usage_reconciliation_payload(
+    *,
+    recommended: bool,
+    consecutive_alternate_rows: int,
+    latest_alternate: dict[str, Any] | None,
+    selected: dict[str, Any],
+) -> dict[str, Any]:
     return {
         "recommended": recommended,
         "reason": "latest_alternate_codex_limit_rows" if recommended else None,
