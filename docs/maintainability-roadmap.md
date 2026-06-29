@@ -4904,3 +4904,44 @@ Checks:
 
 Remaining risks / next handoff:
 - Global Xenon still fails on remaining C-rated blocks in usage-drain feature history/time series/allowance fits, store, diagnostics MCP, recommendations, formatting, dashboard payload, and diagnostic snapshot analysis.
+
+### `refactor/format-recommendations`
+
+Objective:
+- Reduce the human-readable recommendation formatter complexity while preserving current CLI text output.
+
+Files touched:
+- `src/codex_usage_tracker/formatting.py`
+- `tests/test_formatting.py`
+
+Completed edits:
+- Added direct formatter characterization for empty payloads, top-thread output, primary recommendation output, and fallback title/action text.
+- Split recommendation row extraction, thread-section formatting, call-line formatting, primary recommendation normalization, and thread label selection into formatter-specific helpers.
+- Renamed helpers with a `formatted_` prefix to avoid increasing duplicate-helper ratchet debt.
+
+Metrics:
+- `format_recommendations`: C(20) -> A(3).
+- `formatting.py` average complexity: B(6.91) -> A(4.82).
+- New helper ceiling: B(7) for `_formatted_recommendation_call`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/formatting.py tests/test_formatting.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/formatting.py tests/test_formatting.py`: passed.
+- `.venv/bin/python -m pytest tests/test_formatting.py -q`: 2 passed.
+- `.venv/bin/python -m pytest tests/test_formatting.py tests/test_recommendations.py tests/test_server_recommendations.py tests/test_cli_lifecycle.py -q`: 14 passed.
+- `.venv/bin/python -m radon cc src/codex_usage_tracker/formatting.py -a -s`: passed, recommendation formatter now A(3).
+- `.venv/bin/python -m pytest -q`: 446 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `format_calls` remains C(13) in `formatting.py`.
+- Global Xenon still fails on remaining C-rated blocks in usage-drain feature history/time series/allowance fits, store, diagnostics MCP, recommendations, dashboard payload, and diagnostic snapshot analysis.

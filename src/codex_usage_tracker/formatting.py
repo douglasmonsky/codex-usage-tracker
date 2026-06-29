@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def format_summary(rows: list[dict[str, Any]], group_by: str) -> str:
@@ -89,42 +89,65 @@ def format_calls(rows: list[dict[str, Any]], title: str = "Most expensive Codex 
 
 
 def format_recommendations(payload: dict[str, Any]) -> str:
-    rows = payload.get("rows")
-    if not isinstance(rows, list) or not rows:
+    rows = _formatted_recommendation_rows(payload)
+    if not rows:
         return "No aggregate recommendations are currently flagged."
 
     lines = ["Codex usage recommendations", ""]
-    threads = payload.get("threads")
-    if isinstance(threads, list) and threads:
-        lines.append("Top threads:")
-        for thread in threads[:5]:
-            lines.append(
-                f"- {thread.get('thread') or 'Unknown thread'}: "
-                f"score {_fmt_decimal(thread.get('recommendation_score'))}, "
-                f"{_fmt_int(thread.get('call_count'))} calls, "
-                f"{_fmt_int(thread.get('total_tokens'))} tokens"
-            )
-        lines.append("")
+    _append_formatted_recommendation_threads(lines, payload.get("threads"))
     lines.append("Top calls:")
     for index, row in enumerate(rows, 1):
-        primary = row.get("primary_recommendation") or {}
-        if not isinstance(primary, dict):
-            primary = {}
-        thread = (
-            row.get("thread_attachment_label")
-            or row.get("thread_name")
-            or row.get("parent_thread_name")
-            or row.get("session_id")
-            or "Unknown"
-        )
-        lines.append(
-            f"{index}. {thread} | {row.get('model') or 'unknown'} "
-            f"({row.get('effort') or 'unknown'}) | "
-            f"score {_fmt_decimal(row.get('recommendation_score'))} | "
-            f"{primary.get('title') or row.get('primary_signal') or 'Recommendation'}: "
-            f"{row.get('recommended_action') or primary.get('action') or 'Review aggregate usage.'}"
-        )
+        lines.append(_formatted_recommendation_call(index, row))
     return "\n".join(lines)
+
+
+def _formatted_recommendation_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = payload.get("rows")
+    return cast(list[dict[str, Any]], rows) if isinstance(rows, list) else []
+
+
+def _append_formatted_recommendation_threads(lines: list[str], threads: object) -> None:
+    if not isinstance(threads, list) or not threads:
+        return
+    lines.append("Top threads:")
+    for thread in cast(list[dict[str, Any]], threads[:5]):
+        lines.append(_formatted_recommendation_thread(thread))
+    lines.append("")
+
+
+def _formatted_recommendation_thread(thread: dict[str, Any]) -> str:
+    return (
+        f"- {thread.get('thread') or 'Unknown thread'}: "
+        f"score {_fmt_decimal(thread.get('recommendation_score'))}, "
+        f"{_fmt_int(thread.get('call_count'))} calls, "
+        f"{_fmt_int(thread.get('total_tokens'))} tokens"
+    )
+
+
+def _formatted_recommendation_call(index: int, row: dict[str, Any]) -> str:
+    primary = _formatted_primary_recommendation(row)
+    return (
+        f"{index}. {_formatted_recommendation_thread_label(row)} | {row.get('model') or 'unknown'} "
+        f"({row.get('effort') or 'unknown'}) | "
+        f"score {_fmt_decimal(row.get('recommendation_score'))} | "
+        f"{primary.get('title') or row.get('primary_signal') or 'Recommendation'}: "
+        f"{row.get('recommended_action') or primary.get('action') or 'Review aggregate usage.'}"
+    )
+
+
+def _formatted_primary_recommendation(row: dict[str, Any]) -> dict[str, Any]:
+    primary = row.get("primary_recommendation") or {}
+    return primary if isinstance(primary, dict) else {}
+
+
+def _formatted_recommendation_thread_label(row: dict[str, Any]) -> object:
+    return (
+        row.get("thread_attachment_label")
+        or row.get("thread_name")
+        or row.get("parent_thread_name")
+        or row.get("session_id")
+        or "Unknown"
+    )
 
 
 def format_doctor(report: dict[str, Any]) -> str:
