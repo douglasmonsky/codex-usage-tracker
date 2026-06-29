@@ -5317,3 +5317,50 @@ Checks:
 Remaining risks / next handoff:
 - `diagnostic_snapshot_analysis.py::_scan_source_log` is now the largest remaining C-rated block.
 - `usage_drain_state_buckets.py` has two C(16) diagnostic helpers that are likely low-risk report-formatting splits.
+
+### `refactor/diagnostic-source-log-scan`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `diagnostic_snapshot_analysis.py::_scan_source_log` complexity while preserving aggregate-only diagnostic snapshot behavior and source-log privacy guarantees.
+- Keep the active file-size ratchet intact after splitting the scanner.
+
+Files touched:
+- `src/codex_usage_tracker/diagnostic_snapshot_analysis.py`
+- `src/codex_usage_tracker/diagnostic_snapshot_source_scan.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `_SourceLogScanState` so source-log scan state is explicit instead of carried through parallel local dict/list variables.
+- Split line filtering, JSON envelope parsing, event dispatch, modification recording, and response-item dispatch out of `_scan_source_log`.
+- Moved low-level function-call, command, read, modification, output-count, and read-productivity recorders into `diagnostic_snapshot_source_scan.py`.
+- Preserved existing aggregate counters and safe path labels; no raw prompts, command output text, patch text, or source-log paths are added to persisted snapshot payloads.
+
+Metrics:
+- `_scan_source_log`: C(17) -> A(3).
+- `diagnostic_snapshot_analysis.py`: 590 -> 441 lines.
+- New `diagnostic_snapshot_source_scan.py`: 252 lines.
+- Global C-or-worse blocks: 49 -> 48.
+- Largest remaining hotspot after this branch: `usage_drain_state_buckets.py::transition_risk_detail_diagnostics` C(16).
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostic_snapshot_analysis.py src/codex_usage_tracker/diagnostic_snapshot_source_scan.py tests/test_diagnostic_snapshots.py`: passed.
+- `.venv/bin/python -m pytest tests/test_diagnostic_snapshots.py tests/test_dashboard_diagnostics_snapshots.py tests/test_server_diagnostic_snapshots.py -q`: 28 passed.
+- `.venv/bin/python -m pytest -q`: 450 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `diagnostic_snapshot_source_scan.py::record_function_call` is still C(11), but below the current C(15)+ hotspot threshold.
+- Next best small branch is one of the C(16) report-diagnostic helpers in `usage_drain_state_buckets.py` or `usage_drain_boundary_summary.py`.
