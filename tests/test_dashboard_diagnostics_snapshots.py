@@ -753,3 +753,89 @@ console.log(JSON.stringify({
     assert payload["axisLabelCount"] <= 14
     assert payload["hasResetAxisLabel"] is False
     assert payload["trendLabel"] is True
+
+
+def test_dashboard_weekly_projection_uses_time_spacing() -> None:
+    payload = _run_snapshot_renderer_script(
+        """
+        const renderer = factory.create({
+          escapeHtml,
+          formatTimestamp: value => value,
+          number: new Intl.NumberFormat('en-US'),
+          pct: value => `${Math.round(Number(value || 0) * 100)}%`,
+          renderState: message => `<div>${escapeHtml(message)}</div>`,
+          rowInvestigatorLink: () => '<a>1,000</a>',
+          tokenText: value => new Intl.NumberFormat('en-US').format(Number(value || 0)),
+        });
+        const points = [
+          {
+            label: 'Reset Jan 01',
+            start_event_timestamp: '2026-01-01T00:00:00Z',
+            confidence: 'high',
+            rate_limit_plan_type: 'pro',
+            observed_usage_delta_percent: 35,
+            observed_standard_usage_credits: 12000,
+            projected_weekly_credits: 34000,
+            ci_low: 30000,
+            ci_high: 38000,
+          },
+          {
+            label: 'Reset Jan 02',
+            start_event_timestamp: '2026-01-02T00:00:00Z',
+            confidence: 'high',
+            rate_limit_plan_type: 'pro',
+            observed_usage_delta_percent: 35,
+            observed_standard_usage_credits: 12600,
+            projected_weekly_credits: 36000,
+            ci_low: 32000,
+            ci_high: 40000,
+          },
+          {
+            label: 'Reset Jan 08',
+            start_event_timestamp: '2026-01-08T00:00:00Z',
+            confidence: 'high',
+            rate_limit_plan_type: 'pro',
+            observed_usage_delta_percent: 35,
+            observed_standard_usage_credits: 14000,
+            projected_weekly_credits: 40000,
+            ci_low: 36000,
+            ci_high: 44000,
+          },
+        ];
+        const html = renderer.renderPanels({
+          loading: false,
+          payloads: {
+            usageDrain: {
+              status: 'ready',
+              refreshed: false,
+              snapshot: {
+                computed_at: '2026-06-20T00:00:00Z',
+                history_scope: 'active',
+                source_logs_scanned: 1,
+              },
+              summary: { usage_rows: 3 },
+              time_series: {
+                weekly_credit_projection: { points },
+              },
+              thread_cost_curves: { threads: [] },
+              model_highlights: {},
+            },
+          },
+        });
+        const circleXs = Array.from(html.matchAll(/<circle cx="([0-9.]+)"/g))
+          .map(match => Number(match[1]));
+        const firstGap = circleXs[1] - circleXs[0];
+        const secondGap = circleXs[2] - circleXs[1];
+        console.log(JSON.stringify({
+          circleXs,
+          firstGap,
+          secondGap,
+          usesUnevenTimeSpacing: secondGap > firstGap * 3,
+        }));
+        """
+    )
+
+    assert len(payload["circleXs"]) == 3
+    assert payload["firstGap"] > 0
+    assert payload["secondGap"] > payload["firstGap"] * 3
+    assert payload["usesUnevenTimeSpacing"] is True
