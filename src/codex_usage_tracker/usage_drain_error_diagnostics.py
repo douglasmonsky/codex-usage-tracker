@@ -53,54 +53,60 @@ def _span_window_elapsed_fraction(span: UsageDeltaSpan, reset_minutes: float) ->
 def prediction_error_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
-    errors: list[dict[str, Any]] = []
-    for row in rows:
-        predictions = row.get("predictions", {})
-        predicted = number(predictions.get(model_name))
-        actual = number(row.get("actual"))
-        previous_actual = number(row.get("previous_actual"))
-        error = predicted - actual
-        errors.append(
-            {
-                "index": int(row["index"]),
-                "actual": actual,
-                "predicted": predicted,
-                "previous_actual": previous_actual,
-                "error": error,
-                "abs_error": abs(error),
-                "metadata": row.get("metadata", {}),
-            }
-        )
+    errors = prediction_error_rows(rows, model_name)
     if not errors:
-        return {
-            "n": 0,
-            "exact_match_share": None,
-            "within_quarter_point_share": None,
-            "within_one_point_share": None,
-            "large_error_share": None,
-            "top_transition_errors": [],
-            "top_error_dates": [],
-            "error_by_day_of_week": [],
-            "error_by_hour": [],
-            "error_by_reset_phase": [],
-            "error_by_one_percent_streak": [],
-            "error_by_same_delta_streak": [],
-            "largest_errors": [],
-        }
+        return empty_prediction_error_diagnostics()
+    return prediction_error_summary(errors)
+
+
+def prediction_error_rows(
+    rows: list[dict[str, Any]], model_name: str
+) -> list[dict[str, Any]]:
+    return [_prediction_error_row(row, model_name) for row in rows]
+
+
+def _prediction_error_row(row: dict[str, Any], model_name: str) -> dict[str, Any]:
+    predictions = row.get("predictions", {})
+    predicted = number(predictions.get(model_name))
+    actual = number(row.get("actual"))
+    previous_actual = number(row.get("previous_actual"))
+    error = predicted - actual
+    return {
+        "index": int(row["index"]),
+        "actual": actual,
+        "predicted": predicted,
+        "previous_actual": previous_actual,
+        "error": error,
+        "abs_error": abs(error),
+        "metadata": row.get("metadata", {}),
+    }
+
+
+def empty_prediction_error_diagnostics() -> dict[str, Any]:
+    return {
+        "n": 0,
+        "exact_match_share": None,
+        "within_quarter_point_share": None,
+        "within_one_point_share": None,
+        "large_error_share": None,
+        "top_transition_errors": [],
+        "top_error_dates": [],
+        "error_by_day_of_week": [],
+        "error_by_hour": [],
+        "error_by_reset_phase": [],
+        "error_by_one_percent_streak": [],
+        "error_by_same_delta_streak": [],
+        "largest_errors": [],
+    }
+
+
+def prediction_error_summary(errors: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "n": len(errors),
-        "exact_match_share": rounded(
-            sum(1 for item in errors if item["abs_error"] == 0) / len(errors)
-        ),
-        "within_quarter_point_share": rounded(
-            sum(1 for item in errors if item["abs_error"] <= 0.25) / len(errors)
-        ),
-        "within_one_point_share": rounded(
-            sum(1 for item in errors if item["abs_error"] <= 1.0) / len(errors)
-        ),
-        "large_error_share": rounded(
-            sum(1 for item in errors if item["abs_error"] >= 5.0) / len(errors)
-        ),
+        "exact_match_share": prediction_error_share(errors, exact_error=0.0),
+        "within_quarter_point_share": prediction_error_share(errors, max_error=0.25),
+        "within_one_point_share": prediction_error_share(errors, max_error=1.0),
+        "large_error_share": prediction_error_share(errors, min_error=5.0),
         "top_transition_errors": top_transition_errors(errors),
         "top_error_dates": top_error_groups(errors, "date"),
         "error_by_day_of_week": top_error_groups(errors, "day_of_week"),
@@ -114,6 +120,26 @@ def prediction_error_diagnostics(
         ),
         "largest_errors": largest_prediction_errors(errors),
     }
+
+def prediction_error_share(
+    errors: list[dict[str, Any]],
+    *,
+    exact_error: float | None = None,
+    min_error: float | None = None,
+    max_error: float | None = None,
+) -> float | None:
+    if not errors:
+        return None
+    matching = 0
+    for item in errors:
+        abs_error = item["abs_error"]
+        matches_exact = exact_error is None or abs_error == exact_error
+        above_min = min_error is None or abs_error >= min_error
+        below_max = max_error is None or abs_error <= max_error
+        if matches_exact and above_min and below_max:
+            matching += 1
+    return rounded(matching / len(errors))
+
 
 def top_transition_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[tuple[float, float], list[dict[str, Any]]] = {}
