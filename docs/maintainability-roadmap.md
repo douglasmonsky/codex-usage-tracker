@@ -6560,3 +6560,55 @@ Checks so far:
 
 Remaining risks / next handoff:
 - Continue C(12) ratchet with pure usage-drain diagnostics before touching store/source-log code.
+
+### `refactor/span-error-metadata`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `span_error_metadata` complexity while preserving time, reset, and usage bucket metadata.
+- Add direct characterization coverage for date/hour, reset phase, baseline usage, plan, limit, and window source fields.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_error_diagnostics.py`
+- `src/codex_usage_tracker/usage_drain_features.py`
+- `src/codex_usage_tracker/usage_drain_utils.py`
+- `tests/test_usage_drain_error_diagnostics.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split reset remaining minutes and window elapsed fraction out of `span_error_metadata`.
+- Moved shared reset/window helper behavior into `usage_drain_utils.py` and reused it from feature extraction to avoid duplicate helper drift.
+- Preserved metadata keys and bucket values returned by `span_error_metadata`.
+
+Metrics:
+- `span_error_metadata`: C(12) -> B(7).
+- `usage_drain_error_diagnostics.py` maximum complexity: C(11), now `prediction_error_diagnostics`.
+- `usage_drain_error_diagnostics.py`: 185 -> 201 physical lines.
+- New `tests/test_usage_drain_error_diagnostics.py`: 44 physical lines.
+- Global C-or-worse blocks: 21 -> 20.
+- No C(13) or D/E/F complexity blocks remain.
+- Current C(12) targets include `usage_drain_boundary_delta_summary.py::_boundary_delta_residual_diagnostics`, `store_sources.py::source_logs_requiring_parse`, `store_sources.py::upsert_source_file_metadata`, and `diagnostic_snapshot_events.py::shell_command_from_payload`.
+
+Checks so far:
+- `.venv/bin/python -m pytest tests/test_usage_drain_error_diagnostics.py -q`: 1 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_error_diagnostics.py tests/test_usage_drain_walk_forward.py -q`: 3 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_error_diagnostics.py tests/test_usage_drain_error_diagnostics.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_error_diagnostics.py -a -s`: target now B(7), module max C(11).
+- `.venv/bin/python -m pytest tests/test_usage_drain_error_diagnostics.py tests/test_usage_drain_walk_forward.py tests/test_usage_drain_regression.py -q`: 9 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_error_diagnostics.py src/codex_usage_tracker/usage_drain_features.py src/codex_usage_tracker/usage_drain_utils.py tests/test_usage_drain_error_diagnostics.py`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m pytest -q`: 492 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+
+Remaining risks / next handoff:
+- Continue C(12) ratchet with boundary delta diagnostics before touching store/source-log code.

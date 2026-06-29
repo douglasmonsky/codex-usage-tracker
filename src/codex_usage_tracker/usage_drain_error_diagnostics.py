@@ -13,29 +13,17 @@ from codex_usage_tracker.usage_drain_utils import (
     reset_phase_bucket,
     reset_remaining_minutes,
     rounded,
+    span_reset_timestamp,
+    span_window_minutes,
     value_stddev,
+    window_elapsed_fraction,
 )
 
 
 def span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
     start_dt = parse_timestamp(span.start_event_timestamp)
-    reset_timestamp = (
-        span.usage_window_resets_at
-        if span.usage_window_resets_at is not None
-        else span.rate_limit_primary_resets_at
-    )
-    remaining_minutes = reset_remaining_minutes(start_dt, reset_timestamp)
-    window_minutes = (
-        span.usage_window_minutes
-        if span.usage_window_minutes is not None
-        else span.rate_limit_primary_window_minutes or 0.0
-    )
-    reset_minutes = remaining_minutes or 0.0
-    elapsed_fraction = (
-        min(max((window_minutes - reset_minutes) / window_minutes, 0.0), 1.0)
-        if window_minutes > 0
-        else 0.0
-    )
+    reset_minutes = _span_reset_remaining_minutes(span, start_dt)
+    elapsed_fraction = _span_window_elapsed_fraction(span, reset_minutes)
     return {
         "date": start_dt.date().isoformat() if start_dt else "missing",
         "day_of_week": str(start_dt.weekday()) if start_dt else "missing",
@@ -50,6 +38,17 @@ def span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
         "rate_limit_limit_id": span.rate_limit_limit_id or "missing",
         "usage_window_source": span.usage_window_source or "missing",
     }
+
+def _span_reset_remaining_minutes(span: UsageDeltaSpan, start_dt: Any) -> float:
+    remaining_minutes = reset_remaining_minutes(start_dt, span_reset_timestamp(span))
+    return remaining_minutes or 0.0
+
+
+def _span_window_elapsed_fraction(span: UsageDeltaSpan, reset_minutes: float) -> float:
+    window_minutes = span_window_minutes(span)
+    elapsed_minutes = max(window_minutes - reset_minutes, 0.0)
+    return window_elapsed_fraction(elapsed_minutes, window_minutes)
+
 
 def prediction_error_diagnostics(
     rows: list[dict[str, Any]], model_name: str

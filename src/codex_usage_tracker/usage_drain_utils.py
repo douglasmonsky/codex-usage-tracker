@@ -146,6 +146,28 @@ def reset_remaining_minutes(
     return max((reset_at - event_timestamp.timestamp()) / 60.0, 0.0)
 
 
+def span_reset_timestamp(span: UsageDeltaSpan) -> float | None:
+    if span.usage_window_resets_at is not None:
+        return span.usage_window_resets_at
+    return span.rate_limit_primary_resets_at
+
+
+def span_window_minutes(span: UsageDeltaSpan) -> float:
+    if span.usage_window_minutes is not None:
+        return span.usage_window_minutes
+    return span.rate_limit_primary_window_minutes or 0.0
+
+
+def window_elapsed_minutes(window_minutes: float, reset_minutes: float) -> float:
+    return max(window_minutes - reset_minutes, 0.0) if window_minutes > 0 else 0.0
+
+
+def window_elapsed_fraction(elapsed_minutes: float, window_minutes: float) -> float:
+    if window_minutes <= 0:
+        return 0.0
+    return min(max(elapsed_minutes / window_minutes, 0.0), 1.0)
+
+
 def dominant_label(counts: dict[str, int], *, default: str) -> str:
     if not counts:
         return default

@@ -15,7 +15,11 @@ from codex_usage_tracker.usage_drain_utils import (
     reset_phase_bucket,
     reset_remaining_minutes,
     second_bucket,
+    span_reset_timestamp,
     span_wall_time_seconds,
+    span_window_minutes,
+    window_elapsed_fraction,
+    window_elapsed_minutes,
 )
 
 
@@ -191,18 +195,16 @@ def _span_window_features(
     start_dt: datetime | None,
     time_features: dict[str, Any],
 ) -> dict[str, Any]:
-    window_minutes = _span_window_minutes(span)
-    reset_timestamp = _span_reset_timestamp(span)
+    window_minutes = span_window_minutes(span)
+    reset_timestamp = span_reset_timestamp(span)
     remaining_minutes = reset_remaining_minutes(start_dt, reset_timestamp)
     reset_minutes = remaining_minutes or 0.0
-    window_elapsed_minutes = _window_elapsed_minutes(window_minutes, reset_minutes)
-    window_elapsed_fraction = _window_elapsed_fraction(
-        window_elapsed_minutes, window_minutes
-    )
+    elapsed_minutes = window_elapsed_minutes(window_minutes, reset_minutes)
+    elapsed_fraction = window_elapsed_fraction(elapsed_minutes, window_minutes)
     baseline_used_bucket = numeric_bucket(
         span.baseline_used_percent, width=5.0, max_value=100.0, suffix="pct"
     )
-    window_elapsed_bucket = reset_phase_bucket(window_elapsed_fraction)
+    window_elapsed_bucket = reset_phase_bucket(elapsed_fraction)
     reset_remaining_bucket = minute_bucket(reset_minutes)
     hour_bucket = str(time_features["hour_bucket"])
     day_of_week = str(time_features["day_of_week"])
@@ -212,8 +214,8 @@ def _span_window_features(
         "usage_window_minutes": window_minutes,
         "usage_window_source": span.usage_window_source or "missing",
         "reset_remaining_minutes": reset_minutes,
-        "window_elapsed_minutes": window_elapsed_minutes,
-        "window_elapsed_fraction": window_elapsed_fraction,
+        "window_elapsed_minutes": elapsed_minutes,
+        "window_elapsed_fraction": elapsed_fraction,
         "baseline_used_bucket": baseline_used_bucket,
         "window_elapsed_bucket": window_elapsed_bucket,
         "reset_remaining_bucket": reset_remaining_bucket,
@@ -224,28 +226,6 @@ def _span_window_features(
         "day_x_hour_bucket": f"{day_of_week}__{hour_bucket}",
         "days_since_first_span": 0.0,
     }
-
-
-def _span_window_minutes(span: UsageDeltaSpan) -> float:
-    if span.usage_window_minutes is not None:
-        return span.usage_window_minutes
-    return span.rate_limit_primary_window_minutes or 0.0
-
-
-def _span_reset_timestamp(span: UsageDeltaSpan) -> float | None:
-    if span.usage_window_resets_at is not None:
-        return span.usage_window_resets_at
-    return span.rate_limit_primary_resets_at
-
-
-def _window_elapsed_minutes(window_minutes: float, reset_minutes: float) -> float:
-    return max(window_minutes - reset_minutes, 0.0) if window_minutes > 0 else 0.0
-
-
-def _window_elapsed_fraction(elapsed_minutes: float, window_minutes: float) -> float:
-    if window_minutes <= 0:
-        return 0.0
-    return min(max(elapsed_minutes / window_minutes, 0.0), 1.0)
 
 
 def _span_timing_features(
