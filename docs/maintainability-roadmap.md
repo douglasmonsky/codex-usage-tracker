@@ -4544,3 +4544,56 @@ Remaining risks / next handoff:
 - `usage_drain_reports.py`, `dashboard.py`, and `diagnostics.py` are now the
   largest remaining source files over 600 lines.
 - Global Xenon still fails on unrelated C-rated hotspots.
+### `refactor/usage-drain-report-thread-curves`
+
+Objective:
+- Reduce `usage_drain_reports.py` by extracting the dashboard thread cost curve
+  report slice.
+- Preserve aggregate-only thread curve output schema and bounded sampling.
+- Avoid leaving the new public thread-curve entrypoint C-rated.
+
+Baseline metrics:
+- `usage_drain_reports.py`: 677 lines.
+- `_thread_cost_curves`: C(11).
+- Max-file ratchet overage before branch completion: 184.
+
+Completed edits:
+- Added `usage_drain_thread_curves.py` for thread cost curve constants,
+  grouping, sorting, summary, curve-point sampling, labels, and numeric
+  coercion.
+- Replaced the in-file curve builder call with `thread_cost_curves(...)`.
+- Split the moved public entrypoint into bucket, sort, summary, and record
+  helpers so `thread_cost_curves` is A-rated.
+- Fixed the curve sampler edge case where `max_curve_points=1` divided by zero.
+- Added `tests/test_usage_drain_thread_curves.py` for ordering, top-thread
+  share, and one-point sampling behavior.
+
+Metrics edits:
+- `usage_drain_reports.py`: 565 lines.
+- `usage_drain_thread_curves.py`: 171 lines.
+- `tests/test_usage_drain_thread_curves.py`: 38 lines.
+- `thread_cost_curves`: A(1).
+- `usage_drain_thread_curves.py` average complexity: A(3.83).
+- Max-file ratchet overage tightened from 184 to 107.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_reports.py src/codex_usage_tracker/usage_drain_thread_curves.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_reports.py src/codex_usage_tracker/usage_drain_thread_curves.py tests/test_usage_drain_thread_curves.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_thread_curves.py tests/test_usage_drain_reports.py -q`: 6 passed.
+- `.venv/bin/python -m pytest -q`: 442 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted baseline.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `dashboard.py` and `diagnostics.py` are now the largest source files over
+  600 lines.
+- `usage_drain_reports.py` still has C-rated modeling helpers; split those in
+  later report-model branches if prioritizing global Xenon cleanup.

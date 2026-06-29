@@ -6,13 +6,8 @@
   },
   "baselines": {
     "max_file_lines": {
-      "metric_value": 184,
+      "metric_value": 107,
       "items": [
-        {
-          "path": "src/codex_usage_tracker/usage_drain_reports.py",
-          "line_count": 677,
-          "overage": 77
-        },
         {
           "path": "src/codex_usage_tracker/dashboard.py",
           "line_count": 667,
