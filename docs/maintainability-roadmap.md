@@ -6971,3 +6971,47 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue C(11) ratchet. Candidate targets: `usage_drain_predictive.py::capacity_residual_diagnostics`, `usage_drain_error_diagnostics.py::prediction_error_diagnostics`, `dashboard.py::_pricing_snapshot_warning`, or `costing.py::efficiency_flags`.
+
+### `refactor/cost-efficiency-flags`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `costing.py::efficiency_flags` below the C-grade complexity threshold without changing aggregate efficiency labels or flag keys.
+- Add focused threshold coverage for flags not directly asserted by the existing annotation test.
+
+Files touched:
+- `src/codex_usage_tracker/costing.py`
+- `tests/test_pricing.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added direct threshold coverage for elevated context, high reasoning share, and high estimated cost flags.
+- Split each efficiency flag condition into a small helper and kept `efficiency_flags` as the aggregate collector.
+- Preserved existing flag text and downstream `EFFICIENCY_FLAG_KEYS` mapping behavior.
+
+Metrics:
+- `efficiency_flags`: C(11) -> A(3).
+- `costing.py` maximum complexity: B(8); no C-grade functions remain in module.
+- Global C-or-worse blocks: 12 -> 11.
+- No C(12+) or D/E/F complexity blocks remain.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_pricing.py -q`: 8 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/costing.py tests/test_pricing.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/costing.py -a -s`: target now A(3), module max B(8).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 514 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+
+Remaining risks / next handoff:
+- Continue C(11) ratchet. Candidate targets: `usage_drain_predictive.py::capacity_residual_diagnostics`, `usage_drain_error_diagnostics.py::prediction_error_diagnostics`, `dashboard.py::_pricing_snapshot_warning`, `parser.py::inspect_log`, or store/query schema helpers.

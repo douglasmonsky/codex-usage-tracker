@@ -9,6 +9,7 @@ from codex_usage_tracker.pricing import (
     PRICING_SCHEMA,
     PricingParseError,
     annotate_rows_with_efficiency,
+    efficiency_flags,
     load_pricing_config,
     parse_openai_pricing_markdown,
     summarize_pricing_coverage,
@@ -204,4 +205,19 @@ def test_efficiency_annotation_includes_stable_flag_keys(tmp_path: Path) -> None
         "flag.high_context_use",
         "flag.low_cache_reuse",
         "flag.expensive_low_output_call",
+    ]
+
+
+def test_efficiency_flags_cover_remaining_thresholds() -> None:
+    assert efficiency_flags(
+        {
+            "context_window_percent": 0.5,
+            "reasoning_output_ratio": 0.75,
+            "output_tokens": 100,
+            "estimated_cost_usd": 1.0,
+        }
+    ) == [
+        "elevated context use",
+        "high reasoning share",
+        "high estimated cost",
     ]

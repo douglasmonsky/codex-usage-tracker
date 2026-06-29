@@ -156,7 +156,6 @@ def estimate_cache_savings_usd(
 def efficiency_flags(row: dict[str, Any]) -> list[str]:
     """Generate aggregate-only signals worth reviewing."""
 
-    flags: list[str] = []
     total_tokens = _number(row.get("total_tokens"))
     output_tokens = _number(row.get("output_tokens"))
     input_tokens = _number(row.get("input_tokens"))
@@ -164,20 +163,52 @@ def efficiency_flags(row: dict[str, Any]) -> list[str]:
     cache = _number(row.get("cache_ratio"))
     reasoning = _number(row.get("reasoning_output_ratio"))
     cost = row.get("estimated_cost_usd")
+    return [
+        flag
+        for flag in (
+            _context_efficiency_flag(context),
+            _reasoning_efficiency_flag(reasoning, output_tokens),
+            _cache_reuse_efficiency_flag(input_tokens, cache),
+            _low_output_cost_efficiency_flag(total_tokens, output_tokens),
+            _estimated_cost_efficiency_flag(cost),
+        )
+        if flag is not None
+    ]
 
+
+def _context_efficiency_flag(context: float) -> str | None:
     if context >= 0.8:
-        flags.append("high context use")
-    elif context >= 0.5:
-        flags.append("elevated context use")
+        return "high context use"
+    if context >= 0.5:
+        return "elevated context use"
+    return None
+
+
+def _reasoning_efficiency_flag(reasoning: float, output_tokens: float) -> str | None:
     if reasoning >= 0.75 and output_tokens >= 100:
-        flags.append("high reasoning share")
+        return "high reasoning share"
+    return None
+
+
+def _cache_reuse_efficiency_flag(input_tokens: float, cache: float) -> str | None:
     if input_tokens >= 10_000 and cache < 0.1:
-        flags.append("low cache reuse")
+        return "low cache reuse"
+    return None
+
+
+def _low_output_cost_efficiency_flag(
+    total_tokens: float,
+    output_tokens: float,
+) -> str | None:
     if total_tokens >= 20_000 and output_tokens <= 100:
-        flags.append("expensive low-output call")
+        return "expensive low-output call"
+    return None
+
+
+def _estimated_cost_efficiency_flag(cost: object) -> str | None:
     if isinstance(cost, int | float) and cost >= 1:
-        flags.append("high estimated cost")
-    return flags
+        return "high estimated cost"
+    return None
 
 
 def _number(value: object) -> float:
