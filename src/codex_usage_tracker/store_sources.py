@@ -125,48 +125,15 @@ def upsert_source_file_metadata(
     indexed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     rows: list[dict[str, Any]] = []
     for path, events, diagnostics, parser_state in parsed:
-        metadata = _source_file_metadata(path)
-        if metadata is None:
-            continue
-        latest_event = max(
-            events,
-            key=lambda event: (
-                event.event_timestamp,
-                event.cumulative_total_tokens,
-                event.line_number,
-                event.record_id,
-            ),
-            default=None,
+        row = _source_file_metadata_row(
+            path=path,
+            events=events,
+            diagnostics=diagnostics,
+            parser_state=parser_state,
+            indexed_at=indexed_at,
         )
-        rows.append(
-            {
-                "source_file_id": _source_file_id(path),
-                "source_file": str(path),
-                "source_file_hash": _source_file_hash(path),
-                "is_archived": int(metadata["is_archived"]),
-                "size_bytes": int(metadata["size_bytes"]),
-                "mtime_ns": int(metadata["mtime_ns"]),
-                "parsed_until_line": _count_lines(path),
-                "parsed_until_byte": int(metadata["size_bytes"]),
-                "latest_record_id": (
-                    latest_event.record_id
-                    if latest_event
-                    else parser_state.latest_record_id
-                ),
-                "latest_event_timestamp": (
-                    latest_event.event_timestamp
-                    if latest_event
-                    else parser_state.latest_event_timestamp
-                ),
-                "parser_adapter": PARSER_ADAPTER_VERSION,
-                "parser_diagnostics_json": json.dumps(
-                    compact_parser_diagnostics(diagnostics),
-                    sort_keys=True,
-                ),
-                "parser_state_json": parser_state_to_json(parser_state),
-                "last_indexed_at": indexed_at,
-            }
-        )
+        if row is not None:
+            rows.append(row)
     if not rows:
         return
     columns = [
@@ -196,6 +163,70 @@ def upsert_source_file_metadata(
             f"ON CONFLICT(source_file_id) DO UPDATE SET {update_clause}"
         ),
         [[row[column] for column in columns] for row in rows],
+    )
+
+
+def _source_file_metadata_row(
+    *,
+    path: Path,
+    events: list[UsageEvent],
+    diagnostics: dict[str, int],
+    parser_state: ParserState,
+    indexed_at: str,
+) -> dict[str, Any] | None:
+    metadata = _source_file_metadata(path)
+    if metadata is None:
+        return None
+    latest_event = _latest_source_usage_event(events)
+    return {
+        "source_file_id": _source_file_id(path),
+        "source_file": str(path),
+        "source_file_hash": _source_file_hash(path),
+        "is_archived": int(metadata["is_archived"]),
+        "size_bytes": int(metadata["size_bytes"]),
+        "mtime_ns": int(metadata["mtime_ns"]),
+        "parsed_until_line": _count_lines(path),
+        "parsed_until_byte": int(metadata["size_bytes"]),
+        "latest_record_id": _latest_source_record_id(latest_event, parser_state),
+        "latest_event_timestamp": _latest_source_event_timestamp(
+            latest_event, parser_state
+        ),
+        "parser_adapter": PARSER_ADAPTER_VERSION,
+        "parser_diagnostics_json": json.dumps(
+            compact_parser_diagnostics(diagnostics),
+            sort_keys=True,
+        ),
+        "parser_state_json": parser_state_to_json(parser_state),
+        "last_indexed_at": indexed_at,
+    }
+
+
+def _latest_source_record_id(
+    latest_event: UsageEvent | None, parser_state: ParserState
+) -> str | None:
+    return latest_event.record_id if latest_event else parser_state.latest_record_id
+
+
+def _latest_source_event_timestamp(
+    latest_event: UsageEvent | None, parser_state: ParserState
+) -> str | None:
+    return (
+        latest_event.event_timestamp
+        if latest_event
+        else parser_state.latest_event_timestamp
+    )
+
+
+def _latest_source_usage_event(events: list[UsageEvent]) -> UsageEvent | None:
+    return max(
+        events,
+        key=lambda event: (
+            event.event_timestamp,
+            event.cumulative_total_tokens,
+            event.line_number,
+            event.record_id,
+        ),
+        default=None,
     )
 
 

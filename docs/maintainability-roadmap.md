@@ -6795,3 +6795,47 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue with `store_sources.py::upsert_source_file_metadata`, using focused metadata upsert tests before changing write behavior.
+
+### `refactor/source-file-metadata-upsert`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `upsert_source_file_metadata` complexity while preserving source-file metadata rows, latest-event selection, parser-state fallback, and parser metadata persistence.
+- Extend focused source-store coverage for metadata upsert behavior.
+
+Files touched:
+- `src/codex_usage_tracker/store_sources.py`
+- `tests/test_store_sources.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split source-file metadata row construction, latest-event selection, and latest-record/timestamp fallback helpers out of the public upsert function.
+- Added direct tests proving latest event wins over parser-state fallback when events exist, and parser state is used when no events are parsed.
+
+Metrics:
+- `upsert_source_file_metadata`: C(12) -> B(10).
+- `store_sources.py` maximum complexity: B(10); no C-grade functions remain in the module.
+- `store_sources.py`: 232 -> 263 physical lines.
+- `tests/test_store_sources.py`: 99 -> 176 physical lines.
+- Global C-or-worse blocks: 16 -> 15.
+- No C(12+) or D/E/F complexity blocks remain.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_store_sources.py -q`: 3 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store_sources.py tests/test_store_sources.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/store_sources.py -a -s`: target now B(10), module max B(10).
+- `.venv/bin/python -m pytest -q`: 498 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+
+Remaining risks / next handoff:
+- Continue C(11) ratchet. Candidate targets: `parser_state.py::parser_state_from_json`, `diagnostic_snapshot_source_scan.py::record_function_call`, or usage-drain report/diagnostic functions.

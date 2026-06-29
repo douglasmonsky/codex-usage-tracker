@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
+
+from store_dashboard_helpers import _usage_event
 
 from codex_usage_tracker.parser_state import (
     PARSER_ADAPTER_VERSION,
@@ -9,7 +12,10 @@ from codex_usage_tracker.parser_state import (
     parser_state_to_json,
 )
 from codex_usage_tracker.store_schema import init_db
-from codex_usage_tracker.store_sources import source_logs_requiring_parse
+from codex_usage_tracker.store_sources import (
+    source_logs_requiring_parse,
+    upsert_source_file_metadata,
+)
 
 
 def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
@@ -46,6 +52,77 @@ def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
     assert by_path[grown_path].start_byte == len("{}\n")
     assert by_path[grown_path].start_line == 1
     assert by_path[grown_path].initial_state == state
+
+
+def test_upsert_source_file_metadata_records_latest_event_and_parser_state(
+    tmp_path: Path,
+) -> None:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_db(conn)
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_text("{}\n{}\n", encoding="utf-8")
+    state = ParserState(
+        session_id="session",
+        latest_record_id="fallback-record",
+        latest_event_timestamp="2026-06-01T09:00:00Z",
+    )
+    earlier = _usage_event(
+        record_id="record-earlier",
+        session_id="session",
+        thread_key="thread:one",
+        event_timestamp="2026-06-01T10:00:00Z",
+        cumulative_total_tokens=100,
+    )
+    latest = _usage_event(
+        record_id="record-latest",
+        session_id="session",
+        thread_key="thread:one",
+        event_timestamp="2026-06-01T10:01:00Z",
+        cumulative_total_tokens=110,
+    )
+
+    upsert_source_file_metadata(
+        conn,
+        parsed_files=[(source_path, [earlier, latest], {"malformed_json": 1}, state)],
+    )
+
+    row = conn.execute(
+        "SELECT * FROM source_files WHERE source_file = ?", (str(source_path),)
+    ).fetchone()
+    assert row["latest_record_id"] == "record-latest"
+    assert row["latest_event_timestamp"] == "2026-06-01T10:01:00Z"
+    assert row["parsed_until_line"] == 2
+    assert row["parsed_until_byte"] == source_path.stat().st_size
+    assert row["parser_adapter"] == PARSER_ADAPTER_VERSION
+    assert json.loads(row["parser_state_json"])["session_id"] == "session"
+
+
+def test_upsert_source_file_metadata_uses_parser_state_when_no_events(
+    tmp_path: Path,
+) -> None:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_db(conn)
+    source_path = tmp_path / "empty.jsonl"
+    source_path.write_text("{}\n", encoding="utf-8")
+    state = ParserState(
+        session_id="session",
+        latest_record_id="state-record",
+        latest_event_timestamp="2026-06-01T09:00:00Z",
+    )
+
+    upsert_source_file_metadata(conn, parsed_files=[(source_path, [], {}, state)])
+
+    row = conn.execute(
+        "SELECT latest_record_id, latest_event_timestamp FROM source_files "
+        "WHERE source_file = ?",
+        (str(source_path),),
+    ).fetchone()
+    assert dict(row) == {
+        "latest_record_id": "state-record",
+        "latest_event_timestamp": "2026-06-01T09:00:00Z",
+    }
 
 
 def _insert_source_metadata(
