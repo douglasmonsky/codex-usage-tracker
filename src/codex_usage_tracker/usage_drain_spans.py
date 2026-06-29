@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,13 @@ from codex_usage_tracker.usage_drain_types import (
 )
 
 FIVE_HOUR_WINDOW_MINUTES = 300
+
+
+@dataclass
+class _SpanBuildState:
+    baseline_percent: float | None = None
+    baseline_bucket: tuple[Any, ...] | None = None
+    pending_rows: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _span_number(value: object) -> float:
@@ -66,16 +74,73 @@ def build_usage_delta_spans(
     """
 
     proxies = fast_proxy_annotations or {}
-    sorted_rows = sorted(
+    sorted_rows = _sorted_span_rows(rows)
+    spans: list[UsageDeltaSpan] = []
+    stats = _initial_span_stats(len(rows))
+    state = _SpanBuildState()
+
+    for row in sorted_rows:
+        if _ignored_codex_limit(row.get("rate_limit_limit_id")):
+            stats["alternate_codex_limit_rows_ignored_for_boundaries"] += 1
+        usage_observation = _preferred_span_usage_observation(row)
+        if usage_observation["used_percent"] is None:
+            _record_missing_span_usage(stats, state=state, row=row)
+            continue
+        used_percent = float(usage_observation["used_percent"])
+        bucket = _span_usage_bucket(row)
+        _record_span_usage_window(stats, usage_observation)
+
+        if state.baseline_percent is None:
+            _set_span_baseline(state, used_percent=used_percent, bucket=bucket)
+            continue
+
+        if bucket != state.baseline_bucket:
+            _reset_span_baseline(
+                stats,
+                state=state,
+                used_percent=used_percent,
+                bucket=bucket,
+            )
+            continue
+
+        if used_percent < state.baseline_percent:
+            _reset_span_after_usage_decrease(
+                stats,
+                state=state,
+                used_percent=used_percent,
+            )
+            continue
+
+        state.pending_rows.append(row)
+        if used_percent <= state.baseline_percent:
+            continue
+
+        _close_positive_usage_span(
+            spans,
+            stats,
+            state=state,
+            end_used_percent=used_percent,
+            proxies=proxies,
+        )
+
+    if state.pending_rows:
+        stats["censored_or_reset_pending_segments"] += 1
+    return spans, stats
+
+
+def _sorted_span_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
         rows,
         key=lambda row: (
             str(row.get("event_timestamp") or ""),
             str(row.get("record_id") or ""),
         ),
     )
-    spans: list[UsageDeltaSpan] = []
-    stats = {
-        "input_rows": len(rows),
+
+
+def _initial_span_stats(row_count: int) -> dict[str, int]:
+    return {
+        "input_rows": row_count,
         "rows_without_usage_snapshot": 0,
         "rows_without_initial_baseline": 0,
         "alternate_codex_limit_rows_ignored_for_boundaries": 0,
@@ -85,68 +150,84 @@ def build_usage_delta_spans(
         "fallback_usage_window_rows": 0,
     }
 
-    baseline_percent: float | None = None
-    baseline_bucket: tuple[Any, ...] | None = None
-    pending_rows: list[dict[str, Any]] = []
 
-    for row in sorted_rows:
-        if _ignored_codex_limit(row.get("rate_limit_limit_id")):
-            stats["alternate_codex_limit_rows_ignored_for_boundaries"] += 1
-        usage_observation = _preferred_span_usage_observation(row)
-        if usage_observation["used_percent"] is None:
-            stats["rows_without_usage_snapshot"] += 1
-            if baseline_percent is None:
-                stats["rows_without_initial_baseline"] += 1
-            else:
-                pending_rows.append(row)
-            continue
-        used_percent = float(usage_observation["used_percent"])
-        bucket = _span_usage_bucket(row)
-        if usage_observation["window_minutes"] == FIVE_HOUR_WINDOW_MINUTES:
-            stats["five_hour_usage_window_rows"] += 1
-        else:
-            stats["fallback_usage_window_rows"] += 1
+def _record_missing_span_usage(
+    stats: dict[str, int],
+    *,
+    state: _SpanBuildState,
+    row: dict[str, Any],
+) -> None:
+    stats["rows_without_usage_snapshot"] += 1
+    if state.baseline_percent is None:
+        stats["rows_without_initial_baseline"] += 1
+    else:
+        state.pending_rows.append(row)
 
-        if baseline_percent is None:
-            baseline_percent = used_percent
-            baseline_bucket = bucket
-            pending_rows = []
-            continue
 
-        if bucket != baseline_bucket:
-            if pending_rows:
-                stats["censored_or_reset_pending_segments"] += 1
-            baseline_percent = used_percent
-            baseline_bucket = bucket
-            pending_rows = []
-            continue
+def _record_span_usage_window(
+    stats: dict[str, int],
+    usage_observation: dict[str, Any],
+) -> None:
+    if usage_observation["window_minutes"] == FIVE_HOUR_WINDOW_MINUTES:
+        stats["five_hour_usage_window_rows"] += 1
+    else:
+        stats["fallback_usage_window_rows"] += 1
 
-        if used_percent < baseline_percent:
-            if pending_rows:
-                stats["censored_or_reset_pending_segments"] += 1
-            baseline_percent = used_percent
-            pending_rows = []
-            continue
 
-        pending_rows.append(row)
-        if used_percent <= baseline_percent:
-            continue
+def _set_span_baseline(
+    state: _SpanBuildState,
+    *,
+    used_percent: float,
+    bucket: tuple[Any, ...],
+) -> None:
+    state.baseline_percent = used_percent
+    state.baseline_bucket = bucket
+    state.pending_rows = []
 
-        spans.append(
-            _span_from_rows(
-                pending_rows,
-                baseline_percent=baseline_percent,
-                end_used_percent=used_percent,
-                proxies=proxies,
-            )
-        )
-        stats["positive_usage_spans"] += 1
-        baseline_percent = used_percent
-        pending_rows = []
 
-    if pending_rows:
+def _reset_span_baseline(
+    stats: dict[str, int],
+    *,
+    state: _SpanBuildState,
+    used_percent: float,
+    bucket: tuple[Any, ...],
+) -> None:
+    if state.pending_rows:
         stats["censored_or_reset_pending_segments"] += 1
-    return spans, stats
+    _set_span_baseline(state, used_percent=used_percent, bucket=bucket)
+
+
+def _reset_span_after_usage_decrease(
+    stats: dict[str, int],
+    *,
+    state: _SpanBuildState,
+    used_percent: float,
+) -> None:
+    if state.pending_rows:
+        stats["censored_or_reset_pending_segments"] += 1
+    state.baseline_percent = used_percent
+    state.pending_rows = []
+
+
+def _close_positive_usage_span(
+    spans: list[UsageDeltaSpan],
+    stats: dict[str, int],
+    *,
+    state: _SpanBuildState,
+    end_used_percent: float,
+    proxies: dict[str, FastProxyAnnotation],
+) -> None:
+    spans.append(
+        _span_from_rows(
+            state.pending_rows,
+            baseline_percent=_span_number(state.baseline_percent),
+            end_used_percent=end_used_percent,
+            proxies=proxies,
+        )
+    )
+    stats["positive_usage_spans"] += 1
+    state.baseline_percent = end_used_percent
+    state.pending_rows = []
 
 
 def _span_row_token_components(row: dict[str, Any]) -> dict[str, float]:

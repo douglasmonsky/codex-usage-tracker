@@ -5277,3 +5277,43 @@ Checks:
 Remaining risks / next handoff:
 - `build_usage_delta_spans` remains C(16) and is the next natural span follow-up.
 - `diagnostic_snapshot_analysis.py::_scan_source_log` remains one of the highest C-rated blocks.
+### `refactor/usage-drain-span-state-machine`
+
+Objective:
+- Reduce `build_usage_delta_spans` complexity while preserving chronological span grouping, reset/censor handling, five-hour window preference, and alternate-limit treatment.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_spans.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added `_SpanBuildState` to hold baseline percent, usage bucket, and pending rows.
+- Split row sorting, initial stats, missing usage handling, window-source stats, baseline setting, bucket resets, usage-decrease resets, and positive-span closure into helpers.
+- Kept `_span_from_rows` as the single `UsageDeltaSpan` construction point.
+
+Metrics:
+- `build_usage_delta_spans`: C(16) -> B(10).
+- `usage_drain_spans.py` average complexity improved while staying within budget.
+- Global C-or-worse blocks: 50 -> 49.
+- `usage_drain_spans.py`: 495 lines, still under active file-size budgets.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_spans.py tests/test_usage_drain_model.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_spans.py tests/test_usage_drain_model.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py::test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets tests/test_usage_drain_model.py::test_alternate_codex_limit_rows_count_as_work_but_not_boundaries tests/test_usage_drain_model.py::test_build_usage_delta_spans_prefers_five_hour_window_when_secondary -q`: 3 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_spans.py -a -s`: passed, target now B-rated.
+- `.venv/bin/python -m pytest -q`: 450 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `diagnostic_snapshot_analysis.py::_scan_source_log` is now the largest remaining C-rated block.
+- `usage_drain_state_buckets.py` has two C(16) diagnostic helpers that are likely low-risk report-formatting splits.
