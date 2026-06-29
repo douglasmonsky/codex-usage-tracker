@@ -67,6 +67,37 @@ xenon --max-absolute B --max-modules A --max-average A src
 
 ## Branch Ledger
 
+### `refactor/split-oversized-modules`
+
+Goal:
+
+- Continue the post-domain-move handoff by clearing one moved source module from
+  the Agent Maintainer file-length ratchet.
+- Keep the slice small enough to review independently after the broad package
+  boundary merge.
+
+Completed:
+
+- Split `src/codex_usage_tracker/pricing/allowance.py` into a compatibility
+  facade plus `pricing/allowance_config.py` and `pricing/allowance_usage.py`.
+- Kept the public `codex_usage_tracker.pricing.allowance` import surface stable.
+- Verified the pricing-scoped Agent Maintainer fast profile passes.
+
+Checks:
+
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/pricing/allowance.py src/codex_usage_tracker/pricing/allowance_config.py src/codex_usage_tracker/pricing/allowance_usage.py tests/pricing/test_allowance.py`: passed.
+- `.venv/bin/python -m pytest tests/pricing/test_allowance.py -q`: passed, 8 tests.
+- `.venv/bin/python -m agent_maintainer verify --profile fast --file-length-path src/codex_usage_tracker/pricing/allowance.py --file-length-path src/codex_usage_tracker/pricing/allowance_config.py --file-length-path src/codex_usage_tracker/pricing/allowance_usage.py`: passed with non-blocking structure/change-budget warnings.
+
+Remaining risks / next handoff:
+
+- Full `agent_maintainer verify --profile fast` still fails on the remaining
+  oversized moved modules/tests: CLI parser/main, usage-drain model/reports,
+  dashboard API, diagnostics snapshots, store API, and several large tests.
+- Next source candidates: `dashboard/api.py` or `store/api.py` if prioritizing
+  runtime blast radius; `tests/dashboard/test_dashboard_server.py` if
+  prioritizing the largest test file.
+
 ### `refactor/package-domain-boundaries`
 
 Goal:
