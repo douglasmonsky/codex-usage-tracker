@@ -5061,3 +5061,50 @@ Checks:
 
 Remaining risks / next handoff:
 - Global Xenon still fails on remaining C-rated blocks in usage-drain boundary/allowance/state/spans, store, recommendations, dashboard payload, formatting calls, threads, diagnostic reports, and diagnostic snapshot analysis.
+### `refactor/usage-drain-boundary-delta`
+
+Objective:
+- Reduce boundary-delta walk-forward prediction complexity without changing report/dashboard fields.
+- Keep compatibility imports through `usage_drain_boundary_delta.py`.
+- Add focused row-level characterization for matched-state, boundary-conditioned, risk-gated, and adaptive-threshold details.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_boundary_delta.py`
+- `src/codex_usage_tracker/usage_drain_boundary_delta_core.py`
+- `src/codex_usage_tracker/usage_drain_boundary_delta_rows.py`
+- `tests/test_usage_drain_boundary_delta.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split constants and primitive risk/threshold helpers into `usage_drain_boundary_delta_core.py`.
+- Split walk-forward row construction and extracted helpers into `usage_drain_boundary_delta_rows.py`.
+- Kept `usage_drain_boundary_delta.py` as a small compatibility facade exporting the same public names.
+- Added direct characterization coverage for prediction aliases and detail metadata consumed by downstream summaries.
+
+Metrics:
+- `boundary_walk_forward_delta_prediction_rows`: C(18) -> A(4).
+- Boundary-delta implementation modules average complexity: A(2.5).
+- Global C-or-worse blocks: 55 -> 54.
+- New largest remaining hotspot: `usage_drain_allowance_fits.py::allowance_piecewise_credit_to_delta_fit` C(18).
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_boundary_delta.py src/codex_usage_tracker/usage_drain_boundary_delta_core.py src/codex_usage_tracker/usage_drain_boundary_delta_rows.py tests/test_usage_drain_boundary_delta.py tests/test_usage_drain_model.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_boundary_delta.py src/codex_usage_tracker/usage_drain_boundary_delta_core.py src/codex_usage_tracker/usage_drain_boundary_delta_rows.py tests/test_usage_drain_boundary_delta.py tests/test_usage_drain_model.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_boundary_delta.py tests/test_usage_drain_model.py::test_boundary_walk_forward_risk_learns_segment_age_pattern tests/test_usage_drain_model.py::test_boundary_delta_risk_gate_keeps_previous_delta_for_stable_regime -q`: 3 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_reports.py tests/test_usage_drain_thread_curves.py -q`: 22 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_boundary_delta.py src/codex_usage_tracker/usage_drain_boundary_delta_core.py src/codex_usage_tracker/usage_drain_boundary_delta_rows.py -a -s`: passed, all analyzed blocks A-rated.
+- `.venv/bin/python -m pytest -q`: 448 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Global Xenon still fails on remaining C-rated blocks in allowance fits, store upserts, recommendations, usage-drain spans/state summaries, dashboard payload, and diagnostic snapshot analysis.
+- Next high-impact target is likely `usage_drain_allowance_fits.py::allowance_piecewise_credit_to_delta_fit` or `store.py::upsert_usage_events`.
