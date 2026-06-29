@@ -5991,3 +5991,50 @@ Checks:
 
 Remaining risks / next handoff:
 - Next branch should target a remaining C(13) hotspot. Prefer `usage_drain_state_diagnostics.py::state_ambiguous_group_record` because it is isolated and testable.
+
+### `refactor/state-ambiguous-group-record`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `state_ambiguous_group_record` complexity while preserving state ambiguity summary records.
+- Add synthetic characterization coverage for state labels, actual value counts, shares, mode error metrics, and date bounds.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_state_diagnostics.py`
+- `tests/test_usage_drain_state_diagnostics.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split ambiguous-state record construction into helpers for actual values, rounded counts, mode errors, row dates, signature state mapping, value rows, mode share, and mean error.
+- Preserved the existing record keys and value ordering semantics.
+
+Metrics:
+- `state_ambiguous_group_record`: C(13) -> A(3).
+- `usage_drain_state_diagnostics.py` average complexity: A(3.31).
+- `usage_drain_state_diagnostics.py`: 203 -> 242 physical lines.
+- Global C-or-worse blocks remain 33 because `state_signature_ambiguity` remains C(12) in the same module.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are C(13), led by `usage_drain_model.py::_one_percent_capacity_modeling`, `usage_drain_transition_metrics.py::binary_risk_metrics`, and `formatting.py::format_calls`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_state_diagnostics.py -q`: 1 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_state_diagnostics.py tests/test_usage_drain_walk_forward.py tests/test_usage_drain_model.py -q`: 18 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_state_diagnostics.py -a -s`: target now A(3).
+- `.venv/bin/python -m pytest -q`: 479 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, with only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `state_signature_ambiguity` remains C(12) and is a natural follow-up if continuing in this module.
+- The top C(13) targets are now outside this module.

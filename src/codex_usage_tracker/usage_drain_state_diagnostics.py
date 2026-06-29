@@ -166,39 +166,77 @@ def state_ambiguous_group_record(
     signature: tuple[str, ...],
     mode_value: float,
 ) -> dict[str, Any]:
-    values = [number(row.get("actual")) for row in rows]
-    value_counts: dict[float, int] = {}
-    for value in values:
-        rounded_value = round(value, 6)
-        value_counts[rounded_value] = value_counts.get(rounded_value, 0) + 1
-    errors = [abs(value - mode_value) for value in values]
-    dates = [
-        str((row.get("metadata") or {}).get("date") or "missing")
-        for row in rows
-    ]
+    values = _ambiguous_actual_values(rows)
+    value_counts = _rounded_value_counts(values)
+    errors = _mode_errors(values, mode_value)
+    dates = _row_dates(rows)
     return {
-        "state": {
-            field_name: key[index] if index < len(key) else "missing"
-            for index, field_name in enumerate(signature)
-        },
+        "state": _signature_state(key, signature),
         "n": len(rows),
-        "actual_values": [
-            {
-                "delta_percent": value,
-                "count": count,
-                "share": rounded(count / len(rows)),
-            }
-            for value, count in sorted(
-                value_counts.items(), key=lambda item: (-item[1], item[0])
-            )
-        ],
+        "actual_values": _actual_value_rows(value_counts, row_count=len(rows)),
         "mode_delta_percent": rounded(mode_value),
-        "mode_share": rounded(value_counts.get(round(mode_value, 6), 0) / len(rows)),
-        "oracle_mae": rounded(sum(errors) / len(errors) if errors else None),
+        "mode_share": _mode_share(value_counts, mode_value, row_count=len(rows)),
+        "oracle_mae": _mean_error(errors),
         "total_abs_error": rounded(sum(errors)),
         "first_date": min(dates) if dates else None,
         "last_date": max(dates) if dates else None,
     }
+
+
+def _ambiguous_actual_values(rows: list[dict[str, Any]]) -> list[float]:
+    return [number(row.get("actual")) for row in rows]
+
+
+def _rounded_value_counts(values: list[float]) -> dict[float, int]:
+    value_counts: dict[float, int] = {}
+    for value in values:
+        rounded_value = round(value, 6)
+        value_counts[rounded_value] = value_counts.get(rounded_value, 0) + 1
+    return value_counts
+
+
+def _mode_errors(values: list[float], mode_value: float) -> list[float]:
+    return [abs(value - mode_value) for value in values]
+
+
+def _row_dates(rows: list[dict[str, Any]]) -> list[str]:
+    return [
+        str((row.get("metadata") or {}).get("date") or "missing") for row in rows
+    ]
+
+
+def _signature_state(key: tuple[str, ...], signature: tuple[str, ...]) -> dict[str, str]:
+    return {
+        field_name: key[index] if index < len(key) else "missing"
+        for index, field_name in enumerate(signature)
+    }
+
+
+def _actual_value_rows(
+    value_counts: dict[float, int], *, row_count: int
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "delta_percent": value,
+            "count": count,
+            "share": rounded(count / row_count),
+        }
+        for value, count in sorted(
+            value_counts.items(), key=lambda item: (-item[1], item[0])
+        )
+    ]
+
+
+def _mode_share(
+    value_counts: dict[float, int], mode_value: float, *, row_count: int
+) -> float | None:
+    return rounded(value_counts.get(round(mode_value, 6), 0) / row_count)
+
+
+def _mean_error(errors: list[float]) -> float | None:
+    if not errors:
+        return None
+    return rounded(sum(errors) / len(errors))
 
 def state_signature(state: dict[str, Any], signature: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(str(state.get(field) or "missing") for field in signature)
