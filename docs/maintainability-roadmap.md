@@ -5194,3 +5194,45 @@ Checks:
 Remaining risks / next handoff:
 - `store.py::upsert_usage_events` is now the highest remaining C-rated block.
 - Several usage-drain span/state/dashboard diagnostics functions remain C-rated and need subsequent small branches.
+### `refactor/store-upsert-usage-events`
+
+Objective:
+- Reduce `upsert_usage_events` complexity without changing transaction scope, upsert SQL semantics, diagnostic fact replacement, or link refresh behavior.
+- Keep persistence behavior covered by existing store, migration, and diagnostic fact tests.
+
+Files touched:
+- `src/codex_usage_tracker/store.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split usage-event row conversion, diagnostic-fact row conversion, source-file string normalization, source-file replacement deletes, empty-replacement refresh behavior, record-id extraction, usage-event upsert SQL construction, row insertion, and post-upsert link refresh into focused helpers.
+- Preserved the single `connect` transaction boundary and existing `init_db` call placement.
+- Preserved batched diagnostic fact deletion and existing diagnostic fact insert/update behavior.
+
+Metrics:
+- `upsert_usage_events`: C(18) -> A(2).
+- `store.py` average complexity: A(2.71).
+- Global C-or-worse blocks: 52 -> 51.
+- New largest remaining hotspots: `usage_drain_spans.py::_span_from_rows` C(17) and `diagnostic_snapshot_analysis.py::_scan_source_log` C(17).
+- `store.py`: 558 lines, still under the active 600-line physical file budget.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/store.py tests/test_store_large_batches.py tests/test_store_dashboard_mcp.py tests/test_store_migrations.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store.py tests/test_store_large_batches.py tests/test_store_dashboard_mcp.py tests/test_store_migrations.py`: passed.
+- `.venv/bin/python -m pytest tests/test_store_large_batches.py tests/test_store_migrations.py tests/test_store_dashboard_mcp.py -q`: 27 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/store.py -a -s`: passed, target now A-rated.
+- `.venv/bin/python -m pytest -q`: 450 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Store persistence behavior was verified through existing tests, but this branch intentionally avoids schema or SQL contract changes.
+- Next likely target is `usage_drain_spans.py::_span_from_rows` or `diagnostic_snapshot_analysis.py::_scan_source_log`.

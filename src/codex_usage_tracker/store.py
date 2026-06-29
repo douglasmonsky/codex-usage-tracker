@@ -339,54 +339,111 @@ def upsert_usage_events(
     replace_source_files: Iterable[Path] | None = None,
     diagnostic_facts: Iterable[DiagnosticFact] | None = None,
 ) -> int:
-    rows = [event.to_row() for event in events]
-    fact_rows = [fact.to_row() for fact in diagnostic_facts or []]
-    source_files_to_replace = [str(path) for path in replace_source_files or []]
+    rows = _usage_event_rows(events)
+    fact_rows = _diagnostic_fact_rows(diagnostic_facts)
+    source_files_to_replace = _source_file_strings(replace_source_files)
     with connect(db_path) as conn:
         init_db(conn)
-        if source_files_to_replace:
-            placeholders = ", ".join("?" for _source in source_files_to_replace)
-            conn.execute(
-                f"""
-                DELETE FROM call_diagnostic_facts
-                WHERE record_id IN (
-                    SELECT record_id
-                    FROM usage_events
-                    WHERE source_file IN ({placeholders})
-                )
-                """,
-                source_files_to_replace,
-            )
-            conn.execute(
-                f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
-                source_files_to_replace,
-            )
+        _delete_usage_events_for_source_files(conn, source_files_to_replace)
         if not rows:
-            if source_files_to_replace and refresh_links:
-                _refresh_usage_event_links(conn)
-                rebuild_thread_summaries(conn)
+            _refresh_after_empty_source_replacement(
+                conn,
+                refresh_links=refresh_links,
+                source_files_to_replace=source_files_to_replace,
+            )
             return 0
-        placeholders = ", ".join("?" for _ in EVENT_COLUMNS)
-        update_clause = ", ".join(
-            f"{column}=excluded.{column}"
-            for column in EVENT_COLUMNS
-            if column != "record_id"
-        )
-        sql = (
-            f"INSERT INTO usage_events ({', '.join(EVENT_COLUMNS)}) "
-            f"VALUES ({placeholders}) "
-            f"ON CONFLICT(record_id) DO UPDATE SET {update_clause}"
-        )
-        _delete_diagnostic_facts_for_record_ids(
-            conn,
-            [str(row["record_id"]) for row in rows],
-        )
-        conn.executemany(sql, [[row[column] for column in EVENT_COLUMNS] for row in rows])
+        _delete_diagnostic_facts_for_record_ids(conn, _usage_event_record_ids(rows))
+        _insert_usage_event_rows(conn, rows)
         _insert_diagnostic_facts(conn, fact_rows)
-        if refresh_links:
-            _refresh_usage_event_links(conn)
-            rebuild_thread_summaries(conn)
+        _refresh_after_usage_event_upsert(conn, refresh_links=refresh_links)
         return len(rows)
+
+
+def _usage_event_rows(events: Iterable[UsageEvent]) -> list[dict[str, object]]:
+    return [event.to_row() for event in events]
+
+
+def _diagnostic_fact_rows(
+    diagnostic_facts: Iterable[DiagnosticFact] | None,
+) -> list[dict[str, object]]:
+    return [fact.to_row() for fact in diagnostic_facts or []]
+
+
+def _source_file_strings(replace_source_files: Iterable[Path] | None) -> list[str]:
+    return [str(path) for path in replace_source_files or []]
+
+
+def _delete_usage_events_for_source_files(
+    conn: sqlite3.Connection,
+    source_files_to_replace: list[str],
+) -> None:
+    if not source_files_to_replace:
+        return
+    placeholders = ", ".join("?" for _source in source_files_to_replace)
+    conn.execute(
+        f"""
+        DELETE FROM call_diagnostic_facts
+        WHERE record_id IN (
+            SELECT record_id
+            FROM usage_events
+            WHERE source_file IN ({placeholders})
+        )
+        """,
+        source_files_to_replace,
+    )
+    conn.execute(
+        f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
+        source_files_to_replace,
+    )
+
+
+def _refresh_after_empty_source_replacement(
+    conn: sqlite3.Connection,
+    *,
+    refresh_links: bool,
+    source_files_to_replace: list[str],
+) -> None:
+    if source_files_to_replace and refresh_links:
+        _refresh_usage_event_links(conn)
+        rebuild_thread_summaries(conn)
+
+
+def _usage_event_record_ids(rows: list[dict[str, object]]) -> list[str]:
+    return [str(row["record_id"]) for row in rows]
+
+
+def _usage_event_upsert_sql() -> str:
+    placeholders = ", ".join("?" for _column in EVENT_COLUMNS)
+    update_clause = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in EVENT_COLUMNS
+        if column != "record_id"
+    )
+    return (
+        f"INSERT INTO usage_events ({', '.join(EVENT_COLUMNS)}) "
+        f"VALUES ({placeholders}) "
+        f"ON CONFLICT(record_id) DO UPDATE SET {update_clause}"
+    )
+
+
+def _insert_usage_event_rows(
+    conn: sqlite3.Connection,
+    rows: list[dict[str, object]],
+) -> None:
+    conn.executemany(
+        _usage_event_upsert_sql(),
+        [[row[column] for column in EVENT_COLUMNS] for row in rows],
+    )
+
+
+def _refresh_after_usage_event_upsert(
+    conn: sqlite3.Connection,
+    *,
+    refresh_links: bool,
+) -> None:
+    if refresh_links:
+        _refresh_usage_event_links(conn)
+        rebuild_thread_summaries(conn)
 
 
 def _delete_diagnostic_facts_for_record_ids(
