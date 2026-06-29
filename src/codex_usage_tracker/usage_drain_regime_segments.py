@@ -234,25 +234,67 @@ def _piecewise_adaptation_by_position(
     prediction_rows: dict[int, dict[str, Any]],
     segments: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    all_rows_by_position: dict[str, list[dict[str, Any]]] = {
-        bucket: [] for bucket in SEGMENT_POSITION_BUCKETS
-    }
+    all_rows_by_position = _empty_segment_position_rows()
     label_rows_by_position: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for segment in segments:
-        label = str(segment.get("label") or "missing")
-        start_index = int(segment["start_index"])
-        end_index = int(segment["end_index"])
-        for index in range(start_index, end_index + 1):
-            row = prediction_rows.get(index)
-            if row is None:
-                continue
-            position = index - start_index + 1
-            bucket = regime_labels.segment_position_bucket(position)
-            all_rows_by_position[bucket].append(row)
-            label_rows = label_rows_by_position.setdefault(
-                label, {item: [] for item in SEGMENT_POSITION_BUCKETS}
+        _collect_piecewise_position_rows(
+            segment,
+            prediction_rows=prediction_rows,
+            all_rows_by_position=all_rows_by_position,
+            label_rows_by_position=label_rows_by_position,
+        )
+    return _piecewise_adaptation_position_report(
+        all_rows_by_position, label_rows_by_position
+    )
+
+
+def _empty_segment_position_rows() -> dict[str, list[dict[str, Any]]]:
+    return {bucket: [] for bucket in SEGMENT_POSITION_BUCKETS}
+
+
+def _collect_piecewise_position_rows(
+    segment: dict[str, Any],
+    *,
+    prediction_rows: dict[int, dict[str, Any]],
+    all_rows_by_position: dict[str, list[dict[str, Any]]],
+    label_rows_by_position: dict[str, dict[str, list[dict[str, Any]]]],
+) -> None:
+    label = str(segment.get("label") or "missing")
+    start_index = int(segment["start_index"])
+    end_index = int(segment["end_index"])
+    label_rows = label_rows_by_position.setdefault(
+        label, _empty_segment_position_rows()
+    )
+    for index in range(start_index, end_index + 1):
+        row = prediction_rows.get(index)
+        if row is not None:
+            _append_piecewise_position_row(
+                row,
+                index=index,
+                start_index=start_index,
+                all_rows_by_position=all_rows_by_position,
+                label_rows=label_rows,
             )
-            label_rows[bucket].append(row)
+
+
+def _append_piecewise_position_row(
+    row: dict[str, Any],
+    *,
+    index: int,
+    start_index: int,
+    all_rows_by_position: dict[str, list[dict[str, Any]]],
+    label_rows: dict[str, list[dict[str, Any]]],
+) -> None:
+    position = index - start_index + 1
+    bucket = regime_labels.segment_position_bucket(position)
+    all_rows_by_position[bucket].append(row)
+    label_rows[bucket].append(row)
+
+
+def _piecewise_adaptation_position_report(
+    all_rows_by_position: dict[str, list[dict[str, Any]]],
+    label_rows_by_position: dict[str, dict[str, list[dict[str, Any]]]],
+) -> dict[str, Any]:
     return {
         "position_buckets": list(SEGMENT_POSITION_BUCKETS),
         "all_segments": {

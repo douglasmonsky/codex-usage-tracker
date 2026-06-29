@@ -6513,3 +6513,50 @@ Checks so far:
 
 Remaining risks / next handoff:
 - Continue C(12) ratchet with pure usage-drain report helpers before touching store/source-log code.
+
+### `refactor/piecewise-adaptation-position`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `_piecewise_adaptation_by_position` complexity while preserving position-bucket aggregation by segment label.
+- Add direct characterization coverage for all-segment and per-label position reports.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_regime_segments.py`
+- `tests/test_usage_drain_regime_segments.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split empty position buckets, segment row collection, row append behavior, and report assembly into focused helpers.
+- Preserved `position_buckets`, `all_segments`, `by_label`, prediction-row counts, and best-by-MAE output.
+
+Metrics:
+- `_piecewise_adaptation_by_position`: C(12) -> A(2).
+- `usage_drain_regime_segments.py` maximum complexity: B(8).
+- `usage_drain_regime_segments.py`: 369 -> 411 physical lines.
+- `tests/test_usage_drain_regime_segments.py`: 48 -> 86 physical lines.
+- Global C-or-worse blocks: 22 -> 21.
+- No C(13) or D/E/F complexity blocks remain.
+- Current top complexity target is `usage_drain_error_diagnostics.py::span_error_metadata` at C(12).
+
+Checks so far:
+- `.venv/bin/python -m pytest tests/test_usage_drain_regime_segments.py -q`: 2 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_regime_segments.py tests/test_usage_drain_model.py tests/test_usage_drain_reports.py -q`: 21 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_regime_segments.py tests/test_usage_drain_regime_segments.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_regime_segments.py -a -s`: target now A(2), module max B(8).
+- `.venv/bin/python -m pytest -q`: 491 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Continue C(12) ratchet with pure usage-drain diagnostics before touching store/source-log code.

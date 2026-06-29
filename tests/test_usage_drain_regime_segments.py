@@ -1,4 +1,7 @@
-from codex_usage_tracker.usage_drain_regime_segments import regime_streak_summary
+from codex_usage_tracker.usage_drain_regime_segments import (
+    _piecewise_adaptation_by_position,
+    regime_streak_summary,
+)
 from codex_usage_tracker.usage_drain_types import UsageDeltaSpan
 
 
@@ -47,3 +50,37 @@ def test_regime_streak_summary_preserves_runs_and_breaks() -> None:
             "break_date": "2026-06-01",
         }
     ]
+
+
+def test_piecewise_adaptation_by_position_groups_rows_by_segment_position() -> None:
+    prediction_rows = {
+        index: {
+            "actual": float(index + 1),
+            "predictions": {
+                "constant_one_percent": 1.0,
+                "previous_delta": float(index + 1),
+                "one_percent_regime_grace": 1.0,
+                "empirical_reset_state_mode": 1.0,
+            },
+        }
+        for index in range(6)
+    }
+    segments = [
+        {"label": "stable", "start_index": 0, "end_index": 2},
+        {"label": "shift", "start_index": 3, "end_index": 5},
+    ]
+
+    report = _piecewise_adaptation_by_position(prediction_rows, segments)
+
+    assert report["position_buckets"] == [
+        "first_span",
+        "second_span",
+        "third_span",
+        "fourth_fifth_span",
+        "sixth_plus_span",
+    ]
+    assert report["all_segments"]["first_span"]["prediction_rows"] == 2
+    assert report["all_segments"]["second_span"]["prediction_rows"] == 2
+    assert report["all_segments"]["third_span"]["best_by_mae"] == "previous_delta:0.0"
+    assert report["by_label"]["stable"]["first_span"]["prediction_rows"] == 1
+    assert report["by_label"]["shift"]["third_span"]["prediction_rows"] == 1
