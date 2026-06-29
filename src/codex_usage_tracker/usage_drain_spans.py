@@ -164,6 +164,86 @@ def _span_row_token_components(row: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def _span_proxy_float_totals() -> dict[str, float]:
+    return dict.fromkeys(DEFAULT_PROXY_NAMES, 0.0)
+
+
+def _span_proxy_count_totals() -> dict[str, int]:
+    return dict.fromkeys(DEFAULT_PROXY_NAMES, 0)
+
+
+def _span_weighted_token_totals() -> dict[str, dict[str, float]]:
+    return {
+        proxy: dict.fromkeys(TOKEN_COMPONENT_FIELDS, 0.0)
+        for proxy in DEFAULT_PROXY_NAMES
+    }
+
+
+def _add_span_row_dimensions(
+    row: dict[str, Any],
+    *,
+    model_counts: dict[str, int],
+    effort_counts: dict[str, int],
+    turn_counts: dict[tuple[str, str], int],
+) -> None:
+    model = str(row.get("model") or "unknown")
+    model_counts[model] = model_counts.get(model, 0) + 1
+    effort = _span_normalized_effort(row.get("effort"))
+    effort_counts[effort] = effort_counts.get(effort, 0) + 1
+    turn_key = _span_turn_key(row)
+    turn_counts[turn_key] = turn_counts.get(turn_key, 0) + 1
+
+
+def _add_span_row_numeric_totals(
+    row: dict[str, Any],
+    *,
+    token_totals: dict[str, float],
+    timing_totals: dict[str, float],
+) -> None:
+    for field_name in TOKEN_TOTAL_FIELDS:
+        token_totals[field_name] += _span_number(row.get(field_name))
+    for field_name in TIMING_TOTAL_FIELDS:
+        timing_totals[field_name] += _span_number(row.get(field_name))
+
+
+def _span_proxy_flags(annotation: FastProxyAnnotation) -> dict[str, bool]:
+    return {
+        "all_candidates": annotation.is_candidate,
+        "strong_only": annotation.is_strong,
+        "high_medium_candidates": annotation.is_high_or_medium,
+        "high_confidence_only": annotation.is_high,
+    }
+
+
+def _add_span_proxy_totals(
+    row: dict[str, Any],
+    *,
+    credits: float,
+    proxies: dict[str, FastProxyAnnotation],
+    candidate: dict[str, float],
+    non_candidate: dict[str, float],
+    documented_weighted: dict[str, float],
+    candidate_counts: dict[str, int],
+    documented_weighted_token_totals: dict[str, dict[str, float]],
+) -> None:
+    annotation = proxies.get(str(row.get("record_id") or ""), FastProxyAnnotation())
+    token_components = _span_row_token_components(row)
+    multiplier = documented_fast_credit_multiplier(str(row.get("model") or "unknown")) or 1.0
+    for proxy_name, is_candidate in _span_proxy_flags(annotation).items():
+        token_multiplier = multiplier if is_candidate else 1.0
+        for field_name, value in token_components.items():
+            documented_weighted_token_totals[proxy_name][
+                field_name
+            ] += value * token_multiplier
+        if is_candidate:
+            candidate[proxy_name] += credits
+            documented_weighted[proxy_name] += credits * multiplier
+            candidate_counts[proxy_name] += 1
+        else:
+            non_candidate[proxy_name] += credits
+            documented_weighted[proxy_name] += credits
+
+
 def _span_from_rows(
     rows: list[dict[str, Any]],
     *,
@@ -172,14 +252,11 @@ def _span_from_rows(
     proxies: dict[str, FastProxyAnnotation],
 ) -> UsageDeltaSpan:
     standard = 0.0
-    candidate = dict.fromkeys(DEFAULT_PROXY_NAMES, 0.0)
-    non_candidate = dict.fromkeys(DEFAULT_PROXY_NAMES, 0.0)
-    documented_weighted = dict.fromkeys(DEFAULT_PROXY_NAMES, 0.0)
-    candidate_counts = dict.fromkeys(DEFAULT_PROXY_NAMES, 0)
-    documented_weighted_token_totals = {
-        proxy: dict.fromkeys(TOKEN_COMPONENT_FIELDS, 0.0)
-        for proxy in DEFAULT_PROXY_NAMES
-    }
+    candidate = _span_proxy_float_totals()
+    non_candidate = _span_proxy_float_totals()
+    documented_weighted = _span_proxy_float_totals()
+    candidate_counts = _span_proxy_count_totals()
+    documented_weighted_token_totals = _span_weighted_token_totals()
     model_counts: dict[str, int] = {}
     effort_counts: dict[str, int] = {}
     turn_counts: dict[tuple[str, str], int] = {}
@@ -188,38 +265,27 @@ def _span_from_rows(
     for row in rows:
         credits = max(_span_number(row.get("usage_credits")), 0.0)
         standard += credits
-        model = str(row.get("model") or "unknown")
-        model_counts[model] = model_counts.get(model, 0) + 1
-        effort = _span_normalized_effort(row.get("effort"))
-        effort_counts[effort] = effort_counts.get(effort, 0) + 1
-        turn_key = _span_turn_key(row)
-        turn_counts[turn_key] = turn_counts.get(turn_key, 0) + 1
-        for field_name in TOKEN_TOTAL_FIELDS:
-            token_totals[field_name] += _span_number(row.get(field_name))
-        for field_name in TIMING_TOTAL_FIELDS:
-            timing_totals[field_name] += _span_number(row.get(field_name))
-        annotation = proxies.get(str(row.get("record_id") or ""), FastProxyAnnotation())
-        token_components = _span_row_token_components(row)
-        proxy_flags = {
-            "all_candidates": annotation.is_candidate,
-            "strong_only": annotation.is_strong,
-            "high_medium_candidates": annotation.is_high_or_medium,
-            "high_confidence_only": annotation.is_high,
-        }
-        multiplier = documented_fast_credit_multiplier(model) or 1.0
-        for proxy_name, is_candidate in proxy_flags.items():
-            token_multiplier = multiplier if is_candidate else 1.0
-            for field_name, value in token_components.items():
-                documented_weighted_token_totals[proxy_name][
-                    field_name
-                ] += value * token_multiplier
-            if is_candidate:
-                candidate[proxy_name] += credits
-                documented_weighted[proxy_name] += credits * multiplier
-                candidate_counts[proxy_name] += 1
-            else:
-                non_candidate[proxy_name] += credits
-                documented_weighted[proxy_name] += credits
+        _add_span_row_dimensions(
+            row,
+            model_counts=model_counts,
+            effort_counts=effort_counts,
+            turn_counts=turn_counts,
+        )
+        _add_span_row_numeric_totals(
+            row,
+            token_totals=token_totals,
+            timing_totals=timing_totals,
+        )
+        _add_span_proxy_totals(
+            row,
+            credits=credits,
+            proxies=proxies,
+            candidate=candidate,
+            non_candidate=non_candidate,
+            documented_weighted=documented_weighted,
+            candidate_counts=candidate_counts,
+            documented_weighted_token_totals=documented_weighted_token_totals,
+        )
     usage_observation = _preferred_span_usage_observation(rows[-1])
 
     return UsageDeltaSpan(

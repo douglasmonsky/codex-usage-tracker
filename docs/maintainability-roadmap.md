@@ -5236,3 +5236,44 @@ Checks:
 Remaining risks / next handoff:
 - Store persistence behavior was verified through existing tests, but this branch intentionally avoids schema or SQL contract changes.
 - Next likely target is `usage_drain_spans.py::_span_from_rows` or `diagnostic_snapshot_analysis.py::_scan_source_log`.
+### `refactor/usage-drain-span-row`
+
+Objective:
+- Reduce `_span_from_rows` complexity while preserving `UsageDeltaSpan` field construction, proxy weighting, token totals, timing totals, and turn/model/effort counts.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_spans.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split proxy total initialization, weighted token total initialization, row dimension counts, numeric total accumulation, proxy flag calculation, and proxy credit/token accumulation into helpers.
+- Kept `build_usage_delta_spans` boundary behavior unchanged.
+- Preserved five-hour/fallback usage-window metadata from the final row in the span.
+
+Metrics:
+- `_span_from_rows`: C(17) -> B(7).
+- `usage_drain_spans.py` average complexity: A(4.16).
+- Global C-or-worse blocks: 51 -> 50.
+- `usage_drain_spans.py`: 414 lines, still under active file-size budgets.
+- Remaining span hotspot: `build_usage_delta_spans` C(16).
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_spans.py tests/test_usage_drain_model.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_spans.py tests/test_usage_drain_model.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py::test_build_usage_delta_spans_includes_zero_change_calls_then_censors_resets tests/test_usage_drain_model.py::test_alternate_codex_limit_rows_count_as_work_but_not_boundaries tests/test_usage_drain_model.py::test_build_usage_delta_spans_prefers_five_hour_window_when_secondary -q`: 3 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_spans.py -a -s`: passed, target now B-rated.
+- `.venv/bin/python -m pytest -q`: 450 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `build_usage_delta_spans` remains C(16) and is the next natural span follow-up.
+- `diagnostic_snapshot_analysis.py::_scan_source_log` remains one of the highest C-rated blocks.
