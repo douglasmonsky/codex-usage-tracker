@@ -4649,3 +4649,54 @@ Remaining risks / next handoff:
 - `diagnostics.py` is the only remaining source file over 600 lines.
 - `dashboard_payload` and `_pricing_snapshot_warning` remain C-rated and should
   be addressed in later dashboard-payload cleanup branches.
+### `refactor/diagnostics-mcp-checks`
+
+Objective:
+- Clear the last source file over the 600-line limit by moving MCP-specific
+  doctor checks out of `diagnostics.py`.
+- Preserve `run_doctor()` output shape and MCP wrapper behavior.
+- Avoid circular imports by moving `DoctorCheck` into a shared type module.
+
+Baseline metrics:
+- `diagnostics.py`: 640 lines.
+- `_check_mcp_runtime`: C(19).
+- `_check_mcp_config`: C(14).
+- `run_doctor`: C(14), left for later orchestration cleanup.
+- Max-file ratchet overage before branch completion: 40.
+
+Completed edits:
+- Added `diagnostics_types.py` containing the shared `DoctorCheck` dataclass.
+- Added `diagnostics_mcp.py` for MCP config, runtime, launcher, command/cwd
+  resolution, error-line extraction, and module import checks.
+- Replaced `run_doctor()` MCP check calls with public `check_mcp_config`,
+  `check_mcp_runtime`, and `check_mcp_import`.
+
+Metrics edits:
+- `diagnostics.py`: 402 lines.
+- `diagnostics_mcp.py`: 254 lines.
+- `diagnostics_types.py`: 16 lines.
+- Max-file ratchet overage tightened from 40 to 0.
+- No `src/codex_usage_tracker/*.py` file is over 600 lines.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostics.py src/codex_usage_tracker/diagnostics_mcp.py src/codex_usage_tracker/diagnostics_types.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostics.py src/codex_usage_tracker/diagnostics_mcp.py src/codex_usage_tracker/diagnostics_types.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_release.py tests/test_mcp_integration.py -q`: 19 passed.
+- `.venv/bin/python -m pytest -q`: 442 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted baseline to zero.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- File-size ratchet is now clean for `src`.
+- `check_mcp_runtime`, `check_mcp_config`, `run_doctor`, and
+  `_check_parser_diagnostics` remain C-rated complexity cleanup targets.
+- Next branches should shift from file-size repair to complexity reduction and
+  then stricter local gates.
