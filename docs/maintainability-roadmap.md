@@ -5023,3 +5023,41 @@ Checks:
 
 Remaining risks / next handoff:
 - Global Xenon still fails on remaining C-rated blocks in diagnostics MCP, usage-drain boundary/allowance/state/spans, store, recommendations, dashboard payload, formatting calls, and diagnostic snapshot analysis.
+
+### `refactor/diagnostics-mcp-runtime`
+
+Objective:
+- Reduce MCP doctor check complexity while preserving generated plugin/runtime validation messages.
+
+Files touched:
+- `src/codex_usage_tracker/diagnostics_mcp.py`
+
+Completed edits:
+- Split MCP config JSON loading, server entry validation, command validation, and environment detail formatting out of `check_mcp_config`.
+- Split MCP runtime server loading, args validation, command error formatting, subprocess import check execution, runtime environment creation, and failure formatting out of `check_mcp_runtime`.
+- Preserved existing doctor check names, statuses, remediation strings, and plugin installer behavior.
+
+Metrics:
+- `check_mcp_runtime`: C(19) -> B(7).
+- `check_mcp_config`: C(14) -> B(9).
+- `diagnostics_mcp.py` average complexity: A(3.76).
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/diagnostics_mcp.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/diagnostics_mcp.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_release.py tests/test_mcp_integration.py tests/test_support.py tests/test_plugin_installer.py -q`: 31 passed.
+- `.venv/bin/python -m radon cc src/codex_usage_tracker/diagnostics_mcp.py -a -s`: passed, MCP config/runtime checks now B-rated.
+- `.venv/bin/python -m pytest -q`: 447 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Global Xenon still fails on remaining C-rated blocks in usage-drain boundary/allowance/state/spans, store, recommendations, dashboard payload, formatting calls, threads, diagnostic reports, and diagnostic snapshot analysis.
