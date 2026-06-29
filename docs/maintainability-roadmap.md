@@ -4985,3 +4985,41 @@ Checks:
 
 Remaining risks / next handoff:
 - Global Xenon still fails on remaining C-rated blocks in usage-drain time series/allowance fits/boundary rows, store, diagnostics MCP, recommendations, dashboard payload, formatting calls, and diagnostic snapshot analysis.
+
+### `refactor/usage-drain-weekly-projection`
+
+Objective:
+- Reduce weekly credit projection time-series complexity while preserving dashboard/report projection shape.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_time_series.py`
+
+Completed edits:
+- Split usable span filtering, weekly observed totals, full-week estimates, confidence interval calculation, and timestamp range extraction out of `_weekly_projection_point`.
+- Split trend value extraction, insufficient-trend response, slope calculation, and direction labeling out of `_weekly_projection_trend`.
+- Preserved existing weekly projection fields, confidence method, CI math, and plan-aware trend behavior.
+
+Metrics:
+- `_weekly_projection_point`: C(19) -> A(4).
+- `_weekly_projection_trend`: C(15) -> A(4).
+- `usage_drain_time_series.py` no longer has C-rated weekly projection helpers; remaining ceiling is B(10) for `_trend_points_for_latest_plan`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_time_series.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_time_series.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_reports.py tests/test_dashboard_diagnostics_snapshots.py -q`: 14 passed.
+- `.venv/bin/python -m radon cc src/codex_usage_tracker/usage_drain_time_series.py -a -s`: passed, projection point and trend now A(4).
+- `.venv/bin/python -m pytest -q`: 447 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Global Xenon still fails on remaining C-rated blocks in diagnostics MCP, usage-drain boundary/allowance/state/spans, store, recommendations, dashboard payload, formatting calls, and diagnostic snapshot analysis.

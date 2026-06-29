@@ -173,28 +173,16 @@ def _weekly_projection_point(
     key: str,
     spans: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
-    usable = [span for span in spans if _number(span.get("delta_usage_percent")) > 0]
+    usable = _usable_weekly_spans(spans)
     if not usable:
         return None
-    observed_delta = sum(_number(span.get("delta_usage_percent")) for span in usable)
-    observed_credits = sum(_number(span.get("standard_usage_credits")) for span in usable)
+    observed_delta, observed_credits = _weekly_projection_totals(usable)
     if observed_delta <= 0:
         return None
-    estimates = [
-        _number(span.get("standard_usage_credits"))
-        / _number(span.get("delta_usage_percent"))
-        * 100.0
-        for span in usable
-        if _number(span.get("delta_usage_percent")) > 0
-    ]
     projection = observed_credits / observed_delta * 100.0
-    stddev = _sample_stddev(estimates)
-    standard_error = (
-        stddev / sqrt(len(estimates)) if stddev is not None and len(estimates) > 1 else None
-    )
-    ci_half_width = 1.96 * standard_error if standard_error is not None else None
-    start = min(str(span.get("start_event_timestamp") or "") for span in usable)
-    end = max(str(span.get("end_event_timestamp") or "") for span in usable)
+    estimates = _weekly_full_credit_estimates(usable)
+    ci_low, ci_high = _weekly_projection_interval(projection, estimates)
+    start, end = _weekly_projection_time_range(usable)
     return {
         "week_key": key,
         "label": _week_label(usable[0], key),
@@ -205,50 +193,115 @@ def _weekly_projection_point(
         "observed_usage_delta_percent": _rounded(observed_delta),
         "observed_standard_usage_credits": _rounded(observed_credits),
         "projected_weekly_credits": _rounded(projection),
-        "ci_low": _rounded(max(projection - ci_half_width, 0.0) if ci_half_width is not None else None),
-        "ci_high": _rounded(projection + ci_half_width if ci_half_width is not None else None),
+        "ci_low": _rounded(ci_low),
+        "ci_high": _rounded(ci_high),
         "confidence": _projection_confidence(len(usable), observed_delta),
         "rate_limit_plan_type": usable[-1].get("rate_limit_plan_type"),
     }
 
 
+def _usable_weekly_spans(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [span for span in spans if _number(span.get("delta_usage_percent")) > 0]
+
+
+def _weekly_projection_totals(spans: list[dict[str, Any]]) -> tuple[float, float]:
+    return (
+        sum(_number(span.get("delta_usage_percent")) for span in spans),
+        sum(_number(span.get("standard_usage_credits")) for span in spans),
+    )
+
+
+def _weekly_full_credit_estimates(spans: list[dict[str, Any]]) -> list[float]:
+    return [
+        _number(span.get("standard_usage_credits"))
+        / _number(span.get("delta_usage_percent"))
+        * 100.0
+        for span in spans
+        if _number(span.get("delta_usage_percent")) > 0
+    ]
+
+
+def _weekly_projection_interval(
+    projection: float,
+    estimates: list[float],
+) -> tuple[float | None, float | None]:
+    stddev = _sample_stddev(estimates)
+    if stddev is None or len(estimates) <= 1:
+        return None, None
+    standard_error = stddev / sqrt(len(estimates))
+    ci_half_width = 1.96 * standard_error
+    return max(projection - ci_half_width, 0.0), projection + ci_half_width
+
+
+def _weekly_projection_time_range(spans: list[dict[str, Any]]) -> tuple[str, str]:
+    return (
+        min(str(span.get("start_event_timestamp") or "") for span in spans),
+        max(str(span.get("end_event_timestamp") or "") for span in spans),
+    )
+
+
 def _weekly_projection_trend(points: list[dict[str, Any]]) -> dict[str, Any]:
     trend_points, basis = _trend_points_for_latest_plan(points)
-    values = [_number(point.get("projected_weekly_credits")) for point in trend_points]
-    if basis.startswith("insufficient") or len(values) < 3:
-        return {
-            "point_count": len(values),
-            "basis": basis,
-            "slope_credits_per_week": None,
-            "direction": "insufficient_data",
-            "first_projected_weekly_credits": _rounded(values[0]) if values else None,
-            "latest_projected_weekly_credits": _rounded(values[-1]) if values else None,
-            "change_from_first_credits": None,
-            "change_from_first_pct": None,
-            "rate_limit_plan_type": trend_points[0].get("rate_limit_plan_type") if trend_points else None,
-        }
-    xs = list(range(len(values)))
-    x_mean = _mean([float(value) for value in xs])
-    y_mean = _mean(values)
-    denominator = sum((x - x_mean) ** 2 for x in xs)
-    slope = (
-        sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, values, strict=False))
-        / denominator
-        if denominator
-        else 0.0
-    )
+    values = _weekly_projection_values(trend_points)
+    if _has_insufficient_weekly_trend(basis, values):
+        return _insufficient_weekly_projection_trend(trend_points, basis, values)
+    slope = _weekly_projection_slope(values)
     change = values[-1] - values[0]
     return {
         "point_count": len(values),
         "basis": basis,
         "slope_credits_per_week": _rounded(slope),
-        "direction": "up" if slope > 0 else "down" if slope < 0 else "flat",
+        "direction": _weekly_projection_direction(slope),
         "first_projected_weekly_credits": _rounded(values[0]),
         "latest_projected_weekly_credits": _rounded(values[-1]),
         "change_from_first_credits": _rounded(change),
         "change_from_first_pct": _rounded(change / values[0] if values[0] else None),
         "rate_limit_plan_type": trend_points[-1].get("rate_limit_plan_type") if trend_points else None,
     }
+
+
+def _weekly_projection_values(points: list[dict[str, Any]]) -> list[float]:
+    return [_number(point.get("projected_weekly_credits")) for point in points]
+
+
+def _has_insufficient_weekly_trend(basis: str, values: list[float]) -> bool:
+    return basis.startswith("insufficient") or len(values) < 3
+
+
+def _insufficient_weekly_projection_trend(
+    trend_points: list[dict[str, Any]],
+    basis: str,
+    values: list[float],
+) -> dict[str, Any]:
+    return {
+        "point_count": len(values),
+        "basis": basis,
+        "slope_credits_per_week": None,
+        "direction": "insufficient_data",
+        "first_projected_weekly_credits": _rounded(values[0]) if values else None,
+        "latest_projected_weekly_credits": _rounded(values[-1]) if values else None,
+        "change_from_first_credits": None,
+        "change_from_first_pct": None,
+        "rate_limit_plan_type": trend_points[0].get("rate_limit_plan_type") if trend_points else None,
+    }
+
+
+def _weekly_projection_slope(values: list[float]) -> float:
+    xs = list(range(len(values)))
+    x_mean = _mean([float(value) for value in xs])
+    y_mean = _mean(values)
+    denominator = sum((x - x_mean) ** 2 for x in xs)
+    if not denominator:
+        return 0.0
+    return sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, values, strict=False)) / denominator
+
+
+def _weekly_projection_direction(slope: float) -> str:
+    if slope > 0:
+        return "up"
+    if slope < 0:
+        return "down"
+    return "flat"
 
 
 def _trend_points_for_latest_plan(points: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str]:
