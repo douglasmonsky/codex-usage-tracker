@@ -4785,3 +4785,44 @@ Remaining risks / next handoff:
 - `_check_plugin_link` and `_check_marketplace` are the next B-rated functions in `diagnostics.py`.
 - MCP runtime/config checks remain C-rated in `diagnostics_mcp.py`.
 - Global Xenon still fails on unrelated usage-drain, store, parser-state, costing, diagnostic snapshot hotspots.
+
+### `refactor/context-read-entries`
+
+Objective:
+- Reduce the worst remaining source complexity hotspot, `_read_context_entries`, while preserving on-demand context loading and privacy behavior.
+
+Files touched:
+- `src/codex_usage_tracker/context.py`
+- `tests/test_context_scan.py`
+
+Completed edits:
+- Added `_ContextReadState` to make scan state explicit instead of spreading mutable loop state through one large function.
+- Split JSONL line parsing, per-line scan handling, selected-turn reset, serialized-context collection, pending summary carry-forward, and result assembly into focused helpers.
+- Added a parse-error characterization test that proves malformed JSONL lines increment context diagnostics without losing the selected turn.
+
+Metrics:
+- `_read_context_entries`: E(31) -> A(4).
+- `context.py` average complexity: B(8.63) -> A(4.16).
+- New helper ceiling in this module: B(9) for existing `_limit_entries`; new scan helpers are B(7) or better.
+- Source file remains below the 600-line budget.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/context.py tests/test_context_evidence.py tests/test_context_scan.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/context.py tests/test_context_evidence.py tests/test_context_scan.py`: passed.
+- `.venv/bin/python -m pytest tests/test_context_evidence.py tests/test_context_scan.py tests/test_context_serialized.py tests/test_context_summaries.py tests/test_context_action_timing.py -q`: 19 passed.
+- `.venv/bin/python -m radon cc src/codex_usage_tracker/context.py -a -s`: passed, `_read_context_entries` now A(4).
+- `.venv/bin/python -m pytest -q`: 443 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `load_call_context` remains C(13) in `context.py`.
+- Global Xenon still fails on remaining C-rated blocks in usage-drain, store, diagnostics MCP, recommendations, formatting, and project config modules.

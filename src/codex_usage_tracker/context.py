@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -169,6 +170,24 @@ def _json_byte_count(payload: dict[str, Any]) -> int:
         previous_size = size
 
 
+@dataclass
+class _ContextReadState:
+    target_turn_id: str | None
+    full_serialized_analysis: bool
+    encoding: Any
+    estimator: str
+    collecting: bool
+    candidates: list[dict[str, Any]] = field(default_factory=list)
+    raw_entries: list[dict[str, Any]] = field(default_factory=list)
+    field_buckets: dict[str, dict[str, Any]] = field(default_factory=dict)
+    serialized_line_count: int = 0
+    serialized_raw_char_count: int = 0
+    omitted_parse_errors: int = 0
+    current_turn_id: str | None = None
+    pending_compactions: list[dict[str, Any]] = field(default_factory=list)
+    pending_diagnostic_events: list[dict[str, Any]] = field(default_factory=list)
+
+
 def _read_context_entries(
     path: Path,
     token_line: int,
@@ -187,163 +206,222 @@ def _read_context_entries(
     float,
     dict[str, Any],
 ]:
-    candidates: list[dict[str, Any]] = []
-    raw_entries: list[dict[str, Any]] = []
-    field_buckets: dict[str, dict[str, Any]] = {}
-    serialized_line_count = 0
-    serialized_raw_char_count = 0
-    omitted_parse_errors = 0
-    current_turn_id: str | None = None
-    collecting = target_turn_id is None
-    pending_compactions: list[dict[str, Any]] = []
-    pending_diagnostic_events: list[dict[str, Any]] = []
+    state = _new_context_read_state(target_turn_id, model, context_mode)
+
+    with path.open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            if line_number > token_line:
+                break
+            if _scan_context_line(
+                state=state,
+                line_number=line_number,
+                line=line,
+                token_line=token_line,
+                include_tool_output=include_tool_output,
+                include_compaction_history=include_compaction_history,
+            ):
+                break
+
+    return _context_read_result(state, max_chars=max_chars, max_entries=max_entries)
+
+
+def _new_context_read_state(
+    target_turn_id: str | None,
+    model: str | None,
+    context_mode: str,
+) -> _ContextReadState:
     full_serialized_analysis = context_mode == CONTEXT_MODE_FULL
     encoding, estimator = (
         context_encoding(model or "")
         if full_serialized_analysis
         else (None, "chars_per_4_fallback")
     )
+    return _ContextReadState(
+        target_turn_id=target_turn_id,
+        full_serialized_analysis=full_serialized_analysis,
+        encoding=encoding,
+        estimator=estimator,
+        collecting=target_turn_id is None,
+    )
 
-    with path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
-            if line_number > token_line:
-                break
-            try:
-                envelope = json.loads(line)
-            except json.JSONDecodeError:
-                omitted_parse_errors += 1
-                continue
-            if not isinstance(envelope, dict):
-                continue
-            entry_type = optional_str(envelope.get("type")) or "unknown"
-            payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
-            timestamp = optional_str(envelope.get("timestamp"))
 
-            if entry_type == "turn_context":
-                was_collecting = collecting
-                current_turn_id = optional_str(payload.get("turn_id"))
-                collecting = target_turn_id is None or current_turn_id == target_turn_id
-                if collecting:
-                    raw_entries = []
-                    field_buckets = {}
-                    serialized_line_count = 0
-                    serialized_raw_char_count = 0
-                    if full_serialized_analysis:
-                        collect_serialized_envelope(
-                            raw_entries=raw_entries,
-                            field_buckets=field_buckets,
-                            envelope=envelope,
-                            entry_type=entry_type,
-                            payload=payload,
-                            encoding=encoding,
-                        )
-                    else:
-                        serialized_line_count += 1
-                        serialized_raw_char_count += len(line)
-                    carried_compactions = (
-                        [entry for entry in candidates if entry.get("type") == "compacted"]
-                        if was_collecting and target_turn_id is not None
-                        else []
-                    )
-                    candidates = []
-                    candidates.append(
-                        _context_entry(
-                            line_number,
-                            timestamp,
-                            entry_type,
-                            "Turn context",
-                            summarize_turn_context(payload),
-                        )
-                    )
-                    candidates.extend(pending_compactions)
-                    candidates.extend(pending_diagnostic_events)
-                    candidates.extend(carried_compactions)
-                pending_compactions = []
-                pending_diagnostic_events = []
-                continue
+def _context_envelope_from_line(line: str) -> tuple[dict[str, Any] | None, bool]:
+    try:
+        envelope = json.loads(line)
+    except json.JSONDecodeError:
+        return None, True
+    if not isinstance(envelope, dict):
+        return None, False
+    return envelope, False
 
-            if collecting:
-                if full_serialized_analysis:
-                    collect_serialized_envelope(
-                        raw_entries=raw_entries,
-                        field_buckets=field_buckets,
-                        envelope=envelope,
-                        entry_type=entry_type,
-                        payload=payload,
-                        encoding=encoding,
-                    )
-                else:
-                    serialized_line_count += 1
-                    serialized_raw_char_count += len(line)
 
-            summarized = summarize_payload(
-                entry_type=entry_type,
-                payload=payload,
-                include_tool_output=include_tool_output,
-                include_compaction_history=include_compaction_history,
-            )
+def _scan_context_line(
+    state: _ContextReadState,
+    line_number: int,
+    line: str,
+    token_line: int,
+    include_tool_output: bool,
+    include_compaction_history: bool,
+) -> bool:
+    envelope, parse_error = _context_envelope_from_line(line)
+    if parse_error:
+        state.omitted_parse_errors += 1
+        return False
+    if envelope is None:
+        return False
+    entry_type, payload, timestamp = _context_envelope_parts(envelope)
+    if entry_type == "turn_context":
+        _start_turn_context(state, line_number, line, timestamp, envelope, payload)
+        return False
+    if state.collecting:
+        _collect_serialized_context(state, line, envelope, entry_type, payload)
+    summarized = summarize_payload(
+        entry_type=entry_type,
+        payload=payload,
+        include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
+    )
+    if _pending_summary_handled(state, line_number, timestamp, entry_type, summarized):
+        return False
+    if summarized is not None:
+        state.candidates.append(_summarized_context_entry(line_number, timestamp, entry_type, summarized))
+    return _is_token_count_boundary(line_number, token_line, entry_type, payload)
 
-            if not collecting and entry_type == "compacted" and summarized is not None:
-                pending_compactions = [
-                    _summarized_context_entry(
-                        line_number,
-                        timestamp,
-                        entry_type,
-                        summarized,
-                    )
-                ]
-                continue
 
-            if (
-                not collecting
-                and summarized is not None
-                and summarized.get("carry_into_next_turn") is True
-            ):
-                pending_diagnostic_events = [
-                    *pending_diagnostic_events,
-                    _summarized_context_entry(
-                        line_number,
-                        timestamp,
-                        entry_type,
-                        summarized,
-                    ),
-                ][-8:]
-                continue
+def _context_envelope_parts(envelope: dict[str, Any]) -> tuple[str, dict[str, Any], str | None]:
+    payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
+    return optional_str(envelope.get("type")) or "unknown", payload, optional_str(envelope.get("timestamp"))
 
-            if not collecting:
-                continue
 
-            if summarized is not None:
-                candidates.append(_summarized_context_entry(line_number, timestamp, entry_type, summarized))
+def _is_token_count_boundary(
+    line_number: int,
+    token_line: int,
+    entry_type: str,
+    payload: dict[str, Any],
+) -> bool:
+    return line_number >= token_line and entry_type == "event_msg" and payload.get("type") == "token_count"
 
-            if (
-                line_number >= token_line
-                and entry_type == "event_msg"
-                and payload.get("type") == "token_count"
-            ):
-                break
 
+def _start_turn_context(
+    state: _ContextReadState,
+    line_number: int,
+    line: str,
+    timestamp: str | None,
+    envelope: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    was_collecting = state.collecting
+    state.current_turn_id = optional_str(payload.get("turn_id"))
+    state.collecting = state.target_turn_id is None or state.current_turn_id == state.target_turn_id
+    if state.collecting:
+        _reset_selected_turn_context(state)
+        _collect_serialized_context(state, line, envelope, "turn_context", payload)
+        carried_compactions = (
+            [entry for entry in state.candidates if entry.get("type") == "compacted"]
+            if was_collecting and state.target_turn_id is not None
+            else []
+        )
+        state.candidates = [
+            _context_entry(
+                line_number,
+                timestamp,
+                "turn_context",
+                "Turn context",
+                summarize_turn_context(payload),
+            ),
+            *state.pending_compactions,
+            *state.pending_diagnostic_events,
+            *carried_compactions,
+        ]
+    state.pending_compactions = []
+    state.pending_diagnostic_events = []
+
+
+def _reset_selected_turn_context(state: _ContextReadState) -> None:
+    state.raw_entries = []
+    state.field_buckets = {}
+    state.serialized_line_count = 0
+    state.serialized_raw_char_count = 0
+
+
+def _collect_serialized_context(
+    state: _ContextReadState,
+    line: str,
+    envelope: dict[str, Any],
+    entry_type: str,
+    payload: dict[str, Any],
+) -> None:
+    if state.full_serialized_analysis:
+        collect_serialized_envelope(
+            raw_entries=state.raw_entries,
+            field_buckets=state.field_buckets,
+            envelope=envelope,
+            entry_type=entry_type,
+            payload=payload,
+            encoding=state.encoding,
+        )
+    else:
+        state.serialized_line_count += 1
+        state.serialized_raw_char_count += len(line)
+
+
+def _pending_summary_handled(
+    state: _ContextReadState,
+    line_number: int,
+    timestamp: str | None,
+    entry_type: str,
+    summarized: dict[str, Any] | None,
+) -> bool:
+    if state.collecting:
+        return False
+    if summarized is None:
+        return True
+    if entry_type == "compacted":
+        state.pending_compactions = [
+            _summarized_context_entry(line_number, timestamp, entry_type, summarized)
+        ]
+        return True
+    if summarized.get("carry_into_next_turn") is True:
+        state.pending_diagnostic_events = [
+            *state.pending_diagnostic_events,
+            _summarized_context_entry(line_number, timestamp, entry_type, summarized),
+        ][-8:]
+    return True
+
+
+def _context_read_result(
+    state: _ContextReadState,
+    max_chars: int,
+    max_entries: int,
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, Any],
+    list[dict[str, Any]],
+    dict[str, Any],
+    float,
+    dict[str, Any],
+]:
     serialized_started = perf_counter()
-    if full_serialized_analysis:
+    if state.full_serialized_analysis:
         serialized_estimate = serialized_context_estimate(
-            raw_entries=raw_entries,
-            field_buckets=field_buckets,
-            parse_errors=omitted_parse_errors,
-            encoding=encoding,
-            estimator=estimator,
+            raw_entries=state.raw_entries,
+            field_buckets=state.field_buckets,
+            parse_errors=state.omitted_parse_errors,
+            encoding=state.encoding,
+            estimator=state.estimator,
         )
     else:
         serialized_estimate = quick_serialized_context_estimate(
-            raw_line_count=serialized_line_count,
-            raw_json_char_count=serialized_raw_char_count,
-            parse_errors=omitted_parse_errors,
+            raw_line_count=state.serialized_line_count,
+            raw_json_char_count=state.serialized_raw_char_count,
+            parse_errors=state.omitted_parse_errors,
         )
     serialized_estimate_ms = _elapsed_ms(serialized_started)
-    candidates = dedupe_chat_message_echoes(candidates)
+    candidates = dedupe_chat_message_echoes(state.candidates)
     action_timing = annotate_action_timing(candidates)
     limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
-    omitted["parse_errors"] = omitted_parse_errors
-    omitted["target_turn_id"] = target_turn_id
+    omitted["parse_errors"] = state.omitted_parse_errors
+    omitted["target_turn_id"] = state.target_turn_id
     omitted["total_entries"] = len(candidates)
     return limited, omitted, candidates, serialized_estimate, serialized_estimate_ms, action_timing
 
