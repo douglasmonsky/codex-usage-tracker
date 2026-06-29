@@ -6658,3 +6658,49 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue with `_boundary_delta_risk_gate_diagnostics` or move to the C(12) source-log/store functions depending on risk appetite.
+
+### `refactor/boundary-delta-risk-gate-diagnostics`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `_boundary_delta_risk_gate_diagnostics` complexity while preserving risk-gate aggregate payloads.
+- Add direct characterization coverage for override share, mean risk/support/threshold, and source-count ordering.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_boundary_delta_summary.py`
+- `tests/test_usage_drain_boundary_delta_summary.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split risk-gate detail extraction, empty payload, source counting, override share, mean field calculations, and source-count row formatting behind focused helpers.
+- Preserved the risk-gate diagnostic payload returned through boundary-delta prediction scopes.
+
+Metrics:
+- `_boundary_delta_risk_gate_diagnostics`: C(11) -> A(2).
+- `usage_drain_boundary_delta_summary.py` maximum complexity: A(5); no C-grade functions remain in the module.
+- `usage_drain_boundary_delta_summary.py`: 457 -> 504 physical lines.
+- `tests/test_usage_drain_boundary_delta_summary.py`: 231 -> 281 physical lines.
+- Global C-or-worse blocks: 19 -> 18.
+- No C(13) or D/E/F complexity blocks remain.
+- Current C(12) targets include `store_sources.py::source_logs_requiring_parse`, `store_sources.py::upsert_source_file_metadata`, and `diagnostic_snapshot_events.py::shell_command_from_payload`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_boundary_delta_summary.py -q`: 5 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_boundary_delta_summary.py tests/test_usage_drain_model.py -q`: 19 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_boundary_delta_summary.py tests/test_usage_drain_boundary_delta_summary.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_boundary_delta_summary.py -a -s`: target now A(2), module max A(5).
+- `.venv/bin/python -m pytest -q`: 494 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+
+Remaining risks / next handoff:
+- Move next to source-log/store C(12) functions or continue low-risk C(11) diagnostic/report functions in usage-drain modules.

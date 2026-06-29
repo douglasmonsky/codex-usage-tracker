@@ -3,6 +3,7 @@ from __future__ import annotations
 from codex_usage_tracker.usage_drain_boundary_delta_summary import (
     _boundary_delta_prediction_scope,
     _boundary_delta_residual_diagnostics,
+    _boundary_delta_risk_gate_diagnostics,
     _boundary_delta_top_error_groups,
 )
 
@@ -156,6 +157,55 @@ def test_boundary_delta_residual_diagnostics_reports_error_payload() -> None:
         "actual_delta_percent": 3.0,
         "predicted_delta_percent": 1.0,
         "abs_error": 2.0,
+    }
+
+
+def test_boundary_delta_risk_gate_diagnostics_summarizes_sources() -> None:
+    rows = [
+        {
+            "boundary_delta_prediction_details": {
+                "risk_model": {
+                    "source": "matched_state",
+                    "risk": 0.2,
+                    "support": 4,
+                    "risk_threshold": 0.3,
+                }
+            }
+        },
+        {
+            "boundary_delta_prediction_details": {
+                "risk_model": {
+                    "source": "manual_override",
+                    "risk": 0.8,
+                    "support": 2,
+                    "risk_threshold": 0.5,
+                }
+            }
+        },
+        {
+            "boundary_delta_prediction_details": {
+                "risk_model": {
+                    "source": "matched_state",
+                    "risk": 0.5,
+                    "support": 0,
+                    "risk_threshold": 0.7,
+                }
+            }
+        },
+    ]
+
+    result = _boundary_delta_risk_gate_diagnostics(rows, "risk_model")
+
+    assert result == {
+        "n": 3,
+        "override_share": 0.333333,
+        "mean_risk": 0.5,
+        "mean_support": 2.0,
+        "mean_threshold": 0.5,
+        "source_counts": [
+            {"source": "matched_state", "count": 2, "share": 0.666667},
+            {"source": "manual_override", "count": 1, "share": 0.333333},
+        ],
     }
 
 

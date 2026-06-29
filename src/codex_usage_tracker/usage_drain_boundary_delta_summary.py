@@ -222,49 +222,96 @@ def _boundary_delta_model_names(rows: list[dict[str, Any]]) -> list[str]:
 def _boundary_delta_risk_gate_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
-    details = [
+    details = _boundary_delta_risk_gate_details(rows, model_name)
+    if not details:
+        return _empty_boundary_delta_risk_gate_diagnostics()
+    source_counts = _boundary_delta_risk_gate_source_counts(details)
+    return {
+        "n": len(details),
+        "override_share": _boundary_delta_risk_gate_override_share(
+            source_counts, len(details)
+        ),
+        "mean_risk": _boundary_delta_risk_gate_mean_number(details, "risk"),
+        "mean_support": _boundary_delta_risk_gate_mean_support(details),
+        "mean_threshold": _boundary_delta_risk_gate_mean_number(
+            details, "risk_threshold"
+        ),
+        "source_counts": _boundary_delta_risk_gate_source_count_rows(
+            source_counts, len(details)
+        ),
+    }
+
+
+def _boundary_delta_risk_gate_details(
+    rows: list[dict[str, Any]], model_name: str
+) -> list[dict[str, Any]]:
+    return [
         (row.get("boundary_delta_prediction_details") or {}).get(model_name) or {}
         for row in rows
     ]
-    if not details:
-        return {
-            "n": 0,
-            "override_share": None,
-            "mean_risk": None,
-            "mean_support": None,
-            "mean_threshold": None,
-            "source_counts": [],
-        }
+
+
+def _empty_boundary_delta_risk_gate_diagnostics() -> dict[str, Any]:
+    return {
+        "n": 0,
+        "override_share": None,
+        "mean_risk": None,
+        "mean_support": None,
+        "mean_threshold": None,
+        "source_counts": [],
+    }
+
+
+def _boundary_delta_risk_gate_source_counts(
+    details: list[dict[str, Any]],
+) -> dict[str, int]:
     source_counts: dict[str, int] = {}
-    risks: list[float] = []
-    supports: list[int] = []
-    thresholds: list[float] = []
     for detail in details:
         source = str(detail.get("source") or "missing")
         source_counts[source] = source_counts.get(source, 0) + 1
-        risks.append(_number(detail.get("risk")))
-        supports.append(int(detail.get("support") or 0))
-        thresholds.append(_number(detail.get("risk_threshold")))
+    return source_counts
+
+
+def _boundary_delta_risk_gate_override_share(
+    source_counts: dict[str, int], total_count: int
+) -> float | None:
+    if total_count <= 0:
+        return None
     override_count = sum(
         count for source, count in source_counts.items() if source.endswith("_override")
     )
-    return {
-        "n": len(details),
-        "override_share": _rounded(override_count / len(details)),
-        "mean_risk": _rounded(sum(risks) / len(risks)),
-        "mean_support": _rounded(sum(supports) / len(supports)),
-        "mean_threshold": _rounded(sum(thresholds) / len(thresholds)),
-        "source_counts": [
-            {
-                "source": source,
-                "count": count,
-                "share": _rounded(count / len(details)),
-            }
-            for source, count in sorted(
-                source_counts.items(), key=lambda item: (-item[1], item[0])
-            )
-        ],
-    }
+    return _rounded(override_count / total_count)
+
+
+def _boundary_delta_risk_gate_mean_number(
+    details: list[dict[str, Any]], field_name: str
+) -> float | None:
+    if not details:
+        return None
+    return _rounded(sum(_number(detail.get(field_name)) for detail in details) / len(details))
+
+
+def _boundary_delta_risk_gate_mean_support(
+    details: list[dict[str, Any]],
+) -> float | None:
+    if not details:
+        return None
+    return _rounded(sum(int(detail.get("support") or 0) for detail in details) / len(details))
+
+
+def _boundary_delta_risk_gate_source_count_rows(
+    source_counts: dict[str, int], total_count: int
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "source": source,
+            "count": count,
+            "share": _rounded(count / total_count),
+        }
+        for source, count in sorted(
+            source_counts.items(), key=lambda item: (-item[1], item[0])
+        )
+    ]
 
 
 def _boundary_delta_residual_diagnostics(
