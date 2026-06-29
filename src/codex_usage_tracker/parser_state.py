@@ -49,6 +49,22 @@ class ParserState:
 def parser_state_from_json(raw: str | None) -> ParserState | None:
     """Decode a persisted aggregate-only parser cursor."""
 
+    payload = _parser_state_payload(raw)
+    if payload is None:
+        return None
+    return ParserState(
+        session_id=optional_str(payload.get("session_id")),
+        session_meta=_string_dict(payload.get("session_meta")),
+        current_turn=_string_dict(payload.get("current_turn")),
+        last_cumulative_total=_json_int(payload.get("last_cumulative_total"), -1),
+        call_origin_segment=_call_origin_segment_from_json(payload),
+        diagnostic_facts_segment=_diagnostic_facts_segment_from_json(payload),
+        latest_record_id=optional_str(payload.get("latest_record_id")),
+        latest_event_timestamp=optional_str(payload.get("latest_event_timestamp")),
+    )
+
+
+def _parser_state_payload(raw: str | None) -> dict[str, Any] | None:
     if not raw:
         return None
     try:
@@ -57,28 +73,33 @@ def parser_state_from_json(raw: str | None) -> ParserState | None:
         return None
     if not isinstance(payload, dict) or payload.get("version") != 1:
         return None
-    segment = payload.get("call_origin_segment")
-    if not isinstance(segment, list):
-        segment = []
-    diagnostic_segment = payload.get("diagnostic_facts_segment")
-    if not isinstance(diagnostic_segment, list):
-        diagnostic_segment = []
-    return ParserState(
-        session_id=optional_str(payload.get("session_id")),
-        session_meta=_string_dict(payload.get("session_meta")),
-        current_turn=_string_dict(payload.get("current_turn")),
-        last_cumulative_total=_json_int(payload.get("last_cumulative_total"), -1),
-        call_origin_segment=tuple(_call_origin_flags_from_json(item) for item in segment),
-        diagnostic_facts_segment=tuple(
-            fact
-            for fact in (
-                diagnostic_fact_from_json(item) for item in diagnostic_segment
-            )
-            if fact is not None
-        ),
-        latest_record_id=optional_str(payload.get("latest_record_id")),
-        latest_event_timestamp=optional_str(payload.get("latest_event_timestamp")),
+    return payload
+
+
+def _call_origin_segment_from_json(
+    payload: dict[str, Any],
+) -> tuple[CallOriginFlags, ...]:
+    return tuple(
+        _call_origin_flags_from_json(item)
+        for item in _json_list(payload.get("call_origin_segment"))
     )
+
+
+def _diagnostic_facts_segment_from_json(
+    payload: dict[str, Any],
+) -> tuple[DiagnosticFact, ...]:
+    return tuple(
+        fact
+        for fact in (
+            diagnostic_fact_from_json(item)
+            for item in _json_list(payload.get("diagnostic_facts_segment"))
+        )
+        if fact is not None
+    )
+
+
+def _json_list(value: object) -> list[object]:
+    return value if isinstance(value, list) else []
 
 
 def parser_state_to_json(state: ParserState) -> str:

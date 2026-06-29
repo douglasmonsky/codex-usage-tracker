@@ -6839,3 +6839,47 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue C(11) ratchet. Candidate targets: `parser_state.py::parser_state_from_json`, `diagnostic_snapshot_source_scan.py::record_function_call`, or usage-drain report/diagnostic functions.
+
+### `refactor/parser-state-json-decoder`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `parser_state_from_json` complexity while preserving invalid-payload rejection, aggregate-only diagnostic fact decoding, and call-origin segment decoding.
+- Add direct parser-state round-trip and invalid payload tests.
+
+Files touched:
+- `src/codex_usage_tracker/parser_state.py`
+- `tests/test_parser_state.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split parser-state JSON payload loading/version validation, JSON list normalization, call-origin segment decoding, and diagnostic fact segment decoding behind focused helpers.
+- Added tests documenting invalid raw values and the aggregate-only diagnostic fact round-trip where `record_id` is intentionally dropped.
+
+Metrics:
+- `parser_state_from_json`: C(11) -> A(2).
+- `parser_state.py` maximum complexity: A(5); no C-grade functions remain in the module.
+- `parser_state.py`: 160 -> 181 physical lines.
+- New `tests/test_parser_state.py`: 54 physical lines.
+- Global C-or-worse blocks: 15 -> 14.
+- No C(12+) or D/E/F complexity blocks remain.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_parser_state.py -q`: 2 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/parser_state.py tests/test_parser_state.py`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/parser_state.py -a -s`: target now A(2), module max A(5).
+- `.venv/bin/python -m pytest -q`: 500 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+
+Remaining risks / next handoff:
+- Continue C(11) ratchet. Candidate targets: `diagnostic_snapshot_source_scan.py::record_function_call`, `usage_drain_predictive.py::capacity_residual_diagnostics`, or report rendering helpers.
