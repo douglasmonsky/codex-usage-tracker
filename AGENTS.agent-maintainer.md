@@ -41,9 +41,20 @@ configuration first, then regenerate it.
 - Source-without-test-change errors in profiles: `<none>`
 - Source-only changes without test-file changes: `blocked`
 
+## Architecture Policy Changes
+
+- `tach.toml`, `tach.domain.toml`, and architecture boundary
+ configuration are policy files.
+- If a policy file changes, add or update a decision note under
+ `docs/architecture/decisions/`.
+- The note must explain why the policy change is intentional and why
+ it is not architecture drift.
+- Prefer refactoring code to preserve an existing boundary before
+ changing the boundary.
+
 ## Verification Flow
 
-- Trusted Codex hooks normally run fast checks after edits and the precommit profile
+- Trusted agent hooks normally run fast checks after edits and the precommit profile
   before completion.
 - Run the precommit profile manually when hooks are unavailable, after bypassing hooks,
   or when reproducing a hook failure:
@@ -61,6 +72,7 @@ configuration first, then regenerate it.
 - File length baseline: `.agent-maintainer/file-length-baseline.json`
 - Change budget warnings: `300` lines or `8` files
 - Change budget blocks: `800` lines or `20` files
+- Cohesive-change override: `disabled`; allowlist `<none>`; max `2000` lines / `40` files
 - New suppression budget: `3`
 - Ruff McCabe complexity: `10`
 - Xenon complexity: absolute `B`, modules `A`, average `A`

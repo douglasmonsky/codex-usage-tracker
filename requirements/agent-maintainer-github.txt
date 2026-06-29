@@ -1,0 +1,6 @@
+# Local maintainability refactor tooling.
+#
+# PyPI can lag the Agent Maintainer repository. Install this after
+# `python -m pip install -e ".[dev]"` when this branch needs the newest
+# Agent Maintainer behavior.
+agent-maintainer[core] @ git+https://github.com/douglasmonsky/agent-maintainer.git@main
