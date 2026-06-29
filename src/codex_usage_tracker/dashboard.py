@@ -76,33 +76,26 @@ def dashboard_payload(
 
     privacy_mode = validate_privacy_mode(privacy_mode)
     normalized_offset = _normalize_offset(offset)
-    rows = (
-        annotate_thread_attachments(
-            [
-                ensure_call_origin(row)
-                for row in query_dashboard_events(
-                    db_path=db_path,
-                    limit=limit,
-                    offset=normalized_offset,
-                    since=since,
-                    include_archived=include_archived,
-                )
-            ]
-        )
-        if include_rows
-        else []
+    rows = _dashboard_source_rows(
+        db_path=db_path,
+        limit=limit,
+        offset=normalized_offset,
+        since=since,
+        include_archived=include_archived,
+        include_rows=include_rows,
     )
     pricing = load_pricing_config(pricing_path)
     allowance = load_allowance_config(allowance_path, rate_card_path=rate_card_path)
     thresholds = load_threshold_config(thresholds_path)
     projects = load_project_config(projects_path)
-    annotated_rows = annotate_rows_with_allowance(
-        annotate_rows_with_efficiency(rows, pricing),
-        allowance,
+    annotated_rows = _annotated_dashboard_rows(
+        rows,
+        pricing=pricing,
+        allowance=allowance,
+        thresholds=thresholds,
+        projects=projects,
+        privacy_mode=privacy_mode,
     )
-    annotated_rows = annotate_rows_with_recommendations(annotated_rows, thresholds)
-    annotated_rows = annotate_rows_with_project_identity(annotated_rows, projects)
-    annotated_rows = apply_project_privacy_to_rows(annotated_rows, privacy_mode=privacy_mode)
     token_summary = _dashboard_summary(
         db_path=db_path,
         since=since,
@@ -119,27 +112,14 @@ def dashboard_payload(
         include_archived=include_archived,
     )
     normalized_limit = _normalize_limit(limit)
-    total_available_rows = query_dashboard_event_count(
+    row_counts = _dashboard_available_row_counts(
         db_path=db_path,
         since=since,
         include_archived=include_archived,
     )
-    active_available_rows = query_dashboard_event_count(
-        db_path=db_path,
-        since=since,
-        include_archived=False,
-    )
-    all_history_available_rows = query_dashboard_event_count(
-        db_path=db_path,
-        since=since,
-        include_archived=True,
-    )
     metadata = refresh_metadata(db_path)
-    parser_diagnostics = {
-        key.removeprefix("parser_"): _safe_int(value)
-        for key, value in metadata.items()
-        if key.startswith("parser_") and _safe_int(value)
-    }
+    parser_diagnostics = _parser_diagnostics_payload(metadata)
+    row_count = len(annotated_rows)
     return {
         **dashboard_i18n_payload(language),
         "rows": annotated_rows,
@@ -155,26 +135,16 @@ def dashboard_payload(
         "observed_usage": observed_usage,
         "rate_card_configured": allowance_summary["rate_card_loaded"],
         "rate_card_error": allowance_summary["rate_card_error"],
-        "loaded_row_count": len(rows),
-        "total_available_rows": total_available_rows,
-        "active_available_rows": active_available_rows,
-        "all_history_available_rows": all_history_available_rows,
-        "archived_available_rows": max(all_history_available_rows - active_available_rows, 0),
+        "loaded_row_count": row_count,
+        **row_counts,
         "include_archived": include_archived,
         "history_scope": "all-history" if include_archived else "active",
-        "limit": normalized_limit,
-        "offset": normalized_offset,
-        "has_more": (
-            normalized_limit is not None
-            and normalized_offset + len(rows) < total_available_rows
+        **_dashboard_pagination_payload(
+            limit=normalized_limit,
+            offset=normalized_offset,
+            row_count=row_count,
+            total_available_rows=int(row_counts["total_available_rows"]),
         ),
-        "next_offset": (
-            normalized_offset + len(rows)
-            if normalized_limit is not None
-            and normalized_offset + len(rows) < total_available_rows
-            else None
-        ),
-        "limit_label": "All" if normalized_limit is None else str(normalized_limit),
         "parser_diagnostics": parser_diagnostics,
         "parser_adapter": metadata.get("parser_adapter"),
         "latest_refresh_at": metadata.get("latest_refresh_at"),
@@ -195,6 +165,95 @@ def dashboard_payload(
         "project_config_error": projects.error,
         "privacy_mode": privacy_mode,
         "project_metadata_privacy": project_privacy_metadata(privacy_mode),
+    }
+
+
+def _dashboard_source_rows(
+    *,
+    db_path: Path,
+    limit: int | None,
+    offset: int,
+    since: str | None,
+    include_archived: bool,
+    include_rows: bool,
+) -> list[dict[str, Any]]:
+    if not include_rows:
+        return []
+    rows = [
+        ensure_call_origin(row)
+        for row in query_dashboard_events(
+            db_path=db_path,
+            limit=limit,
+            offset=offset,
+            since=since,
+            include_archived=include_archived,
+        )
+    ]
+    return annotate_thread_attachments(rows)
+
+
+def _annotated_dashboard_rows(
+    rows: list[dict[str, Any]],
+    *,
+    pricing: Any,
+    allowance: Any,
+    thresholds: Any,
+    projects: Any,
+    privacy_mode: str,
+) -> list[dict[str, Any]]:
+    annotated_rows = annotate_rows_with_allowance(
+        annotate_rows_with_efficiency(rows, pricing),
+        allowance,
+    )
+    annotated_rows = annotate_rows_with_recommendations(annotated_rows, thresholds)
+    annotated_rows = annotate_rows_with_project_identity(annotated_rows, projects)
+    return apply_project_privacy_to_rows(annotated_rows, privacy_mode=privacy_mode)
+
+
+def _dashboard_available_row_counts(
+    *, db_path: Path, since: str | None, include_archived: bool
+) -> dict[str, int]:
+    total_available_rows = query_dashboard_event_count(
+        db_path=db_path,
+        since=since,
+        include_archived=include_archived,
+    )
+    active_available_rows = query_dashboard_event_count(
+        db_path=db_path,
+        since=since,
+        include_archived=False,
+    )
+    all_history_available_rows = query_dashboard_event_count(
+        db_path=db_path,
+        since=since,
+        include_archived=True,
+    )
+    return {
+        "total_available_rows": total_available_rows,
+        "active_available_rows": active_available_rows,
+        "all_history_available_rows": all_history_available_rows,
+        "archived_available_rows": max(all_history_available_rows - active_available_rows, 0),
+    }
+
+
+def _dashboard_pagination_payload(
+    *, limit: int | None, offset: int, row_count: int, total_available_rows: int
+) -> dict[str, object]:
+    has_more = limit is not None and offset + row_count < total_available_rows
+    return {
+        "limit": limit,
+        "offset": offset,
+        "has_more": has_more,
+        "next_offset": offset + row_count if has_more else None,
+        "limit_label": "All" if limit is None else str(limit),
+    }
+
+
+def _parser_diagnostics_payload(metadata: dict[str, str]) -> dict[str, int]:
+    return {
+        key.removeprefix("parser_"): _safe_int(value)
+        for key, value in metadata.items()
+        if key.startswith("parser_") and _safe_int(value)
     }
 
 

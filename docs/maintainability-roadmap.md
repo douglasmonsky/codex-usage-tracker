@@ -5461,3 +5461,52 @@ Checks:
 Remaining risks / next handoff:
 - `dashboard.py::dashboard_payload` is now the only C(16) block.
 - `usage_drain_boundary_delta_summary.py::_boundary_delta_top_error_groups`, `usage_drain_allowance_fits.py::allowance_online_capacity_credit_to_delta_fit`, `threads.py::_resolve_thread_attachment`, `diagnostic_reports.py::_action_hint`, and `call_origin.py::event_flags_from_envelope` remain C(15).
+
+### `refactor/dashboard-payload-orchestration`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `dashboard_payload` orchestration complexity without changing the static dashboard/API payload contract.
+- Keep dashboard row loading, annotation, pagination, parser diagnostics, and cache-key behavior stable.
+
+Files touched:
+- `src/codex_usage_tracker/dashboard.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Extracted dashboard source row loading into `_dashboard_source_rows`.
+- Extracted pricing/allowance/recommendation/project/privacy row annotation into `_annotated_dashboard_rows`.
+- Extracted dashboard availability counts into `_dashboard_available_row_counts`.
+- Extracted limit/offset/next-page fields into `_dashboard_pagination_payload`.
+- Extracted parser metadata filtering into `_parser_diagnostics_payload`.
+- Preserved returned payload keys and dashboard-focused tests.
+
+Metrics:
+- `dashboard_payload`: C(16) -> B(7).
+- `dashboard.py` average complexity: A(4.63).
+- Global C-or-worse blocks: 45 -> 44.
+- Highest remaining complexity is now C(15).
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/dashboard.py tests/test_dashboard_payload.py tests/test_dashboard_server.py`: passed.
+- `.venv/bin/python -m pytest tests/test_dashboard_payload.py tests/test_dashboard_server.py tests/test_dashboard_live.py tests/test_server_dashboard_shell.py -q`: 24 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/dashboard.py tests/test_dashboard_payload.py tests/test_dashboard_server.py tests/test_dashboard_live.py tests/test_server_dashboard_shell.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/dashboard.py -a -s`: passed, target now B-rated.
+- `.venv/bin/python -m pytest -q`: 453 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Next C(15) targets are `usage_drain_boundary_delta_summary.py::_boundary_delta_top_error_groups`, `usage_drain_allowance_fits.py::allowance_online_capacity_credit_to_delta_fit`, `threads.py::_resolve_thread_attachment`, `diagnostic_reports.py::_action_hint`, and `call_origin.py::event_flags_from_envelope`.
+- `dashboard.py::_pricing_snapshot_warning` remains C(11) and can be addressed later after higher-ranked blocks.
