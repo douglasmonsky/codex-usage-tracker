@@ -6274,3 +6274,54 @@ Checks so far:
 
 Remaining risks / next handoff:
 - Next complexity targets are broader and should stay separate slices.
+
+### `refactor/one-percent-capacity-modeling`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `_one_percent_capacity_modeling` complexity while preserving the one-percent capacity report schema and model-selection behavior.
+- Add explicit characterization coverage for the low-data report shape before refactoring.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_model.py`
+- `tests/test_usage_drain_model.py`
+- `tests/test_usage_drain_one_percent_capacity.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split one-percent capacity report assembly into focused helpers for low-data output, row preparation, model fitting, model annotation, causal-model filtering, and notes.
+- Kept helpers in `usage_drain_model.py` to avoid a circular dependency around `UsageDeltaSpan` and existing private fitting helpers.
+- Moved the one-percent capacity characterization tests into a focused file so the already-large model test file gets smaller rather than larger.
+- Preserved the existing report fields: `target`, `target_description`, `span_count`, `target_distribution`, `splits`, best model names, token component regression, feature-family attribution, models, and notes.
+
+Metrics:
+- `_one_percent_capacity_modeling`: C(13) -> A(5).
+- `usage_drain_model.py` maximum complexity: B(8).
+- `usage_drain_model.py`: 446 -> 497 physical lines.
+- `tests/test_usage_drain_model.py`: 918 -> 823 physical lines.
+- New `tests/test_usage_drain_one_percent_capacity.py`: 137 physical lines.
+- Global C-or-worse blocks: 27 -> 26.
+- No D/E/F complexity blocks remain.
+- Remaining C(13) target: `context.py::load_call_context`.
+
+Checks so far:
+- `.venv/bin/python -m pytest tests/test_usage_drain_model.py tests/test_usage_drain_one_percent_capacity.py -q`: 16 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_one_percent_capacity.py tests/test_usage_drain_model.py tests/test_usage_drain_reports.py tests/test_usage_drain_allowance_fits.py tests/test_usage_drain_regression.py -q`: 27 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_model.py tests/test_usage_drain_model.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_model.py -a -s`: target now A(5), module max B(8).
+- `.venv/bin/python -m pytest -q`: 486 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Next likely branch is `context.py::load_call_context`; treat it carefully because it touches raw-context privacy behavior.

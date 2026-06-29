@@ -269,44 +269,85 @@ def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any
     ]
     rows = [_one_percent_capacity_row(span) for span in one_percent_spans]
     if len(rows) < 10:
-        return {
-            "target": "standard_usage_credits",
-            "target_description": (
-                "Aggregate standard usage credits inside exact 1% visible-counter spans."
-            ),
-            "span_count": len(rows),
-            "splits": ["time_ordered_80_20", "interleaved_every_5th"],
-            "best_by_holdout_mae": None,
-            "best_causal_by_holdout_mae": None,
-            "token_component_regression": token_components.one_percent_capacity_component_regression(
-                one_percent_spans
-            ),
-            "models": [],
-        }
+        return _empty_one_percent_capacity_modeling(one_percent_spans, rows)
+
+    _prepare_one_percent_capacity_rows(rows)
+    models = _fit_one_percent_capacity_models(rows)
+    return _one_percent_capacity_modeling_report(one_percent_spans, rows, models)
+
+
+def _empty_one_percent_capacity_modeling(
+    one_percent_spans: list[UsageDeltaSpan], rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    return {
+        "target": "standard_usage_credits",
+        "target_description": (
+            "Aggregate standard usage credits inside exact 1% visible-counter spans."
+        ),
+        "span_count": len(rows),
+        "splits": ["time_ordered_80_20", "interleaved_every_5th"],
+        "best_by_holdout_mae": None,
+        "best_causal_by_holdout_mae": None,
+        "token_component_regression": token_components.one_percent_capacity_component_regression(
+            one_percent_spans
+        ),
+        "models": [],
+    }
+
+
+def _prepare_one_percent_capacity_rows(rows: list[dict[str, Any]]) -> None:
     _add_days_since_first_span(rows)
     _add_capacity_history_features(rows)
+
+
+def _fit_one_percent_capacity_models(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     models: list[dict[str, Any]] = []
     for split_name, train_rows, holdout_rows in _split_feature_rows(
         rows, train_fraction=0.8
     ):
         models.extend(_fit_capacity_baseline_models(train_rows, holdout_rows, split_name))
-        for spec, kind in _capacity_model_specs():
-            fitted = _fit_predictive_model(
-                train_rows,
-                holdout_rows,
-                spec,
-                include_capacity_residual_diagnostics=True,
+        models.extend(
+            _fit_one_percent_capacity_predictive_models(
+                train_rows, holdout_rows, split_name
             )
-            if fitted is None:
-                continue
-            fitted["validation"] = split_name
-            fitted["kind"] = kind
-            fitted["name"] = f"{spec.name}__{split_name}"
+        )
+    return models
+
+
+def _fit_one_percent_capacity_predictive_models(
+    train_rows: list[dict[str, Any]],
+    holdout_rows: list[dict[str, Any]],
+    split_name: str,
+) -> list[dict[str, Any]]:
+    models: list[dict[str, Any]] = []
+    for spec, kind in _capacity_model_specs():
+        fitted = _fit_predictive_model(
+            train_rows,
+            holdout_rows,
+            spec,
+            include_capacity_residual_diagnostics=True,
+        )
+        if fitted is not None:
+            _annotate_one_percent_capacity_model(fitted, spec.name, split_name, kind)
             models.append(fitted)
+    return models
+
+
+def _annotate_one_percent_capacity_model(
+    fitted: dict[str, Any], spec_name: str, split_name: str, kind: str
+) -> None:
+    fitted["validation"] = split_name
+    fitted["kind"] = kind
+    fitted["name"] = f"{spec_name}__{split_name}"
+
+
+def _one_percent_capacity_modeling_report(
+    one_percent_spans: list[UsageDeltaSpan],
+    rows: list[dict[str, Any]],
+    models: list[dict[str, Any]],
+) -> dict[str, Any]:
     best_model = _best_holdout_model(models)
-    best_causal = _best_holdout_model(
-        [model for model in models if model.get("kind") != "explanatory_same_span"]
-    )
+    best_causal = _best_holdout_model(_causal_one_percent_capacity_models(models))
     return {
         "target": "standard_usage_credits",
         "target_description": (
@@ -326,11 +367,21 @@ def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any
             models, _capacity_family_sequences()
         ),
         "models": models,
-        "notes": [
-            "Causal/history models use prior closed spans plus start-time context.",
-            "Explanatory same-span models use work observed inside the span and should not be treated as advance predictions.",
-        ],
+        "notes": _one_percent_capacity_modeling_notes(),
     }
+
+
+def _causal_one_percent_capacity_models(
+    models: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [model for model in models if model.get("kind") != "explanatory_same_span"]
+
+
+def _one_percent_capacity_modeling_notes() -> list[str]:
+    return [
+        "Causal/history models use prior closed spans plus start-time context.",
+        "Explanatory same-span models use work observed inside span should not treated advance predictions.",
+    ]
 
 
 def _one_percent_capacity_row(span: UsageDeltaSpan) -> dict[str, Any]:
