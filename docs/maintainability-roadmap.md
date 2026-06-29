@@ -5751,3 +5751,51 @@ Checks:
 Remaining risks / next handoff:
 - `_build_parent_candidates` remains B(10), below the current C hotspot threshold.
 - Next branch should target one of the C(14) hotspots, preferably `usage_drain_regression.py::fit_linear_coefficients` if we want to keep reducing modeling core risk.
+
+### `refactor/usage-drain-regression-fit-linear`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `fit_linear_coefficients` complexity while preserving existing ordinary least-squares and tiny ridge fallback behavior.
+- Add focused regression-helper characterization tests because this module previously relied mostly on higher-level usage-drain tests.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_regression.py`
+- `tests/test_usage_drain_regression.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added characterization tests for intercept fit, no-intercept fit, singular-design ridge fallback, and unsolved zero-coefficient fallback.
+- Extracted normal-equation construction, row accumulation, and fallback regularization into named helpers.
+- Preserved `fit_linear_coefficients` and `predict_linear` public call behavior.
+
+Metrics:
+- `fit_linear_coefficients`: C(14) -> A(5).
+- `usage_drain_regression.py`: 344 -> 367 physical lines.
+- `usage_drain_regression.py` average complexity: B(5.91).
+- Global C-or-worse blocks: 39 -> 38.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets: `usage_drain_boundary_delta_summary.py::_boundary_delta_prediction_scope` and `store_dashboard_queries.py::observed_usage_reconciliation` at C(14).
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_regression.py -q`: 4 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_regression.py tests/test_usage_drain_model.py tests/test_usage_drain_allowance_fits.py -q`: 21 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_regression.py -a -s`: target now A(5).
+- `.venv/bin/python -m pytest -q`: 472 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning after staging.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `prepare_design` remains C(12) in the regression module, below the current top hotspot threshold.
+- Next branch should target either `usage_drain_boundary_delta_summary.py::_boundary_delta_prediction_scope` or `store_dashboard_queries.py::observed_usage_reconciliation`.

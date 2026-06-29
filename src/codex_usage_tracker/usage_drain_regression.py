@@ -122,26 +122,49 @@ def fit_linear_coefficients(
     *,
     intercept: bool,
 ) -> list[float]:
-    """Fit ordinary least-squares coefficients with a tiny ridge fallback."""
+    """Fit ordinary least-squares coefficients with tiny ridge fallback."""
 
+    width = len(x_rows[0]) + (1 if intercept else 0)
+    lhs, rhs = _linear_normal_equations(x_rows, y_values, intercept=intercept)
+    coefficients = solve_linear_system(lhs, rhs)
+    if coefficients is not None:
+        return coefficients
+
+    _regularize_linear_equations(lhs, intercept=intercept)
+    coefficients = solve_linear_system(lhs, rhs)
+    return coefficients if coefficients is not None else [0.0 for _index in range(width)]
+
+
+def _linear_normal_equations(
+    x_rows: list[list[float]],
+    y_values: list[float],
+    *,
+    intercept: bool,
+) -> tuple[list[list[float]], list[float]]:
     width = len(x_rows[0]) + (1 if intercept else 0)
     lhs = [[0.0 for _ in range(width)] for _ in range(width)]
     rhs = [0.0 for _ in range(width)]
     for row, y_value in zip(x_rows, y_values, strict=True):
         expanded = ([1.0] if intercept else []) + row
-        for i, x_i in enumerate(expanded):
-            rhs[i] += x_i * y_value
-            for j, x_j in enumerate(expanded):
-                lhs[i][j] += x_i * x_j
-    coefficients = solve_linear_system(lhs, rhs)
-    if coefficients is not None:
-        return coefficients
-    for index in range(1 if intercept else 0, width):
+        _add_normal_equation_row(lhs, rhs, expanded, y_value)
+    return lhs, rhs
+
+
+def _add_normal_equation_row(
+    lhs: list[list[float]],
+    rhs: list[float],
+    expanded: list[float],
+    y_value: float,
+) -> None:
+    for i, x_i in enumerate(expanded):
+        rhs[i] += x_i * y_value
+        for j, x_j in enumerate(expanded):
+            lhs[i][j] += x_i * x_j
+
+
+def _regularize_linear_equations(lhs: list[list[float]], *, intercept: bool) -> None:
+    for index in range(1 if intercept else 0, len(lhs)):
         lhs[index][index] += 1e-9
-    coefficients = solve_linear_system(lhs, rhs)
-    if coefficients is None:
-        return [0.0 for _index in range(width)]
-    return coefficients
 
 
 def predict_linear(
