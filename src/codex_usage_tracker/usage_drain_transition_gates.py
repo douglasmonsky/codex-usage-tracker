@@ -101,18 +101,43 @@ def update_transition_delta_gate_threshold_sums(
 def transition_delta_gate_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
-    details = [
-        (row.get("prediction_details") or {}).get(model_name) or {}
-        for row in rows
-    ]
+    details = _transition_delta_gate_details(rows, model_name)
     if not details:
-        return {
-            "n": 0,
-            "override_share": None,
-            "mean_risk": None,
-            "mean_threshold": None,
-            "source_counts": [],
-        }
+        return _empty_transition_delta_gate_diagnostics()
+
+    summary = _transition_delta_gate_detail_summary(details)
+    return {
+        "n": len(details),
+        "override_share": _override_share(summary["source_counts"], len(details)),
+        "mean_risk": _mean_or_none(summary["risks"]),
+        "mean_threshold": _mean_or_none(summary["thresholds"]),
+        "source_counts": _transition_delta_gate_source_rows(
+            summary["source_counts"], detail_count=len(details)
+        ),
+    }
+
+
+def _transition_delta_gate_details(
+    rows: list[dict[str, Any]], model_name: str
+) -> list[dict[str, Any]]:
+    return [
+        (row.get("prediction_details") or {}).get(model_name) or {} for row in rows
+    ]
+
+
+def _empty_transition_delta_gate_diagnostics() -> dict[str, Any]:
+    return {
+        "n": 0,
+        "override_share": None,
+        "mean_risk": None,
+        "mean_threshold": None,
+        "source_counts": [],
+    }
+
+
+def _transition_delta_gate_detail_summary(
+    details: list[dict[str, Any]],
+) -> dict[str, Any]:
     source_counts: dict[str, int] = {}
     risks: list[float] = []
     thresholds: list[float] = []
@@ -122,26 +147,38 @@ def transition_delta_gate_diagnostics(
         risks.append(number(detail.get("risk")))
         if detail.get("risk_threshold") is not None:
             thresholds.append(number(detail.get("risk_threshold")))
+    return {
+        "source_counts": source_counts,
+        "risks": risks,
+        "thresholds": thresholds,
+    }
+
+
+def _override_share(source_counts: dict[str, int], detail_count: int) -> float | None:
     override_count = sum(
         count
         for source, count in source_counts.items()
         if source.endswith("_history_state_mode")
     )
-    return {
-        "n": len(details),
-        "override_share": rounded(override_count / len(details)),
-        "mean_risk": rounded(sum(risks) / len(risks) if risks else None),
-        "mean_threshold": rounded(
-            sum(thresholds) / len(thresholds) if thresholds else None
-        ),
-        "source_counts": [
-            {
-                "source": source,
-                "count": count,
-                "share": rounded(count / len(details)),
-            }
-            for source, count in sorted(
-                source_counts.items(), key=lambda item: (-item[1], item[0])
-            )
-        ],
-    }
+    return rounded(override_count / detail_count)
+
+
+def _mean_or_none(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return rounded(sum(values) / len(values))
+
+
+def _transition_delta_gate_source_rows(
+    source_counts: dict[str, int], *, detail_count: int
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "source": source,
+            "count": count,
+            "share": rounded(count / detail_count),
+        }
+        for source, count in sorted(
+            source_counts.items(), key=lambda item: (-item[1], item[0])
+        )
+    ]

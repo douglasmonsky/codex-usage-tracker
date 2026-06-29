@@ -6132,3 +6132,50 @@ Checks:
 Remaining risks / next handoff:
 - Remaining C(13) hotspots are now concentrated in usage-drain capacity modeling, context loading, JSON contract validation, transition gate diagnostics, and regime streak summaries.
 - Pick the next branch based on which of those has the narrowest characterization surface.
+
+### `refactor/transition-delta-gate-diagnostics`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `transition_delta_gate_diagnostics` complexity while preserving transition gate diagnostic payloads.
+- Add direct characterization coverage for empty rows and mixed source/risk/threshold summaries.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_transition_gates.py`
+- `tests/test_usage_drain_transition_gates.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split transition gate diagnostics into helpers for detail extraction, empty payloads, source/risk/threshold accumulation, override share, nullable means, and source rows.
+- Preserved source sorting, missing-detail behavior, mean risk/threshold behavior, and override-source suffix detection.
+
+Metrics:
+- `transition_delta_gate_diagnostics`: C(13) -> A(2).
+- `usage_drain_transition_gates.py` average complexity: A(2.8).
+- `usage_drain_transition_gates.py`: 147 -> 184 physical lines.
+- Global C-or-worse blocks: 31 -> 30.
+- No D/E/F complexity blocks remain.
+- Remaining top C targets are C(13), led by `usage_drain_model.py::_one_percent_capacity_modeling`, `context.py::load_call_context`, `json_contracts.py::validate_json_payload_contract`, and `usage_drain_regime_segments.py::regime_streak_summary`.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_transition_gates.py -q`: 2 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_transition_gates.py tests/test_usage_drain_transition_metrics.py tests/test_usage_drain_walk_forward.py tests/test_usage_drain_model.py -q`: 21 passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_transition_gates.py -a -s`: target now A(2).
+- `.venv/bin/python -m pytest -q`: 484 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, with only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Remaining C(13) targets now include `_one_percent_capacity_modeling`, `load_call_context`, `validate_json_payload_contract`, and `regime_streak_summary`.
+- Choose the next branch based on strongest existing coverage or smallest synthetic fixture cost.
