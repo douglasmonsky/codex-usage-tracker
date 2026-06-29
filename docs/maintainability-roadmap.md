@@ -7105,3 +7105,47 @@ Checks:
 
 Remaining risks / next handoff:
 - Continue C(11) ratchet. Candidate targets: `parser.py::inspect_log`, `store_schema.py::init_db`, `usage_drain_predictive.py::capacity_residual_diagnostics`, or usage-drain report helpers.
+
+### `refactor/store-schema-init-db`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached; ready for local commit.
+
+Objective:
+- Reduce `store_schema.py::init_db` below the C-grade complexity threshold without changing migration order, repair behavior, or schema version semantics.
+- Add direct coverage for fresh-database migration history.
+
+Files touched:
+- `src/codex_usage_tracker/store_schema.py`
+- `tests/test_store_migrations.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added focused coverage proving a fresh database records all schema migrations and sets `PRAGMA user_version` to the current schema version.
+- Replaced the repeated migration branch chain with a data-driven migration list and a single migration application helper.
+- Preserved the existing behavior that migrations run idempotently for both old and current `user_version` values while recording missing migration metadata.
+
+Metrics:
+- `init_db`: C(11) -> A(2).
+- `store_schema.py` maximum complexity: B(6); no C-grade functions remain in module.
+- Global C-or-worse blocks: 9 -> 8.
+- No C(12+) or D/E/F complexity blocks remain.
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_store_migrations.py -q`: 6 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/store_schema.py tests/test_store_migrations.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/store_schema.py -a -s`: target now A(2), module max B(6).
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m pytest -q`: 520 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+
+Remaining risks / next handoff:
+- Continue C(11) ratchet. Remaining targets are mostly usage-drain diagnostics/report helpers plus `parser.py::inspect_log`.

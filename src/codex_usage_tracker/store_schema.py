@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from codex_usage_tracker.schema import (
@@ -49,68 +50,44 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
     _ensure_migrations_table(conn)
-    if user_version < 1:
-        _migrate_v1(conn)
-        _record_migration(conn, 1)
-    else:
-        _migrate_v1(conn)
-        _record_migration_if_missing(conn, 1)
-    if user_version < 2:
-        _migrate_v2(conn)
-        _record_migration(conn, 2)
-    else:
-        _migrate_v2(conn)
-        _record_migration_if_missing(conn, 2)
-    if user_version < 3:
-        _migrate_v3(conn)
-        _record_migration(conn, 3)
-    else:
-        _migrate_v3(conn)
-        _record_migration_if_missing(conn, 3)
-    if user_version < 4:
-        _migrate_v4(conn)
-        _record_migration(conn, 4)
-    else:
-        _migrate_v4(conn)
-        _record_migration_if_missing(conn, 4)
-    if user_version < 5:
-        _migrate_v5(conn)
-        _record_migration(conn, 5)
-    else:
-        _migrate_v5(conn)
-        _record_migration_if_missing(conn, 5)
-    if user_version < 6:
-        _migrate_v6(conn)
-        _record_migration(conn, 6)
-    else:
-        _migrate_v6(conn)
-        _record_migration_if_missing(conn, 6)
-    if user_version < 7:
-        _migrate_v7(conn)
-        _record_migration(conn, 7)
-    else:
-        _migrate_v7(conn)
-        _record_migration_if_missing(conn, 7)
-    if user_version < 8:
-        _migrate_v8(conn)
-        _record_migration(conn, 8)
-    else:
-        _migrate_v8(conn)
-        _record_migration_if_missing(conn, 8)
-    if user_version < 9:
-        _migrate_v9(conn)
-        _record_migration(conn, 9)
-    else:
-        _migrate_v9(conn)
-        _record_migration_if_missing(conn, 9)
-    if user_version < 10:
-        _migrate_v10(conn)
-        _record_migration(conn, 10)
-    else:
-        _migrate_v10(conn)
-        _record_migration_if_missing(conn, 10)
+    for version, migrate in _schema_migrations():
+        _apply_schema_migration(
+            conn,
+            user_version=user_version,
+            version=version,
+            migrate=migrate,
+        )
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None]], ...]:
+    return (
+        (1, _migrate_v1),
+        (2, _migrate_v2),
+        (3, _migrate_v3),
+        (4, _migrate_v4),
+        (5, _migrate_v5),
+        (6, _migrate_v6),
+        (7, _migrate_v7),
+        (8, _migrate_v8),
+        (9, _migrate_v9),
+        (10, _migrate_v10),
+    )
+
+
+def _apply_schema_migration(
+    conn: sqlite3.Connection,
+    *,
+    user_version: int,
+    version: int,
+    migrate: Callable[[sqlite3.Connection], None],
+) -> None:
+    migrate(conn)
+    if user_version < version:
+        _record_migration(conn, version)
+        return
+    _record_migration_if_missing(conn, version)
 
 
 def _ensure_migrations_table(conn: sqlite3.Connection) -> None:

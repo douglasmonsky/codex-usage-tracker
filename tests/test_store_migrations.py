@@ -96,6 +96,23 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert metadata["skipped_source_files"] == "1"
 
 
+def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        versions = [
+            row[0]
+            for row in conn.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
+        user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    assert versions == list(range(1, 11))
+    assert user_version == 10
+
+
 def test_csv_export_keeps_current_columns_after_legacy_migration(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     csv_path = tmp_path / "usage.csv"
