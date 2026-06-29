@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import webbrowser
 from typing import Any
 
 from codex_usage_tracker.allowance import (
@@ -21,17 +20,20 @@ from codex_usage_tracker.api_payloads import (
     refresh_result_payload,
     session_payload,
 )
+from codex_usage_tracker.cli_dashboard import (
+    run_dashboard,
+    run_open_dashboard,
+    run_serve_dashboard,
+)
 from codex_usage_tracker.cli_diagnostics import run_diagnostics
 from codex_usage_tracker.cli_output import print_json
 from codex_usage_tracker.cli_parser import build_parser
 from codex_usage_tracker.context import load_call_context
-from codex_usage_tracker.dashboard import generate_dashboard
 from codex_usage_tracker.diagnostics import run_doctor
 from codex_usage_tracker.formatting import (
     format_doctor,
     format_session,
 )
-from codex_usage_tracker.i18n import normalize_language
 from codex_usage_tracker.parser import inspect_log, load_session_index
 from codex_usage_tracker.plugin_installer import install_plugin, uninstall_plugin
 from codex_usage_tracker.pricing import (
@@ -51,7 +53,6 @@ from codex_usage_tracker.reports import (
     build_recommendations_report,
     build_summary_report,
 )
-from codex_usage_tracker.server import serve_dashboard
 from codex_usage_tracker.store import (
     export_usage_csv,
     query_session_usage,
@@ -415,134 +416,6 @@ def _run_context(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_dashboard(args: argparse.Namespace) -> int:
-    output = generate_dashboard(
-        db_path=args.db,
-        output_path=args.output,
-        limit=args.limit,
-        pricing_path=args.pricing,
-        allowance_path=args.allowance,
-        rate_card_path=args.rate_card,
-        since=args.since,
-        thresholds_path=args.thresholds,
-        projects_path=args.projects,
-        privacy_mode=args.privacy_mode,
-        include_archived=args.include_archived,
-        language=normalize_language(args.lang),
-    )
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-dashboard-v1",
-                "dashboard_path": path_payload(output),
-                "file_url": output.resolve().as_uri(),
-                "opened": args.open,
-                "limit": None if args.limit <= 0 else args.limit,
-                "since": args.since,
-                "privacy_mode": args.privacy_mode,
-                "include_archived": args.include_archived,
-                "language": normalize_language(args.lang),
-            }
-        )
-    else:
-        print(f"Wrote dashboard to {output}")
-    if args.open:
-        webbrowser.open(output.resolve().as_uri())
-    return 0
-
-
-def _run_open_dashboard(args: argparse.Namespace) -> int:
-    refresh_payload = None
-    if args.refresh:
-        refresh_payload = refresh_result_payload(
-            refresh_usage_index(
-                codex_home=args.codex_home,
-                db_path=args.db,
-                include_archived=args.include_archived,
-            ),
-            schema="codex-usage-tracker-refresh-v1",
-        )
-    output = generate_dashboard(
-        db_path=args.db,
-        output_path=args.output,
-        limit=args.limit,
-        pricing_path=args.pricing,
-        allowance_path=args.allowance,
-        rate_card_path=args.rate_card,
-        since=args.since,
-        thresholds_path=args.thresholds,
-        projects_path=args.projects,
-        privacy_mode=args.privacy_mode,
-        include_archived=args.include_archived,
-        language=normalize_language(args.lang),
-    )
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-open-dashboard-v1",
-                "dashboard_path": path_payload(output),
-                "file_url": output.resolve().as_uri(),
-                "opened": True,
-                "limit": None if args.limit <= 0 else args.limit,
-                "since": args.since,
-                "refresh": refresh_payload,
-                "privacy_mode": args.privacy_mode,
-                "include_archived": args.include_archived,
-                "language": normalize_language(args.lang),
-            }
-        )
-    else:
-        print(f"Opening dashboard at {output}")
-    webbrowser.open(output.resolve().as_uri())
-    return 0
-
-
-def _run_serve_dashboard(args: argparse.Namespace) -> int:
-    if args.as_json:
-        print_json(
-            {
-                "schema": "codex-usage-tracker-serve-dashboard-v1",
-                "host": args.host,
-                "port": args.port,
-                "dashboard_path": path_payload(args.output),
-                "limit": None if args.limit <= 0 else args.limit,
-                "since": args.since,
-                "context_api": "disabled" if args.no_context_api else args.context_api,
-                "refresh_before_start": args.refresh,
-                "privacy_mode": args.privacy_mode,
-                "include_archived": args.include_archived,
-                "language": normalize_language(args.lang),
-            }
-        )
-    if args.refresh:
-        refresh_usage_index(
-            codex_home=args.codex_home,
-            db_path=args.db,
-            include_archived=args.include_archived,
-        )
-    serve_dashboard(
-        db_path=args.db,
-        output_path=args.output,
-        pricing_path=args.pricing,
-        allowance_path=args.allowance,
-        rate_card_path=args.rate_card,
-        limit=args.limit,
-        since=args.since,
-        host=args.host,
-        port=args.port,
-        context_chars=args.context_chars,
-        open_browser=args.open,
-        codex_home=args.codex_home,
-        include_archived=args.include_archived,
-        context_api="disabled" if args.no_context_api else args.context_api,
-        thresholds_path=args.thresholds,
-        projects_path=args.projects,
-        privacy_mode=args.privacy_mode,
-        language=normalize_language(args.lang),
-    )
-    return 0
-
-
 def _run_expensive(args: argparse.Namespace) -> int:
     report = build_expensive_calls_report(
         db_path=args.db,
@@ -806,9 +679,9 @@ _COMMAND_HANDLERS = {
     "diagnostics": run_diagnostics,
     "session": _run_session,
     "context": _run_context,
-    "dashboard": _run_dashboard,
-    "open-dashboard": _run_open_dashboard,
-    "serve-dashboard": _run_serve_dashboard,
+    "dashboard": run_dashboard,
+    "open-dashboard": run_open_dashboard,
+    "serve-dashboard": run_serve_dashboard,
     "expensive": _run_expensive,
     "pricing-coverage": _run_pricing_coverage,
     "export": _run_export,

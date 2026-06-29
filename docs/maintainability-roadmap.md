@@ -3965,3 +3965,58 @@ Remaining risks:
 
 Next handoff:
 - Continue reducing `cli.py` with another narrow runner extraction or move back to `server.py` once the CLI slices stop being the highest payoff.
+
+### `refactor/cli-dashboard-runner`
+
+Goal:
+- Move dashboard/open-dashboard/serve-dashboard CLI command runners out of oversized `cli.py`.
+- Keep dashboard generation, refresh-before-open, and live server behavior unchanged.
+- Keep the new runner A-rated and explicitly mapped in `tach.toml`.
+
+Files touched:
+- `.agent-maintainer/git-agent-ratchet-max-file-lines.json`
+- `src/codex_usage_tracker/cli.py`
+- `src/codex_usage_tracker/cli_dashboard.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline and metric notes:
+- `cli.py` line count fell from `827` to `700`.
+- Max file-line ratchet fell from `1134` to `1007`.
+- `cli_dashboard.py` is `163` lines.
+- `cli_dashboard.py` average complexity is A `1.89`; command runners are A-rated complexity `3`.
+- `server.py` remains oversized at `823` lines.
+
+Completed edits:
+- Added `cli_dashboard.py` with dashboard, open-dashboard, and serve-dashboard runners.
+- Moved browser-opening, static dashboard generation, live server launch, context API selection, and dashboard JSON payload helpers out of `cli.py`.
+- Updated `_COMMAND_HANDLERS` to point at public dashboard runner functions.
+- Added `cli_dashboard` to the CLI adapter module group in `tach.toml`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_dashboard.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_dashboard.py`: passed.
+- `.venv/bin/python -m pytest tests/test_cli_lifecycle.py::test_report_json_and_query_cli tests/test_cli_release.py::test_cli_reference_documents_only_existing_stable_commands tests/test_dashboard_server.py -q`: 13 passed.
+- `radon cc src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_dashboard.py -a -s`: passed; dashboard runners A-rated.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/cli.py src/codex_usage_tracker/cli_dashboard.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed and ratcheted.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning plus expected change-budget warning because existing tests covered the extraction.
+- `.venv/bin/python -m agent_maintainer doctor --strict`: expected nonzero; same beta `src/agent_maintainer/__main__.py` repo-root false-positive plus optional/local integration warnings.
+
+Remaining risks:
+- `cli.py` is still oversized at `700` lines.
+- `server.py` remains oversized at `823` lines.
+- Overall package still triggers structure-cohesion warnings because the package is intentionally still flat during ratchet setup.
+
+Next handoff:
+- Continue reducing `cli.py`; the setup/plugin/pricing sections are now the biggest remaining CLI chunks.
