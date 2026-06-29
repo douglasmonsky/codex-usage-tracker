@@ -99,38 +99,93 @@ def _usage_where_clause(
     prefix = f"{table_alias}." if table_alias else ""
     clauses: list[str] = []
     params: list[Any] = []
-    if since:
-        clauses.append(f"{prefix}event_timestamp >= ?")
-        params.append(since)
-    if until:
-        clauses.append(f"{prefix}event_timestamp <= ?")
-        params.append(until)
-    if model:
-        clauses.append(f"{prefix}model = ?")
-        params.append(model)
-    if effort:
-        clauses.append(f"{prefix}effort = ?")
-        params.append(effort)
-    if thread:
-        clauses.append(
-            "("
-            f"{prefix}thread_name = ? OR "
-            f"{prefix}parent_thread_name = ? OR "
-            f"{prefix}session_id = ?"
-            ")"
-        )
-        params.extend([thread, thread, thread])
-    if min_tokens is not None:
-        clauses.append(f"{prefix}total_tokens >= ?")
-        params.append(min_tokens)
-    if not include_archived:
-        archived_path_clause = " OR ".join(
-            f"{prefix}source_file LIKE ?" for _pattern in _ARCHIVED_SOURCE_PATTERNS
-        )
-        clauses.append(
-            f"(coalesce({prefix}is_archived, 0) = 0 AND NOT ({archived_path_clause}))"
-        )
-        params.extend(_ARCHIVED_SOURCE_PATTERNS)
+    _extend_basic_usage_filters(
+        clauses,
+        params,
+        prefix=prefix,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+    )
+    _extend_thread_filter(clauses, params, prefix=prefix, thread=thread)
+    _extend_min_tokens_filter(clauses, params, prefix=prefix, min_tokens=min_tokens)
+    _extend_archive_filter(clauses, params, prefix=prefix, include_archived=include_archived)
+    return _where_clause(clauses, params)
+
+
+def _extend_basic_usage_filters(
+    clauses: list[str],
+    params: list[Any],
+    *,
+    prefix: str,
+    since: str | None,
+    until: str | None,
+    model: str | None,
+    effort: str | None,
+) -> None:
+    for value, clause in (
+        (since, f"{prefix}event_timestamp >= ?"),
+        (until, f"{prefix}event_timestamp <= ?"),
+        (model, f"{prefix}model = ?"),
+        (effort, f"{prefix}effort = ?"),
+    ):
+        if value:
+            clauses.append(clause)
+            params.append(value)
+
+
+def _extend_thread_filter(
+    clauses: list[str],
+    params: list[Any],
+    *,
+    prefix: str,
+    thread: str | None,
+) -> None:
+    if not thread:
+        return
+    clauses.append(
+        "("
+        f"{prefix}thread_name = ? OR "
+        f"{prefix}parent_thread_name = ? OR "
+        f"{prefix}session_id = ?"
+        ")"
+    )
+    params.extend([thread, thread, thread])
+
+
+def _extend_min_tokens_filter(
+    clauses: list[str],
+    params: list[Any],
+    *,
+    prefix: str,
+    min_tokens: int | None,
+) -> None:
+    if min_tokens is None:
+        return
+    clauses.append(f"{prefix}total_tokens >= ?")
+    params.append(min_tokens)
+
+
+def _extend_archive_filter(
+    clauses: list[str],
+    params: list[Any],
+    *,
+    prefix: str,
+    include_archived: bool,
+) -> None:
+    if include_archived:
+        return
+    archived_path_clause = " OR ".join(
+        f"{prefix}source_file LIKE ?" for _pattern in _ARCHIVED_SOURCE_PATTERNS
+    )
+    clauses.append(
+        f"(coalesce({prefix}is_archived, 0) = 0 AND NOT ({archived_path_clause}))"
+    )
+    params.extend(_ARCHIVED_SOURCE_PATTERNS)
+
+
+def _where_clause(clauses: list[str], params: list[Any]) -> tuple[str, list[Any]]:
     if not clauses:
         return "", []
     return "WHERE " + " AND ".join(clauses), params
