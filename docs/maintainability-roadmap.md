@@ -6372,3 +6372,50 @@ Checks so far:
 
 Remaining risks / next handoff:
 - Next branch can ratchet C(12) hotspots, starting with either `model_family_attribution` or `state_signature_ambiguity`.
+
+### `refactor/model-family-attribution-summary`
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `model_family_attribution` complexity while preserving feature-family attribution report schema.
+- Add direct characterization coverage for validation-specific sequence rows and metric deltas.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_summary_metrics.py`
+- `tests/test_usage_drain_summary_metrics.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Split model lookup, sequence mapping, validation rows, row formatting, and metric delta/improvement helpers.
+- Preserved validation ordering, missing model skipping, base-name matching, rounded metrics, and returned `metric_notes`/`sequences` shape.
+
+Metrics:
+- `model_family_attribution`: C(12) -> A(1).
+- `usage_drain_summary_metrics.py` maximum complexity: B(8).
+- `usage_drain_summary_metrics.py`: 287 -> 348 physical lines.
+- New `tests/test_usage_drain_summary_metrics.py`: 66 physical lines.
+- Global C-or-worse blocks: 25 -> 24.
+- No C(13) or D/E/F complexity blocks remain.
+- Current top complexity target is `usage_drain_state_diagnostics.py::state_signature_ambiguity` at C(12).
+
+Checks so far:
+- `.venv/bin/python -m pytest tests/test_usage_drain_summary_metrics.py -q`: 1 passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_summary_metrics.py tests/test_usage_drain_one_percent_capacity.py tests/test_usage_drain_model.py -q`: 17 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_summary_metrics.py tests/test_usage_drain_summary_metrics.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_summary_metrics.py -a -s`: target now A(1), module max B(8).
+- `.venv/bin/python -m pytest -q`: 487 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed after staging, only existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- Continue C(12) ratchet with `state_signature_ambiguity` or another isolated pure-report helper before touching store/source-log code.

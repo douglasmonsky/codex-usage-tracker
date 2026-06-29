@@ -100,6 +100,23 @@ def model_family_attribution(
     models: list[dict[str, Any]],
     sequences: dict[str, list[tuple[str, str]]],
 ) -> dict[str, Any]:
+    by_key, validations = _model_family_lookup(models)
+    return {
+        "metric_notes": [
+            "mae_improvement_vs_previous is positive when the later family reduces holdout MAE.",
+            "Sequences are diagnostic comparisons between named model families, not causal proof that one field caused gain.",
+        ],
+        "sequences": _model_family_sequence_results(
+            sequences=sequences,
+            validations=validations,
+            by_key=by_key,
+        ),
+    }
+
+
+def _model_family_lookup(
+    models: list[dict[str, Any]],
+) -> tuple[dict[tuple[str, str], dict[str, Any]], list[str]]:
     by_key: dict[tuple[str, str], dict[str, Any]] = {}
     validations: list[str] = []
     for model in models:
@@ -108,50 +125,94 @@ def model_family_attribution(
             validations.append(validation)
         base_name = model_base_name(model, validation)
         by_key[(validation, base_name)] = model
+    return by_key, validations
 
-    sequence_results: dict[str, dict[str, list[dict[str, Any]]]] = {}
-    for sequence_name, steps in sequences.items():
-        validation_rows: dict[str, list[dict[str, Any]]] = {}
-        for validation in validations:
-            rows: list[dict[str, Any]] = []
-            previous_mae: float | None = None
-            previous_r2: float | None = None
-            for family, base_name in steps:
-                matched_model = by_key.get((validation, base_name))
-                if matched_model is None:
-                    continue
-                mae = holdout_metric(matched_model, "mae")
-                r2 = holdout_metric(matched_model, "r2")
-                rows.append(
-                    {
-                        "family": family,
-                        "model": matched_model.get("name"),
-                        "holdout_mae": rounded(mae),
-                        "holdout_r2": rounded(r2),
-                        "mae_improvement_vs_previous": rounded(
-                            previous_mae - mae
-                            if previous_mae is not None and mae is not None
-                            else None
-                        ),
-                        "r2_delta_vs_previous": rounded(
-                            r2 - previous_r2
-                            if previous_r2 is not None and r2 is not None
-                            else None
-                        ),
-                    }
-                )
-                previous_mae = mae
-                previous_r2 = r2
-            validation_rows[validation] = rows
-        sequence_results[sequence_name] = validation_rows
 
+def _model_family_sequence_results(
+    *,
+    sequences: dict[str, list[tuple[str, str]]],
+    validations: list[str],
+    by_key: dict[tuple[str, str], dict[str, Any]],
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
     return {
-        "metric_notes": [
-            "mae_improvement_vs_previous is positive when the later family reduces holdout MAE.",
-            "Sequences are diagnostic comparisons between named model families, not causal proof that one field caused the gain.",
-        ],
-        "sequences": sequence_results,
+        sequence_name: _model_family_validation_rows(
+            steps=steps,
+            validations=validations,
+            by_key=by_key,
+        )
+        for sequence_name, steps in sequences.items()
     }
+
+
+def _model_family_validation_rows(
+    *,
+    steps: list[tuple[str, str]],
+    validations: list[str],
+    by_key: dict[tuple[str, str], dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    return {
+        validation: _model_family_rows_for_validation(
+            steps=steps,
+            validation=validation,
+            by_key=by_key,
+        )
+        for validation in validations
+    }
+
+
+def _model_family_rows_for_validation(
+    *,
+    steps: list[tuple[str, str]],
+    validation: str,
+    by_key: dict[tuple[str, str], dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    previous_mae: float | None = None
+    previous_r2: float | None = None
+    for family, base_name in steps:
+        matched_model = by_key.get((validation, base_name))
+        if matched_model is None:
+            continue
+        mae = holdout_metric(matched_model, "mae")
+        r2 = holdout_metric(matched_model, "r2")
+        rows.append(
+            _model_family_row(family, matched_model, mae, r2, previous_mae, previous_r2)
+        )
+        previous_mae = mae
+        previous_r2 = r2
+    return rows
+
+
+def _model_family_row(
+    family: str,
+    matched_model: dict[str, Any],
+    mae: float | None,
+    r2: float | None,
+    previous_mae: float | None,
+    previous_r2: float | None,
+) -> dict[str, Any]:
+    return {
+        "family": family,
+        "model": matched_model.get("name"),
+        "holdout_mae": rounded(mae),
+        "holdout_r2": rounded(r2),
+        "mae_improvement_vs_previous": _model_metric_improvement(previous_mae, mae),
+        "r2_delta_vs_previous": _model_metric_delta(previous_r2, r2),
+    }
+
+
+def _model_metric_delta(previous: float | None, current: float | None) -> float | None:
+    if previous is None or current is None:
+        return None
+    return rounded(current - previous)
+
+
+def _model_metric_improvement(
+    previous: float | None, current: float | None
+) -> float | None:
+    if previous is None or current is None:
+        return None
+    return rounded(previous - current)
 
 
 def model_base_name(model: dict[str, Any], validation: str) -> str:
