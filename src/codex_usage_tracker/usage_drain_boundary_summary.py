@@ -319,40 +319,68 @@ def _boundary_risk_model_names(rows: list[dict[str, Any]]) -> list[str]:
 def _boundary_risk_detail_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
-    details = [
-        (row.get("boundary_risk_details") or {}).get(model_name) or {}
-        for row in rows
-    ]
+    details = _boundary_risk_details_for_model(rows, model_name)
     if not details:
         return {
             "matched_state_share": None,
             "mean_support": None,
             "top_signatures": [],
         }
-    matched = [
-        detail for detail in details if detail.get("source") == "matched_boundary_state"
-    ]
-    signature_counts: dict[str, int] = {}
-    for detail in matched:
-        label = ",".join(str(item) for item in detail.get("signature") or [])
-        signature_counts[label or "missing"] = (
-            signature_counts.get(label or "missing", 0) + 1
-        )
+    matched = _matched_boundary_risk_details(details)
     return {
         "matched_state_share": _rounded(len(matched) / len(details)),
-        "mean_support": _rounded(
-            sum(int(detail.get("support") or 0) for detail in matched) / len(matched)
-            if matched
-            else None
+        "mean_support": _mean_boundary_risk_support(matched),
+        "top_signatures": _top_boundary_risk_signatures(
+            matched,
+            denominator=len(details),
         ),
-        "top_signatures": [
-            {
-                "signature": signature,
-                "count": count,
-                "share": _rounded(count / len(details)),
-            }
-            for signature, count in sorted(
-                signature_counts.items(), key=lambda item: (-item[1], item[0])
-            )[:8]
-        ],
     }
+
+
+def _boundary_risk_details_for_model(
+    rows: list[dict[str, Any]], model_name: str
+) -> list[dict[str, Any]]:
+    return [
+        (row.get("boundary_risk_details") or {}).get(model_name) or {}
+        for row in rows
+    ]
+
+
+def _matched_boundary_risk_details(
+    details: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        detail
+        for detail in details
+        if detail.get("source") == "matched_boundary_state"
+    ]
+
+
+def _mean_boundary_risk_support(details: list[dict[str, Any]]) -> float | None:
+    if not details:
+        return None
+    return _rounded(sum(int(detail.get("support") or 0) for detail in details) / len(details))
+
+
+def _top_boundary_risk_signatures(
+    details: list[dict[str, Any]], *, denominator: int
+) -> list[dict[str, Any]]:
+    signature_counts: dict[str, int] = {}
+    for detail in details:
+        label = _boundary_risk_signature_label(detail)
+        signature_counts[label] = signature_counts.get(label, 0) + 1
+    return [
+        {
+            "signature": signature,
+            "count": count,
+            "share": _rounded(count / denominator),
+        }
+        for signature, count in sorted(
+            signature_counts.items(), key=lambda item: (-item[1], item[0])
+        )[:8]
+    ]
+
+
+def _boundary_risk_signature_label(detail: dict[str, Any]) -> str:
+    label = ",".join(str(item) for item in detail.get("signature") or [])
+    return label or "missing"

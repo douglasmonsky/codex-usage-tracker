@@ -5413,3 +5413,51 @@ Checks:
 Remaining risks / next handoff:
 - `usage_drain_boundary_summary.py::_boundary_risk_detail_diagnostics` and `dashboard.py::dashboard_payload` are the next C(16) hotspots.
 - The new helpers return a `fallback_share` field that transition-risk diagnostics intentionally omit from their public payload.
+
+### `refactor/boundary-risk-detail-diagnostics`
+
+Status:
+- Local branch only. Not pushed.
+- Green checkpoint reached.
+
+Objective:
+- Reduce `_boundary_risk_detail_diagnostics` without changing the boundary risk diagnostics payload consumed by usage-drain reports.
+- Add a focused characterization test before extracting the duplicated matched-boundary summary logic.
+
+Files touched:
+- `src/codex_usage_tracker/usage_drain_boundary_summary.py`
+- `tests/test_usage_drain_boundary_summary.py`
+- `docs/maintainability-roadmap.md`
+
+Completed edits:
+- Added direct characterization coverage for matched boundary-state share, mean support, missing signatures, and top-signature ordering.
+- Extracted boundary-risk detail lookup, matched-boundary filtering, support averaging, top-signature construction, and signature labeling helpers.
+- Preserved `_boundary_risk_detail_diagnostics` output keys and omission of fallback-share from this payload.
+
+Metrics:
+- `_boundary_risk_detail_diagnostics`: C(16) -> A(2).
+- `usage_drain_boundary_summary.py` average complexity: A(4.63).
+- Global C-or-worse blocks: 46 -> 45.
+- Largest remaining hotspot after this branch: `dashboard.py::dashboard_payload` C(16).
+
+Checks:
+- `.venv/bin/python -m pytest tests/test_usage_drain_boundary_summary.py -q`: 1 passed before refactor.
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/usage_drain_boundary_summary.py tests/test_usage_drain_boundary_summary.py`: passed.
+- `.venv/bin/python -m pytest tests/test_usage_drain_boundary_summary.py tests/test_usage_drain_model.py tests/test_usage_drain_boundary_delta.py -q`: 17 passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/usage_drain_boundary_summary.py tests/test_usage_drain_boundary_summary.py`: passed.
+- `.venv/bin/radon cc src/codex_usage_tracker/usage_drain_boundary_summary.py -a -s`: passed, target now A-rated.
+- `.venv/bin/python -m pytest -q`: 453 passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected structure-cohesion and change-budget warnings.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+
+Remaining risks / next handoff:
+- `dashboard.py::dashboard_payload` is now the only C(16) block.
+- `usage_drain_boundary_delta_summary.py::_boundary_delta_top_error_groups`, `usage_drain_allowance_fits.py::allowance_online_capacity_credit_to_delta_fit`, `threads.py::_resolve_thread_attachment`, `diagnostic_reports.py::_action_hint`, and `call_origin.py::event_flags_from_envelope` remain C(15).
