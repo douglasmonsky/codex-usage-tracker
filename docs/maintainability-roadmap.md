@@ -7600,3 +7600,41 @@ Remaining risks / next handoff:
 - Continue expanding wemake by small module groups only.
 - Avoid fighting intentional project patterns such as CLI printing, public `__all__`, and package metadata until policy is explicit.
 - The structure-cohesion warning remains until package directories are split by responsibility.
+
+### `docs/maintainability-roadmap-and-scorecard`
+
+Goal:
+- Finalize tracked roadmap and scorecard after the local repair process proved useful.
+- Record current metrics, thresholds, accepted exceptions, commands, and next targets.
+- Keep the local-only policy intact.
+
+Acceptance:
+- Scorecard documentation matches current local evidence.
+- Roadmap records the final closeout branch.
+- Local docs/check hygiene passes.
+
+Status:
+- Added `docs/maintainability-scorecard.md`.
+- Recorded baseline-vs-current file-size and complexity metrics.
+- Recorded enforced local gates and non-blocking exceptions.
+- Documented tach status, wemake baseline scope, and next targets.
+
+Checks recorded in scorecard:
+- `PYTHONPATH=src .venv/bin/python -m pytest -q`: 531 passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/python scripts/check_wemake_baseline.py`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with existing structure-cohesion warning.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- Git-agent-ratchet file length, private import, and duplicate helper checks passed.
+
+Accepted exceptions:
+- `agent_maintainer doctor --strict` still has the known beta repo-root false positive and intentionally missing optional local integration files.
+- `agent_maintainer verify --profile precommit` remains non-blocking because formatter drift, pyright findings, and five B-ranked xenon modules remain.
+- Global wemake remains disabled; the ratcheted local baseline covers selected passing modules only.
+
+Remaining risks / next handoff:
+- Final audit should verify the roadmap requirements before marking the goal complete.
+- No remote work has been performed.
