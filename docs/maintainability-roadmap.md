@@ -4186,3 +4186,57 @@ Remaining risks:
 
 Next handoff:
 - Start a separate allowance-window parser/summary complexity branch instead of mixing it into the rate-card extraction.
+
+### `refactor/allowance-window-complexity`
+
+Goal:
+- Reduce the remaining C-rated allowance-window functions without changing allowance parsing, summary keys, or credit-rate behavior.
+- Keep `allowance.py` below the local 600-line target after the complexity split.
+- Isolate standalone copied-status text matching from allowance config and credit estimation logic.
+
+Files touched:
+- `src/codex_usage_tracker/allowance.py`
+- `src/codex_usage_tracker/allowance_text.py`
+- `tach.toml`
+- `docs/maintainability-roadmap.md`
+
+Baseline metric notes:
+- `allowance.py` line count fell from `591` to `514`.
+- Added `allowance_text.py` at `116` lines.
+- `allowance.py` MI improved from B to A.
+- `allowance.py` and `allowance_text.py` have no C-rated functions; average complexity is A.
+- Highest remaining allowance complexity is B: `_resolve_alias_credit_rate` B(8), `_allowance_window_rows` B(7), and `write_allowance_from_text` B(6).
+
+Completed edits:
+- Extracted copied Codex status text matching and allowance-label regex helpers to `allowance_text.py`.
+- Split `summarize_allowance_usage` into totals and numeric-field helpers.
+- Split `resolve_credit_rate` into direct-rate and alias-rate helpers while preserving existing note wording.
+- Split `parse_windows` into raw-row normalization and single-window construction.
+- Added `allowance_text` to the pricing/allowance architecture group in `tach.toml`.
+
+Checks:
+- `.venv/bin/python -m py_compile src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_text.py`: passed.
+- `.venv/bin/python -m ruff check src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_text.py`: passed after safe import formatting.
+- `.venv/bin/python -m pytest tests/test_allowance.py tests/test_cli_lifecycle.py::test_rate_card_allowance_and_pricing_snapshot_cli -q`: 9 passed.
+- `radon cc src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_text.py -a -s`: passed; no C-rated functions.
+- `radon mi src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_text.py -s`: both A.
+- `xenon --max-absolute B --max-modules A --max-average A src/codex_usage_tracker/allowance.py src/codex_usage_tracker/allowance_text.py`: passed.
+- `.venv/bin/tach check`: passed.
+- `.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__`: passed.
+- `.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python`: passed.
+- `.venv/bin/python -m ruff check .`: passed.
+- `.venv/bin/python -m mypy`: passed.
+- `.venv/bin/python -m compileall src`: passed.
+- `for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done`: passed.
+- `.venv/bin/python -m pytest -q`: 439 passed.
+- `.venv/bin/python scripts/check_release.py`: passed.
+- `git diff --check`: passed.
+- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with expected flat-package structure warning and Python-source-without-test-change warning.
+
+Remaining risks:
+- `allowance.py` still has B-rated helpers, but the C-rated allowance-window hotspots are removed.
+- The package-wide structure-cohesion warning remains because the project is still intentionally flat during gradual decomposition.
+
+Next handoff:
+- Move to the next current file-length hotspot (`cli_parser.py`, `parser.py`, `usage_drain_reports.py`, `dashboard.py`, `diagnostics.py`, `reports.py`, or `diagnostic_facts.py`) depending on the roadmap priority and risk.

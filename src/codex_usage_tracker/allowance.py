@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import re
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +28,7 @@ from codex_usage_tracker.allowance_rate_card import (
     parse_rate_card_source,
     update_rate_card,
 )
+from codex_usage_tracker.allowance_text import allowance_line_matches
 from codex_usage_tracker.paths import DEFAULT_ALLOWANCE_PATH, DEFAULT_RATE_CARD_PATH
 
 __all__ = (
@@ -236,10 +237,6 @@ def write_allowance_template(
     return path
 
 
-
-
-
-
 def parse_allowance_text(
     text: str,
     *,
@@ -249,7 +246,7 @@ def parse_allowance_text(
 
     captured = captured_at or _utc_now()
     windows: list[AllowanceWindow] = []
-    for key, label, percent, reset_at in _allowance_line_matches(text):
+    for key, label, percent, reset_at in allowance_line_matches(text):
         windows.append(
             AllowanceWindow(
                 key=key,
@@ -348,43 +345,18 @@ def annotate_rows_with_allowance(
 def summarize_allowance_usage(
     rows: list[dict[str, Any]], config: UsageAllowanceConfig | None = None
 ) -> dict[str, Any]:
-    """Summarize Codex credit usage and configured allowance windows."""
+    """Summarize Codex credit usage against configured allowance windows."""
 
     resolved = config or load_allowance_config()
-    total_tokens = sum(number_value(row.get("total_tokens")) for row in rows)
-    rated_tokens = sum(
-        number_value(row.get("total_tokens"))
-        for row in rows
-        if row.get("usage_credits") is not None
-    )
-    usage_credits = sum(
-        number_value(row.get("usage_credits"))
-        for row in rows
-        if row.get("usage_credits") is not None
-    )
-    estimated_credits = sum(
-        number_value(row.get("usage_credits"))
-        for row in rows
-        if row.get("usage_credit_confidence") == "estimated"
-    )
-    override_credits = sum(
-        number_value(row.get("usage_credits"))
-        for row in rows
-        if row.get("usage_credit_confidence") == "user_override"
-    )
-    exact_credits = sum(
-        number_value(row.get("usage_credits"))
-        for row in rows
-        if row.get("usage_credit_confidence") == "exact"
-    )
+    totals = _allowance_usage_totals(rows)
     return {
-        "usage_credits": usage_credits,
-        "exact_usage_credits": exact_credits,
-        "estimated_usage_credits": estimated_credits,
-        "user_override_usage_credits": override_credits,
-        "rated_tokens": rated_tokens,
-        "unrated_tokens": max(total_tokens - rated_tokens, 0.0),
-        "credit_token_ratio": rated_tokens / total_tokens if total_tokens else 0.0,
+        "usage_credits": totals["usage_credits"],
+        "exact_usage_credits": totals["exact_usage_credits"],
+        "estimated_usage_credits": totals["estimated_usage_credits"],
+        "user_override_usage_credits": totals["user_override_usage_credits"],
+        "rated_tokens": totals["rated_tokens"],
+        "unrated_tokens": totals["unrated_tokens"],
+        "credit_token_ratio": totals["credit_token_ratio"],
         "windows": [asdict(window) for window in resolved.windows],
         "source": resolved.source,
         "configured": resolved.loaded,
@@ -392,6 +364,41 @@ def summarize_allowance_usage(
         "rate_card_loaded": resolved.rate_card_loaded,
         "rate_card_error": resolved.rate_card_error,
     }
+
+
+def _allowance_usage_totals(rows: list[dict[str, Any]]) -> dict[str, float]:
+    total_tokens = _sum_numeric_field(rows, "total_tokens")
+    rated_tokens = _sum_numeric_field(
+        rows, "total_tokens", lambda row: row.get("usage_credits") is not None
+    )
+    usage_credits = _sum_numeric_field(
+        rows, "usage_credits", lambda row: row.get("usage_credits") is not None
+    )
+    return {
+        "usage_credits": usage_credits,
+        "exact_usage_credits": _sum_credit_confidence(rows, "exact"),
+        "estimated_usage_credits": _sum_credit_confidence(rows, "estimated"),
+        "user_override_usage_credits": _sum_credit_confidence(rows, "user_override"),
+        "rated_tokens": rated_tokens,
+        "unrated_tokens": max(total_tokens - rated_tokens, 0.0),
+        "credit_token_ratio": rated_tokens / total_tokens if total_tokens else 0.0,
+    }
+
+
+def _sum_credit_confidence(rows: list[dict[str, Any]], confidence: str) -> float:
+    return _sum_numeric_field(
+        rows,
+        "usage_credits",
+        lambda row: row.get("usage_credit_confidence") == confidence,
+    )
+
+
+def _sum_numeric_field(
+    rows: list[dict[str, Any]],
+    field: str,
+    include: Callable[[dict[str, Any]], bool] | None = None,
+) -> float:
+    return sum(number_value(row.get(field)) for row in rows if include is None or include(row))
 
 
 def resolve_credit_rate(
@@ -402,18 +409,33 @@ def resolve_credit_rate(
     normalized = normalize_model(model)
     if not normalized:
         return None
-    direct = config.credit_rates.get(normalized)
-    if direct is not None:
-        metadata = config.rate_metadata.get(normalized, {})
-        confidence = optional_str(metadata.get("confidence")) or "exact"
-        note = optional_str(metadata.get("note")) or (
-            "Direct match to Codex credit rates."
-            if confidence != "user_override"
-            else "Direct match to local user-provided Codex credit rate."
-        )
-        return normalized, direct, confidence, note, metadata
+    return _resolve_direct_credit_rate(normalized, config) or _resolve_alias_credit_rate(
+        normalized, config
+    )
 
-    alias = config.aliases.get(normalized)
+
+def _resolve_direct_credit_rate(
+    model: str, config: UsageAllowanceConfig
+) -> tuple[str, dict[str, float], str, str, dict[str, Any]] | None:
+    rates = config.credit_rates.get(model)
+    if rates is None:
+        return None
+    metadata = config.rate_metadata.get(model, {})
+    confidence = optional_str(metadata.get("confidence")) or "exact"
+    note = optional_str(metadata.get("note")) or _direct_credit_rate_note(confidence)
+    return model, rates, confidence, note, metadata
+
+
+def _direct_credit_rate_note(confidence: str) -> str:
+    if confidence == "user_override":
+        return "Direct match to local user-provided Codex credit rate."
+    return "Direct match to Codex credit rates."
+
+
+def _resolve_alias_credit_rate(
+    model: str, config: UsageAllowanceConfig
+) -> tuple[str, dict[str, float], str, str, dict[str, Any]] | None:
+    alias = config.aliases.get(model)
     if not alias:
         return None
     target = normalize_model(alias.get("model"))
@@ -422,10 +444,10 @@ def resolve_credit_rate(
     rates = config.credit_rates.get(target)
     if rates is None:
         return None
-    metadata = {**config.rate_metadata.get(target, {}), **config.alias_metadata.get(normalized, {})}
+    metadata = {**config.rate_metadata.get(target, {}), **config.alias_metadata.get(model, {})}
     confidence = alias.get("confidence") or optional_str(metadata.get("confidence")) or "estimated"
     note = alias.get("note") or optional_str(metadata.get("note")) or (
-        f"Mapped from {normalized} to {target} by local alias."
+        f"Mapped from {model} to {target} by local alias."
     )
     return target, rates, confidence, note, metadata
 
@@ -448,122 +470,37 @@ def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> floa
     ) / 1_000_000
 
 
-
-
-
-
-
-
-
-
-
-
 def parse_windows(raw: object) -> list[AllowanceWindow]:
-    if isinstance(raw, dict):
-        rows = [{**value, "key": key} for key, value in raw.items() if isinstance(value, dict)]
-    elif isinstance(raw, list):
-        rows = [value for value in raw if isinstance(value, dict)]
-    else:
-        rows = []
-
     windows: list[AllowanceWindow] = []
-    for row in rows:
-        key = optional_str(row.get("key"))
-        if not key:
-            continue
-        label = optional_str(row.get("label")) or key.replace("_", " ").title()
-        windows.append(
-            AllowanceWindow(
-                key=key,
-                label=label,
-            total_credits=optional_positive_number(row.get("total_credits")),
-            remaining_credits=optional_positive_number(row.get("remaining_credits")),
-                remaining_percent=_optional_percent(row.get("remaining_percent")),
-                reset_at=optional_str(row.get("reset_at")),
-                captured_at=optional_str(row.get("captured_at")),
-            )
-        )
+    for row in _allowance_window_rows(raw):
+        window = _parse_allowance_window(row)
+        if window is not None:
+            windows.append(window)
     return windows
 
 
+def _allowance_window_rows(raw: object) -> list[dict[str, Any]]:
+    if isinstance(raw, dict):
+        return [{**value, "key": key} for key, value in raw.items() if isinstance(value, dict)]
+    if isinstance(raw, list):
+        return [value for value in raw if isinstance(value, dict)]
+    return []
 
 
-
-
-def _allowance_line_matches(text: str) -> list[tuple[str, str, str, str | None]]:
-    lines = [line.strip() for line in text.replace("\u00a0", " ").splitlines() if line.strip()]
-    matches: list[tuple[str, str, str, str | None]] = []
-    for line in lines:
-        match = _ALLOWANCE_LINE_RE.match(line)
-        if not match:
-            continue
-        key = _allowance_window_key(match.group("label"))
-        if key is None:
-            continue
-        reset_at = match.group("reset")
-        if reset_at and _ALLOWANCE_LABEL_RE.search(reset_at):
-            continue
-        matches.append(
-            (
-                key,
-                "5h" if key == "five_hour" else "Weekly",
-                match.group("percent"),
-                reset_at.strip() if reset_at and reset_at.strip() else None,
-            )
-        )
-    if matches:
-        return _dedupe_allowance_matches(matches)
-
-    flat = " ".join(text.replace("\u00a0", " ").split())
-    label_matches = list(_ALLOWANCE_LABEL_RE.finditer(flat))
-    for index, match in enumerate(label_matches):
-        key = _allowance_window_key(match.group(0))
-        if key is None:
-            continue
-        next_start = label_matches[index + 1].start() if index + 1 < len(label_matches) else len(flat)
-        segment = flat[match.end() : next_start].strip()
-        percent_match = _ALLOWANCE_PERCENT_RE.search(segment)
-        if percent_match is None:
-            continue
-        reset_at = segment[percent_match.end() :].strip()
-        matches.append(
-            (
-                key,
-                "5h" if key == "five_hour" else "Weekly",
-                percent_match.group("percent"),
-                reset_at or None,
-            )
-        )
-    return _dedupe_allowance_matches(matches)
-
-
-def _dedupe_allowance_matches(
-    matches: list[tuple[str, str, str, str | None]],
-) -> list[tuple[str, str, str, str | None]]:
-    seen: set[str] = set()
-    deduped: list[tuple[str, str, str, str | None]] = []
-    for match in matches:
-        key = match[0]
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(match)
-    return deduped
-
-
-def _allowance_window_key(label: str) -> str | None:
-    normalized = label.lower().replace("-", "_").replace(" ", "_")
-    if normalized in {"5h", "5_hour", "five_hour"}:
-        return "five_hour"
-    if normalized in {"weekly", "week"}:
-        return "weekly"
-    return None
-
-
-
-
-
-
+def _parse_allowance_window(row: dict[str, Any]) -> AllowanceWindow | None:
+    key = optional_str(row.get("key"))
+    if not key:
+        return None
+    label = optional_str(row.get("label")) or key.replace("_", " ").title()
+    return AllowanceWindow(
+        key=key,
+        label=label,
+        total_credits=optional_positive_number(row.get("total_credits")),
+        remaining_credits=optional_positive_number(row.get("remaining_credits")),
+        remaining_percent=_optional_percent(row.get("remaining_percent")),
+        reset_at=optional_str(row.get("reset_at")),
+        captured_at=optional_str(row.get("captured_at")),
+    )
 
 
 def _optional_percent(value: object) -> float | None:
@@ -573,19 +510,5 @@ def _optional_percent(value: object) -> float | None:
     return parsed / 100 if parsed > 1 else parsed
 
 
-
-
-
-
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-_ALLOWANCE_LINE_RE = re.compile(
-    r"^(?P<label>5h|5-hour|five-hour|weekly|week)\s+"
-    r"(?P<percent>\d+(?:\.\d+)?)\s*%"
-    r"(?:\s+(?P<reset>.+?))?\s*$",
-    re.IGNORECASE,
-)
-_ALLOWANCE_LABEL_RE = re.compile(r"\b(?:5h|5-hour|five-hour|weekly|week)\b", re.IGNORECASE)
-_ALLOWANCE_PERCENT_RE = re.compile(r"(?P<percent>\d+(?:\.\d+)?)\s*%")
