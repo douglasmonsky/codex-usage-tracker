@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from codex_usage_tracker.reports.support import build_support_bundle, support_bundle_payload
@@ -113,6 +114,7 @@ def test_support_bundle_strict_mode_redacts_local_paths_and_doctor_text(
         str(fixture["db_path"]),
         str(fixture["pricing_path"]),
         str(fixture["projects_path"]),
+        sys.executable,
     ):
         assert raw_path not in bundle_text
 

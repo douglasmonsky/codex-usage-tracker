@@ -177,9 +177,10 @@ def main(argv: list[str] | None = None) -> int:
         _run([str(python), "-c", _import_check_code()])
         _run([str(python), "-c", _resource_check_code()])
         _smoke_plugin_install(command, temp_dir)
+        _smoke_cli_lifecycle(command, temp_dir)
 
-    print("Installed package smoke passed.")
-    return 0
+        print("Installed package smoke passed.")
+        return 0
 
 
 def _run_in_docker(args: argparse.Namespace) -> int:
@@ -340,16 +341,211 @@ def _smoke_plugin_install(command: Path, temp_dir: Path) -> None:
         raise SystemExit("installed-wheel plugin MCP config should not require PYTHONPATH")
 
 
+def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
+    home_dir = temp_dir / "home"
+    codex_home = home_dir / ".codex"
+    app_dir = home_dir / ".codex-usage-tracker"
+    project_dir = temp_dir / "synthetic-project"
+    plugin_dir = temp_dir / "setup-plugin"
+    marketplace = temp_dir / "setup-marketplace.json"
+    dashboard_path = temp_dir / "dashboard.html"
+    support_path = temp_dir / "support-bundle.json"
+    db_path = app_dir / "usage.sqlite3"
+    pricing_path = app_dir / "pricing.json"
+    allowance_path = app_dir / "allowance.json"
+    rate_card_path = app_dir / "rate-card.json"
+    thresholds_path = app_dir / "thresholds.json"
+    projects_path = app_dir / "projects.json"
+    home_dir.mkdir(parents=True)
+    app_dir.mkdir(parents=True)
+    project_dir.mkdir()
+    _write_synthetic_codex_log(codex_home, project_dir)
+    env = _isolated_home_env(home_dir)
+    global_args = [
+        "--db",
+        str(db_path),
+        "--pricing",
+        str(pricing_path),
+        "--allowance",
+        str(allowance_path),
+        "--rate-card",
+        str(rate_card_path),
+        "--thresholds",
+        str(thresholds_path),
+        "--projects",
+        str(projects_path),
+    ]
+
+    setup_result = _run(
+        [
+            str(command),
+            *global_args,
+            "setup",
+            "--codex-home",
+            str(codex_home),
+            "--plugin-dir",
+            str(plugin_dir),
+            "--marketplace",
+            str(marketplace),
+            "--skip-pricing",
+            "--json",
+        ],
+        capture_output=True,
+        env=env,
+    )
+    setup_payload = json.loads(setup_result.stdout)
+    if setup_payload.get("schema") != "codex-usage-tracker-setup-v1":
+        raise SystemExit("setup JSON schema mismatch")
+    refresh = setup_payload.get("refresh", {})
+    if int(refresh.get("parsed_events", 0)) < 1:
+        raise SystemExit("setup did not parse synthetic usage event")
+    if not db_path.exists():
+        raise SystemExit("setup did not create tracker database")
+
+    doctor_result = _run(
+        [str(command), *global_args, "doctor", "--json"],
+        capture_output=True,
+        env=env,
+    )
+    doctor_payload = json.loads(doctor_result.stdout)
+    if doctor_payload.get("schema") != "codex-usage-tracker-doctor-v1":
+        raise SystemExit("doctor JSON schema mismatch")
+    environment = doctor_payload.get("environment", {})
+    package = environment.get("package", {})
+    if package.get("version") != _installed_version(command):
+        raise SystemExit("doctor environment did not report installed package version")
+    if "dashboard_assets" not in environment:
+        raise SystemExit("doctor environment did not report dashboard asset health")
+
+    dashboard_result = _run(
+        [
+            str(command),
+            *global_args,
+            "dashboard",
+            "--output",
+            str(dashboard_path),
+            "--limit",
+            "0",
+            "--json",
+        ],
+        capture_output=True,
+        env=env,
+    )
+    dashboard_payload = json.loads(dashboard_result.stdout)
+    if dashboard_payload.get("schema") != "codex-usage-tracker-dashboard-v1":
+        raise SystemExit("dashboard JSON schema mismatch")
+    if not dashboard_path.exists():
+        raise SystemExit("dashboard command did not write dashboard HTML")
+    dashboard_html = dashboard_path.read_text(encoding="utf-8")
+    if "<html" not in dashboard_html.lower() or "dashboard" not in dashboard_html.lower():
+        raise SystemExit("dashboard HTML does not look like installed dashboard")
+
+    support_result = _run(
+        [
+            str(command),
+            *global_args,
+            "--privacy-mode",
+            "strict",
+            "support-bundle",
+            "--codex-home",
+            str(codex_home),
+            "--output",
+            str(support_path),
+            "--json",
+        ],
+        capture_output=True,
+        env=env,
+    )
+    support_cli_payload = json.loads(support_result.stdout)
+    if support_cli_payload.get("schema") != "codex-usage-tracker-support-bundle-v1":
+        raise SystemExit("support-bundle CLI JSON schema mismatch")
+    support_bundle = json.loads(support_path.read_text(encoding="utf-8"))
+    if not support_bundle.get("issue_report", {}).get("safe_to_paste_after_review"):
+        raise SystemExit("strict support bundle did not mark issue report as paste-safe")
+    support_text = json.dumps(support_bundle)
+    if str(temp_dir) in support_text or str(home_dir) in support_text:
+        raise SystemExit("strict support bundle leaked local temp paths")
+
+
+def _isolated_home_env(home_dir: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    env["HOME"] = str(home_dir)
+    env["USERPROFILE"] = str(home_dir)
+    return env
+
+
+def _write_synthetic_codex_log(codex_home: Path, project_dir: Path) -> None:
+    session_id = "019f0000-0000-7000-8000-000000000001"
+    session_path = codex_home / "sessions" / "2026" / "06" / "30" / f"{session_id}.jsonl"
+    session_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [
+        {
+            "timestamp": "2026-06-30T12:00:00.000Z",
+            "type": "session_meta",
+            "payload": {
+                "id": session_id,
+                "timestamp": "2026-06-30T12:00:00.000Z",
+                "cwd": str(project_dir),
+            },
+        },
+        {
+            "timestamp": "2026-06-30T12:00:01.000Z",
+            "type": "turn_context",
+            "payload": {
+                "cwd": str(project_dir),
+                "model": "gpt-5.5-codex",
+                "effort": "medium",
+                "approval_policy": "never",
+                "sandbox_policy": "danger-full-access",
+            },
+        },
+        {
+            "timestamp": "2026-06-30T12:00:02.000Z",
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "total_token_usage": {
+                        "input_tokens": 200,
+                        "cached_input_tokens": 50,
+                        "output_tokens": 40,
+                        "reasoning_output_tokens": 10,
+                        "total_tokens": 300,
+                    },
+                    "last_token_usage": {
+                        "input_tokens": 120,
+                        "cached_input_tokens": 20,
+                        "output_tokens": 35,
+                        "reasoning_output_tokens": 5,
+                        "total_tokens": 180,
+                    },
+                    "model_context_window": 258400,
+                },
+            },
+        },
+    ]
+    session_path.write_text(
+        "".join(json.dumps(row, separators=(",", ":")) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+
 def _installed_version(command: Path) -> str:
     result = _run([str(command), "--version"], capture_output=True)
     return result.stdout.strip().split()[-1]
 
 
-def _run(command: list[str], *, capture_output: bool = False) -> subprocess.CompletedProcess[str]:
+def _run(
+    command: list[str],
+    *,
+    capture_output: bool = False,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     print("+ " + " ".join(shlex.quote(part) for part in command), flush=True)
     result = subprocess.run(
         command,
         cwd=REPO_ROOT,
+        env=env,
         text=True,
         capture_output=capture_output,
     )
