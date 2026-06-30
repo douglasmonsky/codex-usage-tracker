@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.13.0 - 2026-06-30
+
+- Add first-run onboarding docs covering install, setup, live-dashboard launch, empty-dashboard troubleshooting, plugin discovery, and safe issue diagnostics.
+- Improve `doctor --json` first-run environment reporting so support requests can distinguish missing logs, empty history, and plugin/runtime path issues faster.
+- Add safe support-bundle issue-report fields and issue-template guidance so users can attach diagnostics without leaking prompts, tool outputs, commands, patches, or raw paths in strict mode.
+- Strengthen installed-wheel lifecycle smoke coverage across setup, doctor, dashboard generation, strict support bundles, and plugin resources.
+- Harden strict support-bundle redaction for nested diagnostic paths, Python executable paths, and resolved `/private/var`-style platform path aliases.
+
 ## 0.12.1 - 2026-06-29
 
 - Ship the package-domain boundary refactor behind compatibility facades so existing CLI, imports, dashboard routes, JSON payloads, and MCP entrypoints keep working while the source tree is organized by responsibility.
