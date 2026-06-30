@@ -1,5 +1,7 @@
 # Install Guide
 
+New user? Start with the [First Five Minutes](first-five-minutes.md) guide, then return here for deeper install details.
+
 ## Recommended Install
 
 Use `pipx` so the tracker is installed from PyPI as a command-line app without mixing dependencies into another project.
