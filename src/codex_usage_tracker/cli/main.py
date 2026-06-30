@@ -50,7 +50,10 @@ from codex_usage_tracker.reports.api import (
     build_recommendations_report,
     build_summary_report,
 )
-from codex_usage_tracker.reports.support import build_support_bundle
+from codex_usage_tracker.reports.support import (
+    build_support_bundle,
+    support_bundle_issue_guidance,
+)
 from codex_usage_tracker.store.api import (
     export_usage_csv,
     query_session_usage,
@@ -473,6 +476,7 @@ def _run_support_bundle(args: argparse.Namespace) -> int:
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
     )
+    issue_guidance = support_bundle_issue_guidance(args.privacy_mode)
     if args.as_json:
         print_json(
             {
@@ -485,11 +489,19 @@ def _run_support_bundle(args: argparse.Namespace) -> int:
                     "contains_tool_output": False,
                     "project_metadata_mode": args.privacy_mode,
                 },
+                "issue_report": issue_guidance,
             }
         )
         return 0
     print(f"Wrote privacy-preserving support bundle to {output}")
     print("Bundle excludes raw logs, prompts, assistant messages, tool output, and context text.")
+    print(
+        "GitHub issue fields safe to paste after review: "
+        + ", ".join(issue_guidance["cli_hint_fields"])
+    )
+    print("Full strict-bundle field list lives in issue_report.safe_fields.")
+    if not issue_guidance["safe_to_paste_after_review"]:
+        print("Use --privacy-mode strict before sharing support bundles publicly.")
     return 0
 
 

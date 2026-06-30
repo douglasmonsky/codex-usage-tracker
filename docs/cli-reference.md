@@ -187,6 +187,8 @@ codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage
 
 Support bundles are diagnostic summaries for issues. They include package, platform, doctor, schema, parser, pricing, allowance, threshold, project-config, and privacy metadata. They exclude raw logs, aggregate rows, prompts, assistant messages, tool output, and context text.
 
+Strict support bundles include an `issue_report` section that lists the paste-safe sections and fields for GitHub issues. Review the JSON before posting, and do not add raw JSONL logs, prompts, assistant messages, tool output, command text, patch text, full local paths, secrets, credentials, or private config values.
+
 ## Local Config
 
 ```bash
