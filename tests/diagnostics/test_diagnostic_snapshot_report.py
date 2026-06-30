@@ -8,6 +8,7 @@ from codex_usage_tracker.diagnostics.snapshot_constants import (
     DIAGNOSTIC_FILE_MODIFICATIONS_SECTION,
     DIAGNOSTIC_FILE_READS_SECTION,
     DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
+    DIAGNOSTIC_GUIDED_SUMMARY_SECTION,
     DIAGNOSTIC_READ_PRODUCTIVITY_SECTION,
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
     DIAGNOSTIC_USAGE_DRAIN_SECTION,
@@ -28,6 +29,7 @@ from codex_usage_tracker.diagnostics.snapshot_report import DiagnosticSnapshotRe
         ),
         (DIAGNOSTIC_READ_PRODUCTIVITY_SECTION, "Diagnostic read-productivity snapshot"),
         (DIAGNOSTIC_CONCENTRATION_SECTION, "Diagnostic concentration snapshot"),
+        (DIAGNOSTIC_GUIDED_SUMMARY_SECTION, "Diagnostic guided-summary snapshot"),
         (DIAGNOSTIC_USAGE_DRAIN_SECTION, "Diagnostic usage-drain snapshot"),
     ],
 )

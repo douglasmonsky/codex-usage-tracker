@@ -56,6 +56,7 @@ Tracked schema ids:
 | `codex-usage-tracker-diagnostic-file-modifications-v1` | CLI `diagnostics file-modifications --json`, dashboard server `/api/diagnostics/file-modifications` |
 | `codex-usage-tracker-diagnostic-read-productivity-v1` | CLI `diagnostics read-productivity --json`, dashboard server `/api/diagnostics/read-productivity` |
 | `codex-usage-tracker-diagnostic-concentration-v1` | CLI `diagnostics concentration --json`, dashboard server `/api/diagnostics/concentration` |
+| `codex-usage-tracker-diagnostic-guided-summary-v1` | CLI `diagnostics guided-summary --json`, dashboard server `/api/diagnostics/guided-summary` |
 | `codex-usage-tracker-diagnostic-usage-drain-v1` | CLI `diagnostics usage-drain --json`, dashboard server `/api/diagnostics/usage-drain` |
 | `codex-usage-tracker-session-v1` | CLI `session --json`, MCP `session_usage(response_format="json")` |
 | `codex-usage-tracker-context-v1` | CLI `context`, MCP `usage_call_context` when raw context is explicitly enabled |

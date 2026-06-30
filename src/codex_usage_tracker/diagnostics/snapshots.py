@@ -11,6 +11,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PRICING_PATH,
     DEFAULT_RATE_CARD_PATH,
 )
+from codex_usage_tracker.diagnostics.guided_summary import refresh_guided_summary_snapshot
 from codex_usage_tracker.diagnostics.snapshot_analysis import analyze_indexed_source_logs
 from codex_usage_tracker.diagnostics.snapshot_concentration import compute_concentration
 from codex_usage_tracker.diagnostics.snapshot_constants import (
@@ -25,6 +26,8 @@ from codex_usage_tracker.diagnostics.snapshot_constants import (
     DIAGNOSTIC_FILE_READS_SECTION,
     DIAGNOSTIC_GIT_INTERACTIONS_SCHEMA,
     DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
+    DIAGNOSTIC_GUIDED_SUMMARY_SCHEMA,
+    DIAGNOSTIC_GUIDED_SUMMARY_SECTION,
     DIAGNOSTIC_OVERVIEW_SCHEMA,
     DIAGNOSTIC_OVERVIEW_SECTION,
     DIAGNOSTIC_READ_PRODUCTIVITY_SCHEMA,
@@ -209,6 +212,32 @@ def build_diagnostic_concentration_report(
     )
 
 
+def build_diagnostic_guided_summary_report(
+    *,
+    db_path: Path = DEFAULT_DB_PATH,
+    include_archived: bool = False,
+    refresh: bool = False,
+) -> DiagnosticSnapshotReport:
+    """Return guided usage-driver summary snapshot, optionally recomputing it."""
+
+    if refresh:
+        return DiagnosticSnapshotReport(
+            refresh_guided_summary_snapshot(
+                db_path=db_path,
+                include_archived=include_archived,
+            )
+        )
+
+    return DiagnosticSnapshotReport(
+        source_log_snapshot_payload(
+            db_path=db_path,
+            include_archived=include_archived,
+            section=DIAGNOSTIC_GUIDED_SUMMARY_SECTION,
+            schema=DIAGNOSTIC_GUIDED_SUMMARY_SCHEMA,
+        )
+    )
+
+
 def build_diagnostic_usage_drain_report(
     *,
     db_path: Path = DEFAULT_DB_PATH,
@@ -330,6 +359,10 @@ def refresh_diagnostic_snapshots(
         rate_card_path=rate_card_path,
         include_archived=include_archived,
     )
+    guided_summary_payload = refresh_guided_summary_snapshot(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
     return {
         "schema": DIAGNOSTIC_BATCH_REFRESH_SCHEMA,
         "status": "ready",
@@ -345,6 +378,7 @@ def refresh_diagnostic_snapshots(
             "fileModifications": source_payloads[DIAGNOSTIC_FILE_MODIFICATIONS_SECTION],
             "readProductivity": source_payloads[DIAGNOSTIC_READ_PRODUCTIVITY_SECTION],
             "concentration": concentration_payload,
+            "guidedSummary": guided_summary_payload,
             "usageDrain": usage_drain_payload,
         },
         "meta": {

@@ -466,6 +466,15 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
         "--refresh",
         "--json",
     )
+    guided_summary_refresh = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "diagnostics",
+        "guided-summary",
+        "--refresh",
+        "--json",
+    )
     usage_drain_refresh = _run_cli(
         tmp_path,
         "--db",
@@ -504,6 +513,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     file_modifications_refresh_payload = json.loads(file_modifications_refresh.stdout)
     read_productivity_refresh_payload = json.loads(read_productivity_refresh.stdout)
     concentration_refresh_payload = json.loads(concentration_refresh.stdout)
+    guided_summary_refresh_payload = json.loads(guided_summary_refresh.stdout)
     usage_drain_refresh_payload = json.loads(usage_drain_refresh.stdout)
     fact_calls_payload = json.loads(fact_calls.stdout)
     for payload in (
@@ -595,6 +605,12 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     )
     assert concentration_refresh_payload["summary"]["usage_rows"] == 2
     assert concentration_refresh_payload["metrics"]
+    assert (
+        guided_summary_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-guided-summary-v1"
+    )
+    assert guided_summary_refresh_payload["summary"]["usage_rows"] == 2
+    assert guided_summary_refresh_payload["drivers"]
     assert (
         usage_drain_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-usage-drain-v1"

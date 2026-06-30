@@ -136,10 +136,10 @@ DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     'codex-usage-tracker-diagnostic-concentration-v1': {
-            "required": {
-                "section": str,
-                "status": str,
-                "refreshed": bool,
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
                 "raw_context_included": bool,
                 "snapshot": (dict, NoneType),
                 "summary": (dict, NoneType),
@@ -147,11 +147,28 @@ DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "dimensions": list,
                 "largest_impact_rows": list,
                 "privacy": dict,
-                "notes": list,
-            }
-        },
+            "notes": list,
+        }
+    },
+    'codex-usage-tracker-diagnostic-guided-summary-v1': {
+        "required": {
+            "section": str,
+            "status": str,
+            "refreshed": bool,
+            "raw_context_included": bool,
+            "snapshot": (dict, NoneType),
+            "summary": (dict, NoneType),
+            "drivers": list,
+            "top_threads": list,
+            "top_models": list,
+            "top_efforts": list,
+            "token_mix": (dict, NoneType),
+            "signals": list,
+            "notes": list,
+        }
+    },
     'codex-usage-tracker-diagnostic-usage-drain-v1': {
-            "required": {
+        "required": {
                 "section": str,
                 "status": str,
                 "refreshed": bool,
