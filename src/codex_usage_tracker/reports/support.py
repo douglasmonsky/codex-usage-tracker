@@ -285,15 +285,18 @@ def _support_path_replacements(
         ("dashboard_path", DEFAULT_DASHBOARD_PATH),
         ("plugin_path", DEFAULT_PLUGIN_LINK),
         ("marketplace_path", DEFAULT_MARKETPLACE_PATH),
+        ("python_executable", Path(sys.executable)),
         ("cwd", Path.cwd()),
         ("home", Path.home()),
     ]
     replacements: dict[str, str] = {}
     for label, path in raw_paths:
-        expanded = _safe_path(path.expanduser())
-        _add_path_replacement(replacements, label, expanded)
-        if label not in {"home", "cwd"}:
-            _add_path_replacement(replacements, f"{label}_dir", expanded.parent)
+        expanded = path.expanduser()
+        candidates = (expanded, _safe_path(expanded))
+        for candidate in candidates:
+            _add_path_replacement(replacements, label, candidate)
+            if label not in {"home", "cwd"}:
+                _add_path_replacement(replacements, f"{label}_dir", candidate.parent)
     return tuple(sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True))
 
 
