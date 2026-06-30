@@ -16,6 +16,7 @@ from codex_usage_tracker.diagnostics.snapshot_constants import (
     DIAGNOSTIC_FILE_MODIFICATIONS_SECTION,
     DIAGNOSTIC_FILE_READS_SECTION,
     DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
+    DIAGNOSTIC_GUIDED_SUMMARY_SECTION,
     DIAGNOSTIC_HISTORY_ACTIVE,
     DIAGNOSTIC_HISTORY_ALL,
     DIAGNOSTIC_OVERVIEW_SCHEMA,
@@ -79,6 +80,15 @@ _MISSING_SECTION_DEFAULTS: dict[str, dict[str, MissingFieldValue]] = {
         "dimensions": list,
         "largest_impact_rows": list,
         "privacy": concentration_privacy_metadata,
+    },
+    DIAGNOSTIC_GUIDED_SUMMARY_SECTION: {
+        "summary": None,
+        "drivers": list,
+        "top_threads": list,
+        "top_models": list,
+        "top_efforts": list,
+        "token_mix": None,
+        "signals": list,
     },
     DIAGNOSTIC_USAGE_DRAIN_SECTION: {
         "summary": None,

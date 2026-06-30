@@ -147,6 +147,18 @@ def add_diagnostics_parser(
     )
     concentration.add_argument("--json", action="store_true", dest="as_json")
 
+    guided_summary = diagnostic_subparsers.add_parser(
+        "guided-summary",
+        help="Show plain-language aggregate usage-driver diagnostics",
+    )
+    guided_summary.add_argument("--include-archived", action="store_true")
+    guided_summary.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute and persist guided summary snapshot before reading it.",
+    )
+    guided_summary.add_argument("--json", action="store_true", dest="as_json")
+
     usage_drain = diagnostic_subparsers.add_parser(
         "usage-drain",
         help="Show usage-drain modeling and cumulative cost diagnostic reports",

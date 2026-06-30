@@ -18,6 +18,7 @@ from codex_usage_tracker.diagnostics.snapshots import (
     build_diagnostic_file_modifications_report,
     build_diagnostic_file_reads_report,
     build_diagnostic_git_interactions_report,
+    build_diagnostic_guided_summary_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
@@ -145,6 +146,7 @@ _REPORT_BUILDERS: dict[str, ReportBuilder] = {
     "file-modifications": _build_snapshot_report,
     "read-productivity": _build_snapshot_report,
     "concentration": _build_snapshot_report,
+    "guided-summary": _build_snapshot_report,
     "usage-drain": _build_usage_drain_report,
 }
 
@@ -157,4 +159,5 @@ _SNAPSHOT_REPORT_BUILDERS: dict[str, Callable[..., Any]] = {
     "file-modifications": build_diagnostic_file_modifications_report,
     "read-productivity": build_diagnostic_read_productivity_report,
     "concentration": build_diagnostic_concentration_report,
+    "guided-summary": build_diagnostic_guided_summary_report,
 }

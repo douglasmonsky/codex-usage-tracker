@@ -20,7 +20,8 @@
       { key: 'fileModifications', title: 'File Modifications', path: '/api/diagnostics/file-modifications', refreshPath: '/api/diagnostics/file-modifications/refresh' },
       { key: 'readProductivity', title: 'Read Productivity', path: '/api/diagnostics/read-productivity', refreshPath: '/api/diagnostics/read-productivity/refresh' },
       { key: 'concentration', title: 'Concentration', path: '/api/diagnostics/concentration', refreshPath: '/api/diagnostics/concentration/refresh' },
-      { key: 'usageDrain', title: 'Usage Drain', path: '/api/diagnostics/usage-drain', refreshPath: '/api/diagnostics/usage-drain/refresh' },
+{ key: 'guidedSummary', title: 'What Is Driving Usage?', path: '/api/diagnostics/guided-summary', refreshPath: '/api/diagnostics/guided-summary/refresh' },
+{ key: 'usageDrain', title: 'Usage Drain', path: '/api/diagnostics/usage-drain', refreshPath: '/api/diagnostics/usage-drain/refresh' },
     ];
 
     function renderToolbar({ loading, payloads, refreshStatus, refreshError }) {
@@ -122,7 +123,8 @@
       if (key === 'fileModifications') return renderFileModifications(payload);
       if (key === 'readProductivity') return renderReadProductivity(payload);
       if (key === 'concentration') return renderConcentration(payload);
-      if (key === 'usageDrain') return renderUsageDrain(payload);
+if (key === 'guidedSummary') return renderGuidedSummary(payload);
+if (key === 'usageDrain') return renderUsageDrain(payload);
       return renderState('No renderer for this diagnostic section.');
     }
 
@@ -318,7 +320,50 @@
       `;
     }
 
-    function renderUsageDrain(payload) {
+function renderGuidedSummary(payload) {
+  const summary = payload?.summary || {};
+  const drivers = Array.isArray(payload?.drivers) ? payload.drivers.slice(0, 5) : [];
+  const signals = Array.isArray(payload?.signals) ? payload.signals.slice(0, 6) : [];
+  const tokenMix = payload?.token_mix || {};
+  return `
+    ${renderKeyValueTable([
+      ['Usage rows', tokenText(summary.usage_rows)],
+      ['Total tokens', tokenText(summary.total_tokens)],
+      ['Cache ratio', pct(summary.cache_ratio)],
+      ['Subagent row share', pct(summary.subagent_row_share)],
+      ['High-context row share', pct(summary.high_context_row_share)],
+    ])}
+    ${renderSimpleTable(
+      ['Driver', 'Bucket', 'Value', 'Share', 'Suggested review'],
+      drivers.map(row => [
+        row.title,
+        row.label,
+        guidedDriverValue(row),
+        row.share === null || row.share === undefined ? 'n/a' : pct(row.share),
+        row.action,
+      ]),
+      'No guided driver rows in snapshot.',
+    )}
+    ${renderSimpleTable(
+      ['Signal', 'Severity', 'Finding', 'Action'],
+      signals.map(row => [
+        row.title,
+        humanizeMetric(row.severity),
+        row.finding,
+        row.action,
+      ]),
+      'No guided signals in snapshot.',
+    )}
+    ${renderKeyValueTable([
+      ['Uncached input share', pct(tokenMix.uncached_input_share)],
+      ['Cached input share', pct(tokenMix.cached_input_share)],
+      ['Output share', pct(tokenMix.output_share)],
+      ['Reasoning output share', pct(tokenMix.reasoning_output_share)],
+    ])}
+  `;
+}
+
+function renderUsageDrain(payload) {
       const summary = payload?.summary || {};
       const curves = payload?.thread_cost_curves || {};
       const timeSeries = payload?.time_series || {};
@@ -942,14 +987,21 @@
       return /^[$+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?$/.test(text);
     }
 
-    function numberText(value) {
+function numberText(value) {
       if (value === null || value === undefined || value === '') return 'n/a';
       const numeric = Number(value);
       if (!Number.isFinite(numeric)) return 'n/a';
       return number.format(Math.round(numeric * 1000) / 1000);
-    }
+}
 
-    function moneyText(value) {
+function guidedDriverValue(row) {
+  if (!row) return 'n/a';
+  if (row.value_kind === 'ratio') return pct(row.value);
+  if (row.value_kind === 'tokens') return tokenText(row.value);
+  return numberText(row.value);
+}
+
+function moneyText(value) {
       if (typeof sharedMoneyText === 'function') return sharedMoneyText(value);
       if (value === null || value === undefined) return 'No price';
       const numeric = Number(value || 0);

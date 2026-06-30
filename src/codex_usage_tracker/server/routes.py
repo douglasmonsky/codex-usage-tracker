@@ -27,6 +27,7 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType({
     "/api/diagnostics/file-modifications": "_handle_diagnostics_file_modifications",
     "/api/diagnostics/read-productivity": "_handle_diagnostics_read_productivity",
     "/api/diagnostics/concentration": "_handle_diagnostics_concentration",
+    "/api/diagnostics/guided-summary": "_handle_diagnostics_guided_summary",
     "/api/diagnostics/usage-drain": "_handle_diagnostics_usage_drain",
     "/api/usage": "_handle_usage",
 })
@@ -46,6 +47,7 @@ POST_ROUTE_METHODS: Mapping[str, str] = MappingProxyType({
     "/api/diagnostics/file-modifications/refresh": "_handle_diagnostics_file_modifications_refresh",
     "/api/diagnostics/read-productivity/refresh": "_handle_diagnostics_read_productivity_refresh",
     "/api/diagnostics/concentration/refresh": "_handle_diagnostics_concentration_refresh",
+    "/api/diagnostics/guided-summary/refresh": "_handle_diagnostics_guided_summary_refresh",
     "/api/diagnostics/usage-drain/refresh": "_handle_diagnostics_usage_drain_refresh",
 })
 

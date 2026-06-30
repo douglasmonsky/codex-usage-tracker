@@ -189,6 +189,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         diagnostic_concentration_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "concentration"
         ]
+        diagnostic_guided_summary_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "guidedSummary"
+        ]
         diagnostic_usage_drain_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "usageDrain"
         ]
@@ -215,6 +218,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         )
         diagnostic_concentration_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/concentration"
+        )
+        diagnostic_guided_summary_stored_payload = _read_json(
+            f"http://127.0.0.1:{server.server_port}/api/diagnostics/guided-summary"
         )
         diagnostic_usage_drain_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/usage-drain"
@@ -323,6 +329,13 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_concentration_refresh_payload["status"] == "ready"
     assert diagnostic_concentration_refresh_payload["summary"]["usage_rows"] == 4
     assert (
+        diagnostic_guided_summary_refresh_payload["schema"]
+        == "codex-usage-tracker-diagnostic-guided-summary-v1"
+    )
+    assert diagnostic_guided_summary_refresh_payload["status"] == "ready"
+    assert diagnostic_guided_summary_refresh_payload["summary"]["usage_rows"] == 4
+    assert diagnostic_guided_summary_refresh_payload["drivers"]
+    assert (
         diagnostic_usage_drain_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-usage-drain-v1"
     )
@@ -345,6 +358,8 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_read_productivity_stored_payload["refreshed"] is False
     assert diagnostic_concentration_stored_payload["status"] == "ready"
     assert diagnostic_concentration_stored_payload["refreshed"] is False
+    assert diagnostic_guided_summary_stored_payload["status"] == "ready"
+    assert diagnostic_guided_summary_stored_payload["refreshed"] is False
     assert diagnostic_usage_drain_stored_payload["status"] == "ready"
     assert diagnostic_usage_drain_stored_payload["refreshed"] is False
     assert second_usage_refresh_payload["refresh_result"]["parsed_events"] == 0

@@ -12,6 +12,14 @@ def test_diagnostics_cli_parser_keeps_nested_subcommand_arguments() -> None:
     assert overview.refresh is True
     assert overview.as_json is True
 
+    guided = parser.parse_args(
+        ["diagnostics", "guided-summary", "--include-archived", "--refresh", "--json"],
+    )
+    assert guided.diagnostics_command == "guided-summary"
+    assert guided.include_archived is True
+    assert guided.refresh is True
+    assert guided.as_json is True
+
     calls = parser.parse_args(
         [
             "diagnostics",

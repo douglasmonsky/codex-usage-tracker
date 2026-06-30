@@ -12,6 +12,7 @@ from codex_usage_tracker.diagnostics.snapshots import (
     build_diagnostic_file_modifications_report,
     build_diagnostic_file_reads_report,
     build_diagnostic_git_interactions_report,
+    build_diagnostic_guided_summary_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
@@ -47,6 +48,10 @@ _DIAGNOSTIC_SNAPSHOT_REPORTS: dict[str, tuple[Any, str]] = {
         "diagnostic read productivity",
     ),
     "concentration": (build_diagnostic_concentration_report, "diagnostic concentration"),
+    "guided-summary": (
+        build_diagnostic_guided_summary_report,
+        "diagnostic guided summary",
+    ),
 }
 
 
@@ -154,6 +159,12 @@ class DiagnosticRouteMixin:
 
     def _handle_diagnostics_concentration_refresh(self, query: str) -> None:
         self._handle_named_diagnostic_snapshot(query, "concentration", refresh=True)
+
+    def _handle_diagnostics_guided_summary(self, query: str) -> None:
+        self._handle_named_diagnostic_snapshot(query, "guided-summary", refresh=False)
+
+    def _handle_diagnostics_guided_summary_refresh(self, query: str) -> None:
+        self._handle_named_diagnostic_snapshot(query, "guided-summary", refresh=True)
 
     def _handle_diagnostics_usage_drain(self, query: str) -> None:
         self._handle_diagnostic_usage_drain_snapshot(query, refresh=False)

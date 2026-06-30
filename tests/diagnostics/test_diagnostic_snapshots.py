@@ -12,6 +12,7 @@ from codex_usage_tracker.diagnostics.snapshots import (
     build_diagnostic_file_modifications_report,
     build_diagnostic_file_reads_report,
     build_diagnostic_git_interactions_report,
+    build_diagnostic_guided_summary_report,
     build_diagnostic_overview_report,
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
@@ -151,12 +152,86 @@ def test_batch_diagnostic_refresh_shares_source_log_analysis_pass(
     assert refreshed["sections"]["fileModifications"]["status"] == "ready"
     assert refreshed["sections"]["readProductivity"]["status"] == "ready"
     assert refreshed["sections"]["concentration"]["status"] == "ready"
+    assert refreshed["sections"]["guidedSummary"]["status"] == "ready"
     assert stored_file_reads["status"] == "ready"
     assert stored_file_reads["refreshed"] is False
     assert stored_file_modifications["status"] == "ready"
     assert stored_file_modifications["refreshed"] is False
     assert stored_read_productivity["status"] == "ready"
     assert stored_read_productivity["refreshed"] is False
+
+
+def test_guided_summary_snapshot_ranks_aggregate_usage_drivers(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    first = replace(
+        _usage_event(
+            record_id="heavy-thread-a",
+            session_id=SESSION_ID,
+            thread_key="thread:Long Research Thread",
+            event_timestamp="2026-05-17T14:00:00Z",
+            cumulative_total_tokens=1_000,
+        ),
+        model="gpt-5.5",
+        effort="high",
+        input_tokens=900,
+        cached_input_tokens=100,
+        output_tokens=100,
+        reasoning_output_tokens=50,
+        total_tokens=1_000,
+        cumulative_input_tokens=900,
+        cumulative_cached_input_tokens=100,
+        cumulative_output_tokens=100,
+        cumulative_reasoning_output_tokens=50,
+        cumulative_total_tokens=1_000,
+    )
+    second = replace(
+        _usage_event(
+            record_id="small-thread-b",
+            session_id="019e37d4-c1f1-71aa-b154-2d5d837af92c",
+            thread_key="thread:Small Fix Thread",
+            event_timestamp="2026-05-17T15:00:00Z",
+            cumulative_total_tokens=1_120,
+        ),
+        model="gpt-5.4",
+        effort="low",
+        input_tokens=90,
+        cached_input_tokens=70,
+        output_tokens=30,
+        reasoning_output_tokens=5,
+        total_tokens=120,
+        cumulative_input_tokens=90,
+        cumulative_cached_input_tokens=70,
+        cumulative_output_tokens=30,
+        cumulative_reasoning_output_tokens=5,
+        cumulative_total_tokens=120,
+    )
+    upsert_usage_events(db_path=db_path, events=[first, second])
+
+    missing = build_diagnostic_guided_summary_report(db_path=db_path).payload
+    guided = build_diagnostic_guided_summary_report(
+        db_path=db_path,
+        refresh=True,
+    ).payload
+    stored = build_diagnostic_guided_summary_report(db_path=db_path).payload
+
+    _assert_contract(missing)
+    _assert_contract(guided)
+    assert missing["status"] == "missing"
+    assert guided["status"] == "ready"
+    assert guided["schema"] == "codex-usage-tracker-diagnostic-guided-summary-v1"
+    assert guided["summary"]["usage_rows"] == 2
+    assert guided["summary"]["total_tokens"] == 1_120
+    assert guided["top_threads"][0]["label"] == "Long Research Thread"
+    assert guided["top_models"][0]["label"] == "gpt-5.5"
+    assert guided["drivers"][0]["key"] == "top-thread"
+    assert any(signal["key"] == "low-cache-reuse" for signal in guided["signals"])
+    assert stored["status"] == "ready"
+
+    serialized = json.dumps(guided, sort_keys=True)
+    assert "SECRET" not in serialized
+    assert "tool output" not in serialized.lower()
 
 
 def test_tool_output_and_command_snapshots_use_safe_aggregate_labels(

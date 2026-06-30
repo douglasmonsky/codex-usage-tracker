@@ -12,6 +12,7 @@ from codex_usage_tracker.diagnostics.snapshot_constants import (
     DIAGNOSTIC_FILE_MODIFICATIONS_SECTION,
     DIAGNOSTIC_FILE_READS_SECTION,
     DIAGNOSTIC_GIT_INTERACTIONS_SECTION,
+    DIAGNOSTIC_GUIDED_SUMMARY_SECTION,
     DIAGNOSTIC_READ_PRODUCTIVITY_SECTION,
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
     DIAGNOSTIC_USAGE_DRAIN_SECTION,
@@ -40,6 +41,7 @@ class DiagnosticSnapshotReport:
             DIAGNOSTIC_FILE_MODIFICATIONS_SECTION: self._render_file_modifications,
             DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: self._render_read_productivity,
             DIAGNOSTIC_CONCENTRATION_SECTION: self._render_concentration,
+            DIAGNOSTIC_GUIDED_SUMMARY_SECTION: self._render_guided_summary,
             DIAGNOSTIC_USAGE_DRAIN_SECTION: self._render_usage_drain,
         }
 
@@ -163,6 +165,25 @@ class DiagnosticSnapshotReport:
             ]
         )
 
+    def _render_guided_summary(self) -> str:
+        snapshot = self.payload.get("snapshot") or {}
+        summary = self.payload.get("summary") or {}
+        drivers = self.payload.get("drivers") or []
+        signals = self.payload.get("signals") or []
+        lines = [
+            "Diagnostic guided-summary snapshot",
+            f"Computed: {snapshot.get('computed_at')}",
+            f"History scope: {snapshot.get('history_scope')}",
+            f"Usage rows: {_int_text(summary.get('usage_rows'))}",
+            f"Total tokens: {_int_text(summary.get('total_tokens'))}",
+            f"Cache ratio: {_pct_text(summary.get('cache_ratio'))}",
+            "Top drivers:",
+        ]
+        lines.extend(_driver_lines(drivers))
+        lines.append("Signals:")
+        lines.extend(_signal_lines(signals))
+        return "\n".join(lines)
+
     def _render_usage_drain(self) -> str:
         snapshot = self.payload.get("snapshot") or {}
         summary = self.payload.get("summary") or {}
@@ -185,6 +206,38 @@ class DiagnosticSnapshotReport:
 
 def _int_text(value: object) -> str:
     return f"{int_value(value):,}"
+
+
+def _driver_lines(drivers: object) -> list[str]:
+    rows = drivers if isinstance(drivers, list) else []
+    if not rows:
+        return ["- No driver rows available."]
+    return [
+        (
+            f"- {row.get('title')}: {row.get('label')} "
+            f"({_driver_value(row)}, share {_pct_text(row.get('share'))})"
+        )
+        for row in rows
+        if isinstance(row, dict)
+    ] or ["- No driver rows available."]
+
+
+def _signal_lines(signals: object) -> list[str]:
+    rows = signals if isinstance(signals, list) else []
+    if not rows:
+        return ["- No signals available."]
+    return [
+        f"- {row.get('title')}: {row.get('finding')}"
+        for row in rows
+        if isinstance(row, dict)
+    ] or ["- No signals available."]
+
+
+def _driver_value(row: dict[str, Any]) -> str:
+    value = row.get("value")
+    if row.get("value_kind") == "ratio":
+        return _pct_text(value)
+    return _int_text(value)
 
 
 def _unavailable_snapshot_message(payload: dict[str, Any]) -> str:

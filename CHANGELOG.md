@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add guided usage-summary diagnostics across CLI, API, and dashboard to explain the largest aggregate drivers behind usage.
+
 ## 0.13.0 - 2026-06-30
 
 - Add first-run onboarding docs covering install, setup, live-dashboard launch, empty-dashboard troubleshooting, plugin discovery, and safe issue diagnostics.

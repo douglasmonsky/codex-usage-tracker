@@ -23,6 +23,7 @@ test.describe('diagnostics dashboard smoke', () => {
       'File Modifications',
       'Read Productivity',
       'Concentration',
+      'What Is Driving Usage?',
     ]) {
       await expect(page.getByRole('heading', { name: heading })).toBeVisible();
     }
