@@ -91,7 +91,10 @@ blocked
 Recommended milestones:
 
 ```text
-0.12.1
+0.13-adoption-hardening
+0.14-guided-diagnostics
+0.15-reliability-scale
+0.16-maintainability-ratchet
 1.0-readiness
 1.0.0
 ```

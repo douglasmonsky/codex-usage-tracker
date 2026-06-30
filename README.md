@@ -275,6 +275,8 @@ This is optional. The normal shell install above is the fastest trusted path for
 
 ## Roadmap
 
+The next phase is adoption hardening: better first-run setup, safer support bundles, clearer guided diagnostics, and scale/reliability checks now that more people are trying the project. See [Adoption Hardening Roadmap](docs/adoption-hardening-roadmap.md) for the branch-by-branch plan.
+
 - Keep Python runtime support validated with CI matrix coverage, package classifiers, release docs, and installed-package smoke tests.
 - Improve the `Set limits` flow with a paste/import experience for 5-hour and weekly allowance snapshots.
 - Track allowance snapshot history so local Codex credits can be compared against visible remaining-usage changes over time.
