@@ -26,13 +26,14 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     'codex-usage-tracker-doctor-v1': {
-            "required": {
-                "status": str,
-                "failures": int,
-                "warnings": int,
-                "checks": list,
-            }
-        },
+        "required": {
+            "status": str,
+            "failures": int,
+            "warnings": int,
+            "environment": dict,
+            "checks": list,
+        }
+    },
     'codex-usage-tracker-plugin-install-v1': {"required": PLUGIN_INSTALL_FIELDS},
     'codex-usage-tracker-plugin-upgrade-v1': {"required": PLUGIN_INSTALL_FIELDS},
     'codex-usage-tracker-plugin-uninstall-v1': {
