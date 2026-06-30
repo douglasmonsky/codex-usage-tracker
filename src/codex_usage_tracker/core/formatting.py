@@ -180,6 +180,47 @@ def format_doctor(report: dict[str, Any]) -> str:
         f"Failures: {report.get('failures', 0)} | warnings: {report.get('warnings', 0)}",
         "",
     ]
+    environment = report.get("environment")
+    if isinstance(environment, dict):
+        lines.extend(["Environment:"])
+        package = environment.get("package")
+        if isinstance(package, dict):
+            lines.append(
+                "Package: "
+                f"{package.get('name', 'unknown')} "
+                f"{package.get('version', 'unknown')}"
+            )
+        python = environment.get("python")
+        if isinstance(python, dict):
+            lines.append(
+                "Python: "
+                f"{python.get('version', 'unknown')} "
+                f"({python.get('implementation', 'unknown')})"
+            )
+        paths = environment.get("paths")
+        if isinstance(paths, dict):
+            lines.append(f"Codex home: {paths.get('codex_home', 'unknown')}")
+            lines.append(f"Database: {paths.get('db_path', 'unknown')}")
+            lines.append(f"Dashboard: {paths.get('dashboard_path', 'unknown')}")
+        codex_logs = environment.get("codex_logs")
+        if isinstance(codex_logs, dict):
+            sessions_status = "found" if codex_logs.get("sessions_dir_exists") else "missing"
+            lines.append(
+                "Codex logs: "
+                f"{sessions_status}, "
+                f"{_fmt_int(codex_logs.get('jsonl_files'))} JSONL files"
+            )
+        assets = environment.get("dashboard_assets")
+        if isinstance(assets, dict):
+            asset_status = "available" if assets.get("available") else "missing"
+            missing = assets.get("missing")
+            suffix = (
+                f" ({len(missing)} missing)"
+                if isinstance(missing, list) and missing
+                else ""
+            )
+            lines.append(f"Dashboard assets: {asset_status}{suffix}")
+        lines.append("")
     for check in report.get("checks", []):
         status = str(check.get("status", "unknown")).upper()
         lines.append(f"- [{status}] {check.get('name')}: {check.get('detail')}")

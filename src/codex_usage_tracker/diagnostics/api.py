@@ -5,9 +5,13 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import platform
+import sys
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker import __version__
 from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
@@ -26,6 +30,13 @@ from codex_usage_tracker.pricing.api import load_pricing_config
 from codex_usage_tracker.store.api import SchemaMigrationError, refresh_metadata, schema_state
 
 PLUGIN_NAME = "codex-usage-tracker"
+DASHBOARD_REQUIRED_ASSETS = (
+    "dashboard_data.js",
+    "dashboard_live.js",
+    "dashboard_tables.js",
+    "dashboard_responsive.css",
+    "locales/en.json",
+)
 
 
 def run_doctor(
@@ -41,6 +52,15 @@ def run_doctor(
 ) -> dict[str, Any]:
     """Run read-only checks and return a structured report."""
     root = repo_root or _resolve_plugin_root(plugin_link) or find_project_root()
+    environment = _doctor_environment(
+        codex_home=codex_home,
+        db_path=db_path,
+        dashboard_path=dashboard_path,
+        pricing_path=pricing_path,
+        plugin_link=plugin_link,
+        marketplace_path=marketplace_path,
+        root=root,
+    )
     checks = _doctor_checks(
         codex_home=codex_home,
         db_path=db_path,
@@ -50,7 +70,11 @@ def run_doctor(
         marketplace_path=marketplace_path,
         root=root,
     )
-    return _doctor_report(checks, suggest_repair=suggest_repair)
+    return _doctor_report(
+        checks,
+        suggest_repair=suggest_repair,
+        environment=environment,
+    )
 
 
 def _doctor_checks(
@@ -80,7 +104,12 @@ def _doctor_checks(
     ]
 
 
-def _doctor_report(checks: list[DoctorCheck], *, suggest_repair: bool) -> dict[str, Any]:
+def _doctor_report(
+    checks: list[DoctorCheck],
+    *,
+    suggest_repair: bool,
+    environment: dict[str, Any],
+) -> dict[str, Any]:
     fail_count = _count_check_status(checks, "fail")
     warn_count = _count_check_status(checks, "warn")
     report: dict[str, Any] = {
@@ -88,11 +117,92 @@ def _doctor_report(checks: list[DoctorCheck], *, suggest_repair: bool) -> dict[s
         "status": _doctor_status(fail_count=fail_count, warn_count=warn_count),
         "failures": fail_count,
         "warnings": warn_count,
+        "environment": environment,
         "checks": [check.to_dict() for check in checks],
     }
     if suggest_repair:
         report["repair_suggestions"] = _doctor_repair_suggestions(checks)
     return report
+
+
+def _doctor_environment(
+    *,
+    codex_home: Path,
+    db_path: Path,
+    dashboard_path: Path,
+    pricing_path: Path,
+    plugin_link: Path,
+    marketplace_path: Path,
+    root: Path | None,
+) -> dict[str, Any]:
+    return {
+        "package": {
+            "name": "codex-usage-tracker",
+            "version": __version__,
+        },
+        "python": {
+            "version": sys.version.split()[0],
+            "executable": sys.executable,
+            "implementation": platform.python_implementation(),
+            "platform": platform.platform(),
+        },
+        "paths": {
+            "codex_home": str(codex_home.expanduser()),
+            "codex_sessions": str(codex_home.expanduser() / "sessions"),
+            "db_path": str(db_path.expanduser()),
+            "dashboard_path": str(dashboard_path.expanduser()),
+            "pricing_path": str(pricing_path.expanduser()),
+            "plugin_link": str(plugin_link.expanduser()),
+            "marketplace_path": str(marketplace_path.expanduser()),
+            "plugin_root": str(root) if root else None,
+        },
+        "codex_logs": _codex_log_environment(codex_home),
+        "dashboard_assets": _dashboard_asset_environment(),
+    }
+
+
+def _codex_log_environment(codex_home: Path) -> dict[str, Any]:
+    expanded_home = codex_home.expanduser()
+    sessions_dir = expanded_home / "sessions"
+    jsonl_count = 0
+    latest_mtime: float | None = None
+    if sessions_dir.is_dir():
+        for log_path in sessions_dir.rglob("*.jsonl"):
+            jsonl_count += 1
+            try:
+                mtime = log_path.stat().st_mtime
+            except OSError:
+                continue
+            latest_mtime = mtime if latest_mtime is None else max(latest_mtime, mtime)
+    return {
+        "codex_home_exists": expanded_home.exists(),
+        "sessions_dir": str(sessions_dir),
+        "sessions_dir_exists": sessions_dir.is_dir(),
+        "jsonl_files": jsonl_count,
+        "latest_jsonl_mtime": latest_mtime,
+    }
+
+
+def _dashboard_asset_environment() -> dict[str, Any]:
+    try:
+        dashboard_root = files("codex_usage_tracker.plugin_data").joinpath("dashboard")
+        missing = [
+            asset
+            for asset in DASHBOARD_REQUIRED_ASSETS
+            if not dashboard_root.joinpath(asset).is_file()
+        ]
+    except (AttributeError, FileNotFoundError, ModuleNotFoundError, TypeError) as exc:
+        return {
+            "available": False,
+            "checked": list(DASHBOARD_REQUIRED_ASSETS),
+            "missing": list(DASHBOARD_REQUIRED_ASSETS),
+            "error": str(exc),
+        }
+    return {
+        "available": not missing,
+        "checked": list(DASHBOARD_REQUIRED_ASSETS),
+        "missing": missing,
+    }
 
 
 def _count_check_status(checks: list[DoctorCheck], status: str) -> int:

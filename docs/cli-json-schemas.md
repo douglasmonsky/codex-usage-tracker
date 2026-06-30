@@ -37,6 +37,7 @@ Tracked schema ids:
 | --- | --- |
 | `codex-usage-tracker-setup-v1` | CLI `setup --json` |
 | `codex-usage-tracker-doctor-v1` | CLI `doctor --json`, MCP `usage_doctor(response_format="json")` |
+| | Includes an `environment` object with package and Python versions, important local paths, lightweight Codex log discovery counts, and packaged dashboard asset health. Support bundles sanitize this payload according to the selected privacy mode. |
 | `codex-usage-tracker-plugin-install-v1` | CLI `install-plugin --json`, setup plugin payload |
 | `codex-usage-tracker-plugin-upgrade-v1` | CLI `upgrade-plugin --json` |
 | `codex-usage-tracker-plugin-uninstall-v1` | CLI `uninstall-plugin --json` |
