@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.13.1 - 2026-06-30
+
 - Add guided usage-summary diagnostics across CLI, API, and dashboard to explain the largest aggregate drivers behind usage.
 
 ## 0.13.0 - 2026-06-30
