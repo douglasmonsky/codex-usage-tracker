@@ -35,6 +35,74 @@ from codex_usage_tracker.pricing.api import load_pricing_config
 from codex_usage_tracker.reports.recommendations import load_threshold_config
 from codex_usage_tracker.store.api import refresh_metadata, schema_state
 
+ISSUE_SAFE_SECTIONS = (
+    "privacy",
+    "package",
+    "paths",
+    "database",
+    "refresh",
+    "pricing",
+    "allowance",
+    "thresholds",
+    "projects",
+    "doctor",
+)
+
+ISSUE_SAFE_FIELDS = (
+    "privacy",
+    "package.name",
+    "package.version",
+    "package.python",
+    "package.platform",
+    "paths.codex_home_exists",
+    "paths.sessions_dir_exists",
+    "database",
+    "refresh",
+    "pricing.loaded",
+    "pricing.error",
+    "pricing.model_count",
+    "pricing.source",
+    "allowance.loaded",
+    "allowance.error",
+    "allowance.window_count",
+    "allowance.credit_rate_count",
+    "thresholds.loaded",
+    "thresholds.error",
+    "thresholds.keys",
+    "projects.loaded",
+    "projects.error",
+    "projects.alias_count",
+    "projects.ignored_path_count",
+    "projects.tag_group_count",
+    "doctor.status",
+    "doctor.checks",
+    "doctor.repair_suggestions",
+    "doctor.environment",
+)
+
+ISSUE_CLI_HINT_FIELDS = (
+    "privacy",
+    "package",
+    "database",
+    "refresh",
+    "doctor.status",
+    "doctor.checks",
+    "doctor.environment",
+    "issue_report.safe_fields",
+)
+
+ISSUE_UNSAFE_ADDITIONS = (
+    "raw Codex JSONL logs",
+    "prompts or conversation text",
+    "assistant messages",
+    "tool output",
+    "command text",
+    "patch text",
+    "full local paths",
+    "secrets or credentials",
+    "private config values",
+)
+
 
 def build_support_bundle(
     *,
@@ -125,6 +193,7 @@ def support_bundle_payload(
             "thresholds_path": _support_path_value("thresholds_path", thresholds_path, privacy_mode),
             "projects_path": _support_path_value("projects_path", projects_path, privacy_mode),
         },
+        "issue_report": support_bundle_issue_guidance(privacy_mode),
         "database": schema_state(db_path),
         "refresh": refresh_metadata(db_path),
         "pricing": {
@@ -167,6 +236,24 @@ def support_bundle_payload(
         redact_paths=redact_paths,
         path_replacements=path_replacements,
     )
+
+
+def support_bundle_issue_guidance(privacy_mode: str) -> dict[str, Any]:
+    """Return reviewer-facing guidance for pasting support data into issues."""
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    return {
+        "recommended_privacy_mode": "strict",
+        "current_privacy_mode": privacy_mode,
+        "safe_to_paste_after_review": privacy_mode == "strict",
+        "safe_sections": list(ISSUE_SAFE_SECTIONS),
+        "safe_fields": list(ISSUE_SAFE_FIELDS),
+        "cli_hint_fields": list(ISSUE_CLI_HINT_FIELDS),
+        "do_not_add": list(ISSUE_UNSAFE_ADDITIONS),
+        "note": (
+            "For public GitHub issues, prefer a reviewed strict support bundle. "
+            "Normal mode may include local diagnostic paths."
+        ),
+    }
 
 
 def _support_path_value(label: str, path: Path, privacy_mode: str) -> str:

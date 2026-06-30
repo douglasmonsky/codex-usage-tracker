@@ -65,9 +65,12 @@ def test_setup_support_bundle_and_reset_db_cli(tmp_path: Path) -> None:
     bundle = json.loads(support_path.read_text(encoding="utf-8"))
 
     assert support.returncode == 0
+    assert "GitHub issue fields safe to paste after review" in support.stdout
+    assert "doctor.environment" in support.stdout
     assert bundle["privacy"]["contains_raw_logs"] is False
     assert bundle["privacy"]["project_metadata"]["mode"] == "strict"
     assert bundle["privacy"]["project_metadata"]["relative_cwd_hidden"] is True
+    assert bundle["issue_report"]["safe_to_paste_after_review"] is True
     assert bundle["refresh"]["parsed_events"] == "1"
     assert "low_cache_ratio" in bundle["thresholds"]["keys"]
     assert bundle["projects"]["alias_count"] == 0

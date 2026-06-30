@@ -90,6 +90,15 @@ def test_support_bundle_strict_mode_redacts_local_paths_and_doctor_text(
     assert bundle["privacy"]["project_metadata"]["mode"] == "strict"
     assert bundle["privacy"]["project_metadata"]["relative_cwd_hidden"] is True
     assert bundle["privacy"]["diagnostic_paths_redacted"] is True
+    issue_report = bundle["issue_report"]
+    assert issue_report["recommended_privacy_mode"] == "strict"
+    assert issue_report["current_privacy_mode"] == "strict"
+    assert issue_report["safe_to_paste_after_review"] is True
+    assert "privacy" in issue_report["safe_sections"]
+    assert "doctor.environment" in issue_report["safe_fields"]
+    assert "issue_report.safe_fields" in issue_report["cli_hint_fields"]
+    assert "raw Codex JSONL logs" in issue_report["do_not_add"]
+    assert "private config values" in issue_report["do_not_add"]
     assert bundle["paths"]["db_path"].startswith("[redacted path:db_path:")
     assert bundle["paths"]["codex_home"].startswith("[redacted path:codex_home:")
     assert "[redacted path:" in bundle_text

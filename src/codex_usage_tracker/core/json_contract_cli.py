@@ -216,18 +216,29 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "required": {"projects_path": str, **PATH_CREATED_FIELDS}
         },
     'codex-usage-tracker-support-bundle-v1': {
-            "required": {
-                "support_bundle_path": str,
-                "privacy": dict,
-            },
-            "nested": {
-                "privacy": {
-                    "contains_raw_logs": bool,
-                    "contains_prompts": bool,
-                    "contains_assistant_messages": bool,
-                    "contains_tool_output": bool,
-                    "project_metadata_mode": str,
-                }
-            },
+        "required": {
+            "support_bundle_path": str,
+            "privacy": dict,
+            "issue_report": dict,
         },
+        "nested": {
+            "privacy": {
+                "contains_raw_logs": bool,
+                "contains_prompts": bool,
+                "contains_assistant_messages": bool,
+                "contains_tool_output": bool,
+                "project_metadata_mode": str,
+            },
+            "issue_report": {
+                "recommended_privacy_mode": str,
+                "current_privacy_mode": str,
+                "safe_to_paste_after_review": bool,
+                "safe_sections": list,
+                "safe_fields": list,
+                "cli_hint_fields": list,
+                "do_not_add": list,
+                "note": str,
+            }
+        },
+    },
 }

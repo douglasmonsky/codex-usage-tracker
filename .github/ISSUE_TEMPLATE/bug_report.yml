@@ -30,7 +30,7 @@ body:
     id: diagnostics
     attributes:
       label: Safe diagnostics
-      description: Prefer a reviewed strict support bundle from `codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json`. If pasting JSON, paste only reviewed strict-mode bundle content or `doctor --json` output.
+      description: Prefer a reviewed strict support bundle from `codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json`. The bundle's `issue_report.safe_fields` list names the safest fields to paste. If pasting JSON, paste only reviewed strict-mode bundle content or `doctor --json` output.
       render: json
   - type: input
     id: version
