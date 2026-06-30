@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.12.1 - 2026-06-29
+
+- Ship the package-domain boundary refactor behind compatibility facades so existing CLI, imports, dashboard routes, JSON payloads, and MCP entrypoints keep working while the source tree is organized by responsibility.
+- Add Tach domain configuration files, refreshed Agent Maintainer baselines, and package-boundary documentation for the new module layout.
+- Restore `python -m codex_usage_tracker.cli` after the CLI package split and add regression coverage for both module entrypoints.
+- Split allowance pricing helpers into smaller modules while preserving the public allowance facade.
+
 ## 0.12.0 - 2026-06-29
 
 - Refactor CLI, dashboard server routing, SQLite store/query boundaries, context parsing, diagnostics, and usage-drain modeling into smaller modules with compatibility facades.

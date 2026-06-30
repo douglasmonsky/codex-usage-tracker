@@ -5,7 +5,11 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
+from codex_usage_tracker.cli.main import main
+
 _API_MODULE = "codex_usage_tracker.cli.main"
+
+__all__ = ["main"]
 
 def __getattr__(name: str) -> Any:
     module = import_module(_API_MODULE)

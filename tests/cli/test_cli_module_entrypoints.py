@@ -8,6 +8,11 @@ import sys
 from pathlib import Path
 
 from codex_usage_tracker import __version__
+from codex_usage_tracker.cli import main as cli_main
+
+
+def test_console_script_target_is_callable() -> None:
+    assert callable(cli_main)
 
 
 def test_cli_package_module_version() -> None:
