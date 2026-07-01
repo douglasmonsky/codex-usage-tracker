@@ -1,0 +1,55 @@
+import {
+  Activity,
+  BarChart3,
+  BookOpen,
+  Boxes,
+  BrainCircuit,
+  Database,
+  FileText,
+  Home,
+  Search,
+  Settings,
+  Table2,
+  Workflow,
+  type LucideIcon,
+} from 'lucide-react';
+
+export type ViewId =
+  | 'overview'
+  | 'investigator'
+  | 'calls'
+  | 'threads'
+  | 'usage-drain'
+  | 'cache-context'
+  | 'diagnostics'
+  | 'reports'
+  | 'settings';
+
+export type NavItem = {
+  id: ViewId;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+};
+
+export const navItems: NavItem[] = [
+  { id: 'overview', label: 'Overview', description: 'High-level telemetry', icon: Home },
+  { id: 'investigator', label: 'Investigator', description: 'Usage drivers', icon: Search },
+  { id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2 },
+  { id: 'threads', label: 'Threads', description: 'Thread efficiency', icon: Workflow },
+  { id: 'usage-drain', label: 'Usage Drain Lab', description: 'Allowance and weekly credits', icon: BrainCircuit },
+  { id: 'cache-context', label: 'Cache And Context', description: 'Cache and cold resumes', icon: Database },
+  { id: 'diagnostics', label: 'Diagnostics Notebook', description: 'Technical report', icon: BookOpen },
+  { id: 'reports', label: 'Reports', description: 'Generated analyses', icon: BarChart3 },
+  { id: 'settings', label: 'Settings', description: 'Local configuration', icon: Settings },
+];
+
+export const secondaryNavItems = [
+  { label: 'Files', icon: FileText },
+  { label: 'Commands', icon: Activity },
+  { label: 'Models', icon: Boxes },
+];
+
+export function isViewId(value: string | null): value is ViewId {
+  return navItems.some(item => item.id === value);
+}
