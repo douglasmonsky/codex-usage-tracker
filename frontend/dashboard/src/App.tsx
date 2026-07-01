@@ -89,7 +89,7 @@ export function App() {
           {secondaryNavItems.map(item => {
             const Icon = item.icon;
             return (
-              <button type="button" key={item.label}>
+              <button type="button" key={item.label} onClick={() => setView(item.target)}>
                 <Icon size={16} />
                 {item.label}
               </button>

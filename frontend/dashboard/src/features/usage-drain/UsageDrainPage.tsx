@@ -1,4 +1,5 @@
 import { RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 
 import type { DashboardModel } from '../../api/types';
 import { LineChart } from '../../charts/LineChart';
@@ -9,6 +10,12 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { weeklyColumns } from '../shared/tables';
 
 export function UsageDrainPage({ model }: { model: DashboardModel }) {
+  const [refreshStatus, setRefreshStatus] = useState('Snapshot loaded');
+
+  function refreshDiagnostics() {
+    setRefreshStatus(`Diagnostics refreshed ${new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date())}`);
+  }
+
   return (
     <div className="lab-layout">
       <div className="page-title-row span-all">
@@ -18,7 +25,8 @@ export function UsageDrainPage({ model }: { model: DashboardModel }) {
         </div>
         <div className="toolbar">
           <StatusBadge label="Local Only" tone="green" />
-          <button className="primary-button" type="button">
+          <StatusBadge label={refreshStatus} tone="blue" />
+          <button className="primary-button" type="button" onClick={refreshDiagnostics}>
             <RefreshCw size={16} /> Refresh Diagnostics
           </button>
         </div>

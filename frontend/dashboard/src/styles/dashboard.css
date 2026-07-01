@@ -849,6 +849,19 @@ button {
   background: #fbfdff;
 }
 
+.report-card {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.finding-card.active,
+.report-card.active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
 .finding-card {
   grid-template-columns: 30px minmax(0, 1fr) auto;
 }

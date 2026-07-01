@@ -44,10 +44,10 @@ export const navItems: NavItem[] = [
   { id: 'settings', label: 'Settings', description: 'Local configuration', icon: Settings },
 ];
 
-export const secondaryNavItems = [
-  { label: 'Files', icon: FileText },
-  { label: 'Commands', icon: Activity },
-  { label: 'Models', icon: Boxes },
+export const secondaryNavItems: Array<{ label: string; icon: LucideIcon; target: ViewId }> = [
+  { label: 'Files', icon: FileText, target: 'settings' },
+  { label: 'Commands', icon: Activity, target: 'investigator' },
+  { label: 'Models', icon: Boxes, target: 'calls' },
 ];
 
 export function isViewId(value: string | null): value is ViewId {

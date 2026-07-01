@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { VisibilityState } from '@tanstack/react-table';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { enableContextApi, loadCallContext, type ContextRequestOptions } from '../../api/context';
 import type { CallContextPayload, CallRow, ContextRuntime, DashboardModel } from '../../api/types';
 import { BarChart } from '../../charts/BarChart';
@@ -60,8 +60,10 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
   const [density, setDensity] = useState<'dense' | 'roomy'>('dense');
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
   const contextRuntime = useMemo(
     () => ({ ...model.contextRuntime, contextApiEnabled }),
@@ -89,6 +91,11 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
   function exportCalls() {
     downloadCsv(`codex-calls-${csvDateStamp()}.csv`, rowsToCsv(filteredCalls, callCsvColumns));
     setExportStatus(`Exported ${filteredCalls.length} calls`);
+  }
+
+  function focusFilters() {
+    searchInputRef.current?.focus();
+    setFilterStatus(`Filters ready for ${filteredCalls.length} calls`);
   }
 
   return (
@@ -131,7 +138,7 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
       <div className="filter-row">
         <label className="search-box">
           <span className="sr-only">Search calls</span>
-          <input value={localQuery} onChange={event => setLocalQuery(event.target.value)} placeholder="Search calls, threads, models..." />
+          <input ref={searchInputRef} value={localQuery} onChange={event => setLocalQuery(event.target.value)} placeholder="Search calls, threads, models..." />
         </label>
         <label className="filter-field">
           <span>Model</span>
@@ -155,7 +162,7 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
             ))}
           </select>
         </label>
-        <button className="toolbar-button" type="button">
+        <button className="toolbar-button" type="button" onClick={focusFilters}>
           <Filter size={16} />
           More Filters
         </button>
@@ -171,7 +178,7 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
       <div className="table-detail-layout">
         <Panel
           title="Model Calls"
-          subtitle={exportStatus || `Showing ${filteredCalls.length} of ${model.calls.length} aggregate rows`}
+          subtitle={exportStatus || filterStatus || `Showing ${filteredCalls.length} of ${model.calls.length} aggregate rows`}
           action={<StatusBadge label="Raw context gated" tone="blue" />}
         >
           <DataTable

@@ -15,6 +15,7 @@ Implemented in this slice:
 - Aggregate row compatibility for newer dashboard/query fields including `call_started_at`, `cache_ratio`, thread attachment labels, usage-credit confidence, and recommendation signals.
 - Shared chart, card, table, badge, panel, and formatting primitives.
 - Working global search, Calls and Threads local filters, column choosers, sortable table headers, aggregate CSV exports, selected-call drill-down with gated Evidence context loading, and selected-thread detail panels.
+- Quick links and prototype action controls now perform local aggregate actions or focus relevant controls instead of acting as inert placeholders.
 - Vitest unit coverage and Playwright desktop/mobile smoke coverage for the experimental React dashboard.
 - Vite production build output and package-data globs for the experimental React asset bundle.
 - Pasted design references copied into `docs/assets/frontend-rewrite-references/`.

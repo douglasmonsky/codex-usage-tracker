@@ -1,6 +1,6 @@
 import type { VisibilityState } from '@tanstack/react-table';
 import { Download, Filter } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { DashboardModel, ThreadRow } from '../../api/types';
 import { BarChart } from '../../charts/BarChart';
 import { ColumnChooser } from '../../components/ColumnChooser';
@@ -23,8 +23,10 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
   const [riskFilter, setRiskFilter] = useState('all');
   const [selectedThreadName, setSelectedThreadName] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const filteredThreads = useMemo(
     () =>
@@ -44,6 +46,11 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
     setExportStatus(`Exported ${filteredThreads.length} threads`);
   }
 
+  function focusFilters() {
+    searchInputRef.current?.focus();
+    setFilterStatus(`Filters ready for ${filteredThreads.length} grouped threads`);
+  }
+
   return (
     <div className="thread-layout">
       <div className="page-title-row span-all">
@@ -56,7 +63,7 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
             <Download size={16} />
             Export
           </button>
-          <button className="toolbar-button" type="button">
+          <button className="toolbar-button" type="button" onClick={focusFilters}>
             <Filter size={16} />
             Filters
           </button>
@@ -73,7 +80,7 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
       <div className="filter-row span-all">
         <label className="search-box">
           <span className="sr-only">Search threads</span>
-          <input value={localQuery} onChange={event => setLocalQuery(event.target.value)} placeholder="Search threads, risks, token totals..." />
+          <input ref={searchInputRef} value={localQuery} onChange={event => setLocalQuery(event.target.value)} placeholder="Search threads, risks, token totals..." />
         </label>
         <label className="filter-field">
           <span>Cold risk</span>
@@ -97,7 +104,7 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
       </Panel>
       <Panel
         title="Thread Leaderboard"
-        subtitle={exportStatus || `Showing ${filteredThreads.length} of ${model.threads.length} grouped threads`}
+        subtitle={exportStatus || filterStatus || `Showing ${filteredThreads.length} of ${model.threads.length} grouped threads`}
         action={<StatusBadge label={globalQuery || localQuery ? 'Filtered' : 'Aggregate'} tone="blue" />}
       >
         <DataTable

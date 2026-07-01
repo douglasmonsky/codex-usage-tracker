@@ -31,6 +31,38 @@ describe('React dashboard shell', () => {
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
   });
 
+  it('wires quick links and local prototype action controls', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Models' }));
+    expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /More Filters/i }));
+    expect(screen.getByPlaceholderText('Search calls, threads, models...')).toHaveFocus();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }));
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
+    expect(screen.getByRole('heading', { name: 'Investigator Workbench' })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /^Inspect/i })[0]);
+    expect(screen.getByText(/Selected Long Thread/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Cost Curves/i }));
+    expect(screen.getAllByText('Cost Curves').length).toBeGreaterThan(1);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    fireEvent.click(screen.getByRole('button', { name: /Export Pack/i }));
+    expect(screen.getByText(/Exported 6 report snapshots/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Refresh Diagnostics/i }));
+    expect(screen.getByText(/Diagnostics refreshed/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Filters$/i }));
+    expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveFocus();
+  });
+
   it('filters calls and shows the selected call drill-down panel', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
