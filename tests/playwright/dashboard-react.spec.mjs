@@ -41,10 +41,11 @@ test.describe('React dashboard rewrite smoke', () => {
     await expect(page.getByRole('tab', { name: /Summary/i })).toHaveAttribute('aria-selected', 'true');
     await page.getByRole('tab', { name: /Tokens/i }).click();
     await expect(page.getByText('Reasoning output')).toBeVisible();
-    await page.getByRole('tab', { name: /Evidence/i }).click();
-    await expect(page.getByText('Raw context is gated')).toBeVisible();
+  await page.getByRole('tab', { name: /Evidence/i }).click();
+  await expect(page.getByText('Raw context is gated')).toBeVisible();
+  await expect(page.getByText(/localhost dashboard server API token/i)).toBeVisible();
 
-    const downloadPromise = page.waitForEvent('download');
+  const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: /^Export$/i }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^codex-calls-\d{4}-\d{2}-\d{2}\.csv$/);

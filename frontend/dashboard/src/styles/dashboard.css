@@ -1053,6 +1053,91 @@ button {
   font-size: 13px;
 }
 
+.context-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.context-action-grid .toggle-row {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #243248;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.context-state-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.context-state-note.error {
+  border-color: #fecaca;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.context-evidence {
+  display: grid;
+  gap: 10px;
+}
+
+.context-evidence-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.context-entry-list {
+  display: grid;
+  gap: 8px;
+}
+
+.context-entry {
+  overflow: hidden;
+  border: 1px solid #e1e8f2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.context-entry-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e8eef6;
+  background: #f8fafc;
+  color: #52627a;
+  font-size: 12px;
+}
+
+.context-entry-meta strong {
+  color: #0f172a;
+}
+
+.context-entry pre {
+  max-height: 220px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #172033;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
 .composition-bar {
   display: flex;
   overflow: hidden;
@@ -1407,6 +1492,11 @@ button {
     width: auto;
     max-height: calc(100vh - 112px);
     overflow: auto;
+  }
+
+  .context-action-grid,
+  .context-evidence-summary {
+    grid-template-columns: 1fr;
   }
 
   .metric-grid,

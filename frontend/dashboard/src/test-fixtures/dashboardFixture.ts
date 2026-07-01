@@ -3,6 +3,11 @@ import type { DashboardModel } from '../api/types';
 const weeklyLabels = ['May 12', 'May 19', 'May 26', 'Jun 02', 'Jun 09', 'Jun 16', 'Jun 23', 'Jun 30'];
 
 export const fixtureModel: DashboardModel = {
+  contextRuntime: {
+    apiToken: '',
+    contextApiEnabled: false,
+    fileMode: false,
+  },
   cards: [
     {
       label: 'Total Tokens',

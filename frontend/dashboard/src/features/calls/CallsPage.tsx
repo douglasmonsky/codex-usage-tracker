@@ -10,8 +10,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { VisibilityState } from '@tanstack/react-table';
-import { useMemo, useState } from 'react';
-import type { CallRow, DashboardModel } from '../../api/types';
+import { useEffect, useMemo, useState } from 'react';
+import { enableContextApi, loadCallContext, type ContextRequestOptions } from '../../api/context';
+import type { CallContextPayload, CallRow, ContextRuntime, DashboardModel } from '../../api/types';
 import { BarChart } from '../../charts/BarChart';
 import { ColumnChooser } from '../../components/ColumnChooser';
 import { LineChart } from '../../charts/LineChart';
@@ -31,6 +32,20 @@ type CallsPageProps = {
 
 type DrillDownTab = 'summary' | 'tokens' | 'cache' | 'evidence';
 
+type ContextLoadState =
+  | { status: 'idle'; message?: string }
+  | { status: 'loading'; message: string }
+  | { status: 'loaded'; payload: CallContextPayload }
+  | { status: 'error'; message: string };
+
+const defaultContextOptions: ContextRequestOptions = {
+  includeToolOutput: false,
+  includeCompactionHistory: false,
+  maxChars: 8_000,
+  maxEntries: 20,
+  mode: 'quick',
+};
+
 const drillDownTabs: Array<{ id: DrillDownTab; label: string; icon: LucideIcon }> = [
   { id: 'summary', label: 'Summary', icon: Activity },
   { id: 'tokens', label: 'Tokens', icon: BarChart3 },
@@ -47,6 +62,11 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
   const [exportStatus, setExportStatus] = useState('');
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
+  const contextRuntime = useMemo(
+    () => ({ ...model.contextRuntime, contextApiEnabled }),
+    [contextApiEnabled, model.contextRuntime],
+  );
 
   const modelOptions = useMemo(() => uniqueSorted(model.calls.map(call => call.model)), [model.calls]);
   const effortOptions = useMemo(() => uniqueSorted(model.calls.map(call => call.effort)), [model.calls]);
@@ -166,13 +186,25 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
             onColumnVisibilityChange={setColumnVisibility}
           />
         </Panel>
-        <CallDrillDown call={selectedCall} />
+        <CallDrillDown
+          call={selectedCall}
+          contextRuntime={contextRuntime}
+          onContextApiEnabledChange={setContextApiEnabled}
+        />
       </div>
     </div>
   );
 }
 
-function CallDrillDown({ call }: { call: CallRow | null }) {
+function CallDrillDown({
+  call,
+  contextRuntime,
+  onContextApiEnabledChange,
+}: {
+  call: CallRow | null;
+  contextRuntime: ContextRuntime;
+  onContextApiEnabledChange: (enabled: boolean) => void;
+}) {
   const [activeTab, setActiveTab] = useState<DrillDownTab>('summary');
 
   if (!call) {
@@ -217,7 +249,13 @@ function CallDrillDown({ call }: { call: CallRow | null }) {
           {activeTab === 'summary' ? <SummaryTab call={call} /> : null}
           {activeTab === 'tokens' ? <TokensTab call={call} /> : null}
           {activeTab === 'cache' ? <CacheTab call={call} /> : null}
-          {activeTab === 'evidence' ? <EvidenceTab call={call} /> : null}
+          {activeTab === 'evidence' ? (
+            <EvidenceTab
+              call={call}
+              contextRuntime={contextRuntime}
+              onContextApiEnabledChange={onContextApiEnabledChange}
+            />
+          ) : null}
         </div>
       </Panel>
     </aside>
@@ -279,14 +317,59 @@ function CacheTab({ call }: { call: CallRow }) {
   );
 }
 
-function EvidenceTab({ call }: { call: CallRow }) {
+function EvidenceTab({
+  call,
+  contextRuntime,
+  onContextApiEnabledChange,
+}: {
+  call: CallRow;
+  contextRuntime: ContextRuntime;
+  onContextApiEnabledChange: (enabled: boolean) => void;
+}) {
+  const [options, setOptions] = useState(defaultContextOptions);
+  const [contextState, setContextState] = useState<ContextLoadState>({ status: 'idle' });
+  const canUseContextServer = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
+  const canLoadContext = canUseContextServer && contextRuntime.contextApiEnabled;
+
+  useEffect(() => {
+    setContextState({ status: 'idle' });
+  }, [call.id, options.includeCompactionHistory, options.includeToolOutput, options.maxChars, options.maxEntries, options.mode]);
+
+  async function enableContextLoading() {
+    setContextState({ status: 'loading', message: 'Enabling localhost context API...' });
+    try {
+      const enabled = await enableContextApi(contextRuntime);
+      onContextApiEnabledChange(enabled);
+      setContextState({
+        status: 'idle',
+        message: enabled ? 'Context API enabled. Load this call when ready.' : 'Context API did not enable.',
+      });
+    } catch (error) {
+      setContextState({ status: 'error', message: errorMessage(error) });
+    }
+  }
+
+  async function loadEvidence() {
+    setContextState({ status: 'loading', message: 'Loading selected-turn evidence...' });
+    try {
+      const payload = await loadCallContext(call.id, contextRuntime, options);
+      setContextState({ status: 'loaded', payload });
+    } catch (error) {
+      setContextState({ status: 'error', message: errorMessage(error) });
+    }
+  }
+
+  function updateOption<K extends keyof ContextRequestOptions>(key: K, value: ContextRequestOptions[K]) {
+    setOptions(current => ({ ...current, [key]: value }));
+  }
+
   return (
     <>
       <div className="locked-context-card">
         <LockKeyhole size={20} />
         <div>
           <strong>Raw context is gated</strong>
-          <p>Prompt text, assistant text, and tool output are not embedded. Evidence can load only through the explicit localhost context API.</p>
+          <p>{contextRuntimeMessage(contextRuntime)}</p>
         </div>
       </div>
       <dl className="detail-list">
@@ -296,17 +379,96 @@ function EvidenceTab({ call }: { call: CallRow }) {
         <DetailRow label="Model" value={call.model} />
         <DetailRow label="Effort" value={call.effort} />
       </dl>
-      <div className="action-row">
-        <button className="primary-button" type="button" disabled>
-          Open investigator
+      <div className="context-action-grid">
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={enableContextLoading}
+          disabled={!canUseContextServer || contextRuntime.contextApiEnabled || contextState.status === 'loading'}
+        >
+          Enable context loading
         </button>
-        <button className="toolbar-button" type="button" disabled>
+        <button
+          className="primary-button"
+          type="button"
+          onClick={loadEvidence}
+          disabled={!canLoadContext || contextState.status === 'loading'}
+        >
           Show turn evidence
         </button>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={options.includeToolOutput}
+            disabled={!canLoadContext || contextState.status === 'loading'}
+            onChange={event => updateOption('includeToolOutput', event.target.checked)}
+          />
+          Include tool output
+        </label>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={options.maxChars === 0}
+            disabled={!canLoadContext || contextState.status === 'loading'}
+            onChange={event => updateOption('maxChars', event.target.checked ? 0 : defaultContextOptions.maxChars)}
+          />
+          No char limit
+        </label>
       </div>
-      <p className="privacy-note">These actions are intentionally disabled until `/api/context` is wired with explicit raw-context permission.</p>
+      {contextState.status === 'idle' && contextState.message ? <p className="context-state-note">{contextState.message}</p> : null}
+      {contextState.status === 'loading' ? <p className="context-state-note">{contextState.message}</p> : null}
+      {contextState.status === 'error' ? <p className="context-state-note error">{contextState.message}</p> : null}
+      {contextState.status === 'loaded' ? <ContextEvidence payload={contextState.payload} /> : null}
+      <p className="privacy-note">
+        Raw context is never embedded in the dashboard HTML. This view reads the selected local JSONL turn only after an explicit request.
+      </p>
     </>
   );
+}
+
+function ContextEvidence({ payload }: { payload: CallContextPayload }) {
+  const entries = payload.entries ?? [];
+  const omitted = payload.omitted ?? {};
+
+  return (
+    <div className="context-evidence">
+      <div className="context-evidence-summary">
+        <DrillMetric label="Entries" value={formatNumber(entries.length)} detail={String(payload.context_mode ?? 'quick')} />
+        <DrillMetric label="Visible chars" value={formatNumber(Number(payload.visible_char_count ?? 0))} detail="redacted local text" />
+        <DrillMetric label="Visible tokens" value={formatNumber(Number(payload.visible_token_estimate ?? 0))} detail="estimator" />
+        <DrillMetric label="Older omitted" value={formatNumber(Number(omitted.older_entries ?? 0))} detail="entry budget" />
+      </div>
+      <div className="context-entry-list">
+        {entries.slice(0, 8).map((entry, index) => (
+          <article className="context-entry" key={`${entry.type ?? 'entry'}-${entry.line_number ?? index}`}>
+            <div className="context-entry-meta">
+              <strong>{entry.label || entry.role || entry.type || `Entry ${index + 1}`}</strong>
+              <span>{entry.line_number ? `line ${entry.line_number}` : entry.timestamp || 'local evidence'}</span>
+            </div>
+            <pre>{entry.text || '[no visible text]'}</pre>
+          </article>
+        ))}
+        {!entries.length ? <p className="empty-state">No visible evidence entries returned for this call.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function contextRuntimeMessage(runtime: ContextRuntime): string {
+  if (runtime.fileMode) {
+    return 'Static file mode cannot read local JSONL context. Use serve-dashboard with the context API enabled.';
+  }
+  if (!runtime.apiToken) {
+    return 'Context loading requires the localhost dashboard server API token.';
+  }
+  if (!runtime.contextApiEnabled) {
+    return 'Context API is available but off. Enable it here before loading selected-turn evidence.';
+  }
+  return 'Context API is enabled. Load selected-turn evidence from the local JSONL source only when needed.';
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function DrillMetric({ label, value, detail }: { label: string; value: string; detail: string }) {

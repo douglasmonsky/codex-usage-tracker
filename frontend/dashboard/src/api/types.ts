@@ -2,6 +2,8 @@ export type UsageRow = {
   id?: string;
   record_id?: string;
   session_id?: string;
+  source_file?: string | null;
+  line_number?: number | null;
   started_at?: string;
   call_started_at?: string;
   event_timestamp?: string;
@@ -36,6 +38,7 @@ export type UsageRow = {
 
 export type DashboardBootPayload = {
   api_token?: string;
+  context_api_enabled?: boolean;
   rows?: UsageRow[];
   summary?: Record<string, unknown>;
   observed_usage?: Record<string, unknown>;
@@ -48,6 +51,38 @@ export type DashboardBootPayload = {
   allowance_source?: string | Record<string, unknown>;
   privacy_mode?: string;
   shell_boot?: boolean;
+};
+
+export type ContextRuntime = {
+  apiToken: string;
+  contextApiEnabled: boolean;
+  fileMode: boolean;
+};
+
+export type CallContextEntry = {
+  type?: string;
+  label?: string;
+  role?: string;
+  text?: string;
+  timestamp?: string;
+  line_number?: number;
+  chars?: number;
+  tokens?: number;
+};
+
+export type CallContextPayload = {
+  schema?: string;
+  record_id?: string;
+  context_mode?: string;
+  entries?: CallContextEntry[];
+  visible_char_count?: number;
+  visible_token_estimate?: number;
+  omitted?: Record<string, unknown>;
+  serialized_evidence?: {
+    total_chars?: number;
+    token_estimate?: number;
+    parse_errors?: number;
+  };
 };
 
 export type MetricTone = 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'neutral';
@@ -167,6 +202,7 @@ export type ReportSummary = {
 };
 
 export type DashboardModel = {
+  contextRuntime: ContextRuntime;
   cards: MetricCard[];
   tokenSeries: Series[];
   costSeries: Series[];

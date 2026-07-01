@@ -1,5 +1,5 @@
 import { fixtureModel } from '../test-fixtures/dashboardFixture';
-import type { CallRow, DashboardBootPayload, DashboardModel, MetricCard, ThreadRow, UsageRow } from './types';
+import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, ThreadRow, UsageRow } from './types';
 
 declare global {
   interface Window {
@@ -26,7 +26,10 @@ export function readBootPayload(): DashboardBootPayload | null {
 
 export function modelFromBootPayload(payload: DashboardBootPayload | null): DashboardModel {
   if (!payload?.rows?.length) {
-    return fixtureModel;
+    return {
+      ...fixtureModel,
+      contextRuntime: contextRuntimeFromBootPayload(payload),
+    };
   }
 
   const calls = payload.rows.slice(0, 100).map(rowToCall);
@@ -47,6 +50,7 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
 
   return {
     ...fixtureModel,
+    contextRuntime: contextRuntimeFromBootPayload(payload),
     cards,
     calls,
     threads: buildThreads(calls),
@@ -54,6 +58,14 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
       { label: 'Cache read', value: cachePct, color: '#2563eb' },
       { label: 'Uncached input', value: Math.max(100 - cachePct, 0), color: '#7c3aed' },
     ],
+  };
+}
+
+function contextRuntimeFromBootPayload(payload: DashboardBootPayload | null): ContextRuntime {
+  return {
+    apiToken: String(payload?.api_token ?? ''),
+    contextApiEnabled: Boolean(payload?.context_api_enabled),
+    fileMode: window.location.protocol === 'file:',
   };
 }
 
