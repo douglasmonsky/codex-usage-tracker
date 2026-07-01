@@ -11,10 +11,12 @@ export function readBootPayload(): DashboardBootPayload | null {
   if (window.__CODEX_USAGE_BOOT__) {
     return window.__CODEX_USAGE_BOOT__;
   }
+
   const embedded = document.getElementById('usage-data');
   if (!embedded?.textContent) {
     return null;
   }
+
   try {
     return JSON.parse(embedded.textContent) as DashboardBootPayload;
   } catch {
@@ -50,8 +52,7 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
     threads: buildThreads(calls),
     cacheSegments: [
       { label: 'Cache read', value: cachePct, color: '#2563eb' },
-      { label: 'Uncached input', value: Math.max(100 - cachePct, 0), color: '#f59e0b' },
-      { label: 'Output', value: 22, color: '#0f766e' },
+      { label: 'Uncached input', value: Math.max(100 - cachePct, 0), color: '#7c3aed' },
     ],
   };
 }
@@ -68,15 +69,15 @@ function buildCards(input: {
     {
       label: 'Total Tokens',
       value: formatCompact(input.totalTokens),
-      detail: `${formatNumber(input.totalCalls)} loaded calls`,
-      trend: 'active snapshot',
+      detail: `${input.historyScope} history scope`,
+      trend: 'loaded aggregate rows',
       tone: 'blue',
     },
     {
       label: 'Estimated Cost',
       value: money(input.estimatedCost),
-      detail: `${input.historyScope} scope`,
-      trend: 'local estimate',
+      detail: 'local pricing config',
+      trend: 'privacy-safe estimate',
       tone: 'green',
     },
     {
@@ -103,24 +104,59 @@ function buildCards(input: {
   ];
 }
 
-function rowToCall(row: UsageRow): CallRow {
+function rowToCall(row: UsageRow, index: number): CallRow {
+  const rawTime = String(row.started_at ?? row.call_started_at ?? row.time ?? row.event_timestamp ?? row.turn_timestamp ?? '');
   const input = Number(row.input_tokens ?? 0);
+  const output = Number(row.output_tokens ?? 0);
+  const reasoningOutput = Number(row.reasoning_output_tokens ?? 0);
   const cached = Number(row.cached_input_tokens ?? 0);
-  const cachedPct = input > 0 ? (cached / input) * 100 : Number(row.cache_hit_ratio ?? 0) * 100;
-  const totalTokens = Number(row.total_tokens ?? input + Number(row.output_tokens ?? 0));
+  const cacheRatio = Number(row.cache_hit_ratio ?? row.cache_ratio ?? 0);
+  const cachedPct = input > 0 ? (cached / input) * 100 : cacheRatio * 100;
+  const totalTokens = Number(row.total_tokens ?? input + output);
+  const durationSeconds = Number(row.duration_seconds ?? row.call_duration_seconds ?? 0);
+  const uncachedInput = Number(row.uncached_input_tokens ?? Math.max(input - cached, 0));
+  const id = String(row.record_id ?? row.id ?? `${rawTime || 'row'}-${index}`);
+  const signal = String(row.primary_signal ?? '').trim();
+
   return {
-    time: formatShortDate(String(row.started_at ?? row.time ?? '')),
-    thread: String(row.thread_name ?? row.thread ?? 'Untitled thread'),
+    id,
+    rawTime,
+    time: formatShortDate(rawTime),
+    thread: getThreadLabel(row),
     model: String(row.model ?? 'unknown'),
     effort: String(row.effort ?? 'blank'),
     input,
-    output: Number(row.output_tokens ?? 0),
+    output,
+    reasoningOutput,
+    totalTokens,
+    uncachedInput,
     cachedPct,
     cost: Number(row.estimated_cost_usd ?? 0),
-    duration: formatDuration(Number(row.duration_seconds ?? 0)),
-    fast: Number(row.duration_seconds ?? 0) > 0 && totalTokens / Math.max(Number(row.duration_seconds ?? 1), 1) > 4_000,
+    credits: Number(row.usage_credits ?? 0),
+    duration: formatDuration(durationSeconds),
+    durationSeconds,
+    fast: durationSeconds > 0 && totalTokens / Math.max(durationSeconds, 1) > 4_000,
+    usageCreditConfidence: String(row.usage_credit_confidence ?? 'unknown'),
+    pricingEstimated: Boolean(row.pricing_estimated),
+    signal: signal || (cachedPct < 25 ? 'cache-risk' : 'aggregate'),
+    recommendation: String(row.recommended_action ?? ''),
     tags: cachedPct < 25 ? ['uncached'] : cachedPct > 60 ? ['healthy-cache'] : [],
   };
+}
+
+function getThreadLabel(row: UsageRow): string {
+  const direct = row.thread_name ?? row.thread ?? row.resolved_parent_thread_name ?? row.parent_thread_name;
+  if (direct && String(direct).trim()) {
+    return String(direct);
+  }
+
+  const project = row.project_name ?? row.project_relative_cwd;
+  const sessionSuffix = row.session_id ? row.session_id.slice(-6) : '';
+  if (project && sessionSuffix) {
+    return `${project} ${sessionSuffix}`;
+  }
+
+  return row.thread_attachment_label ? String(row.thread_attachment_label) : 'Untitled thread';
 }
 
 function buildThreads(calls: CallRow[]): ThreadRow[] {
@@ -132,7 +168,7 @@ function buildThreads(calls: CallRow[]): ThreadRow[] {
   return [...grouped.entries()]
     .map(([name, rows]) => {
       const turns = rows.length;
-      const totalTokens = rows.reduce((sum, row) => sum + row.input + row.output, 0);
+      const totalTokens = rows.reduce((sum, row) => sum + row.totalTokens, 0);
       const cost = rows.reduce((sum, row) => sum + row.cost, 0);
       const cachePct = rows.reduce((sum, row) => sum + row.cachedPct, 0) / Math.max(turns, 1);
       const coldResumeRisk = cachePct < 25 ? 'High' : cachePct < 45 ? 'Medium' : 'Low';
@@ -144,7 +180,7 @@ function buildThreads(calls: CallRow[]): ThreadRow[] {
         cachePct,
         costPerCall: cost / Math.max(turns, 1),
         coldResumeRisk,
-        productivity: Math.max(20, Math.min(92, Math.round(cachePct + 30 - turns / 4))),
+        productivity: Math.max(20, Math.round(cachePct - cost / Math.max(turns, 1) * 4)),
       } satisfies ThreadRow;
     })
     .sort((left, right) => right.cost - left.cost)

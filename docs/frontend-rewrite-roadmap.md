@@ -12,7 +12,9 @@ Implemented in this slice:
 - Cohesive white analytical canvas using compact metric cards, dense tables, chart panels, right-side detail panels, and mobile-responsive layout.
 - Feature workspaces for Overview, Investigator, Calls, Threads, Usage Drain Lab, Cache And Context Lab, Diagnostics Notebook, Reports, and Settings.
 - Typed aggregate boot-payload normalization from existing embedded `usage-data` rows, with synthetic fallback fixtures.
+- Aggregate row compatibility for newer dashboard/query fields including `call_started_at`, `cache_ratio`, thread attachment labels, usage-credit confidence, and recommendation signals.
 - Shared chart, card, table, badge, panel, and formatting primitives.
+- Working global search, Calls and Threads local filters, sortable table headers, aggregate CSV exports, selected-call drill-down, and selected-thread detail panels.
 - Vitest unit coverage and Playwright desktop/mobile smoke coverage for the experimental React dashboard.
 - Vite production build output and package-data globs for the experimental React asset bundle.
 - Pasted design references copied into `docs/assets/frontend-rewrite-references/`.
@@ -21,7 +23,7 @@ Not implemented yet:
 
 - React default switch or legacy fallback routing.
 - Backend report APIs under `/api/reports/*`.
-- Full parity for every legacy filter, export, selected-call, language, and call-investigator workflow.
+- Full parity for every legacy advanced filter, column chooser, language, and call-investigator workflow.
 - Table virtualization for large live histories.
 - Dedicated call investigator privacy-gated raw-context workflow.
 - Legacy cleanup. That must happen only after React default acceptance on a later branch.
@@ -67,8 +69,9 @@ These references are inspiration, not exact mockups to clone. The React implemen
 | Investigator Workbench | [investigator-workbench-reference.png](assets/frontend-rewrite-references/investigator-workbench-reference.png) | Investigator workspace | Ranked findings, selected-finding details, evidence table, confidence and caveats. |
 | Diagnostics Notebook | [diagnostics-notebook-reference.png](assets/frontend-rewrite-references/diagnostics-notebook-reference.png) | Diagnostics Notebook and Reports narrative layout | Executive findings, report index, chart/evidence/caveat rows, notebook navigation. |
 | Calls High Density | [calls-high-density-reference.png](assets/frontend-rewrite-references/calls-high-density-reference.png) | Calls table workspace | Dense table, column controls, heatmap-like numeric cells, side detail workflow. |
+| Call Drill-Down Menu Concept | [call-drilldown-menu-concept-reference.png](assets/frontend-rewrite-references/call-drilldown-menu-concept-reference.png) | Calls selected-call side panel | Tabbed aggregate drill-down with Summary, Tokens, Cache, Evidence, locked raw-context actions, and compact token/cache readouts. |
 | Projected weekly credits overlap | [projected-weekly-credits-overlap-reference.png](assets/frontend-rewrite-references/projected-weekly-credits-overlap-reference.png) | Negative reference | Avoid x-axis label collisions with horizontal scrolling or tick thinning. |
-| Generated exploration references | `generated-*.png` in reference folder | Archived design exploration | Preserve for context; do not copy dark/neon marketing style into the dashboard. |
+| Generated exploration references | `generated-*.png` in reference folder | Archived design exploration | Preserve for context; do not copy dark/neon marketing style into the dashboard. Exact duplicate overlap reference removed 2026-07-01. |
 
 ## App Information Architecture
 
@@ -169,7 +172,7 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 | Build system | Done | React, Vite, TypeScript, Vitest, Testing Library, Playwright, TanStack Table, D3 helpers, Lucide, ESLint, package scripts, and package-data globs added. |
 | React shell | Prototype done | Shell, navigation, status chips, search, metric cards, mobile responsive behavior, URL view state, and synthetic fallback fixtures implemented. |
 | API client layer | Prototype done | Existing embedded `usage-data` rows normalize into calls, cards, and thread summaries. Live fetch helpers and report APIs remain future work. |
-| Calls and Threads | Prototype done | Calls table, chart panels, thread leaderboard, and selected thread panel implemented with synthetic/boot aggregate data. Full legacy filtering, export, and virtualization remain future work. |
+| Calls and Threads | Parity slice in progress | Calls table, chart panels, thread leaderboard, selected call drill-down, selected thread panel, filters, sorting, and aggregate CSV export implemented. Column chooser, virtualization, and raw-context investigator remain future work. |
 | Usage Drain and Cache Labs | Prototype done | Weekly credits, usage remaining, confidence intervals, controls, cache heatmap, and thread diagnosis surfaces implemented. |
 | Diagnostics Notebook | Prototype done | Notebook layout, executive findings, section index, evidence rows, and status chips implemented. Exact legacy diagnostics ordering and expansion parity remain future work. |
 | Reports workspace | Prototype done | Report library, weekly credits, cost curves, usage drain model, and confidence table surfaces implemented. Backend `/api/reports/*` remains future work. |
@@ -186,9 +189,9 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 | Metric cards | `dashboard.js`, `dashboard_analysis.js` | `components/MetricCard.tsx` | embedded payload, `/api/usage` | totals render, boot fallback | Prototype done |
 | Overview charts | `dashboard.js`, `dashboard_analysis.js` | `features/overview/` | embedded payload, `/api/usage` | chart render, mobile screenshot | Prototype done |
 | Investigator findings | `dashboard_insights.js` | `features/investigator/` | future `/api/recommendations`, `/api/summary` | cards render, selected finding | Prototype done with fixtures |
-| Calls table | `dashboard_tables.js`, `dashboard_cells.js` | `features/calls/` | `/api/calls` | table render, navigation smoke | Prototype done; virtualization pending |
-| Detail panel | `dashboard_details.js` | future `features/call-investigator/` | `/api/call` | selected call, empty state | Not started |
-| Threads | `dashboard_tables.js`, `dashboard_details.js` | `features/threads/` | `/api/threads`, `/api/thread-calls` | grouping parity | Prototype done |
+| Calls table | `dashboard_tables.js`, `dashboard_cells.js` | `features/calls/` | `/api/calls` | table render, navigation smoke, sorting, search, export | Aggregate filters, sorting, CSV export done; virtualization pending |
+| Detail panel | `dashboard_details.js` | `features/calls/`, future `features/call-investigator/` | `/api/call` | selected call, empty state | Aggregate selected-call drill-down done; raw context gated workflow pending |
+| Threads | `dashboard_tables.js`, `dashboard_details.js` | `features/threads/` | `/api/threads`, `/api/thread-calls` | grouping parity, selected thread, export | Filters, sorting, CSV export, selected thread done |
 | Usage Drain Lab | current diagnostics usage-drain views | `features/usage-drain/` | future report payloads | CI table, long axis, controls | Prototype done |
 | Cache And Context Lab | diagnostics/cache references | `features/cache-context/` | `/api/diagnostics/*` | heatmap, selected thread | Prototype done |
 | Diagnostics snapshot panels | `dashboard_diagnostics.js`, `dashboard_diagnostics_snapshots.js` | `features/diagnostics/` | `/api/diagnostics/*` | stale, refresh, expansion | Prototype done with fixtures |
@@ -206,6 +209,9 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 - Legacy dashboard still loads at `/dashboard.html`.
 - React dashboard opt-in loads without changing legacy default.
 - Overview, Investigator, Calls, Threads, Usage Drain Lab, Cache And Context Lab, Diagnostics Notebook, Reports, and Settings are reachable.
+- Top search filters Overview recent calls and table-heavy workspaces.
+- Calls workspace supports local search, model filter, effort filter, sortable headers, aggregate CSV export, and selected-call drill-down.
+- Threads workspace supports local search, cold-risk filter, sortable headers, aggregate CSV export, and selected-thread detail panel.
 - Current UI screenshots can be recreated from synthetic local aggregate data.
 - Projected weekly credits is first in the Usage Drain and Reports prototype.
 - Usage remaining is second in the Usage Drain prototype.

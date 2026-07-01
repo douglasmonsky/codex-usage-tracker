@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table';
-
 import type { CallRow, ThreadRow, WeeklyWindow } from '../../api/types';
+import type { CsvColumn } from './exportCsv';
 import { formatCompact, formatNumber, money, pct } from './format';
 
 export const callColumns: Array<ColumnDef<CallRow>> = [
@@ -34,10 +34,27 @@ export const callColumns: Array<ColumnDef<CallRow>> = [
   },
   { accessorKey: 'duration', header: 'Duration' },
   {
-    accessorKey: 'fast',
-    header: 'Fast',
-    cell: info => <span className={info.getValue() ? 'status-badge green' : 'muted'}>{info.getValue() ? 'Yes' : '-'}</span>,
+    accessorKey: 'signal',
+    header: 'Signal',
+    cell: info => <span className="status-badge blue">{String(info.getValue())}</span>,
   },
+];
+
+export const callCsvColumns: Array<CsvColumn<CallRow>> = [
+  { header: 'Time', value: row => row.rawTime || row.time },
+  { header: 'Thread', value: row => row.thread },
+  { header: 'Model', value: row => row.model },
+  { header: 'Effort', value: row => row.effort },
+  { header: 'Input Tokens', value: row => row.input },
+  { header: 'Output Tokens', value: row => row.output },
+  { header: 'Reasoning Output Tokens', value: row => row.reasoningOutput },
+  { header: 'Uncached Input Tokens', value: row => row.uncachedInput },
+  { header: 'Cached Percent', value: row => row.cachedPct.toFixed(2) },
+  { header: 'Estimated Cost USD', value: row => row.cost.toFixed(6) },
+  { header: 'Usage Credits', value: row => row.credits.toFixed(6) },
+  { header: 'Duration Seconds', value: row => row.durationSeconds },
+  { header: 'Signal', value: row => row.signal },
+  { header: 'Recommendation', value: row => row.recommendation },
 ];
 
 export const threadColumns: Array<ColumnDef<ThreadRow>> = [
@@ -75,47 +92,43 @@ export const threadColumns: Array<ColumnDef<ThreadRow>> = [
   {
     accessorKey: 'productivity',
     header: 'Productivity',
-    cell: info => <span className="score">{formatNumber(Number(info.getValue()))}</span>,
+    cell: info => <span className="score">{Number(info.getValue())}</span>,
   },
 ];
 
-export const weeklyColumns: Array<ColumnDef<WeeklyWindow>> = [
+export const threadCsvColumns: Array<CsvColumn<ThreadRow>> = [
+  { header: 'Thread', value: row => row.name },
+  { header: 'Turns', value: row => row.turns },
+  { header: 'Total Tokens', value: row => row.totalTokens },
+  { header: 'Estimated Cost USD', value: row => row.cost.toFixed(6) },
+  { header: 'Cache Percent', value: row => row.cachePct.toFixed(2) },
+  { header: 'Cost Per Call USD', value: row => row.costPerCall.toFixed(6) },
+  { header: 'Cold Resume Risk', value: row => row.coldResumeRisk },
+  { header: 'Productivity', value: row => row.productivity },
+];
+
+export const weeklyWindowColumns: Array<ColumnDef<WeeklyWindow>> = [
   { accessorKey: 'week', header: 'Week' },
   { accessorKey: 'plan', header: 'Plan' },
   {
-    accessorKey: 'observedPct',
-    header: 'Observed %',
-    cell: info => <span className="num">{pct(Number(info.getValue()))}</span>,
-  },
-  {
     accessorKey: 'credits',
     header: 'Credits',
-    cell: info => <span className="num">{formatNumber(Number(info.getValue()))}</span>,
+    cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
     accessorKey: 'projected',
-    header: 'Projected / Week',
-    cell: info => <span className="num">{formatNumber(Number(info.getValue()))}</span>,
-  },
-  {
-    id: 'ci',
-    header: '95% CI',
-    cell: info => {
-      const row = info.row.original;
-      return (
-        <span className="num">
-          {formatNumber(row.ciLow)} - {formatNumber(row.ciHigh)}
-        </span>
-      );
-    },
+    header: 'Projected',
+    cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
     accessorKey: 'confidence',
     header: 'Confidence',
     cell: info => <span className={`status-badge ${riskTone(String(info.getValue()))}`}>{String(info.getValue())}</span>,
   },
-  { accessorKey: 'note', header: 'Notes' },
+  { accessorKey: 'note', header: 'Note' },
 ];
+
+export const weeklyColumns = weeklyWindowColumns;
 
 function riskTone(value: string): 'green' | 'orange' | 'red' | 'neutral' {
   if (value === 'High') {

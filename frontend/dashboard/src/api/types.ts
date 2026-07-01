@@ -1,10 +1,19 @@
 export type UsageRow = {
   id?: string;
   record_id?: string;
+  session_id?: string;
   started_at?: string;
+  call_started_at?: string;
+  event_timestamp?: string;
+  turn_timestamp?: string;
   time?: string;
-  thread_name?: string;
+  thread_name?: string | null;
   thread?: string;
+  resolved_parent_thread_name?: string | null;
+  parent_thread_name?: string | null;
+  thread_attachment_label?: string | null;
+  project_name?: string | null;
+  project_relative_cwd?: string | null;
   model?: string;
   effort?: string;
   input_tokens?: number;
@@ -12,10 +21,17 @@ export type UsageRow = {
   output_tokens?: number;
   reasoning_output_tokens?: number;
   total_tokens?: number;
+  uncached_input_tokens?: number;
   estimated_cost_usd?: number;
   usage_credits?: number;
   duration_seconds?: number;
+  call_duration_seconds?: number;
   cache_hit_ratio?: number;
+  cache_ratio?: number;
+  usage_credit_confidence?: string;
+  pricing_estimated?: boolean;
+  primary_signal?: string | null;
+  recommended_action?: string | null;
 };
 
 export type DashboardBootPayload = {
@@ -28,8 +44,8 @@ export type DashboardBootPayload = {
   total_available_rows?: number;
   all_history_available_rows?: number;
   active_available_rows?: number;
-  pricing_source?: string;
-  allowance_source?: string;
+  pricing_source?: string | Record<string, unknown>;
+  allowance_source?: string | Record<string, unknown>;
   privacy_mode?: string;
   shell_boot?: boolean;
 };
@@ -70,16 +86,27 @@ export type Finding = {
 };
 
 export type CallRow = {
+  id: string;
+  rawTime: string;
   time: string;
   thread: string;
   model: string;
   effort: string;
   input: number;
   output: number;
+  reasoningOutput: number;
+  totalTokens: number;
+  uncachedInput: number;
   cachedPct: number;
   cost: number;
+  credits: number;
   duration: string;
+  durationSeconds: number;
   fast: boolean;
+  usageCreditConfidence: string;
+  pricingEstimated: boolean;
+  signal: string;
+  recommendation: string;
   tags: string[];
 };
 

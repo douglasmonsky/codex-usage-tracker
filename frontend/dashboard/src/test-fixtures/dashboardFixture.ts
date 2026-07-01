@@ -113,19 +113,36 @@ export const fixtureModel: DashboardModel = {
     ['Jun 1, 09:55 AM', 'thread-2f9e7d', 'o4-mini', 'medium', 76_881, 28_442, 39, 0.24, '11.2s', false, ['subagent']],
     ['Jun 1, 09:50 AM', 'thread-6a5b4c', 'codex-1', 'high', 312_654, 112_991, 67, 1.12, '31.8s', false, ['file-heavy']],
     ['Jun 1, 09:47 AM', 'thread-0f1e2d', 'o3', 'low', 8_221, 2_903, 15, 0.02, '2.8s', true, ['fast']],
-  ].map(([time, thread, model, effort, input, output, cachedPct, cost, duration, fast, tags]) => ({
-    time: String(time),
-    thread: String(thread),
-    model: String(model),
-    effort: String(effort),
-    input: Number(input),
-    output: Number(output),
-    cachedPct: Number(cachedPct),
-    cost: Number(cost),
-    duration: String(duration),
-    fast: Boolean(fast),
-    tags: tags as string[],
-  })),
+  ].map(([time, thread, model, effort, input, output, cachedPct, cost, duration, fast, tags], index) => {
+    const inputTokens = Number(input);
+    const outputTokens = Number(output);
+    const cachedPercent = Number(cachedPct);
+    const uncachedInput = Math.round(inputTokens * Math.max(100 - cachedPercent, 0) / 100);
+    return {
+      id: `fixture-call-${index}`,
+      rawTime: String(time),
+      time: String(time),
+      thread: String(thread),
+      model: String(model),
+      effort: String(effort),
+      input: inputTokens,
+      output: outputTokens,
+      reasoningOutput: Math.round(outputTokens * 0.2),
+      totalTokens: inputTokens + outputTokens,
+      uncachedInput,
+      cachedPct: cachedPercent,
+      cost: Number(cost),
+      credits: Number(cost) * 25,
+      duration: String(duration),
+      durationSeconds: Number.parseFloat(String(duration)) || 0,
+      fast: Boolean(fast),
+      usageCreditConfidence: 'fixture',
+      pricingEstimated: false,
+      signal: uncachedInput > 50_000 ? 'cache-risk' : 'aggregate',
+      recommendation: uncachedInput > 50_000 ? 'Review uncached aggregate input before continuing this thread.' : '',
+      tags: tags as string[],
+    };
+  }),
   threads: [
     ['thread-9f3a', 142, 58_400, 8.76, 12, 1.38, 'High', 42],
     ['thread-7c2b', 87, 31_200, 4.21, 22, 1.12, 'Medium', 55],

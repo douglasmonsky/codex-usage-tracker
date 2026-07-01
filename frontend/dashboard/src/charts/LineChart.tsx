@@ -14,7 +14,7 @@ type LineChartProps = {
 export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, height = 280 }: LineChartProps) {
   const labels = series[0]?.points.map(point => point.label) ?? [];
   const width = Math.max(760, labels.length * 112);
-  const margin = { top: 24, right: 24, bottom: 54, left: 72 };
+  const margin = { top: 24, right: 56, bottom: 54, left: 72 };
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
   const allValues = series.flatMap(item =>
