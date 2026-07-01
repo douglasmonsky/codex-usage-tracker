@@ -71,7 +71,6 @@ where = ["src"]
   "dashboard/*",
   "dashboard/locales/*",
   "dashboard/react/*",
-  "dashboard/react/.vite/*",
   "dashboard/react/assets/*",
   "docs/*",
   "docs/assets/*",
