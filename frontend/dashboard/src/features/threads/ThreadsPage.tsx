@@ -1,7 +1,9 @@
-import { Columns3, Download, Filter } from 'lucide-react';
+import type { VisibilityState } from '@tanstack/react-table';
+import { Download, Filter } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { DashboardModel, ThreadRow } from '../../api/types';
 import { BarChart } from '../../charts/BarChart';
+import { ColumnChooser } from '../../components/ColumnChooser';
 import { DonutChart } from '../../charts/DonutChart';
 import { DataTable } from '../../components/DataTable';
 import { Panel } from '../../components/Panel';
@@ -9,7 +11,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
 import { rowMatchesQuery } from '../shared/filtering';
 import { formatCompact, money, pct } from '../shared/format';
-import { threadColumns, threadCsvColumns } from '../shared/tables';
+import { threadColumnChoices, threadColumns, threadCsvColumns } from '../shared/tables';
 
 type ThreadsPageProps = {
   model: DashboardModel;
@@ -21,6 +23,8 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
   const [riskFilter, setRiskFilter] = useState('all');
   const [selectedThreadName, setSelectedThreadName] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState('');
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
   const filteredThreads = useMemo(
     () =>
@@ -56,10 +60,14 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
             <Filter size={16} />
             Filters
           </button>
-          <button className="toolbar-button" type="button" aria-label="Manage thread columns">
-            <Columns3 size={16} />
-            Columns
-          </button>
+          <ColumnChooser
+            label="Threads"
+            columns={threadColumnChoices}
+            open={columnsOpen}
+            onOpenChange={setColumnsOpen}
+            visibility={columnVisibility}
+            onVisibilityChange={setColumnVisibility}
+          />
         </div>
       </div>
       <div className="filter-row span-all">
@@ -100,6 +108,8 @@ export function ThreadsPage({ model, globalQuery }: ThreadsPageProps) {
           selectedRowId={selected?.name}
           onRowSelect={thread => setSelectedThreadName(thread.name)}
           ariaLabel="Thread leaderboard"
+          columnVisibility={columnVisibility}
+          onColumnVisibilityChange={setColumnVisibility}
         />
       </Panel>
       <ThreadDetail selected={selected} />

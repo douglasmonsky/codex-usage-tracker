@@ -1,5 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import type { CallRow, ThreadRow, WeeklyWindow } from '../../api/types';
+import type { ColumnChoice } from '../../components/ColumnChooser';
 import type { CsvColumn } from './exportCsv';
 import { formatCompact, formatNumber, money, pct } from './format';
 
@@ -57,6 +58,19 @@ export const callCsvColumns: Array<CsvColumn<CallRow>> = [
   { header: 'Recommendation', value: row => row.recommendation },
 ];
 
+export const callColumnChoices: ColumnChoice[] = [
+  { id: 'time', label: 'Time', locked: true },
+  { id: 'thread', label: 'Thread', locked: true },
+  { id: 'model', label: 'Model' },
+  { id: 'effort', label: 'Effort' },
+  { id: 'input', label: 'Input Tokens' },
+  { id: 'output', label: 'Output Tokens' },
+  { id: 'cachedPct', label: 'Cached %' },
+  { id: 'cost', label: 'Est. Cost' },
+  { id: 'duration', label: 'Duration' },
+  { id: 'signal', label: 'Signal' },
+];
+
 export const threadColumns: Array<ColumnDef<ThreadRow>> = [
   { accessorKey: 'name', header: 'Thread' },
   {
@@ -105,6 +119,17 @@ export const threadCsvColumns: Array<CsvColumn<ThreadRow>> = [
   { header: 'Cost Per Call USD', value: row => row.costPerCall.toFixed(6) },
   { header: 'Cold Resume Risk', value: row => row.coldResumeRisk },
   { header: 'Productivity', value: row => row.productivity },
+];
+
+export const threadColumnChoices: ColumnChoice[] = [
+  { id: 'name', label: 'Thread', locked: true },
+  { id: 'turns', label: 'Turns' },
+  { id: 'totalTokens', label: 'Total Tokens' },
+  { id: 'cost', label: 'Est. Cost' },
+  { id: 'cachePct', label: 'Cache %' },
+  { id: 'costPerCall', label: 'Cost / Call' },
+  { id: 'coldResumeRisk', label: 'Cold Resume Risk' },
+  { id: 'productivity', label: 'Productivity' },
 ];
 
 export const weeklyWindowColumns: Array<ColumnDef<WeeklyWindow>> = [

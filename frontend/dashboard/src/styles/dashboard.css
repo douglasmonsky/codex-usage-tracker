@@ -443,6 +443,81 @@ button {
   opacity: 0.55;
 }
 
+.column-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.toolbar-count {
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: #eaf1ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.column-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(280px, 82vw);
+  padding: 12px;
+  border: 1px solid #cfd9e8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+}
+
+.column-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.column-menu-head strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.column-menu-head button {
+  padding: 0;
+  border: 0;
+  color: #1d4ed8;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.column-menu-options {
+  display: grid;
+  gap: 8px;
+}
+
+.column-menu-options label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 28px;
+  color: #243248;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.column-menu-options label.locked {
+  color: #7b8798;
+}
+
+.column-menu-options input {
+  width: 16px;
+  height: 16px;
+}
+
 .primary-button {
   color: #ffffff;
   background: #2563eb;
@@ -1318,6 +1393,20 @@ button {
   .page-title-row .toolbar-button {
     justify-self: start;
     max-width: 100%;
+  }
+
+  .column-menu-wrap {
+    position: static;
+  }
+
+  .column-menu {
+    position: fixed;
+    top: 88px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100vh - 112px);
+    overflow: auto;
   }
 
   .metric-grid,

@@ -20,6 +20,12 @@ test.describe('React dashboard rewrite smoke', () => {
     await page.goto('/?view=calls');
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
 
+    await page.getByRole('button', { name: /Columns/i }).click();
+    await expect(page.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
+    await page.getByRole('checkbox', { name: 'Signal' }).uncheck();
+    await expect(page.getByRole('columnheader', { name: /Signal/i })).toHaveCount(0);
+    await page.getByRole('button', { name: /Columns/i }).click();
+
     await page.getByRole('button', { name: 'Sort by Est. Cost' }).click();
     await expect(page.getByRole('columnheader', { name: /Est. Cost/i })).toHaveAttribute('aria-sort', 'descending');
 

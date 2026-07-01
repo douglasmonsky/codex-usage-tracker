@@ -14,7 +14,7 @@ Implemented in this slice:
 - Typed aggregate boot-payload normalization from existing embedded `usage-data` rows, with synthetic fallback fixtures.
 - Aggregate row compatibility for newer dashboard/query fields including `call_started_at`, `cache_ratio`, thread attachment labels, usage-credit confidence, and recommendation signals.
 - Shared chart, card, table, badge, panel, and formatting primitives.
-- Working global search, Calls and Threads local filters, sortable table headers, aggregate CSV exports, selected-call drill-down, and selected-thread detail panels.
+- Working global search, Calls and Threads local filters, column choosers, sortable table headers, aggregate CSV exports, selected-call drill-down, and selected-thread detail panels.
 - Vitest unit coverage and Playwright desktop/mobile smoke coverage for the experimental React dashboard.
 - Vite production build output and package-data globs for the experimental React asset bundle.
 - Pasted design references copied into `docs/assets/frontend-rewrite-references/`.
@@ -23,7 +23,7 @@ Not implemented yet:
 
 - React default switch or legacy fallback routing.
 - Backend report APIs under `/api/reports/*`.
-- Full parity for every legacy advanced filter, column chooser, language, and call-investigator workflow.
+- Full parity for every legacy advanced filter, language, and call-investigator workflow.
 - Table virtualization for large live histories.
 - Dedicated call investigator privacy-gated raw-context workflow.
 - Legacy cleanup. That must happen only after React default acceptance on a later branch.
@@ -172,7 +172,7 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 | Build system | Done | React, Vite, TypeScript, Vitest, Testing Library, Playwright, TanStack Table, D3 helpers, Lucide, ESLint, package scripts, and package-data globs added. |
 | React shell | Prototype done | Shell, navigation, status chips, search, metric cards, mobile responsive behavior, URL view state, and synthetic fallback fixtures implemented. |
 | API client layer | Prototype done | Existing embedded `usage-data` rows normalize into calls, cards, and thread summaries. Live fetch helpers and report APIs remain future work. |
-| Calls and Threads | Parity slice in progress | Calls table, chart panels, thread leaderboard, selected call drill-down, selected thread panel, filters, sorting, and aggregate CSV export implemented. Column chooser, virtualization, and raw-context investigator remain future work. |
+| Calls and Threads | Parity slice in progress | Calls table, chart panels, thread leaderboard, selected call drill-down, selected thread panel, filters, column choosers, sorting, and aggregate CSV export implemented. Virtualization and raw-context investigator remain future work. |
 | Usage Drain and Cache Labs | Prototype done | Weekly credits, usage remaining, confidence intervals, controls, cache heatmap, and thread diagnosis surfaces implemented. |
 | Diagnostics Notebook | Prototype done | Notebook layout, executive findings, section index, evidence rows, and status chips implemented. Exact legacy diagnostics ordering and expansion parity remain future work. |
 | Reports workspace | Prototype done | Report library, weekly credits, cost curves, usage drain model, and confidence table surfaces implemented. Backend `/api/reports/*` remains future work. |
@@ -210,8 +210,8 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 - React dashboard opt-in loads without changing legacy default.
 - Overview, Investigator, Calls, Threads, Usage Drain Lab, Cache And Context Lab, Diagnostics Notebook, Reports, and Settings are reachable.
 - Top search filters Overview recent calls and table-heavy workspaces.
-- Calls workspace supports local search, model filter, effort filter, sortable headers, aggregate CSV export, and selected-call drill-down.
-- Threads workspace supports local search, cold-risk filter, sortable headers, aggregate CSV export, and selected-thread detail panel.
+- Calls workspace supports local search, model filter, effort filter, column chooser, sortable headers, aggregate CSV export, and selected-call drill-down.
+- Threads workspace supports local search, cold-risk filter, column chooser, sortable headers, aggregate CSV export, and selected-thread detail panel.
 - Current UI screenshots can be recreated from synthetic local aggregate data.
 - Projected weekly credits is first in the Usage Drain and Reports prototype.
 - Usage remaining is second in the Usage Drain prototype.

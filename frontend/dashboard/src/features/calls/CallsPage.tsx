@@ -1,7 +1,6 @@
 import {
   Activity,
   BarChart3,
-  Columns3,
   Database,
   Download,
   Filter,
@@ -10,9 +9,11 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
+import type { VisibilityState } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
 import type { CallRow, DashboardModel } from '../../api/types';
 import { BarChart } from '../../charts/BarChart';
+import { ColumnChooser } from '../../components/ColumnChooser';
 import { LineChart } from '../../charts/LineChart';
 import { DataTable } from '../../components/DataTable';
 import { Panel } from '../../components/Panel';
@@ -20,7 +21,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
 import { rowMatchesQuery, uniqueSorted } from '../shared/filtering';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
-import { callColumns, callCsvColumns } from '../shared/tables';
+import { callColumnChoices, callColumns, callCsvColumns } from '../shared/tables';
 
 type CallsPageProps = {
   model: DashboardModel;
@@ -44,6 +45,8 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
   const [density, setDensity] = useState<'dense' | 'roomy'>('dense');
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState('');
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
   const modelOptions = useMemo(() => uniqueSorted(model.calls.map(call => call.model)), [model.calls]);
   const effortOptions = useMemo(() => uniqueSorted(model.calls.map(call => call.effort)), [model.calls]);
@@ -76,10 +79,14 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
           <p>High-density analyst view model calls, cost, cache hits, duration.</p>
         </div>
         <div className="toolbar">
-          <button className="toolbar-button" type="button" aria-label="Manage call columns">
-            <Columns3 size={16} />
-            Columns
-          </button>
+          <ColumnChooser
+            label="Calls"
+            columns={callColumnChoices}
+            open={columnsOpen}
+            onOpenChange={setColumnsOpen}
+            visibility={columnVisibility}
+            onVisibilityChange={setColumnVisibility}
+          />
           <button className="toolbar-button" type="button" onClick={exportCalls} disabled={!filteredCalls.length}>
             <Download size={16} />
             Export
@@ -155,6 +162,8 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
             selectedRowId={selectedCall?.id}
             onRowSelect={call => setSelectedCallId(call.id)}
             ariaLabel="Model calls"
+            columnVisibility={columnVisibility}
+            onColumnVisibilityChange={setColumnVisibility}
           />
         </Panel>
         <CallDrillDown call={selectedCall} />

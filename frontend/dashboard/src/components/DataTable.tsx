@@ -4,7 +4,9 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type OnChangeFn,
   type SortingState,
+  type VisibilityState,
 } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { useState } from 'react';
@@ -18,6 +20,8 @@ type DataTableProps<T> = {
   selectedRowId?: string;
   onRowSelect?: (row: T) => void;
   ariaLabel?: string;
+  columnVisibility?: VisibilityState;
+  onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 };
 
 export function DataTable<T>({
@@ -29,13 +33,16 @@ export function DataTable<T>({
   selectedRowId,
   onRowSelect,
   ariaLabel,
+  columnVisibility,
+  onColumnVisibilityChange,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const table = useReactTable({
     columns,
     data,
-    state: { sorting },
+    state: { sorting, ...(columnVisibility ? { columnVisibility } : {}) },
     onSortingChange: setSorting,
+    onColumnVisibilityChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     ...(getRowId ? { getRowId } : {}),
@@ -100,7 +107,7 @@ export function DataTable<T>({
             })
           ) : (
             <tr>
-              <td colSpan={columns.length} className="empty-cell">
+              <td colSpan={Math.max(table.getVisibleLeafColumns().length, 1)} className="empty-cell">
                 {emptyLabel}
               </td>
             </tr>

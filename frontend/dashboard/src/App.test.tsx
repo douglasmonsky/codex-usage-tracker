@@ -62,6 +62,22 @@ describe('React dashboard shell', () => {
     expect(sortButton.closest('th')).toHaveAttribute('aria-sort', 'descending');
   });
 
+  it('toggles call and thread columns while keeping identity columns locked', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Columns/i }));
+    expect(screen.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Signal' }));
+    expect(screen.queryByRole('columnheader', { name: /Signal/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Columns/i }));
+    expect(screen.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Productivity' }));
+    expect(screen.queryByRole('columnheader', { name: /Productivity/i })).not.toBeInTheDocument();
+  });
+
   it('escapes CSV output for aggregate exports', () => {
     expect(
       rowsToCsv(
