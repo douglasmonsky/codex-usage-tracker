@@ -945,6 +945,13 @@ button {
   align-items: start;
 }
 
+.call-investigator-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.72fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .drilldown-panel {
   position: sticky;
   top: 18px;
@@ -1011,6 +1018,15 @@ button {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.drilldown-metric-grid.wide {
+  grid-template-columns: repeat(6, minmax(118px, 1fr));
+}
+
+.investigator-evidence {
+  display: grid;
+  gap: 12px;
 }
 
 .drilldown-metric {
@@ -1427,13 +1443,19 @@ button {
   .cache-layout,
   .diagnostics-layout,
   .reports-layout,
-  .thread-layout {
+  .thread-layout,
+  .call-investigator-layout {
     grid-template-columns: 1fr;
   }
 
   .diagnostic-sections,
+  .call-investigator-layout .span-all,
   .span-all {
     grid-column: 1;
+  }
+
+  .drilldown-metric-grid.wide {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .side-panel {
@@ -1508,7 +1530,9 @@ button {
   }
 
   .context-action-grid,
-  .context-evidence-summary {
+  .context-evidence-summary,
+  .drilldown-metric-grid,
+  .drilldown-metric-grid.wide {
     grid-template-columns: 1fr;
   }
 

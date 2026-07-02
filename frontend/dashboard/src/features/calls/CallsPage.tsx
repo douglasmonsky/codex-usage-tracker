@@ -6,6 +6,7 @@ import {
   Filter,
   LockKeyhole,
   RefreshCw,
+  Search,
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
@@ -28,6 +29,9 @@ type CallsPageProps = {
   model: DashboardModel;
   globalQuery: string;
   onRefresh: () => void;
+  contextRuntime: ContextRuntime;
+  onContextApiEnabledChange: (enabled: boolean) => void;
+  onOpenInvestigator: (recordId: string) => void;
 };
 
 type DrillDownTab = 'summary' | 'tokens' | 'cache' | 'evidence';
@@ -53,7 +57,14 @@ const drillDownTabs: Array<{ id: DrillDownTab; label: string; icon: LucideIcon }
   { id: 'evidence', label: 'Evidence', icon: LockKeyhole },
 ];
 
-export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
+export function CallsPage({
+  model,
+  globalQuery,
+  onRefresh,
+  contextRuntime,
+  onContextApiEnabledChange,
+  onOpenInvestigator,
+}: CallsPageProps) {
   const [localQuery, setLocalQuery] = useState('');
   const [modelFilter, setModelFilter] = useState('all');
   const [effortFilter, setEffortFilter] = useState('all');
@@ -64,11 +75,6 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
-  const contextRuntime = useMemo(
-    () => ({ ...model.contextRuntime, contextApiEnabled }),
-    [contextApiEnabled, model.contextRuntime],
-  );
 
   const modelOptions = useMemo(() => uniqueSorted(model.calls.map(call => call.model)), [model.calls]);
   const effortOptions = useMemo(() => uniqueSorted(model.calls.map(call => call.effort)), [model.calls]);
@@ -196,7 +202,8 @@ export function CallsPage({ model, globalQuery, onRefresh }: CallsPageProps) {
         <CallDrillDown
           call={selectedCall}
           contextRuntime={contextRuntime}
-          onContextApiEnabledChange={setContextApiEnabled}
+          onContextApiEnabledChange={onContextApiEnabledChange}
+          onOpenInvestigator={onOpenInvestigator}
         />
       </div>
     </div>
@@ -207,10 +214,12 @@ function CallDrillDown({
   call,
   contextRuntime,
   onContextApiEnabledChange,
+  onOpenInvestigator,
 }: {
   call: CallRow | null;
   contextRuntime: ContextRuntime;
   onContextApiEnabledChange: (enabled: boolean) => void;
+  onOpenInvestigator: (recordId: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<DrillDownTab>('summary');
 
@@ -232,6 +241,12 @@ function CallDrillDown({
           <StatusBadge label={call.signal} tone={call.signal === 'cache-risk' ? 'orange' : 'blue'} />
           <StatusBadge label="Raw context gated" tone="blue" />
           <span className="call-id">{call.id.slice(0, 12)}</span>
+        </div>
+        <div className="action-row">
+          <button className="toolbar-button" type="button" onClick={() => onOpenInvestigator(call.id)}>
+            <Search size={16} />
+            Open investigator
+          </button>
         </div>
         <div className="drilldown-tabs" role="tablist" aria-label="Call drill-down sections">
           {drillDownTabs.map(tab => {

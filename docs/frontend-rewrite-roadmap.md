@@ -14,7 +14,7 @@ Implemented in this slice:
 - Typed aggregate boot-payload normalization from existing embedded `usage-data` rows, with synthetic fallback fixtures.
 - Aggregate row compatibility for newer dashboard/query fields including `call_started_at`, `cache_ratio`, thread attachment labels, usage-credit confidence, and recommendation signals.
 - Shared chart, card, table, badge, panel, and formatting primitives.
-- Working global search, Calls and Threads local filters, column choosers, sortable table headers, aggregate CSV exports, selected-call drill-down with gated Evidence context loading, and selected-thread detail panels.
+- Working global search, Calls and Threads local filters, column choosers, sortable table headers, aggregate CSV exports, selected-call drill-down with gated Evidence context loading, hidden full-page `view=call&record=...` investigator route, and selected-thread detail panels.
 - Quick links and prototype action controls now perform local aggregate actions or focus relevant controls instead of acting as inert placeholders.
 - Vitest unit coverage and Playwright desktop/mobile smoke coverage for the experimental React dashboard.
 - Vite production build output and package-data globs for the experimental React asset bundle.
@@ -24,9 +24,9 @@ Not implemented yet:
 
 - React default switch or legacy fallback routing.
 - Backend report APIs under `/api/reports/*`.
-- Full parity for every legacy advanced filter, language, and call-investigator workflow.
+- Full parity for every legacy advanced filter, language, and exact legacy call-investigator workflow.
 - Table virtualization for large live histories.
-- Dedicated full-page call investigator parity workflow. Calls side-panel Evidence tab now has first gated `/api/context` bridge.
+- Dedicated full-page call investigator parity is in prototype: React now supports `view=call&record=...` with gated `/api/context`; exact legacy `/api/call` hydration and all legacy controls remain future work.
 - Legacy cleanup. That must happen only after React default acceptance on a later branch.
 
 ## Non-Negotiables
@@ -69,7 +69,7 @@ These references are inspiration, not exact mockups to clone. The React implemen
 | Thread Efficiency | [thread-efficiency-reference.png](assets/frontend-rewrite-references/thread-efficiency-reference.png) | Threads workspace | Thread leaderboard, selected thread panel, productivity and cold-resume signals. |
 | Investigator Workbench | [investigator-workbench-reference.png](assets/frontend-rewrite-references/investigator-workbench-reference.png) | Investigator workspace | Ranked findings, selected-finding details, evidence table, confidence and caveats. |
 | Diagnostics Notebook | [diagnostics-notebook-reference.png](assets/frontend-rewrite-references/diagnostics-notebook-reference.png) | Diagnostics Notebook and Reports narrative layout | Executive findings, report index, chart/evidence/caveat rows, notebook navigation. |
-| Calls High Density | [calls-high-density-reference.png](assets/frontend-rewrite-references/calls-high-density-reference.png) | Calls table workspace | Dense table, column controls, heatmap-like numeric cells, side detail workflow. |
+| Calls Analyst View | [calls-analyst-view-reference.png](assets/frontend-rewrite-references/calls-analyst-view-reference.png) | Calls table workspace | Dense table, column controls, heatmap-like numeric cells, shortcuts panel, side detail workflow. |
 | Call Drill-Down Menu Concept | [call-drilldown-menu-concept-reference.png](assets/frontend-rewrite-references/call-drilldown-menu-concept-reference.png) | Calls selected-call side panel | Tabbed aggregate drill-down with Summary, Tokens, Cache, Evidence, locked raw-context actions, and compact token/cache readouts. |
 | Projected weekly credits overlap | [projected-weekly-credits-overlap-reference.png](assets/frontend-rewrite-references/projected-weekly-credits-overlap-reference.png) | Negative reference | Avoid x-axis label collisions with horizontal scrolling or tick thinning. |
 | Generated exploration references | `generated-*.png` in reference folder | Archived design exploration | Preserve for context; do not copy dark/neon marketing style into the dashboard. Exact duplicate overlap reference removed 2026-07-01. |
@@ -173,11 +173,11 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 | Build system | Done | React, Vite, TypeScript, Vitest, Testing Library, Playwright, TanStack Table, D3 helpers, Lucide, ESLint, package scripts, and package-data globs added. |
 | React shell | Prototype done | Shell, navigation, status chips, search, metric cards, mobile responsive behavior, URL view state, and synthetic fallback fixtures implemented. |
 | API client layer | Prototype done | Existing embedded `usage-data` rows normalize into calls, cards, and thread summaries. Live fetch helpers and report APIs remain future work. |
-| Calls and Threads | Parity slice in progress | Calls table, chart panels, thread leaderboard, selected call drill-down, selected thread panel, filters, column choosers, sorting, aggregate CSV export, and gated side-panel Evidence context loading implemented. Virtualization and full-page call investigator remain future work. |
+| Calls and Threads | Parity slice in progress | Calls table, chart panels, thread leaderboard, selected call drill-down, selected thread panel, filters, column choosers, sorting, aggregate CSV export, gated side-panel Evidence context loading, and Calls-to-investigator action implemented. Virtualization remains future work. |
 | Usage Drain and Cache Labs | Prototype done | Weekly credits, usage remaining, confidence intervals, controls, cache heatmap, and thread diagnosis surfaces implemented. |
 | Diagnostics Notebook | Prototype done | Notebook layout, executive findings, section index, evidence rows, and status chips implemented. Exact legacy diagnostics ordering and expansion parity remain future work. |
 | Reports workspace | Prototype done | Report library, weekly credits, cost curves, usage drain model, and confidence table surfaces implemented. Backend `/api/reports/*` remains future work. |
-| Call investigator | Partial side-panel bridge | Calls Evidence tab can load redacted selected-turn context through `/api/context` when the localhost token and context API are present. Dedicated full-page investigator parity remains future work. |
+| Call investigator | Prototype full-page route done | Hidden React `view=call&record=...` route loads one aggregate call, supports previous/next navigation, back-to-Calls, copy-link affordance, token accounting, aggregate identity, and gated redacted context loading through `/api/context`. Exact legacy parity and `/api/call` hydration remain future work. |
 | Default switch candidate | Blocked pending approval | Requires parity tests, live API integration, static fallback checks, and explicit approval. |
 | Legacy cleanup | Blocked pending acceptance | Separate cleanup branch only after React default is approved. |
 
@@ -191,7 +191,7 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 | Overview charts | `dashboard.js`, `dashboard_analysis.js` | `features/overview/` | embedded payload, `/api/usage` | chart render, mobile screenshot | Prototype done |
 | Investigator findings | `dashboard_insights.js` | `features/investigator/` | future `/api/recommendations`, `/api/summary` | cards render, selected finding | Prototype done with fixtures |
 | Calls table | `dashboard_tables.js`, `dashboard_cells.js` | `features/calls/` | `/api/calls` | table render, navigation smoke, sorting, search, export | Aggregate filters, sorting, CSV export done; virtualization pending |
-| Detail panel | `dashboard_details.js` | `features/calls/`, future `features/call-investigator/` | `/api/call`, `/api/context` | selected call, empty state, gated evidence | Aggregate selected-call drill-down and side-panel context Evidence bridge done; full-page investigator pending |
+| Detail panel | `dashboard_details.js` | `features/calls/`, `features/call-investigator/` | `/api/call`, `/api/context` | selected call, empty state, gated evidence | Aggregate selected-call drill-down, side-panel context Evidence bridge, and full-page investigator route done; `/api/call` hydration pending |
 | Threads | `dashboard_tables.js`, `dashboard_details.js` | `features/threads/` | `/api/threads`, `/api/thread-calls` | grouping parity, selected thread, export | Filters, sorting, CSV export, selected thread done |
 | Usage Drain Lab | current diagnostics usage-drain views | `features/usage-drain/` | future report payloads | CI table, long axis, controls | Prototype done |
 | Cache And Context Lab | diagnostics/cache references | `features/cache-context/` | `/api/diagnostics/*` | heatmap, selected thread | Prototype done |
@@ -202,7 +202,7 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 | Cost curves report | cost curves report reference | `features/reports/` | `/api/reports/cost-curves` | thread ranking, chart | Prototype done |
 | Fast mode report | fast mode report reference | `features/reports/` | `/api/reports/fast-mode-proxy` | histogram, scatter | Planned |
 | Usage drain model report | usage drain predictor reference | `features/reports/` | `/api/reports/usage-drain-model` | actual/predicted, correlations | Prototype done |
-| Call investigator | `dashboard_call_investigator.js` | future `features/call-investigator/` | `/api/context`, `/api/open-investigator` | privacy, context gating | Partial side-panel Evidence bridge done; full-page parity not started |
+| Call investigator | `dashboard_call_investigator.js` | `features/call-investigator/` | `/api/context`, `/api/open-investigator`, future `/api/call` | privacy, context gating | Prototype React full-page route and Calls menu action done; exact legacy parity and server-side one-record hydration pending |
 | i18n | `dashboard_i18n.js`, locales | `app/`, `api/` | packaged locale JSON | language switch | Not started |
 
 ## Parity Checklist
@@ -212,6 +212,7 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 - Overview, Investigator, Calls, Threads, Usage Drain Lab, Cache And Context Lab, Diagnostics Notebook, Reports, and Settings are reachable.
 - Top search filters Overview recent calls and table-heavy workspaces.
 - Calls workspace supports local search, model filter, effort filter, column chooser, sortable headers, aggregate CSV export, selected-call drill-down, and gated Evidence context loading through `/api/context`.
+- Calls workspace exposes an updated Open investigator action, and direct `?view=call&record=...` URLs render a full-page single-call investigator without embedding raw context.
 - Threads workspace supports local search, cold-risk filter, column chooser with Escape/outside close, sortable headers, aggregate CSV export, and selected-thread detail panel.
 - Current UI screenshots can be recreated from synthetic local aggregate data.
 - Projected weekly credits is first in the Usage Drain and Reports prototype.
@@ -226,7 +227,7 @@ Root `package.json` delegates dashboard scripts into `frontend/dashboard`.
 - Installed wheel includes required React assets.
 - Static dashboard mode degrades gracefully when live APIs are unavailable.
 - Before completion, run repeated functional exploration across every top-level workspace, quick links, filters, buttons, tabs, column menus, exports, desktop/mobile layouts, and console/network error capture.
-- Mocked localhost context API integration must prove the React Evidence tab sends `X-Codex-Usage-Token`, includes `record_id`, and renders only redacted on-demand context.
+- Mocked localhost context API integration must prove the React Evidence tab and full-page investigator send `X-Codex-Usage-Token`, include `record_id`, and render only redacted on-demand context.
 
 ## Dead Code Controls
 
@@ -272,3 +273,4 @@ Checks run for this prototype slice:
 - `.venv/bin/python scripts/check_release.py`
 - `git diff --check`
 - Manual Playwright screenshots at desktop and mobile widths for Overview, Reports, and Usage Drain Lab.
+- 2026-07-01 call investigator slice: repeated MCP Playwright exploration across Overview, Investigator, Calls, Thread Efficiency, Usage Drain Lab, Cache And Context Lab, Diagnostics Notebook, Reports, Settings, Calls/Threads column menus, Calls drill-down tabs, full-page call investigator open/next/back/direct URL, mocked context evidence, and mobile Calls/Call Investigator screenshots. Console errors: 0. Failed requests: 0.

@@ -2,8 +2,9 @@ import { RefreshCw, Terminal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { isViewId, navItems, secondaryNavItems, type ViewId } from './app/navigation';
 import { modelFromBootPayload, readBootPayload } from './api/client';
-import type { DashboardModel } from './api/types';
+import type { ContextRuntime, DashboardModel } from './api/types';
 import { StatusBadge } from './components/StatusBadge';
+import { CallInvestigatorPage } from './features/call-investigator/CallInvestigatorPage';
 import { CacheContextPage } from './features/cache-context/CacheContextPage';
 import { CallsPage } from './features/calls/CallsPage';
 import { DiagnosticsPage } from './features/diagnostics/DiagnosticsPage';
@@ -21,20 +22,41 @@ export function App() {
     const requestedView = params.get('view');
     return isViewId(requestedView) ? requestedView : 'overview';
   });
+  const [activeRecordId, setActiveRecordId] = useState(
+    () => new URLSearchParams(window.location.search).get('record') ?? '',
+  );
   const [globalQuery, setGlobalQuery] = useState(() => new URLSearchParams(window.location.search).get('q') ?? '');
   const [refreshState, setRefreshState] = useState('Stored snapshot loaded just now');
+  const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
+  const contextRuntime = useMemo<ContextRuntime>(
+    () => ({ ...model.contextRuntime, contextApiEnabled }),
+    [contextApiEnabled, model.contextRuntime],
+  );
 
   function setView(view: ViewId) {
     setActiveView(view);
     const url = new URL(window.location.href);
     url.searchParams.set('view', view);
+    if (view !== 'call') {
+      url.searchParams.delete('record');
+      setActiveRecordId('');
+    }
+    window.history.replaceState(null, '', url);
+  }
+
+  function openCallInvestigator(recordId: string) {
+    setActiveView('call');
+    setActiveRecordId(recordId);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'call');
+    url.searchParams.set('record', recordId);
     window.history.replaceState(null, '', url);
   }
 
   function updateGlobalQuery(value: string) {
     setGlobalQuery(value);
     const url = new URL(window.location.href);
-    if (value.trim()) {
+    if (value) {
       url.searchParams.set('q', value);
     } else {
       url.searchParams.delete('q');
@@ -43,12 +65,8 @@ export function App() {
   }
 
   function handleRefresh() {
-    setRefreshState(
-      `Manual refresh requested ${new Intl.DateTimeFormat('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(new Date())}`,
-    );
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setRefreshState(`Stored snapshot refreshed at ${timestamp}`);
   }
 
   return (
@@ -56,26 +74,27 @@ export function App() {
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">
-            <Terminal size={18} />
+            <Terminal size={22} />
           </div>
           <div>
             <strong>Codex Usage Tracker</strong>
-            <span>Local Telemetry Console</span>
+            <span>Local telemetry console</span>
           </div>
         </div>
         <div className="local-pill">
-          <i />
+          <span aria-hidden="true" />
           Local data only
         </div>
-        <nav className="primary-nav" aria-label="Dashboard sections">
+        <nav className="primary-nav" aria-label="Primary">
           {navItems.map(item => {
             const Icon = item.icon;
+            const selected = activeView === item.id || (activeView === 'call' && item.id === 'calls');
             return (
               <button
                 type="button"
                 key={item.id}
-                aria-pressed={activeView === item.id}
-                className={activeView === item.id ? 'active' : ''}
+                aria-pressed={selected}
+                className={selected ? 'active' : ''}
                 onClick={() => setView(item.id)}
               >
                 <Icon size={18} />
@@ -125,11 +144,25 @@ export function App() {
             </button>
           </div>
         </header>
-
-        {renderView(activeView, model, handleRefresh, refreshState, globalQuery)}
+        {renderView(
+          activeView,
+          model,
+          onRefresh,
+          refreshState,
+          globalQuery,
+          activeRecordId,
+          contextRuntime,
+          setContextApiEnabled,
+          openCallInvestigator,
+          setView,
+        )}
       </main>
     </div>
   );
+
+  function onRefresh() {
+    handleRefresh();
+  }
 }
 
 function renderView(
@@ -138,6 +171,11 @@ function renderView(
   onRefresh: () => void,
   refreshState: string,
   globalQuery: string,
+  activeRecordId: string,
+  contextRuntime: ContextRuntime,
+  setContextApiEnabled: (enabled: boolean) => void,
+  openCallInvestigator: (recordId: string) => void,
+  setView: (view: ViewId) => void,
 ) {
   switch (activeView) {
     case 'overview':
@@ -145,7 +183,27 @@ function renderView(
     case 'investigator':
       return <InvestigatorPage model={model} />;
     case 'calls':
-      return <CallsPage model={model} globalQuery={globalQuery} onRefresh={onRefresh} />;
+      return (
+        <CallsPage
+          model={model}
+          globalQuery={globalQuery}
+          onRefresh={onRefresh}
+          contextRuntime={contextRuntime}
+          onContextApiEnabledChange={setContextApiEnabled}
+          onOpenInvestigator={openCallInvestigator}
+        />
+      );
+    case 'call':
+      return (
+        <CallInvestigatorPage
+          model={model}
+          recordId={activeRecordId}
+          contextRuntime={contextRuntime}
+          onContextApiEnabledChange={setContextApiEnabled}
+          onNavigateRecord={openCallInvestigator}
+          onBackToCalls={() => setView('calls')}
+        />
+      );
     case 'threads':
       return <ThreadsPage model={model} globalQuery={globalQuery} />;
     case 'usage-drain':

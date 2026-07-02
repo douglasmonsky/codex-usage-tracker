@@ -36,8 +36,12 @@ describe('React dashboard shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Models' }));
     expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /More Filters/i }));
     expect(screen.getByPlaceholderText('Search calls, threads, models...')).toHaveFocus();
+    const sortButton = screen.getByRole('button', { name: 'Sort by Est. Cost' });
+    fireEvent.click(sortButton);
+    expect(sortButton.closest('th')).toHaveAttribute('aria-sort', 'descending');
 
     fireEvent.click(screen.getByRole('button', { name: 'Files' }));
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
@@ -63,11 +67,11 @@ describe('React dashboard shell', () => {
     expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveFocus();
   });
 
-  it('filters calls and shows the selected call drill-down panel', () => {
+  it('filters and drills into calls through detail tabs', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
-
     expect(screen.getByRole('heading', { name: 'Call Drill-Down' })).toBeInTheDocument();
+
     fireEvent.change(screen.getByPlaceholderText('Search calls, threads, models...'), {
       target: { value: 'thread-3c8d4e' },
     });
@@ -102,11 +106,11 @@ describe('React dashboard shell', () => {
   it('toggles call and thread columns while keeping identity columns locked', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
-
     fireEvent.click(screen.getByRole('button', { name: /Columns/i }));
     expect(screen.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByText('Calls columns')).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /Columns/i }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Signal' }));
     expect(screen.queryByRole('columnheader', { name: /Signal/i })).not.toBeInTheDocument();
@@ -116,6 +120,31 @@ describe('React dashboard shell', () => {
     expect(screen.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Productivity' }));
     expect(screen.queryByRole('columnheader', { name: /Productivity/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the full-page call investigator from calls and direct record URLs', () => {
+    const view = render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Open investigator/i }));
+
+    expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
+    expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
+    expect(window.location.search).toContain('view=call');
+    expect(window.location.search).toContain('record=fixture-call-0');
+    expect(screen.getByRole('button', { name: /^Calls$/i })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    expect(screen.getByText('thread-7b2e91 / o4-mini')).toBeInTheDocument();
+    expect(window.location.search).toContain('record=fixture-call-1');
+
+    fireEvent.click(screen.getByRole('button', { name: /Back to Calls/i }));
+    expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
+
+    view.unmount();
+    window.history.replaceState(null, '', '/?view=call&record=fixture-call-2');
+    render(<App />);
+    expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
+    expect(screen.getByText('thread-3c8d4e / o3')).toBeInTheDocument();
   });
 
   it('loads selected-call context evidence through the localhost API', async () => {
@@ -158,6 +187,58 @@ describe('React dashboard shell', () => {
     fireEvent.click(screen.getByRole('button', { name: /Show turn evidence/i }));
 
     expect(await screen.findByText('redacted context sample')).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/context?');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('record_id=record-context-1');
+    expect(fetchMock.mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        cache: 'no-store',
+        headers: expect.objectContaining({
+          'X-Codex-Usage-Token': 'test-token',
+        }),
+      }),
+    );
+  });
+
+  it('loads full-page investigator context through the localhost API', async () => {
+    window.history.replaceState(null, '', '/?view=call&record=record-context-1');
+    window.__CODEX_USAGE_BOOT__ = {
+      api_token: 'test-token',
+      context_api_enabled: true,
+      loaded_row_count: 1,
+      rows: [
+        {
+          record_id: 'record-context-1',
+          call_started_at: '2026-07-01T12:00:00Z',
+          thread_name: 'context-thread',
+          model: 'gpt-5.5',
+          effort: 'high',
+          input_tokens: 1000,
+          cached_input_tokens: 500,
+          output_tokens: 100,
+          total_tokens: 1100,
+          estimated_cost_usd: 0.1,
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        schema: 'codex-usage-tracker-context-v1',
+        record_id: 'record-context-1',
+        context_mode: 'quick',
+        visible_char_count: 42,
+        visible_token_estimate: 11,
+        omitted: { older_entries: 0 },
+        entries: [{ type: 'message', label: 'User prompt', line_number: 14, text: 'redacted investigator sample' }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /Show turn evidence/i }));
+
+    expect(await screen.findByText('redacted investigator sample')).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/context?');
     expect(String(fetchMock.mock.calls[0][0])).toContain('record_id=record-context-1');

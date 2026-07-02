@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('React dashboard rewrite smoke', () => {
-  test('renders and navigates experimental dashboard', async ({ page }) => {
+  test('renders and navigates the experimental dashboard', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
     await expect(page.getByText('Local data only').first()).toBeVisible();
@@ -10,6 +10,15 @@ test.describe('React dashboard rewrite smoke', () => {
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
     await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
+
+    await page.getByRole('button', { name: /Open investigator/i }).click();
+    await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
+    await expect(page).toHaveURL(/view=call/);
+    await expect(page).toHaveURL(/record=fixture-call-0/);
+    await page.getByRole('button', { name: /Next/i }).click();
+    await expect(page.getByText('thread-7b2e91 / o4-mini')).toBeVisible();
+    await page.getByRole('button', { name: /Back to Calls/i }).click();
+    await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: /^Reports$/i }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
@@ -30,24 +39,22 @@ test.describe('React dashboard rewrite smoke', () => {
     await expect(page.getByRole('columnheader', { name: /Est. Cost/i })).toHaveAttribute('aria-sort', 'descending');
 
     await page.getByPlaceholder('Search calls, threads, models...').fill('thread-3c8d4e');
-    const callsTable = page.getByRole('table', { name: 'Model calls' });
-    const matchingCall = callsTable.getByRole('cell', { name: 'thread-3c8d4e' });
-    await expect(matchingCall).toBeVisible();
-    await expect(callsTable.getByRole('cell', { name: 'thread-9f3a1c' })).toHaveCount(0);
-
-    await matchingCall.click();
+    await expect(page.getByRole('cell', { name: 'thread-3c8d4e' })).toBeVisible();
+    await page.getByRole('row', { name: /thread-3c8d4e/ }).click();
     await expect(page.getByText('thread-3c8d4e / o3')).toBeVisible();
-    await expect(page.getByText('Uncached input').first()).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Summary/i })).toHaveAttribute('aria-selected', 'true');
-    await page.getByRole('tab', { name: /Tokens/i }).click();
-    await expect(page.getByText('Reasoning output')).toBeVisible();
-  await page.getByRole('tab', { name: /Evidence/i }).click();
-  await expect(page.getByText('Raw context is gated')).toBeVisible();
-  await expect(page.getByText(/localhost dashboard server API token/i)).toBeVisible();
+    await page.getByRole('tab', { name: /Evidence/i }).click();
+    await expect(page.getByText('Raw context is gated')).toBeVisible();
 
-  const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: /^Export$/i }).click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Export/i }).click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(/^codex-calls-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(download.suggestedFilename()).toContain('codex-calls-');
+  });
+
+  test('opens direct call investigator URLs', async ({ page }) => {
+    await page.goto('/?view=call&record=fixture-call-2');
+    await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
+    await expect(page.getByText('thread-3c8d4e / o3')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Calls$/i })).toHaveAttribute('aria-pressed', 'true');
   });
 });

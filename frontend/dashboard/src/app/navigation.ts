@@ -18,6 +18,7 @@ export type ViewId =
   | 'overview'
   | 'investigator'
   | 'calls'
+  | 'call'
   | 'threads'
   | 'usage-drain'
   | 'cache-context'
@@ -51,5 +52,5 @@ export const secondaryNavItems: Array<{ label: string; icon: LucideIcon; target:
 ];
 
 export function isViewId(value: string | null): value is ViewId {
-  return navItems.some(item => item.id === value);
+  return value === 'call' || navItems.some(item => item.id === value);
 }
