@@ -1,0 +1,260 @@
+import type { DashboardModel } from '../api/types';
+
+const weeklyLabels = ['May 12', 'May 19', 'May 26', 'Jun 02', 'Jun 09', 'Jun 16', 'Jun 23', 'Jun 30'];
+
+export const fixtureModel: DashboardModel = {
+  contextRuntime: {
+    apiToken: '',
+    contextApiEnabled: false,
+    fileMode: false,
+  },
+  cards: [
+    {
+      label: 'Total Tokens',
+      value: '24.83M',
+      detail: '7-day total: 12.56M',
+      trend: 'up 18.7% vs prior 7 days',
+      tone: 'blue',
+    },
+    {
+      label: 'Estimated Cost',
+      value: '$42.67',
+      detail: '7-day total: $24.81',
+      trend: 'up 14.2% vs prior 7 days',
+      tone: 'green',
+    },
+    {
+      label: 'Cache Hit Rate',
+      value: '38.7%',
+      detail: '7-day average: 42.3%',
+      trend: 'down 3.6pp vs prior 7 days',
+      tone: 'purple',
+    },
+    {
+      label: 'Total Calls',
+      value: '1,342',
+      detail: '678 calls in last 7 days',
+      trend: 'up 11.3% vs prior 7 days',
+      tone: 'blue',
+    },
+    {
+      label: 'Usage Remaining',
+      value: '32.4%',
+      detail: '~15.9K credits estimated',
+      trend: 'resets in 4d 12h',
+      tone: 'green',
+    },
+  ],
+  tokenSeries: [
+    series('input', 'Input', '#2563eb', [5.2, 6.4, 7.5, 9.2, 6.7, 7.5, 6.6, 9.0], 1_000_000),
+    series('output', 'Output', '#059669', [2.5, 3.0, 3.6, 5.1, 3.7, 5.0, 4.0, 5.4], 1_000_000),
+    series('cached', 'Cached', '#7c3aed', [1.1, 1.4, 1.7, 2.4, 1.8, 2.3, 1.8, 2.6], 1_000_000, true),
+  ],
+  costSeries: [series('cost', 'Estimated Cost', '#2563eb', [8.4, 10.1, 14.3, 9.9, 11.4, 7.8, 12.7, 16.5])],
+  cacheSeries: [series('cache', 'Cache Hit Rate', '#059669', [58, 61, 39, 45, 50, 44, 48, 41])],
+  weeklyCreditSeries: [
+    {
+      id: 'pro',
+      label: 'Pro observed',
+      color: '#2563eb',
+      points: weeklyLabels.map((label, index) => ({
+        label,
+        value: [59_800, 44_900, 45_000, 40_500, 42_800, 38_900, 31_400, 35_900][index] ?? 0,
+        low: [52_100, 38_800, 38_900, 34_700, 36_200, 32_200, 26_100, 29_900][index] ?? 0,
+        high: [67_400, 51_200, 51_100, 46_800, 49_200, 45_100, 37_300, 41_900][index] ?? 0,
+      })),
+    },
+    series('pro-trend', 'Pro trend', '#1d4ed8', [54.2, 51.0, 47.8, 44.6, 41.4, 38.2, 35.0, 31.8], 1_000, true),
+    series('prolite', 'Prolite observed', '#0f766e', [15.9, 15.8, 15.9, 16.1, 15.7, 15.6, 15.9, 15.8], 1_000),
+  ],
+  usageRemainingSeries: [
+    series('remaining', 'Usage remaining', '#059669', [87, 71, 63, 56, 56, 48, 50, 54]),
+    series('allowance', 'Allowance guide', '#0f766e', [86, 85, 84, 83, 82, 81, 80, 79], 1, true),
+  ],
+  actualVsPredictedSeries: [
+    series('observed', 'Observed drain', '#2563eb', [18.7, 22.1, 45.3, 31.0, 34.8], 1_000),
+    series('predicted', 'Predicted baseline', '#1d4ed8', [17.9, 21.4, 41.2, 29.6, 33.9], 1_000, true),
+  ],
+  findings: [
+    {
+      rank: 1,
+      title: 'Long Thread: data-engine-refactor',
+      severity: 'High',
+      credits: 12_847,
+      share: 25.6,
+      summary: 'Very long duration with high model effort.',
+    },
+    {
+      rank: 2,
+      title: 'Cache Misses (Large Inputs)',
+      severity: 'High',
+      credits: 9_612,
+      share: 19.1,
+      summary: 'Large uncached inputs across 214 calls.',
+    },
+    {
+      rank: 3,
+      title: 'High Model Effort',
+      severity: 'Medium',
+      credits: 7_404,
+      share: 14.7,
+      summary: 'Reasoning and output token volume are concentrated.',
+    },
+    {
+      rank: 4,
+      title: 'Tool Output Volume',
+      severity: 'Medium',
+      credits: 5_231,
+      share: 10.4,
+      summary: 'Large tool outputs returned to the model.',
+    },
+  ],
+  calls: [
+    ['Jun 1, 10:24 AM', 'thread-9f3a1c', 'codex-1', 'high', 128_542, 45_231, 62, 0.42, '18.4s', false, ['review']],
+    ['Jun 1, 10:18 AM', 'thread-7b2e91', 'o4-mini', 'medium', 98_731, 32_104, 41, 0.31, '12.7s', true, ['analysis']],
+    ['Jun 1, 10:12 AM', 'thread-3c8d4e', 'o3', 'high', 64_221, 18_903, 28, 0.12, '9.3s', true, ['uncached']],
+    ['Jun 1, 10:06 AM', 'thread-1a2b3c', 'codex-1', 'high', 245_123, 98_112, 71, 0.87, '27.6s', false, ['large']],
+    ['Jun 1, 10:01 AM', 'thread-8d7c6b', 'gpt-4.1', 'low', 12_543, 4_231, 12, 0.03, '3.6s', true, ['quick']],
+    ['Jun 1, 09:55 AM', 'thread-2f9e7d', 'o4-mini', 'medium', 76_881, 28_442, 39, 0.24, '11.2s', false, ['subagent']],
+    ['Jun 1, 09:50 AM', 'thread-6a5b4c', 'codex-1', 'high', 312_654, 112_991, 67, 1.12, '31.8s', false, ['file-heavy']],
+    ['Jun 1, 09:47 AM', 'thread-0f1e2d', 'o3', 'low', 8_221, 2_903, 15, 0.02, '2.8s', true, ['fast']],
+  ].map(([time, thread, model, effort, input, output, cachedPct, cost, duration, fast, tags], index) => {
+    const inputTokens = Number(input);
+    const outputTokens = Number(output);
+    const cachedPercent = Number(cachedPct);
+    const uncachedInput = Math.round(inputTokens * Math.max(100 - cachedPercent, 0) / 100);
+    return {
+      id: `fixture-call-${index}`,
+      rawTime: String(time),
+      time: String(time),
+      thread: String(thread),
+      model: String(model),
+      effort: String(effort),
+      input: inputTokens,
+      output: outputTokens,
+      reasoningOutput: Math.round(outputTokens * 0.2),
+      totalTokens: inputTokens + outputTokens,
+      uncachedInput,
+      cachedPct: cachedPercent,
+      cost: Number(cost),
+      credits: Number(cost) * 25,
+      duration: String(duration),
+      durationSeconds: Number.parseFloat(String(duration)) || 0,
+      fast: Boolean(fast),
+      usageCreditConfidence: 'fixture',
+      pricingEstimated: false,
+      signal: uncachedInput > 50_000 ? 'cache-risk' : 'aggregate',
+      recommendation: uncachedInput > 50_000 ? 'Review uncached aggregate input before continuing this thread.' : '',
+      tags: tags as string[],
+    };
+  }),
+  threads: [
+    ['thread-9f3a', 142, 58_400, 8.76, 12, 1.38, 'High', 42],
+    ['thread-7c2b', 87, 31_200, 4.21, 22, 1.12, 'Medium', 55],
+    ['thread-1a8c', 64, 22_700, 3.02, 18, 0.98, 'High', 48],
+    ['thread-d3e1', 53, 18_100, 2.11, 41, 0.81, 'Low', 72],
+    ['thread-b7f0', 41, 13_600, 1.65, 47, 0.73, 'Low', 75],
+    ['thread-3c5d', 36, 9_900, 1.18, 35, 0.66, 'Medium', 63],
+    ['thread-0e16', 28, 6_400, 0.72, 56, 0.58, 'Low', 82],
+  ].map(([name, turns, totalTokens, cost, cachePct, costPerCall, coldResumeRisk, productivity]) => ({
+    name: String(name),
+    turns: Number(turns),
+    totalTokens: Number(totalTokens),
+    cost: Number(cost),
+    cachePct: Number(cachePct),
+    costPerCall: Number(costPerCall),
+    coldResumeRisk: coldResumeRisk as 'High' | 'Medium' | 'Low',
+    productivity: Number(productivity),
+  })),
+  weeklyWindows: weeklyLabels.map((label, index) => ({
+    week: label,
+    plan: index === 0 ? 'Prolite' : 'Pro',
+    observedPct: [61.4, 49.2, 47.7, 48.3, 44.5, 37.4, 40.1, 35.8][index] ?? 0,
+    credits: [49_812, 41_275, 39_887, 40_563, 37_284, 31_420, 33_842, 35_900][index] ?? 0,
+    projected: [49_812, 41_275, 39_887, 40_563, 37_284, 31_420, 33_842, 35_900][index] ?? 0,
+    ciLow: [42_156, 34_892, 33_424, 34_021, 31_241, 26_164, 28_234, 29_450][index] ?? 0,
+    ciHigh: [57_467, 47_657, 46_349, 47_105, 43_326, 36_676, 39_450, 41_900][index] ?? 0,
+    confidence: index === 0 ? 'Medium' : 'High',
+    note: ['Prolite baseline', 'Drop in credits', 'Stable', 'Slight uptick', 'Down again', 'Lowest window', 'Recovery', 'Latest'][index] ?? '',
+  })),
+  modelCosts: [
+    { label: 'codex-1', value: 16.21, color: '#2563eb' },
+    { label: 'o3', value: 12.43, color: '#1d4ed8' },
+    { label: 'o4-mini', value: 7.62, color: '#059669' },
+    { label: 'gpt-4.1', value: 4.91, color: '#f59e0b' },
+    { label: 'other', value: 1.5, color: '#94a3b8' },
+  ],
+  commandActions: [
+    { title: 'Show highest uncached calls', status: 'Ready', owner: 'Calls', description: '214 calls above the uncached threshold.' },
+    { title: 'Compare Pro weeks', status: 'Ready', owner: 'Usage Drain', description: 'Allowance windows with confidence intervals.' },
+    { title: 'Find cold resumes', status: 'Ready', owner: 'Cache', description: '14 threads with long idle gaps.' },
+    { title: 'Export support bundle', status: 'Planned', owner: 'Reports', description: 'Local aggregate artifacts only.' },
+  ],
+  cacheSegments: [
+    { label: 'Cache read', value: 38.7, color: '#2563eb' },
+    { label: 'Cache write', value: 29.6, color: '#059669' },
+    { label: 'Uncached', value: 31.7, color: '#7c3aed' },
+  ],
+  cacheHeatmap: [
+    { thread: 'thread-8c1e', values: [62, 71, 89, 82, 74, 31] },
+    { thread: 'thread-2b9d', values: [42, 58, 77, 61, 51, 24] },
+    { thread: 'thread-713a', values: [78, 81, 83, 66, 59, 37] },
+    { thread: 'thread-4af2', values: [24, 36, 63, 54, 71, 44] },
+    { thread: 'thread-f9c3', values: [18, 25, 41, 38, 52, 22] },
+  ],
+  diagnostics: [
+    {
+      title: 'Usage Drain',
+      status: 'Ready',
+      finding: 'Projected weekly credits declined from the baseline and partially recovered in the latest window.',
+      confidence: 'High',
+      metric: '33,842 credits / week',
+      series: [series('usage-drain', 'Projected credits', '#2563eb', [41.8, 46.7, 45.9, 32.1, 33.8], 1_000)],
+    },
+    {
+      title: 'Cache Behavior',
+      status: 'Ready',
+      finding: 'Cache hit rate is healthy overall, with spikes aligned to large cache misses and cold resumes.',
+      confidence: 'Medium',
+      metric: '41.1% hit rate',
+      series: [series('cache', 'Cache hit %', '#059669', [44, 48, 38, 33, 40])],
+    },
+    {
+      title: 'Thread Efficiency',
+      status: 'Ready',
+      finding: 'Long threads account for most estimated cost and are the clearest optimization target.',
+      confidence: 'High',
+      metric: '65% cost share',
+      series: [series('threads', 'Cost share', '#1d4ed8', [65, 23, 8, 4])],
+    },
+    {
+      title: 'Tool And Command Activity',
+      status: 'Stale',
+      finding: 'Command volume is stable with a slight upward trend; read and shell commands dominate.',
+      confidence: 'Medium',
+      metric: '912 commands',
+      series: [series('commands', 'Commands', '#7c3aed', [542, 488, 611, 883, 912])],
+    },
+  ],
+  reports: [
+    { title: 'Weekly Credits', status: 'Ready', owner: 'Usage Drain', description: 'Plan-specific weekly credits, trend lines, and confidence intervals.' },
+    { title: 'Usage Remaining', status: 'Ready', owner: 'Usage Drain', description: 'Observed remaining usage over time with reset handling.' },
+    { title: 'Cost Curves', status: 'Ready', owner: 'Threads', description: 'Cumulative estimated cost by thread and concentration metrics.' },
+    { title: 'Usage Drain Model', status: 'Ready', owner: 'Reports', description: 'Actual-vs-predicted drain and feature group comparisons.' },
+    { title: 'Fast Mode Proxy', status: 'Planned', owner: 'Calls', description: 'Candidate detection, speedup histogram, and confidence breakdowns.' },
+    { title: 'Allowance Change', status: 'Planned', owner: 'Reports', description: 'Week-to-week allowance estimate changes with careful language.' },
+  ],
+};
+
+function series(id: string, label: string, color: string, values: number[], multiplier = 1, dashed = false) {
+  return {
+    id,
+    label,
+    color,
+    dashed,
+    points: values.map((value, index) => ({
+      label: weeklyLabels[index] ?? `Point ${index + 1}`,
+      value: value * multiplier,
+    })),
+  };
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@codex-usage-tracker/dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json --pretty false",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test ../../tests/playwright/dashboard-react.spec.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.12",
+    "d3-array": "^3.2.4",
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
+    "d3-time-format": "^4.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/d3-array": "^3.2.1",
+    "@types/d3-scale": "^4.0.9",
+    "@types/d3-shape": "^3.1.6",
+    "@types/d3-time-format": "^4.0.3",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "4.3.4",
+    "eslint": "^9.17.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.8"
+  }
+}
