@@ -40,6 +40,9 @@ describe('threadsUrlState', () => {
     expect(readThreadSortingParam(`${baseHref}&sort=usage&direction=desc`)).toEqual([{ id: 'credits', desc: true }]);
     expect(readThreadSortingParam(`${baseHref}&sort=cache&direction=asc`)).toEqual([{ id: 'cachePct', desc: false }]);
     expect(readThreadSortingParam(`${baseHref}&sort=context&direction=desc`)).toEqual([{ id: 'contextPct', desc: true }]);
+    expect(readThreadCallSortParam(`${baseHref}&thread_call_sort=time`)).toBe('newest');
+    expect(readThreadCallSortParam(`${baseHref}&thread_call_sort=total`)).toBe('tokens');
+    expect(readThreadCallSortParam(`${baseHref}&thread_call_sort=reasoning`)).toBe('tokens');
   });
 
   it('falls back invalid URL values to legacy defaults', () => {

@@ -70,7 +70,8 @@ export function readThreadCallPageVisibleRowsParam(pageSize: number, href = wind
 }
 
 export function normalizeThreadCallSort(value: string): ThreadCallSortKey {
-  return threadCallSortValues.has(value) ? (value as ThreadCallSortKey) : 'newest';
+  const normalizedValue = normalizeLegacyThreadCallSortKey(value);
+  return threadCallSortValues.has(normalizedValue) ? (normalizedValue as ThreadCallSortKey) : 'newest';
 }
 
 export type ThreadsViewLinkState = {
@@ -130,6 +131,14 @@ function normalizeLegacyThreadSortKey(value: string): string {
   if (value === 'usage') return 'credits';
   if (value === 'cache') return 'cachePct';
   if (value === 'context') return 'contextPct';
+  return value;
+}
+
+function normalizeLegacyThreadCallSortKey(value: string): string {
+  if (value === 'time') return 'newest';
+  if (value === 'total' || value === 'cached' || value === 'uncached' || value === 'output' || value === 'reasoning') {
+    return 'tokens';
+  }
   return value;
 }
 
