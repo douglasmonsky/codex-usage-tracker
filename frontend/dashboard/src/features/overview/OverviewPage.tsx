@@ -126,6 +126,23 @@ export function OverviewPage({
         action={
           <div className="panel-action-group">
             <StatusBadge label={globalQuery ? `${visibleCalls.length} matches` : 'Local data only'} tone="green" />
+          </div>
+        }
+      >
+        <DataTable
+          columns={overviewCallColumns}
+          data={recentCalls}
+          compact
+          getRowId={call => call.id}
+          getRowActionLabel={call => callInvestigatorRowLabel(call)}
+          onRowActivate={call => onOpenInvestigator(call.id)}
+          ariaLabel="Recent calls"
+        />
+        <div className="table-window-footer recent-calls-footer">
+          <span>
+            Showing {formatNumber(recentCalls.length)} of {formatNumber(visibleCalls.length)} loaded calls
+          </span>
+          <div className="panel-action-group">
             <button
               className="table-action-button"
               type="button"
@@ -141,17 +158,7 @@ export function OverviewPage({
               Load all rows
             </button>
           </div>
-        }
-      >
-        <DataTable
-          columns={overviewCallColumns}
-          data={recentCalls}
-          compact
-          getRowId={call => call.id}
-          getRowActionLabel={call => callInvestigatorRowLabel(call)}
-          onRowActivate={call => onOpenInvestigator(call.id)}
-          ariaLabel="Recent calls"
-        />
+        </div>
       </Panel>
     </div>
   );

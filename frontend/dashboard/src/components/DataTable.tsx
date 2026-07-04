@@ -226,5 +226,5 @@ function headerLabel(header: unknown): string {
 }
 
 function stickyColumnClass(columnId: string): string | undefined {
-  return columnId === 'thread' ? 'sticky-column' : undefined;
+  return columnId === 'thread' || columnId === 'name' ? 'sticky-column' : undefined;
 }

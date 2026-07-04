@@ -72,6 +72,7 @@ expect(params.get(name)).toBeNull();
     const recentCallsTable = screen.getByRole('table', { name: 'Recent calls' });
     expect(within(recentCallsTable).getByRole('columnheader', { name: /Thread/i })).toHaveClass('sticky-column');
     expect(within(recentCallsTable).getByText('live-overview-thread').closest('td')).toHaveClass('sticky-column');
+    expect(screen.getByText('Showing 1 of 1 loaded calls')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Load all rows/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText('32.4%')).not.toBeInTheDocument();
     expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();

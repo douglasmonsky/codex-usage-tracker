@@ -131,10 +131,12 @@ it('opens full-page call investigator from cache context thread table rows', () 
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /Cache And Context/i }));
 
-const table = screen.getByRole('table', { name: 'Cache context threads overview' });
-const row = within(table).getByText('thread-9f3a').closest('tr');
-expect(row).not.toBeNull();
-fireEvent.click(row as HTMLTableRowElement);
+  const table = screen.getByRole('table', { name: 'Cache context threads overview' });
+  expect(within(table).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
+  expect(within(table).getByText('thread-9f3a').closest('td')).toHaveClass('sticky-column');
+  const row = within(table).getByText('thread-9f3a').closest('tr');
+  expect(row).not.toBeNull();
+  fireEvent.click(row as HTMLTableRowElement);
 
   expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
   expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();

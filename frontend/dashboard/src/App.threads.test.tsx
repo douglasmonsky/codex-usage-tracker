@@ -52,6 +52,8 @@ describe('React dashboard threads workspace', () => {
 
     expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
     const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
+    expect(within(threadsTable).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
+    expect(within(threadsTable).getByText('thread-9f3a').closest('td')).toHaveClass('sticky-column');
     const firstThreadRow = within(threadsTable).getByText('thread-9f3a').closest('tr');
     expect(firstThreadRow).not.toBeNull();
     expect(firstThreadRow).toHaveAttribute('aria-selected', 'true');
