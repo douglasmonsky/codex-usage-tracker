@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 import webbrowser
@@ -41,6 +42,7 @@ from codex_usage_tracker.server.open_investigator import (
     open_investigator_payload,
 )
 from codex_usage_tracker.server.recommendations import handle_recommendations_request
+from codex_usage_tracker.server.reports import handle_reports_pack_request
 from codex_usage_tracker.server.request_guards import (
     has_valid_api_token,
     request_origin_allowed,
@@ -83,6 +85,8 @@ _DASHBOARD_ASSET_MIME_TYPES = {
     ".json": "application/json; charset=utf-8",
     ".svg": "image/svg+xml",
 }
+_REACT_DASHBOARD_PATH = "/react-dashboard.html"
+_REACT_DASHBOARD_INDEX_PATH = "/codex-usage-tracker-assets/react/index.html"
 def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
     value = _first(params.get(key))
     return None if value is None else _safe_int(value)
@@ -158,6 +162,9 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
         if is_dashboard_shell_path(parsed.path, self._dashboard_name):
             self._handle_dashboard_shell(parsed.query)
             return
+        if parsed.path == _REACT_DASHBOARD_PATH:
+            self._handle_react_dashboard(parsed.query)
+            return
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
@@ -195,7 +202,57 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
 
     def _is_dashboard_html_request(self) -> bool:
         path = urlparse(self.path).path
-        return path in {"/", f"/{self._dashboard_name}"}
+        return path in {"/", f"/{self._dashboard_name}", _REACT_DASHBOARD_PATH} or bool(
+            getattr(self, "_serving_react_dashboard", False),
+        )
+
+    def _handle_react_dashboard(self, query: str) -> None:
+        payload = self._dashboard_shell_payload(query)
+        if payload is None:
+            return
+        payload["pricing_snapshot_warning"] = ""
+        index_path = Path(self.translate_path(_REACT_DASHBOARD_INDEX_PATH))
+        try:
+            html = index_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            self._send_exception("Could not read React dashboard shell", exc)
+            return
+        html = self._cache_bust_react_asset_urls(html)
+        usage_data = json.dumps(payload, ensure_ascii=True).replace("</", "<\\/")
+        usage_script = f'<script id="usage-data" type="application/json">{usage_data}</script>'
+        if '<div id="root"></div>' in html:
+            html = html.replace('<div id="root"></div>', f'<div id="root"></div>\n    {usage_script}', 1)
+        elif "</head>" in html:
+            html = html.replace("</head>", f"  {usage_script}\n</head>", 1)
+        else:
+            html = f"{html}\n{usage_script}"
+        original_path = self.path
+        self._serving_react_dashboard = True
+        try:
+            self._send_html(html.encode("utf-8"))
+        finally:
+            self.path = original_path
+            self._serving_react_dashboard = False
+
+    def _cache_bust_react_asset_urls(self, html: str) -> str:
+        for asset_url in (
+            "/codex-usage-tracker-assets/react/assets/dashboard-react.js",
+            "/codex-usage-tracker-assets/react/assets/index.css",
+        ):
+            version = self._react_asset_version(asset_url)
+            if not version:
+                continue
+            html = html.replace(f'{asset_url}"', f'{asset_url}?v={version}"')
+            html = html.replace(f"{asset_url}'", f"{asset_url}?v={version}'")
+        return html
+
+    def _react_asset_version(self, asset_url: str) -> str:
+        asset_path = Path(self.translate_path(asset_url))
+        try:
+            stat = asset_path.stat()
+        except OSError:
+            return ""
+        return f"{stat.st_mtime_ns:x}-{stat.st_size:x}"
 
     def _is_investigator_dashboard_request(self, path: str, query: str) -> bool:
         if path != f"/{self._dashboard_name}":
@@ -247,10 +304,11 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
                 privacy_mode=self._privacy_mode,
                 since=self._since,
                 api_token=self._api_token,
-                context_api_enabled=self._context_api_state.enabled,
-                include_archived_default=self._include_archived,
-                language_default=self._language,
-            )
+            context_api_enabled=self._context_api_state.enabled,
+            include_archived_default=self._include_archived,
+            language_default=self._language,
+            limit_default=self._limit,
+        )
         except sqlite3.Error as exc:
             self._send_exception("Database error while preparing dashboard shell", exc)
             return None
@@ -371,6 +429,16 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
             allowance_path=self._allowance_path,
             projects_path=self._projects_path,
             privacy_mode=self._privacy_mode,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
+
+    def _handle_reports_pack(self, query: str) -> None:
+        handle_reports_pack_request(
+            query,
+            live_query_params=self._live_query_params,
+            live_call_rows=self._live_call_rows,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,

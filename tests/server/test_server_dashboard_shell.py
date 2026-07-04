@@ -40,10 +40,11 @@ def test_dashboard_shell_payload_builds_lightweight_payload(
         context_api_enabled=True,
         include_archived_default=False,
         language_default="en",
+        limit_default=5000,
     )
 
     assert payload == {"shell_boot": True}
-    assert calls["limit"] == 0
+    assert calls["limit"] == 5000
     assert calls["offset"] == 0
     assert calls["include_rows"] is False
     assert calls["include_archived"] is False
@@ -74,6 +75,7 @@ def test_dashboard_shell_payload_history_scope_controls_default(
         context_api_enabled=False,
         include_archived_default=True,
         language_default="en",
+        limit_default=5000,
     )
 
     assert calls["include_archived"] is False

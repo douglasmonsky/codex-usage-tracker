@@ -35,7 +35,7 @@ codex-usage-tracker --privacy-mode strict dashboard --open
 
 Redacted mode hides raw cwd/source paths, hides Git remote labels, and hashes unnamed projects while preserving configured aliases. Strict mode also hides project-relative cwd, Git branch, and tags. The dashboard header shows the active metadata mode.
 
-`serve-dashboard` refreshes active-session logs before opening by default. Use `--no-refresh` only when you intentionally want a cached view of the existing local index.
+`serve-dashboard` refreshes active-session logs before opening the React dashboard by default. The legacy dashboard remains available at `/dashboard.html` on the same localhost server. Use `--no-refresh` only when you intentionally want a cached view of the existing local index.
 
 Set the initial dashboard language with the global `--lang` option before the command, or use `CODEX_USAGE_TRACKER_LANG`:
 
@@ -61,17 +61,17 @@ Static file mode can still filter, sort, and inspect aggregate call fields. `ope
 
 The localhost server uses a random per-server token for refresh and context API calls, validates loopback `Host` and `Origin` headers, and can start with context loading off through `codex-usage-tracker serve-dashboard --no-context-api`.
 
-## Insights View
+## Overview View
 
-![Insights view with ranked attention cards, investigation presets, and top threads by attention score.](assets/dashboard-insights.png)
+![Overview view with high-level metrics, time-series charts, and recent aggregate calls.](assets/dashboard-insights.png)
 
-Open the `Insights` view when you want to answer "what needs attention?" before you start sorting tables.
+Open `Overview` when you want a quick read on current aggregate usage before sorting deeper tables.
 
-- `Needs Attention` cards rank costly threads, Codex allowance usage, low cache reuse, context bloat, unpriced usage, estimated pricing, and reasoning-output spikes from aggregate fields only.
-- `Investigation Presets` apply a view, derived filter, sort order, and explanatory caption together.
-- Presets include highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, and estimated-price review.
-- The top table shows threads by attention score so you can jump from a summary signal into a thread timeline or selected call.
-- Clear an active preset to return to normal manual filtering and sorting.
+- Global dashboard filters narrow Overview and the secondary workspaces by model, reasoning effort, pricing/credit confidence, and time range using the same URL parameters as legacy dashboard links.
+- Metric cards summarize loaded aggregate rows without exposing prompts, assistant text, or raw tool output.
+- Time-series charts open on the most recent dates first and can scroll left for earlier history while keeping the value axis visible.
+- `Recent Calls` keeps the homepage modular: it shows the latest matching calls and lets any row open Call Investigator directly.
+- Use `Investigator` or `Calls` when you need deeper ranking, filtering, or preset-style investigation workflows.
 
 ## Calls View
 
@@ -101,7 +101,7 @@ Use `Calls` view when you want to inspect individual model calls.
 - The first detail section includes a recommended action and a "why flagged" explanation derived only from aggregate counters and pricing/allowance metadata.
 - Raw aggregate identifiers and source file metadata are collapsed until you need them.
 - The expanded details panel reserves a visible scrollbar so long field lists are discoverable before you start scrolling.
-- `Load more` appears when the active Insights, Calls, Threads, or expanded thread-call section has more rows to reveal.
+- `Load more` appears when the active Overview, Calls, Threads, or expanded thread-call section has more rows to reveal.
 - When served from localhost, `/api/usage` accepts `limit` and `offset` so automation can page aggregate rows without loading an entire large history.
 - After you scroll down, the bottom-right `Top` button returns to the top of the dashboard.
 
@@ -149,13 +149,13 @@ Use `Diagnostics` view when you want to see what structured event patterns are h
 - Click `Calls` on a fact row to load associated model calls. Call links and largest-call links open the Call Investigator, where raw context remains explicit and on demand.
 - Associated token totals are not causal allocations and are not additive when one call has multiple diagnostic facts.
 
-The same time range, model, reasoning, history scope, cards, and load controls apply in `Insights`, `Calls`, `Threads`, and `Diagnostics` views. Search, confidence, and sort controls currently scope the call/thread tables, not Diagnostics fact totals.
+The same model, reasoning, confidence, time range, history scope, cards, and load controls apply in `Overview`, `Threads`, `Diagnostics`, and the other secondary workspaces. `Calls` keeps a fuller table-specific filter row for local search, source coverage, sorting, density, and selected-row state.
 
 ## Call Investigator
 
 ![Call investigator showing exact token accounting, cache/accounting deltas, context estimates, and runtime evidence.](assets/dashboard-call-investigator.png)
 
-Clicking a Calls row opens `dashboard.html?view=call&record=<record_id>` for one model call. Hover remains the fast scanning surface; the investigator is the deeper diagnostic page for a single selected call. Expanded Threads rows and the details panel can still expose explicit investigator actions where a row click already has another meaning.
+Clicking a Calls row opens `react-dashboard.html?view=call&record=<record_id>` for one model call. Legacy `dashboard.html?view=call&record=...` links remain accepted and hydrate the same investigator route. Hover remains the fast scanning surface; the investigator is the deeper diagnostic page for a single selected call. Expanded Threads rows and the details panel can still expose explicit investigator actions where a row click already has another meaning.
 
 The investigator separates evidence by confidence:
 
@@ -206,7 +206,7 @@ When served from localhost, the call investigator automatically fetches quick, r
 2. Leave `Live` enabled while you work, or click `Refresh` after a Codex run finishes.
 3. Leave `History` on `Active sessions only` for current work. Switch to `All history` when you intentionally want archived sessions included in the live refresh.
 4. Optionally run `parse-allowance` with copied values from Codex Usage or `/status`, or initialize and edit `allowance.json` manually.
-5. Start in `Insights` view and review the highest-severity attention cards.
+5. Start in `Overview` view and review high-level totals, recent trends, and recent calls.
 6. Narrow the `Time` filter when you are investigating a recent spike or a specific work window.
 7. Use a preset when the question is already clear: highest-cost threads, highest Codex credits, context bloat, cache misses, pricing gaps, or estimated-price review.
 8. Use `Threads` view to find the active work thread and any spawned subagent calls.

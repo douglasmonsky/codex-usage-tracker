@@ -1,0 +1,19 @@
+:root {
+  --dashboard-bg: #f4f7fb;
+  --dashboard-text: #102033;
+  --dashboard-muted: #64748b;
+  --dashboard-label: #42526a;
+  --dashboard-subtle: #52627a;
+  --dashboard-surface: #ffffff;
+  --dashboard-border: #cfd9e8;
+  --dashboard-accent: #2563eb;
+  --dashboard-accent-strong: #1d4ed8;
+  --dashboard-sidebar-bg: #07162b;
+  --dashboard-sidebar-bg-raised: #0c213d;
+  --dashboard-sidebar-bg-hover: #102847;
+  --dashboard-sidebar-border: #254365;
+  --dashboard-sidebar-text: #d7e4f8;
+  --dashboard-sidebar-muted: #9eb1cc;
+  --dashboard-sidebar-heading: #ffffff;
+  --dashboard-focus: #60a5fa;
+}

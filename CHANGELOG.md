@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.14.0 - 2026-07-04
+
+- Make `serve-dashboard --open` prefer the React dashboard route while keeping legacy `/dashboard.html` available as a localhost fallback, and expose both URLs in `serve-dashboard --json`.
+- Restore major legacy dashboard parity in the React dashboard, including overview recent-call loading controls, sticky thread/header table affordances, row-to-investigator actions, diagnostics fact-call pagination, report and call sorting state, and legacy URL/filter normalization.
+- Add local-only transition safeguards: the prominent unofficial-project banner, aggregate-only privacy boundaries, rebuilt dashboard assets, and release-gate documentation for the React bundle.
+- Prioritize weekly usage windows in Overview and Settings so weekly remaining usage is surfaced ahead of short 5-hour windows.
+
 ## 0.13.1 - 2026-06-30
 
 - Add guided usage-summary diagnostics across CLI, API, and dashboard to explain the largest aggregate drivers behind usage.
@@ -90,7 +97,7 @@
 - Add an aggregate Diagnostics dashboard for inspecting diagnostic facts, associated calls, token totals, and on-demand evidence without persisting raw transcript text.
 - Add diagnostic fact extraction, reporting APIs, dashboard drilldowns, sortable associated-call tables, and load-more controls for larger diagnostic result sets.
 - Add source byte offsets and context seek diagnostics so on-demand evidence loading can seek when offsets are valid and fall back safely when they are missing or stale.
-- Harden dashboard startup so visiting Diagnostics before other views load no longer prevents Calls, Threads, or Insights from hydrating.
+- Harden dashboard startup so visiting Diagnostics before other views load no longer prevents Calls, Threads, or Overview from hydrating.
 - Make Live refresh use the cached/indexed append path and fetch only newly visible leading rows instead of running the full manual refresh reset cycle.
 
 ## 0.7.0 - 2026-06-18

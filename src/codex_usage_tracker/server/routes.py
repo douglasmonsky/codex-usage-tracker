@@ -16,6 +16,7 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType({
     "/api/thread-calls": "_handle_thread_calls",
     "/api/summary": "_handle_summary",
     "/api/recommendations": "_handle_recommendations",
+    "/api/reports/pack": "_handle_reports_pack",
     "/api/diagnostics/summary": "_handle_diagnostics_summary",
     "/api/diagnostics/facts": "_handle_diagnostics_facts",
     "/api/diagnostics/fact-calls": "_handle_diagnostics_fact_calls",

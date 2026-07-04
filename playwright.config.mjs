@@ -5,6 +5,13 @@ const baseURL = process.env.DASHBOARD_BASE_URL || 'http://127.0.0.1:8898';
 export default defineConfig({
   testDir: './tests/playwright',
   timeout: 30_000,
+  webServer: process.env.REACT_DASHBOARD_WEB_SERVER
+    ? {
+        command: 'npm --workspace frontend/dashboard run dev -- --port 5173',
+        url: 'http://127.0.0.1:5173',
+        reuseExistingServer: true,
+      }
+    : undefined,
   expect: {
     timeout: 10_000,
   },

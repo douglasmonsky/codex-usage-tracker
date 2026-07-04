@@ -1,0 +1,436 @@
+/* Diagnostics workspace styles. Keep selectors here when they only apply to Diagnostics Notebook surfaces. */
+
+.diagnostics-layout {
+  --diagnostics-action: #1f56c2;
+  --diagnostics-action-hover: #eef5ff;
+  --diagnostics-action-surface: #f8fbff;
+  --diagnostics-border: #e1e8f2;
+  --diagnostics-border-muted: #e8eef6;
+  --diagnostics-border-subtle: #edf2f7;
+  --diagnostics-focus: #93c5fd;
+  --diagnostics-selected: #eff6ff;
+  --diagnostics-surface: #fbfdff;
+  --diagnostics-surface-raised: #ffffff;
+  --diagnostics-text-emphasis: #0f172a;
+  --diagnostics-text-muted: #64748b;
+  --diagnostics-text-soft: #61728a;
+  --diagnostics-text-strong: #172033;
+}
+
+.diagnostic-source-tabs button {
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 96px;
+  min-height: 44px;
+  padding: 6px 8px;
+}
+
+.diagnostic-source-tabs small {
+  color: var(--diagnostics-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.diagnostic-fact-controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.diagnostic-call-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.diagnostic-call-row {
+  grid-template-columns: minmax(84px, 0.7fr) minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.diagnostic-call-row em {
+  grid-column: 2;
+}
+
+.diagnostic-call-row .table-action-group {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.diagnostics-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.diagnostics-snapshot-card {
+  display: grid;
+  gap: 11px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--diagnostics-border);
+  border-radius: 8px;
+  background: var(--diagnostics-surface);
+}
+
+.diagnostics-snapshot-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.diagnostics-snapshot-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.diagnostics-snapshot-card-actions .diagnostics-section-refresh {
+  min-height: 26px;
+  padding: 5px 8px;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.diagnostics-snapshot-card-head h3,
+.diagnostics-snapshot-card-head p {
+  margin: 0;
+}
+
+.diagnostics-snapshot-card-head h3 {
+  color: var(--diagnostics-text-emphasis);
+  font-size: 15px;
+}
+
+.diagnostics-snapshot-card-head p {
+  margin-top: 3px;
+  color: var(--diagnostics-text-soft);
+  font-size: 12px;
+}
+
+.diagnostics-snapshot-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.diagnostics-snapshot-metrics span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px;
+  border: 1px solid var(--diagnostics-border-muted);
+  border-radius: 7px;
+  background: var(--diagnostics-surface-raised);
+}
+
+.diagnostics-snapshot-metrics small {
+  color: var(--diagnostics-text-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.diagnostics-snapshot-metrics strong {
+  overflow: hidden;
+  color: var(--diagnostics-text-emphasis);
+  font-size: 16px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostics-snapshot-rows {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagnostics-snapshot-rows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px;
+  border: 1px solid var(--diagnostics-border-subtle);
+  border-radius: 7px;
+  background: var(--diagnostics-surface-raised);
+}
+
+.diagnostics-snapshot-rows li.has-row-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.diagnostics-snapshot-rows li.empty-state {
+  display: block;
+}
+
+.diagnostics-snapshot-row-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.diagnostics-snapshot-row-button:hover,
+.diagnostics-snapshot-row-button:focus-visible {
+  background: var(--diagnostics-action-hover);
+  outline: none;
+}
+.diagnostics-snapshot-row-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 70px;
+  padding: 8px;
+  border: 0;
+  border-left: 1px solid var(--diagnostics-border-subtle);
+  background: var(--diagnostics-action-surface);
+  color: var(--diagnostics-action);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.diagnostics-snapshot-row-copy:hover,
+.diagnostics-snapshot-row-copy:focus-visible {
+  background: var(--diagnostics-action-hover);
+  outline: none;
+}
+
+.diagnostics-snapshot-rows span {
+  display: grid;
+  min-width: 0;
+}
+
+.diagnostics-snapshot-rows strong,
+.diagnostics-snapshot-rows em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostics-snapshot-rows strong {
+  color: var(--diagnostics-text-strong);
+  font-size: 12px;
+}
+
+.diagnostics-snapshot-rows em {
+  color: var(--diagnostics-text-soft);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.diagnostics-snapshot-rows b {
+  color: var(--diagnostics-text-emphasis);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.diagnostics-snapshot-rows .diagnostics-snapshot-row-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--diagnostics-action);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.diagnostics-snapshot-row-depth {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--diagnostics-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.diagnostics-snapshot-row-children {
+  grid-column: 1 / -1;
+  margin: 0 8px 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--diagnostics-border-subtle);
+  color: var(--diagnostics-text-muted);
+  font-size: 12px;
+}
+
+.diagnostics-snapshot-row-children summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.diagnostics-snapshot-row-children ul {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagnostics-snapshot-row-children li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.diagnostics-snapshot-row-children span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--diagnostics-text-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostic-fact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.diagnostic-fact-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--diagnostics-border);
+  border-radius: 8px;
+  color: inherit;
+  background: var(--diagnostics-surface);
+}
+
+.diagnostic-fact-card:hover,
+.diagnostic-fact-card.active {
+  border-color: var(--diagnostics-focus);
+  background: var(--diagnostics-selected);
+}
+
+.diagnostic-fact-select {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 10px;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.diagnostic-fact-select:focus-visible {
+  outline: 2px solid var(--diagnostics-focus);
+  outline-offset: 4px;
+}
+
+.diagnostic-fact-select span:first-child,
+.diagnostic-fact-select strong,
+.diagnostic-fact-select small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.diagnostic-fact-select span:first-child {
+  color: var(--diagnostics-text-strong);
+  font-weight: 800;
+}
+
+.diagnostic-fact-select strong {
+  justify-self: end;
+  color: var(--diagnostics-text-emphasis);
+  font-size: 12px;
+}
+
+.diagnostic-fact-select small {
+  grid-column: 1;
+  color: var(--diagnostics-text-soft);
+}
+
+.diagnostic-fact-meta {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 3px;
+}
+
+.diagnostic-fact-meta span {
+  min-width: 0;
+  color: var(--diagnostics-text-strong);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.diagnostic-fact-meta b {
+  display: block;
+  margin-bottom: 1px;
+  color: var(--diagnostics-text-muted);
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.diagnostic-fact-card .table-action-group {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.diagnostic-fact-call-scroll {
+  max-height: min(58vh, 560px);
+  margin-top: 8px;
+}
+
+.diagnostic-fact-call-table {
+ min-width: 980px;
+}
+
+.diagnostic-fact-call-table .sticky-column {
+  min-width: 210px;
+  max-width: 360px;
+  background: var(--dashboard-surface);
+}
+
+.diagnostic-fact-call-table th.sticky-column {
+ background: #f8fafc;
+}
+
+.diagnostic-fact-call-table td strong {
+ color: var(--diagnostics-text-strong);
+ font-weight: 800;
+}

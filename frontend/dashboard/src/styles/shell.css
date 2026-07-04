@@ -1,0 +1,254 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px 16px;
+  color: #dce7f7;
+  background: var(--dashboard-sidebar-bg);
+  border-right: 1px solid #152b4d;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand strong {
+  display: block;
+  color: var(--dashboard-surface);
+  font-size: 15px;
+}
+
+.brand span,
+.secondary-block span,
+.status-card small {
+  color: var(--dashboard-sidebar-muted);
+  font-size: 12px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  color: #93c5fd;
+  background: #0b1f3a;
+}
+
+.local-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 7px 10px;
+  border: 1px solid var(--dashboard-sidebar-border);
+  border-radius: 8px;
+  color: #e8f1ff;
+  background: var(--dashboard-sidebar-bg-raised);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.local-pill i {
+width: 9px;
+height: 9px;
+border-radius: 50%;
+background: #22c55e;
+}
+
+.environment-status {
+display: grid;
+gap: 9px;
+}
+
+.environment-status-title {
+color: #93a9c5;
+font-size: 11px;
+font-weight: 700;
+letter-spacing: 0;
+text-transform: uppercase;
+}
+
+.environment-status-grid {
+display: flex;
+flex-wrap: wrap;
+gap: 6px;
+}
+
+.environment-chip {
+max-width: 100%;
+padding: 5px 8px;
+border: 1px solid var(--dashboard-sidebar-border);
+border-radius: 8px;
+color: #dbeafe;
+background: var(--dashboard-sidebar-bg-raised);
+font-size: 11px;
+line-height: 1.2;
+}
+
+.environment-chip[data-state='ready'] {
+border-color: #256d5b;
+color: #bbf7d0;
+background: #0f2c34;
+}
+
+.environment-chip[data-state='warn'] {
+border-color: #8a5d1c;
+color: #fed7aa;
+background: #332414;
+}
+
+.environment-chip[data-state='missing'] {
+border-color: #8f3b3f;
+color: #fecaca;
+background: #341b25;
+}
+
+.environment-chip[data-state='neutral'] {
+color: #dbeafe;
+}
+
+.primary-nav,
+.secondary-block {
+display: grid;
+gap: 6px;
+}
+
+.primary-nav button,
+.secondary-block button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 10px;
+  color: var(--dashboard-sidebar-text);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.primary-nav button:hover,
+.secondary-block button:hover,
+.primary-nav button:focus-visible,
+.secondary-block button:focus-visible {
+  outline: 2px solid var(--dashboard-focus);
+  outline-offset: 2px;
+  background: var(--dashboard-sidebar-bg-hover);
+}
+
+.primary-nav button.active {
+  color: var(--dashboard-surface);
+  background: var(--dashboard-accent-strong);
+}
+
+.secondary-block {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid #193252;
+}
+
+.status-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--dashboard-sidebar-border);
+  border-radius: 8px;
+  background: var(--dashboard-sidebar-bg-raised);
+}
+
+.status-card span {
+  color: #93a9c5;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.status-card strong {
+  color: var(--dashboard-surface);
+}
+
+.status-card button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  color: var(--dashboard-surface);
+  background: #14345c;
+  border: 1px solid #2f5687;
+  border-radius: 8px;
+}
+
+.workspace {
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 16px 20px 28px;
+}
+
+.unofficial-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 9px 14px;
+  border: 1px solid #f2c46d;
+  border-radius: 8px;
+  color: #5f3b04;
+  background: #fff8e6;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.unofficial-banner svg {
+  flex: 0 0 auto;
+  color: #b7791f;
+}
+
+.unofficial-banner strong {
+  color: #3f2600;
+}
+
+.page-grid,
+.stacked-panels {
+  display: grid;
+  gap: 16px;
+}
+
+.page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.page-title-row h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.page-title-row p,
+.panel-header p {
+  margin: 4px 0 0;
+  color: var(--dashboard-subtle);
+}

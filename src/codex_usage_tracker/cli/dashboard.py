@@ -12,6 +12,7 @@ from codex_usage_tracker.core.api_payloads import path_payload, refresh_result_p
 from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.dashboard.api import generate_dashboard
 from codex_usage_tracker.server.api import serve_dashboard
+from codex_usage_tracker.server.utils import url_host
 from codex_usage_tracker.store.api import refresh_usage_index
 
 
@@ -65,6 +66,8 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
                 "host": args.host,
                 "port": args.port,
                 "dashboard_path": path_payload(args.output),
+                "dashboard_url": _served_dashboard_url(args.host, args.port),
+                "legacy_dashboard_url": _served_legacy_dashboard_url(args.host, args.port, args.output.name),
                 "limit": _limit_value(args),
                 "since": args.since,
                 "context_api": _context_api(args),
@@ -118,6 +121,14 @@ def _generate_dashboard(args: argparse.Namespace) -> Path:
         include_archived=args.include_archived,
         language=_language(args),
     )
+
+
+def _served_dashboard_url(host: str, port: int) -> str:
+    return f"http://{url_host(host)}:{port}/react-dashboard.html"
+
+
+def _served_legacy_dashboard_url(host: str, port: int, dashboard_name: str) -> str:
+    return f"http://{url_host(host)}:{port}/{dashboard_name}"
 
 
 def _dashboard_payload(

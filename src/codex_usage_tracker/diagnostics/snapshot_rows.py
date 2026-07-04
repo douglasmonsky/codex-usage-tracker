@@ -12,6 +12,7 @@ def function_rows(
     *,
     function_calls: Counter[str],
     function_outputs: Counter[str],
+    function_record_ids: dict[str, str],
     output_with_count: Counter[str],
     output_missing_count: Counter[str],
     output_token_sum: Counter[str],
@@ -25,6 +26,7 @@ def function_rows(
             "with_original_token_count": int(output_with_count[name]),
             "missing_original_token_count": int(output_missing_count[name]),
             "original_token_sum": int(output_token_sum[name]),
+            "representative_record_id": function_record_ids.get(name, ""),
         }
         for name in names
     ]
@@ -34,6 +36,7 @@ def function_rows(
 def command_output_rows(
     *,
     command_calls: Counter[str],
+    command_record_ids: dict[str, str],
     command_with_count: Counter[str],
     command_missing_count: Counter[str],
     command_token_sum: Counter[str],
@@ -45,6 +48,7 @@ def command_output_rows(
             "with_original_token_count": int(command_with_count[root]),
             "missing_original_token_count": int(command_missing_count[root]),
             "original_token_sum": int(command_token_sum[root]),
+            "representative_record_id": command_record_ids.get(root, ""),
         }
         for root in set(command_calls) | set(command_token_sum)
     ]
@@ -55,17 +59,26 @@ def command_rows(
     *,
     command_calls: Counter[str],
     command_children: dict[str, Counter[str]],
+    command_record_ids: dict[str, str],
 ) -> list[dict[str, Any]]:
     rows = []
     for root, total in command_calls.items():
         children = simple_rows(command_children.get(root, Counter()), key_name="child")
-        rows.append({"root": root, "total": int(total), "children": children[:25]})
+        rows.append(
+            {
+                "root": root,
+                "total": int(total),
+                "representative_record_id": command_record_ids.get(root, ""),
+                "children": children[:25],
+            }
+        )
     return sorted(rows, key=lambda row: (-int(row["total"]), row["root"]))
 
 
 def git_interaction_rows(
     *,
     git_interaction_calls: Counter[tuple[str, str, str, str]],
+    git_interaction_record_ids: dict[tuple[str, str, str, str], str],
     git_interaction_with_count: Counter[tuple[str, str, str, str]],
     git_interaction_missing_count: Counter[tuple[str, str, str, str]],
     git_interaction_token_sum: Counter[tuple[str, str, str, str]],
@@ -89,6 +102,7 @@ def git_interaction_rows(
                 "with_original_token_count": int(git_interaction_with_count[key]),
                 "missing_original_token_count": int(git_interaction_missing_count[key]),
                 "original_token_sum": int(git_interaction_token_sum[key]),
+                "representative_record_id": git_interaction_record_ids.get(key, ""),
             }
         )
     return sorted(
@@ -105,6 +119,7 @@ def git_interaction_rows(
 def read_reader_rows(
     *,
     read_events_by_reader: Counter[str],
+    read_reader_record_ids: dict[str, str],
     read_events_with_count_by_reader: Counter[str],
     read_events_missing_count_by_reader: Counter[str],
     read_tokens_by_reader: Counter[str],
@@ -116,6 +131,7 @@ def read_reader_rows(
             "events_with_output_count": int(read_events_with_count_by_reader[reader]),
             "events_missing_output_count": int(read_events_missing_count_by_reader[reader]),
             "allocated_output_token_sum": int(read_tokens_by_reader[reader]),
+            "representative_record_id": read_reader_record_ids.get(reader, ""),
         }
         for reader in set(read_events_by_reader) | set(read_tokens_by_reader)
     ]
@@ -129,6 +145,7 @@ def read_path_rows(
     *,
     read_path_refs: dict[str, dict[str, str]],
     read_events_by_path: Counter[str],
+    read_path_record_ids: dict[str, str],
     read_tokens_by_path: Counter[str],
 ) -> list[dict[str, Any]]:
     rows = [
@@ -137,6 +154,7 @@ def read_path_rows(
             "path_hash": read_path_refs[path_key]["path_hash"],
             "read_events": int(read_events_by_path[path_key]),
             "allocated_output_token_sum": int(read_tokens_by_path[path_key]),
+            "representative_record_id": read_path_record_ids.get(path_key, ""),
         }
         for path_key in set(read_events_by_path) | set(read_tokens_by_path)
         if path_key in read_path_refs
@@ -167,12 +185,14 @@ def file_modification_path_rows(
     *,
     modification_path_refs: dict[str, dict[str, str]],
     modifications_by_path: Counter[str],
+    modification_path_record_ids: dict[str, str],
 ) -> list[dict[str, Any]]:
     rows = [
         {
             "path_label": modification_path_refs[path_key]["path_label"],
             "path_hash": modification_path_refs[path_key]["path_hash"],
             "modification_events": int(modifications_by_path[path_key]),
+            "representative_record_id": modification_path_record_ids.get(path_key, ""),
         }
         for path_key in modifications_by_path
         if path_key in modification_path_refs
@@ -201,6 +221,7 @@ def read_productivity_reader_rows(
     *,
     read_events_by_reader: Counter[str],
     read_modified_by_reader: Counter[str],
+    read_reader_record_ids: dict[str, str],
 ) -> list[dict[str, Any]]:
     rows = [
         {
@@ -211,6 +232,7 @@ def read_productivity_reader_rows(
                 int(read_modified_by_reader[reader]),
                 int(read_events_by_reader[reader]),
             ),
+            "representative_record_id": read_reader_record_ids.get(reader, ""),
         }
         for reader in read_events_by_reader
     ]
@@ -229,6 +251,7 @@ def read_productivity_path_rows(
     read_path_refs: dict[str, dict[str, str]],
     read_events_by_path: Counter[str],
     read_modified_by_path: Counter[str],
+    read_path_record_ids: dict[str, str],
 ) -> list[dict[str, Any]]:
     rows = [
         {
@@ -240,6 +263,7 @@ def read_productivity_path_rows(
                 int(read_modified_by_path[path_key]),
                 int(read_events_by_path[path_key]),
             ),
+            "representative_record_id": read_path_record_ids.get(path_key, ""),
         }
         for path_key in read_modified_by_path
         if path_key in read_path_refs

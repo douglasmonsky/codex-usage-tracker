@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -39,6 +40,8 @@ from codex_usage_tracker.diagnostics.snapshot_source_scan import (
 from codex_usage_tracker.store.api import connect
 from codex_usage_tracker.store.schema import init_db
 
+SourceRecordIndex = dict[str, list[tuple[int, str]]]
+
 
 def analyze_indexed_source_logs(
     *,
@@ -49,13 +52,17 @@ def analyze_indexed_source_logs(
         db_path=db_path,
         include_archived=include_archived,
     )
+    source_record_index = _source_record_index(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
     counters = _empty_counters()
     meta: Counter[str] = Counter()
     meta["source_logs_scanned"] = len(source_logs)
     meta["usage_rows_scanned"] = usage_rows_scanned
 
     for source_log in source_logs:
-        _scan_source_log(source_log, counters=counters, meta=meta)
+        _scan_source_log(source_log, counters=counters, meta=meta, source_record_index=source_record_index)
 
     return _analysis_payload(counters=counters, meta=meta)
 
@@ -77,19 +84,44 @@ def _indexed_source_logs(
     return [Path(str(row["source_file"])) for row in rows], int_value(usage_row["usage_rows"])
 
 
+def _source_record_index(*, db_path: Path, include_archived: bool) -> SourceRecordIndex:
+    where = "" if include_archived else "WHERE is_archived = 0"
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT source_file, line_number, record_id
+            FROM usage_events
+            {where}
+            ORDER BY source_file, line_number
+            """
+        ).fetchall()
+    index: SourceRecordIndex = {}
+    for row in rows:
+        source_file = str(row["source_file"] or "")
+        record_id = str(row["record_id"] or "")
+        line_number = int_value(row["line_number"])
+        if source_file and record_id and line_number > 0:
+            index.setdefault(source_file, []).append((line_number, record_id))
+    return index
+
+
 def _empty_counters() -> dict[str, Any]:
     return {
         "function_calls": Counter(),
         "function_outputs": Counter(),
+        "function_record_ids": {},
         "output_with_count": Counter(),
         "output_missing_count": Counter(),
         "output_token_sum": Counter(),
         "command_calls": Counter(),
         "command_children": {},
+        "command_record_ids": {},
         "command_with_count": Counter(),
         "command_missing_count": Counter(),
         "command_token_sum": Counter(),
         "git_interaction_calls": Counter(),
+        "git_interaction_record_ids": {},
         "git_interaction_with_count": Counter(),
         "git_interaction_missing_count": Counter(),
         "git_interaction_token_sum": Counter(),
@@ -100,6 +132,8 @@ def _empty_counters() -> dict[str, Any]:
         "read_command_count": 0,
         "read_events_by_reader": Counter(),
         "read_events_by_path": Counter(),
+        "read_reader_record_ids": {},
+        "read_path_record_ids": {},
         "read_events_with_count_by_reader": Counter(),
         "read_events_missing_count_by_reader": Counter(),
         "read_tokens_by_reader": Counter(),
@@ -111,6 +145,7 @@ def _empty_counters() -> dict[str, Any]:
         "file_modification_events": 0,
         "file_modification_path_events": Counter(),
         "file_modification_path_refs": {},
+        "file_modification_path_record_ids": {},
         "file_modification_extensions": Counter(),
         "largest_file_modification_events": [],
         "missing_reasons": Counter(),
@@ -123,13 +158,20 @@ class _SourceLogScanState:
     call_roots: dict[str, str] = field(default_factory=dict)
     call_git_interactions: dict[str, tuple[str, str, str, str]] = field(default_factory=dict)
     call_read_events: dict[str, list[int]] = field(default_factory=dict)
+    call_record_ids: dict[str, str] = field(default_factory=dict)
     source_read_events: list[int] = field(default_factory=list)
     modified_orders_by_path: defaultdict[str, list[int]] = field(
         default_factory=lambda: defaultdict(list)
     )
 
 
-def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counter[str]) -> None:
+def _scan_source_log(
+    source_log: Path,
+    *,
+    counters: dict[str, Any],
+    meta: Counter[str],
+    source_record_index: SourceRecordIndex,
+) -> None:
     state = _SourceLogScanState()
     try:
         lines = source_log.open(encoding="utf-8")
@@ -140,11 +182,13 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
     with lines:
         for order, line in enumerate(lines):
             _scan_source_log_line(
+                source_log,
                 line,
                 order=order,
                 counters=counters,
                 meta=meta,
                 state=state,
+                source_record_index=source_record_index,
             )
 
     mark_later_modifications(
@@ -155,12 +199,14 @@ def _scan_source_log(source_log: Path, *, counters: dict[str, Any], meta: Counte
 
 
 def _scan_source_log_line(
+    source_log: Path,
     line: str,
     *,
     order: int,
     counters: dict[str, Any],
     meta: Counter[str],
     state: _SourceLogScanState,
+    source_record_index: SourceRecordIndex,
 ) -> None:
     if not _source_log_line_may_have_diagnostic_payload(line):
         return
@@ -177,11 +223,23 @@ def _scan_source_log_line(
         counters=counters,
         meta=meta,
         state=state,
+        representative_record_id=_record_id_for_order(source_log, order, source_record_index),
     )
 
 
 def _source_log_line_may_have_diagnostic_payload(line: str) -> bool:
     return '"response_item"' in line or '"patch_apply_end"' in line
+
+
+def _record_id_for_order(source_log: Path, order: int, source_record_index: SourceRecordIndex) -> str | None:
+    rows = source_record_index.get(str(source_log))
+    if not rows:
+        return None
+    line_number = order + 1
+    index = bisect.bisect_left(rows, (line_number, ""))
+    if index < len(rows):
+        return rows[index][1]
+    return rows[-1][1]
 
 
 def _scan_source_log_payload(
@@ -192,6 +250,7 @@ def _scan_source_log_payload(
     counters: dict[str, Any],
     meta: Counter[str],
     state: _SourceLogScanState,
+    representative_record_id: str | None,
 ) -> None:
     envelope_type = envelope.get("type")
     if envelope_type == "event_msg":
@@ -201,6 +260,7 @@ def _scan_source_log_payload(
             event_kind=safe_label(payload.get("type")) or "file_modification",
             order=order,
             state=state,
+            representative_record_id=representative_record_id,
         )
         return
     if envelope_type != "response_item":
@@ -211,6 +271,7 @@ def _scan_source_log_payload(
         event_kind=safe_label(payload.get("name")) or "file_modification",
         order=order,
         state=state,
+        representative_record_id=representative_record_id,
     ):
         return
     _record_source_log_response_item(
@@ -219,6 +280,7 @@ def _scan_source_log_payload(
         counters=counters,
         meta=meta,
         state=state,
+        representative_record_id=representative_record_id,
     )
 
 
@@ -229,6 +291,7 @@ def _record_source_log_modification(
     event_kind: str,
     order: int,
     state: _SourceLogScanState,
+    representative_record_id: str | None,
 ) -> bool:
     path_refs = modified_path_refs(payload)
     if not path_refs:
@@ -237,6 +300,7 @@ def _record_source_log_modification(
         path_refs,
         counters=counters,
         event_kind=event_kind,
+        representative_record_id=representative_record_id,
     )
     for path_ref in path_refs:
         state.modified_orders_by_path[path_ref["path_key"]].append(order)
@@ -250,6 +314,7 @@ def _record_source_log_response_item(
     counters: dict[str, Any],
     meta: Counter[str],
     state: _SourceLogScanState,
+    representative_record_id: str | None,
 ) -> None:
     payload_type = payload.get("type")
     if payload_type == "function_call":
@@ -262,7 +327,9 @@ def _record_source_log_response_item(
             call_roots=state.call_roots,
             call_git_interactions=state.call_git_interactions,
             call_read_events=state.call_read_events,
+            call_record_ids=state.call_record_ids,
             source_read_events=state.source_read_events,
+            representative_record_id=representative_record_id,
         )
     elif payload_type == "function_call_output":
         record_function_output(
@@ -272,6 +339,8 @@ def _record_source_log_response_item(
             call_roots=state.call_roots,
             call_git_interactions=state.call_git_interactions,
             call_read_events=state.call_read_events,
+            call_record_ids=state.call_record_ids,
+            representative_record_id=representative_record_id,
         )
 
 
@@ -308,12 +377,14 @@ def _tool_output_payload(counters: dict[str, Any]) -> dict[str, Any]:
         "functions": function_rows(
             function_calls=counters["function_calls"],
             function_outputs=counters["function_outputs"],
+            function_record_ids=counters["function_record_ids"],
             output_with_count=counters["output_with_count"],
             output_missing_count=counters["output_missing_count"],
             output_token_sum=counters["output_token_sum"],
         ),
         "command_roots": command_output_rows(
             command_calls=counters["command_calls"],
+            command_record_ids=counters["command_record_ids"],
             command_with_count=counters["command_with_count"],
             command_missing_count=counters["command_missing_count"],
             command_token_sum=counters["command_token_sum"],
@@ -332,6 +403,7 @@ def _commands_payload(counters: dict[str, Any], *, meta: Counter[str]) -> dict[s
         "commands": command_rows(
             command_calls=counters["command_calls"],
             command_children=counters["command_children"],
+            command_record_ids=counters["command_record_ids"],
         ),
     }
 
@@ -353,6 +425,7 @@ def _git_interactions_payload(counters: dict[str, Any]) -> dict[str, Any]:
         },
         "interactions": git_interaction_rows(
             git_interaction_calls=counters["git_interaction_calls"],
+            git_interaction_record_ids=counters["git_interaction_record_ids"],
             git_interaction_with_count=counters["git_interaction_with_count"],
             git_interaction_missing_count=counters["git_interaction_missing_count"],
             git_interaction_token_sum=counters["git_interaction_token_sum"],
@@ -374,6 +447,7 @@ def _file_reads_payload(counters: dict[str, Any]) -> dict[str, Any]:
         },
         "by_reader": read_reader_rows(
             read_events_by_reader=counters["read_events_by_reader"],
+            read_reader_record_ids=counters["read_reader_record_ids"],
             read_events_with_count_by_reader=counters["read_events_with_count_by_reader"],
             read_events_missing_count_by_reader=counters["read_events_missing_count_by_reader"],
             read_tokens_by_reader=counters["read_tokens_by_reader"],
@@ -381,6 +455,7 @@ def _file_reads_payload(counters: dict[str, Any]) -> dict[str, Any]:
         "top_paths": read_path_rows(
             read_path_refs=counters["read_path_refs"],
             read_events_by_path=counters["read_events_by_path"],
+            read_path_record_ids=counters["read_path_record_ids"],
             read_tokens_by_path=counters["read_tokens_by_path"],
         ),
         "largest_read_commands": largest_read_command_rows(counters["largest_read_commands"]),
@@ -404,6 +479,7 @@ def _file_modifications_payload(counters: dict[str, Any]) -> dict[str, Any]:
         "top_paths": file_modification_path_rows(
             modification_path_refs=counters["file_modification_path_refs"],
             modifications_by_path=counters["file_modification_path_events"],
+            modification_path_record_ids=counters["file_modification_path_record_ids"],
         ),
         "by_extension": simple_rows(counters["file_modification_extensions"], key_name="extension"),
         "largest_events": largest_file_modification_event_rows(
@@ -431,11 +507,13 @@ def _read_productivity_payload(counters: dict[str, Any]) -> dict[str, Any]:
         "by_reader": read_productivity_reader_rows(
             read_events_by_reader=counters["read_events_by_reader"],
             read_modified_by_reader=counters["read_modified_by_reader"],
+            read_reader_record_ids=counters["read_reader_record_ids"],
         ),
         "top_modified_paths": read_productivity_path_rows(
             read_path_refs=counters["read_path_refs"],
             read_events_by_path=counters["read_events_by_path"],
             read_modified_by_path=counters["read_modified_by_path"],
+            read_path_record_ids=counters["read_path_record_ids"],
         ),
         "path_privacy": path_privacy_metadata(),
     }

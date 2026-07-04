@@ -106,13 +106,101 @@ def test_dashboard_server_forces_dashboard_asset_mime_types(
         assert nosniff == "nosniff"
 
 
+def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
+    from codex_usage_tracker.server.api import _UsageDashboardHandler
+
+    react_dir = tmp_path / "codex-usage-tracker-assets" / "react"
+    react_asset_dir = react_dir / "assets"
+    react_asset_dir.mkdir(parents=True)
+    (react_dir / "index.html").write_text(
+        "\n".join(
+            [
+                "<!doctype html>",
+                "<title>Codex Usage Tracker React Dashboard</title>",
+                '<script type="module" src="/codex-usage-tracker-assets/react/assets/dashboard-react.js"></script>',
+            ],
+        ),
+        encoding="utf-8",
+    )
+    (react_asset_dir / "dashboard-react.js").write_text(
+        "window.__reactDashboard = true;\n", encoding="utf-8"
+    )
+    (tmp_path / "dashboard.html").write_text(
+        "<!doctype html><title>Legacy Dashboard</title>", encoding="utf-8"
+    )
+
+    handler = partial(
+        _UsageDashboardHandler,
+        directory=str(tmp_path),
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        thresholds_path=tmp_path / "thresholds.json",
+        projects_path=tmp_path / "projects.json",
+        limit=5000,
+        since=None,
+        codex_home=tmp_path / "codex-home",
+        include_archived=False,
+        dashboard_name="dashboard.html",
+        context_chars=2000,
+        api_token="test-token",
+        context_api_enabled=True,
+        refresh_lock=threading.Lock(),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_port}"
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"{base_url}/react-dashboard.html?view=diagnostics",
+            timeout=5,
+        ) as response:
+            react_html = response.read().decode("utf-8")
+            react_content_type = response.headers.get("Content-Type")
+            react_cache_control = response.headers.get("Cache-Control")
+
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"{base_url}/dashboard.html",
+            timeout=5,
+        ) as response:
+            legacy_html = response.read().decode("utf-8")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert react_content_type is not None
+    assert react_content_type.split(";", 1)[0] == "text/html"
+    assert react_cache_control == "no-store"
+    assert "Codex Usage Tracker React Dashboard" in react_html
+    assert "/codex-usage-tracker-assets/react/assets/dashboard-react.js?v=" in react_html
+    assert '<script id="usage-data" type="application/json">' in react_html
+    react_payload = json.loads(
+        react_html.split('<script id="usage-data" type="application/json">', 1)[1].split(
+            "</script>",
+            1,
+        )[0],
+    )
+    assert react_payload["api_token"] == "test-token"
+    assert react_payload["context_api_enabled"] is True
+    assert react_payload["rows"] == []
+    assert react_payload["loaded_row_count"] == 0
+    assert react_payload["limit"] == 5000
+    assert react_payload["limit_label"] == "5000"
+    assert "<!doctype html>" in legacy_html
+    assert "Usage Dashboard" in legacy_html
+
+
 def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> None:
     from codex_usage_tracker.server.api import _UsageDashboardHandler
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
-    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    (tmp_path / "dashboard.html").write_text(
+        "<!doctype html><title>Dashboard</title>", encoding="utf-8"
+    )
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
@@ -174,15 +262,21 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             data=b"",
             method="POST",
         )
-        diagnostic_tool_output_refresh_payload = diagnostic_batch_refresh_payload["sections"]["toolOutput"]
-        diagnostic_commands_refresh_payload = diagnostic_batch_refresh_payload["sections"]["commands"]
+        diagnostic_tool_output_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "toolOutput"
+        ]
+        diagnostic_commands_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "commands"
+        ]
         diagnostic_git_interactions_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "gitInteractions"
         ]
-        diagnostic_file_reads_refresh_payload = diagnostic_batch_refresh_payload["sections"]["fileReads"]
-        diagnostic_file_modifications_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "fileModifications"
+        diagnostic_file_reads_refresh_payload = diagnostic_batch_refresh_payload["sections"][
+            "fileReads"
         ]
+        diagnostic_file_modifications_refresh_payload = diagnostic_batch_refresh_payload[
+            "sections"
+        ]["fileModifications"]
         diagnostic_read_productivity_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "readProductivity"
         ]
@@ -342,6 +436,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_usage_drain_refresh_payload["status"] == "ready"
     assert diagnostic_usage_drain_refresh_payload["summary"]["usage_rows"] == 4
     assert diagnostic_usage_drain_refresh_payload["thread_cost_curves"]["threads"]
+    usage_drain_thread = diagnostic_usage_drain_refresh_payload["thread_cost_curves"]["threads"][0]
+    assert usage_drain_thread["largest_record_id"]
+    assert usage_drain_thread["representative_record_id"] == usage_drain_thread["largest_record_id"]
     assert diagnostic_stored_payload["status"] == "ready"
     assert diagnostic_stored_payload["refreshed"] is False
     assert diagnostic_tool_output_stored_payload["status"] == "ready"
@@ -363,7 +460,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert diagnostic_usage_drain_stored_payload["status"] == "ready"
     assert diagnostic_usage_drain_stored_payload["refreshed"] is False
     assert second_usage_refresh_payload["refresh_result"]["parsed_events"] == 0
-    assert diagnostic_after_second_usage_refresh["snapshot"]["computed_at"] == diagnostic_computed_at
+    assert (
+        diagnostic_after_second_usage_refresh["snapshot"]["computed_at"] == diagnostic_computed_at
+    )
     assert len(limited_payload["rows"]) == 2
     assert limited_payload["loaded_row_count"] == 2
     assert limited_payload["total_available_rows"] == 4
@@ -456,8 +555,7 @@ def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Pat
     )
     assert len(active_rows_after_migrated_flag_reset) == 4
     assert not any(
-        "/archived_sessions/" in row["source_file"]
-        for row in active_rows_after_migrated_flag_reset
+        "/archived_sessions/" in row["source_file"] for row in active_rows_after_migrated_flag_reset
     )
 
 
@@ -528,8 +626,7 @@ def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> No
     assert active_after_all_payload["loaded_row_count"] == 4
     assert active_after_all_payload["archived_available_rows"] == 1
     assert not any(
-        "/archived_sessions/" in row["source_file"]
-        for row in active_after_all_payload["rows"]
+        "/archived_sessions/" in row["source_file"] for row in active_after_all_payload["rows"]
     )
 
 
@@ -707,6 +804,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         )
         summary_payload = _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
         recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
+        reports_pack_payload = _read_json(f"{base_url}/api/reports/pack?limit=5&evidence_limit=2")
         diagnostics_summary_payload = _read_json(f"{base_url}/api/diagnostics/summary?limit=5")
         diagnostics_facts_payload = _read_json(f"{base_url}/api/diagnostics/facts?limit=5")
         diagnostics_sorted_facts_payload = _read_json(
@@ -766,6 +864,14 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert summary_payload["group_by"] == "model"
     assert recommendations_payload["schema"] == "codex-usage-tracker-recommendations-v1"
     _assert_contract(recommendations_payload)
+    assert reports_pack_payload["schema"] == "codex-usage-tracker-reports-pack-v1"
+    _assert_contract(reports_pack_payload)
+    report_titles = {report["title"] for report in reports_pack_payload["reports"]}
+    assert report_titles >= {"Cost Curves", "Usage Drain Model"}
+    assert reports_pack_payload["evidence"]["cost-curves"]["row_count"] <= 2
+    if "Fast Mode Proxy" in report_titles:
+        assert reports_pack_payload["evidence"]["fast-mode-proxy"]["row_count"] <= 2
+    assert reports_pack_payload["raw_context_included"] is False
     assert diagnostics_summary_payload["schema"] == "codex-usage-tracker-diagnostics-v1"
     _assert_contract(diagnostics_summary_payload)
     assert diagnostics_summary_payload["view"] == "summary"
@@ -773,17 +879,13 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert diagnostics_facts_payload["schema"] == "codex-usage-tracker-diagnostics-v1"
     _assert_contract(diagnostics_facts_payload)
     assert diagnostics_facts_payload["view"] == "facts"
-    assert {row["fact_name"] for row in diagnostics_facts_payload["rows"]} >= {
-        "post_compaction"
-    }
+    assert {row["fact_name"] for row in diagnostics_facts_payload["rows"]} >= {"post_compaction"}
     assert diagnostics_sorted_facts_payload["filters"]["sort"] == "cached"
     assert diagnostics_sorted_facts_payload["filters"]["direction"] == "desc"
     _assert_contract(diagnostics_sorted_facts_payload)
     assert diagnostics_compactions_payload["filters"]["fact_type"] == "compaction"
     _assert_contract(diagnostics_compactions_payload)
-    assert {row["fact_type"] for row in diagnostics_compactions_payload["rows"]} == {
-        "compaction"
-    }
+    assert {row["fact_type"] for row in diagnostics_compactions_payload["rows"]} == {"compaction"}
     assert diagnostics_tools_payload["filters"]["fact_type"] is None
     assert diagnostics_tools_payload["filters"]["fact_group"] == "tools"
     _assert_contract(diagnostics_tools_payload)
@@ -805,6 +907,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
             thread_calls_payload,
             summary_payload,
             recommendations_payload,
+            reports_pack_payload,
             diagnostics_summary_payload,
             diagnostics_facts_payload,
             diagnostics_compactions_payload,
@@ -813,7 +916,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         ]
     )
     assert "SECRET RAW PROMPT" not in combined_payload
-    assert "raw_context_included\": true" not in combined_payload
+    assert 'raw_context_included": true' not in combined_payload
 
 
 def test_dashboard_server_serves_lightweight_call_investigator_boot_html(
@@ -961,8 +1064,12 @@ def test_dashboard_server_opens_only_token_protected_investigator_urls(
     from codex_usage_tracker.server.api import _UsageDashboardHandler
 
     opened_urls: list[str] = []
-    monkeypatch.setattr(server_module.webbrowser, "open_new_tab", lambda url: opened_urls.append(url) or True)
-    (tmp_path / "dashboard.html").write_text("<!doctype html><title>Dashboard</title>", encoding="utf-8")
+    monkeypatch.setattr(
+        server_module.webbrowser, "open_new_tab", lambda url: opened_urls.append(url) or True
+    )
+    (tmp_path / "dashboard.html").write_text(
+        "<!doctype html><title>Dashboard</title>", encoding="utf-8"
+    )
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
@@ -988,10 +1095,10 @@ def test_dashboard_server_opens_only_token_protected_investigator_urls(
         base_url = f"http://127.0.0.1:{server.server_port}"
         target = f"{base_url}/dashboard.html?view=call&record=abc123&history=all"
         encoded_target = urllib.parse.quote(target, safe="")
-        without_token = _http_error_json(
-            f"{base_url}/api/open-investigator?url={encoded_target}"
+        without_token = _http_error_json(f"{base_url}/api/open-investigator?url={encoded_target}")
+        external_url = urllib.parse.quote(
+            "https://example.test/dashboard.html?view=call&record=abc123", safe=""
         )
-        external_url = urllib.parse.quote("https://example.test/dashboard.html?view=call&record=abc123", safe="")
         external_error = _http_error_json(
             f"{base_url}/api/open-investigator?url={external_url}",
             headers={"X-Codex-Usage-Token": "test-token"},
@@ -1019,7 +1126,9 @@ def test_dashboard_server_opens_only_token_protected_investigator_urls(
     assert missing_record_error["status"] == 400
     assert payload["schema"] == "codex-usage-tracker-open-investigator-v1"
     assert payload["opened"] is True
-    assert opened_urls == [target]
+    expected_url = f"{base_url}/react-dashboard.html?view=call&record=abc123&history=all"
+    assert payload["url"] == expected_url
+    assert opened_urls == [expected_url]
 
 
 def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeypatch) -> None:
@@ -1032,7 +1141,9 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
     def broken_context(*args, **kwargs):
         raise sqlite3.OperationalError("database is locked")
 
-    monkeypatch.setattr(server_module.server_usage_refresh, "usage_payload", broken_dashboard_payload)
+    monkeypatch.setattr(
+        server_module.server_usage_refresh, "usage_payload", broken_dashboard_payload
+    )
     monkeypatch.setattr(server_module.server_context, "context_payload", broken_context)
     handler = partial(
         _UsageDashboardHandler,
@@ -1056,9 +1167,7 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        usage_error = _http_error_json(
-            f"http://127.0.0.1:{server.server_port}/api/usage"
-        )
+        usage_error = _http_error_json(f"http://127.0.0.1:{server.server_port}/api/usage")
         context_error = _http_error_json(
             f"http://127.0.0.1:{server.server_port}/api/context?record_id=abc",
             headers={"X-Codex-Usage-Token": "test-token"},

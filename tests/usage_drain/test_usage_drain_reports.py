@@ -41,6 +41,10 @@ def test_usage_drain_dashboard_report_builds_bounded_thread_curves(tmp_path: Pat
     alpha = next(row for row in curves["threads"] if row["thread"] == "Alpha")
     assert alpha["call_count"] == 3
     assert alpha["estimated_cost_usd"] > 0
+    assert alpha["largest_record_id"] == "alpha-3"
+    assert alpha["representative_record_id"] == "alpha-3"
+    assert alpha["largest_call_tokens"] == 110
+    assert alpha["largest_call_cost_usd"] > 0
     assert alpha["points"][0]["call_index"] == 1
     assert alpha["points"][-1]["call_index"] == 3
     time_series = report["time_series"]

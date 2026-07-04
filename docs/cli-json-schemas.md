@@ -47,6 +47,7 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
+| `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
@@ -71,7 +72,7 @@ Tracked schema ids:
 | `codex-usage-tracker-thread-calls-v1` | Dashboard server `/api/thread-calls` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
-| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload |
+| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url` and legacy `legacy_dashboard_url` fallback |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |

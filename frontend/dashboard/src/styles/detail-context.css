@@ -1,0 +1,149 @@
+.thread-context-module {
+  display: grid;
+  gap: 14px;
+}
+
+.thread-context-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.thread-context-grid h3 {
+  margin: 0 0 8px;
+  color: #172033;
+  font-size: 14px;
+}
+
+.detail-list.compact {
+  margin: 22px 0 0;
+}
+
+.cache-mini-card {
+ display: grid;
+ gap: 10px;
+}
+
+.cache-mini-card span {
+  color: #61728a;
+}
+
+.cache-bars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  height: 92px;
+  align-items: end;
+}
+
+.cache-bars span {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  text-align: center;
+}
+
+.cache-bars i {
+  align-self: end;
+  width: 100%;
+  border-radius: 6px 6px 3px 3px;
+  opacity: 0.9;
+}
+
+.cache-bars em {
+  color: #52627a;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.locked-context-card,
+.call-decision-card,
+.recommendation-box {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.call-decision-card {
+  grid-template-columns: minmax(0, 1fr);
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #d8e3f2;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.locked-context-card svg {
+  color: #b45309;
+}
+
+.recommendation-box {
+  color: #92400e;
+  background: #fff8e8;
+}
+
+.recommendation-box svg {
+  color: #b45309;
+}
+
+.recommendation-box p,
+.locked-context-card p {
+  margin: 0;
+  color: #52627a;
+  line-height: 1.5;
+}
+
+.detail-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.detail-list div {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5edf6;
+}
+
+.detail-list dt {
+  color: #61728a;
+  font-weight: 800;
+}
+
+.detail-list dd {
+  min-width: 0;
+  margin: 0;
+  color: #0f172a;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.detail-collapse {
+  margin: 10px 0 12px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.detail-collapse summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.detail-collapse-body {
+  padding: 0 12px 12px;
+}
+
+.detail-collapse-body .detail-list {
+  margin: 0;
+}

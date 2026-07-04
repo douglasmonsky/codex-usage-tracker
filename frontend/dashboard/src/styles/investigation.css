@@ -1,0 +1,246 @@
+.cache-window-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cache-window-strip span {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border: 1px solid #d8e3f2;
+  border-radius: 8px;
+  color: #0f172a;
+  background: color-mix(in srgb, #2563eb calc(var(--intensity) * 35%), #f8fbff);
+}
+
+.cache-window-strip small {
+  color: #52627a;
+  font-size: 11px;
+}
+
+.cache-window-strip strong {
+  font-size: 15px;
+}
+
+.detail-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 0 16px;
+}
+
+.detail-stat-grid.vertical {
+  grid-template-columns: 1fr;
+}
+
+.detail-stat-grid span,
+.mini-evidence {
+  padding: 12px;
+  border: 1px solid #e1e8f2;
+  border-radius: 8px;
+  color: #52627a;
+  background: #fbfdff;
+}
+
+.table-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+  gap: 16px;
+  align-items: start;
+}
+
+.table-detail-layout.detail-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.call-investigator-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.72fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.drilldown-panel {
+  position: sticky;
+  top: 18px;
+}
+
+.call-summary,
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.drilldown-tabs {
+display: flex;
+gap: 4px;
+margin: 0 0 14px;
+padding: 3px;
+border: 1px solid #d8e3f2;
+border-radius: 8px;
+background: #f8fafc;
+overflow-x: auto;
+}
+
+.drilldown-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  color: #52627a;
+  background: transparent;
+font-size: 12px;
+font-weight: 800;
+flex: 1 0 76px;
+white-space: nowrap;
+}
+
+.drilldown-tabs button.active {
+  color: #1d4ed8;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+
+.drilldown-tab-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.call-id {
+  padding: 4px 8px;
+  border: 1px solid #d8e3f2;
+  border-radius: 7px;
+  color: #52627a;
+  background: #f8fafc;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.drilldown-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.drilldown-metric-grid.wide {
+  grid-template-columns: repeat(6, minmax(118px, 1fr));
+}
+
+.investigator-evidence {
+  display: grid;
+  gap: 12px;
+}
+
+.context-attribution-module {
+  display: grid;
+  gap: 10px;
+}
+
+.serialized-breakdown {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d9e4f2;
+  border-radius: 7px;
+  background: #f8fbff;
+}
+
+.serialized-breakdown.deferred {
+  border-style: dashed;
+}
+
+.serialized-breakdown-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.serialized-breakdown-heading strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.serialized-breakdown-heading span {
+  color: #64748b;
+  font-size: 11px;
+  text-align: right;
+}
+
+.serialized-bucket-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.serialized-bucket {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e1e8f2;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.serialized-bucket span {
+  min-width: 0;
+  overflow: hidden;
+  color: #52627a;
+  font-size: 10px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.serialized-bucket strong {
+  color: #102033;
+  font-size: 17px;
+}
+
+.serialized-bucket small {
+  min-width: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drilldown-metric {
+  display: grid;
+  gap: 3px;
+  min-height: 82px;
+  padding: 11px;
+  border: 1px solid #e1e8f2;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.drilldown-metric small {
+  color: #61728a;
+  font-weight: 800;
+}
+
+.drilldown-metric strong {
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.drilldown-metric em {
+  color: #52627a;
+  font-style: normal;
+  font-size: 12px;
+}

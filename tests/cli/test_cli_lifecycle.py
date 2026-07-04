@@ -617,6 +617,12 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     )
     assert usage_drain_refresh_payload["summary"]["usage_rows"] == 2
     assert "thread_cost_curves" in usage_drain_refresh_payload
+    usage_drain_thread = usage_drain_refresh_payload["thread_cost_curves"]["threads"][0]
+    assert usage_drain_thread["largest_record_id"]
+    assert (
+        usage_drain_thread["representative_record_id"]
+        == usage_drain_thread["largest_record_id"]
+    )
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
     assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")
