@@ -350,7 +350,7 @@ export function FactCallsPanel({
               <thead>
                 <tr>
                   <th>Time</th>
-                  <th>Thread</th>
+<th className="sticky-column">Thread</th>
                   <th>Model</th>
                   <th>Effort</th>
                   <th className="numeric">Input</th>
@@ -379,9 +379,9 @@ export function FactCallsPanel({
                     }}
                   >
                     <td>{call.time}</td>
-                    <td>
-                      <strong>{call.thread}</strong>
-                    </td>
+<td className="sticky-column">
+<strong>{call.thread}</strong>
+</td>
                     <td>{call.model}</td>
                     <td>{call.effort}</td>
                     <td className="numeric">{formatCompact(call.input)}</td>

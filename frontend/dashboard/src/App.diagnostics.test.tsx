@@ -63,6 +63,9 @@ expect(screen.getAllByRole('columnheader', { name: 'Uncached' }).length).toBeGre
 expect(screen.getAllByRole('columnheader', { name: 'Output' }).length).toBeGreaterThan(0);
 expect(screen.getAllByRole('columnheader', { name: 'Reasoning' }).length).toBeGreaterThan(0);
 expect(screen.getAllByRole('columnheader', { name: 'Cache %' }).length).toBeGreaterThan(0);
+const factCallsPanel = screen.getByText('Diagnostic Fact Calls').closest('section') as HTMLElement;
+expect(within(factCallsPanel).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
+expect(within(factCallsPanel).getByText('thread-1a2b3c').closest('td')).toHaveClass('sticky-column');
 fireEvent.change(screen.getByLabelText('Sort diagnostic fact calls'), { target: { value: 'cache' } });
 fireEvent.click(screen.getByRole('button', { name: /Sort diagnostic fact calls ascending/i }));
 

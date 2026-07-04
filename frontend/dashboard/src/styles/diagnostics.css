@@ -416,10 +416,19 @@
 }
 
 .diagnostic-fact-call-table {
-  min-width: 980px;
+ min-width: 980px;
+}
+
+.diagnostic-fact-call-table .sticky-column {
+ min-width: 210px;
+ background: var(--dashboard-surface);
+}
+
+.diagnostic-fact-call-table th.sticky-column {
+ background: #f8fafc;
 }
 
 .diagnostic-fact-call-table td strong {
-  color: var(--diagnostics-text-strong);
-  font-weight: 800;
+ color: var(--diagnostics-text-strong);
+ font-weight: 800;
 }
