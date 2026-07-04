@@ -1,6 +1,7 @@
 import type { SortingState, VisibilityState } from '@tanstack/react-table';
 import { Copy, Download, Filter, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, DashboardModel, ThreadRow } from '../../api/types';
 import { BarChart } from '../../charts/BarChart';
@@ -51,6 +52,7 @@ type ThreadsPageProps = {
   globalQuery: string;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
+  globalFilters?: ReactNode;
 };
 
 type ThreadLifecycle = {
@@ -115,7 +117,7 @@ function callsForThreadRows(calls: CallRow[], threads: ThreadRow[]): CallRow[] {
     );
 }
 
-export function ThreadsPage({ model, globalQuery, onOpenInvestigator, onCopyCallLink }: ThreadsPageProps) {
+export function ThreadsPage({ model, globalQuery, onOpenInvestigator, onCopyCallLink, globalFilters }: ThreadsPageProps) {
   const shellI18n = useShellI18n();
   const [localQuery, setLocalQuery] = useState(() => readThreadSearchParam('thread_q'));
 const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadRiskParam());
@@ -313,6 +315,7 @@ Clear filters
           />
         </div>
       </div>
+      {globalFilters}
       <div className="filter-row span-all">
         <label className="search-box">
           <span className="sr-only">Search threads</span>

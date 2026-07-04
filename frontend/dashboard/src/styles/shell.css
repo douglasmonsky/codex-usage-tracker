@@ -207,13 +207,13 @@ gap: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 14px;
-  padding: 9px 14px;
+  margin: 0 0 10px;
+  padding: 7px 10px;
   border: 1px solid #f2c46d;
   border-radius: 8px;
   color: #5f3b04;
   background: #fff8e6;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.35;
 }
 

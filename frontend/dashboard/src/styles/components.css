@@ -282,6 +282,7 @@ margin-bottom: 14px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
   color: #475569;
   background: #eef2f7;
 }

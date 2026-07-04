@@ -8,7 +8,7 @@ test.describe('React dashboard rewrite smoke', () => {
 
     await page.getByRole('button', { name: /^Calls$/i }).click();
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
+ await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
     await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
 
     await page.getByRole('button', { name: /Open investigator for thread-9f3a1c codex-1/i }).click();
@@ -26,12 +26,14 @@ test.describe('React dashboard rewrite smoke', () => {
   });
 
   test('filters, sorts, drills into calls, and exports aggregate CSV', async ({ page }) => {
-await page.goto('/?view=calls');
-await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
-await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
-await page.getByRole('button', { name: /Hide details/i }).click();
-await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
-await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
+ await page.goto('/?view=calls');
+ await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
+ await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
+ await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
+ await page.getByRole('button', { name: /Call Details/i }).click();
+ await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
+ await page.getByRole('button', { name: /Hide details/i }).click();
+ await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
 await page.getByRole('button', { name: /Call Details/i }).click();
 await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
 
