@@ -213,7 +213,10 @@ position: static;
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding: 4px 16px 8px 0;
+    scrollbar-width: thin;
+    scrollbar-color: #40628d transparent;
+    box-shadow: inset -22px 0 18px -18px rgb(147 169 197 / 72%);
   }
 
   .primary-nav button {
