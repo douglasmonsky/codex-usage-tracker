@@ -6,6 +6,8 @@ describe('React dashboard calls drilldown and investigator', () => {
   it('filters and drills into calls through detail tabs', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+    expect(screen.queryByRole('heading', { name: 'Call Drill-Down' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Call Details/i }));
     expect(screen.getByRole('heading', { name: 'Call Drill-Down' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('Search calls, cwd, projects, models...'), {
@@ -104,23 +106,22 @@ it('toggles the calls detail panel like the legacy dashboard', () => {
 render(<App />);
 fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
 
-expect(screen.getByRole('heading', { name: 'Call Drill-Down' })).toBeInTheDocument();
-const hideButton = screen.getByRole('button', { name: /Hide details/i });
-expect(hideButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('heading', { name: 'Call Drill-Down' })).not.toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Model calls' })).toBeInTheDocument();
 
-fireEvent.click(hideButton);
+    const showButton = screen.getByRole('button', { name: /Call Details/i });
+    expect(showButton).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(showButton);
 
-expect(screen.queryByRole('heading', { name: 'Call Drill-Down' })).not.toBeInTheDocument();
-expect(window.sessionStorage.getItem('codexUsageDetailPanel')).toBe('collapsed');
-expect(screen.getByRole('table', { name: 'Model calls' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Call Drill-Down' })).toBeInTheDocument();
+    expect(window.sessionStorage.getItem('codexUsageDetailPanel')).toBe('expanded');
+    const hideButton = screen.getByRole('button', { name: /Hide details/i });
+    expect(hideButton).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(hideButton);
 
-const showButton = screen.getByRole('button', { name: /Call Details/i });
-expect(showButton).toHaveAttribute('aria-expanded', 'false');
-fireEvent.click(showButton);
-
-expect(screen.getByRole('heading', { name: 'Call Drill-Down' })).toBeInTheDocument();
-expect(window.sessionStorage.getItem('codexUsageDetailPanel')).toBe('expanded');
-});
+    expect(screen.queryByRole('heading', { name: 'Call Drill-Down' })).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem('codexUsageDetailPanel')).toBe('collapsed');
+  });
 
 it('hydrates calls detail panel toggle labels from dashboard i18n payload', () => {
   window.__CODEX_USAGE_BOOT__ = {
@@ -157,6 +158,7 @@ it('hydrates calls detail panel toggle labels from dashboard i18n payload', () =
 
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Detalles de la llamada/i }));
 
   expect(screen.getByText('Llamadas modelo')).toBeInTheDocument();
   expect(screen.getByRole('table', { name: 'Llamadas modelo' })).toBeInTheDocument();
@@ -170,6 +172,7 @@ it('hydrates calls detail panel toggle labels from dashboard i18n payload', () =
 it('updates the calls drill-down when hovering model-call rows', () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Call Details/i }));
 
   expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
   const row = screen.getByText('thread-7b2e91').closest('tr');
@@ -232,6 +235,7 @@ it('sorts table columns through accessible header controls', () => {
   it('keeps selected-call thread context modular in the calls drill-down', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Call Details/i }));
     fireEvent.click(screen.getByRole('tab', { name: /^Thread$/i }));
 
     expect(screen.getByText('Thread timeline')).toBeInTheDocument();

@@ -180,13 +180,14 @@ export function CallsPage({
   const [sortKey, setSortKey] = useState<CallsSortKey>(() => readCallsSortKeyParam());
   const [sortDirection, setSortDirection] = useState<SortDirection>(() => readSortDirectionParam(readCallsSortKeyParam()));
   const [density, setDensity] = useState<Density>(() => readDensityParam());
-  const [selectedCallId, setSelectedCallId] = useState<string | null>(() => readInitialSelectedCallId());
+  const initialSelectedCallId = readInitialSelectedCallId();
+  const [selectedCallId, setSelectedCallId] = useState<string | null>(() => initialSelectedCallId);
   const [visibleCallRows, setVisibleCallRows] = useState(() => readPageVisibleRowsParam(callsTablePageSize));
   const [exportStatus, setExportStatus] = useState('');
-const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [detailsExpanded, setDetailsExpanded] = useState(() => readCallsDetailPanelPreference());
+  const [detailsExpanded, setDetailsExpanded] = useState(() => readCallsDetailPanelPreference(Boolean(initialSelectedCallId)));
   const searchInputRef = useRef<HTMLInputElement>(null);
   const previousGlobalQueryRef = useRef(globalQuery);
 
@@ -1249,13 +1250,13 @@ return (
 );
 }
 
-function readCallsDetailPanelPreference(): boolean {
-try {
-const storedValue = window.sessionStorage?.getItem(callsDetailPanelStorageKey);
-return storedValue ? storedValue === 'expanded' : true;
-} catch {
-return true;
-}
+function readCallsDetailPanelPreference(defaultExpanded = false): boolean {
+  try {
+    const storedValue = window.sessionStorage?.getItem(callsDetailPanelStorageKey);
+    return storedValue ? storedValue === 'expanded' : defaultExpanded;
+  } catch {
+    return defaultExpanded;
+  }
 }
 
 function rememberCallsDetailPanelPreference(expanded: boolean) {

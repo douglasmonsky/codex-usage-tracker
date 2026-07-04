@@ -75,7 +75,7 @@ Open `Overview` when you want a quick read on current aggregate usage before sor
 
 ## Calls View
 
-![Calls view showing filters, totals, the model-call table, and load controls.](assets/dashboard-calls.png)
+![Calls view showing the expanded model-call table with sticky thread rows and detail controls.](assets/dashboard-calls.png)
 
 Use `Calls` view when you want to inspect individual model calls.
 
@@ -168,7 +168,7 @@ Previous and next buttons move chronologically within the same resolved thread a
 
 ## Details And Context
 
-![Calls view showing a selected row with the Call Drill-Down detail rail.](assets/dashboard-details.png)
+![Calls view showing the expanded model-call table beside the Call Drill-Down detail rail.](assets/dashboard-details.png)
 
 The details rail is collapsed by default to preserve table space. Open `Call Details` when you want a compact aggregate preview without leaving the table. When expanded on desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
