@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+## 0.14.0 - 2026-07-04
+
 - Make `serve-dashboard --open` prefer the React dashboard route while keeping legacy `/dashboard.html` available as a localhost fallback, and expose both URLs in `serve-dashboard --json`.
+- Restore major legacy dashboard parity in the React dashboard, including overview recent-call loading controls, sticky thread/header table affordances, row-to-investigator actions, diagnostics fact-call pagination, report and call sorting state, and legacy URL/filter normalization.
+- Add local-only transition safeguards: the prominent unofficial-project banner, aggregate-only privacy boundaries, rebuilt dashboard assets, and release-gate documentation for the React bundle.
+- Prioritize weekly usage windows in Overview and Settings so weekly remaining usage is surfaced ahead of short 5-hour windows.
 
 ## 0.13.1 - 2026-06-30
 
