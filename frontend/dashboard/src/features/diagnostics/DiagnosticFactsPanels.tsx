@@ -52,6 +52,16 @@ export type FactSourcePanelState = {
   state: FactLoadState;
 };
 
+export type DashboardRowLoadControls = {
+  loadedRowCount: number;
+  totalAvailableRows: number;
+  canLoadMoreRows: boolean;
+  canLoadAllRows: boolean;
+  refreshing: boolean;
+  onLoadMoreRows: () => void;
+  onLoadAllRows: () => void;
+};
+
 export function StructuredFactsPanel({
   sources,
   activeSourceKey,
@@ -275,6 +285,7 @@ export function FactCallsPanel({
   usingLiveFacts,
   liveResult,
   factCallSort,
+  rowLoadControls,
   onFactCallSortChange,
   onLoadMore,
   onOpenInvestigator,
@@ -286,6 +297,7 @@ export function FactCallsPanel({
   usingLiveFacts: boolean;
   liveResult: DiagnosticFactCallsResult | null;
   factCallSort: FactCallSortState;
+  rowLoadControls: DashboardRowLoadControls;
   onFactCallSortChange: (sort: FactCallSortState) => void;
   onLoadMore: () => void;
   onOpenInvestigator: (recordId: string) => void;
@@ -295,6 +307,8 @@ export function FactCallsPanel({
   const liveTotal = liveResult ? factCallsTotal(liveResult) : calls.length;
   const canLoadMore = usingLiveFacts && liveResult ? factCallsHasMore(liveResult) : false;
   const loadingMore = status.status === 'appending';
+  const showDashboardRowControls =
+    rowLoadControls.canLoadMoreRows || rowLoadControls.canLoadAllRows || rowLoadControls.totalAvailableRows > rowLoadControls.loadedRowCount;
   const sortedCalls = useMemo(() => sortDiagnosticFactCalls(calls, factCallSort.key, factCallSort.direction), [calls, factCallSort]);
   const sortDescription = diagnosticFactCallSortDescription(factCallSort);
   const subtitle =
@@ -347,7 +361,7 @@ export function FactCallsPanel({
         </button>
           </div>
           <div className="table-scroll diagnostic-fact-call-scroll">
-            <table className="data-table compact diagnostic-fact-call-table">
+            <table className="data-table compact diagnostic-fact-call-table" aria-label="Diagnostic fact calls">
               <thead>
                 <tr>
                   <th>Time</th>
@@ -425,16 +439,45 @@ export function FactCallsPanel({
               </tbody>
             </table>
           </div>
-          {usingLiveFacts ? (
+          {usingLiveFacts || showDashboardRowControls ? (
             <div className="child-load-more diagnostics-call-load-more">
-              <span>
-                Showing {formatNumber(calls.length)} of {formatNumber(liveTotal)} calls
-              </span>
-              {canLoadMore ? (
-                <button className="pager-button" type="button" onClick={onLoadMore} disabled={loadingMore}>
-                  {loadingMore ? 'Loading...' : 'Load more'}
-                </button>
-              ) : null}
+              <div>
+                <span>
+                  Showing {formatNumber(calls.length)} of {formatNumber(liveTotal)} calls
+                </span>
+                {showDashboardRowControls ? (
+                  <small>
+                    Dashboard rows: {formatNumber(rowLoadControls.loadedRowCount)} of {formatNumber(rowLoadControls.totalAvailableRows)} loaded
+                  </small>
+                ) : null}
+              </div>
+              <div className="panel-action-group">
+                {canLoadMore ? (
+                  <button className="pager-button" type="button" onClick={onLoadMore} disabled={loadingMore}>
+                    {loadingMore ? 'Loading fact calls...' : 'Load more fact calls'}
+                  </button>
+                ) : null}
+                {showDashboardRowControls ? (
+                  <>
+                    <button
+                      className="pager-button"
+                      type="button"
+                      onClick={rowLoadControls.onLoadMoreRows}
+                      disabled={!rowLoadControls.canLoadMoreRows || rowLoadControls.refreshing}
+                    >
+                      {rowLoadControls.refreshing ? 'Loading rows...' : 'Load more dashboard rows'}
+                    </button>
+                    <button
+                      className="pager-button"
+                      type="button"
+                      onClick={rowLoadControls.onLoadAllRows}
+                      disabled={!rowLoadControls.canLoadAllRows || rowLoadControls.refreshing}
+                    >
+                      Load all dashboard rows
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </>

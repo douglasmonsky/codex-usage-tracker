@@ -64,6 +64,7 @@ expect(screen.getAllByRole('columnheader', { name: 'Output' }).length).toBeGreat
 expect(screen.getAllByRole('columnheader', { name: 'Reasoning' }).length).toBeGreaterThan(0);
 expect(screen.getAllByRole('columnheader', { name: 'Cache %' }).length).toBeGreaterThan(0);
 const factCallsPanel = screen.getByText('Diagnostic Fact Calls').closest('section') as HTMLElement;
+expect(within(factCallsPanel).getByRole('table', { name: 'Diagnostic fact calls' })).toBeInTheDocument();
 expect(within(factCallsPanel).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
 expect(within(factCallsPanel).getByText('thread-1a2b3c').closest('td')).toHaveClass('sticky-column');
 fireEvent.change(screen.getByLabelText('Sort diagnostic fact calls'), { target: { value: 'cache' } });
@@ -339,7 +340,8 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
       api_token: 'diagnostic-fact-paging-token',
       context_api_enabled: true,
       loaded_row_count: 1,
-      total_available_rows: 1,
+      total_available_rows: 12,
+      has_more: true,
       rows: [usageRows[0]],
     };
     const jsonResponse = (payload: Record<string, unknown>) =>
@@ -392,15 +394,18 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
 
     expect((await screen.findAllByText('Showing 8 of 10 calls')).length).toBeGreaterThan(0);
+    expect(screen.getByText('Dashboard rows: 1 of 12 loaded')).toBeInTheDocument();
     expect(screen.getByText('diag-page-thread-7')).toBeInTheDocument();
     expect(screen.queryByText('diag-page-thread-8')).not.toBeInTheDocument();
     const factCallsPanel = screen.getByText('Diagnostic Fact Calls').closest('section') as HTMLElement;
+    expect(within(factCallsPanel).getByRole('button', { name: /^Load more dashboard rows$/i })).toBeEnabled();
+    expect(within(factCallsPanel).getByRole('button', { name: /^Load all dashboard rows$/i })).toBeEnabled();
 
-    fireEvent.click(within(factCallsPanel).getByRole('button', { name: /^Load more$/i }));
+    fireEvent.click(within(factCallsPanel).getByRole('button', { name: /^Load more fact calls$/i }));
 
     expect(await screen.findByText('diag-page-thread-9')).toBeInTheDocument();
     expect(screen.getAllByText('Showing 10 of 10 calls').length).toBeGreaterThan(0);
-    expect(within(factCallsPanel).queryByRole('button', { name: /^Load more$/i })).not.toBeInTheDocument();
+    expect(within(factCallsPanel).queryByRole('button', { name: /^Load more fact calls$/i })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/fact-calls?') && String(input).includes('offset=8'))).toBe(
       true,
     );

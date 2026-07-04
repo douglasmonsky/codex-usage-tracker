@@ -412,6 +412,7 @@
 }
 
 .diagnostic-fact-call-scroll {
+  max-height: min(58vh, 560px);
   margin-top: 8px;
 }
 
@@ -420,8 +421,9 @@
 }
 
 .diagnostic-fact-call-table .sticky-column {
- min-width: 210px;
- background: var(--dashboard-surface);
+  min-width: 210px;
+  max-width: 360px;
+  background: var(--dashboard-surface);
 }
 
 .diagnostic-fact-call-table th.sticky-column {

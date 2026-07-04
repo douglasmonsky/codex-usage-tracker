@@ -827,6 +827,15 @@ _applyInvestigationPreset: (action: InvestigationPresetAction) => void,
         <DiagnosticsPage
           model={model}
           contextRuntime={contextRuntime}
+          rowLoadControls={{
+            loadedRowCount,
+            totalAvailableRows,
+            canLoadMoreRows: canUseLiveApi && hasMoreRows,
+            canLoadAllRows,
+            refreshing,
+            onLoadMoreRows: loadMoreRows,
+            onLoadAllRows: loadAllRows,
+          }}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
         />

@@ -20,6 +20,7 @@ import { formatCompact, money, pct } from '../shared/format';
 import {
   FactCallsPanel,
   factCallsResult,
+  type DashboardRowLoadControls,
   type FactCallsState,
   type FactLoadState,
   type FactSourcePanelState,
@@ -43,11 +44,13 @@ export function diagnosticsCallsForCurrentUrl(model: DashboardModel): CallRow[] 
 export function DiagnosticsPage({
   model,
   contextRuntime,
+  rowLoadControls,
   onOpenInvestigator,
   onCopyCallLink,
 }: {
   model: DashboardModel;
   contextRuntime: ContextRuntime;
+  rowLoadControls: DashboardRowLoadControls;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 }) {
@@ -315,6 +318,7 @@ export function DiagnosticsPage({
           usingLiveFacts={usingLiveFacts}
           liveResult={liveFactCallsResult}
           factCallSort={factCallSort}
+          rowLoadControls={rowLoadControls}
           onFactCallSortChange={setFactCallSort}
           onLoadMore={loadMoreFactCalls}
           onOpenInvestigator={onOpenInvestigator}
