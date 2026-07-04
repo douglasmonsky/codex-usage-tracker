@@ -43,7 +43,7 @@ Compare usage by project for the last 7 days.
 Show me what is estimated or unpriced before I trust the cost numbers.
 ```
 
-The API skill should refresh the local index, call aggregate tools such as `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, or `usage_pricing_coverage`, then explain the answer with the data scope and estimate caveats.
+The API skill should refresh the local index, call aggregate tools such as `usage_status`, `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_report_pack`, `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, or `usage_pricing_coverage`, then explain the answer with the data scope and estimate caveats.
 
 If MCP tools are not available, the same questions can be answered through CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
 
@@ -55,6 +55,12 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_doctor`
 - `usage_summary`
 - `usage_query`
+- `usage_status`
+- `usage_calls`
+- `usage_call_detail`
+- `usage_threads`
+- `usage_report_pack`
+- `usage_dashboard_recommendations`
 - `usage_recommendations`
 - `session_usage`
 - `usage_call_context`
@@ -67,6 +73,20 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `init_usage_allowance_config`
 
 `usage_doctor`, `usage_summary`, `usage_recommendations`, `session_usage`, `most_expensive_usage_calls`, and `usage_pricing_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown.
+
+Dashboard-shaped MCP tools return JSON dictionaries directly and reuse the same aggregate schemas as the local React dashboard API:
+
+Status: `usage_status()` returns `/api/status` freshness, row counts, parser diagnostics, and observed allowance windows.
+
+Calls: `usage_calls(...)` returns `/api/calls` rows with filters, pagination, `total_matched_rows`, `has_more`, and `next_offset`.
+
+Call detail: `usage_call_detail(record_id=...)` returns `/api/call` data for the Call Investigator without raw transcript context.
+
+Threads: `usage_threads(...)` returns `/api/threads` aggregate thread rows.
+
+Report pack: `usage_report_pack(...)` returns `/api/reports/pack` report cards and compact evidence rows.
+
+Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the dashboard recommendation payload.
 
 `refresh_usage_index`, `usage_query`, `generate_usage_dashboard`, `export_usage_csv`, and config-writing MCP tools return JSON dictionaries directly.
 
