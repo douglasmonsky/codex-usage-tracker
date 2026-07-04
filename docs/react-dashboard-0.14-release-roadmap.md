@@ -104,9 +104,9 @@ Goal: prove the release candidate works from source checkout and installed packa
 - [x] `git diff --check`
 - [x] `.venv/bin/python -m pytest`
 - [x] `.venv/bin/python -m compileall src`
-- [ ] `.venv/bin/python -m build`
-- [ ] `.venv/bin/python -m twine check dist/*`
-- [ ] `.venv/bin/python scripts/check_release.py --dist`
+- [x] `.venv/bin/python -m build`
+- [x] `.venv/bin/python -m twine check dist/*`
+- [x] `.venv/bin/python scripts/check_release.py --dist`
 - [x] Installed-wheel smoke: create a clean temp environment, install the built wheel, launch `codex-usage-tracker serve-dashboard --context-api explicit`, and verify React and legacy dashboard assets load.
 
 Current execution notes:
@@ -118,9 +118,11 @@ Current execution notes:
 - 2026-07-03: temporary package shape check passed with `.venv/bin/python -m build --outdir /tmp/codex-usage-tracker-0.14-build` and `.venv/bin/python -m twine check /tmp/codex-usage-tracker-0.14-build/*`.
 - 2026-07-03: installed-wheel smoke found `/react-dashboard.html` missing from packaged server routes; fixed alias routing to bundled React `index.html`, rebuilt into a temp wheel, installed in a clean temp venv, and verified `/react-dashboard.html`, `/dashboard.html`, React JS, and React CSS all return 200 from the installed CLI server.
 - 2026-07-03: rebuilt packaged React assets from current `frontend/dashboard` source after Call Investigator link cleanup, verified bundled JS contains the new `Copy investigator link` path, and reran `scripts/check_release.py` plus focused shell/workspace URL tests.
-- Clean `dist/` release gates remain unchecked because repository `dist/` currently contains stale `0.13.1` artifacts and the release branch/version bump has not started.
-- Merge-readiness snapshot: implementation and source/installed smoke gates are close, but do not merge blind while the branch still has a large dirty working tree and unreviewed untracked frontend files. Remaining release blockers are intentional file inventory/staging, clean release-branch `dist/` build checks, version bump, and final known-limitations review.
-- 2026-07-03: refreshed untracked-file inventory remains source/test/doc-only: 97 files total, including 39 frontend tests, 41 frontend TS/TSX source modules, 13 CSS modules, 1 Python source file, 2 Python tests, and 1 doc. Filename/path scan found no generated caches, build artifacts, local databases, logs, `.env` files, JSONL transcripts, or credential-looking files. Static basename import scan still flags only `frontend/dashboard/src/features/overview/InvestigationPresetsPanel.tsx` as likely orphaned and needing explicit keep/remove decision before staging.
+- 2026-07-03: follow-up React parity fix committed in `d05575e`: Overview Usage Remaining prefers weekly observed/configured windows over 5-hour windows, shell row loading exposes explicit loading state plus Load all rows, Overview Recent Calls exposes local show-more plus live Load more rows/Load all rows controls, and shared data tables freeze header rows plus the Thread column.
+- 2026-07-03: post-commit stability gates passed: full frontend suite 40 files / 234 tests, `npm --workspace frontend/dashboard run typecheck`, `npm --workspace frontend/dashboard run lint`, `npm --workspace frontend/dashboard run build`, `.venv/bin/python -m pytest` 544 tests, `.venv/bin/python -m compileall src`, dashboard JS `node --check`, `.venv/bin/python scripts/check_release.py`, and `git diff --check && git diff --cached --check`.
+- 2026-07-03: clean package-shape gates passed from detached temp worktree at commit `d05575e`: `.venv/bin/python -m build --outdir <temp-worktree>/dist <temp-worktree>`, `.venv/bin/python -m twine check <temp-worktree>/dist/*`, and `.venv/bin/python scripts/check_release.py --dist`. Repository `dist/` still contains old ignored `0.13.1` artifacts and was intentionally not overwritten during this branch pass.
+- Merge-readiness snapshot: implementation source/installed smoke/dist gates are close, but do not merge blind while one untracked frontend orphan still needs an explicit keep/remove decision, plus release-branch version bump and final known-limitations review.
+- 2026-07-03: refreshed untracked-file inventory after commit shows exactly one untracked file: `frontend/dashboard/src/features/overview/InvestigationPresetsPanel.tsx`. The file defines the removed Overview "Investigation Presets" panel, is not imported by tracked React code, and conflicts with the product direction to remove presets from the home page; it should be removed with maintainer approval or intentionally restored before release.
 
 ## Phase 4: Real-Data QA
 
