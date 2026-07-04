@@ -27,11 +27,13 @@ import {
 } from './threadFilterSummary';
 import {
   buildThreadsViewLink,
+  defaultThreadCallSortDirection,
   detailFirstSelectedThreadName,
   filterThreads,
   normalizeThreadCallSort,
   readInitialSelectedThreadParam,
   readThreadCallPageVisibleRowsParam,
+  readThreadCallSortDirectionParam,
   readThreadCallSortParam,
   readThreadPageVisibleRowsParam,
   readThreadRiskParam,
@@ -40,6 +42,7 @@ import {
   sortThreads,
   threadCallPageSize,
   threadsTablePageSize,
+  type ThreadCallSortDirection,
   type ThreadCallSortKey,
 } from './threadsUrlState';
 
@@ -119,7 +122,11 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
   const [selectedThreadName, setSelectedThreadName] = useState<string | null>(() => readInitialSelectedThreadParam());
   const [threadSorting, setThreadSorting] = useState<SortingState>(() => readThreadSortingParam());
   const [visibleThreadRows, setVisibleThreadRows] = useState(() => readThreadPageVisibleRowsParam(threadsTablePageSize));
-  const [threadCallSort, setThreadCallSort] = useState<ThreadCallSortKey>(() => readThreadCallSortParam());
+  const initialThreadCallSort = readThreadCallSortParam();
+  const [threadCallSort, setThreadCallSort] = useState<ThreadCallSortKey>(() => initialThreadCallSort);
+  const [threadCallSortDirection, setThreadCallSortDirection] = useState<ThreadCallSortDirection>(() =>
+    readThreadCallSortDirectionParam(initialThreadCallSort),
+  );
   const [visibleThreadCallCount, setVisibleThreadCallCount] = useState(() => readThreadCallPageVisibleRowsParam(threadCallPageSize));
   const [exportStatus, setExportStatus] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -191,13 +198,14 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
       selectedThreadName: selectedThreadNameForUrl,
       sorting: threadSorting,
       visibleRowCount: visibleThreadRows,
-      threadCallSort,
-      visibleThreadCallCount,
-    });
+threadCallSort,
+threadCallSortDirection,
+visibleThreadCallCount,
+});
     if (url.toString() !== window.location.href) {
       window.history.replaceState(null, '', url);
     }
-  }, [localQuery, riskFilter, selectedThreadNameForUrl, threadCallSort, threadSorting, visibleThreadCallCount, visibleThreadRows]);
+}, [localQuery, riskFilter, selectedThreadNameForUrl, threadCallSort, threadCallSortDirection, threadSorting, visibleThreadCallCount, visibleThreadRows]);
 
   function exportThreads() {
     const exportRows = callsForThreadRows(model.calls, sortThreads(filteredThreads, threadSorting));
@@ -233,19 +241,21 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
   function clearThreadFilters() {
     setLocalQuery('');
     setRiskFilter('all');
-    setSelectedThreadName(null);
-    setVisibleThreadRows(threadsTablePageSize);
-    setThreadCallSort('newest');
-    setVisibleThreadCallCount(threadCallPageSize);
+setSelectedThreadName(null);
+setVisibleThreadRows(threadsTablePageSize);
+setThreadCallSort('newest');
+setThreadCallSortDirection(defaultThreadCallSortDirection('newest'));
+setVisibleThreadCallCount(threadCallPageSize);
     const url = buildThreadsViewLink({
       localQuery: '',
       riskFilter: 'all',
       selectedThreadName: null,
       sorting: threadSorting,
       visibleRowCount: threadsTablePageSize,
-      threadCallSort: 'newest',
-      visibleThreadCallCount: threadCallPageSize,
-    });
+threadCallSort: 'newest',
+threadCallSortDirection: defaultThreadCallSortDirection('newest'),
+visibleThreadCallCount: threadCallPageSize,
+});
     window.history.replaceState(null, '', url);
     setFilterStatus('Thread filters cleared');
   }
@@ -255,10 +265,17 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
     setVisibleThreadCallCount(threadCallPageSize);
   }
 
-  function updateThreadCallSort(value: string) {
-    setThreadCallSort(normalizeThreadCallSort(value));
-    setVisibleThreadCallCount(threadCallPageSize);
-  }
+function updateThreadCallSort(value: string) {
+const nextSort = normalizeThreadCallSort(value);
+setThreadCallSort(nextSort);
+setThreadCallSortDirection(defaultThreadCallSortDirection(nextSort));
+setVisibleThreadCallCount(threadCallPageSize);
+}
+
+function updateThreadCallSortDirection(value: string) {
+setThreadCallSortDirection(value === 'asc' ? 'asc' : 'desc');
+setVisibleThreadCallCount(threadCallPageSize);
+}
 
   function openThreadInvestigator(thread: ThreadRow) {
     if (thread.latestCallId) {
@@ -351,12 +368,14 @@ onVisibleRowCountChange={setVisibleThreadRows}
   calls={selectedCalls}
   allCalls={model.calls}
   callSort={threadCallSort}
+  callSortDirection={threadCallSortDirection}
   visibleCallCount={visibleThreadCallCount}
-	  onCallSortChange={updateThreadCallSort}
-	  onVisibleCallCountChange={setVisibleThreadCallCount}
-	  onOpenInvestigator={onOpenInvestigator}
-	  onCopyCallLink={onCopyCallLink}
-	/>
+  onCallSortChange={updateThreadCallSort}
+  onCallSortDirectionChange={updateThreadCallSortDirection}
+  onVisibleCallCountChange={setVisibleThreadCallCount}
+  onOpenInvestigator={onOpenInvestigator}
+  onCopyCallLink={onCopyCallLink}
+/>
     </div>
   );
 }
@@ -365,9 +384,11 @@ function ThreadDetail({
   selected,
   calls,
   allCalls,
-  callSort,
-  visibleCallCount,
+callSort,
+callSortDirection,
+visibleCallCount,
 onCallSortChange,
+onCallSortDirectionChange,
 onVisibleCallCountChange,
 onOpenInvestigator,
 onCopyCallLink,
@@ -376,14 +397,16 @@ selected: ThreadRow | null;
 calls: CallRow[];
 allCalls: CallRow[];
 callSort: ThreadCallSortKey;
+callSortDirection: ThreadCallSortDirection;
 visibleCallCount: number;
 onCallSortChange(value: string): void;
+onCallSortDirectionChange(value: string): void;
 onVisibleCallCountChange(count: number | ((current: number) => number)): void;
 onOpenInvestigator(recordId: string): void;
 onCopyCallLink(recordId: string): void;
 }) {
-  const shellI18n = useShellI18n();
-  const sortedCalls = useMemo(() => sortThreadCalls(calls, callSort), [calls, callSort]);
+const shellI18n = useShellI18n();
+const sortedCalls = useMemo(() => sortThreadCalls(calls, callSort, callSortDirection), [calls, callSort, callSortDirection]);
   const lifecycle = useMemo(() => computeThreadLifecycle(calls, selected?.name ?? ''), [calls, selected?.name]);
   const status = useMemo(() => computeThreadStatus(calls, selected, lifecycle), [calls, lifecycle, selected]);
   const relationships = useMemo(
@@ -636,9 +659,29 @@ value={callSort}
 onChange={event => onCallSortChange(event.target.value)}
                   >
                     <option value="newest">Newest</option>
+                    <option value="duration">Duration</option>
+                    <option value="gap">Previous gap</option>
+                    <option value="initiator">Initiator</option>
+                    <option value="model">Model</option>
+                    <option value="effort">Effort</option>
                     <option value="tokens">Most tokens</option>
+                    <option value="cached">Cached input</option>
+                    <option value="uncached">Uncached input</option>
+                    <option value="output">Output</option>
+                    <option value="reasoning">Reasoning</option>
                     <option value="cost">Highest cost</option>
                     <option value="cache">Lowest cache</option>
+                  </select>
+                </label>
+                <label className="mini-select-field">
+                  <span>Direction</span>
+                  <select
+                    aria-label="Sort thread calls direction"
+                    value={callSortDirection}
+                    onChange={event => onCallSortDirectionChange(event.target.value)}
+                  >
+                    <option value="desc">Descending</option>
+                    <option value="asc">Ascending</option>
                   </select>
                 </label>
               </div>
@@ -743,13 +786,35 @@ function callTimestamp(call: CallRow): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function sortThreadCalls(calls: CallRow[], sortKey: ThreadCallSortKey): CallRow[] {
+function sortThreadCalls(calls: CallRow[], sortKey: ThreadCallSortKey, direction: ThreadCallSortDirection): CallRow[] {
 return [...calls].sort((left, right) => {
-if (sortKey === 'tokens') return right.totalTokens - left.totalTokens || compareCallTimeDescending(left, right);
-if (sortKey === 'cost') return right.cost - left.cost || compareCallTimeDescending(left, right);
-if (sortKey === 'cache') return left.cachedPct - right.cachedPct || compareCallTimeDescending(left, right);
-return compareCallTimeDescending(left, right);
+const comparison = compareThreadCallSortValues(threadCallSortValue(left, sortKey), threadCallSortValue(right, sortKey));
+const primary = direction === 'asc' ? comparison : -comparison;
+return primary || compareCallTimeDescending(left, right) || left.id.localeCompare(right.id);
 });
+}
+
+function threadCallSortValue(call: CallRow, sortKey: ThreadCallSortKey): number | string {
+if (sortKey === 'duration') return call.durationSeconds;
+if (sortKey === 'gap') return call.previousCallGapSeconds;
+if (sortKey === 'initiator') return call.initiator.toLowerCase();
+if (sortKey === 'model') return call.model.toLowerCase();
+if (sortKey === 'effort') return call.effort.toLowerCase();
+if (sortKey === 'tokens') return call.totalTokens;
+if (sortKey === 'cached') return call.cachedInput;
+if (sortKey === 'uncached') return call.uncachedInput;
+if (sortKey === 'output') return call.output;
+if (sortKey === 'reasoning') return call.reasoningOutput;
+if (sortKey === 'cost') return call.cost;
+if (sortKey === 'cache') return call.cachedPct;
+return callTimestamp(call);
+}
+
+function compareThreadCallSortValues(left: number | string, right: number | string): number {
+if (typeof left === 'number' && typeof right === 'number') {
+return left - right;
+}
+return String(left).localeCompare(String(right));
 }
 
 function threadLabelsMatch(callThread: string, threadName: string): boolean {

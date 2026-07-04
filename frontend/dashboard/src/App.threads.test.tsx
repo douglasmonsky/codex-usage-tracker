@@ -226,10 +226,14 @@ fireEvent.click(threadCallList.getByRole('button', { name: /Show 2 more calls/i 
     expect(threadCallList.getByText('Prev -')).toBeInTheDocument();
     expect(threadCallList.getAllByText('user initiated').length).toBeGreaterThan(0);
 
-    fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'tokens' } });
-  expect(threadCallList.getByText('5 of 7 loaded')).toBeInTheDocument();
-  expect(threadCallList.getByText('model-0 / high')).toBeInTheDocument();
-  expect(threadCallList.getByText('2 more available')).toBeInTheDocument();
+fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'tokens' } });
+expect(threadCallList.getByText('5 of 7 loaded')).toBeInTheDocument();
+expect(threadCallList.getByText('model-0 / high')).toBeInTheDocument();
+expect(threadCallList.getByText('2 more available')).toBeInTheDocument();
+expect(threadCallList.getByLabelText('Sort thread calls direction')).toHaveValue('desc');
+fireEvent.change(threadCallList.getByLabelText('Sort thread calls direction'), { target: { value: 'asc' } });
+expect(threadCallList.getByText('model-1 / high')).toBeInTheDocument();
+expect(threadCallList.queryByText('model-0 / high')).not.toBeInTheDocument();
 });
 
 it('hydrates and syncs selected thread call sort and page URL state', async () => {

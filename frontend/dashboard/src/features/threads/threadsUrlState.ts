@@ -3,13 +3,41 @@ import type { ThreadRow } from '../../api/types';
 import { threadColumnChoices } from '../shared/tables';
 import { normalizeThreadRiskFilter, threadMatchesFilters, type ThreadRiskFilter } from './threadFilterSummary';
 
-export type ThreadCallSortKey = 'newest' | 'tokens' | 'cost' | 'cache';
+export type ThreadCallSortKey =
+  | 'newest'
+  | 'duration'
+  | 'gap'
+  | 'initiator'
+  | 'model'
+  | 'effort'
+  | 'tokens'
+  | 'cached'
+  | 'uncached'
+  | 'output'
+  | 'reasoning'
+  | 'cost'
+  | 'cache';
+export type ThreadCallSortDirection = 'asc' | 'desc';
 
 export const threadCallPageSize = 5;
 export const threadsTablePageSize = 250;
 export const detailFirstSelectedThreadName = '__detail_first__';
 
-const threadCallSortValues = new Set<string>(['newest', 'tokens', 'cost', 'cache']);
+const threadCallSortValues = new Set<string>([
+  'newest',
+  'duration',
+  'gap',
+  'initiator',
+  'model',
+  'effort',
+  'tokens',
+  'cached',
+  'uncached',
+  'output',
+  'reasoning',
+  'cost',
+  'cache',
+]);
 const threadSortKeyValues = new Set(threadColumnChoices.map(choice => choice.id).filter(id => id !== 'investigate'));
 
 export function readSelectedThreadParam(href = window.location.href): string | null {
@@ -61,7 +89,15 @@ export function readThreadPageVisibleRowsParam(pageSize: number, href = window.l
 }
 
 export function readThreadCallSortParam(href = window.location.href): ThreadCallSortKey {
-  return normalizeThreadCallSort(readThreadSearchParam('thread_call_sort', href));
+return normalizeThreadCallSort(readThreadSearchParam('thread_call_sort', href));
+}
+
+export function readThreadCallSortDirectionParam(
+  sortKey: ThreadCallSortKey,
+  href = window.location.href,
+): ThreadCallSortDirection {
+  const direction = readThreadSearchParam('thread_call_direction', href).toLowerCase();
+  return direction === 'asc' || direction === 'desc' ? direction : defaultThreadCallSortDirection(sortKey);
 }
 
 export function readThreadCallPageVisibleRowsParam(pageSize: number, href = window.location.href): number {
@@ -70,8 +106,12 @@ export function readThreadCallPageVisibleRowsParam(pageSize: number, href = wind
 }
 
 export function normalizeThreadCallSort(value: string): ThreadCallSortKey {
-  const normalizedValue = normalizeLegacyThreadCallSortKey(value);
-  return threadCallSortValues.has(normalizedValue) ? (normalizedValue as ThreadCallSortKey) : 'newest';
+const normalizedValue = normalizeLegacyThreadCallSortKey(value);
+return threadCallSortValues.has(normalizedValue) ? (normalizedValue as ThreadCallSortKey) : 'newest';
+}
+
+export function defaultThreadCallSortDirection(sortKey: ThreadCallSortKey): ThreadCallSortDirection {
+  return sortKey === 'cache' || sortKey === 'effort' || sortKey === 'initiator' || sortKey === 'model' ? 'asc' : 'desc';
 }
 
 export type ThreadsViewLinkState = {
@@ -80,8 +120,9 @@ export type ThreadsViewLinkState = {
   selectedThreadName: string | null;
   sorting: SortingState;
   visibleRowCount: number;
-  threadCallSort: ThreadCallSortKey;
-  visibleThreadCallCount: number;
+threadCallSort: ThreadCallSortKey;
+threadCallSortDirection: ThreadCallSortDirection;
+visibleThreadCallCount: number;
 };
 
 export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.location.href): URL {
@@ -99,9 +140,15 @@ export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.
   setOptionalThreadParam(url, 'thread', state.selectedThreadName ?? '', '');
   setOptionalThreadParam(url, 'sort', sortKey, '');
   setOptionalThreadParam(url, 'direction', sortKey ? (activeSort?.desc ? 'desc' : 'asc') : '', '');
-  setOptionalThreadParam(url, 'page', String(threadPageNumberFromVisibleRows(state.visibleRowCount, threadsTablePageSize)), '1');
-  setOptionalThreadParam(url, 'thread_call_sort', state.threadCallSort, 'newest');
-  setOptionalThreadParam(
+setOptionalThreadParam(url, 'page', String(threadPageNumberFromVisibleRows(state.visibleRowCount, threadsTablePageSize)), '1');
+setOptionalThreadParam(url, 'thread_call_sort', state.threadCallSort, 'newest');
+setOptionalThreadParam(
+  url,
+  'thread_call_direction',
+  state.threadCallSortDirection,
+  defaultThreadCallSortDirection(state.threadCallSort),
+);
+setOptionalThreadParam(
     url,
     'thread_call_page',
     String(threadPageNumberFromVisibleRows(state.visibleThreadCallCount, threadCallPageSize)),
@@ -135,10 +182,10 @@ function normalizeLegacyThreadSortKey(value: string): string {
 }
 
 function normalizeLegacyThreadCallSortKey(value: string): string {
-  if (value === 'time') return 'newest';
-  if (value === 'total' || value === 'cached' || value === 'uncached' || value === 'output' || value === 'reasoning') {
-    return 'tokens';
-  }
+if (value === 'time') return 'newest';
+if (value === 'total') {
+return 'tokens';
+}
   return value;
 }
 
