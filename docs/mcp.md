@@ -39,6 +39,10 @@ Use my Codex Usage Tracker data to explain what drove usage this week.
 Heaviest thread?
 Thread leaderboard.
 Find low-cache or high-context calls from today and suggest what to inspect next.
+Look through my usage for token waste.
+Find calls where context got bloated.
+Show me where caching failed.
+Find expensive calls worth opening in the investigator.
 Compare usage by project for the last 7 days.
 Show me what is estimated or unpriced before I trust the cost numbers.
 ```

@@ -54,6 +54,19 @@ The only exception is `usage_call_context`, which reads one selected record's lo
 - "What happened in this session?" Use `session_usage(session_id=..., response_format="json")`.
 - "What should I inspect next?" Use `usage_report_pack(...)` or `usage_recommendations(response_format="json")`, then explain the primary recommendation, secondary signals, and row scope.
 
+## Suggested Investigation Ideas
+
+When the user asks what they can look into, offer a short menu of concrete aggregate-only investigations rather than a generic list.
+
+- "Look through my usage for token waste." Use `usage_report_pack(...)`, then `usage_calls(sort="tokens", direction="desc", limit=10)` and call out high-token calls, low cache ratios, high context-window percent, expensive estimates, or repeated same-thread spikes.
+- "Find calls where context got bloated." Use `usage_calls(...)` sorted by tokens or filtered to recent rows, then rank by `context_window_percent`, `input_tokens`, and low `cache_ratio`.
+- "Show me where caching failed." Use `usage_calls(...)` and `usage_report_pack(...)`; prioritize rows with high `input_tokens`, low `cached_input_tokens`, or low `cache_ratio`.
+- "Which threads are draining the most?" Use `usage_threads(limit=10)` and `usage_summary(group_by="thread", response_format="json")`; include total tokens, estimated cost or credits, and whether archived rows are excluded.
+- "What changed recently?" Use `usage_status()` for freshness, then `usage_calls(since=..., limit=...)` or `usage_summary(group_by="date", response_format="json")` for recent movement.
+- "Find expensive calls worth opening." Use `most_expensive_usage_calls(response_format="json")` or `usage_calls(sort="tokens", direction="desc")`; suggest `usage_call_detail(record_id=...)` for the top few aggregate records.
+- "Check whether model or effort choice is wasting tokens." Use `usage_summary(group_by="model", response_format="json")`, `usage_summary(group_by="effort", response_format="json")`, and supporting `usage_calls(...)` rows.
+- "Can I share this safely?" Use `privacy_mode="strict"` and avoid `usage_call_context`.
+
 ## Answer Style
 
 - Lead with the direct answer and key metric.
