@@ -1,9 +1,8 @@
-# Codex Usage Tracker
-
 <p align="center">
-  <a href="docs/assets/dashboard-calls.png?v=readme-smart-20260704"><img src="docs/assets/dashboard-calls-preview.png?v=readme-smart-20260704" alt="Codex Usage Tracker React dashboard showing model-call filters, frozen call rows, and row loading controls." width="49%"></a>
-  <a href="docs/assets/dashboard-call-investigator.png?v=readme-smart-20260704"><img src="docs/assets/dashboard-call-investigator-preview.png?v=readme-smart-20260704" alt="Codex Usage Tracker call investigator showing token accounting, cache diagnostics, and explicit evidence controls." width="49%"></a>
+ <img src="docs/assets/readme-hero.png?v=readme-hero-20260704" alt="Codex Usage Tracker local-first analytics dashboard preview with overview, calls, and investigator surfaces." width="100%">
 </p>
+
+# Codex Usage Tracker
 
 Local-first dashboard, Codex plugin, and companion skill for understanding where your Codex tokens and usage credits are going.
 
