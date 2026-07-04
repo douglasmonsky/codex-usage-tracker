@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.14.1 - 2026-07-04
+
+- Harden React dashboard responsive chrome, including topbar control wrapping, table containment, sticky table affordances, mobile nav polish, and refreshed synthetic dashboard screenshots.
+
 ## 0.14.0 - 2026-07-04
 
 - Make `serve-dashboard --open` prefer the React dashboard route while keeping legacy `/dashboard.html` available as a localhost fallback, and expose both URLs in `serve-dashboard --json`.
