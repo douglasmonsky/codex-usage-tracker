@@ -25,6 +25,9 @@ describe('React dashboard secondary workspaces', () => {
 expect(screen.getByText('Cost: $1.38 per call; inspect threshold above $1.00')).toBeInTheDocument();
 expect(screen.getByText('Evidence: 1 loaded calls, no heatmap row')).toBeInTheDocument();
 expect(screen.getAllByText('May 26').length).toBeGreaterThan(0);
+const heatmap = screen.getByRole('table', { name: 'Cache reuse heatmap' });
+expect(within(heatmap).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
+expect(within(heatmap).getByRole('rowheader', { name: 'thread-f9c3' })).toHaveClass('sticky-column');
 expect(screen.getByText('Thread Calls')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Open investigator for cache thread call thread-9f3a1c codex-1/i }));

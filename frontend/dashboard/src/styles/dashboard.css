@@ -40,11 +40,16 @@
   justify-content: start;
 }
 
+.heatmap-scroll {
+ max-height: min(62vh, 620px);
+ overflow: auto;
+}
+
 .heatmap {
-  min-width: 720px;
-  overflow: hidden;
-  border: 1px solid #e1e8f2;
-  border-radius: 8px;
+ min-width: 720px;
+ overflow: hidden;
+ border: 1px solid #e1e8f2;
+ border-radius: 8px;
 }
 
 .heatmap-head,
@@ -63,13 +68,30 @@
 }
 
 .heatmap-head span {
-  color: #4b5d76;
-  background: #f8fafc;
-  font-weight: 800;
+ position: sticky;
+ top: 0;
+ z-index: 2;
+ color: #4b5d76;
+ background: #f8fafc;
+ font-weight: 800;
+}
+
+.heatmap .sticky-column {
+ position: sticky;
+ left: 0;
+ z-index: 1;
+ min-width: 150px;
+ background: var(--dashboard-surface);
+ box-shadow: 1px 0 0 #dbe6f3;
+}
+
+.heatmap-head .sticky-column {
+ z-index: 3;
+ background: #f8fafc;
 }
 
 .heatmap-row span {
-  color: #064e3b;
+ color: #064e3b;
   background: color-mix(in srgb, #22c55e calc(var(--intensity) * 78%), #f8fafc);
   text-align: center;
 }

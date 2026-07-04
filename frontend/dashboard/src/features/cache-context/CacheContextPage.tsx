@@ -66,27 +66,29 @@ return (
 
 <Panel title="Cache Reuse Heatmap" subtitle={heatmapWindowLabels.length ? `${heatmapWindowLabels.length} cache windows` : 'No cache heatmap rows'}>
         {heatmapWindowLabels.length ? (
-        <div className="heatmap" role="table" aria-label="Cache reuse heatmap" style={{ '--heatmap-columns': heatmapWindowLabels.length } as CSSProperties}>
-          <div className="heatmap-head">
-            <span>Thread</span>
-            {heatmapWindowLabels.map(label => (
-              <span key={label}>{label}</span>
-            ))}
-          </div>
-          {model.cacheHeatmap.map(row => (
-            <div className="heatmap-row" key={row.thread}>
-              <strong>{row.thread}</strong>
-              {heatmapWindowLabels.map((label, index) => {
-                const value = row.values[index];
-                return (
-                  <span key={`${row.thread}-${label}`} style={{ '--intensity': (value ?? 0) / 100 } as CSSProperties}>
-                    {typeof value === 'number' ? `${value}%` : '-'}
-                  </span>
-                );
-              })}
+          <div className="heatmap-scroll">
+            <div className="heatmap" role="table" aria-label="Cache reuse heatmap" style={{ '--heatmap-columns': heatmapWindowLabels.length } as CSSProperties}>
+              <div className="heatmap-head" role="row">
+                <span className="sticky-column" role="columnheader">Thread</span>
+                {heatmapWindowLabels.map(label => (
+                  <span key={label} role="columnheader">{label}</span>
+                ))}
+              </div>
+              {model.cacheHeatmap.map(row => (
+                <div className="heatmap-row" role="row" key={row.thread}>
+                  <strong className="sticky-column" role="rowheader">{row.thread}</strong>
+                  {heatmapWindowLabels.map((label, index) => {
+                    const value = row.values[index];
+                    return (
+                      <span role="cell" key={`${row.thread}-${label}`} style={{ '--intensity': (value ?? 0) / 100 } as CSSProperties}>
+                        {typeof value === 'number' ? `${value}%` : '-'}
+                      </span>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
         ) : (
           <p className="empty-state">No cache heatmap rows in the current aggregate snapshot.</p>
         )}
