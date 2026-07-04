@@ -367,12 +367,20 @@ it('surfaces legacy source health metadata in Settings', () => {
   render(<App />);
 
 expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
-expect(screen.getByText('Allowance Windows')).toBeInTheDocument();
-expect(screen.getByText('token_count.rate_limits · plan pro · limit codex · observed 2026-07-01 10:15 UTC')).toBeInTheDocument();
-expect(screen.getByText('Observed 5h')).toBeInTheDocument();
-expect(screen.getByText('79% remaining · 21% used · resets 2026-07-01 16:30 UTC')).toBeInTheDocument();
-expect(screen.getByText('Observed Weekly')).toBeInTheDocument();
-expect(screen.getByText('33% remaining · 67% used · resets 2026-07-04 00:00 UTC')).toBeInTheDocument();
+  expect(screen.getByText('Allowance Windows')).toBeInTheDocument();
+  expect(screen.getByText('token_count.rate_limits · plan pro · limit codex · observed 2026-07-01 10:15 UTC')).toBeInTheDocument();
+  const allowancePanel = screen.getByText('Allowance Windows').closest('section') as HTMLElement;
+  expect(allowancePanel).toBeTruthy();
+  const observedWeekly = within(allowancePanel).getByText('Observed Weekly');
+  const observedFiveHour = within(allowancePanel).getByText('Observed 5h');
+  const configuredWeekly = within(allowancePanel).getByText('Configured Weekly');
+  const configuredFiveHour = within(allowancePanel).getByText('Configured 5h');
+  expect(observedWeekly.compareDocumentPosition(observedFiveHour) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(configuredWeekly.compareDocumentPosition(configuredFiveHour) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByText('Observed 5h')).toBeInTheDocument();
+  expect(screen.getByText('79% remaining · 21% used · resets 2026-07-01 16:30 UTC')).toBeInTheDocument();
+  expect(screen.getByText('Observed Weekly')).toBeInTheDocument();
+  expect(screen.getByText('33% remaining · 67% used · resets 2026-07-04 00:00 UTC')).toBeInTheDocument();
 expect(screen.getByText('Configured 5h')).toBeInTheDocument();
 expect(screen.getByText('79% remaining · 2.75 cr left · 5 cr total · resets 2026-07-01 16:30 UTC')).toBeInTheDocument();
 expect(screen.getByText('Source Health')).toBeInTheDocument();

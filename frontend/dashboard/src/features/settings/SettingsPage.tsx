@@ -153,7 +153,7 @@ function allowanceWindowSummary(payload: DashboardBootPayload | null): Allowance
 function observedUsageWindowRows(observedUsage: DashboardBootPayload['observed_usage']): AllowanceWindowRow[] {
   const windows = Array.isArray(observedUsage?.windows) ? observedUsage.windows : [];
   if (!observedUsage?.available || !windows.length) return [];
-  return windows.map(window => {
+  return weeklyFirst(windows).map(window => {
     const usedPercent = numericValue(window.used_percent);
     const remaining = usedPercent === null ? null : Math.max(0, Math.min(100, 100 - usedPercent));
     const details = [
@@ -171,7 +171,7 @@ function observedUsageWindowRows(observedUsage: DashboardBootPayload['observed_u
 
 function configuredAllowanceWindowRows(windows: DashboardBootPayload['allowance_windows']): AllowanceWindowRow[] {
   if (!Array.isArray(windows) || !windows.length) return [];
-  return windows.map(window => {
+  return weeklyFirst(windows).map(window => {
     const remainingPercent = numericValue(window.remaining_percent);
     const remainingCredits = numericValue(window.remaining_credits);
     const totalCredits = numericValue(window.total_credits);
@@ -187,6 +187,16 @@ function configuredAllowanceWindowRows(windows: DashboardBootPayload['allowance_
       value: details.length ? details.join(' · ') : 'Configured allowance window',
     };
   });
+}
+
+function weeklyFirst<T extends { key?: unknown; label?: unknown; window_minutes?: unknown }>(windows: T[]): T[] {
+  return [...windows].sort((left, right) => Number(isWeeklyWindow(right)) - Number(isWeeklyWindow(left)));
+}
+
+function isWeeklyWindow(window: { key?: unknown; label?: unknown; window_minutes?: unknown }): boolean {
+  const minutes = numericValue(window.window_minutes);
+  const label = `${window.key ?? ''} ${window.label ?? ''}`.toLowerCase();
+  return minutes === 10_080 || /\b(weekly|week|7d|7-day|7 day)\b/.test(label);
 }
 
 function allowanceWindowSubtitle(payload: DashboardBootPayload | null): string {
