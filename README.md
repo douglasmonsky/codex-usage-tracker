@@ -1,8 +1,8 @@
 # Codex Usage Tracker
 
 <p align="center">
-  <a href="docs/assets/dashboard-calls.png"><img src="docs/assets/dashboard-calls-preview.png?v=readme-react-014" alt="Codex Usage Tracker React dashboard showing model-call filters, frozen call rows, and row loading controls." width="49%"></a>
-  <a href="docs/assets/dashboard-call-investigator.png"><img src="docs/assets/dashboard-call-investigator-preview.png?v=readme-react-014" alt="Codex Usage Tracker call investigator showing token accounting, cache diagnostics, and explicit evidence controls." width="49%"></a>
+  <a href="docs/assets/dashboard-calls.png?v=readme-react-014-20260704"><img src="docs/assets/dashboard-calls-preview.png?v=readme-react-014-20260704" alt="Codex Usage Tracker React dashboard showing model-call filters, frozen call rows, and row loading controls." width="49%"></a>
+  <a href="docs/assets/dashboard-call-investigator.png?v=readme-react-014-20260704"><img src="docs/assets/dashboard-call-investigator-preview.png?v=readme-react-014-20260704" alt="Codex Usage Tracker call investigator showing token accounting, cache diagnostics, and explicit evidence controls." width="49%"></a>
 </p>
 
 Local-first dashboard, Codex plugin, and companion skill for understanding where your Codex tokens and usage credits are going.
@@ -54,31 +54,31 @@ Want Codex to do it for you? Paste: `Install codex-usage-tracking with pipx, run
 
 Overview is the dashboard landing workspace: it shows recent aggregate usage, weekly remaining usage context, row loading controls, and charts that open on recent dates.
 
-![Overview view showing high-level metrics, row loading controls, time-series charts, and recent aggregate calls.](docs/assets/dashboard-insights.png?v=readme-react-014)
+![Overview view showing high-level metrics, row loading controls, time-series charts, and recent aggregate calls.](docs/assets/dashboard-insights.png?v=readme-react-014-20260704)
 
 Calls is the high-density investigation surface: filter, sort, inspect details, and export the exact aggregate rows you are looking at.
 
-![Calls view showing filters, totals, the model-call table, and load controls.](docs/assets/dashboard-calls.png?v=readme-react-014)
+![Calls view showing filters, totals, the model-call table, and load controls.](docs/assets/dashboard-calls.png?v=readme-react-014-20260704)
 
 The details rail stays beside the model-call table, so you can inspect aggregate call accounting before opening a full investigator route.
 
-![Calls view showing a selected row with the Call Drill-Down detail rail.](docs/assets/dashboard-details.png?v=readme-react-014)
+![Calls view showing a selected row with the Call Drill-Down detail rail.](docs/assets/dashboard-details.png?v=readme-react-014-20260704)
 
 Click a call row to open the dedicated investigator for exact token accounting, cache/accounting deltas, local serialized evidence buckets, and runtime-only evidence controls.
 
-![Call investigator showing token accounting, cache diagnostics, serialized evidence groups, and evidence controls.](docs/assets/dashboard-call-investigator.png?v=readme-react-014)
+![Call investigator showing token accounting, cache diagnostics, serialized evidence groups, and evidence controls.](docs/assets/dashboard-call-investigator.png?v=readme-react-014-20260704)
 
 The lower investigator view keeps local JSONL context gated behind explicit localhost actions; raw context is not embedded in generated dashboard HTML.
 
-![Lower call investigator view showing context estimates and the explicit raw-context evidence gate.](docs/assets/dashboard-call-investigator-evidence.png?v=readme-react-014)
+![Lower call investigator view showing context estimates and the explicit raw-context evidence gate.](docs/assets/dashboard-call-investigator-evidence.png?v=readme-react-014-20260704)
 
 Threads view groups related calls so long chats, subagents, and auto-review passes are easier to reason about as one work session.
 
-![Threads view with one expanded thread and its calls.](docs/assets/dashboard-threads.png?v=readme-react-014)
+![Threads view with one expanded thread and its calls.](docs/assets/dashboard-threads.png?v=readme-react-014-20260704)
 
 Diagnostics Notebook surfaces on-demand snapshot reports for usage drain, tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration without tying them to the normal live refresh loop.
 
-![Diagnostics Notebook view showing diagnostic snapshot modules and usage-drain reporting.](docs/assets/dashboard-diagnostics.png?v=readme-react-014)
+![Diagnostics Notebook view showing diagnostic snapshot modules and usage-drain reporting.](docs/assets/dashboard-diagnostics.png?v=readme-react-014-20260704)
 
 Dashboard screenshots use synthetic aggregate fixture data, and companion prompt/chat previews are synthetic. They do not contain prompts, local logs, assistant responses, real tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
 
