@@ -42,7 +42,8 @@ export function readCallsSearchParam(name: string, href = window.location.href):
 
 export function readConfidenceFilterParam(href = window.location.href): ConfidenceFilter {
   const value = readCallsSearchParam('confidence', href) || readCallsSearchParam('pricing', href);
-  return confidenceFilterValues.has(value) ? (value as ConfidenceFilter) : 'all';
+  const normalizedValue = normalizeLegacyConfidenceValue(value);
+  return confidenceFilterValues.has(normalizedValue) ? (normalizedValue as ConfidenceFilter) : 'all';
 }
 
 export function readSourceFilterParam(href = window.location.href): SourceFilter {
@@ -146,6 +147,13 @@ function setOptionalCallsParam(url: URL, name: string, value: string, defaultVal
     return;
   }
   url.searchParams.set(name, value);
+}
+
+function normalizeLegacyConfidenceValue(value: string): string {
+  if (value === 'official') return 'cost-exact';
+  if (value === 'estimated') return 'cost-estimated';
+  if (value === 'unpriced') return 'cost-unpriced';
+  return value;
 }
 
 function parseCallsDateInput(value: string): Date | null {
