@@ -36,6 +36,10 @@ describe('threadsUrlState', () => {
     expect(readThreadPageVisibleRowsParam(threadsTablePageSize, href)).toBe(750);
     expect(readThreadCallSortParam(href)).toBe('cache');
     expect(readThreadCallPageVisibleRowsParam(threadCallPageSize, href)).toBe(10);
+    expect(readThreadSortingParam(`${baseHref}&sort=total&direction=desc`)).toEqual([{ id: 'totalTokens', desc: true }]);
+    expect(readThreadSortingParam(`${baseHref}&sort=usage&direction=desc`)).toEqual([{ id: 'credits', desc: true }]);
+    expect(readThreadSortingParam(`${baseHref}&sort=cache&direction=asc`)).toEqual([{ id: 'cachePct', desc: false }]);
+    expect(readThreadSortingParam(`${baseHref}&sort=context&direction=desc`)).toEqual([{ id: 'contextPct', desc: true }]);
   });
 
   it('falls back invalid URL values to legacy defaults', () => {

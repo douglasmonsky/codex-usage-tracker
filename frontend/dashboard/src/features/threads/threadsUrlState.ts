@@ -48,7 +48,7 @@ export function sortThreads(threads: ThreadRow[], sorting: SortingState): Thread
 }
 
 export function readThreadSortingParam(href = window.location.href): SortingState {
-  const sortKey = readThreadSearchParam('sort', href);
+  const sortKey = normalizeLegacyThreadSortKey(readThreadSearchParam('sort', href));
   if (!threadSortKeyValues.has(sortKey)) {
     return [];
   }
@@ -123,6 +123,14 @@ function readLegacyExpandedThreadParam(href: string): string | null {
     .map(thread => thread.trim())
     .filter(Boolean);
   return expandedThreads?.[0] ?? null;
+}
+
+function normalizeLegacyThreadSortKey(value: string): string {
+  if (value === 'total') return 'totalTokens';
+  if (value === 'usage') return 'credits';
+  if (value === 'cache') return 'cachePct';
+  if (value === 'context') return 'contextPct';
+  return value;
 }
 
 function compareThreadsBySort(left: ThreadRow, right: ThreadRow, key: string, desc: boolean): number {
