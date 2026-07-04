@@ -219,7 +219,7 @@ it('pages and sorts selected thread calls', () => {
 
   expect(threadCallList.getByText('5 of 7 loaded')).toBeInTheDocument();
   expect(threadCallList.queryByText('model-0 / high')).not.toBeInTheDocument();
-    fireEvent.click(threadCallList.getByRole('button', { name: /Load more/i }));
+fireEvent.click(threadCallList.getByRole('button', { name: /Show 2 more calls/i }));
     expect(threadCallList.getByText('7 of 7 loaded')).toBeInTheDocument();
     expect(threadCallList.getByText('model-0 / high')).toBeInTheDocument();
     expect(threadCallList.getAllByText('CACHE')[0]).toHaveAttribute('title', 'Cache Risk');
@@ -279,7 +279,7 @@ it('hydrates and syncs selected thread call sort and page URL state', async () =
     expect(params.get('thread_call_page')).toBeNull();
   });
 
-  fireEvent.click(threadCallList.getByRole('button', { name: /Load more/i }));
+  fireEvent.click(threadCallList.getByRole('button', { name: /Show 2 more calls/i }));
 
   await waitFor(() => {
     expect(new URLSearchParams(window.location.search).get('thread_call_page')).toBe('2');

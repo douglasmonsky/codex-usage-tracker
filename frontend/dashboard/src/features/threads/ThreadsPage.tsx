@@ -396,7 +396,8 @@ onCopyCallLink(recordId: string): void;
     [efficiencySignalCount, relationships, selected, status],
   );
   const visibleCalls = sortedCalls.slice(0, visibleCallCount);
-const hiddenCallCount = Math.max(sortedCalls.length - visibleCalls.length, 0);
+  const hiddenCallCount = Math.max(sortedCalls.length - visibleCalls.length, 0);
+  const nextThreadCallBatchCount = Math.min(threadCallPageSize, hiddenCallCount);
 
 if (!selected) {
 return (
@@ -711,10 +712,10 @@ Copy
                 <button
                   className="toolbar-button"
                   type="button"
-onClick={() => onVisibleCallCountChange(current => Math.min(current + threadCallPageSize, sortedCalls.length))}
+                  onClick={() => onVisibleCallCountChange(current => Math.min(current + threadCallPageSize, sortedCalls.length))}
                   disabled={!hiddenCallCount}
                 >
-                  Load more
+                  Show {formatNumber(nextThreadCallBatchCount || threadCallPageSize)} more calls
                 </button>
                 {visibleCallCount > threadCallPageSize ? (
 <button className="toolbar-button" type="button" onClick={() => onVisibleCallCountChange(threadCallPageSize)}>
