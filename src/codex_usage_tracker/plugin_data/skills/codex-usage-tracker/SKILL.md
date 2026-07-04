@@ -26,12 +26,33 @@ The only exception is `usage_call_context`, which intentionally reads one select
 - If neither command is available, say briefly that the tracker CLI is not on `PATH` and ask the user to run `codex-usage-tracker setup` or reinstall with `pipx`.
 - Keep dashboard-open narration minimal: one short progress note if needed, then the localhost URL, or if falling back to a static file, the file path plus a note that Live requires `serve-dashboard`. Do not narrate plugin discovery.
 
+## Suggested Usage Questions
+
+When the user wants ideas, suggest concrete aggregate investigations:
+
+- Look through my usage for token waste.
+- Find calls where context got bloated.
+- Show me where caching failed.
+- Which threads are draining the most?
+- What changed recently?
+- Find expensive calls worth opening in the investigator.
+- Check whether model or effort choice is wasting tokens.
+- Build a strict-privacy summary I can share.
+
+Route these through `usage_report_pack`, `usage_calls`, `usage_threads`, `usage_summary`, and `usage_call_detail` before considering raw context.
+
 ## Common Workflows
 
 - Refresh the index before answering usage questions.
 - Use `usage_doctor` when setup, plugin discovery, MCP launch, dashboard output, or pricing estimates look wrong.
 - Use `usage_summary` for high-level totals by date, model, effort, cwd, thread, or session.
 - Use `usage_query` for stable JSON rows filtered by date, project, model, effort, thread, pricing status, token minimums, or Codex credit minimums.
+- Use `usage_status` for dashboard/index freshness, active/scoped/total row counts, latest refresh timestamp, and observed allowance windows.
+- Use `usage_calls` for the same aggregate Calls table rows as the React dashboard, including pagination, filters, derived pricing status, and credit confidence.
+- Use `usage_call_detail` for the aggregate Call Investigator payload for one `record_id`. Use `usage_call_context` only for explicit raw-context requests.
+- Use `usage_threads` for the same aggregate Threads table rows as the dashboard.
+- Use `usage_report_pack` for dashboard report cards plus compact evidence rows when the user wants less cloudy "what should I inspect?" output.
+- Use `usage_dashboard_recommendations` when the dashboard-specific recommendation payload is more useful than the older markdown-oriented recommendation report.
 - Use `usage_recommendations` when the user asks what to inspect next or wants ranked action items by aggregate severity.
 - Use `usage_summary` presets `today`, `last-7-days`, `by-model`, `by-cwd`, `by-thread`, and `expensive` for common requests.
 - Use `usage_pricing_coverage` when the user asks whether costs are fully priced or which models use estimated or missing pricing.

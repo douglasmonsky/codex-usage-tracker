@@ -33,12 +33,16 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     allowance_path = tmp_path / "allowance.json"
     projects_path = tmp_path / "projects.json"
+    rate_card_path = tmp_path / "rate-card.json"
+    thresholds_path = tmp_path / "thresholds.json"
     monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
     monkeypatch.setattr(mcp_server, "DEFAULT_DB_PATH", db_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_DASHBOARD_PATH", dashboard_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_PRICING_PATH", pricing_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_ALLOWANCE_PATH", allowance_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_PROJECTS_PATH", projects_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_RATE_CARD_PATH", rate_card_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_THRESHOLDS_PATH", thresholds_path)
     monkeypatch.setattr(mcp_server, "update_pricing_from_openai_docs", _fake_pricing_update)
 
     refresh = mcp_server.refresh_usage_index()
@@ -64,6 +68,26 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
+    status_json = mcp_server.usage_status()
+    calls_json = mcp_server.usage_calls(
+        model="gpt-5.5",
+        limit=1,
+        privacy_mode="strict",
+    )
+    call_detail_json = mcp_server.usage_call_detail(
+        record_id=record_id,
+        privacy_mode="strict",
+    )
+    threads_json = mcp_server.usage_threads(limit=2)
+    dashboard_recommendations_json = mcp_server.usage_dashboard_recommendations(
+        limit=2,
+        privacy_mode="strict",
+    )
+    report_pack_json = mcp_server.usage_report_pack(
+        limit=2,
+        evidence_limit=1,
+        privacy_mode="strict",
+    )
     context_disabled = mcp_server.usage_call_context(record_id=record_id)
     context_disabled_json = json.loads(context_disabled)
     monkeypatch.setenv("CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT", "1")
@@ -85,6 +109,12 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         recommendations_json,
         pricing_coverage_json,
         session_json,
+        status_json,
+        calls_json,
+        call_detail_json,
+        threads_json,
+        dashboard_recommendations_json,
+        report_pack_json,
         context_disabled_json,
         context_json,
         dashboard,
@@ -120,6 +150,23 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2
+    assert status_json["schema"] == "codex-usage-tracker-status-v1"
+    assert status_json["row_counts"]["active_rows"] >= 2
+    assert calls_json["schema"] == "codex-usage-tracker-calls-v1"
+    assert calls_json["row_count"] == 1
+    assert calls_json["total_matched_rows"] > calls_json["row_count"]
+    assert calls_json["rows"][0]["cwd"].startswith("[redacted cwd:")
+    assert calls_json["raw_context_included"] is False
+    assert call_detail_json["schema"] == "codex-usage-tracker-call-v1"
+    assert call_detail_json["record"]["record_id"] == record_id
+    assert call_detail_json["raw_context_included"] is False
+    assert "SECRET RAW PROMPT" not in json.dumps(call_detail_json)
+    assert threads_json["schema"] == "codex-usage-tracker-threads-v1"
+    assert threads_json["row_count"] >= 1
+    assert dashboard_recommendations_json["schema"] == "codex-usage-tracker-recommendations-v1"
+    assert dashboard_recommendations_json["row_count"] >= 1
+    assert report_pack_json["schema"] == "codex-usage-tracker-reports-pack-v1"
+    assert report_pack_json["evidence"]["cost-curves"]["raw_context_included"] is False
     assert "Raw context loading through MCP is disabled" in context_disabled
     assert context_disabled_json["schema"] == "codex-usage-tracker-context-disabled-v1"
     assert "SECRET RAW PROMPT" not in context_disabled

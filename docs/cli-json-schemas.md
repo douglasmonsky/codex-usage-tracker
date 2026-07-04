@@ -46,8 +46,8 @@ Tracked schema ids:
 | `codex-usage-tracker-reset-db-v1` | CLI `reset-db --yes --json` |
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
-| `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")` |
-| `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response |
+| `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
+| `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response, MCP `usage_report_pack(...)` |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
@@ -65,10 +65,10 @@ Tracked schema ids:
 | `codex-usage-tracker-context-settings-v1` | Dashboard server `/api/context-settings` response |
 | `codex-usage-tracker-open-investigator-v1` | Dashboard server `/api/open-investigator` response |
 | `codex-usage-tracker-live-api-v1` | Dashboard server live API payload family marker |
-| `codex-usage-tracker-status-v1` | Dashboard server `/api/status` response |
-| `codex-usage-tracker-calls-v1` | Dashboard server `/api/calls` response |
-| `codex-usage-tracker-call-v1` | Dashboard server `/api/call` response |
-| `codex-usage-tracker-threads-v1` | Dashboard server `/api/threads` response |
+| `codex-usage-tracker-status-v1` | Dashboard server `/api/status` response, MCP `usage_status()` |
+| `codex-usage-tracker-calls-v1` | Dashboard server `/api/calls` response, MCP `usage_calls(...)` |
+| `codex-usage-tracker-call-v1` | Dashboard server `/api/call` response, MCP `usage_call_detail(record_id=...)` |
+| `codex-usage-tracker-threads-v1` | Dashboard server `/api/threads` response, MCP `usage_threads(...)` |
 | `codex-usage-tracker-thread-calls-v1` | Dashboard server `/api/thread-calls` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
