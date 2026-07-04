@@ -218,15 +218,15 @@ it('loads the next finite row batch from recent calls controls', async () => {
 
 expect(screen.getAllByText('Loaded 500 of 900').length).toBeGreaterThan(0);
 expect(screen.getByText('Most recent 500 calls')).toBeInTheDocument();
-expect(screen.getByRole('button', { name: 'Load more rows' })).toBeEnabled();
-fireEvent.click(screen.getByRole('button', { name: 'Load more rows' }));
+    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Load more recent calls' }));
 
   expect(await screen.findByText('row-batch-after-thread')).toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   expect(String(fetchMock.mock.calls[0][0])).toContain('limit=1500');
   expect(screen.getByLabelText('Rows to load')).toHaveValue(1500);
 expect(screen.getAllByText('Loaded 1,500 rows').length).toBeGreaterThan(0);
-expect(screen.getByRole('button', { name: 'Load more rows' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeDisabled();
 expect(screen.getByRole('button', { name: /^Load more$/i })).toBeDisabled();
 });
 

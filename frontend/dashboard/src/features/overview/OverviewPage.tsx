@@ -66,6 +66,9 @@ export function OverviewPage({
   const visibleCalls = useMemo(() => overviewCallsForQuery(model.calls, globalQuery), [globalQuery, model.calls]);
   const recentCalls = visibleCalls.slice(0, recentVisibleCount);
   const hiddenLoadedRecentCalls = Math.max(0, visibleCalls.length - recentCalls.length);
+  const hasMoreDashboardRows = canLoadMoreRows || runtime.totalAvailableRows > runtime.loadedRowCount;
+  const recentRowsStatus = `Showing ${formatNumber(recentCalls.length)} of ${formatNumber(visibleCalls.length)} loaded calls`;
+  const dashboardRowsStatus = `Dashboard rows: ${formatNumber(runtime.loadedRowCount)} of ${formatNumber(runtime.totalAvailableRows)} loaded`;
   const recentCallsSubtitle = exportStatus
     ? `${exportStatus} - ${recentCallsBasis(recentCalls.length, visibleCalls.length, runtime, Boolean(globalQuery.trim()))}`
     : `${recentCallsBasis(recentCalls.length, visibleCalls.length, runtime, Boolean(globalQuery.trim()))} - ${refreshState}`;
@@ -140,21 +143,29 @@ export function OverviewPage({
         />
         <div className="table-window-footer recent-calls-footer">
           <span>
-            Showing {formatNumber(recentCalls.length)} of {formatNumber(visibleCalls.length)} loaded calls
+            {recentRowsStatus}
+            <small>{dashboardRowsStatus}</small>
           </span>
           <div className="panel-action-group">
+            {hiddenLoadedRecentCalls ? (
+              <button className="table-action-button" type="button" onClick={showMoreRecentCalls}>
+                Show {formatNumber(Math.min(25, hiddenLoadedRecentCalls))} more loaded calls
+              </button>
+            ) : null}
             <button
               className="table-action-button"
               type="button"
-              onClick={showMoreRecentCalls}
-              disabled={!hiddenLoadedRecentCalls}
+              onClick={onLoadMoreRows}
+              disabled={!canLoadMoreRows || refreshing}
             >
-              Show {formatNumber(Math.min(25, hiddenLoadedRecentCalls || 25))} more calls
+              {refreshing ? 'Loading recent calls...' : 'Load more recent calls'}
             </button>
-            <button className="table-action-button" type="button" onClick={onLoadMoreRows} disabled={!canLoadMoreRows || refreshing}>
-              {refreshing ? 'Loading rows...' : 'Load more rows'}
-            </button>
-            <button className="table-action-button" type="button" onClick={onLoadAllRows} disabled={!canLoadAllRows || refreshing}>
+            <button
+              className="table-action-button"
+              type="button"
+              onClick={onLoadAllRows}
+              disabled={!canLoadAllRows || refreshing || !hasMoreDashboardRows}
+            >
               Load all rows
             </button>
           </div>

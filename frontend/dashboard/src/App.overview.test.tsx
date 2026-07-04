@@ -73,8 +73,48 @@ expect(params.get(name)).toBeNull();
     expect(within(recentCallsTable).getByRole('columnheader', { name: /Thread/i })).toHaveClass('sticky-column');
     expect(within(recentCallsTable).getByText('live-overview-thread').closest('td')).toHaveClass('sticky-column');
     expect(screen.getByText('Showing 1 of 1 loaded calls')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard rows: 1 of 1 loaded')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeDisabled();
     expect(screen.getAllByRole('button', { name: /Load all rows/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText('32.4%')).not.toBeInTheDocument();
     expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();
+  });
+
+  it('separates showing loaded recent calls from loading more dashboard rows', () => {
+    window.__CODEX_USAGE_BOOT__ = {
+      api_token: 'overview-load-token',
+      context_api_enabled: true,
+      loaded_row_count: 8,
+      total_available_rows: 20,
+      has_more: true,
+      limit: 8,
+      history_scope: 'active',
+      rows: Array.from({ length: 8 }, (_, index) => ({
+        record_id: `overview-load-row-${index}`,
+        call_started_at: new Date(Date.UTC(2026, 6, 2, 10, index)).toISOString(),
+        thread_name: `overview-load-thread-${index}`,
+        model: 'codex-1',
+        effort: 'medium',
+        input_tokens: 100 + index,
+        cached_input_tokens: 40,
+        output_tokens: 10,
+        total_tokens: 110 + index,
+        estimated_cost_usd: 0.01,
+      })),
+    };
+
+    render(<App />);
+
+    const recentCallsTable = screen.getByRole('table', { name: 'Recent calls' });
+    expect(within(recentCallsTable).getByRole('columnheader', { name: /Thread/i })).toHaveClass('sticky-column');
+    expect(within(recentCallsTable).getByText('overview-load-thread-0').closest('td')).toHaveClass('sticky-column');
+    expect(screen.getByText('Showing 6 of 8 loaded calls')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard rows: 8 of 20 loaded')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show 2 more loaded calls' }));
+
+    expect(screen.getByText('overview-load-thread-7')).toBeInTheDocument();
+    expect(screen.getByText('Showing 8 of 8 loaded calls')).toBeInTheDocument();
   });
 });
