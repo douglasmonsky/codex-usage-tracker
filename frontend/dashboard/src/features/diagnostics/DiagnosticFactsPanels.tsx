@@ -72,6 +72,9 @@ export function StructuredFactsPanel({
   onFactSortChange,
   onSelectSource,
   onSelectFact,
+  canLoadMoreFacts,
+  loadingMoreFacts,
+  onLoadMoreFacts,
   onOpenInvestigator,
   onCopyCallLink,
 }: {
@@ -84,6 +87,9 @@ export function StructuredFactsPanel({
   onFactSortChange: (sort: FactSortState) => void;
   onSelectSource: (key: DiagnosticFactSourceKey) => void;
   onSelectFact: (fact: DiagnosticFactRow) => void;
+  canLoadMoreFacts: boolean;
+  loadingMoreFacts: boolean;
+  onLoadMoreFacts: () => void;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 }) {
@@ -251,7 +257,7 @@ export function StructuredFactsPanel({
           <p className="empty-state">No diagnostic facts matched the current aggregate data.</p>
         )}
       </div>
-      {facts.length > FACT_PREVIEW_COUNT ? (
+      {facts.length > FACT_PREVIEW_COUNT || canLoadMoreFacts ? (
         <div className="child-load-more diagnostics-fact-load-more">
           <span>
           Showing {formatNumber(visibleFacts.length)} of {formatNumber(loadedFactCount)} loaded facts
@@ -270,6 +276,11 @@ export function StructuredFactsPanel({
               }
             >
               Show {formatNumber(Math.min(FACT_PREVIEW_COUNT, hiddenFactCount))} more
+            </button>
+          ) : null}
+          {canLoadMoreFacts ? (
+            <button className="pager-button" type="button" onClick={onLoadMoreFacts} disabled={loadingMoreFacts}>
+              {loadingMoreFacts ? 'Loading more facts...' : 'Load more live facts'}
             </button>
           ) : null}
         </div>

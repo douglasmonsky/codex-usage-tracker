@@ -210,7 +210,10 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
       });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/api/diagnostics/facts?')) return factPayload('cache', 'large_uncached_input', 10_000, 8, 12);
+      if (url.includes('/api/diagnostics/facts?')) {
+        const params = new URL(`http://local.test${url}`).searchParams;
+        return factPayload('cache', 'large_uncached_input', 10_000, params.get('limit') === '12' ? 12 : 8, 12);
+      }
       if (url.includes('/api/diagnostics/tools?')) return factPayload('tool', 'function_call', 44_000);
       if (url.includes('/api/diagnostics/compactions?')) {
         return factPayload('compaction', 'compacted_history', 18_000);
@@ -248,6 +251,19 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     expect(screen.queryByText(/large_uncached_input_8/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Show 2 more/i }));
     expect(screen.getByText(/large_uncached_input_8/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Load more live facts$/i }));
+    await waitFor(() => expect(
+      fetchMock.mock.calls.some(([input]) => {
+        const url = String(input);
+        return url.includes('/api/diagnostics/facts?') && url.includes('limit=12');
+      }),
+    ).toBe(true));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Load more live facts$/i })).not.toBeInTheDocument());
+    const showMoreLoadedFacts = screen.queryByRole('button', { name: /Show \d+ more/i });
+    if (showMoreLoadedFacts) {
+      fireEvent.click(showMoreLoadedFacts);
+    }
+    expect(screen.getByText(/large_uncached_input_12/i)).toBeInTheDocument();
     const factRequestCount = fetchMock.mock.calls.filter(([input]) =>
       String(input).includes('/api/diagnostics/facts?'),
     ).length;

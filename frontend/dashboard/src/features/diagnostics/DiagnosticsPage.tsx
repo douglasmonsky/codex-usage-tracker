@@ -58,6 +58,7 @@ export function DiagnosticsPage({
   const [factStates, setFactStates] = useState<FactSourceStateMap>(() => cachedFactStates(contextRuntime, {}));
   const [factSortStates, setFactSortStates] = useState<FactSortStateMap>({});
   const [selectedFactKey, setSelectedFactKey] = useState('');
+  const [loadingMoreFactSourceKey, setLoadingMoreFactSourceKey] = useState<DiagnosticFactSourceKey | null>(null);
   const [factCallSort, setFactCallSort] = useState<FactCallSortState>({ key: 'tokens', direction: 'desc' });
   const [factCallsState, setFactCallsState] = useState<FactCallsState>({
     status: 'idle',
@@ -88,6 +89,10 @@ export function DiagnosticsPage({
   const selectedFactCalls = liveFactCallsResult && usingLiveFacts ? liveFactCallsResult.calls : fallbackFactCalls;
   const activeFactSource =
     diagnosticFactSourceDefinitions.find(source => source.key === factSourceKey) ?? diagnosticFactSourceDefinitions[0];
+  const loadedFactCount = factState.status === 'loaded' ? (factState.payload.rows?.length ?? 0) : 0;
+  const matchedFactCount = factState.status === 'loaded' ? Number(factState.payload.total_matched_rows ?? loadedFactCount) : loadedFactCount;
+  const canLoadMoreFacts =
+    usingLiveFacts && factState.status === 'loaded' && matchedFactCount > loadedFactCount;
   const factStatusNoun = activeFactSource.key === 'facts' ? 'facts' : activeFactSource.label.toLowerCase();
   const factStatusLabel =
     factState.status === 'loaded'
@@ -229,6 +234,33 @@ export function DiagnosticsPage({
     }
   }
 
+  async function loadMoreFacts() {
+    if (!contextRuntime.apiToken || contextRuntime.fileMode || factState.status !== 'loaded' || loadingMoreFactSourceKey) return;
+    const currentRows = factState.payload.rows ?? [];
+    const totalMatched = Math.max(Number(factState.payload.total_matched_rows ?? currentRows.length), currentRows.length);
+    const nextLimit = Math.min(Math.max(currentRows.length + activeFactSource.limit, activeFactSource.limit), totalMatched);
+    if (nextLimit <= currentRows.length) return;
+    setLoadingMoreFactSourceKey(factSourceKey);
+    try {
+      const payload = await loadDiagnosticFactSource(factSourceKey, contextRuntime, {
+        limit: nextLimit,
+        sort: factSort.key,
+        direction: factSort.direction,
+      });
+      setFactStates(current => ({
+        ...current,
+        [factSourceKey]: { status: 'loaded', payload },
+      }));
+    } catch (error) {
+      setFactStates(current => ({
+        ...current,
+        [factSourceKey]: { status: 'error', message: errorMessage(error) },
+      }));
+    } finally {
+      setLoadingMoreFactSourceKey(null);
+    }
+  }
+
   function selectFactSource(sourceKey: DiagnosticFactSourceKey) {
     setFactSourceKey(sourceKey);
     setSelectedFactKey('');
@@ -307,6 +339,9 @@ export function DiagnosticsPage({
         onFactSortChange={sort => setFactSortStates(current => ({ ...current, [factSourceKey]: sort }))}
         onSelectSource={selectFactSource}
         onSelectFact={selectFact}
+        canLoadMoreFacts={canLoadMoreFacts}
+        loadingMoreFacts={loadingMoreFactSourceKey === factSourceKey}
+        onLoadMoreFacts={loadMoreFacts}
         onOpenInvestigator={onOpenInvestigator}
         onCopyCallLink={onCopyCallLink}
       />

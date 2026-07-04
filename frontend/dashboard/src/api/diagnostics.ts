@@ -141,6 +141,8 @@ export type DiagnosticFactCallSortKey =
 export type DiagnosticSortDirection = 'asc' | 'desc';
 
 export type DiagnosticFactsOptions = {
+  limit?: number;
+  offset?: number;
   sort?: DiagnosticFactSortKey;
   direction?: DiagnosticSortDirection;
 };
@@ -232,7 +234,9 @@ export function cachedDiagnosticFactSource(
   const definition = diagnosticFactSourceDefinitions.find(candidate => candidate.key === sourceKey) ?? diagnosticFactSourceDefinitions[0];
   const sort = normalizeDiagnosticFactSortKey(options.sort ?? 'uncached');
   const direction = options.direction ?? 'desc';
-  return resolvedCachedValue(diagnosticFactsCache, factSourceCacheKey(definition.key, runtime, sort, direction));
+  const limit = Math.max(1, Math.round(options.limit ?? definition.limit));
+  const offset = Math.max(0, Math.round(options.offset ?? 0));
+  return resolvedCachedValue(diagnosticFactsCache, factSourceCacheKey(definition.key, runtime, limit, offset, sort, direction));
 }
 
 export async function loadDiagnosticFactSource(
@@ -245,9 +249,12 @@ export async function loadDiagnosticFactSource(
     diagnosticFactSourceDefinitions.find(candidate => candidate.key === sourceKey) ?? diagnosticFactSourceDefinitions[0];
   const sort = normalizeDiagnosticFactSortKey(options.sort ?? 'uncached');
   const direction = options.direction ?? 'desc';
-  return cachedRequest(diagnosticFactsCache, factSourceCacheKey(definition.key, runtime, sort, direction), async () => {
+  const limit = Math.max(1, Math.round(options.limit ?? definition.limit));
+  const offset = Math.max(0, Math.round(options.offset ?? 0));
+  return cachedRequest(diagnosticFactsCache, factSourceCacheKey(definition.key, runtime, limit, offset, sort, direction), async () => {
     const params = new URLSearchParams({
-      limit: String(definition.limit),
+      limit: String(limit),
+      offset: String(offset),
       sort,
       direction,
       _: String(Date.now()),
@@ -387,10 +394,12 @@ function runtimeCacheKey(runtime: ContextRuntime): string {
 function factSourceCacheKey(
   sourceKey: DiagnosticFactSourceKey,
   runtime: ContextRuntime,
+  limit: number,
+  offset: number,
   sort: DiagnosticFactSortKey,
   direction: DiagnosticSortDirection,
 ): string {
-  return ['facts', sourceKey, runtimeCacheKey(runtime), sort, direction].join(':');
+  return ['facts', sourceKey, runtimeCacheKey(runtime), limit, offset, sort, direction].join(':');
 }
 
 function normalizeDiagnosticFactSortKey(sort: DiagnosticFactSortKey): DiagnosticFactSortKey {
