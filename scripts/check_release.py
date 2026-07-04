@@ -65,6 +65,41 @@ SECRET_PATTERNS = {
     "GitHub token": re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}"),
     "Google API key": re.compile(r"\bAI" r"za[0-9A-Za-z_-]{20,}"),
 }
+REACT_DASHBOARD_PRIVACY_SCAN_ROOTS = [
+    "frontend/dashboard/src",
+    "src/codex_usage_tracker/plugin_data/dashboard/react",
+    "docs/frontend-rewrite-roadmap.md",
+    "docs/react-dashboard-0.14-release-roadmap.md",
+]
+REACT_DASHBOARD_PRIVACY_FILE_SUFFIXES = {
+    ".css",
+    ".html",
+    ".js",
+    ".json",
+    ".md",
+    ".ts",
+    ".tsx",
+}
+REACT_DASHBOARD_PRIVACY_PATTERNS = {
+    "raw context persisted in React dashboard artifact": re.compile(
+        r"\braw_context_persisted\b[\"']?\s*[:=]\s*true",
+        re.IGNORECASE,
+    ),
+    "raw context included in React dashboard artifact": re.compile(
+        r"\braw_context_included\b[\"']?\s*[:=]\s*true",
+        re.IGNORECASE,
+    ),
+    "local Codex session JSONL path in React dashboard artifact": re.compile(
+        r"(?:^|[\"'\s])[^\"'\s]*\.codex/sessions/[^\"'\s]+\.jsonl",
+    ),
+    "patch transcript marker in React dashboard artifact": re.compile(r"\*\*\* Begin Patch"),
+    "raw assistant message JSONL shape in React dashboard artifact": re.compile(
+        r'"role"\s*:\s*"assistant"\s*,\s*"content"\s*:\s*\[',
+    ),
+    "raw user message JSONL shape in React dashboard artifact": re.compile(
+        r'"role"\s*:\s*"user"\s*,\s*"content"\s*:\s*\[',
+    ),
+}
 REQUIRED_FILES = [
     "README.md",
     "LICENSE",
@@ -216,6 +251,7 @@ def main() -> int:
     failures.extend(_check_issue_templates())
     failures.extend(_check_packaging_metadata())
     failures.extend(_check_tracked_files_for_secrets())
+    failures.extend(_check_react_dashboard_privacy_artifacts())
     if args.dist:
         failures.extend(_check_sdist())
         failures.extend(_check_wheel())
@@ -579,6 +615,39 @@ def _check_tracked_files_for_secrets() -> list[str]:
             if pattern.search(text):
                 failures.append(f"possible {label} in tracked file: {path.relative_to(REPO_ROOT)}")
     return failures
+
+
+def _check_react_dashboard_privacy_artifacts() -> list[str]:
+    failures: list[str] = []
+    for path in _react_dashboard_privacy_scan_files():
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for label, pattern in REACT_DASHBOARD_PRIVACY_PATTERNS.items():
+            if pattern.search(text):
+                failures.append(f"possible {label}: {path.relative_to(REPO_ROOT)}")
+    return failures
+
+
+def _react_dashboard_privacy_scan_files() -> list[Path]:
+    files: list[Path] = []
+    for relative_root in REACT_DASHBOARD_PRIVACY_SCAN_ROOTS:
+        root = REPO_ROOT / relative_root
+        if root.is_file():
+            candidates = [root]
+        elif root.is_dir():
+            candidates = [path for path in root.rglob("*") if path.is_file()]
+        else:
+            continue
+        files.extend(
+            path
+            for path in candidates
+            if path.suffix in REACT_DASHBOARD_PRIVACY_FILE_SUFFIXES
+            and "__pycache__" not in path.parts
+            and "node_modules" not in path.parts
+        )
+    return sorted(set(files))
 
 
 def _tracked_files() -> list[Path]:

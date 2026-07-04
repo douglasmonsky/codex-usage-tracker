@@ -25,6 +25,7 @@ def dashboard_shell_payload(
     context_api_enabled: bool,
     include_archived_default: bool,
     language_default: str,
+    limit_default: int,
 ) -> dict[str, object]:
     """Build the lightweight shell payload served before live hydration."""
     params = parse_qs(query)
@@ -35,7 +36,7 @@ def dashboard_shell_payload(
     language = normalize_language(first_query_value(params.get("lang")) or language_default)
     return dashboard_payload(
         db_path=db_path,
-        limit=0,
+        limit=limit_default,
         offset=0,
         pricing_path=pricing_path,
         allowance_path=allowance_path,

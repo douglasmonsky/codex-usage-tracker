@@ -26,15 +26,15 @@ def test_open_investigator_payload_opens_safe_relative_dashboard_url() -> None:
     assert payload == {
         "schema": OPEN_INVESTIGATOR_SCHEMA,
         "opened": True,
-        "url": "http://127.0.0.1:8898/dashboard.html?view=call&record=abc",
+        "url": "http://127.0.0.1:8898/react-dashboard.html?view=call&record=abc",
     }
-    assert opened_urls == ["http://127.0.0.1:8898/dashboard.html?view=call&record=abc"]
+    assert opened_urls == ["http://127.0.0.1:8898/react-dashboard.html?view=call&record=abc"]
 
 
 def test_open_investigator_payload_preserves_fragment() -> None:
     opened_urls: list[str] = []
     target = quote(
-        "http://127.0.0.1:8898/dashboard.html?view=call&record=abc#section",
+        "http://127.0.0.1:8898/react-dashboard.html?view=call&record=abc#section",
         safe="",
     )
 
@@ -47,8 +47,28 @@ def test_open_investigator_payload_preserves_fragment() -> None:
     )
 
     assert payload["opened"] is False
-    assert payload["url"] == "http://localhost:8898/dashboard.html?view=call&record=abc#section"
-    assert opened_urls == ["http://localhost:8898/dashboard.html?view=call&record=abc#section"]
+    assert payload["url"] == "http://localhost:8898/react-dashboard.html?view=call&record=abc#section"
+    assert opened_urls == ["http://localhost:8898/react-dashboard.html?view=call&record=abc#section"]
+
+
+def test_open_investigator_payload_accepts_preferred_react_dashboard_url() -> None:
+    opened_urls: list[str] = []
+    target = quote(
+        "http://127.0.0.1:8898/react-dashboard.html?view=call&record=abc&return=calls",
+        safe="",
+    )
+
+    payload = open_investigator_payload(
+        f"url={target}",
+        request_host="127.0.0.1:8898",
+        server_port=8898,
+        dashboard_name="dashboard.html",
+        open_new_tab=lambda url: opened_urls.append(url) or True,
+    )
+
+    expected = "http://127.0.0.1:8898/react-dashboard.html?view=call&record=abc&return=calls"
+    assert payload["url"] == expected
+    assert opened_urls == [expected]
 
 
 @pytest.mark.parametrize(

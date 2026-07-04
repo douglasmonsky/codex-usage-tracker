@@ -1,6 +1,7 @@
 import type { DashboardModel } from '../api/types';
 
 const weeklyLabels = ['May 12', 'May 19', 'May 26', 'Jun 02', 'Jun 09', 'Jun 16', 'Jun 23', 'Jun 30'];
+const cacheHeatmapLabels = weeklyLabels.slice(2);
 
 export const fixtureModel: DashboardModel = {
   contextRuntime: {
@@ -126,6 +127,8 @@ export const fixtureModel: DashboardModel = {
     return {
       id: `fixture-call-${index}`,
       rawTime: String(time),
+      eventTimestamp: String(time),
+      callStartedAt: String(time),
       time: String(time),
       thread: String(thread),
       model: String(model),
@@ -134,19 +137,56 @@ export const fixtureModel: DashboardModel = {
       output: outputTokens,
       reasoningOutput: Math.round(outputTokens * 0.2),
       totalTokens: inputTokens + outputTokens,
+      cachedInput: Math.round(inputTokens * cachedPercent / 100),
       uncachedInput,
       cachedPct: cachedPercent,
-      cost: Number(cost),
-      credits: Number(cost) * 25,
+      cost: index === 4 ? 0 : Number(cost),
+      credits: (index === 4 ? 0 : Number(cost)) * 25,
       duration: String(duration),
       durationSeconds: Number.parseFloat(String(duration)) || 0,
+      previousCallGap: index === 0 ? '-' : `${index * 7}m 0s`,
+      previousCallEventTimestamp: index === 0 ? '' : `2026-06-01T09:${String(40 + index).padStart(2, '0')}:00Z`,
+      previousCallGapSeconds: index * 420,
+      initiator: index % 3 === 0 ? 'user' : index % 3 === 1 ? 'assistant' : 'tool',
+      initiatorReason: index % 3 === 0 ? 'direct user request' : index % 3 === 1 ? 'assistant follow-up' : 'tool-driven continuation',
+      initiatorConfidence: index % 2 === 0 ? 'exact' : 'estimated',
       fast: Boolean(fast),
-      usageCreditConfidence: 'fixture',
-      pricingEstimated: false,
+usageCreditConfidence: index === 7 ? 'user_override' : index % 4 === 0 ? 'exact' : index % 4 === 1 ? 'estimated' : index % 4 === 2 ? 'missing' : 'fixture',
+usageCreditModel: index === 4 ? '' : `${model}-credits`,
+usageCreditSource: index === 4 ? '' : 'fixture-rate-card',
+usageCreditFetchedAt: index === 4 ? '' : '2026-06-01T10:00:00Z',
+    usageCreditTier: index % 2 === 0 ? 'standard' : 'estimated',
+    usageCreditNote: index === 2 ? 'fixture inherited rate card' : '',
+pricingModel: index === 4 ? '' : `${model}-pricing`,
+pricingEstimated: index === 1 || index === 5,
       signal: uncachedInput > 50_000 ? 'cache-risk' : 'aggregate',
       recommendation: uncachedInput > 50_000 ? 'Review uncached aggregate input before continuing this thread.' : '',
       tags: tags as string[],
-    };
+    sessionId: `fixture-session-${index}`,
+    turnId: `fixture-turn-${index}`,
+    parentSessionId: index % 3 === 0 ? 'fixture-parent-session' : '',
+    parentSessionUpdatedAt: index % 3 === 0 ? '2026-06-01T09:30:00Z' : '',
+    parentThread: index % 3 === 0 ? 'parent-thread-analysis' : '',
+    threadAttachmentLabel: index % 3 === 0 ? 'spawned child thread' : 'direct active thread',
+    threadSource: index % 3 === 0 ? 'subagent' : 'user',
+    subagentType: index % 3 === 0 ? 'analysis' : '',
+    agentRole: index % 3 === 0 ? 'reviewer' : '',
+    agentNickname: index % 3 === 0 ? 'usage-reviewer' : '',
+    project: index % 2 === 0 ? 'codex-usage-tracker' : 'local-ops',
+    projectRelativeCwd: index % 2 === 0 ? 'frontend/dashboard' : '.',
+    projectTags: index % 2 === 0 ? ['dashboard', 'rewrite'] : ['local'],
+    cwd: `/fixtures/${index % 2 === 0 ? 'codex-usage-tracker' : 'local-ops'}`,
+      sourceFile: `fixture-thread-${index}.jsonl`,
+      lineNumber: 120 + index,
+      gitBranch: 'experiment/frontend-rewrite',
+      gitRemoteLabel: 'origin',
+      gitRemoteHash: `fixture-${index}`,
+contextWindowPct: Math.min(18 + cachedPercent, 96),
+modelContextWindow: 128_000,
+cumulativeTotalTokens: inputTokens + outputTokens + index * 10_000,
+estimatedCacheSavings: Math.round((inputTokens - uncachedInput) * 0.00001 * 100) / 100,
+efficiencyFlags: uncachedInput > 50_000 ? ['cache-risk'] : [],
+};
   }),
   threads: [
     ['thread-9f3a', 142, 58_400, 8.76, 12, 1.38, 'High', 42],
@@ -156,16 +196,39 @@ export const fixtureModel: DashboardModel = {
     ['thread-b7f0', 41, 13_600, 1.65, 47, 0.73, 'Low', 75],
     ['thread-3c5d', 36, 9_900, 1.18, 35, 0.66, 'Medium', 63],
     ['thread-0e16', 28, 6_400, 0.72, 56, 0.58, 'Low', 82],
-  ].map(([name, turns, totalTokens, cost, cachePct, costPerCall, coldResumeRisk, productivity]) => ({
-    name: String(name),
-    turns: Number(turns),
-    totalTokens: Number(totalTokens),
-    cost: Number(cost),
-    cachePct: Number(cachePct),
-    costPerCall: Number(costPerCall),
-    coldResumeRisk: coldResumeRisk as 'High' | 'Medium' | 'Low',
-    productivity: Number(productivity),
-  })),
+  ].map(([name, turns, totalTokens, cost, cachePct, costPerCall, coldResumeRisk, productivity], index) => {
+    const threadTurns = Number(turns);
+    const threadTokens = Number(totalTokens);
+    const threadCachePct = Number(cachePct);
+    const totalDurationSeconds = threadTurns * 48;
+    const averageGapSeconds = (index + 1) * 420;
+    return {
+      name: String(name),
+      latestCallId: `fixture-call-${index}`,
+      latestActivity: `Jun ${index + 1}, 10:${String(24 - index).padStart(2, '0')} AM`,
+      latestActivityRaw: `2026-06-${String(index + 1).padStart(2, '0')}T10:${String(24 - index).padStart(2, '0')}:00Z`,
+      turns: threadTurns,
+      totalDurationSeconds,
+      totalDuration: `${Math.floor(totalDurationSeconds / 60)}m ${totalDurationSeconds % 60}s`,
+      averageGapSeconds,
+      averageGap: `${Math.floor(averageGapSeconds / 60)}m ${averageGapSeconds % 60}s`,
+      initiatorSummary: index % 2 === 0 ? 'user x4, assistant x2' : 'assistant x3, tool x1',
+      modelSummary: index % 2 === 0 ? 'codex-1 x5, o4-mini x2' : 'o4-mini x3, o3 x1',
+      effortSummary: index % 2 === 0 ? 'high x5, medium x2' : 'medium x3, low x1',
+      totalTokens: threadTokens,
+      cachedInput: Math.round(threadTokens * threadCachePct / 100),
+      uncachedInput: Math.round(threadTokens * Math.max(100 - threadCachePct, 0) / 100),
+      outputTokens: Math.round(threadTokens * 0.28),
+      reasoningOutput: Math.round(threadTokens * 0.08),
+      cost: Number(cost),
+      credits: Number(cost) * 25,
+      cachePct: threadCachePct,
+      contextPct: Math.min(96, 28 + index * 7),
+      costPerCall: Number(costPerCall),
+      coldResumeRisk: coldResumeRisk as 'High' | 'Medium' | 'Low',
+      productivity: Number(productivity),
+    };
+  }),
   weeklyWindows: weeklyLabels.map((label, index) => ({
     week: label,
     plan: index === 0 ? 'Prolite' : 'Pro',
@@ -195,13 +258,13 @@ export const fixtureModel: DashboardModel = {
     { label: 'Cache write', value: 29.6, color: '#059669' },
     { label: 'Uncached', value: 31.7, color: '#7c3aed' },
   ],
-  cacheHeatmap: [
-    { thread: 'thread-8c1e', values: [62, 71, 89, 82, 74, 31] },
-    { thread: 'thread-2b9d', values: [42, 58, 77, 61, 51, 24] },
-    { thread: 'thread-713a', values: [78, 81, 83, 66, 59, 37] },
-    { thread: 'thread-4af2', values: [24, 36, 63, 54, 71, 44] },
-    { thread: 'thread-f9c3', values: [18, 25, 41, 38, 52, 22] },
-  ],
+cacheHeatmap: [
+{ thread: 'thread-8c1e', labels: cacheHeatmapLabels, values: [62, 71, 89, 82, 74, 31] },
+{ thread: 'thread-2b9d', labels: cacheHeatmapLabels, values: [42, 58, 77, 61, 51, 24] },
+{ thread: 'thread-713a', labels: cacheHeatmapLabels, values: [78, 81, 83, 66, 59, 37] },
+{ thread: 'thread-4af2', labels: cacheHeatmapLabels, values: [24, 36, 63, 54, 71, 44] },
+{ thread: 'thread-f9c3', labels: cacheHeatmapLabels, values: [18, 25, 41, 38, 52, 22] },
+],
   diagnostics: [
     {
       title: 'Usage Drain',

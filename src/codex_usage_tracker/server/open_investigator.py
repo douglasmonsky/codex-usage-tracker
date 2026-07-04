@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from codex_usage_tracker.server.utils import allowed_loopback_host, first_query_value
 
 OPEN_INVESTIGATOR_SCHEMA = "codex-usage-tracker-open-investigator-v1"
+REACT_DASHBOARD_PATH = "/react-dashboard.html"
 
 
 class OpenInvestigatorRequestError(ValueError):
@@ -31,7 +32,8 @@ def open_investigator_payload(
     parsed_target = urlparse(target)
     if parsed_target.scheme:
         _validate_absolute_target(parsed_target.scheme, parsed_target.hostname, parsed_target.port, server_port)
-    if parsed_target.path != f"/{dashboard_name}":
+    allowed_paths = {f"/{dashboard_name}", REACT_DASHBOARD_PATH}
+    if parsed_target.path not in allowed_paths:
         raise OpenInvestigatorRequestError("Only dashboard investigator URLs can be opened")
 
     target_params = parse_qs(parsed_target.query)
@@ -41,7 +43,7 @@ def open_investigator_payload(
         raise OpenInvestigatorRequestError("Investigator URL must include view=call and record")
 
     host = request_host or f"127.0.0.1:{server_port}"
-    safe_url = f"http://{host}{parsed_target.path}"
+    safe_url = f"http://{host}{REACT_DASHBOARD_PATH}"
     if parsed_target.query:
         safe_url = f"{safe_url}?{parsed_target.query}"
     if parsed_target.fragment:

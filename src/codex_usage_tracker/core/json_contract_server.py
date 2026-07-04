@@ -91,16 +91,28 @@ SERVER_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     'codex-usage-tracker-thread-calls-v1': {
-            "required": {
-                "thread_key": str,
-                "rows": list,
+        "required": {
+            "thread_key": str,
+            "rows": list,
                 "row_count": int,
                 "total_matched_rows": int,
                 "limit": (int, NoneType),
                 "offset": int,
                 "has_more": bool,
                 "next_offset": (int, NoneType),
-                "raw_context_included": bool,
-            }
-        },
+            "raw_context_included": bool,
+        }
+    },
+    'codex-usage-tracker-reports-pack-v1': {
+        "required": {
+            "reports": list,
+            "evidence": dict,
+            "row_count": int,
+            "total_matched_rows": int,
+            "limit": (int, NoneType),
+            "offset": int,
+            "filters": dict,
+            "raw_context_included": bool,
+        }
+    },
 }

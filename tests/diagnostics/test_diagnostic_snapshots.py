@@ -20,6 +20,7 @@ from codex_usage_tracker.diagnostics.snapshots import (
 )
 from codex_usage_tracker.store.api import (
     query_diagnostic_snapshot,
+    query_session_usage,
     refresh_usage_index,
     upsert_diagnostic_snapshot,
     upsert_usage_events,
@@ -316,6 +317,7 @@ def test_tool_output_and_command_snapshots_use_safe_aggregate_labels(
     )
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
 
     missing = build_diagnostic_tool_output_report(db_path=db_path).payload
     tool_output = build_diagnostic_tool_output_report(db_path=db_path, refresh=True).payload
@@ -335,13 +337,17 @@ def test_tool_output_and_command_snapshots_use_safe_aggregate_labels(
     assert functions["exec_command"]["calls"] == 2
     assert functions["exec_command"]["with_original_token_count"] == 1
     assert functions["exec_command"]["missing_original_token_count"] == 1
+    assert functions["exec_command"]["representative_record_id"] == record_id
     assert functions["write_stdin"]["original_token_sum"] == 5
+    assert functions["write_stdin"]["representative_record_id"] == record_id
     assert tool_output["missing_reasons"] == [{"name": "string_no_header", "count": 1}]
 
     command_rows = {row["root"]: row for row in commands["commands"]}
     assert command_rows["git"]["total"] == 1
+    assert command_rows["git"]["representative_record_id"] == record_id
     assert command_rows["git"]["children"][0] == {"child": "diff", "count": 1}
     assert command_rows["python"]["children"][0] == {"child": "-m:pytest", "count": 1}
+    assert command_rows["python"]["representative_record_id"] == record_id
     assert commands["summary"]["missing_command"] == 1
 
     serialized = json.dumps([tool_output, commands], sort_keys=True)
@@ -393,6 +399,7 @@ def test_git_interaction_snapshot_uses_safe_aggregate_operations(tmp_path: Path)
     )
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
 
     missing = build_diagnostic_git_interactions_report(db_path=db_path).payload
     git_interactions = build_diagnostic_git_interactions_report(
@@ -417,6 +424,7 @@ def test_git_interaction_snapshot_uses_safe_aggregate_operations(tmp_path: Path)
     }
     assert rows[("git", "status")]["category"] == "read_only"
     assert rows[("git", "status")]["mutability"] == "read_only"
+    assert rows[("git", "status")]["representative_record_id"] == record_id
     assert rows[("git", "diff")]["original_token_sum"] == 42
     assert rows[("git", "commit")]["missing_original_token_count"] == 1
     assert rows[("git", "push")]["category"] == "remote_ref"
@@ -489,6 +497,7 @@ def test_file_read_snapshots_allocate_tokens_and_correlate_later_modifications(
     )
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
 
     missing = build_diagnostic_file_reads_report(db_path=db_path).payload
     file_reads = build_diagnostic_file_reads_report(db_path=db_path, refresh=True).payload
@@ -513,18 +522,21 @@ def test_file_read_snapshots_allocate_tokens_and_correlate_later_modifications(
     assert by_reader["direct_file_read:cat"]["read_events"] == 3
     assert by_reader["direct_file_read:cat"]["events_missing_output_count"] == 1
     assert by_reader["direct_file_read:cat"]["allocated_output_token_sum"] == 90
+    assert by_reader["direct_file_read:cat"]["representative_record_id"] == record_id
     assert by_reader["search_path_scan:rg"]["allocated_output_token_sum"] == 80
     assert by_reader["search_path_scan:find"]["allocated_output_token_sum"] == 20
 
     paths = {row["path_label"]: row for row in file_reads["top_paths"]}
     assert paths["app.py"]["read_events"] == 3
     assert paths["app.py"]["allocated_output_token_sum"] == 85
+    assert paths["app.py"]["representative_record_id"] == record_id
     assert paths["readme.md"]["allocated_output_token_sum"] == 45
     assert paths["src"]["allocated_output_token_sum"] == 60
     assert paths["tests"]["allocated_output_token_sum"] == 40
 
     assert file_reads["largest_read_commands"][0]["root"] == "cat"
     assert file_reads["largest_read_commands"][0]["original_token_count"] == 90
+    assert file_reads["largest_read_commands"][0]["representative_record_id"] == record_id
 
     assert read_productivity["summary"]["read_events"] == 8
     assert read_productivity["summary"]["read_events_modified_later"] == 4
@@ -532,10 +544,12 @@ def test_file_read_snapshots_allocate_tokens_and_correlate_later_modifications(
     assert read_productivity["summary"]["unique_paths_modified_later"] == 2
     productivity_by_reader = {row["reader"]: row for row in read_productivity["by_reader"]}
     assert productivity_by_reader["direct_file_read:cat"]["read_events_modified_later"] == 2
+    assert productivity_by_reader["direct_file_read:cat"]["representative_record_id"] == record_id
     assert productivity_by_reader["direct_file_read:sed"]["read_events_modified_later"] == 1
     assert productivity_by_reader["direct_file_read:nl"]["read_events_modified_later"] == 1
     modified_paths = {row["path_label"]: row for row in read_productivity["top_modified_paths"]}
     assert modified_paths["app.py"]["read_events_modified_later"] == 3
+    assert modified_paths["app.py"]["representative_record_id"] == record_id
     assert modified_paths["readme.md"]["read_events_modified_later"] == 1
     assert "temporal correlations" in read_productivity["summary"]["correlation_note"]
 
@@ -610,6 +624,7 @@ def test_file_modification_snapshot_uses_safe_path_aggregates(tmp_path: Path) ->
     )
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
 
     missing = build_diagnostic_file_modifications_report(db_path=db_path).payload
     file_modifications = build_diagnostic_file_modifications_report(
@@ -628,6 +643,7 @@ def test_file_modification_snapshot_uses_safe_path_aggregates(tmp_path: Path) ->
 
     paths = {row["path_label"]: row for row in file_modifications["top_paths"]}
     assert paths["app.py"]["modification_events"] == 1
+    assert paths["app.py"]["representative_record_id"] == record_id
     assert paths["notes.md"]["modification_events"] == 1
     assert paths["readme.md"]["modification_events"] == 1
     assert paths["old.py"]["modification_events"] == 1
@@ -639,6 +655,7 @@ def test_file_modification_snapshot_uses_safe_path_aggregates(tmp_path: Path) ->
     assert extensions[".py"] == 4
     assert extensions[".md"] == 3
     assert file_modifications["largest_events"][0]["modified_path_count"] == 3
+    assert file_modifications["largest_events"][0]["representative_record_id"] == record_id
 
     serialized = json.dumps(file_modifications, sort_keys=True)
     assert "SECRET" not in serialized

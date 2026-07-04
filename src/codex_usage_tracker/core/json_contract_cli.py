@@ -138,6 +138,8 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "host": str,
                 "port": int,
                 "dashboard_path": str,
+                "dashboard_url": str,
+                "legacy_dashboard_url": str,
                 "limit": (int, NoneType),
                 "since": (str, NoneType),
                 "context_api": str,

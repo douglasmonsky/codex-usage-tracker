@@ -148,6 +148,41 @@ def test_release_check_rejects_old_pypi_package_install_docs(tmp_path: Path) -> 
     } <= set(failures)
 
 
+def test_release_check_rejects_raw_context_in_react_dashboard_artifacts(tmp_path: Path) -> None:
+    module = _load_release_check_module()
+    safe_file = tmp_path / "frontend" / "dashboard" / "src" / "safeFixture.ts"
+    leak_file = (
+        tmp_path
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "react"
+        / "assets"
+        / "dashboard-react.js"
+    )
+    safe_file.parent.mkdir(parents=True)
+    leak_file.parent.mkdir(parents=True)
+    safe_file.write_text(
+        "export const fixture = { raw_context_included: false, note: 'aggregate-only synthetic fixture' };\n",
+        encoding="utf-8",
+    )
+    leak_file.write_text(
+        'window.__BOOT__ = {"raw_context_persisted": true, "source": "/tmp/.codex/sessions/private.jsonl"};\n',
+        encoding="utf-8",
+    )
+    original_root = module.REPO_ROOT
+    module.REPO_ROOT = tmp_path
+    try:
+        failures = module._check_react_dashboard_privacy_artifacts()
+    finally:
+        module.REPO_ROOT = original_root
+
+    assert any("raw context persisted" in failure for failure in failures)
+    assert any("local Codex session JSONL path" in failure for failure in failures)
+    assert not any("safeFixture.ts" in failure for failure in failures)
+
+
 def test_readme_codex_usage_tracker_commands_reference_known_subcommands() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     readme = repo_root / "README.md"

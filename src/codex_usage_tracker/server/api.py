@@ -114,8 +114,10 @@ def serve_dashboard(
         refresh_lock=threading.Lock(),
     )
     server = ThreadingHTTPServer((host, port), handler)
-    url = f"http://{_url_host(host)}:{port}/{output.name}"
-    print(f"Serving Codex usage dashboard at {url}")
+    legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"
+    dashboard_url = f"http://{_url_host(host)}:{port}/react-dashboard.html"
+    print(f"Serving Codex usage dashboard at {dashboard_url}")
+    print(f"Legacy dashboard fallback remains available at {legacy_url}")
     context_mode = (
         "enabled for explicit row actions"
         if context_api_enabled
@@ -124,7 +126,7 @@ def serve_dashboard(
     print("Aggregate rows refresh through /api/usage with a per-server token.")
     print(f"Raw context API is {context_mode}; context is never embedded in the dashboard HTML.")
     if open_browser:
-        webbrowser.open(url)
+        webbrowser.open(dashboard_url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -13,6 +13,7 @@ def test_record_function_call_tracks_read_command_event() -> None:
     call_roots: dict[str, str] = {}
     call_git_interactions: dict[str, tuple[str, str, str, str]] = {}
     call_read_events: dict[str, list[int]] = {}
+    call_record_ids: dict[str, str] = {}
     source_read_events: list[int] = []
 
     record_function_call(
@@ -28,7 +29,9 @@ def test_record_function_call_tracks_read_command_event() -> None:
         call_roots=call_roots,
         call_git_interactions=call_git_interactions,
         call_read_events=call_read_events,
+        call_record_ids=call_record_ids,
         source_read_events=source_read_events,
+        representative_record_id=None,
     )
 
     assert counters["function_calls"] == Counter({"exec_command": 1})
@@ -44,6 +47,7 @@ def test_record_function_call_tracks_read_command_event() -> None:
             "path_hash": "4e4ec982419e",
             "order": 7,
             "modified_later": False,
+            "record_id": "",
         }
     ]
     assert counters["read_events_by_reader"] == Counter({"direct_file_read:cat": 1})
@@ -51,6 +55,7 @@ def test_record_function_call_tracks_read_command_event() -> None:
     assert call_names == {"call-read": "exec_command"}
     assert call_roots == {"call-read": "cat"}
     assert call_read_events == {"call-read": [0]}
+    assert call_record_ids == {}
     assert source_read_events == [0]
     assert not call_git_interactions
     assert not meta
@@ -73,7 +78,9 @@ def test_record_function_call_tracks_git_interaction() -> None:
         call_roots={},
         call_git_interactions=call_git_interactions,
         call_read_events={},
+        call_record_ids={},
         source_read_events=[],
+        representative_record_id=None,
     )
 
     interaction_key = ("git", "status", "read_only", "read_only")
@@ -99,7 +106,9 @@ def test_record_function_call_counts_missing_shell_command() -> None:
         call_roots={},
         call_git_interactions={},
         call_read_events={},
+        call_record_ids={},
         source_read_events=[],
+        representative_record_id=None,
     )
 
     assert counters["function_calls"] == Counter({"exec_command": 1})
@@ -121,4 +130,9 @@ def _source_scan_counters() -> dict[str, Any]:
         "read_events_by_reader": Counter(),
         "read_events_by_path": Counter(),
         "read_path_refs": {},
+        "function_record_ids": {},
+        "command_record_ids": {},
+        "git_interaction_record_ids": {},
+        "read_reader_record_ids": {},
+        "read_path_record_ids": {},
     }

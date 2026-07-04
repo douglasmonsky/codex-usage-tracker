@@ -36,7 +36,7 @@ If `codex-usage-tracker` is not found after installing with pipx, open a new ter
 
 First install? Start with the [First Five Minutes guide](docs/first-five-minutes.md) for setup, verification, empty-dashboard checks, and safe issue diagnostics.
 
-`serve-dashboard` refreshes active-session usage before opening by default. Use `--no-refresh` only when you intentionally want to inspect the cached local index.
+`serve-dashboard` refreshes active-session usage before opening the React dashboard by default. The legacy dashboard remains available at `/dashboard.html` on the same localhost server. Use `--no-refresh` only when you intentionally want to inspect the cached local index.
 
 Package naming: the PyPI distribution is `codex-usage-tracking`; the installed command is `codex-usage-tracker`; the GitHub repository remains `douglasmonsky/codex-usage-tracker`. The `codex-usage-tracker` PyPI name is not this project, so avoid similarly named packages when following these docs.
 
@@ -76,9 +76,9 @@ The Git Interactions panel expands the safe Git and GitHub CLI operation familie
 
 ![Diagnostics Git Interactions panel showing aggregate Git and GitHub CLI operation counts.](docs/assets/dashboard-diagnostics-git-expanded.png?v=readme-diagnostics-git)
 
-Insights still gives a fast triage layer for costly threads, low cache reuse, context bloat, and pricing gaps.
+Overview gives a fast triage layer for recent aggregate activity, costly threads, low cache reuse, context bloat, and pricing gaps.
 
-![Insights view with ranked Needs Attention cards, investigation presets, and top threads by attention score.](docs/assets/dashboard-insights.png?v=readme-drilldown)
+![Overview view with high-level metrics, time-series charts, and recent aggregate calls.](docs/assets/dashboard-insights.png?v=readme-drilldown)
 
 The dashboard screenshots use synthetic aggregate fixture data, and the companion prompt and chat previews are synthetic. They do not contain prompts from local logs, assistant responses, real tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
 
@@ -148,7 +148,7 @@ codex-usage-tracker serve-dashboard --open
 Then:
 
 1. Leave `Live` enabled while working, or click `Refresh` after a Codex run finishes.
-2. Start in `Insights` and scan the `Needs Attention` cards.
+2. Start in `Overview` and scan the high-level metrics and recent calls.
 3. Use `Time` presets or calendar fields to focus on today, this week, the last 7 days, this month, or a custom range.
 4. Use investigation presets for highest-cost threads, highest-credit calls, context bloat, cache misses, pricing gaps, or estimated-price review.
 5. Open `Threads` to see how a conversation grew and whether subagent or auto-review work attached to it.
@@ -167,7 +167,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
-- `Insights`, `Calls`, `Threads`, and `Diagnostics` dashboard views, including on-demand usage-drain report runs with cumulative per-thread cost curves.
+- `Overview`, `Calls`, `Threads`, and `Diagnostics` dashboard views, including on-demand usage-drain report runs with cumulative per-thread cost curves.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.

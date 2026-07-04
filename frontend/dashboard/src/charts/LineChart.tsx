@@ -1,6 +1,7 @@
 import { max } from 'd3-array';
 import { scaleLinear, scalePoint } from 'd3-scale';
 import { line } from 'd3-shape';
+import { useLayoutEffect, useRef } from 'react';
 
 import type { Series } from '../api/types';
 
@@ -11,9 +12,13 @@ type LineChartProps = {
   height?: number;
 };
 
+const dateLabelWidth = 38;
+
 export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, height = 280 }: LineChartProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const labels = series[0]?.points.map(point => point.label) ?? [];
-  const width = Math.max(760, labels.length * 112);
+  const minWidth = labels.length <= 1 ? 360 : labels.length <= 4 ? 520 : 760;
+  const width = Math.max(minWidth, labels.length * dateLabelWidth);
   const margin = { top: 24, right: 56, bottom: 54, left: 72 };
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
@@ -33,78 +38,133 @@ export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, h
     .x(point => x(point.label) ?? margin.left)
     .y(point => y(point.value));
   const ticks = y.ticks(4);
+  const hasScrollableHistory = labels.length > 1;
+
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) {
+      return;
+    }
+    const scrollToRecent = () => {
+      scroller.scrollLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+    };
+    scrollToRecent();
+    const frame = window.requestAnimationFrame(scrollToRecent);
+    const timeouts = [80, 250, 600].map(delay => window.setTimeout(scrollToRecent, delay));
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            scrollToRecent();
+          });
+    resizeObserver?.observe(scroller);
+    if (scroller.firstElementChild) {
+      resizeObserver?.observe(scroller.firstElementChild);
+    }
+    return () => {
+      window.cancelAnimationFrame(frame);
+      timeouts.forEach(timeout => window.clearTimeout(timeout));
+      resizeObserver?.disconnect();
+    };
+  }, [labels.length, width]);
 
   return (
-    <div className="chart-scroll" role="img" aria-label={`${yLabel} line chart`}>
-      <svg className="chart" viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
-        {ticks.map(tick => (
-          <g key={tick}>
-            <line x1={margin.left} y1={y(tick)} x2={margin.left + innerWidth} y2={y(tick)} className="grid-line" />
-            <text x={margin.left - 10} y={y(tick) + 4} textAnchor="end" className="axis-text">
+    <div className="line-chart-frame" role="img" aria-label={`${yLabel} line chart`}>
+      {hasScrollableHistory ? <div className="chart-scroll-cue">Recent dates shown. Scroll left for earlier dates.</div> : null}
+      <div className="chart-scroll-shell">
+        <div
+          className="chart-scroll"
+          ref={scrollRef}
+          tabIndex={hasScrollableHistory ? 0 : undefined}
+          aria-label={`${yLabel} history. Recent dates are shown first; scroll left for earlier dates.`}
+        >
+          <svg className="chart" viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
+            {ticks.map(tick => (
+              <g key={tick}>
+                <line x1={margin.left} y1={y(tick)} x2={margin.left + innerWidth} y2={y(tick)} className="grid-line" />
+              </g>
+            ))}
+            <line
+              x1={margin.left}
+              y1={margin.top + innerHeight}
+              x2={margin.left + innerWidth}
+              y2={margin.top + innerHeight}
+              className="axis-line"
+            />
+            {labels.map(label => {
+              const xValue = x(label) ?? margin.left;
+              return (
+                <text key={label} x={xValue} y={height - 18} textAnchor="middle" className="axis-text">
+                  {label}
+                </text>
+              );
+            })}
+            {series.map(item => (
+              <g key={item.id}>
+                {item.points.map(point =>
+                  isNumber(point.low) && isNumber(point.high) ? (
+                    <line
+                      key={`${item.id}-${point.label}-ci`}
+                      x1={x(point.label)}
+                      x2={x(point.label)}
+                      y1={y(point.low)}
+                      y2={y(point.high)}
+                      className="confidence-line"
+                    />
+                  ) : null,
+                )}
+                <path
+                  d={pathFor(item.points) ?? undefined}
+                  fill="none"
+                  stroke={item.color}
+                  strokeDasharray={item.dashed ? '7 7' : undefined}
+                  strokeWidth={3}
+                />
+                {item.points.map(point => (
+                  <circle
+                    key={`${item.id}-${point.label}`}
+                    cx={x(point.label)}
+                    cy={y(point.value)}
+                    r={4}
+                    fill={item.color}
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                  />
+                ))}
+              </g>
+            ))}
+          </svg>
+        </div>
+        <svg
+          className="chart-axis-overlay"
+          viewBox={`0 0 ${margin.left} ${height}`}
+          width={margin.left}
+          height={height}
+          aria-hidden="true"
+        >
+          <rect className="chart-axis-bg" width={margin.left} height={height} />
+          {ticks.map(tick => (
+            <text key={tick} x={margin.left - 10} y={y(tick) + 4} textAnchor="end" className="axis-text">
               {valueFormatter(tick)}
             </text>
-          </g>
-        ))}
-        <line
-          x1={margin.left}
-          y1={margin.top + innerHeight}
-          x2={margin.left + innerWidth}
-          y2={margin.top + innerHeight}
-          className="axis-line"
-        />
-        <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + innerHeight} className="axis-line" />
-        <text
-          x={18}
-          y={margin.top + innerHeight / 2}
-          className="axis-label"
-          transform={`rotate(-90 18 ${margin.top + innerHeight / 2})`}
-        >
-          {yLabel}
-        </text>
-        {labels.map((label, index) => {
-          const xValue = x(label) ?? margin.left;
-          const show = labels.length <= 9 || index % Math.ceil(labels.length / 8) === 0;
-          return show ? (
-            <text key={label} x={xValue} y={height - 18} textAnchor="middle" className="axis-text">
-              {label}
-            </text>
-          ) : null;
-        })}
-        {series.map(item => (
-          <g key={item.id}>
-            {item.points.map(point =>
-              isNumber(point.low) && isNumber(point.high) ? (
-                <line
-                  key={`${item.id}-${point.label}-ci`}
-                  x1={x(point.label)}
-                  x2={x(point.label)}
-                  y1={y(point.low)}
-                  y2={y(point.high)}
-                  className="confidence-line"
-                />
-              ) : null,
-            )}
-            <path
-              d={pathFor(item.points) ?? undefined}
-              fill="none"
-              stroke={item.color}
-              strokeDasharray={item.dashed ? '7 7' : undefined}
-              strokeWidth={3}
-            />
-            {item.points.map(point => (
-              <circle
-                key={`${item.id}-${point.label}`}
-                cx={x(point.label)}
-                cy={y(point.value)}
-                r={4}
-                fill={item.color}
-                stroke="#ffffff"
-                strokeWidth={2}
-              />
-            ))}
-          </g>
-        ))}
-      </svg>
+          ))}
+          <line
+            x1={margin.left - 0.5}
+            y1={margin.top}
+            x2={margin.left - 0.5}
+            y2={margin.top + innerHeight}
+            className="axis-line"
+          />
+          <text
+            x={18}
+            y={margin.top + innerHeight / 2}
+            className="axis-label"
+            transform={`rotate(-90 18 ${margin.top + innerHeight / 2})`}
+          >
+            {yLabel}
+          </text>
+        </svg>
+      </div>
       <div className="chart-legend">
         {series.map(item => (
           <span key={item.id}>

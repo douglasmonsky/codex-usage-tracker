@@ -85,6 +85,7 @@ def _thread_curve_record(
     max_curve_points: int,
 ) -> dict[str, Any]:
     calls = list(bucket["calls"])
+    representative_call = _representative_call(calls)
     cumulative = 0.0
     points: list[dict[str, Any]] = []
     call_costs: list[float] = []
@@ -111,11 +112,39 @@ def _thread_curve_record(
         "call_count": len(calls),
         "estimated_cost_usd": round(cumulative, 6),
         "avg_cost_usd": round(cumulative / len(calls), 6) if calls else 0.0,
+        "largest_record_id": _record_id(representative_call),
+        "representative_record_id": _record_id(representative_call),
+        "largest_call_tokens": int(number(representative_call.get("total_tokens"))),
+        "largest_call_cost_usd": round(
+            number(representative_call.get("estimated_cost_usd")),
+            6,
+        ),
         "first_half_cost_share": round(first_half_share, 6),
         "largest_call_cost_share": round(largest_share, 6),
         "shape": _curve_shape(first_half_share, largest_share),
         "points": _sample_curve_points(points, max_points=max_curve_points),
     }
+
+def _representative_call(calls: list[dict[str, Any]]) -> dict[str, Any]:
+    if not calls:
+        return {}
+    return max(calls, key=_representative_call_key)
+
+
+def _representative_call_key(row: dict[str, Any]) -> tuple[float, int, int, str, str]:
+    return (
+        number(row.get("estimated_cost_usd")),
+        int(number(row.get("total_tokens"))),
+        int(number(row.get("cumulative_total_tokens"))),
+        str(row.get("event_timestamp") or ""),
+        _record_id(row),
+    )
+
+
+def _record_id(row: dict[str, Any]) -> str:
+    value = row.get("record_id")
+    return str(value) if value else ""
+
 
 def _sample_curve_points(
     points: list[dict[str, Any]],

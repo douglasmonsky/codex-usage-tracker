@@ -1,0 +1,172 @@
+.chart-scroll {
+ width: 100%;
+ overflow-x: auto;
+}
+
+.table-scroll {
+ width: 100%;
+ max-height: min(70vh, 760px);
+ overflow: auto;
+}
+
+.line-chart-frame {
+  display: grid;
+  gap: 8px;
+}
+
+.chart-scroll-cue {
+  justify-self: end;
+  color: var(--dashboard-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chart-scroll-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.line-chart-frame .chart-scroll {
+  padding-bottom: 4px;
+  scroll-behavior: smooth;
+  scrollbar-color: #94a3b8 #eef2f7;
+}
+
+.line-chart-frame .chart-scroll:focus-visible {
+  outline: 3px solid var(--dashboard-focus);
+  outline-offset: 2px;
+}
+
+.chart-axis-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.chart-axis-bg {
+  fill: var(--dashboard-surface);
+}
+
+.table-window {
+  display: grid;
+  gap: 10px;
+}
+
+.table-window-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--dashboard-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chart {
+  display: block;
+}
+
+.grid-line {
+  stroke: #dfe7f2;
+  stroke-dasharray: 2 2;
+}
+
+.axis-line {
+  stroke: #b8c7da;
+}
+
+.axis-text,
+.axis-label {
+  fill: var(--dashboard-subtle);
+  font-size: 12px;
+}
+
+.confidence-line {
+  stroke: #93b4e8;
+  stroke-width: 7;
+  stroke-linecap: round;
+  opacity: 0.35;
+}
+
+.chart-legend,
+.donut-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  color: #334155;
+  font-size: 12px;
+}
+
+.chart-legend span,
+.donut-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-legend i,
+.donut-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.donut-wrap {
+  display: grid;
+  grid-template-columns: 180px minmax(160px, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.donut {
+  width: 180px;
+  height: 180px;
+}
+
+.donut-value {
+  fill: var(--dashboard-text);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.donut-label {
+  fill: var(--dashboard-muted);
+  font-size: 11px;
+}
+
+.bar-list {
+  display: grid;
+  gap: 12px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) minmax(150px, 2fr) 70px;
+  gap: 10px;
+  align-items: center;
+}
+
+.bar-row span {
+  color: #334155;
+}
+
+.bar-row strong,
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2f8;
+}
+
+.bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
