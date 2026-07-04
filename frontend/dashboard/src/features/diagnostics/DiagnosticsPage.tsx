@@ -28,6 +28,7 @@ import {
 import { DiagnosticSnapshotMatrix } from './DiagnosticSnapshotMatrix';
 import { FACT_CALL_PAGE_SIZE, diagnosticFactKey, factCallsHasMore, mergeFactCallResults } from './diagnosticFactCalls';
 import type { FactCallSortState, FactSortState } from './diagnosticFactSorting';
+import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 
 type FactSourceStateMap = Partial<Record<DiagnosticFactSourceKey, FactLoadState>>;
 type FactSortStateMap = Partial<Record<DiagnosticFactSourceKey, FactSortState>>;
@@ -383,6 +384,7 @@ function DiagnosticRow({
                     className="table-action-button"
                     type="button"
                     aria-label={`Open investigator for diagnostic call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                     onClick={event => {
                       event.stopPropagation();
                       onOpenInvestigator(call.id);
@@ -394,6 +396,7 @@ function DiagnosticRow({
                     className="table-action-button"
                     type="button"
                     aria-label={`Copy link for diagnostic call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                     onClick={event => {
                       event.stopPropagation();
                       onCopyCallLink(call.id);

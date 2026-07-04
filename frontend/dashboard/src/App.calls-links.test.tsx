@@ -11,8 +11,12 @@ describe('React dashboard call investigator link URL state', () => {
       });
       window.history.replaceState(null, '', '/?view=overview&qa=row-copy');
 
-      render(<App />);
-      fireEvent.click(screen.getByRole('button', { name: /Copy link for thread-9f3a1c codex-1/i }));
+ render(<App />);
+ const copyButton = screen.getByRole('button', { name: /Copy link for thread-9f3a1c codex-1/i });
+ fireEvent.keyDown(copyButton, { key: 'Enter' });
+ expect(screen.queryByRole('heading', { name: 'Call Investigator' })).not.toBeInTheDocument();
+ expect(window.location.search).toContain('view=overview');
+ fireEvent.click(copyButton);
 
       await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
       const copiedUrl = new URL(writeText.mock.calls[0][0]);

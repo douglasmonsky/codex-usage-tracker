@@ -10,11 +10,12 @@ import type {
 import type { CallRow } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { formatCompact, formatNumber, pct } from '../shared/format';
+import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 import { diagnosticFactKey, factCallsHasMore, factCallsTotal } from './diagnosticFactCalls';
 import {
-  cachePctFromFact,
-  defaultFactCallSortDirection,
-  defaultFactSortDirection,
+cachePctFromFact,
+defaultFactCallSortDirection,
+defaultFactSortDirection,
   diagnosticFactCallSortDescription,
   diagnosticFactSortDescription,
   factCallSortOptions,
@@ -397,6 +398,7 @@ export function FactCallsPanel({
                           className="table-action-button"
                           type="button"
                           aria-label={`Open investigator diagnostic fact call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                           onClick={event => {
                             event.stopPropagation();
                             onOpenInvestigator(call.id);
@@ -408,6 +410,7 @@ export function FactCallsPanel({
                           className="table-action-button"
                           type="button"
                           aria-label={`Copy link for diagnostic fact call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                           onClick={event => {
                             event.stopPropagation();
                             onCopyCallLink(call.id);

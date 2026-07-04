@@ -19,6 +19,7 @@ import {
   threadColumns,
   threadInvestigatorRowLabel,
 } from '../shared/tables';
+import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 import {
   buildThreadsFilterSummary,
   normalizeThreadRiskFilter,
@@ -680,6 +681,7 @@ onChange={event => onCallSortChange(event.target.value)}
 className="table-action-button"
 type="button"
 aria-label={`Open investigator for thread call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
 onClick={event => {
 event.stopPropagation();
 onOpenInvestigator(call.id);
@@ -692,6 +694,7 @@ Open
 className="table-action-button"
 type="button"
 aria-label={`Copy link for thread call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
 onClick={event => {
 event.stopPropagation();
 onCopyCallLink(call.id);

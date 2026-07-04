@@ -11,6 +11,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { uniqueSorted } from '../shared/filtering';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
 import { callActionColumn, callInvestigatorRowLabel, weeklyColumns } from '../shared/tables';
+import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 
 type UsageDrainPageProps = {
   model: DashboardModel;
@@ -320,6 +321,7 @@ onRowActivate={call => onOpenInvestigator(call.id)}
                         className="table-action-button"
                         type="button"
                         aria-label={`Open investigator for usage drain evidence call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                         onClick={event => {
                           event.stopPropagation();
                           onOpenInvestigator(call.id);
@@ -332,6 +334,7 @@ onRowActivate={call => onOpenInvestigator(call.id)}
                         className="table-action-button"
                         type="button"
                         aria-label={`Copy link for usage drain evidence call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                         onClick={event => {
                           event.stopPropagation();
                           onCopyCallLink(call.id);

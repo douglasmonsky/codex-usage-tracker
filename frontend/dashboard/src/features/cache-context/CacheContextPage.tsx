@@ -9,6 +9,7 @@ import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
 import { threadActionColumn, threadColumns, threadInvestigatorRowLabel } from '../shared/tables';
+import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 
 type CacheContextPageProps = {
   model: DashboardModel;
@@ -243,6 +244,7 @@ return (
  className="table-action-button"
  type="button"
  aria-label={`Open investigator for cache thread call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
  onClick={event => {
  event.stopPropagation();
  onOpenInvestigator(call.id);
@@ -255,6 +257,7 @@ return (
  className="table-action-button"
  type="button"
  aria-label={`Copy link for cache thread call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
  onClick={event => {
  event.stopPropagation();
  onCopyCallLink(call.id);

@@ -5,6 +5,7 @@ import type { CallRow, ThreadRow, WeeklyWindow } from '../../api/types';
 import type { ColumnChoice } from '../../components/ColumnChooser';
 import type { CsvColumn } from './exportCsv';
 import { formatCompact, formatNumber, money, pct } from './format';
+import { stopRowActionKeyDown } from './rowActionEvents';
 
 export const callColumns: Array<ColumnDef<CallRow>> = [
   { accessorKey: 'time', header: 'Time' },
@@ -312,26 +313,28 @@ function CallActionCell({
 
   return (
     <div className="table-action-group">
-      <button
-        className="table-action-button"
-        type="button"
-        aria-label={`${openInvestigatorLabel} for ${labelTarget}`}
-        onClick={event => {
-          event.stopPropagation();
-          onOpenInvestigator(call.id);
+<button
+className="table-action-button"
+type="button"
+aria-label={`${openInvestigatorLabel} for ${labelTarget}`}
+onKeyDown={stopRowActionKeyDown}
+onClick={event => {
+event.stopPropagation();
+onOpenInvestigator(call.id);
         }}
       >
         <Search size={14} />
         {openInvestigatorLabel}
       </button>
       {onCopyCallLink ? (
-        <button
-          className="table-action-button"
-          type="button"
-          aria-label={`${copyLinkLabel} for ${labelTarget}`}
-          onClick={event => {
-            event.stopPropagation();
-            onCopyCallLink(call.id);
+<button
+className="table-action-button"
+type="button"
+aria-label={`${copyLinkLabel} for ${labelTarget}`}
+onKeyDown={stopRowActionKeyDown}
+onClick={event => {
+event.stopPropagation();
+onCopyCallLink(call.id);
           }}
         >
           <Copy size={14} />
@@ -454,6 +457,7 @@ export function threadActionColumn({ onOpenInvestigator, onCopyCallLink }: Threa
             className="table-action-button"
             type="button"
             aria-label={`Open investigator for latest call in ${thread.name}`}
+ onKeyDown={stopRowActionKeyDown}
             onClick={event => {
               event.stopPropagation();
               if (thread.latestCallId) {
@@ -469,6 +473,7 @@ export function threadActionColumn({ onOpenInvestigator, onCopyCallLink }: Threa
             <button
               className="table-action-button"
               type="button"
+ onKeyDown={stopRowActionKeyDown}
               aria-label={`Copy link for latest call in ${thread.name}`}
               onClick={event => {
                 event.stopPropagation();

@@ -9,6 +9,7 @@ import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
 import { callActionColumn, callColumns, callInvestigatorRowLabel } from '../shared/tables';
+import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 
 type InvestigatorPageProps = {
   model: DashboardModel;
@@ -266,6 +267,7 @@ function SelectedFinding({
                       className="table-action-button"
                       type="button"
                       aria-label={`Open investigator for workbench evidence call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                       onClick={event => {
                         event.stopPropagation();
                         onOpenInvestigator(call.id);
@@ -278,6 +280,7 @@ function SelectedFinding({
                       className="table-action-button"
                       type="button"
                       aria-label={`Copy link for workbench evidence call ${call.thread} ${call.model}`}
+ onKeyDown={stopRowActionKeyDown}
                       onClick={event => {
                         event.stopPropagation();
                         onCopyCallLink(call.id);
