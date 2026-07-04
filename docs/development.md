@@ -214,6 +214,14 @@ After refreshing screenshots, copy the same files into `src/codex_usage_tracker/
 
 Do not use real session logs, real prompts, assistant text, tool output, secrets, or private data in docs or screenshots.
 
+The repository social preview artwork is generated separately:
+
+```bash
+python scripts/generate_social_preview.py
+```
+
+It writes `docs/assets/social-preview.png` and `docs/assets/readme-hero.png` at 1280x640, using exact rendered text and existing synthetic dashboard screenshots. Refresh the static downloads claim only after checking a public package-download source such as PyPI Stats.
+
 ## Large-History Benchmarking
 
 Use the synthetic benchmark script when changing SQLite filters, dashboard payload loading, or indexes:
