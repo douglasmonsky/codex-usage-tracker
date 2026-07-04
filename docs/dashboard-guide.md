@@ -63,7 +63,7 @@ The localhost server uses a random per-server token for refresh and context API 
 
 ## Overview View
 
-![Overview view with high-level metrics, time-series charts, and recent aggregate calls.](assets/dashboard-insights.png)
+![Overview view showing high-level metrics, row loading controls, time-series charts, and recent aggregate calls.](assets/dashboard-insights.png)
 
 Open `Overview` when you want a quick read on current aggregate usage before sorting deeper tables.
 
@@ -75,7 +75,7 @@ Open `Overview` when you want a quick read on current aggregate usage before sor
 
 ## Calls View
 
-![Calls view showing filters, totals, the model-call table, and the compact details rail.](assets/dashboard-calls.png)
+![Calls view showing filters, totals, the model-call table, and load controls.](assets/dashboard-calls.png)
 
 Use `Calls` view when you want to inspect individual model calls.
 
@@ -117,7 +117,7 @@ Useful interpretation notes:
 
 ## Threads View
 
-![Threads view with one expanded thread and sortable newest-first calls.](assets/dashboard-threads.png)
+![Threads view with one expanded thread and its calls.](assets/dashboard-threads.png)
 
 Use `Threads` view when you want to understand a work session as a group instead of one call at a time.
 
@@ -130,7 +130,7 @@ Use `Threads` view when you want to understand a work session as a group instead
 
 ## Diagnostics View
 
-![Diagnostics view showing on-demand usage-drain charts for weekly usage remaining and projected weekly credits.](assets/dashboard-diagnostics.png)
+![Diagnostics Notebook view showing diagnostic snapshot modules and usage-drain reporting.](assets/dashboard-diagnostics.png)
 
 Use `Diagnostics` view when you want to see what structured event patterns are happening and what token totals are associated with those patterns.
 
@@ -153,7 +153,7 @@ The same model, reasoning, confidence, time range, history scope, cards, and loa
 
 ## Call Investigator
 
-![Call investigator showing exact token accounting, cache/accounting deltas, context estimates, and runtime evidence.](assets/dashboard-call-investigator.png)
+![Call investigator showing exact token accounting, cache/accounting deltas, context estimates, and evidence controls.](assets/dashboard-call-investigator.png)
 
 Clicking a Calls row opens `react-dashboard.html?view=call&record=<record_id>` for one model call. Legacy `dashboard.html?view=call&record=...` links remain accepted and hydrate the same investigator route. Hover remains the fast scanning surface; the investigator is the deeper diagnostic page for a single selected call. Expanded Threads rows and the details panel can still expose explicit investigator actions where a row click already has another meaning.
 
@@ -162,13 +162,13 @@ The investigator separates evidence by confidence:
 - `Exact`: logged token callback counts, cost, Codex credits, cache ratio, model, effort, source, and context-window pressure.
 - `Derived`: previous/next calls in the same resolved thread and cache/accounting deltas versus the previous chronological call.
 - `Estimated`: visible new-context estimates, serialized local JSONL upper bounds, candidate serialized-overhead groups, and any remaining gap after that upper bound. These are attribution aids, not exact cached text spans.
-- `Evidence`: redacted local JSONL turn-log evidence loaded at runtime for the selected investigator call.
+- `Evidence`: redacted local JSONL turn-log evidence loaded at runtime for the selected investigator call after explicit localhost action.
 
 Previous and next buttons move chronologically within the same resolved thread and keep the selected call in the URL. Cache diagnostics label common patterns such as warm cache reuse, cold resume or stale cache, partial cache miss, uncached spike, and post-compaction. Delta cards compare input, cached input, uncached input, output/reasoning output, and cache ratio to the previous call and use "cache/accounting delta" terminology because logs do not expose exact cached text spans.
 
 ## Details And Context
 
-![Calls view with a selected usage row and the compact Call Details rail collapsed.](assets/dashboard-details.png)
+![Calls view showing a selected row with the Call Drill-Down detail rail.](assets/dashboard-details.png)
 
 The details rail is collapsed by default to preserve table space. Open `Call Details` when you want a compact aggregate preview without leaving the table. When expanded on desktop, it sticks inside the viewport and scrolls internally when the selected call has more fields or loaded context than can fit on screen.
 
@@ -191,7 +191,7 @@ For selected threads, the panel shows:
 - a compact thread timeline with recent calls, cost, credits, cache, context, and pricing cues
 - direct, subagent, auto-review, attached-call, and spawned-thread relationship counts
 
-When served from localhost, the call investigator automatically fetches quick, redacted source evidence for only that call. The details panel still uses an explicit `Show turn log evidence` action so hovering rows does not pull raw context unexpectedly.
+When served from localhost with the context API enabled, the call investigator can fetch quick, redacted source evidence for only the selected call. The details panel still uses an explicit `Show turn log evidence` action so hovering rows does not pull raw context unexpectedly.
 
 - `Hide tool output` reloads evidence without tool output when the output is noisy.
 - `Show tool output` appears after hiding it and reloads evidence with redacted tool output included again.
