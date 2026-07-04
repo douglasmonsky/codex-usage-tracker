@@ -1,4 +1,5 @@
 import type { CallRow } from '../../api/types';
+import { sourceLine } from './callPresentation';
 
 export function CallSourceMetadata({ call }: { call: CallRow }) {
   return (
@@ -44,11 +45,6 @@ function formatTimestamp(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function sourceLine(call: CallRow): string {
-  if (!call.sourceFile) return 'Source line not reported';
-  return `${call.sourceFile}${call.lineNumber ? `:${call.lineNumber}` : ''}`;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
