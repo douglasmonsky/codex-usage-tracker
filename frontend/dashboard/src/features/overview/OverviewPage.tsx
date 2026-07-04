@@ -1,6 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowRight, Download, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { CallRow, DashboardModel, Finding } from '../../api/types';
 import { DonutChart } from '../../charts/DonutChart';
 import { LineChart } from '../../charts/LineChart';
@@ -34,6 +35,7 @@ type OverviewPageProps = {
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
   onOpenFinding: (rank: number) => void;
+  globalFilters?: ReactNode;
 };
 
 export function overviewCallsForQuery(calls: CallRow[], globalQuery = ''): CallRow[] {
@@ -56,6 +58,7 @@ export function OverviewPage({
   onOpenInvestigator,
   onCopyCallLink,
   onOpenFinding,
+  globalFilters,
 }: OverviewPageProps) {
   const [exportStatus, setExportStatus] = useState('');
   const [recentVisibleCount, setRecentVisibleCount] = useState(6);
@@ -100,6 +103,7 @@ export function OverviewPage({
           </button>
         </div>
       </div>
+      {globalFilters}
       <div className="metric-grid">
         {model.cards.map(card => (
           <MetricCard key={card.label} card={card} />

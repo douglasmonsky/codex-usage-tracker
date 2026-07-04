@@ -104,7 +104,7 @@ export function ShellGlobalFilters({ activeView, locationSearch, model, onUrlCha
   }
 
   return (
-    <section className="global-filter-strip" aria-label="Dashboard filters">
+    <section className="global-filter-strip span-all" aria-label="Dashboard filters">
       <strong>
         <Filter size={15} />
         Filters

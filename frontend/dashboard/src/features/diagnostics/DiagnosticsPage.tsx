@@ -1,5 +1,6 @@
 import { Copy, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 
 import {
   cachedDiagnosticFactCalls,
@@ -47,12 +48,14 @@ export function DiagnosticsPage({
   rowLoadControls,
   onOpenInvestigator,
   onCopyCallLink,
+  globalFilters,
 }: {
   model: DashboardModel;
   contextRuntime: ContextRuntime;
   rowLoadControls: DashboardRowLoadControls;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
+  globalFilters?: ReactNode;
 }) {
   const [factSourceKey, setFactSourceKey] = useState<DiagnosticFactSourceKey>(() => diagnosticFactSourceFromUrl());
   const [factStates, setFactStates] = useState<FactSourceStateMap>(() => cachedFactStates(contextRuntime, {}));
@@ -284,6 +287,8 @@ export function DiagnosticsPage({
           <StatusBadge label="Local Only" tone="green" />
         </div>
       </div>
+
+      {globalFilters}
 
       <Panel title="Executive Findings" subtitle="Top observations aggregate telemetry" className="span-all">
         <div className="executive-grid">

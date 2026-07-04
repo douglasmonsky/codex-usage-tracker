@@ -1,5 +1,6 @@
 import { ArrowUp, Copy, Download, RefreshCw, ShieldAlert, Terminal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { currentViewCsvExport } from './app/currentViewExport';
 import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyScope';
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
@@ -679,7 +680,6 @@ Use Load all rows for the full history, or type any finite row count.
 </button>
           </div>
       </header>
-      <ShellGlobalFilters activeView={activeView} locationSearch={locationSearch} model={model} onUrlChange={replaceShellUrl} />
       {renderView(
         activeView,
         scopedModel,
@@ -710,7 +710,8 @@ backFromCallInvestigator,
  canLoadAllRows,
  loadMoreRows,
  loadAllRows,
- )}
+ <ShellGlobalFilters activeView={activeView} locationSearch={locationSearch} model={model} onUrlChange={replaceShellUrl} />,
+)}
       </main>
       {showBackToTop ? (
         <button className="to-top-button" type="button" onClick={scrollToTop} aria-label="Back to top">
@@ -755,6 +756,7 @@ _applyInvestigationPreset: (action: InvestigationPresetAction) => void,
  canLoadAllRows: boolean,
  loadMoreRows: () => void,
  loadAllRows: () => void,
+ globalFilters: ReactNode,
 ) {
   switch (activeView) {
     case 'overview':
@@ -773,6 +775,7 @@ _applyInvestigationPreset: (action: InvestigationPresetAction) => void,
 	onOpenInvestigator={openCallInvestigator}
 	onCopyCallLink={copyCallInvestigatorLink}
 	onOpenFinding={openFindingInvestigator}
+	globalFilters={globalFilters}
 />
       );
     case 'investigator':
@@ -810,6 +813,7 @@ _applyInvestigationPreset: (action: InvestigationPresetAction) => void,
           globalQuery={globalQuery}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
+          globalFilters={globalFilters}
         />
       );
     case 'usage-drain':
@@ -838,6 +842,7 @@ _applyInvestigationPreset: (action: InvestigationPresetAction) => void,
           }}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
+          globalFilters={globalFilters}
         />
       );
     case 'reports':
