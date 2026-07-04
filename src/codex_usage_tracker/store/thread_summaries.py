@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,23 +21,37 @@ from codex_usage_tracker.store.rows import row_to_dict
 from codex_usage_tracker.store.schema import init_db
 
 
-def rebuild_thread_summaries(conn: sqlite3.Connection) -> int:
+def rebuild_thread_summaries(
+    conn: sqlite3.Connection,
+    *,
+    thread_keys: Iterable[str] | None = None,
+) -> int:
     """Rebuild materialized per-thread aggregate summaries."""
 
     before = conn.total_changes
-    conn.execute("DELETE FROM thread_summaries")
+    normalized_thread_keys = sorted({key for key in thread_keys or [] if key})
+    if normalized_thread_keys:
+        placeholders = ", ".join("?" for _key in normalized_thread_keys)
+        conn.execute(
+            f"DELETE FROM thread_summaries WHERE thread_key IN ({placeholders})",
+            normalized_thread_keys,
+        )
+    else:
+        conn.execute("DELETE FROM thread_summaries")
     updated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     _insert_thread_summary_scope(
         conn,
         scope="active",
         include_archived=False,
         updated_at=updated_at,
+        thread_keys=normalized_thread_keys,
     )
     _insert_thread_summary_scope(
         conn,
         scope="all-history",
         include_archived=True,
         updated_at=updated_at,
+        thread_keys=normalized_thread_keys,
     )
     return conn.total_changes - before
 
@@ -105,9 +120,19 @@ def _insert_thread_summary_scope(
     scope: str,
     include_archived: bool,
     updated_at: str,
+    thread_keys: Iterable[str] | None = None,
 ) -> None:
     where_clause, params = usage_where_clause(include_archived=include_archived)
     thread_key_expr = thread_key_expression()
+    normalized_thread_keys = sorted({key for key in thread_keys or [] if key})
+    if normalized_thread_keys:
+        placeholders = ", ".join("?" for _key in normalized_thread_keys)
+        thread_filter = f"{thread_key_expr} IN ({placeholders})"
+        if where_clause:
+            where_clause = f"{where_clause} AND ({thread_filter})"
+        else:
+            where_clause = f"WHERE {thread_filter}"
+        params.extend(normalized_thread_keys)
     conn.execute(
         f"""
         INSERT INTO thread_summaries (

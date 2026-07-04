@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -344,18 +344,24 @@ def upsert_usage_events(
     source_files_to_replace = _source_file_strings(replace_source_files)
     with connect(db_path) as conn:
         init_db(conn)
+        affected_thread_keys = _thread_keys_for_source_files(conn, source_files_to_replace)
         _delete_usage_events_for_source_files(conn, source_files_to_replace)
         if not rows:
             _refresh_after_empty_source_replacement(
                 conn,
                 refresh_links=refresh_links,
-                source_files_to_replace=source_files_to_replace,
+                affected_thread_keys=affected_thread_keys,
             )
             return 0
+        affected_thread_keys.update(_thread_keys_for_usage_rows(rows))
         _delete_diagnostic_facts_for_record_ids(conn, _usage_event_record_ids(rows))
         _insert_usage_event_rows(conn, rows)
         _insert_diagnostic_facts(conn, fact_rows)
-        _refresh_after_usage_event_upsert(conn, refresh_links=refresh_links)
+        _refresh_after_usage_event_upsert(
+            conn,
+            refresh_links=refresh_links,
+            affected_thread_keys=affected_thread_keys,
+        )
         return len(rows)
 
 
@@ -397,15 +403,59 @@ def _delete_usage_events_for_source_files(
     )
 
 
+def _thread_keys_for_source_files(
+    conn: sqlite3.Connection,
+    source_files_to_replace: list[str],
+) -> set[str]:
+    if not source_files_to_replace:
+        return set()
+    placeholders = ", ".join("?" for _source in source_files_to_replace)
+    rows = conn.execute(
+        f"""
+        SELECT thread_key, session_id
+        FROM usage_events
+        WHERE source_file IN ({placeholders})
+        """,
+        source_files_to_replace,
+    ).fetchall()
+    return _thread_keys_for_usage_rows(rows)
+
+
+def _thread_keys_for_usage_rows(
+    rows: Iterable[Mapping[str, object] | sqlite3.Row],
+) -> set[str]:
+    keys: set[str] = set()
+    for row in rows:
+        session_id = _usage_row_value(row, "session_id")
+        thread_key = _usage_row_value(row, "thread_key") or (
+            f"session:{session_id}" if session_id else None
+        )
+        if thread_key:
+            keys.add(str(thread_key))
+    return keys
+
+
+def _usage_row_value(
+    row: Mapping[str, object] | sqlite3.Row,
+    key: str,
+) -> object | None:
+    if isinstance(row, Mapping):
+        return row.get(key)
+    try:
+        return row[key]
+    except (IndexError, KeyError, TypeError):
+        return None
+
+
 def _refresh_after_empty_source_replacement(
     conn: sqlite3.Connection,
     *,
     refresh_links: bool,
-    source_files_to_replace: list[str],
+    affected_thread_keys: set[str],
 ) -> None:
-    if source_files_to_replace and refresh_links:
-        _refresh_usage_event_links(conn)
-        rebuild_thread_summaries(conn)
+    if affected_thread_keys and refresh_links:
+        _refresh_usage_event_links_for_threads(conn, affected_thread_keys)
+        rebuild_thread_summaries(conn, thread_keys=affected_thread_keys)
 
 
 def _usage_event_record_ids(rows: list[dict[str, object]]) -> list[str]:
@@ -440,10 +490,11 @@ def _refresh_after_usage_event_upsert(
     conn: sqlite3.Connection,
     *,
     refresh_links: bool,
+    affected_thread_keys: set[str],
 ) -> None:
-    if refresh_links:
-        _refresh_usage_event_links(conn)
-        rebuild_thread_summaries(conn)
+    if refresh_links and affected_thread_keys:
+        _refresh_usage_event_links_for_threads(conn, affected_thread_keys)
+        rebuild_thread_summaries(conn, thread_keys=affected_thread_keys)
 
 
 def _delete_diagnostic_facts_for_record_ids(
@@ -495,11 +546,38 @@ def refresh_usage_event_links(db_path: Path = DEFAULT_DB_PATH) -> int:
         return changed
 
 
+def _refresh_usage_event_links_for_threads(
+    conn: sqlite3.Connection,
+    affected_thread_keys: Iterable[str],
+) -> int:
+    thread_keys = sorted({key for key in affected_thread_keys if key})
+    if not thread_keys:
+        return 0
+    placeholders = ", ".join("?" for _key in thread_keys)
+    return _refresh_usage_event_links_scoped(
+        conn,
+        where_clause=(
+            "WHERE coalesce(nullif(thread_key, ''), 'session:' || session_id) "
+            f"IN ({placeholders})"
+        ),
+        params=thread_keys,
+    )
+
+
 def _refresh_usage_event_links(conn: sqlite3.Connection) -> int:
+    return _refresh_usage_event_links_scoped(conn)
+
+
+def _refresh_usage_event_links_scoped(
+    conn: sqlite3.Connection,
+    *,
+    where_clause: str = "",
+    params: Iterable[object] = (),
+) -> int:
     before = conn.total_changes
     conn.execute("DROP TABLE IF EXISTS temp_usage_event_links")
     conn.execute(
-        """
+        f"""
         CREATE TEMP TABLE temp_usage_event_links AS
         SELECT
             record_id,
@@ -516,7 +594,9 @@ def _refresh_usage_event_links(conn: sqlite3.Connection) -> int:
                 ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
             ) AS next_id
         FROM usage_events
-        """
+        {where_clause}
+        """,
+        list(params),
     )
     conn.execute(
         "CREATE UNIQUE INDEX temp_usage_event_links_record_id ON temp_usage_event_links(record_id)"

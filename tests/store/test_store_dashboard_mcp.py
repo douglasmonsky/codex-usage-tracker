@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+import codex_usage_tracker.store.api as store_api
 from codex_usage_tracker import store as store_module
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.diagnostics.reports import build_diagnostics_facts_report
@@ -144,7 +145,7 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     first = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     with connect(db_path) as conn:
         init_db(conn)
-        source_before = conn.execute(
+        source_before_row = conn.execute(
             """
             SELECT parsed_until_byte, parsed_until_line, parser_state_json
             FROM source_files
@@ -152,10 +153,20 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
             """,
             (str(log_path),),
         ).fetchone()
+        assert source_before_row is not None
+        source_before = dict(source_before_row)
+    target_thread_key = query_session_usage(
+        db_path=db_path,
+        session_id=SESSION_ID,
+    )[0]["thread_key"]
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(_token_event(650, 350)) + "\n")
     parse_calls: list[dict[str, Any]] = []
     original_parse = store_module.parse_usage_events_from_file_with_state
+    link_scopes: list[set[str]] = []
+    original_refresh_links = store_api._refresh_usage_event_links_for_threads
+    summary_scopes: list[set[str]] = []
+    original_rebuild_summaries = store_api.rebuild_thread_summaries
 
     def tracking_parse(*args: Any, **kwargs: Any):
         parse_calls.append(
@@ -168,10 +179,28 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
         )
         return original_parse(*args, **kwargs)
 
+    def tracking_refresh_links(*args: Any, **kwargs: Any) -> int:
+        link_scopes.append(set(args[1]))
+        return original_refresh_links(*args, **kwargs)
+
+    def tracking_rebuild_summaries(*args: Any, **kwargs: Any) -> int:
+        summary_scopes.append(set(kwargs.get("thread_keys") or []))
+        return original_rebuild_summaries(*args, **kwargs)
+
     monkeypatch.setattr(
         store_module,
         "parse_usage_events_from_file_with_state",
         tracking_parse,
+    )
+    monkeypatch.setattr(
+        store_api,
+        "_refresh_usage_event_links_for_threads",
+        tracking_refresh_links,
+    )
+    monkeypatch.setattr(
+        store_api,
+        "rebuild_thread_summaries",
+        tracking_rebuild_summaries,
     )
     second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
     third = refresh_usage_index(codex_home=codex_home, db_path=db_path)
@@ -190,6 +219,8 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert second.parsed_events == 1
     assert second.inserted_or_updated_events == 1
     assert third.parsed_events == 0
+    assert link_scopes == [{target_thread_key}]
+    assert summary_scopes == [{target_thread_key}]
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
     assert metadata["parsed_source_files"] == "0"
     assert metadata["skipped_source_files"] == "3"
