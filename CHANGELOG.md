@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.15.1 - 2026-07-05
+
+- Fix the PyPI wheel package resources by tracking the React dashboard `index.html` entrypoint used by `serve-dashboard` and installed-package smoke tests.
+
 ## 0.15.0 - 2026-07-05
 
 - Make the companion plugin/skills remediation-aware for token-waste investigations, including Headroom suggestions when available, dashboard verification paths, and custom local automation ideas.
