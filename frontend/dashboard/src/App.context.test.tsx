@@ -112,7 +112,7 @@ expect(screen.getByRole('button', { name: /Next/i })).not.toBeDisabled();
   });
 
   it('loads selected-call context evidence through the localhost API', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-context-1');
     window.__CODEX_USAGE_BOOT__ = {
       api_token: 'test-token',
       context_api_enabled: true,
@@ -297,7 +297,7 @@ expect(fetchMock.mock.calls[0][1]).toEqual(
   });
 
   it('loads older selected-call context when entries were omitted', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-context-older');
     window.__CODEX_USAGE_BOOT__ = {
       api_token: 'test-token',
       context_api_enabled: true,

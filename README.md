@@ -49,6 +49,27 @@ pipx install "git+https://github.com/douglasmonsky/codex-usage-tracker.git"
 
 Want Codex to do it for you? Paste: `Install codex-usage-tracking with pipx, run codex-usage-tracker setup, and open the Codex Usage Tracker dashboard.`
 
+## Talk To Your Usage Data
+
+The dashboard shows the evidence; the companion plugin and skills make it conversational. After `setup` and a Codex restart, ask Codex to refresh the local aggregate index, call MCP tools, and explain what is driving usage without exposing prompts or tool output.
+
+Good starter prompts:
+
+```text
+Look through my usage for token waste and recommend what I should change.
+Find high-context, low-cache calls worth opening in the investigator.
+Which threads are draining the most, and what would reduce that next time?
+Compare model and effort usage, then suggest safer defaults.
+Open the dashboard and filter Calls to the rows behind your recommendation.
+```
+
+The companion skill treats waste discovery as diagnosis plus remediation: it can point to Calls, Threads, Call Investigator, Diagnostics Notebook, Headroom when available, or a custom local command/skill/report preset Codex can build to stop repeating the same waste pattern.
+
+Example conversation docs:
+
+- [Token Waste Review](docs/examples/token-waste-conversation.md)
+- [Remediation Planning](docs/examples/remediation-conversation.md)
+
 ## Dashboard Preview
 
 Overview is the dashboard landing workspace: it shows recent aggregate usage, weekly remaining usage context, row loading controls, and charts that open on recent dates.
@@ -85,7 +106,7 @@ If this helped you track Codex usage, starring the repo helps others find it. Is
 
 ## Companion Skill And Plugin
 
-The dashboard is the core product surface. The Codex plugin and companion usage skill are add-ons that let Codex refresh local aggregates, call the MCP tools, and explain usage patterns conversationally after plugin discovery. Examples: [MCP And Codex Skills](docs/mcp.md).
+The dashboard is the core product surface. The Codex plugin and companion usage skills let Codex refresh local aggregates, call MCP tools, and explain usage patterns conversationally after plugin discovery. Setup and tool details: [MCP And Codex Skills](docs/mcp.md).
 
 <p align="center">
   <a href="docs/assets/plugin-prompts.png"><img src="docs/assets/plugin-prompts.png?v=readme-drilldown" alt="Synthetic Codex plugin prompt preview showing usage dashboard and thread investigation suggestions." width="86%"></a>

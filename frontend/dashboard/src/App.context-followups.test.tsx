@@ -4,7 +4,7 @@ describe('React dashboard context follow-up actions', () => {
 installAppTestHooks();
 
 it('loads omitted tool output from selected-call evidence entries', async () => {
-window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-tool-output');
 installToolOutputBootPayload();
 const fetchMock = vi.fn()
 .mockResolvedValueOnce(contextResponse('tool output omitted sample', true))
@@ -60,7 +60,7 @@ expect(String(fetchMock.mock.calls[1][0])).toContain('record_id=record-tool-outp
 });
 
 it('loads compacted replacement from selected-call evidence entries', async () => {
-window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-tool-output');
 installToolOutputBootPayload();
 const fetchMock = vi.fn()
 .mockResolvedValueOnce(compactionResponse('compaction omitted sample', false))

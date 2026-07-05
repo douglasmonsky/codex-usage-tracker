@@ -38,6 +38,7 @@ Open dashboard.
 Use my Codex Usage Tracker data to explain what drove usage this week.
 Heaviest thread?
 Thread leaderboard.
+Look through my usage for token waste and recommend fixes.
 Find low-cache or high-context calls from today and suggest what to inspect next.
 Look through my usage for token waste.
 Find calls where context got bloated.
@@ -50,6 +51,8 @@ Show me what is estimated or unpriced before I trust the cost numbers.
 The API skill should refresh the local index, call aggregate tools such as `usage_status`, `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_report_pack`, `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, or `usage_pricing_coverage`, then explain the answer with the data scope and estimate caveats.
 
 If MCP tools are not available, the same questions can be answered through CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
+
+Waste-discovery answers should include remediation ideas when evidence supports them: dashboard rows to inspect, Headroom if available for context/headroom checks, workflow changes such as thread splitting or lower effort for routine work, and small custom local commands or skill updates Codex can build when the same waste pattern keeps recurring.
 
 The companion skill cannot read your logged-in Codex account plan, native remaining allowance, or usage from other agentic surfaces. Remaining allowance context is only as accurate as the values you manually copy into `~/.codex-usage-tracker/allowance.json`.
 

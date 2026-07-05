@@ -67,6 +67,17 @@ When the user asks what they can look into, offer a short menu of concrete aggre
 - "Check whether model or effort choice is wasting tokens." Use `usage_summary(group_by="model", response_format="json")`, `usage_summary(group_by="effort", response_format="json")`, and supporting `usage_calls(...)` rows.
 - "Can I share this safely?" Use `privacy_mode="strict"` and avoid `usage_call_context`.
 
+## Waste Reduction Recommendations
+
+When user asks to look for token waste, treat answer as diagnosis plus remediation. After ranking aggregate drivers, recommend concrete next steps that can reduce future usage:
+
+- Suggest Headroom when available for context/headroom estimation if evidence shows high context-window pressure, repeated large reads, or long-thread accumulation. Say "if available" unless tool registry confirms it.
+- Suggest dashboard verification steps: open top rows in Calls, inspect selected records in Call Investigator, compare Threads by total tokens, or use Diagnostics Notebook for usage-drain evidence.
+- Suggest custom solutions Codex can build when pattern repeatable: repo-specific test selector, local summary command, prompt checklist, dashboard report preset, or small script extracting exact project facts Codex keeps rediscovering.
+- Suggest workflow changes only when aggregate evidence supports them: split bloated threads, lower reasoning effort for routine edits, reuse one thread for cache-friendly related work, or start fresh thread after compacting needed state into docs.
+
+Structure recommendations as `Evidence`, `Likely waste pattern`, `Next action`, and `How to verify`. Keep privacy boundary explicit and avoid raw context unless user asks.
+
 ## Answer Style
 
 - Lead with the direct answer and key metric.

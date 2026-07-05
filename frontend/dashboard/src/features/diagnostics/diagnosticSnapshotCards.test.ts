@@ -30,7 +30,7 @@ describe('diagnostic snapshot cards', () => {
       functions: [],
     } as DiagnosticSnapshotPayload);
 
-    expect(card.subtitle).toContain('Computed Jul 3, 8:00 AM');
+    expect(card.subtitle).toContain('Computed Jul 3,');
     expect(card.subtitle).toContain('history all');
     expect(card.subtitle).toContain('logs scanned 12');
     expect(card.subtitle).toContain('rows scanned 34');

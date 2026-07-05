@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.15.0 - 2026-07-05
+
+- Make the companion plugin/skills remediation-aware for token-waste investigations, including Headroom suggestions when available, dashboard verification paths, and custom local automation ideas.
+- Fix React dashboard package verification for public release readiness, including bundled React dashboard resources in local wheel smoke coverage and refreshed synthetic Calls/Details README screenshots.
+- Harden React dashboard context evidence and diagnostics smoke tests against current row-selection and duplicate-heading behavior.
+- Recenter the README around talking with the plugin/skill about local aggregate usage, with example conversation docs for token-waste and remediation workflows.
+
 ## 0.14.1 - 2026-07-04
 
 - Harden React dashboard responsive chrome, including topbar control wrapping, table containment, sticky table affordances, mobile nav polish, and refreshed synthetic dashboard screenshots.
