@@ -4,7 +4,7 @@ describe('React dashboard context evidence cache', () => {
   installAppTestHooks();
 
   it('reuses loaded evidence when returning to the side-panel Evidence tab', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-context-cache');
     installContextCacheBootPayload();
     const fetchMock = vi.fn().mockResolvedValue(contextResponse('cached side-panel sample'));
     vi.stubGlobal('fetch', fetchMock);
@@ -26,7 +26,7 @@ describe('React dashboard context evidence cache', () => {
   });
 
   it('restores opened context entries and scroll positions when returning to Evidence', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-context-cache');
     installContextCacheBootPayload();
     const fetchMock = vi.fn().mockResolvedValue(contextEntriesResponse(['context entry one', 'context entry two']));
     vi.stubGlobal('fetch', fetchMock);
@@ -54,7 +54,7 @@ await waitFor(() => expect(restoredEntries[1]).toHaveAttribute('open'));
   });
 
   it('restores show-all context entry depth across tabs and full-page investigator', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-context-cache');
     installContextCacheBootPayload();
     const fetchMock = vi.fn().mockResolvedValue(
       contextEntriesResponse(Array.from({ length: 12 }, (_, index) => `context depth entry ${index + 1}`)),
@@ -80,7 +80,7 @@ await waitFor(() => expect(restoredEntries[1]).toHaveAttribute('open'));
   });
 
   it('reuses side-panel evidence in the full-page Call Investigator', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-context-cache');
     installContextCacheBootPayload();
     const fetchMock = vi.fn().mockResolvedValue(serializedContextResponse('cached full-page sample'));
     vi.stubGlobal('fetch', fetchMock);
@@ -122,7 +122,7 @@ await waitFor(() => expect(restoredEntries[1]).toHaveAttribute('open'));
   });
 
   it('restores non-default side-panel context options in the full-page Call Investigator', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-context-cache');
     installContextCacheBootPayload();
     const fetchMock = vi.fn().mockResolvedValue(contextResponse('cached full-analysis option sample'));
     vi.stubGlobal('fetch', fetchMock);

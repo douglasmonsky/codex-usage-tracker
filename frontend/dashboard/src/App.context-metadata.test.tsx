@@ -4,7 +4,7 @@ describe('React dashboard context entry metadata', () => {
   installAppTestHooks();
 
   it('hydrates selected-call evidence action labels from dashboard i18n payload', () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-side-panel-i18n');
     window.__CODEX_USAGE_BOOT__ = {
       language: 'es',
       language_direction: 'ltr',
@@ -51,7 +51,7 @@ describe('React dashboard context entry metadata', () => {
   });
 
   it('shows timing, token, compaction, and tool-output metadata in selected-call evidence', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-metadata');
     window.__CODEX_USAGE_BOOT__ = {
       api_token: 'test-token',
       context_api_enabled: true,
@@ -164,7 +164,7 @@ describe('React dashboard context entry metadata', () => {
   });
 
   it('runs full serialized analysis from deferred selected-call evidence', async () => {
-    window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-metadata');
     installMetadataBootPayload();
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(contextAttributionResponse({ deferred: true }))

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.14.2 - 2026-07-05
+
+- Fix React dashboard package verification for public release readiness, including bundled React dashboard resources in local wheel smoke coverage and refreshed synthetic Calls/Details README screenshots.
+- Harden React dashboard context evidence and diagnostics smoke tests against current row-selection and duplicate-heading behavior.
+- Copyedit public dashboard/plugin positioning ahead of the API, MCP, and React UI showcase.
+
 ## 0.14.1 - 2026-07-04
 
 - Harden React dashboard responsive chrome, including topbar control wrapping, table containment, sticky table affordances, mobile nav polish, and refreshed synthetic dashboard screenshots.

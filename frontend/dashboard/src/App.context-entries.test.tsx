@@ -4,7 +4,7 @@ describe('React dashboard context entry visibility', () => {
 installAppTestHooks();
 
 it('reveals all returned selected-call evidence entries instead of silently truncating them', async () => {
-window.history.replaceState(null, '', '/?view=calls');
+    window.history.replaceState(null, '', '/?view=calls&record=record-many-entries');
 installEntryBootPayload();
 const fetchMock = vi.fn().mockResolvedValue(contextEntriesResponse(10));
 vi.stubGlobal('fetch', fetchMock);

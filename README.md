@@ -85,7 +85,7 @@ If this helped you track Codex usage, starring the repo helps others find it. Is
 
 ## Companion Skill And Plugin
 
-The dashboard is the core product surface. The Codex plugin and companion usage skill are add-ons that let Codex refresh local aggregates, call the MCP tools, and explain usage patterns conversationally after plugin discovery. Examples: [MCP And Codex Skills](docs/mcp.md).
+The dashboard is the core product surface. The Codex plugin and companion usage skills let Codex refresh local aggregates, call MCP tools, and explain usage patterns conversationally after plugin discovery. Examples: [MCP And Codex Skills](docs/mcp.md).
 
 <p align="center">
   <a href="docs/assets/plugin-prompts.png"><img src="docs/assets/plugin-prompts.png?v=readme-drilldown" alt="Synthetic Codex plugin prompt preview showing usage dashboard and thread investigation suggestions." width="86%"></a>
