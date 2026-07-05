@@ -111,6 +111,8 @@ RESOURCE_PATHS = [
     "dashboard/locales/it.json",
     "dashboard/locales/ar.json",
     "docs/dashboard-guide.html",
+    "docs/examples/token-waste-conversation.md",
+    "docs/examples/remediation-conversation.md",
     "docs/assets/dashboard-insights.png",
     "docs/assets/dashboard-calls.png",
     "docs/assets/dashboard-calls-preview.png",

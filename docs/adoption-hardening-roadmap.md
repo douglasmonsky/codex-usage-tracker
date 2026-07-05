@@ -94,7 +94,7 @@ Branches:
 
 Release target:
 
-- Ship `0.15.0` when refresh behavior is explainable for both normal and large histories.
+- Fold remaining refresh-behavior hardening into the next adoption patch/minor after `0.15.0`.
 
 ## 0.16: Maintainability Ratchet
 

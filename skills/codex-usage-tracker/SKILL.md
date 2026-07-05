@@ -41,6 +41,19 @@ When the user wants ideas, suggest concrete aggregate investigations:
 
 Route these through `usage_report_pack`, `usage_calls`, `usage_threads`, `usage_summary`, and `usage_call_detail` before considering raw context.
 
+## Remediation Recommendations
+
+When a usage-waste investigation finds clear patterns, do not stop at "interesting." Recommend practical next actions and existing tools that could reduce future usage. Keep recommendations tied to aggregate evidence, and label speculative ideas.
+
+- If context pressure is high, threads are long, or repeated file reads dominate, suggest Headroom if available as a follow-up tool for estimating context/headroom and deciding whether to split the thread, summarize, or start a fresh task.
+- If cache ratio is low on repeated work, suggest concrete workflow fixes: keep related work in one thread, avoid unnecessary broad file reads, pin reusable project context in docs, or create a small project command/script that produces the exact aggregate needed.
+- If one thread or subagent pattern dominates, suggest narrowing the task, splitting investigation from implementation, or creating a repeatable custom checklist/command so Codex does not rediscover the same facts every turn.
+- If effort/model choice looks expensive, compare aggregate results by model and effort before recommending lower effort, smaller models, or explicit "use minimal reasoning unless blocked" instructions.
+- If diagnostics point to missing local automation, offer to design a custom lightweight solution: a repo command, lint/test selector, dashboard report preset, support-bundle check, or Codex skill update that prevents the same waste pattern.
+- Mention dashboard actions that help the user verify the fix: open Calls filtered to the expensive rows, Threads sorted by tokens, Call Investigator for a selected record, or Diagnostics Notebook for usage-drain evidence.
+
+Phrase the final answer as "what happened, why it likely matters, what to try next, how to verify." Avoid implying an external tool is installed unless the current environment or tool registry confirms it.
+
 ## Common Workflows
 
 - Refresh the index before answering usage questions.
