@@ -13,7 +13,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -25,6 +25,7 @@ MIGRATION_NAMES = {
     8: "persist observed Codex usage snapshots",
     9: "persist aggregate diagnostic facts",
     10: "persist on-demand diagnostic report snapshots",
+    11: "normalize observed allowance history",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -73,6 +74,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (8, _migrate_v8),
         (9, _migrate_v9),
         (10, _migrate_v10),
+        (11, _migrate_v11),
     )
 
 
@@ -280,6 +282,135 @@ def _migrate_v10(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_diagnostic_snapshots_computed_at
             ON diagnostic_snapshots(computed_at);
+        """
+    )
+
+
+def _migrate_v11(conn: sqlite3.Connection) -> None:
+    _create_allowance_observations_table(conn)
+    _backfill_allowance_observations(conn)
+
+
+def _create_allowance_observations_table(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS allowance_observations (
+            observation_id TEXT PRIMARY KEY,
+            record_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            event_timestamp TEXT NOT NULL,
+            line_number INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            window_key TEXT NOT NULL,
+            window_kind TEXT NOT NULL,
+            window_minutes INTEGER,
+            used_percent REAL,
+            remaining_percent REAL,
+            resets_at INTEGER,
+            plan_type TEXT,
+            limit_id TEXT,
+            is_archived INTEGER NOT NULL DEFAULT 0,
+            model TEXT,
+            effort TEXT,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            uncached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_output_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            cumulative_total_tokens INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_observations_window_time
+        ON allowance_observations(window_kind, event_timestamp);
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_observations_record
+        ON allowance_observations(record_id);
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_observations_limit_window_time
+        ON allowance_observations(limit_id, window_kind, event_timestamp);
+        """
+    )
+
+
+def _backfill_allowance_observations(conn: sqlite3.Connection) -> None:
+    conn.execute("DELETE FROM allowance_observations")
+    _backfill_allowance_observation_window(conn, "primary")
+    _backfill_allowance_observation_window(conn, "secondary")
+
+
+def _backfill_allowance_observation_window(
+    conn: sqlite3.Connection, window_key: str
+) -> None:
+    used_col = f"rate_limit_{window_key}_used_percent"
+    minutes_col = f"rate_limit_{window_key}_window_minutes"
+    resets_col = f"rate_limit_{window_key}_resets_at"
+    conn.execute(
+        f"""
+        INSERT INTO allowance_observations (
+            observation_id,
+            record_id,
+            session_id,
+            event_timestamp,
+            line_number,
+            source,
+            window_key,
+            window_kind,
+            window_minutes,
+            used_percent,
+            remaining_percent,
+            resets_at,
+            plan_type,
+            limit_id,
+            is_archived,
+            model,
+            effort,
+            input_tokens,
+            cached_input_tokens,
+            uncached_input_tokens,
+            output_tokens,
+            reasoning_output_tokens,
+            total_tokens,
+            cumulative_total_tokens
+        )
+        SELECT
+            record_id || ':{window_key}',
+            record_id,
+            session_id,
+            event_timestamp,
+            line_number,
+            'token_count.rate_limits',
+            '{window_key}',
+            CASE
+                WHEN {minutes_col} = 300 THEN 'five_hour'
+                WHEN {minutes_col} = 10080 THEN 'weekly'
+                WHEN {minutes_col} IS NULL THEN 'unknown'
+                ELSE 'custom'
+            END,
+            {minutes_col},
+            {used_col},
+            CASE
+                WHEN {used_col} IS NULL THEN NULL
+                ELSE 100.0 - {used_col}
+            END,
+            {resets_col},
+            rate_limit_plan_type,
+            rate_limit_limit_id,
+            is_archived,
+            model,
+            effort,
+            input_tokens,
+            cached_input_tokens,
+            uncached_input_tokens,
+            output_tokens,
+            reasoning_output_tokens,
+            total_tokens,
+            cumulative_total_tokens
+        FROM usage_events
+        WHERE {used_col} IS NOT NULL
+            OR {minutes_col} IS NOT NULL
+            OR {resets_col} IS NOT NULL
         """
     )
 

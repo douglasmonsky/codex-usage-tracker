@@ -7,6 +7,11 @@ import json
 import sys
 from typing import Any
 
+from codex_usage_tracker.allowance_intelligence import (
+    build_allowance_diagnostics_report,
+    build_allowance_export_report,
+    build_allowance_history_report,
+)
 from codex_usage_tracker.cli.config import (
     run_init_allowance,
     run_init_pricing,
@@ -442,6 +447,71 @@ def _run_pricing_coverage(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_allowance_history(args: argparse.Namespace) -> int:
+    report = build_allowance_history_report(
+        db_path=args.db,
+        allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        include_archived=args.include_archived,
+        window_kind=args.window_kind,
+        limit=_allowance_report_limit(args.limit),
+        privacy_mode=args.privacy_mode,
+    )
+    if args.as_json:
+        print_json(report.payload)
+        return 0
+    print(report.render())
+    return 0
+
+
+def _run_allowance_diagnostics(args: argparse.Namespace) -> int:
+    report = build_allowance_diagnostics_report(
+        db_path=args.db,
+        allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        include_archived=args.include_archived,
+        window_kind=args.window_kind,
+        limit=_allowance_report_limit(args.limit),
+        privacy_mode=args.privacy_mode,
+    )
+    if args.as_json:
+        print_json(report.payload)
+        return 0
+    print(report.render())
+    return 0
+
+
+def _run_allowance_export(args: argparse.Namespace) -> int:
+    report = build_allowance_export_report(
+        db_path=args.db,
+        allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        include_archived=args.include_archived,
+        window_kind=args.window_kind,
+        limit=_allowance_report_limit(args.limit),
+    )
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(report.payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    if args.as_json:
+        print_json(report.payload)
+        return 0
+    if args.output is not None:
+        print(f"Wrote allowance evidence export to {args.output}")
+        return 0
+    print(report.render())
+    return 0
+
+
+def _allowance_report_limit(limit: int | None) -> int | None:
+    if limit is None or limit <= 0:
+        return None
+    return limit
+
+
 def _run_export(args: argparse.Namespace) -> int:
     count = export_usage_csv(
         output_path=args.output,
@@ -526,6 +596,9 @@ _COMMAND_HANDLERS = {
     "serve-dashboard": run_serve_dashboard,
     "expensive": _run_expensive,
     "pricing-coverage": _run_pricing_coverage,
+    "allowance-history": _run_allowance_history,
+    "allowance-diagnostics": _run_allowance_diagnostics,
+    "allowance-export": _run_allowance_export,
     "export": _run_export,
     "init-pricing": run_init_pricing,
     "update-pricing": run_update_pricing,

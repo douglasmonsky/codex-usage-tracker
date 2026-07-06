@@ -101,6 +101,8 @@ codex-usage-tracker summary --preset by-subagent-role
 codex-usage-tracker expensive --limit 10
 codex-usage-tracker recommendations --limit 10
 codex-usage-tracker pricing-coverage
+codex-usage-tracker allowance-history --window-kind weekly --json
+codex-usage-tracker allowance-diagnostics --window-kind weekly --json
 ```
 
 Useful investigations:
@@ -112,6 +114,8 @@ Useful investigations:
 - Use `summary --preset by-subagent-role` to see whether delegated work is driving a large share of usage.
 - Use `expensive --limit 10` for a quick list of the highest-cost calls.
 - Use `recommendations --json` for ranked action rows and thread rollups with severity score, primary recommendation, and secondary signals.
+
+- Use `allowance-diagnostics --window-kind weekly --json` when investigating allowance-change claims; 5-hour diagnostics are rolling-window context. Read `summary.research_readiness` and candidate `statistical_evidence` before making stronger claims.
 
 ## Diagnostics
 
@@ -176,9 +180,11 @@ Raw context is read from the original local JSONL source only when explicitly re
 ```bash
 codex-usage-tracker export --output usage.csv
 codex-usage-tracker export --output usage.csv --limit 0
+codex-usage-tracker allowance-export --output /tmp/codex-allowance-evidence.json
 ```
 
 Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing CSV output.
+`allowance-export` always produces a strict-privacy local evidence bundle for manual sharing and omits prompts, thread names, session IDs, record IDs, file paths, and tool output.
 
 ## Support Bundle
 

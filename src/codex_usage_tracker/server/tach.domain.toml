@@ -1,5 +1,6 @@
 [root]
 depends_on = [
+    "//codex_usage_tracker.allowance_intelligence",
     "//codex_usage_tracker.context",
     "//codex_usage_tracker.core",
     "//codex_usage_tracker.dashboard",
