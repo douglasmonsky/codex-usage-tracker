@@ -55,14 +55,17 @@ def parse_dashboard_offset(value: str | None) -> int:
 def parse_api_limit(value: str | None, default: int) -> int | None:
     if value is None or value == "":
         return default
-    if value.lower() == "all":
+    normalized = value.strip().lower()
+    if normalized in {"all", "none", "null"}:
         return None
     try:
-        limit = int(value)
+        limit = int(normalized)
     except ValueError as exc:
-        raise ValueError("limit must be a positive integer or all") from exc
-    if limit <= 0:
-        raise ValueError("limit must be a positive integer or all")
+        raise ValueError("limit must be a positive integer, 0, all, or none") from exc
+    if limit == 0:
+        return None
+    if limit < 0:
+        raise ValueError("limit must be a positive integer, 0, all, or none")
     return min(limit, 10_000)
 
 

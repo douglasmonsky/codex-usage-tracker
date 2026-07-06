@@ -27,6 +27,39 @@ def test_allowance_history_payload_returns_normalized_rows(tmp_path: Path) -> No
     assert "record_id" not in payload["rows"][0]
 
 
+@pytest.mark.parametrize("limit_query", ["limit=0", "limit=None", "limit=none"])
+def test_allowance_payloads_accept_zero_and_none_limits(
+    tmp_path: Path,
+    limit_query: str,
+) -> None:
+    db_path = _allowance_db(tmp_path)
+    common = {
+        "db_path": db_path,
+        "allowance_path": tmp_path / "allowance.json",
+        "rate_card_path": tmp_path / "rate-card.json",
+        "include_archived_default": False,
+    }
+
+    history = server_allowance.allowance_history_payload(
+        f"window_kind=weekly&privacy_mode=strict&{limit_query}",
+        privacy_mode="strict",
+        **common,
+    )
+    diagnostics = server_allowance.allowance_diagnostics_payload(
+        f"window_kind=weekly&privacy_mode=strict&{limit_query}",
+        privacy_mode="strict",
+        **common,
+    )
+    export = server_allowance.allowance_export_payload(
+        f"window_kind=weekly&{limit_query}",
+        **common,
+    )
+
+    assert history["row_count"] == 2
+    assert diagnostics["summary"]["observation_count"] == 2
+    assert export["summary"]["observation_count"] == 2
+
+
 def test_allowance_diagnostics_payload_validates_window_kind(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="window_kind must be one of"):
         server_allowance.allowance_diagnostics_payload(

@@ -132,10 +132,34 @@ def test_threads_payload_uses_defaults_and_all_limit(
     assert calls["direction"] == "desc"
 
 
+@pytest.mark.parametrize("limit_value", ["0", "None", "none", "null"])
+def test_threads_payload_accepts_zero_and_none_as_all_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    limit_value: str,
+) -> None:
+    calls: dict[str, Any] = {}
+
+    def query_threads(**kwargs: Any) -> list[dict[str, object]]:
+        calls.update(kwargs)
+        return []
+
+    monkeypatch.setattr(server_threads, "query_thread_summaries", query_threads)
+
+    payload = server_threads.threads_payload(
+        f"limit={limit_value}",
+        db_path=tmp_path / "usage.sqlite3",
+        include_archived_default=False,
+    )
+
+    assert payload["limit"] is None
+    assert calls["limit"] is None
+
+
 def test_threads_payload_rejects_invalid_limit(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="limit must be .*positive integer.*all"):
         server_threads.threads_payload(
-            "limit=0",
+            "limit=-1",
             db_path=tmp_path / "usage.sqlite3",
             include_archived_default=False,
         )

@@ -247,6 +247,8 @@ Schemas:
 
 Allowance intelligence normalizes observed 5-hour and weekly usage snapshots from aggregate token-count rows. Diagnostics compare visible usage movement with locally estimated Codex credits and grade the evidence. Weekly windows are the primary signal; 5-hour windows are treated as noisy rolling counters. Weekly change candidates include `nonparametric-v1` statistical evidence and a stricter `summary.research_readiness.ready_for_public_claim` flag. Strict export omits prompts, assistant text, tool output, file paths, thread names, session IDs, and record IDs.
 
+HTTP report endpoints accept `limit=all`, `limit=0`, `limit=none`, and `limit=null` as all rows up to the endpoint safety cap.
+
 ```json
 {
   "schema": "codex-usage-tracker-allowance-diagnostics-v1",
