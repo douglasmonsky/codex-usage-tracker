@@ -61,7 +61,7 @@ def test_weekly_stable_allowance_does_not_flag_regime_change() -> None:
     assert analysis["summary"]["candidate_change_count"] == 0
 
 
-def test_weekly_capacity_drop_flags_strong_local_evidence() -> None:
+def test_weekly_capacity_drop_with_thin_baseline_is_not_promoted() -> None:
     analysis = build_allowance_analysis(
         [
             _analysis_row("r0", 10.0, 0.0),
@@ -73,9 +73,22 @@ def test_weekly_capacity_drop_flags_strong_local_evidence() -> None:
         ]
     )
 
+    assert analysis["summary"]["primary_evidence_grade"] == "no_change_detected"
+    assert analysis["summary"]["candidate_change_count"] == 0
+    assert analysis["change_candidates"] == []
+
+
+def test_weekly_capacity_drop_flags_strong_local_evidence_after_baseline() -> None:
+    rows = [_analysis_row("r0", 10.0, 0.0)]
+    rows.extend(_analysis_row(f"r{index}", 10.0 + index, 100.0) for index in range(1, 7))
+    rows.extend(_analysis_row(f"r{index}", 10.0 + index, 50.0) for index in range(7, 10))
+
+    analysis = build_allowance_analysis(rows)
+
     assert analysis["summary"]["primary_evidence_grade"] == "strong_local_evidence"
     assert analysis["summary"]["candidate_change_count"] == 1
     candidate = analysis["change_candidates"][0]
+    assert candidate["previous_span_count"] == 6
     assert candidate["capacity_ratio"] == 0.5
     assert candidate["recent_span_count"] == 3
     assert candidate["statistical_evidence"]["method"] == "exact_permutation_mean_shift"
