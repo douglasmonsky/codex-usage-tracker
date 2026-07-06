@@ -29,7 +29,7 @@ The detector now includes a `nonparametric-v1` evidence block for weekly candida
 - Cliff's delta effect size, where negative values mean recent spans bought less visible allowance movement per estimated credit;
 - a stricter `research_readiness.ready_for_public_claim` flag that requires repeated weekly spans on both sides of the split, strong effect size, and p-value support.
 
-This intentionally separates local diagnostics from public claims. A small sample can still produce `strong_local_evidence` when the direction is consistent, but the public-claim readiness flag stays false until there are enough weekly spans to make a more defensible statement.
+This intentionally separates local diagnostics from public claims. Candidate shifts require at least six positive weekly spans before the split, which keeps a tiny early baseline from becoming the headline result when later data is much denser. Public-claim readiness stays stricter still: it requires repeated weekly spans on both sides, strong effect size, and p-value support.
 
 ## Commands
 

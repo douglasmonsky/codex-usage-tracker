@@ -20,8 +20,9 @@ EVIDENCE_GRADES = (
 
 _CHANGE_RATIO_THRESHOLD = 0.75
 _STRONG_CHANGE_RATIO_THRESHOLD = 0.67
-_MIN_CHANGE_SPANS = 4
+_MIN_BASELINE_CHANGE_SPANS = 6
 _MIN_RECENT_CHANGE_SPANS = 2
+_MIN_CHANGE_SPANS = _MIN_BASELINE_CHANGE_SPANS + _MIN_RECENT_CHANGE_SPANS
 _PUBLIC_CLAIM_MIN_SPLIT_SPANS = 6
 _PUBLIC_CLAIM_P_VALUE_THRESHOLD = 0.05
 _PERMUTATION_EXACT_MAX_COMBINATIONS = 50_000
@@ -178,7 +179,9 @@ def _change_candidate(window_kind: str, spans: list[dict[str, Any]]) -> dict[str
         return None
 
     best: dict[str, Any] | None = None
-    for split in range(2, len(spans) - _MIN_RECENT_CHANGE_SPANS + 1):
+    for split in range(
+        _MIN_BASELINE_CHANGE_SPANS, len(spans) - _MIN_RECENT_CHANGE_SPANS + 1
+    ):
         previous = spans[:split]
         recent = spans[split:]
         previous_median = _median_credits_per_percent(previous)
