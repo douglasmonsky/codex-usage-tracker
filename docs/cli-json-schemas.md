@@ -47,6 +47,9 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
+| `codex-usage-tracker-allowance-history-v1` | CLI `allowance-history --json`, MCP `usage_allowance_history(...)`, dashboard server `/api/allowance/history` |
+| `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
+| `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
 | `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response, MCP `usage_report_pack(...)` |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
@@ -213,6 +216,74 @@ Schema: `codex-usage-tracker-recommendations-v1`
 ```
 
 Rows include `recommendation_score`, `primary_recommendation`, `secondary_recommendations`, `primary_signal`, `secondary_signals`, `recommended_action`, and `flag_explanations`. Thread rollups summarize the highest-priority threads using the same aggregate-only signals.
+
+## Allowance Intelligence
+
+Commands:
+
+```bash
+codex-usage-tracker allowance-history --window-kind weekly --json
+codex-usage-tracker allowance-diagnostics --window-kind weekly --json
+codex-usage-tracker allowance-export --output /tmp/codex-allowance-evidence.json
+```
+
+MCP:
+
+- `usage_allowance_history(...)`
+- `usage_allowance_diagnostics(...)`
+- `usage_allowance_export(...)`
+
+Server API:
+
+- `/api/allowance/history`
+- `/api/allowance/diagnostics`
+- `/api/allowance/export`
+
+Schemas:
+
+- `codex-usage-tracker-allowance-history-v1`
+- `codex-usage-tracker-allowance-diagnostics-v1`
+- `codex-usage-tracker-allowance-evidence-export-v1`
+
+Allowance intelligence normalizes observed 5-hour and weekly usage snapshots from aggregate token-count rows. Diagnostics compare visible usage movement with locally estimated Codex credits and grade the evidence. Weekly windows are the primary signal; 5-hour windows are treated as noisy rolling counters. Weekly change candidates include `nonparametric-v1` statistical evidence and a stricter `summary.research_readiness.ready_for_public_claim` flag. Strict export omits prompts, assistant text, tool output, file paths, thread names, session IDs, and record IDs.
+
+```json
+{
+  "schema": "codex-usage-tracker-allowance-diagnostics-v1",
+  "generated_at": "2026-06-01T00:00:00+00:00",
+  "privacy_mode": "strict",
+  "include_archived": false,
+  "window_kind": "weekly",
+  "summary": {
+    "observation_count": 4,
+    "primary_evidence_grade": "possible_regime_change",
+    "research_readiness": {
+      "detector_version": "nonparametric-v1",
+      "ready_for_public_claim": false,
+      "weekly_positive_span_count": 3,
+      "minimum_split_spans_for_public_claim": 6
+    }
+  },
+  "windows": [],
+  "spans": [],
+  "change_candidates": [
+    {
+      "evidence_grade": "possible_regime_change",
+      "capacity_ratio": 0.72,
+      "outside_usage_possible": true,
+      "statistical_evidence": {
+        "detector_version": "nonparametric-v1",
+        "method": "exact_permutation_mean_shift",
+        "effect_size_cliffs_delta": -0.67,
+        "p_value_one_sided": 0.18,
+        "signal": "directional_effect_limited",
+        "public_claim_ready": false
+      }
+    }
+  ],
+  "notes": []
+}
+```
 
 ## Session
 

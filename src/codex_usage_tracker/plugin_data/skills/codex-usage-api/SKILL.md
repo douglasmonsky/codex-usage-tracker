@@ -31,9 +31,12 @@ The only exception is `usage_call_context`, which reads one selected record's lo
    - `usage_summary(..., response_format="json")`
    - `session_usage(..., response_format="json")`
    - `most_expensive_usage_calls(..., response_format="json")`
-   - `usage_recommendations(..., response_format="json")`
-   - `usage_pricing_coverage(..., response_format="json")`
-   - `usage_query(...)`
+ - `usage_recommendations(..., response_format="json")`
+ - `usage_pricing_coverage(..., response_format="json")`
+ - `usage_allowance_diagnostics(..., privacy_mode="strict")`
+ - `usage_allowance_history(..., privacy_mode="strict")`
+ - `usage_allowance_export(...)`
+ - `usage_query(...)`
 7. Check the top-level `schema` field before interpreting structured output. Known schema ids are documented in `docs/cli-json-schemas.md`.
 8. If MCP tools are unavailable, fall back to CLI equivalents: `refresh --json`, `summary --json`, `query`, `session --json`, `expensive --json`, `recommendations --json`, and `pricing-coverage --json`.
 9. If `codex-usage-tracker` is missing but you are inside the source checkout, use `PYTHONPATH=src .venv/bin/python -m codex_usage_tracker.cli <command>`. Do not use `PYTHONPATH=src` outside that checkout.
@@ -51,12 +54,18 @@ The only exception is `usage_call_context`, which reads one selected record's lo
 - "Why did usage spike?" Use `usage_recommendations(response_format="json")` for ranked causes, then `usage_query` or `usage_calls` with focused filters for supporting rows.
 - "What is unpriced or estimated?" Use `usage_pricing_coverage(response_format="json")` and `usage_query(pricing_status="unpriced")` or `usage_query(credit_confidence="estimated")`.
 - "How does this affect my allowance?" Use rows from `usage_query` or `usage_calls` and summarize `usage_credits`, `usage_credit_confidence`, and allowance annotations. Explain that remaining allowance is only as accurate as the user's local allowance config.
+- "Did my allowance change?", "Are limits lower?", "Am I being throttled?", or "Why is weekly usage weird?" Use `usage_allowance_diagnostics(window_kind="weekly", privacy_mode="strict")`. Read `change_candidates[].statistical_evidence` and `summary.research_readiness` before answering. Separate local evidence from public claims, and preserve caveats about outside usage and unofficial inference.
 - "What happened in this session?" Use `session_usage(session_id=..., response_format="json")`.
 - "What should I inspect next?" Use `usage_report_pack(...)` or `usage_recommendations(response_format="json")`, then explain the primary recommendation, secondary signals, and row scope.
 
 ## Suggested Investigation Ideas
 
 When the user asks what they can look into, offer a short menu of concrete aggregate-only investigations rather than a generic list.
+
+- "Did my Codex allowance or limit change?" Use `usage_allowance_diagnostics(window_kind="weekly", privacy_mode="strict")`. Lead with `primary_evidence_grade`, candidate change count, weekly observation count, and caveat local logs are not OpenAI official ledger.
+- "Why does the 5-hour counter look weird?" Use `usage_allowance_diagnostics(window_kind="five_hour", privacy_mode="strict")` and explain rolling-window noise before claiming allowance changes.
+- "Can I share allowance evidence?" Use `usage_allowance_export(...)`. Do not use raw context, CSV, or non-strict reports for public sharing unless user explicitly wants local-only detail.
+- "Compare observed usage movement against estimated credits." Use `usage_allowance_diagnostics(privacy_mode="strict")`, then `usage_allowance_history(...)` only when user needs normalized rows.
 
 - "Look through my usage for token waste." Use `usage_report_pack(...)`, then `usage_calls(sort="tokens", direction="desc", limit=10)` and call out high-token calls, low cache ratios, high context-window percent, expensive estimates, or repeated same-thread spikes.
 - "Find calls where context got bloated." Use `usage_calls(...)` sorted by tokens or filtered to recent rows, then rank by `context_window_percent`, `input_tokens`, and low `cache_ratio`.
@@ -84,5 +93,6 @@ Structure recommendations as `Evidence`, `Likely waste pattern`, `Next action`, 
 - Use at most one short progress update such as "Refreshing aggregate usage, then ranking threads."
 - Name data scope, time window, project, thread, model, row count, and whether rows are truncated or paginated.
 - Separate exact facts from estimates. Call out `pricing_estimated`, missing `pricing_model`, `usage_credit_confidence`, and missing allowance windows.
+- For allowance-change answers, separate weekly evidence from 5-hour counter behavior. Name the evidence grade and say when outside usage could explain movement.
 - Include the next useful investigation when the answer depends on unclear pricing, stale allowance values, or a broad time window.
 - Keep explanations tied to aggregate fields. Do not guess conversation content.

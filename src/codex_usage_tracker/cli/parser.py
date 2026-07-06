@@ -80,6 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_export_parser(subparsers)
     _add_pricing_parsers(subparsers)
     _add_allowance_parser(subparsers)
+    _add_allowance_intelligence_parsers(subparsers)
     _add_rate_card_parser(subparsers)
     _add_threshold_parser(subparsers)
     _add_project_parser(subparsers)
@@ -495,6 +496,54 @@ def _add_allowance_parser(
         help="Overwrite an invalid existing allowance config.",
     )
     parse_allowance.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_allowance_intelligence_parsers(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    history = subparsers.add_parser(
+        "allowance-history",
+        help="Return normalized observed Codex allowance history",
+    )
+    _add_allowance_intelligence_filters(history, default_limit=1000)
+    history.add_argument("--json", action="store_true", dest="as_json")
+
+    diagnostics = subparsers.add_parser(
+        "allowance-diagnostics",
+        help="Diagnose observed allowance movement against local credit estimates",
+    )
+    _add_allowance_intelligence_filters(diagnostics, default_limit=10000)
+    diagnostics.add_argument("--json", action="store_true", dest="as_json")
+
+    export = subparsers.add_parser(
+        "allowance-export",
+        help="Build strict-privacy allowance evidence bundle for manual sharing",
+    )
+    _add_allowance_intelligence_filters(export, default_limit=10000)
+    export.add_argument("--output", type=Path, default=None)
+    export.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_allowance_intelligence_filters(
+    parser: argparse.ArgumentParser, *, default_limit: int
+) -> None:
+    parser.add_argument(
+        "--window-kind",
+        choices=("weekly", "five_hour", "custom", "unknown"),
+        default=None,
+        help="Limit analysis to one observed allowance window kind.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=default_limit,
+        help="Maximum normalized observations to inspect. Use 0 for all.",
+    )
+    parser.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived Codex sessions.",
+    )
 
 
 def _add_rate_card_parser(

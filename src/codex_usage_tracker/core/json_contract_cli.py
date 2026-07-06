@@ -88,8 +88,8 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             },
         },
     'codex-usage-tracker-recommendations-v1': {
-            "required": {
-                "filters": dict,
+        "required": {
+            "filters": dict,
                 "row_count": int,
                 "total_matched_rows": int,
                 "truncated": bool,
@@ -107,12 +107,47 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                     "min_score": (int, float, NoneType),
                     "limit": (int, NoneType),
                     "privacy_mode": str,
-                }
-            },
+            }
         },
+    },
+    "codex-usage-tracker-allowance-history-v1": {
+        "required": {
+            "generated_at": str,
+            "privacy_mode": str,
+            "include_archived": bool,
+            "window_kind": (str, NoneType),
+            "row_count": int,
+            "rows": list,
+            "notes": list,
+        },
+    },
+    "codex-usage-tracker-allowance-diagnostics-v1": {
+        "required": {
+            "generated_at": str,
+            "privacy_mode": str,
+            "include_archived": bool,
+            "window_kind": (str, NoneType),
+            "summary": dict,
+            "windows": list,
+            "spans": list,
+            "change_candidates": list,
+            "notes": list,
+        },
+    },
+    "codex-usage-tracker-allowance-evidence-export-v1": {
+        "required": {
+            "generated_at": str,
+            "privacy_mode": str,
+            "include_archived": bool,
+            "summary": dict,
+            "windows": list,
+            "change_candidates": list,
+            "notes": list,
+        },
+    },
     'codex-usage-tracker-dashboard-v1': {
-            "required": {
-                "dashboard_path": str,
+        "required": {
+            "dashboard_path": str,
                 "file_url": str,
                 "opened": bool,
                 "limit": (int, NoneType),

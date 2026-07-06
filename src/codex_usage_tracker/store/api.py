@@ -20,6 +20,9 @@ from codex_usage_tracker.parser.state import (
     PARSER_ADAPTER_VERSION,
     PARSER_DIAGNOSTIC_KEYS,
 )
+from codex_usage_tracker.store.allowance_observations import (
+    query_allowance_observations as query_allowance_observations,
+)
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,

@@ -73,6 +73,9 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_call_context`
 - `most_expensive_usage_calls`
 - `usage_pricing_coverage`
+- `usage_allowance_history`
+- `usage_allowance_diagnostics`
+- `usage_allowance_export`
 - `generate_usage_dashboard`
 - `export_usage_csv`
 - `init_usage_pricing_config`
@@ -98,6 +101,14 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `refresh_usage_index`, `usage_query`, `generate_usage_dashboard`, `export_usage_csv`, and config-writing MCP tools return JSON dictionaries directly.
 
 `refresh_usage_index(include_archived=True)` and `generate_usage_dashboard(include_archived=True)` are explicit all-history opt-ins. The default dashboard view excludes archived session rows so older work does not inflate the current usage picture.
+
+## Allowance Intelligence MCP Tools
+
+- `usage_allowance_history(...)` returns normalized observed weekly and 5-hour allowance snapshots.
+- `usage_allowance_diagnostics(...)` returns evidence grades comparing observed usage movement against estimated local credits. Weekly candidates include `nonparametric-v1` statistical evidence plus `summary.research_readiness`; weekly windows are primary and 5-hour windows are noisy rolling-window context.
+- `usage_allowance_export(...)` returns a strict-privacy evidence bundle for manual sharing.
+
+Use these when users ask whether limits changed, whether weekly allowance behavior shifted, why the 5-hour counter looks noisy, or how to share aggregate allowance evidence safely.
 
 ## Raw Context Guard
 

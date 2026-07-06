@@ -63,7 +63,7 @@ Compare model and effort usage, then suggest safer defaults.
 Open the dashboard and filter Calls to the rows behind your recommendation.
 ```
 
-The companion skill treats waste discovery as diagnosis plus remediation: it can point to Calls, Threads, Call Investigator, Diagnostics Notebook, Headroom when available, or a custom local command/skill/report preset Codex can build to stop repeating the same waste pattern.
+The companion skill treats waste discovery as diagnosis plus remediation: it can point to Calls, Threads, Call Investigator, Diagnostics Notebook, Allowance Intelligence, Headroom when available, or a custom local command/skill/report preset Codex can build to stop repeating the same waste pattern.
 
 Example conversation docs:
 
@@ -262,6 +262,7 @@ Full model: [Privacy Guide](docs/privacy.md).
 - [Dashboard Guide](docs/dashboard-guide.md)
 - [CLI Reference](docs/cli-reference.md)
 - [Pricing, Credits, And Allowance](docs/pricing-and-credits.md)
+- [Allowance Intelligence](docs/allowance-intelligence.md)
 - [MCP And Codex Skills](docs/mcp.md)
 - [Privacy Guide](docs/privacy.md)
 - [Architecture](docs/architecture.md)
