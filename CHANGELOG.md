@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.16.0 - 2026-07-07
+
+- Add allowance intelligence foundation with normalized allowance history, evidence-graded change diagnostics, local evidence exports, and API/MCP report surfaces for weekly-vs-5-hour usage analysis.
+- Add local content-indexed MCP/API exploration surfaces, including content search, thread trace, pattern scans, investigation walks, and strict local evidence exports.
+- Add roadmap for default local content indexing, SQLite FTS5 search, parser drift handling, and future diagnostics for repeated file rediscovery, shell churn, and large low-output calls.
+- Fix schema initialization so already-applied migrations are not rerun during read/report calls on migrated local databases.
+
 ## 0.15.1 - 2026-07-05
 
 - Fix the PyPI wheel package resources by tracking the React dashboard `index.html` entrypoint used by `serve-dashboard` and installed-package smoke tests.
