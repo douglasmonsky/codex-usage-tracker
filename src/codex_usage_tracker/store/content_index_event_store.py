@@ -93,11 +93,11 @@ def _merge_tool_call_row(existing: dict[str, object], row: dict[str, object]) ->
     existing["ended_at"] = row.get("ended_at") or existing.get("ended_at")
     existing["argument_shape"] = existing.get("argument_shape") or row.get("argument_shape")
     existing["output_size_bytes"] = max(
-        int(existing.get("output_size_bytes") or 0),
-        int(row.get("output_size_bytes") or 0),
+        _int_value(existing.get("output_size_bytes")),
+        _int_value(row.get("output_size_bytes")),
     )
-    existing["line_start"] = min(int(existing["line_start"]), int(row["line_start"]))
-    existing["line_end"] = max(int(existing["line_end"]), int(row["line_end"]))
+    existing["line_start"] = min(_int_value(existing["line_start"]), _int_value(row["line_start"]))
+    existing["line_end"] = max(_int_value(existing["line_end"]), _int_value(row["line_end"]))
 
 
 def _command_run_rows(
@@ -159,11 +159,11 @@ def _merge_command_run_row(existing: dict[str, object], row: dict[str, object]) 
     existing["status"] = _merged_status(existing.get("status"), row.get("status"))
     existing["exit_code"] = row.get("exit_code") if row.get("exit_code") is not None else existing.get("exit_code")
     existing["output_size_bytes"] = max(
-        int(existing.get("output_size_bytes") or 0),
-        int(row.get("output_size_bytes") or 0),
+        _int_value(existing.get("output_size_bytes")),
+        _int_value(row.get("output_size_bytes")),
     )
-    existing["line_start"] = min(int(existing["line_start"]), int(row["line_start"]))
-    existing["line_end"] = max(int(existing["line_end"]), int(row["line_end"]))
+    existing["line_start"] = min(_int_value(existing["line_start"]), _int_value(row["line_start"]))
+    existing["line_end"] = max(_int_value(existing["line_end"]), _int_value(row["line_end"]))
 
 
 def _file_event_rows(
@@ -288,3 +288,18 @@ def _merged_status(existing: object, incoming: object) -> object:
 
 def _stable_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _int_value(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default

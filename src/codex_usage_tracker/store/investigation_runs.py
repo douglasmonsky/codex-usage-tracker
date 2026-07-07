@@ -20,8 +20,10 @@ def insert_investigation_run(
     created_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     schema = str(payload.get("schema") or "")
     question = str(payload.get("question") or "")
-    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
-    branches = payload.get("branches") if isinstance(payload.get("branches"), list) else []
+    summary_value = payload.get("summary")
+    summary = summary_value if isinstance(summary_value, dict) else {}
+    branches_value = payload.get("branches")
+    branches = branches_value if isinstance(branches_value, list) else []
     run_key = _stable_hash(f"{run_kind}:{schema}:{question}:{created_at}")
     conn.execute(
         """
@@ -75,7 +77,16 @@ def _evidence_count(branches: list[object]) -> int:
     total = 0
     for branch in branches:
         if isinstance(branch, dict):
-            total += int(branch.get("evidence_count") or 0)
+            value = branch.get("evidence_count")
+            if isinstance(value, bool):
+                total += int(value)
+            elif isinstance(value, int):
+                total += value
+            elif isinstance(value, str):
+                try:
+                    total += int(value)
+                except ValueError:
+                    continue
     return total
 
 
