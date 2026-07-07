@@ -402,10 +402,10 @@ def _path_values(value: object) -> list[str]:
             paths.extend(_path_values(item))
         return paths
     if isinstance(value, dict):
-        paths: list[str] = []
+        dict_paths: list[str] = []
         for key in _PATH_VALUE_KEYS:
-            paths.extend(_path_values(value.get(key)))
-        return paths
+            dict_paths.extend(_path_values(value.get(key)))
+        return dict_paths
     return []
 
 
