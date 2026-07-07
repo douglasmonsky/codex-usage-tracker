@@ -13,6 +13,13 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION, optional_str
+from codex_usage_tracker.store.content_index_event_store import flush_pending_event_rows
+from codex_usage_tracker.store.content_index_events import (
+    PendingCommandRun,
+    PendingFileEvent,
+    PendingToolCall,
+    extract_pending_local_events,
+)
 from codex_usage_tracker.store.query_sql import usage_where_clause
 
 MAX_FRAGMENT_CHARS = 4000
@@ -704,6 +711,9 @@ def _index_content_for_source_file(
         source_files_to_replace=[str(source_path)],
     )
     pending: list[_PendingFragment] = []
+    pending_tool_calls: list[PendingToolCall] = []
+    pending_command_runs: list[PendingCommandRun] = []
+    pending_file_events: list[PendingFileEvent] = []
     turn_id: str | None = None
     turn_index = 0
     parse_warnings = 0
@@ -736,7 +746,17 @@ def _index_content_for_source_file(
                             pending=pending,
                             usage_row=usage_row,
                         )
+                        flush_pending_event_rows(
+                            conn,
+                            tool_calls=pending_tool_calls,
+                            command_runs=pending_command_runs,
+                            file_events=pending_file_events,
+                            usage_row=usage_row,
+                        )
                     pending = []
+                    pending_tool_calls = []
+                    pending_command_runs = []
+                    pending_file_events = []
                     continue
                 pending.extend(
                     _extract_pending_fragments(
@@ -748,6 +768,15 @@ def _index_content_for_source_file(
                         turn_index=turn_index,
                     )
                 )
+                events = extract_pending_local_events(
+                    envelope=envelope,
+                    payload=payload,
+                    line_number=line_number,
+                    timestamp=timestamp,
+                )
+                pending_tool_calls.extend(events.tool_calls)
+                pending_command_runs.extend(events.command_runs)
+                pending_file_events.extend(events.file_events)
     except OSError:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
 

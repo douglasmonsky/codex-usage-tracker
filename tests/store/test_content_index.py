@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
@@ -8,7 +9,7 @@ from codex_usage_tracker.reports.api import (
     build_thread_trace_report,
 )
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
-from tests.store_dashboard_helpers import _make_codex_home
+from tests.store_dashboard_helpers import _entry, _make_codex_home, _token_event, _write_jsonl
 
 
 def test_refresh_populates_normalized_content_index_by_default(tmp_path: Path) -> None:
@@ -37,6 +38,108 @@ def test_refresh_populates_normalized_content_index_by_default(tmp_path: Path) -
     assert all("SECRET RAW PROMPT" not in row["safe_label"] for row in fragment_rows)
 
 
+def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    session_id = "019e37f1-15d4-76a5-bf68-9d7616f9b8db"
+    log_path = (
+        codex_home / "sessions" / "2026" / "05" / "18" / f"rollout-2026-05-18T09-00-00-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        log_path,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry("turn_context", {"turn_id": "turn-tools", "model": "gpt-5.5"}),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "call_id": "call-read",
+                    "name": "exec_command",
+                    "arguments": json.dumps({"cmd": "cat docs/private_notes.md"}),
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "call_id": "call-read",
+                    "output": (
+                        "Chunk ID: abc123\n"
+                        "Wall time: 0.0000 seconds\n"
+                        "Process exited with code 0\n"
+                        "Original token count: 12\n"
+                        "Output:\n"
+                        "SECRET FILE CONTENT"
+                    ),
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "call_id": "call-patch",
+                    "name": "apply_patch",
+                    "input": (
+                        "*** Begin Patch\n"
+                        "*** Update File: src/app.py\n"
+                        "@@\n"
+                        "-old\n"
+                        "+new\n"
+                        "*** End Patch\n"
+                    ),
+                },
+            ),
+            _token_event(420, 120),
+        ],
+    )
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        tool_rows = conn.execute(
+            """
+            SELECT tool_name, call_id, status, argument_shape, output_size_bytes, line_start, line_end
+            FROM tool_calls
+            ORDER BY call_id
+            """
+        ).fetchall()
+        command_rows = conn.execute(
+            """
+            SELECT command_root, command_label, status, exit_code, output_size_bytes, line_start, line_end
+            FROM command_runs
+            """
+        ).fetchall()
+        file_rows = conn.execute(
+            """
+            SELECT operation, path_basename, path_extension, path_identity
+            FROM file_events
+            ORDER BY operation, path_basename
+            """
+        ).fetchall()
+
+    read_tool = next(row for row in tool_rows if row["call_id"] == "call-read")
+    assert read_tool["tool_name"] == "exec_command"
+    assert read_tool["status"] == "completed"
+    assert read_tool["argument_shape"] == '{"cmd":"str"}'
+    assert read_tool["output_size_bytes"] > 0
+    assert read_tool["line_start"] < read_tool["line_end"]
+    assert all("docs/private_notes.md" not in row["argument_shape"] for row in tool_rows)
+
+    assert len(command_rows) == 1
+    assert command_rows[0]["command_root"] == "cat"
+    assert command_rows[0]["command_label"] == "cat"
+    assert command_rows[0]["status"] == "completed"
+    assert command_rows[0]["exit_code"] == 0
+    assert command_rows[0]["output_size_bytes"] > 0
+
+    assert {row["operation"] for row in file_rows} == {"modify", "read"}
+    assert {row["path_basename"] for row in file_rows} == {"app.py", "private_notes.md"}
+    assert all("/" not in row["path_basename"] for row in file_rows)
+    assert all(row["path_identity"] == row["path_identity"][:12] for row in file_rows)
+
+
 def test_refresh_aggregate_only_skips_content_index(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -47,11 +150,20 @@ def test_refresh_aggregate_only_skips_content_index(tmp_path: Path) -> None:
         init_db(conn)
         usage_count = conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()
         fragment_count = conn.execute("SELECT COUNT(*) FROM content_fragments").fetchone()
+        tool_count = conn.execute("SELECT COUNT(*) FROM tool_calls").fetchone()
+        command_count = conn.execute("SELECT COUNT(*) FROM command_runs").fetchone()
+        file_count = conn.execute("SELECT COUNT(*) FROM file_events").fetchone()
 
-        assert usage_count is not None
-        assert fragment_count is not None
-        assert usage_count[0] > 0
-        assert fragment_count[0] == 0
+    assert usage_count is not None
+    assert fragment_count is not None
+    assert tool_count is not None
+    assert command_count is not None
+    assert file_count is not None
+    assert usage_count[0] > 0
+    assert fragment_count[0] == 0
+    assert tool_count[0] == 0
+    assert command_count[0] == 0
+    assert file_count[0] == 0
 
 
 def test_content_search_returns_explicit_local_snippets(tmp_path: Path) -> None:

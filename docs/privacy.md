@@ -17,9 +17,9 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - observed Codex rate-limit snapshot metadata from local token-count logs, including plan type, limit id, 5-hour and weekly used percentages, window lengths, and reset times
 - diagnostic fact labels tied to aggregate call records, safe event categories, payload type labels, counts, timestamps, and line ranges
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
-- normalized local content-index rows for local investigation, including conversation turns, bounded content fragments, source provenance, parser adapter metadata, parser warnings, and FTS5 search rows when SQLite supports FTS5
+- normalized local content-index rows for local investigation, including conversation turns, bounded content fragments, tool calls, command runs, file events, source provenance, parser adapter metadata, parser warnings, and FTS5 search rows when SQLite supports FTS5
 
-The content index is intended for local MCP/API exploration. It is not a hosted collection system and it does not change where the original Codex logs live.
+The content index is intended for local MCP/API exploration. It is not a hosted collection system and it does not change where the original Codex logs live. Normalized command and file-event rows store command roots/labels plus path hashes/basenames rather than full shell commands or full paths; bounded raw snippets remain confined to `content_fragments`.
 
 ## Shareable Outputs
 

@@ -5,14 +5,14 @@ Codex Usage Tracker is a local sidecar app. It reads Codex session JSONL logs, s
 The current storage model has two layers:
 
 - Aggregate usage index: token counters, model/effort metadata, call origins, diagnostic labels, thread summaries, pricing/credit estimates, allowance snapshots, and safe report payloads.
-- Local content index: normalized conversation turns and bounded content fragments with source provenance for explicit local MCP/API investigation.
+- Local content index: normalized conversation turns, bounded content fragments, tool calls, command runs, file events, and source provenance for explicit local MCP/API investigation.
 
 Shareable outputs remain aggregate-first and must omit indexed/raw content unless an export is explicitly documented as a local raw/content export.
 
 ## Boundaries
 
 - `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories, diagnostic facts from `diagnostic_facts.py`, archived-session flags, conservative thread keys, source cursors, and parser diagnostics.
-- `store/content_index.py` owns normalized local content-index population and cleanup. It may persist bounded local snippets, parser adapter metadata, source provenance, parse warnings, and FTS5 search rows. It must not feed raw/indexed content into default CSV, dashboard HTML, support bundle, or aggregate report payloads.
+- `store/content_index.py` owns normalized local content-index population and cleanup. It may persist bounded local snippets, tool-call metadata, command roots/labels, file path hashes/basenames, parser adapter metadata, source provenance, parse warnings, and FTS5 search rows. It must not feed raw/indexed content into default CSV, dashboard HTML, support bundle, or aggregate report payloads.
 - `call_origin.py` owns the pure call-origin classifier and migrated-row fallback. It must not open source JSONL files; source-log reads belong in refresh/indexing or explicit context loading.
 - `schema.py` owns persisted SQLite columns and migrations. Add columns or tables there before changing refresh, export, or MCP behavior.
 - `store.py` and `store/api.py` own SQLite setup, refresh, rebuild, query access, previous/next call links, materialized thread summaries, source-file refresh cursors, SQL-backed live dashboard API slices, and cleanup ordering.
