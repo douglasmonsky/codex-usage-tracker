@@ -16,6 +16,7 @@ from codex_usage_tracker.store.api import (
     init_db,
     query_dashboard_event_count,
     query_session_usage,
+    query_source_records,
     refresh_metadata,
     refresh_usage_index,
     schema_state,
@@ -33,6 +34,7 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
         init_db(conn)
 
     rows = query_session_usage(db_path=db_path, session_id=LEGACY_SESSION_ID)
+    source_rows = query_source_records(db_path=db_path, limit=0)
     state = schema_state(db_path)
     metadata = refresh_metadata(db_path)
 
@@ -54,11 +56,20 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert rows[0]["rate_limit_limit_id"] is None
     assert rows[0]["rate_limit_primary_used_percent"] is None
     assert rows[0]["rate_limit_secondary_used_percent"] is None
+    assert len(source_rows) == 1
+    assert source_rows[0]["record_id"] == "legacy-record"
+    assert source_rows[0]["source_file"] == "/tmp/synthetic-session.jsonl"
+    assert source_rows[0]["line_number"] == 12
+    assert source_rows[0]["raw_shape_label"] == "token_count"
+    assert source_rows[0]["parser_adapter"] == "codex-jsonl"
+    assert source_rows[0]["parser_version"] == "codex-jsonl-v2"
+    assert source_rows[0]["hash_basis"] == "source_file_id:line_number:record_id"
+    assert len(str(source_rows[0]["source_record_hash"])) == 64
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 11
+    assert state["schema_version"] == 12
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == list(range(1, 12))
+    assert [row["version"] for row in state["migrations"]] == list(range(1, 13))
     with connect(db_path) as conn:
         init_db(conn)
         facts = conn.execute("SELECT COUNT(*) AS count FROM call_diagnostic_facts").fetchone()
@@ -89,7 +100,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "11"
+    assert metadata["schema_version"] == "12"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -109,8 +120,8 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
         ]
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
-    assert versions == list(range(1, 12))
-    assert user_version == 11
+    assert versions == list(range(1, 13))
+    assert user_version == 12
 
 
 def test_csv_export_keeps_current_columns_after_legacy_migration(tmp_path: Path) -> None:

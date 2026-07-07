@@ -13,7 +13,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -26,6 +26,7 @@ MIGRATION_NAMES = {
     9: "persist aggregate diagnostic facts",
     10: "persist on-demand diagnostic report snapshots",
     11: "normalize observed allowance history",
+    12: "persist source record provenance",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -75,6 +76,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (9, _migrate_v9),
         (10, _migrate_v10),
         (11, _migrate_v11),
+        (12, _migrate_v12),
     )
 
 
@@ -289,6 +291,59 @@ def _migrate_v10(conn: sqlite3.Connection) -> None:
 def _migrate_v11(conn: sqlite3.Connection) -> None:
     _create_allowance_observations_table(conn)
     _backfill_allowance_observations(conn)
+
+
+def _migrate_v12(conn: sqlite3.Connection) -> None:
+    _create_source_records_table(conn)
+    _backfill_source_records(conn)
+
+
+def _create_source_records_table(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS source_records (
+            record_id TEXT PRIMARY KEY,
+            source_file_id TEXT NOT NULL,
+            source_file_hash TEXT NOT NULL,
+            line_number INTEGER NOT NULL,
+            event_timestamp TEXT NOT NULL,
+            source_record_hash TEXT NOT NULL,
+            hash_basis TEXT NOT NULL DEFAULT 'source_file_id:line_number:record_id',
+            raw_shape_label TEXT NOT NULL DEFAULT 'token_count',
+            parser_adapter TEXT NOT NULL,
+            parser_version TEXT NOT NULL,
+            parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+            created_from TEXT NOT NULL DEFAULT 'usage_events',
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_source_records_source_line
+        ON source_records(source_file_id, line_number);
+
+        CREATE INDEX IF NOT EXISTS idx_source_records_shape_adapter
+        ON source_records(raw_shape_label, parser_adapter, parser_version);
+
+        CREATE INDEX IF NOT EXISTS idx_source_records_event_timestamp
+        ON source_records(event_timestamp);
+        """
+    )
+
+
+def _backfill_source_records(conn: sqlite3.Connection) -> None:
+    if not _source_record_backfill_columns_available(conn):
+        return
+    from codex_usage_tracker.store.source_records import sync_source_records
+
+    sync_source_records(conn)
+
+
+def _source_record_backfill_columns_available(conn: sqlite3.Connection) -> bool:
+    existing = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+    }
+    required = {"record_id", "source_file", "line_number", "event_timestamp"}
+    return required.issubset(existing)
 
 
 def _create_allowance_observations_table(conn: sqlite3.Connection) -> None:

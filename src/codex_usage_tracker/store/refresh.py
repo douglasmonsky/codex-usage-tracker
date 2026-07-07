@@ -111,6 +111,7 @@ def rebuild_usage_index(
         init_db(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
+        conn.execute("DELETE FROM source_records")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
