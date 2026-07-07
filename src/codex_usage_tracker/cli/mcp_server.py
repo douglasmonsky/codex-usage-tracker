@@ -1,4 +1,4 @@
-"""MCP server exposing aggregate-only Codex usage tools."""
+"""MCP server exposing Codex usage, diagnostics, and local investigation tools."""
 
 from __future__ import annotations
 
