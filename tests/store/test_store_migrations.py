@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from codex_usage_tracker.diagnostics.api import run_doctor
+from codex_usage_tracker.store import schema as schema_module
 from codex_usage_tracker.store.api import (
     EVENT_COLUMNS,
     SchemaMigrationError,
@@ -143,6 +144,35 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
     assert content_feature is not None
     if int(content_feature["enabled"]):
         assert "content_fts" in tables
+
+
+def test_init_db_does_not_rerun_applied_migrations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    with connect(db_path) as conn:
+        init_db(conn)
+
+    def fail_if_rerun(conn: sqlite3.Connection) -> None:
+        raise AssertionError("init_db reran an applied migration")
+
+    monkeypatch.setattr(
+        schema_module,
+        "_schema_migrations",
+        lambda: tuple(
+            (version, fail_if_rerun)
+            for version in range(1, schema_module.SCHEMA_VERSION + 1)
+        ),
+    )
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+        recorded_count = conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0]
+
+    assert user_version == schema_module.SCHEMA_VERSION
+    assert recorded_count == schema_module.SCHEMA_VERSION
 
 
 def test_csv_export_keeps_current_columns_after_legacy_migration(tmp_path: Path) -> None:

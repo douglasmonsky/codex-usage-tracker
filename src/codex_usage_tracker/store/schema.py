@@ -91,11 +91,10 @@ def _apply_schema_migration(
     version: int,
     migrate: Callable[[sqlite3.Connection], None],
 ) -> None:
-    migrate(conn)
-    if user_version < version:
+    if user_version < version or not _migration_record_exists(conn, version):
+        migrate(conn)
         _record_migration(conn, version)
         return
-    _record_migration_if_missing(conn, version)
 
 
 def _ensure_migrations_table(conn: sqlite3.Connection) -> None:
@@ -715,12 +714,18 @@ def _record_migration(conn: sqlite3.Connection, version: int) -> None:
 
 
 def _record_migration_if_missing(conn: sqlite3.Connection, version: int) -> None:
-    exists = conn.execute(
-        "SELECT 1 FROM schema_migrations WHERE version = ?",
-        (version,),
-    ).fetchone()
-    if exists is None:
+    if not _migration_record_exists(conn, version):
         _record_migration(conn, version)
+
+
+def _migration_record_exists(conn: sqlite3.Connection, version: int) -> bool:
+    return (
+        conn.execute(
+            "SELECT 1 FROM schema_migrations WHERE version = ?",
+            (version,),
+        ).fetchone()
+        is not None
+    )
 
 
 def _ensure_columns(conn: sqlite3.Connection, columns: dict[str, str]) -> None:
