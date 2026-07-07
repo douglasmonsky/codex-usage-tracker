@@ -49,6 +49,7 @@ from codex_usage_tracker.store.api import (
     query_source_record_totals,
     query_summary,
     query_thread_trace,
+    record_investigation_run,
 )
 
 SUMMARY_GROUP_BY_CHOICES = (
@@ -563,32 +564,32 @@ def build_investigation_walk_report(
     patterns = pattern_result["patterns"]
     branches = _investigation_branches(patterns=patterns, evidence_limit=normalized_evidence_limit)
     supported = [branch for branch in branches if branch["status"] != "no_evidence"]
-    return InvestigationWalkReport(
-        {
-            "schema": "codex-usage-tracker-investigation-walk-v1",
-            "content_mode": "local_content_index",
-            "includes_indexed_content": True,
-            "includes_raw_fragments": False,
-            "privacy_mode": privacy_mode,
-            "question": question,
-            "filters": {
-                "since": since,
-                "until": until,
-                "thread": thread,
-                "include_archived": include_archived,
-                "min_occurrences": max(1, min_occurrences),
-                "evidence_limit": normalized_evidence_limit,
-            },
-            "summary": {
-                "branch_count": len(branches),
-                "supported_branch_count": len(supported),
-                "top_hypothesis": supported[0]["hypothesis"] if supported else None,
-                "confidence": _walk_confidence(supported),
-            },
-            "branches": branches,
-            "recommended_next_tools": _recommended_investigation_tools(supported),
-        }
-    )
+    payload = {
+        "schema": "codex-usage-tracker-investigation-walk-v1",
+        "content_mode": "local_content_index",
+        "includes_indexed_content": True,
+        "includes_raw_fragments": False,
+        "privacy_mode": privacy_mode,
+        "question": question,
+        "filters": {
+            "since": since,
+            "until": until,
+            "thread": thread,
+            "include_archived": include_archived,
+            "min_occurrences": max(1, min_occurrences),
+            "evidence_limit": normalized_evidence_limit,
+        },
+        "summary": {
+            "branch_count": len(branches),
+            "supported_branch_count": len(supported),
+            "top_hypothesis": supported[0]["hypothesis"] if supported else None,
+            "confidence": _walk_confidence(supported),
+        },
+        "branches": branches,
+        "recommended_next_tools": _recommended_investigation_tools(supported),
+    }
+    record_investigation_run(db_path=db_path, run_kind="investigation_walk", payload=payload)
+    return InvestigationWalkReport(payload)
 
 
 def _investigation_branches(
@@ -737,39 +738,39 @@ def build_local_evidence_export_report(
         privacy_mode="strict",
     ).payload
     branches = [_export_branch(branch) for branch in walk["branches"]]
-    return LocalEvidenceExportReport(
-        {
-            "schema": "codex-usage-tracker-local-evidence-export-v1",
-            "content_mode": "shareable_local_evidence",
-            "includes_indexed_content": False,
-            "includes_raw_fragments": False,
-            "privacy_mode": "strict",
-            "question": question,
-            "filters": walk["filters"],
-            "summary": {
-                **walk["summary"],
-                "export_branch_count": len(branches),
-            },
-            "branches": branches,
-            "omitted_fields": [
-                "record_id",
-                "session_id",
-                "thread_name",
-                "raw_fragment",
-                "snippet",
-                "raw_command",
-                "raw_tool_output",
-                "full_path",
-                "path_basename",
-                "command_label",
-            ],
-            "caveats": [
-                "Local evidence only; not an official OpenAI ledger.",
-                "Counts are derived from local Codex logs and normalized tracker indexes.",
-                "Export intentionally omits prompts, snippets, thread names, record ids, raw command output, and file names.",
-            ],
-        }
-    )
+    payload = {
+        "schema": "codex-usage-tracker-local-evidence-export-v1",
+        "content_mode": "shareable_local_evidence",
+        "includes_indexed_content": False,
+        "includes_raw_fragments": False,
+        "privacy_mode": "strict",
+        "question": question,
+        "filters": walk["filters"],
+        "summary": {
+            **walk["summary"],
+            "export_branch_count": len(branches),
+        },
+        "branches": branches,
+        "omitted_fields": [
+            "record_id",
+            "session_id",
+            "thread_name",
+            "raw_fragment",
+            "snippet",
+            "raw_command",
+            "raw_tool_output",
+            "full_path",
+            "path_basename",
+            "command_label",
+        ],
+        "caveats": [
+            "Local evidence only; not an official OpenAI ledger.",
+            "Counts are derived from local Codex logs and normalized tracker indexes.",
+            "Export intentionally omits prompts, snippets, thread names, record ids, raw command output, and file names.",
+        ],
+    }
+    record_investigation_run(db_path=db_path, run_kind="local_evidence_export", payload=payload)
+    return LocalEvidenceExportReport(payload)
 
 
 def _export_branch(branch: dict[str, Any]) -> dict[str, Any]:

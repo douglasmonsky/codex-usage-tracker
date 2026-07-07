@@ -201,6 +201,23 @@ def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None
     serialized_export = json.dumps(export)
     for forbidden in _private_export_sentinels():
         assert forbidden not in serialized_export
+    with connect(db_path) as conn:
+        init_db(conn)
+        run_rows = conn.execute(
+            """
+            SELECT run_kind, payload_schema, content_mode, includes_raw_fragments, summary_json
+            FROM investigation_runs
+            ORDER BY created_at, run_kind
+            """
+        ).fetchall()
+    assert {row["run_kind"] for row in run_rows} >= {
+        "investigation_walk",
+        "local_evidence_export",
+    }
+    assert all(row["includes_raw_fragments"] == 0 for row in run_rows)
+    serialized_runs = json.dumps([dict(row) for row in run_rows])
+    for forbidden in _private_export_sentinels():
+        assert forbidden not in serialized_runs
 
 
 def test_refresh_aggregate_only_skips_content_index(tmp_path: Path) -> None:

@@ -59,6 +59,7 @@ from codex_usage_tracker.store.diagnostic_queries import (
     query_diagnostic_summary as query_diagnostic_summary,
 )
 from codex_usage_tracker.store.exports import export_usage_csv as export_usage_csv
+from codex_usage_tracker.store.investigation_runs import insert_investigation_run
 from codex_usage_tracker.store.rows import (
     row_to_dict as _row_to_dict,
 )
@@ -264,6 +265,19 @@ def query_pattern_scan(
             min_occurrences=min_occurrences,
             limit=limit,
         )
+
+
+def record_investigation_run(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    run_kind: str,
+    payload: dict[str, Any],
+) -> str:
+    """Persist bounded investigation run metadata."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        return insert_investigation_run(conn, run_kind=run_kind, payload=payload)
 
 
 def record_refresh_metadata(

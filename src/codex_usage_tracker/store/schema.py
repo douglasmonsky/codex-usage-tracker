@@ -13,7 +13,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -28,6 +28,7 @@ MIGRATION_NAMES = {
     11: "normalize observed allowance history",
     12: "persist source record provenance",
     13: "create normalized content index tables",
+    14: "persist investigation run summaries",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -79,6 +80,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (11, _migrate_v11),
         (12, _migrate_v12),
         (13, _migrate_v13),
+        (14, _migrate_v14),
     )
 
 
@@ -302,6 +304,34 @@ def _migrate_v12(conn: sqlite3.Connection) -> None:
 
 def _migrate_v13(conn: sqlite3.Connection) -> None:
     _create_content_index_tables(conn)
+
+
+def _migrate_v14(conn: sqlite3.Connection) -> None:
+    _create_investigation_run_tables(conn)
+
+
+def _create_investigation_run_tables(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS investigation_runs (
+            run_key TEXT PRIMARY KEY,
+            run_kind TEXT NOT NULL,
+            question TEXT NOT NULL DEFAULT '',
+            payload_schema TEXT NOT NULL,
+            content_mode TEXT NOT NULL,
+            includes_indexed_content INTEGER NOT NULL DEFAULT 0,
+            includes_raw_fragments INTEGER NOT NULL DEFAULT 0,
+            privacy_mode TEXT NOT NULL,
+            summary_json TEXT NOT NULL DEFAULT '{}',
+            branch_count INTEGER NOT NULL DEFAULT 0,
+            evidence_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_investigation_runs_kind_created
+        ON investigation_runs(run_kind, created_at);
+        """
+    )
 
 
 def _create_content_index_tables(conn: sqlite3.Connection) -> None:
