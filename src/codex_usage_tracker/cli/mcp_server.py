@@ -1,4 +1,4 @@
-"""MCP server exposing aggregate-only Codex usage tools."""
+"""MCP server exposing Codex usage, diagnostics, and local investigation tools."""
 
 from __future__ import annotations
 
@@ -44,11 +44,17 @@ from codex_usage_tracker.pricing.api import (
     write_pricing_template,
 )
 from codex_usage_tracker.reports.api import (
+    build_content_search_report,
     build_expensive_calls_report,
+    build_investigation_walk_report,
+    build_local_evidence_export_report,
+    build_pattern_scan_report,
     build_pricing_coverage_report,
     build_query_report,
     build_recommendations_report,
+    build_source_coverage_report,
     build_summary_report,
+    build_thread_trace_report,
 )
 from codex_usage_tracker.server.call_detail import call_detail_payload
 from codex_usage_tracker.server.call_lists import calls_payload
@@ -134,13 +140,17 @@ def _live_call_rows(
 
 
 @mcp.tool()
-def refresh_usage_index(include_archived: bool = False) -> dict[str, Any]:
-    """Scan local Codex logs and upsert aggregate usage metrics into SQLite."""
+def refresh_usage_index(
+    include_archived: bool = False,
+    aggregate_only: bool = False,
+) -> dict[str, Any]:
+    """Scan local Codex logs into SQLite usage and content indexes."""
 
     result = refresh_index(
         codex_home=DEFAULT_CODEX_HOME,
         db_path=DEFAULT_DB_PATH,
         include_archived=include_archived,
+        aggregate_only=aggregate_only,
     )
     return refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1")
 
@@ -348,6 +358,257 @@ def usage_pricing_coverage(
     if response_format == "json":
         return report.payload
     return report.render(limit=limit)
+
+
+@mcp.tool()
+def usage_source_coverage(
+    include_archived: bool = False,
+    limit: int = 20,
+    response_format: str = "markdown",
+) -> str | dict[str, Any]:
+    """Show source provenance parser coverage aggregate-only."""
+
+    report = build_source_coverage_report(
+        db_path=DEFAULT_DB_PATH,
+        include_archived=include_archived,
+    )
+    if response_format == "json":
+        return report.payload
+    return report.render(limit=limit)
+
+
+@mcp.tool()
+def usage_content_search(
+    query: str,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 20,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Search explicit local content index snippets with aggregate call metadata."""
+
+    return build_content_search_report(
+        db_path=DEFAULT_DB_PATH,
+        query=query,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_thread_trace(
+    thread: str | None = None,
+    thread_key: str | None = None,
+    session_id: str | None = None,
+    record_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 100,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Return a local content-index call timeline for one thread/session."""
+
+    return build_thread_trace_report(
+        db_path=DEFAULT_DB_PATH,
+        thread=thread,
+        thread_key=thread_key,
+        session_id=session_id,
+        record_id=record_id,
+        since=since,
+        until=until,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+def _pattern_scan_payload(
+    *,
+    scan_type: str,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    min_occurrences: int,
+    limit: int | None,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    return build_pattern_scan_report(
+        db_path=DEFAULT_DB_PATH,
+        scan_type=scan_type,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_repetition_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find repeated local content fragment hashes."""
+
+    return _pattern_scan_payload(
+        scan_type="repetition",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+@mcp.tool()
+def usage_command_loop_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find repeated command roots/labels and failing command loops."""
+
+    return _pattern_scan_payload(
+        scan_type="command_loop",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+@mcp.tool()
+def usage_file_churn_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find repeated normalized file read/modify events."""
+
+    return _pattern_scan_payload(
+        scan_type="file_churn",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+@mcp.tool()
+def usage_context_bloat_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find high-token threads with local content/event density."""
+
+    return _pattern_scan_payload(
+        scan_type="context_bloat",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+@mcp.tool()
+def usage_investigation_walk(
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Run a bounded local hypothesis walk over normalized usage evidence."""
+
+    return build_investigation_walk_report(
+        db_path=DEFAULT_DB_PATH,
+        question=question,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        evidence_limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_local_evidence_export(
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+) -> dict[str, Any]:
+    """Return a strict shareable local evidence summary without raw content."""
+
+    return build_local_evidence_export_report(
+        db_path=DEFAULT_DB_PATH,
+        question=question,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        evidence_limit=evidence_limit,
+    ).payload
 
 
 @mcp.tool()

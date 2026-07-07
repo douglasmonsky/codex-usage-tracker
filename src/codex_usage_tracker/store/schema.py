@@ -13,7 +13,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 14
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -26,6 +26,9 @@ MIGRATION_NAMES = {
     9: "persist aggregate diagnostic facts",
     10: "persist on-demand diagnostic report snapshots",
     11: "normalize observed allowance history",
+    12: "persist source record provenance",
+    13: "create normalized content index tables",
+    14: "persist investigation run summaries",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -75,6 +78,9 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (9, _migrate_v9),
         (10, _migrate_v10),
         (11, _migrate_v11),
+        (12, _migrate_v12),
+        (13, _migrate_v13),
+        (14, _migrate_v14),
     )
 
 
@@ -85,11 +91,10 @@ def _apply_schema_migration(
     version: int,
     migrate: Callable[[sqlite3.Connection], None],
 ) -> None:
-    migrate(conn)
-    if user_version < version:
+    if user_version < version or not _migration_record_exists(conn, version):
+        migrate(conn)
         _record_migration(conn, version)
         return
-    _record_migration_if_missing(conn, version)
 
 
 def _ensure_migrations_table(conn: sqlite3.Connection) -> None:
@@ -291,6 +296,281 @@ def _migrate_v11(conn: sqlite3.Connection) -> None:
     _backfill_allowance_observations(conn)
 
 
+def _migrate_v12(conn: sqlite3.Connection) -> None:
+    _create_source_records_table(conn)
+    _backfill_source_records(conn)
+
+
+def _migrate_v13(conn: sqlite3.Connection) -> None:
+    _create_content_index_tables(conn)
+
+
+def _migrate_v14(conn: sqlite3.Connection) -> None:
+    _create_investigation_run_tables(conn)
+
+
+def _create_investigation_run_tables(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS investigation_runs (
+            run_key TEXT PRIMARY KEY,
+            run_kind TEXT NOT NULL,
+            question TEXT NOT NULL DEFAULT '',
+            payload_schema TEXT NOT NULL,
+            content_mode TEXT NOT NULL,
+            includes_indexed_content INTEGER NOT NULL DEFAULT 0,
+            includes_raw_fragments INTEGER NOT NULL DEFAULT 0,
+            privacy_mode TEXT NOT NULL,
+            summary_json TEXT NOT NULL DEFAULT '{}',
+            branch_count INTEGER NOT NULL DEFAULT 0,
+            evidence_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_investigation_runs_kind_created
+        ON investigation_runs(run_kind, created_at);
+        """
+    )
+
+
+def _create_content_index_tables(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS content_index_features (
+            feature_key TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 0,
+            detail TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS conversation_turns (
+            turn_key TEXT PRIMARY KEY,
+            record_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            turn_id TEXT,
+            turn_index INTEGER,
+            role TEXT NOT NULL,
+            event_timestamp TEXT,
+            source_record_hash TEXT,
+            source_file_id TEXT,
+            line_start INTEGER,
+            line_end INTEGER,
+            content_hash TEXT,
+            content_size_bytes INTEGER NOT NULL DEFAULT 0,
+            indexed_content_included INTEGER NOT NULL DEFAULT 0,
+            parser_adapter TEXT NOT NULL,
+            parser_version TEXT NOT NULL,
+            parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_conversation_turns_record
+        ON conversation_turns(record_id);
+
+        CREATE INDEX IF NOT EXISTS idx_conversation_turns_session_time
+        ON conversation_turns(session_id, event_timestamp);
+
+        CREATE TABLE IF NOT EXISTS tool_calls (
+            tool_call_key TEXT PRIMARY KEY,
+            record_id TEXT NOT NULL,
+            turn_key TEXT,
+            tool_name TEXT NOT NULL,
+            call_id TEXT,
+            status TEXT,
+            started_at TEXT,
+            ended_at TEXT,
+            duration_ms INTEGER,
+            argument_shape TEXT NOT NULL DEFAULT '',
+            output_size_bytes INTEGER NOT NULL DEFAULT 0,
+            source_file_id TEXT,
+            line_start INTEGER,
+            line_end INTEGER,
+            parser_adapter TEXT NOT NULL,
+            parser_version TEXT NOT NULL,
+            parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE,
+            FOREIGN KEY(turn_key) REFERENCES conversation_turns(turn_key) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_tool_calls_record
+        ON tool_calls(record_id);
+
+        CREATE INDEX IF NOT EXISTS idx_tool_calls_tool_status
+        ON tool_calls(tool_name, status);
+
+        CREATE TABLE IF NOT EXISTS command_runs (
+            command_run_key TEXT PRIMARY KEY,
+            record_id TEXT NOT NULL,
+            turn_key TEXT,
+            command_root TEXT NOT NULL,
+            command_label TEXT NOT NULL DEFAULT '',
+            exit_code INTEGER,
+            status TEXT,
+            duration_ms INTEGER,
+            output_size_bytes INTEGER NOT NULL DEFAULT 0,
+            failure_category TEXT,
+            retry_group TEXT,
+            source_file_id TEXT,
+            line_start INTEGER,
+            line_end INTEGER,
+            parser_adapter TEXT NOT NULL,
+            parser_version TEXT NOT NULL,
+            parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE,
+            FOREIGN KEY(turn_key) REFERENCES conversation_turns(turn_key) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_command_runs_record
+        ON command_runs(record_id);
+
+        CREATE INDEX IF NOT EXISTS idx_command_runs_root_status
+        ON command_runs(command_root, status);
+
+        CREATE TABLE IF NOT EXISTS file_events (
+            file_event_key TEXT PRIMARY KEY,
+            record_id TEXT NOT NULL,
+            turn_key TEXT,
+            operation TEXT NOT NULL,
+            path_hash TEXT NOT NULL,
+            path_basename TEXT NOT NULL DEFAULT '',
+            path_extension TEXT NOT NULL DEFAULT '',
+            path_identity TEXT NOT NULL DEFAULT '',
+            source_file_id TEXT,
+            line_start INTEGER,
+            line_end INTEGER,
+            parser_adapter TEXT NOT NULL,
+            parser_version TEXT NOT NULL,
+            parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE,
+            FOREIGN KEY(turn_key) REFERENCES conversation_turns(turn_key) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_file_events_record
+        ON file_events(record_id);
+
+        CREATE INDEX IF NOT EXISTS idx_file_events_operation_path
+        ON file_events(operation, path_hash);
+
+        CREATE TABLE IF NOT EXISTS content_fragments (
+            fragment_rowid INTEGER PRIMARY KEY,
+            fragment_id TEXT NOT NULL UNIQUE,
+            record_id TEXT NOT NULL,
+            turn_key TEXT,
+            fragment_kind TEXT NOT NULL,
+            role TEXT,
+            safe_label TEXT NOT NULL DEFAULT '',
+            content_hash TEXT NOT NULL,
+            content_size_bytes INTEGER NOT NULL DEFAULT 0,
+            fragment_text TEXT NOT NULL DEFAULT '',
+            includes_raw_fragment INTEGER NOT NULL DEFAULT 0,
+            source_file_id TEXT,
+            line_start INTEGER,
+            line_end INTEGER,
+            token_link_record_id TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE,
+            FOREIGN KEY(turn_key) REFERENCES conversation_turns(turn_key) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_content_fragments_record
+        ON content_fragments(record_id);
+
+        CREATE INDEX IF NOT EXISTS idx_content_fragments_kind_role
+        ON content_fragments(fragment_kind, role);
+        """
+    )
+    _create_content_fts_table(conn)
+
+
+def _create_content_fts_table(conn: sqlite3.Connection) -> None:
+    updated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    try:
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS content_fts
+            USING fts5(
+                fragment_text,
+                safe_label,
+                fragment_kind,
+                content='content_fragments',
+                content_rowid='fragment_rowid'
+            )
+            """
+        )
+    except sqlite3.OperationalError as exc:
+        conn.execute(
+            """
+            INSERT INTO content_index_features (feature_key, enabled, detail, updated_at)
+            VALUES ('fts5', 0, ?, ?)
+            ON CONFLICT(feature_key) DO UPDATE SET
+                enabled = excluded.enabled,
+                detail = excluded.detail,
+                updated_at = excluded.updated_at
+            """,
+            (str(exc), updated_at),
+        )
+        return
+    conn.execute(
+        """
+        INSERT INTO content_index_features (feature_key, enabled, detail, updated_at)
+        VALUES ('fts5', 1, 'content_fts available', ?)
+        ON CONFLICT(feature_key) DO UPDATE SET
+            enabled = excluded.enabled,
+            detail = excluded.detail,
+            updated_at = excluded.updated_at
+        """,
+        (updated_at,),
+    )
+
+
+def _create_source_records_table(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS source_records (
+            record_id TEXT PRIMARY KEY,
+            source_file_id TEXT NOT NULL,
+            source_file_hash TEXT NOT NULL,
+            line_number INTEGER NOT NULL,
+            event_timestamp TEXT NOT NULL,
+            source_record_hash TEXT NOT NULL,
+            hash_basis TEXT NOT NULL DEFAULT 'source_file_id:line_number:record_id',
+            raw_shape_label TEXT NOT NULL DEFAULT 'token_count',
+            parser_adapter TEXT NOT NULL,
+            parser_version TEXT NOT NULL,
+            parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+            created_from TEXT NOT NULL DEFAULT 'usage_events',
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_source_records_source_line
+        ON source_records(source_file_id, line_number);
+
+        CREATE INDEX IF NOT EXISTS idx_source_records_shape_adapter
+        ON source_records(raw_shape_label, parser_adapter, parser_version);
+
+        CREATE INDEX IF NOT EXISTS idx_source_records_event_timestamp
+        ON source_records(event_timestamp);
+        """
+    )
+
+
+def _backfill_source_records(conn: sqlite3.Connection) -> None:
+    if not _source_record_backfill_columns_available(conn):
+        return
+    from codex_usage_tracker.store.source_records import sync_source_records
+
+    sync_source_records(conn)
+
+
+def _source_record_backfill_columns_available(conn: sqlite3.Connection) -> bool:
+    existing = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+    }
+    required = {"record_id", "source_file", "line_number", "event_timestamp"}
+    return required.issubset(existing)
+
+
 def _create_allowance_observations_table(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
@@ -434,12 +714,18 @@ def _record_migration(conn: sqlite3.Connection, version: int) -> None:
 
 
 def _record_migration_if_missing(conn: sqlite3.Connection, version: int) -> None:
-    exists = conn.execute(
-        "SELECT 1 FROM schema_migrations WHERE version = ?",
-        (version,),
-    ).fetchone()
-    if exists is None:
+    if not _migration_record_exists(conn, version):
         _record_migration(conn, version)
+
+
+def _migration_record_exists(conn: sqlite3.Connection, version: int) -> bool:
+    return (
+        conn.execute(
+            "SELECT 1 FROM schema_migrations WHERE version = ?",
+            (version,),
+        ).fetchone()
+        is not None
+    )
 
 
 def _ensure_columns(conn: sqlite3.Connection, columns: dict[str, str]) -> None:

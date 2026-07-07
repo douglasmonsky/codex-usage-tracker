@@ -77,6 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_dashboard_parsers(subparsers)
     _add_expensive_parser(subparsers)
     _add_pricing_coverage_parser(subparsers)
+    _add_source_coverage_parser(subparsers)
     _add_export_parser(subparsers)
     _add_pricing_parsers(subparsers)
     _add_allowance_parser(subparsers)
@@ -187,6 +188,11 @@ def _add_refresh_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     refresh = subparsers.add_parser("refresh", help="Scan Codex logs into SQLite")
     refresh.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     refresh.add_argument("--include-archived", action="store_true")
+    refresh.add_argument(
+        "--aggregate-only",
+        action="store_true",
+        help="Skip local content indexing and store aggregate usage rows only.",
+    )
     refresh.add_argument("--json", action="store_true", dest="as_json")
 
 
@@ -209,6 +215,11 @@ def _add_rebuild_index_parser(
     )
     rebuild.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     rebuild.add_argument("--include-archived", action="store_true")
+    rebuild.add_argument(
+        "--aggregate-only",
+        action="store_true",
+        help="Rebuild aggregate usage rows without local content indexing.",
+    )
     rebuild.add_argument("--json", action="store_true", dest="as_json")
 
 
@@ -428,6 +439,23 @@ def _add_pricing_coverage_parser(
         action="store_true",
         dest="as_json",
         help="Return the coverage report as JSON",
+    )
+
+
+def _add_source_coverage_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    source_coverage = subparsers.add_parser(
+        "source-coverage",
+        help="Show source provenance and parser coverage",
+    )
+    source_coverage.add_argument("--include-archived", action="store_true")
+    source_coverage.add_argument("--limit", type=int, default=20)
+    source_coverage.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Return source coverage report as JSON",
     )
 
 

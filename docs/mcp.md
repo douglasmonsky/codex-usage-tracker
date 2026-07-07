@@ -1,6 +1,6 @@
 # MCP And Codex Skills
 
-Codex Usage Tracker can be installed as a local Codex plugin and exposes MCP tools for aggregate usage analysis.
+Codex Usage Tracker can be installed as a local Codex plugin and exposes MCP tools for local usage analysis, aggregate reports, allowance diagnostics, source coverage, and future content-index investigation.
 
 ## Local Plugin
 
@@ -29,7 +29,7 @@ The launcher stores the package spec used for that runtime and reinstalls when t
 The plugin installs two companion skills. They are local instruction files that help Codex use this package; they do not create another hosted service or send usage data outside the machine.
 
 - `codex-usage-tracker`: operational setup and direct tracker work, including refresh, dashboards, CSV export, doctor checks, and MCP tools.
-- `codex-usage-api`: conversational usage analysis using stable aggregate JSON first.
+- `codex-usage-api`: conversational usage analysis using stable usage APIs first, with content-index tools treated as explicit local investigation tools when they are available.
 
 Good prompts for the API companion skill:
 
@@ -48,7 +48,7 @@ Compare usage by project for the last 7 days.
 Show me what is estimated or unpriced before I trust the cost numbers.
 ```
 
-The API skill should refresh the local index, call aggregate tools such as `usage_status`, `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_report_pack`, `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, or `usage_pricing_coverage`, then explain the answer with the data scope and estimate caveats.
+The API skill should refresh the local index, call stable tools such as `usage_status`, `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_report_pack`, `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`, then explain the answer with the data scope and estimate caveats. Content-aware tools should be used only when the user asks for local content exploration or a diagnostic clearly needs indexed snippets.
 
 If MCP tools are not available, the same questions can be answered through CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
 
@@ -73,6 +73,15 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_call_context`
 - `most_expensive_usage_calls`
 - `usage_pricing_coverage`
+- `usage_source_coverage`
+- `usage_content_search`
+- `usage_thread_trace`
+- `usage_repetition_scan`
+- `usage_command_loop_scan`
+- `usage_file_churn_scan`
+- `usage_context_bloat_scan`
+- `usage_investigation_walk`
+- `usage_local_evidence_export`
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
@@ -82,7 +91,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `update_usage_pricing_config`
 - `init_usage_allowance_config`
 
-`usage_doctor`, `usage_summary`, `usage_recommendations`, `session_usage`, `most_expensive_usage_calls`, and `usage_pricing_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown.
+`usage_doctor`, `usage_summary`, `usage_recommendations`, `session_usage`, `most_expensive_usage_calls`, `usage_pricing_coverage`, and `usage_source_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown.
 
 Dashboard-shaped MCP tools return JSON dictionaries directly and reuse the same aggregate schemas as the local React dashboard API:
 
@@ -100,7 +109,19 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 
 `refresh_usage_index`, `usage_query`, `generate_usage_dashboard`, `export_usage_csv`, and config-writing MCP tools return JSON dictionaries directly.
 
+`refresh_usage_index()` indexes aggregate usage rows and the local content index by default. Use `refresh_usage_index(aggregate_only=True)` when the user wants the older aggregate-only SQLite posture.
+
 `refresh_usage_index(include_archived=True)` and `generate_usage_dashboard(include_archived=True)` are explicit all-history opt-ins. The default dashboard view excludes archived session rows so older work does not inflate the current usage picture.
+
+`usage_content_search(query=...)` searches the explicit local content index and can return indexed snippets. Use it only when the user asks for local content exploration, pattern hunting, or diagnostics that need transcript-level evidence. Its payload marks `content_mode="local_content_index"`, `includes_indexed_content=true`, and `includes_raw_fragments=true`.
+
+`usage_thread_trace(...)` returns a paged call timeline for one thread, thread key, session id, or seed record id, with local indexed fragments attached when present. It is also an explicit local content-index surface and carries the same indexed-content flags.
+
+`usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, and `usage_context_bloat_scan(...)` run explicit local content/event-index diagnostics over normalized fragment hashes, command roots/labels, file hashes/basenames, and aggregate token rows. These payloads set `includes_indexed_content=true` and `includes_raw_fragments=false`.
+
+`usage_investigation_walk(question=...)` runs a bounded local hypothesis walk over those normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. It is local-index evidence, not a shareable aggregate-only report.
+
+`usage_local_evidence_export(question=...)` returns a strict shareable summary derived from the investigation walk. It omits prompts, indexed snippets, record ids, thread names, raw commands, raw tool output, full paths, file basenames, and command labels.
 
 ## Allowance Intelligence MCP Tools
 

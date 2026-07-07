@@ -24,6 +24,13 @@ from codex_usage_tracker.store.allowance_observations import (
     query_allowance_observations as query_allowance_observations,
 )
 from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.content_index import (
+    clear_content_index_rows,
+    delete_content_index_rows_for_source_files,
+    search_content_fragments,
+    trace_thread_content,
+)
+from codex_usage_tracker.store.content_patterns import query_local_pattern_scan
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,
 )
@@ -52,6 +59,7 @@ from codex_usage_tracker.store.diagnostic_queries import (
     query_diagnostic_summary as query_diagnostic_summary,
 )
 from codex_usage_tracker.store.exports import export_usage_csv as export_usage_csv
+from codex_usage_tracker.store.investigation_runs import insert_investigation_run
 from codex_usage_tracker.store.rows import (
     row_to_dict as _row_to_dict,
 )
@@ -60,6 +68,16 @@ from codex_usage_tracker.store.schema import (
     SchemaMigrationError,
     init_db,
 )
+from codex_usage_tracker.store.source_records import (
+    query_source_record_coverage as query_source_record_coverage,
+)
+from codex_usage_tracker.store.source_records import (
+    query_source_record_totals as query_source_record_totals,
+)
+from codex_usage_tracker.store.source_records import (
+    query_source_records as query_source_records,
+)
+from codex_usage_tracker.store.source_records import sync_source_records
 from codex_usage_tracker.store.sources import (
     ParsedSourceFile,
     upsert_source_file_metadata,
@@ -93,6 +111,7 @@ def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    aggregate_only: bool = False,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
@@ -104,6 +123,7 @@ def refresh_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
+        aggregate_only=aggregate_only,
     )
 
 
@@ -111,6 +131,7 @@ def rebuild_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    aggregate_only: bool = False,
 ) -> RefreshResult:
     """Drop and rebuild the usage index from all selected Codex logs."""
 
@@ -122,6 +143,7 @@ def rebuild_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
+        aggregate_only=aggregate_only,
     )
 
 
@@ -132,8 +154,10 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         init_db(conn)
         row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
         deleted_rows = int(row["count"] if row is not None else 0)
+        clear_content_index_rows(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
+        conn.execute("DELETE FROM source_records")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
@@ -141,6 +165,119 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
 
+def query_content_search(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    query: str,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 20,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+) -> dict[str, Any]:
+    """Search explicit local content index snippets."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        result = search_content_fragments(
+            conn,
+            query=query,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            include_archived=include_archived,
+            limit=limit,
+            offset=offset,
+            max_snippet_chars=max_snippet_chars,
+        )
+    return {
+        "rows": result.rows,
+        "total_matched_rows": result.total_matched_rows,
+        "search_mode": result.search_mode,
+    }
+
+
+def query_thread_trace(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    thread: str | None = None,
+    thread_key: str | None = None,
+    session_id: str | None = None,
+    record_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 100,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+) -> dict[str, Any]:
+    """Return explicit local content-index trace for one thread/session."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        result = trace_thread_content(
+            conn,
+            thread=thread,
+            thread_key=thread_key,
+            session_id=session_id,
+            record_id=record_id,
+            since=since,
+            until=until,
+            include_archived=include_archived,
+            limit=limit,
+            offset=offset,
+            max_snippet_chars=max_snippet_chars,
+        )
+    return {
+        "calls": result.calls,
+        "total_matched_calls": result.total_matched_calls,
+    }
+
+
+def query_pattern_scan(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    scan_type: str = "all",
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+) -> dict[str, Any]:
+    """Return local content/event-index pattern scan rows."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        return query_local_pattern_scan(
+            conn,
+            scan_type=scan_type,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_occurrences=min_occurrences,
+            limit=limit,
+        )
+
+
+def record_investigation_run(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    run_kind: str,
+    payload: dict[str, Any],
+) -> str:
+    """Persist bounded investigation run metadata."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        return insert_investigation_run(conn, run_kind=run_kind, payload=payload)
 
 
 def record_refresh_metadata(
@@ -332,6 +469,10 @@ def record_source_file_metadata(
     with connect(db_path) as conn:
         init_db(conn)
         upsert_source_file_metadata(conn, parsed_files=parsed)
+        sync_source_records(
+            conn,
+            source_files=[str(path) for path, _events, _diagnostics, _state in parsed],
+        )
 
 
 def upsert_usage_events(
@@ -359,6 +500,7 @@ def upsert_usage_events(
         affected_thread_keys.update(_thread_keys_for_usage_rows(rows))
         _delete_diagnostic_facts_for_record_ids(conn, _usage_event_record_ids(rows))
         _insert_usage_event_rows(conn, rows)
+        sync_source_records(conn, record_ids=_usage_event_record_ids(rows))
         _insert_diagnostic_facts(conn, fact_rows)
         _refresh_after_usage_event_upsert(
             conn,
@@ -389,6 +531,22 @@ def _delete_usage_events_for_source_files(
     if not source_files_to_replace:
         return
     placeholders = ", ".join("?" for _source in source_files_to_replace)
+    delete_content_index_rows_for_source_files(
+        conn,
+        placeholders=placeholders,
+        source_files_to_replace=source_files_to_replace,
+    )
+    conn.execute(
+        f"""
+        DELETE FROM source_records
+        WHERE record_id IN (
+            SELECT record_id
+            FROM usage_events
+            WHERE source_file IN ({placeholders})
+        )
+        """,
+        source_files_to_replace,
+    )
     conn.execute(
         f"""
         DELETE FROM call_diagnostic_facts

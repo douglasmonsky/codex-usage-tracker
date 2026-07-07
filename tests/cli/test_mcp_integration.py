@@ -65,6 +65,32 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     )
     pricing_coverage = mcp_server.usage_pricing_coverage()
     pricing_coverage_json = mcp_server.usage_pricing_coverage(response_format="json")
+    source_coverage = mcp_server.usage_source_coverage()
+    source_coverage_json = mcp_server.usage_source_coverage(response_format="json")
+    content_search_json = mcp_server.usage_content_search(
+        query="SECRET RAW PROMPT",
+        limit=1,
+        max_snippet_chars=48,
+    )
+    thread_trace_json = mcp_server.usage_thread_trace(
+        thread="Add Codex token tracking",
+        limit=5,
+        max_snippet_chars=48,
+    )
+    repetition_scan_json = mcp_server.usage_repetition_scan(min_occurrences=1, limit=2)
+    command_scan_json = mcp_server.usage_command_loop_scan(min_occurrences=1, limit=2)
+    file_scan_json = mcp_server.usage_file_churn_scan(min_occurrences=1, limit=2)
+    context_scan_json = mcp_server.usage_context_bloat_scan(min_occurrences=1, limit=2)
+    investigation_walk_json = mcp_server.usage_investigation_walk(
+        question="Look for local token waste patterns",
+        min_occurrences=1,
+        evidence_limit=2,
+    )
+    local_evidence_export_json = mcp_server.usage_local_evidence_export(
+        question="Share local token waste evidence",
+        min_occurrences=1,
+        evidence_limit=2,
+    )
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
@@ -108,6 +134,14 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         query_json,
         recommendations_json,
         pricing_coverage_json,
+        content_search_json,
+        thread_trace_json,
+        repetition_scan_json,
+        command_scan_json,
+        file_scan_json,
+        context_scan_json,
+        investigation_walk_json,
+        local_evidence_export_json,
         session_json,
         status_json,
         calls_json,
@@ -147,6 +181,40 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert recommendations_json["threads"]
     assert "Codex pricing coverage" in pricing_coverage
     assert pricing_coverage_json["schema"] == "codex-usage-tracker-pricing-coverage-v1"
+    assert "Codex source coverage" in source_coverage
+    assert source_coverage_json["schema"] == "codex-usage-tracker-source-coverage-v1"
+    assert source_coverage_json["content_mode"] == "aggregate_only"
+    assert source_coverage_json["includes_indexed_content"] is False
+    assert source_coverage_json["includes_raw_fragments"] is False
+    assert content_search_json["schema"] == "codex-usage-tracker-content-search-v1"
+    assert content_search_json["content_mode"] == "local_content_index"
+    assert content_search_json["includes_indexed_content"] is True
+    assert content_search_json["row_count"] == 1
+    assert "SECRET" in content_search_json["rows"][0]["snippet"]
+    assert thread_trace_json["schema"] == "codex-usage-tracker-thread-trace-v1"
+    assert thread_trace_json["content_mode"] == "local_content_index"
+    assert thread_trace_json["includes_indexed_content"] is True
+    assert thread_trace_json["call_count"] >= 1
+    assert any(call["fragment_count"] > 0 for call in thread_trace_json["calls"])
+    for payload in (
+        repetition_scan_json,
+        command_scan_json,
+        file_scan_json,
+        context_scan_json,
+    ):
+        assert payload["schema"] == "codex-usage-tracker-pattern-scan-v1"
+        assert payload["content_mode"] == "local_content_index"
+        assert payload["includes_indexed_content"] is True
+        assert payload["includes_raw_fragments"] is False
+    assert investigation_walk_json["schema"] == "codex-usage-tracker-investigation-walk-v1"
+    assert investigation_walk_json["content_mode"] == "local_content_index"
+    assert investigation_walk_json["includes_indexed_content"] is True
+    assert investigation_walk_json["includes_raw_fragments"] is False
+    assert investigation_walk_json["branches"]
+    assert local_evidence_export_json["schema"] == "codex-usage-tracker-local-evidence-export-v1"
+    assert local_evidence_export_json["content_mode"] == "shareable_local_evidence"
+    assert local_evidence_export_json["includes_indexed_content"] is False
+    assert local_evidence_export_json["includes_raw_fragments"] is False
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2

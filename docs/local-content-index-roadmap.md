@@ -270,6 +270,80 @@ disable content indexing before the default changes.
 - Add compact investigation reports.
 - Add skill guidance so MCP can answer "what is wasting tokens?" using structured evidence.
 
+## Next Actionable MCP Insight Diagnostics
+
+These follow-on diagnostics should turn the local content/event index into sharper
+recommendations instead of broad summaries.
+
+### Top Repeated File Rediscovery
+
+Add an endpoint/MCP tool that ranks exact safe file identities by repeated local
+rediscovery. It should group by path hash, basename, extension, operation, and
+thread/session linkage while omitting full paths by default.
+
+Useful output:
+
+- repeated path hash count
+- unique threads and calls touching the file
+- linked aggregate token totals
+- first/last observed timestamps
+- operation mix such as read, edit, or write
+- safe drill-down handles for `usage_thread_trace`
+
+Acceptance criteria:
+
+- Does not expose full paths unless an explicit raw/local export mode is added.
+- Ranks repeated file reads separately from actual edit/write churn.
+- Flags files reread many times across adjacent calls as rediscovery candidates.
+- Includes synthetic tests with repeated reads of the same file and unrelated
+  same-extension reads.
+
+### Shell Churn Diagnostic
+
+Add an endpoint/MCP tool for repeated shell command families and shell-loop
+sequences, especially `sed`, `rg`, `git`, `nl`, test commands, package commands,
+and repeated unknown command labels.
+
+Useful output:
+
+- command root, bounded command label, status, exit code, retry group
+- adjacent-run loop evidence within the same thread/session
+- linked aggregate token totals and output byte totals
+- failure/retry categories
+- recommended action such as "use a script", "cache this query result", or
+  "summarize findings once before continuing"
+
+Acceptance criteria:
+
+- Separates productive one-off shell work from repetitive churn.
+- Detects high-frequency successful loops as well as failing retries.
+- Groups safely by command root/label without raw command output.
+- Includes tests for repeated `sed`/`rg`/`git`/`nl` sequences and mixed benign
+  commands.
+
+### Large Low-Output Calls
+
+Add an aggregate-first report/MCP tool for calls that consume large input/context
+but produce little output. These are strong token-waste candidates because they
+often mean the model paid to carry context without making much progress.
+
+Useful output:
+
+- total/input/cached/uncached/output/reasoning token counts
+- cache ratio and context-window percent
+- thread/session/call timestamp
+- nearby command/file/tool activity counts
+- candidate explanation such as cold resume, tool-output pressure, stale thread,
+  or low-value continuation
+
+Acceptance criteria:
+
+- Defaults to aggregate-only output.
+- Supports thresholds for minimum total tokens and maximum output tokens.
+- Can be used by `usage_investigation_walk` as a first-class evidence branch.
+- Includes tests for high-input low-output calls, high-output false positives,
+  and low-cache cold-resume cases.
+
 ## Testing Requirements
 
 Each implementation milestone must include:

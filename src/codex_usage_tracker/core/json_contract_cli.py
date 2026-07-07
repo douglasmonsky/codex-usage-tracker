@@ -184,8 +184,8 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     'codex-usage-tracker-pricing-coverage-v1': {
-            "required": {
-                "model_count": int,
+        "required": {
+            "model_count": int,
                 "priced_model_count": int,
                 "unpriced_model_count": int,
                 "total_tokens": Number,
@@ -196,12 +196,155 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "pricing_loaded": bool,
                 "pricing_path": str,
                 "pricing_source": (dict, NoneType),
-                "rows": list,
+            "rows": list,
+        }
+    },
+    'codex-usage-tracker-source-coverage-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "include_archived": bool,
+            "source_record_count": int,
+            "source_file_count": int,
+            "parser_version_count": int,
+            "warning_record_count": int,
+            "rows": list,
+        }
+    },
+    'codex-usage-tracker-content-search-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "query": str,
+            "filters": dict,
+            "search_mode": str,
+            "row_count": int,
+            "total_matched_rows": int,
+            "truncated": bool,
+            "has_more": bool,
+            "next_offset": (int, NoneType),
+            "rows": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "model": (str, NoneType),
+                "effort": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "limit": (int, NoneType),
+                "offset": int,
+                "max_snippet_chars": (int, NoneType),
             }
         },
+    },
+    'codex-usage-tracker-thread-trace-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "filters": dict,
+            "call_count": int,
+            "total_matched_calls": int,
+            "truncated": bool,
+            "has_more": bool,
+            "next_offset": (int, NoneType),
+            "calls": list,
+        },
+        "nested": {
+            "filters": {
+                "thread": (str, NoneType),
+                "thread_key": (str, NoneType),
+                "session_id": (str, NoneType),
+                "record_id": (str, NoneType),
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "include_archived": bool,
+                "limit": (int, NoneType),
+                "offset": int,
+                "max_snippet_chars": (int, NoneType),
+            }
+        },
+    },
+    'codex-usage-tracker-pattern-scan-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "scan_type": str,
+            "scan_types": list,
+            "filters": dict,
+            "pattern_count": int,
+            "total_patterns": int,
+            "patterns": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "min_occurrences": int,
+                "limit": (int, NoneType),
+            }
+        },
+    },
+    'codex-usage-tracker-investigation-walk-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "question": str,
+            "filters": dict,
+            "summary": dict,
+            "branches": list,
+            "recommended_next_tools": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "min_occurrences": int,
+                "evidence_limit": int,
+            }
+        },
+    },
+    'codex-usage-tracker-local-evidence-export-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "question": str,
+            "filters": dict,
+            "summary": dict,
+            "branches": list,
+            "omitted_fields": list,
+            "caveats": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "min_occurrences": int,
+                "evidence_limit": int,
+            }
+        },
+    },
     'codex-usage-tracker-export-v1': {
-            "required": {
-                "rows": int,
+        "required": {
+            "rows": int,
                 "csv_path": str,
                 "limit": (int, NoneType),
                 "privacy_mode": str,

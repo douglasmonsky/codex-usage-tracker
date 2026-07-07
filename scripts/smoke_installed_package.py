@@ -57,6 +57,7 @@ CLI_HELP_SUBCOMMANDS = [
     "serve-dashboard",
     "expensive",
     "pricing-coverage",
+    "source-coverage",
     "allowance-history",
     "allowance-diagnostics",
     "allowance-export",

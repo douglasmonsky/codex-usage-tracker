@@ -11,6 +11,7 @@ from codex_usage_tracker.core.formatting import (
     format_calls,
     format_pricing_coverage,
     format_recommendations,
+    format_source_coverage,
     format_summary,
 )
 from codex_usage_tracker.core.paths import DEFAULT_PROJECTS_PATH
@@ -40,9 +41,15 @@ from codex_usage_tracker.reports.recommendation_builder import (
 )
 from codex_usage_tracker.reports.recommendations import annotate_rows_with_recommendations
 from codex_usage_tracker.store.api import (
+    query_content_search,
     query_dashboard_events,
     query_most_expensive_calls,
+    query_pattern_scan,
+    query_source_record_coverage,
+    query_source_record_totals,
     query_summary,
+    query_thread_trace,
+    record_investigation_run,
 )
 
 SUMMARY_GROUP_BY_CHOICES = (
@@ -120,6 +127,51 @@ class PricingCoverageReport:
 
     def render(self, limit: int = 20) -> str:
         return format_pricing_coverage(self.payload, limit=limit)
+
+
+@dataclass(frozen=True)
+class SourceCoverageReport:
+    """Resolved source provenance parser coverage report."""
+
+    payload: dict[str, Any]
+
+    def render(self, limit: int = 20) -> str:
+        return format_source_coverage(self.payload, limit=limit)
+
+
+@dataclass(frozen=True)
+class ContentSearchReport:
+    """Stable machine-readable local content-index search result."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ThreadTraceReport:
+    """Stable machine-readable local content-index thread trace."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PatternScanReport:
+    """Stable machine-readable local content/event-index pattern scan."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class InvestigationWalkReport:
+    """Stable machine-readable local investigation walk."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LocalEvidenceExportReport:
+    """Stable shareable local evidence export without raw/indexed content."""
+
+    payload: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -257,6 +309,514 @@ def build_pricing_coverage_report(
     config = pricing or load_pricing_config(pricing_path)
     rows = query_summary(db_path, group_by="model", limit=limit, since=since)
     return PricingCoverageReport(summarize_pricing_coverage(rows, pricing=config))
+
+
+def build_source_coverage_report(
+    *,
+    db_path: Path,
+    include_archived: bool = False,
+) -> SourceCoverageReport:
+    """Build parser/source provenance coverage report."""
+
+    rows = query_source_record_coverage(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    totals = query_source_record_totals(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    return SourceCoverageReport(
+        {
+            "schema": "codex-usage-tracker-source-coverage-v1",
+            "content_mode": "aggregate_only",
+            "includes_indexed_content": False,
+            "includes_raw_fragments": False,
+            "include_archived": include_archived,
+            "source_record_count": int(totals.get("source_record_count") or 0),
+            "source_file_count": int(totals.get("source_file_count") or 0),
+            "parser_version_count": int(totals.get("parser_version_count") or 0),
+            "warning_record_count": int(totals.get("warning_record_count") or 0),
+            "rows": rows,
+        }
+    )
+
+
+def build_content_search_report(
+    *,
+    db_path: Path,
+    query: str,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 20,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> ContentSearchReport:
+    """Build explicit local content-index search payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    result = query_content_search(
+        db_path=db_path,
+        query=query,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+    )
+    rows = result["rows"]
+    normalized_limit = None if limit is None or limit <= 0 else limit
+    normalized_offset = max(0, offset)
+    total_matched = int(result["total_matched_rows"])
+    has_more = (
+        False
+        if normalized_limit is None
+        else normalized_offset + len(rows) < total_matched
+    )
+    return ContentSearchReport(
+        {
+            "schema": "codex-usage-tracker-content-search-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": True,
+            "privacy_mode": privacy_mode,
+            "query": query,
+            "filters": {
+                "since": since,
+                "until": until,
+                "model": model,
+                "effort": effort,
+                "thread": thread,
+                "include_archived": include_archived,
+                "limit": limit,
+                "offset": normalized_offset,
+                "max_snippet_chars": max_snippet_chars,
+            },
+            "search_mode": result["search_mode"],
+            "row_count": len(rows),
+            "total_matched_rows": total_matched,
+            "truncated": has_more,
+            "has_more": has_more,
+            "next_offset": (
+                normalized_offset + len(rows) if has_more else None
+            ),
+            "rows": rows,
+        }
+    )
+
+
+def build_thread_trace_report(
+    *,
+    db_path: Path,
+    thread: str | None = None,
+    thread_key: str | None = None,
+    session_id: str | None = None,
+    record_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 100,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> ThreadTraceReport:
+    """Build explicit local content-index thread/session trace payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    result = query_thread_trace(
+        db_path=db_path,
+        thread=thread,
+        thread_key=thread_key,
+        session_id=session_id,
+        record_id=record_id,
+        since=since,
+        until=until,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+    )
+    calls = result["calls"]
+    normalized_limit = None if limit is None or limit <= 0 else limit
+    normalized_offset = max(0, offset)
+    total_matched = int(result["total_matched_calls"])
+    has_more = (
+        False
+        if normalized_limit is None
+        else normalized_offset + len(calls) < total_matched
+    )
+    return ThreadTraceReport(
+        {
+            "schema": "codex-usage-tracker-thread-trace-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": True,
+            "privacy_mode": privacy_mode,
+            "filters": {
+                "thread": thread,
+                "thread_key": thread_key,
+                "session_id": session_id,
+                "record_id": record_id,
+                "since": since,
+                "until": until,
+                "include_archived": include_archived,
+                "limit": limit,
+                "offset": normalized_offset,
+                "max_snippet_chars": max_snippet_chars,
+            },
+            "call_count": len(calls),
+            "total_matched_calls": total_matched,
+            "truncated": has_more,
+            "has_more": has_more,
+            "next_offset": (
+                normalized_offset + len(calls) if has_more else None
+            ),
+            "calls": calls,
+        }
+    )
+
+
+def build_pattern_scan_report(
+    *,
+    db_path: Path,
+    scan_type: str = "all",
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> PatternScanReport:
+    """Build local content/event-index pattern scan payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    result = query_pattern_scan(
+        db_path=db_path,
+        scan_type=scan_type,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+    )
+    patterns = result["patterns"]
+    return PatternScanReport(
+        {
+            "schema": "codex-usage-tracker-pattern-scan-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": False,
+            "privacy_mode": privacy_mode,
+            "scan_type": scan_type,
+            "scan_types": list(result["scan_types"]),
+            "filters": {
+                "since": since,
+                "until": until,
+                "thread": thread,
+                "include_archived": include_archived,
+                "min_occurrences": max(1, min_occurrences),
+                "limit": limit,
+            },
+            "pattern_count": len(patterns),
+            "total_patterns": result["total_patterns"],
+            "patterns": patterns,
+        }
+    )
+
+
+def build_investigation_walk_report(
+    *,
+    db_path: Path,
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> InvestigationWalkReport:
+    """Build a bounded local investigation walk over normalized pattern evidence."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    normalized_evidence_limit = max(1, evidence_limit)
+    pattern_result = query_pattern_scan(
+        db_path=db_path,
+        scan_type="all",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=normalized_evidence_limit * 4,
+    )
+    patterns = pattern_result["patterns"]
+    branches = _investigation_branches(patterns=patterns, evidence_limit=normalized_evidence_limit)
+    supported = [branch for branch in branches if branch["status"] != "no_evidence"]
+    payload = {
+        "schema": "codex-usage-tracker-investigation-walk-v1",
+        "content_mode": "local_content_index",
+        "includes_indexed_content": True,
+        "includes_raw_fragments": False,
+        "privacy_mode": privacy_mode,
+        "question": question,
+        "filters": {
+            "since": since,
+            "until": until,
+            "thread": thread,
+            "include_archived": include_archived,
+            "min_occurrences": max(1, min_occurrences),
+            "evidence_limit": normalized_evidence_limit,
+        },
+        "summary": {
+            "branch_count": len(branches),
+            "supported_branch_count": len(supported),
+            "top_hypothesis": supported[0]["hypothesis"] if supported else None,
+            "confidence": _walk_confidence(supported),
+        },
+        "branches": branches,
+        "recommended_next_tools": _recommended_investigation_tools(supported),
+    }
+    record_investigation_run(db_path=db_path, run_kind="investigation_walk", payload=payload)
+    return InvestigationWalkReport(payload)
+
+
+def _investigation_branches(
+    *,
+    patterns: list[dict[str, Any]],
+    evidence_limit: int,
+) -> list[dict[str, Any]]:
+    specs = (
+        (
+            "context_bloat",
+            "High-token thread/context bloat",
+            "Threads with concentrated token use or dense local evidence may be driving usage.",
+        ),
+        (
+            "command_loop",
+            "Repeated or failing command loop",
+            "Repeated command roots/labels can indicate retry loops or avoidable automation waste.",
+        ),
+        (
+            "file_churn",
+            "Repeated file rediscovery or churn",
+            "Repeated reads or edits of the same path hash can indicate rediscovery or unstable workflow loops.",
+        ),
+        (
+            "repetition",
+            "Repeated local content pattern",
+            "Repeated fragment hashes can indicate recurring prompts, summaries, or copied context.",
+        ),
+    )
+    branches: list[dict[str, Any]] = []
+    for scan_type, hypothesis, rationale in specs:
+        evidence = [row for row in patterns if row.get("scan_type") == scan_type]
+        evidence.sort(key=lambda row: (-int(row.get("total_tokens") or 0), -int(row.get("occurrences") or 0)))
+        selected = evidence[:evidence_limit]
+        score = _branch_score(selected)
+        branches.append(
+            {
+                "scan_type": scan_type,
+                "hypothesis": hypothesis,
+                "rationale": rationale,
+                "status": _branch_status(score, selected),
+                "score": score,
+                "evidence_count": len(selected),
+                "evidence": selected,
+                "pruned_reason": None if selected else "No matching normalized local evidence at this threshold.",
+            }
+        )
+    branches.sort(key=lambda branch: (-int(branch["score"]), str(branch["scan_type"])))
+    return branches
+
+
+def _branch_score(evidence: list[dict[str, Any]]) -> int:
+    total = 0
+    for row in evidence:
+        total += int(row.get("total_tokens") or 0)
+        total += int(row.get("occurrences") or 0) * 100
+        total += int(row.get("call_count") or 0) * 50
+    return total
+
+
+def _branch_status(score: int, evidence: list[dict[str, Any]]) -> str:
+    if not evidence:
+        return "no_evidence"
+    if score >= 10_000:
+        return "strong_local_signal"
+    return "candidate"
+
+
+def _walk_confidence(supported: list[dict[str, Any]]) -> str:
+    if not supported:
+        return "insufficient_local_evidence"
+    if supported[0]["status"] == "strong_local_signal":
+        return "moderate_local_evidence"
+    return "weak_local_evidence"
+
+
+def _recommended_investigation_tools(supported: list[dict[str, Any]]) -> list[dict[str, str]]:
+    tools = [
+        {
+            "tool": "usage_calls",
+            "reason": "Inspect the aggregate call rows behind high-token evidence.",
+        }
+    ]
+    if not supported:
+        tools.append(
+            {
+                "tool": "usage_report_pack",
+                "reason": "Start from aggregate report cards when local pattern evidence is sparse.",
+            }
+        )
+        return tools
+    top_scan = str(supported[0]["scan_type"])
+    if top_scan == "context_bloat":
+        tools.append(
+            {
+                "tool": "usage_thread_trace",
+                "reason": "Trace the highest-scoring thread to inspect call sequence and indexed fragments.",
+            }
+        )
+    elif top_scan == "command_loop":
+        tools.append(
+            {
+                "tool": "usage_command_loop_scan",
+                "reason": "Raise limit or lower occurrence threshold to inspect repeated command families.",
+            }
+        )
+    elif top_scan == "file_churn":
+        tools.append(
+            {
+                "tool": "usage_file_churn_scan",
+                "reason": "Inspect repeated file path hashes and linked aggregate calls.",
+            }
+        )
+    else:
+        tools.append(
+            {
+                "tool": "usage_content_search",
+                "reason": "Use explicit local snippet search only when transcript-level evidence is needed.",
+            }
+        )
+    return tools
+
+
+def build_local_evidence_export_report(
+    *,
+    db_path: Path,
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+) -> LocalEvidenceExportReport:
+    """Build shareable local evidence summary without raw/indexed records."""
+
+    walk = build_investigation_walk_report(
+        db_path=db_path,
+        question=question,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        evidence_limit=evidence_limit,
+        privacy_mode="strict",
+    ).payload
+    branches = [_export_branch(branch) for branch in walk["branches"]]
+    payload = {
+        "schema": "codex-usage-tracker-local-evidence-export-v1",
+        "content_mode": "shareable_local_evidence",
+        "includes_indexed_content": False,
+        "includes_raw_fragments": False,
+        "privacy_mode": "strict",
+        "question": question,
+        "filters": walk["filters"],
+        "summary": {
+            **walk["summary"],
+            "export_branch_count": len(branches),
+        },
+        "branches": branches,
+        "omitted_fields": [
+            "record_id",
+            "session_id",
+            "thread_name",
+            "raw_fragment",
+            "snippet",
+            "raw_command",
+            "raw_tool_output",
+            "full_path",
+            "path_basename",
+            "command_label",
+        ],
+        "caveats": [
+            "Local evidence only; not an official OpenAI ledger.",
+            "Counts are derived from local Codex logs and normalized tracker indexes.",
+            "Export intentionally omits prompts, snippets, thread names, record ids, raw command output, and file names.",
+        ],
+    }
+    record_investigation_run(db_path=db_path, run_kind="local_evidence_export", payload=payload)
+    return LocalEvidenceExportReport(payload)
+
+
+def _export_branch(branch: dict[str, Any]) -> dict[str, Any]:
+    evidence = branch.get("evidence")
+    evidence_rows = evidence if isinstance(evidence, list) else []
+    return {
+        "scan_type": branch["scan_type"],
+        "hypothesis": branch["hypothesis"],
+        "status": branch["status"],
+        "score_bucket": _score_bucket(int(branch.get("score") or 0)),
+        "evidence_count": int(branch.get("evidence_count") or 0),
+        "pruned": branch["status"] == "no_evidence",
+        "pruned_reason": branch.get("pruned_reason"),
+        "aggregate_evidence": {
+            "total_tokens": sum(int(row.get("total_tokens") or 0) for row in evidence_rows),
+            "occurrences": sum(int(row.get("occurrences") or 0) for row in evidence_rows),
+            "call_count": sum(int(row.get("call_count") or 0) for row in evidence_rows),
+            "thread_count": sum(int(row.get("thread_count") or 0) for row in evidence_rows),
+            "first_seen_date": _date_bucket(_first_seen(evidence_rows)),
+            "last_seen_date": _date_bucket(_last_seen(evidence_rows)),
+        },
+    }
+
+
+def _score_bucket(score: int) -> str:
+    if score >= 100_000:
+        return "100k_plus"
+    if score >= 10_000:
+        return "10k_to_100k"
+    if score > 0:
+        return "under_10k"
+    return "none"
+
+
+def _first_seen(rows: list[dict[str, Any]]) -> str | None:
+    values = [str(row["first_seen_at"]) for row in rows if row.get("first_seen_at")]
+    return min(values) if values else None
+
+
+def _last_seen(rows: list[dict[str, Any]]) -> str | None:
+    values = [str(row["last_seen_at"]) for row in rows if row.get("last_seen_at")]
+    return max(values) if values else None
+
+
+def _date_bucket(value: str | None) -> str | None:
+    return value[:10] if value else None
 
 
 def build_query_report(

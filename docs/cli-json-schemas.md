@@ -1,6 +1,6 @@
 # CLI, MCP, and Dashboard JSON Schemas
 
-Codex Usage Tracker exposes aggregate-only JSON for automation through CLI `--json` flags, MCP tools, and the local dashboard server API. These payloads do not include prompts, assistant messages, tool output, or raw transcript snippets.
+Codex Usage Tracker exposes JSON for automation through CLI `--json` flags, MCP tools, and the local dashboard server API. Default shareable payloads are aggregate-first and do not include prompts, assistant messages, tool output, or raw transcript snippets. `usage_content_search` is the explicit local content-index exception and marks that it can include indexed snippets.
 
 ## Companion Skill Usage
 
@@ -77,6 +77,12 @@ Tracked schema ids:
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url` and legacy `legacy_dashboard_url` fallback |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
+| `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |
+| `codex-usage-tracker-content-search-v1` | MCP `usage_content_search(...)`; explicit local content-index search, may include indexed snippets |
+| `codex-usage-tracker-thread-trace-v1` | MCP `usage_thread_trace(...)`; explicit local content-index thread/session timeline |
+| `codex-usage-tracker-pattern-scan-v1` | MCP `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, `usage_context_bloat_scan(...)`; explicit local content/event-index pattern diagnostics |
+| `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
+| `codex-usage-tracker-local-evidence-export-v1` | MCP `usage_local_evidence_export(question=...)`; strict shareable local evidence summary without raw/indexed content |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
 | `codex-usage-tracker-update-pricing-v1` | CLI `update-pricing --json`, MCP `update_usage_pricing_config()` |
@@ -836,6 +842,168 @@ Schema: `codex-usage-tracker-pricing-coverage-v1`
 }
 ```
 
+## Source Coverage
+
+Command:
+
+```bash
+codex-usage-tracker source-coverage --json
+```
+
+MCP:
+
+- `usage_source_coverage(response_format="json")`
+
+Schema: `codex-usage-tracker-source-coverage-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-source-coverage-v1",
+  "content_mode": "aggregate_only",
+  "includes_indexed_content": false,
+  "includes_raw_fragments": false,
+  "include_archived": false,
+  "source_record_count": 2,
+  "source_file_count": 2,
+  "parser_version_count": 1,
+  "warning_record_count": 0,
+  "rows": [
+    {
+      "raw_shape_label": "token_count",
+      "parser_adapter": "codex-jsonl",
+      "parser_version": "codex-jsonl-v2",
+      "record_count": 2,
+      "source_file_count": 2,
+      "warning_record_count": 0
+    }
+  ]
+}
+```
+
+## Content Search
+
+MCP:
+
+- `usage_content_search(query="token waste")`
+
+Schema: `codex-usage-tracker-content-search-v1`
+
+This is an explicit local content-index investigation surface. It can include indexed snippets from local Codex logs, so do not treat it as a default shareable aggregate report.
+
+```json
+{
+  "schema": "codex-usage-tracker-content-search-v1",
+  "content_mode": "local_content_index",
+  "includes_indexed_content": true,
+  "includes_raw_fragments": true,
+  "privacy_mode": "normal",
+  "query": "token waste",
+  "filters": {
+    "since": null,
+    "until": null,
+    "model": null,
+    "effort": null,
+    "thread": null,
+    "include_archived": false,
+    "limit": 20,
+    "offset": 0,
+    "max_snippet_chars": 800
+  },
+  "search_mode": "fts5",
+  "row_count": 0,
+  "total_matched_rows": 0,
+  "truncated": false,
+  "has_more": false,
+  "next_offset": null,
+  "rows": []
+}
+```
+
+## Thread Trace
+
+MCP:
+
+- `usage_thread_trace(thread="Add Codex token tracking")`
+- `usage_thread_trace(session_id="...")`
+- `usage_thread_trace(record_id="...")`
+
+Schema: `codex-usage-tracker-thread-trace-v1`
+
+This is an explicit local content-index investigation surface. It returns aggregate call metadata plus indexed fragments for a selected thread/session scope.
+
+```json
+{
+  "schema": "codex-usage-tracker-thread-trace-v1",
+  "content_mode": "local_content_index",
+  "includes_indexed_content": true,
+  "includes_raw_fragments": true,
+  "privacy_mode": "normal",
+  "filters": {
+    "thread": "Add Codex token tracking",
+    "thread_key": null,
+    "session_id": null,
+    "record_id": null,
+    "since": null,
+    "until": null,
+    "include_archived": false,
+    "limit": 100,
+    "offset": 0,
+    "max_snippet_chars": 800
+  },
+  "call_count": 0,
+  "total_matched_calls": 0,
+  "truncated": false,
+  "has_more": false,
+  "next_offset": null,
+  "calls": []
+}
+```
+
+## Pattern Scan
+
+MCP:
+
+- `usage_repetition_scan(min_occurrences=2)`
+- `usage_command_loop_scan(min_occurrences=2)`
+- `usage_file_churn_scan(min_occurrences=2)`
+- `usage_context_bloat_scan(min_occurrences=2)`
+
+Schema: `codex-usage-tracker-pattern-scan-v1`
+
+This explicit local content/event-index diagnostic surface scans normalized fragment hashes, command roots, file hashes/basenames, and aggregate token rows. It does not include raw fragments.
+
+```json
+{"schema":"codex-usage-tracker-pattern-scan-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","scan_type":"command_loop","scan_types":["command_loop"],"filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"limit":20},"pattern_count":0,"total_patterns":0,"patterns":[]}
+```
+
+## Investigation Walk
+
+MCP:
+
+- `usage_investigation_walk(question="look for token waste")`
+
+Schema: `codex-usage-tracker-investigation-walk-v1`
+
+Runs a bounded local hypothesis walk over normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. Does not include raw fragments.
+
+```json
+{"schema":"codex-usage-tracker-investigation-walk-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","question":"look for token waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":4,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence"},"branches":[],"recommended_next_tools":[]}
+```
+
+## Local Evidence Export
+
+MCP:
+
+- `usage_local_evidence_export(question="share token waste evidence")`
+
+Schema: `codex-usage-tracker-local-evidence-export-v1`
+
+Strict shareable summary derived from local investigation evidence. It omits raw fragments, snippets, record ids, thread names, command labels, file basenames, full paths, raw commands, and raw tool output.
+
+```json
+{"schema":"codex-usage-tracker-local-evidence-export-v1","content_mode":"shareable_local_evidence","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"strict","question":"share token waste evidence","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":4,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence","export_branch_count":0},"branches":[],"omitted_fields":["record_id","session_id","thread_name","raw_fragment","snippet","raw_command","raw_tool_output","full_path","path_basename","command_label"],"caveats":["Local evidence only; not an official OpenAI ledger."]}
+```
+
 ## Lifecycle Commands
 
 Most setup and file-writing commands accept `--json` and return a schema-specific payload with written paths and counts:
@@ -849,6 +1017,7 @@ Most setup and file-writing commands accept `--json` and return a schema-specifi
 - `dashboard --json`: `codex-usage-tracker-dashboard-v1`
 - `export --json`: `codex-usage-tracker-export-v1`
 - `pricing-coverage --json`
+- `source-coverage --json`
 - `recommendations --json`
 - `init-pricing --json`, `update-pricing --json`, `pin-pricing --json`
 - `init-allowance --json`, `parse-allowance --json`
