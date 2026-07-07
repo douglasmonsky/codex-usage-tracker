@@ -72,6 +72,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         limit=1,
         max_snippet_chars=48,
     )
+    thread_trace_json = mcp_server.usage_thread_trace(
+        thread="Add Codex token tracking",
+        limit=5,
+        max_snippet_chars=48,
+    )
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
@@ -116,6 +121,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         recommendations_json,
         pricing_coverage_json,
         content_search_json,
+        thread_trace_json,
         session_json,
         status_json,
         calls_json,
@@ -165,6 +171,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert content_search_json["includes_indexed_content"] is True
     assert content_search_json["row_count"] == 1
     assert "SECRET" in content_search_json["rows"][0]["snippet"]
+    assert thread_trace_json["schema"] == "codex-usage-tracker-thread-trace-v1"
+    assert thread_trace_json["content_mode"] == "local_content_index"
+    assert thread_trace_json["includes_indexed_content"] is True
+    assert thread_trace_json["call_count"] >= 1
+    assert any(call["fragment_count"] > 0 for call in thread_trace_json["calls"])
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2

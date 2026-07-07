@@ -51,6 +51,7 @@ from codex_usage_tracker.reports.api import (
     build_recommendations_report,
     build_source_coverage_report,
     build_summary_report,
+    build_thread_trace_report,
 )
 from codex_usage_tracker.server.call_detail import call_detail_payload
 from codex_usage_tracker.server.call_lists import calls_payload
@@ -397,6 +398,38 @@ def usage_content_search(
         model=model,
         effort=effort,
         thread=thread,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_thread_trace(
+    thread: str | None = None,
+    thread_key: str | None = None,
+    session_id: str | None = None,
+    record_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 100,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Return a local content-index call timeline for one thread/session."""
+
+    return build_thread_trace_report(
+        db_path=DEFAULT_DB_PATH,
+        thread=thread,
+        thread_key=thread_key,
+        session_id=session_id,
+        record_id=record_id,
+        since=since,
+        until=until,
         include_archived=include_archived,
         limit=limit,
         offset=offset,

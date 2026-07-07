@@ -37,6 +37,7 @@ Use `usage_call_context` only when the user explicitly asks to inspect actual lo
 - `usage_pricing_coverage(..., response_format="json")`
 - `usage_source_coverage(..., response_format="json")`
 - `usage_content_search(...)` only for explicit local content-index exploration
+- `usage_thread_trace(...)` only for explicit local content-index thread/session timelines
 - `usage_allowance_diagnostics(..., privacy_mode="strict")`
  - `usage_allowance_history(..., privacy_mode="strict")`
  - `usage_allowance_export(...)`
@@ -51,6 +52,7 @@ Use `usage_call_context` only when the user explicitly asks to inspect actual lo
 - "Which project/thread/model is driving usage?" Use `usage_summary` grouped by `project`, `thread`, or `model`.
 - "Show/filter the calls table" Use `usage_calls(...)` with `limit`, `offset`, `search`, `since`, `model`, `effort`, `thread`, `pricing_status`, or `credit_confidence`. Report `row_count`, `total_matched_rows`, and `has_more`.
 - "Search my local usage content for X" Use `usage_content_search(query="X", limit=20)` and state snippets are local indexed content, not public-safe aggregate export.
+- "Trace this thread/session" Use `usage_thread_trace(thread=...)`, `usage_thread_trace(session_id=...)`, or seed with `usage_thread_trace(record_id=...)`; state fragments are local indexed content.
 - "Open/investigate this call" Use `usage_call_detail(record_id=...)` for the aggregate call investigator payload. Use `usage_call_context` only if the user explicitly asks for raw local context.
 - "Show threads" Use `usage_threads(...)`, sorted by token impact by default.
 - "Give me dashboard report evidence" Use `usage_report_pack(...)` for report cards and compact evidence rows. Use `usage_dashboard_recommendations(...)` when the user specifically wants the dashboard recommendation payload.

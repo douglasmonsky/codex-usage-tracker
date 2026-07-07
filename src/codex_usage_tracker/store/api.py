@@ -28,6 +28,7 @@ from codex_usage_tracker.store.content_index import (
     clear_content_index_rows,
     delete_content_index_rows_for_source_files,
     search_content_fragments,
+    trace_thread_content,
 )
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,
@@ -197,6 +198,43 @@ def query_content_search(
         "rows": result.rows,
         "total_matched_rows": result.total_matched_rows,
         "search_mode": result.search_mode,
+    }
+
+
+def query_thread_trace(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    thread: str | None = None,
+    thread_key: str | None = None,
+    session_id: str | None = None,
+    record_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 100,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+) -> dict[str, Any]:
+    """Return explicit local content-index trace for one thread/session."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        result = trace_thread_content(
+            conn,
+            thread=thread,
+            thread_key=thread_key,
+            session_id=session_id,
+            record_id=record_id,
+            since=since,
+            until=until,
+            include_archived=include_archived,
+            limit=limit,
+            offset=offset,
+            max_snippet_chars=max_snippet_chars,
+        )
+    return {
+        "calls": result.calls,
+        "total_matched_calls": result.total_matched_calls,
     }
 
 

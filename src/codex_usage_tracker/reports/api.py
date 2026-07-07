@@ -47,6 +47,7 @@ from codex_usage_tracker.store.api import (
     query_source_record_coverage,
     query_source_record_totals,
     query_summary,
+    query_thread_trace,
 )
 
 SUMMARY_GROUP_BY_CHOICES = (
@@ -139,6 +140,13 @@ class SourceCoverageReport:
 @dataclass(frozen=True)
 class ContentSearchReport:
     """Stable machine-readable local content-index search result."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ThreadTraceReport:
+    """Stable machine-readable local content-index thread trace."""
 
     payload: dict[str, Any]
 
@@ -379,6 +387,77 @@ def build_content_search_report(
                 normalized_offset + len(rows) if has_more else None
             ),
             "rows": rows,
+        }
+    )
+
+
+def build_thread_trace_report(
+    *,
+    db_path: Path,
+    thread: str | None = None,
+    thread_key: str | None = None,
+    session_id: str | None = None,
+    record_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 100,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> ThreadTraceReport:
+    """Build explicit local content-index thread/session trace payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    result = query_thread_trace(
+        db_path=db_path,
+        thread=thread,
+        thread_key=thread_key,
+        session_id=session_id,
+        record_id=record_id,
+        since=since,
+        until=until,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+    )
+    calls = result["calls"]
+    normalized_limit = None if limit is None or limit <= 0 else limit
+    normalized_offset = max(0, offset)
+    total_matched = int(result["total_matched_calls"])
+    has_more = (
+        False
+        if normalized_limit is None
+        else normalized_offset + len(calls) < total_matched
+    )
+    return ThreadTraceReport(
+        {
+            "schema": "codex-usage-tracker-thread-trace-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": True,
+            "privacy_mode": privacy_mode,
+            "filters": {
+                "thread": thread,
+                "thread_key": thread_key,
+                "session_id": session_id,
+                "record_id": record_id,
+                "since": since,
+                "until": until,
+                "include_archived": include_archived,
+                "limit": limit,
+                "offset": normalized_offset,
+                "max_snippet_chars": max_snippet_chars,
+            },
+            "call_count": len(calls),
+            "total_matched_calls": total_matched,
+            "truncated": has_more,
+            "has_more": has_more,
+            "next_offset": (
+                normalized_offset + len(calls) if has_more else None
+            ),
+            "calls": calls,
         }
     )
 

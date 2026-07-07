@@ -75,6 +75,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_pricing_coverage`
 - `usage_source_coverage`
 - `usage_content_search`
+- `usage_thread_trace`
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
@@ -107,6 +108,8 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `refresh_usage_index(include_archived=True)` and `generate_usage_dashboard(include_archived=True)` are explicit all-history opt-ins. The default dashboard view excludes archived session rows so older work does not inflate the current usage picture.
 
 `usage_content_search(query=...)` searches the explicit local content index and can return indexed snippets. Use it only when the user asks for local content exploration, pattern hunting, or diagnostics that need transcript-level evidence. Its payload marks `content_mode="local_content_index"`, `includes_indexed_content=true`, and `includes_raw_fragments=true`.
+
+`usage_thread_trace(...)` returns a paged call timeline for one thread, thread key, session id, or seed record id, with local indexed fragments attached when present. It is also an explicit local content-index surface and carries the same indexed-content flags.
 
 ## Allowance Intelligence MCP Tools
 

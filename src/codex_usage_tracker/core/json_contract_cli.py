@@ -242,6 +242,35 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    'codex-usage-tracker-thread-trace-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "filters": dict,
+            "call_count": int,
+            "total_matched_calls": int,
+            "truncated": bool,
+            "has_more": bool,
+            "next_offset": (int, NoneType),
+            "calls": list,
+        },
+        "nested": {
+            "filters": {
+                "thread": (str, NoneType),
+                "thread_key": (str, NoneType),
+                "session_id": (str, NoneType),
+                "record_id": (str, NoneType),
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "include_archived": bool,
+                "limit": (int, NoneType),
+                "offset": int,
+                "max_snippet_chars": (int, NoneType),
+            }
+        },
+    },
     'codex-usage-tracker-export-v1': {
         "required": {
             "rows": int,

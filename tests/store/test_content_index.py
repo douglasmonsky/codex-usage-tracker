@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
-from codex_usage_tracker.reports.api import build_content_search_report
+from codex_usage_tracker.reports.api import (
+    build_content_search_report,
+    build_thread_trace_report,
+)
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
 from tests.store_dashboard_helpers import _make_codex_home
 
@@ -73,3 +76,30 @@ def test_content_search_returns_explicit_local_snippets(tmp_path: Path) -> None:
     assert payload["rows"][0]["includes_raw_fragment"] is True
     assert "SECRET" in payload["rows"][0]["snippet"]
     assert payload["rows"][0]["snippet_truncated"] is True
+
+
+def test_thread_trace_returns_calls_with_indexed_fragments(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    payload = build_thread_trace_report(
+        db_path=db_path,
+        thread="Add Codex token tracking",
+        limit=5,
+        max_snippet_chars=64,
+    ).payload
+
+    assert validate_json_payload_contract(payload) == []
+    assert payload["schema"] == "codex-usage-tracker-thread-trace-v1"
+    assert payload["content_mode"] == "local_content_index"
+    assert payload["includes_indexed_content"] is True
+    assert payload["includes_raw_fragments"] is True
+    assert payload["call_count"] >= 1
+    assert payload["total_matched_calls"] >= payload["call_count"]
+    assert any(call["fragment_count"] > 0 for call in payload["calls"])
+    assert any(
+        "SECRET" in fragment["snippet"]
+        for call in payload["calls"]
+        for fragment in call["fragments"]
+    )

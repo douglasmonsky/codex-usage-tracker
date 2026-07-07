@@ -79,6 +79,7 @@ Tracked schema ids:
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
 | `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |
 | `codex-usage-tracker-content-search-v1` | MCP `usage_content_search(...)`; explicit local content-index search, may include indexed snippets |
+| `codex-usage-tracker-thread-trace-v1` | MCP `usage_thread_trace(...)`; explicit local content-index thread/session timeline |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
 | `codex-usage-tracker-update-pricing-v1` | CLI `update-pricing --json`, MCP `update_usage_pricing_config()` |
@@ -912,6 +913,46 @@ This is an explicit local content-index investigation surface. It can include in
   "has_more": false,
   "next_offset": null,
   "rows": []
+}
+```
+
+## Thread Trace
+
+MCP:
+
+- `usage_thread_trace(thread="Add Codex token tracking")`
+- `usage_thread_trace(session_id="...")`
+- `usage_thread_trace(record_id="...")`
+
+Schema: `codex-usage-tracker-thread-trace-v1`
+
+This is an explicit local content-index investigation surface. It returns aggregate call metadata plus indexed fragments for a selected thread/session scope.
+
+```json
+{
+  "schema": "codex-usage-tracker-thread-trace-v1",
+  "content_mode": "local_content_index",
+  "includes_indexed_content": true,
+  "includes_raw_fragments": true,
+  "privacy_mode": "normal",
+  "filters": {
+    "thread": "Add Codex token tracking",
+    "thread_key": null,
+    "session_id": null,
+    "record_id": null,
+    "since": null,
+    "until": null,
+    "include_archived": false,
+    "limit": 100,
+    "offset": 0,
+    "max_snippet_chars": 800
+  },
+  "call_count": 0,
+  "total_matched_calls": 0,
+  "truncated": false,
+  "has_more": false,
+  "next_offset": null,
+  "calls": []
 }
 ```
 
