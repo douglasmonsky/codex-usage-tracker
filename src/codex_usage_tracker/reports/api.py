@@ -11,6 +11,7 @@ from codex_usage_tracker.core.formatting import (
     format_calls,
     format_pricing_coverage,
     format_recommendations,
+    format_source_coverage,
     format_summary,
 )
 from codex_usage_tracker.core.paths import DEFAULT_PROJECTS_PATH
@@ -42,6 +43,8 @@ from codex_usage_tracker.reports.recommendations import annotate_rows_with_recom
 from codex_usage_tracker.store.api import (
     query_dashboard_events,
     query_most_expensive_calls,
+    query_source_record_coverage,
+    query_source_record_totals,
     query_summary,
 )
 
@@ -120,6 +123,16 @@ class PricingCoverageReport:
 
     def render(self, limit: int = 20) -> str:
         return format_pricing_coverage(self.payload, limit=limit)
+
+
+@dataclass(frozen=True)
+class SourceCoverageReport:
+    """Resolved source provenance parser coverage report."""
+
+    payload: dict[str, Any]
+
+    def render(self, limit: int = 20) -> str:
+        return format_source_coverage(self.payload, limit=limit)
 
 
 @dataclass(frozen=True)
@@ -257,6 +270,37 @@ def build_pricing_coverage_report(
     config = pricing or load_pricing_config(pricing_path)
     rows = query_summary(db_path, group_by="model", limit=limit, since=since)
     return PricingCoverageReport(summarize_pricing_coverage(rows, pricing=config))
+
+
+def build_source_coverage_report(
+    *,
+    db_path: Path,
+    include_archived: bool = False,
+) -> SourceCoverageReport:
+    """Build parser/source provenance coverage report."""
+
+    rows = query_source_record_coverage(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    totals = query_source_record_totals(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    return SourceCoverageReport(
+        {
+            "schema": "codex-usage-tracker-source-coverage-v1",
+            "content_mode": "aggregate_only",
+            "includes_indexed_content": False,
+            "includes_raw_fragments": False,
+            "include_archived": include_archived,
+            "source_record_count": int(totals.get("source_record_count") or 0),
+            "source_file_count": int(totals.get("source_file_count") or 0),
+            "parser_version_count": int(totals.get("parser_version_count") or 0),
+            "warning_record_count": int(totals.get("warning_record_count") or 0),
+            "rows": rows,
+        }
+    )
 
 
 def build_query_report(

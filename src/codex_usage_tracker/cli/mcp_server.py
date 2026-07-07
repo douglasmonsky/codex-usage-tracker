@@ -48,6 +48,7 @@ from codex_usage_tracker.reports.api import (
     build_pricing_coverage_report,
     build_query_report,
     build_recommendations_report,
+    build_source_coverage_report,
     build_summary_report,
 )
 from codex_usage_tracker.server.call_detail import call_detail_payload
@@ -344,6 +345,23 @@ def usage_pricing_coverage(
         db_path=DEFAULT_DB_PATH,
         pricing_path=DEFAULT_PRICING_PATH,
         since=since,
+    )
+    if response_format == "json":
+        return report.payload
+    return report.render(limit=limit)
+
+
+@mcp.tool()
+def usage_source_coverage(
+    include_archived: bool = False,
+    limit: int = 20,
+    response_format: str = "markdown",
+) -> str | dict[str, Any]:
+    """Show source provenance parser coverage aggregate-only."""
+
+    report = build_source_coverage_report(
+        db_path=DEFAULT_DB_PATH,
+        include_archived=include_archived,
     )
     if response_format == "json":
         return report.payload

@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from codex_usage_tracker.parser.state import ParserState
+from codex_usage_tracker.reports.api import build_source_coverage_report
 from codex_usage_tracker.store.api import (
     query_source_record_coverage,
     query_source_records,
@@ -37,6 +38,7 @@ def test_upsert_usage_events_persists_source_record_provenance(tmp_path: Path) -
     unlimited_rows = query_source_records(db_path=db_path, limit=0)
     none_limit_rows = query_source_records(db_path=db_path, limit=None)
     coverage_rows = query_source_record_coverage(db_path=db_path)
+    report = build_source_coverage_report(db_path=db_path)
 
     assert [row["record_id"] for row in unlimited_rows] == ["source-a", "source-b"]
     assert [row["record_id"] for row in none_limit_rows] == ["source-a", "source-b"]
@@ -57,6 +59,13 @@ def test_upsert_usage_events_persists_source_record_provenance(tmp_path: Path) -
             "warning_record_count": 0,
         }
     ]
+    assert report.payload["schema"] == "codex-usage-tracker-source-coverage-v1"
+    assert report.payload["content_mode"] == "aggregate_only"
+    assert report.payload["includes_indexed_content"] is False
+    assert report.payload["includes_raw_fragments"] is False
+    assert report.payload["source_record_count"] == 2
+    assert report.payload["source_file_count"] == 2
+    assert "Codex source coverage" in report.render()
 
 
 def test_source_file_metadata_refreshes_source_record_parser_details(

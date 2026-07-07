@@ -77,6 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_dashboard_parsers(subparsers)
     _add_expensive_parser(subparsers)
     _add_pricing_coverage_parser(subparsers)
+    _add_source_coverage_parser(subparsers)
     _add_export_parser(subparsers)
     _add_pricing_parsers(subparsers)
     _add_allowance_parser(subparsers)
@@ -428,6 +429,23 @@ def _add_pricing_coverage_parser(
         action="store_true",
         dest="as_json",
         help="Return the coverage report as JSON",
+    )
+
+
+def _add_source_coverage_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    source_coverage = subparsers.add_parser(
+        "source-coverage",
+        help="Show source provenance and parser coverage",
+    )
+    source_coverage.add_argument("--include-archived", action="store_true")
+    source_coverage.add_argument("--limit", type=int, default=20)
+    source_coverage.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Return source coverage report as JSON",
     )
 
 

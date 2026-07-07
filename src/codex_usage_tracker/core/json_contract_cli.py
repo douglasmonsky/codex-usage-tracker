@@ -184,8 +184,8 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     'codex-usage-tracker-pricing-coverage-v1': {
-            "required": {
-                "model_count": int,
+        "required": {
+            "model_count": int,
                 "priced_model_count": int,
                 "unpriced_model_count": int,
                 "total_tokens": Number,
@@ -196,9 +196,22 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "pricing_loaded": bool,
                 "pricing_path": str,
                 "pricing_source": (dict, NoneType),
-                "rows": list,
-            }
-        },
+            "rows": list,
+        }
+    },
+    'codex-usage-tracker-source-coverage-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "include_archived": bool,
+            "source_record_count": int,
+            "source_file_count": int,
+            "parser_version_count": int,
+            "warning_record_count": int,
+            "rows": list,
+        }
+    },
     'codex-usage-tracker-export-v1': {
             "required": {
                 "rows": int,

@@ -75,6 +75,7 @@ Phrase the final answer as "what happened, why it likely matters, what to try ne
 - Use `usage_recommendations` when the user asks what to inspect next or wants ranked action items by aggregate severity.
 - Use `usage_summary` presets `today`, `last-7-days`, `by-model`, `by-cwd`, `by-thread`, and `expensive` for common requests.
 - Use `usage_pricing_coverage` when the user asks whether costs are fully priced or which models use estimated or missing pricing.
+- Use `usage_source_coverage` when the user asks whether parser/source provenance coverage is healthy or whether the local index is ready for deeper investigation.
 - Use `session_usage` for per-call and per-turn detail for one session.
 - Use `usage_call_context` for one selected model call when the user asks to load actual logged context on demand.
 - Use `most_expensive_usage_calls` to identify high-token calls and aggregate efficiency signals.

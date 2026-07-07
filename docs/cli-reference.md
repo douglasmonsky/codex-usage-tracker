@@ -101,6 +101,7 @@ codex-usage-tracker summary --preset by-subagent-role
 codex-usage-tracker expensive --limit 10
 codex-usage-tracker recommendations --limit 10
 codex-usage-tracker pricing-coverage
+codex-usage-tracker source-coverage
 codex-usage-tracker allowance-history --window-kind weekly --json
 codex-usage-tracker allowance-diagnostics --window-kind weekly --json
 ```

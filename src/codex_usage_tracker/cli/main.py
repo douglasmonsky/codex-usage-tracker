@@ -53,6 +53,7 @@ from codex_usage_tracker.reports.api import (
     build_pricing_coverage_report,
     build_query_report,
     build_recommendations_report,
+    build_source_coverage_report,
     build_summary_report,
 )
 from codex_usage_tracker.reports.support import (
@@ -447,6 +448,18 @@ def _run_pricing_coverage(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_source_coverage(args: argparse.Namespace) -> int:
+    report = build_source_coverage_report(
+        db_path=args.db,
+        include_archived=args.include_archived,
+    )
+    if args.as_json:
+        print_json(report.payload)
+        return 0
+    print(report.render(args.limit))
+    return 0
+
+
 def _run_allowance_history(args: argparse.Namespace) -> int:
     report = build_allowance_history_report(
         db_path=args.db,
@@ -596,6 +609,7 @@ _COMMAND_HANDLERS = {
     "serve-dashboard": run_serve_dashboard,
     "expensive": _run_expensive,
     "pricing-coverage": _run_pricing_coverage,
+    "source-coverage": _run_source_coverage,
     "allowance-history": _run_allowance_history,
     "allowance-diagnostics": _run_allowance_diagnostics,
     "allowance-export": _run_allowance_export,

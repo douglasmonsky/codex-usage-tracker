@@ -65,6 +65,8 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     )
     pricing_coverage = mcp_server.usage_pricing_coverage()
     pricing_coverage_json = mcp_server.usage_pricing_coverage(response_format="json")
+    source_coverage = mcp_server.usage_source_coverage()
+    source_coverage_json = mcp_server.usage_source_coverage(response_format="json")
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
@@ -147,6 +149,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert recommendations_json["threads"]
     assert "Codex pricing coverage" in pricing_coverage
     assert pricing_coverage_json["schema"] == "codex-usage-tracker-pricing-coverage-v1"
+    assert "Codex source coverage" in source_coverage
+    assert source_coverage_json["schema"] == "codex-usage-tracker-source-coverage-v1"
+    assert source_coverage_json["content_mode"] == "aggregate_only"
+    assert source_coverage_json["includes_indexed_content"] is False
+    assert source_coverage_json["includes_raw_fragments"] is False
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2

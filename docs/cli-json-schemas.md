@@ -77,6 +77,7 @@ Tracked schema ids:
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url` and legacy `legacy_dashboard_url` fallback |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
+| `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
 | `codex-usage-tracker-update-pricing-v1` | CLI `update-pricing --json`, MCP `update_usage_pricing_config()` |
@@ -836,6 +837,44 @@ Schema: `codex-usage-tracker-pricing-coverage-v1`
 }
 ```
 
+## Source Coverage
+
+Command:
+
+```bash
+codex-usage-tracker source-coverage --json
+```
+
+MCP:
+
+- `usage_source_coverage(response_format="json")`
+
+Schema: `codex-usage-tracker-source-coverage-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-source-coverage-v1",
+  "content_mode": "aggregate_only",
+  "includes_indexed_content": false,
+  "includes_raw_fragments": false,
+  "include_archived": false,
+  "source_record_count": 2,
+  "source_file_count": 2,
+  "parser_version_count": 1,
+  "warning_record_count": 0,
+  "rows": [
+    {
+      "raw_shape_label": "token_count",
+      "parser_adapter": "codex-jsonl",
+      "parser_version": "codex-jsonl-v2",
+      "record_count": 2,
+      "source_file_count": 2,
+      "warning_record_count": 0
+    }
+  ]
+}
+```
+
 ## Lifecycle Commands
 
 Most setup and file-writing commands accept `--json` and return a schema-specific payload with written paths and counts:
@@ -849,6 +888,7 @@ Most setup and file-writing commands accept `--json` and return a schema-specifi
 - `dashboard --json`: `codex-usage-tracker-dashboard-v1`
 - `export --json`: `codex-usage-tracker-export-v1`
 - `pricing-coverage --json`
+- `source-coverage --json`
 - `recommendations --json`
 - `init-pricing --json`, `update-pricing --json`, `pin-pricing --json`
 - `init-allowance --json`, `parse-allowance --json`

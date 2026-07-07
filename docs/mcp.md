@@ -48,7 +48,7 @@ Compare usage by project for the last 7 days.
 Show me what is estimated or unpriced before I trust the cost numbers.
 ```
 
-The API skill should refresh the local index, call aggregate tools such as `usage_status`, `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_report_pack`, `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, or `usage_pricing_coverage`, then explain the answer with the data scope and estimate caveats.
+The API skill should refresh the local index, call aggregate tools such as `usage_status`, `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_report_pack`, `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`, then explain the answer with the data scope and estimate caveats.
 
 If MCP tools are not available, the same questions can be answered through CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
 
@@ -73,6 +73,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_call_context`
 - `most_expensive_usage_calls`
 - `usage_pricing_coverage`
+- `usage_source_coverage`
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
@@ -82,7 +83,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `update_usage_pricing_config`
 - `init_usage_allowance_config`
 
-`usage_doctor`, `usage_summary`, `usage_recommendations`, `session_usage`, `most_expensive_usage_calls`, and `usage_pricing_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown.
+`usage_doctor`, `usage_summary`, `usage_recommendations`, `session_usage`, `most_expensive_usage_calls`, `usage_pricing_coverage`, and `usage_source_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown.
 
 Dashboard-shaped MCP tools return JSON dictionaries directly and reuse the same aggregate schemas as the local React dashboard API:
 

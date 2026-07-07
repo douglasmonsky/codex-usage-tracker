@@ -265,6 +265,32 @@ def format_pricing_coverage(report: dict[str, Any], limit: int = 20) -> str:
     return "\n".join(lines)
 
 
+def format_source_coverage(report: dict[str, Any], limit: int = 20) -> str:
+    rows = report.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return "No source provenance records found. Run refresh_usage_index first."
+
+    lines = [
+        "Codex source coverage",
+        "",
+        f"Source records: {_fmt_int(report.get('source_record_count'))} across "
+        f"{_fmt_int(report.get('source_file_count'))} source files",
+        f"Parser versions: {_fmt_int(report.get('parser_version_count'))}",
+        f"Warning records: {_fmt_int(report.get('warning_record_count'))}",
+        "",
+    ]
+    for row in rows[:limit]:
+        lines.append(
+            f"- {row.get('raw_shape_label') or 'unknown'} via "
+            f"{row.get('parser_adapter') or 'unknown'} "
+            f"{row.get('parser_version') or 'unknown'}: "
+            f"{_fmt_int(row.get('record_count'))} records, "
+            f"{_fmt_int(row.get('source_file_count'))} files, "
+            f"{_fmt_int(row.get('warning_record_count'))} warning records"
+        )
+    return "\n".join(lines)
+
+
 def _fmt_int(value: object) -> str:
     if not isinstance(value, int | float | str):
         return "0"

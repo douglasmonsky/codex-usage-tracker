@@ -145,6 +145,39 @@ def query_source_record_coverage(
         return [row_to_dict(row) for row in rows]
 
 
+def query_source_record_totals(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    include_archived: bool = False,
+) -> dict[str, Any]:
+    """Return aggregate parser/source provenance coverage totals."""
+
+    from codex_usage_tracker.store.schema import init_db
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        sync_source_records(conn)
+        where_sql = "" if include_archived else "WHERE u.is_archived = 0"
+        row = conn.execute(
+            f"""
+            SELECT
+                COUNT(*) AS source_record_count,
+                COUNT(DISTINCT sr.source_file_id) AS source_file_count,
+                COUNT(DISTINCT sr.parser_version) AS parser_version_count,
+                SUM(
+                    CASE
+                    WHEN sr.parse_warnings_json NOT IN ('', '[]') THEN 1
+                    ELSE 0
+                    END
+                ) AS warning_record_count
+            FROM source_records AS sr
+            JOIN usage_events AS u ON u.record_id = sr.record_id
+            {where_sql}
+            """
+        ).fetchone()
+        return row_to_dict(row) if row is not None else {}
+
+
 def _chunks(values: Iterable[str] | None) -> list[list[str]]:
     if values is None:
         return []

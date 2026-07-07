@@ -64,6 +64,9 @@ from codex_usage_tracker.store.source_records import (
     query_source_record_coverage as query_source_record_coverage,
 )
 from codex_usage_tracker.store.source_records import (
+    query_source_record_totals as query_source_record_totals,
+)
+from codex_usage_tracker.store.source_records import (
     query_source_records as query_source_records,
 )
 from codex_usage_tracker.store.source_records import sync_source_records

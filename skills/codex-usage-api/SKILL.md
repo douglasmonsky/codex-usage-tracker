@@ -31,14 +31,15 @@ The only exception is `usage_call_context`, which reads one selected record's lo
    - `usage_summary(..., response_format="json")`
    - `session_usage(..., response_format="json")`
    - `most_expensive_usage_calls(..., response_format="json")`
- - `usage_recommendations(..., response_format="json")`
- - `usage_pricing_coverage(..., response_format="json")`
- - `usage_allowance_diagnostics(..., privacy_mode="strict")`
+- `usage_recommendations(..., response_format="json")`
+- `usage_pricing_coverage(..., response_format="json")`
+- `usage_source_coverage(..., response_format="json")`
+- `usage_allowance_diagnostics(..., privacy_mode="strict")`
  - `usage_allowance_history(..., privacy_mode="strict")`
  - `usage_allowance_export(...)`
  - `usage_query(...)`
 7. Check the top-level `schema` field before interpreting structured output. Known schema ids are documented in `docs/cli-json-schemas.md`.
-8. If MCP tools are unavailable, fall back to CLI equivalents: `refresh --json`, `summary --json`, `query`, `session --json`, `expensive --json`, `recommendations --json`, and `pricing-coverage --json`.
+8. If MCP tools are unavailable, fall back to CLI equivalents: `refresh --json`, `summary --json`, `query`, `session --json`, `expensive --json`, `recommendations --json`, `pricing-coverage --json`, and `source-coverage --json`.
 9. If `codex-usage-tracker` is missing but you are inside the source checkout, use `PYTHONPATH=src .venv/bin/python -m codex_usage_tracker.cli <command>`. Do not use `PYTHONPATH=src` outside that checkout.
 
 ## Routing Questions To API Calls
