@@ -27,6 +27,7 @@ from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import (
     clear_content_index_rows,
     delete_content_index_rows_for_source_files,
+    search_content_fragments,
 )
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,
@@ -159,6 +160,44 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
+
+
+def query_content_search(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    query: str,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 20,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+) -> dict[str, Any]:
+    """Search explicit local content index snippets."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        result = search_content_fragments(
+            conn,
+            query=query,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            include_archived=include_archived,
+            limit=limit,
+            offset=offset,
+            max_snippet_chars=max_snippet_chars,
+        )
+    return {
+        "rows": result.rows,
+        "total_matched_rows": result.total_matched_rows,
+        "search_mode": result.search_mode,
+    }
 
 
 def record_refresh_metadata(

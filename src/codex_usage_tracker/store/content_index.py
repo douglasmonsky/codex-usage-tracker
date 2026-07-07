@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -12,8 +13,10 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION, optional_str
+from codex_usage_tracker.store.query_sql import usage_where_clause
 
 MAX_FRAGMENT_CHARS = 4000
+DEFAULT_SEARCH_SNIPPET_CHARS = 800
 PARSER_ADAPTER_NAME = "codex-jsonl"
 CONTENT_INDEX_TABLES = (
     "content_fragments",
@@ -45,6 +48,15 @@ class _PendingFragment:
     turn_id: str | None
     turn_index: int
     event_timestamp: str | None
+
+
+@dataclass(frozen=True)
+class ContentSearchResult:
+    """Content-index search result rows and paging metadata."""
+
+    rows: list[dict[str, object]]
+    total_matched_rows: int
+    search_mode: str
 
 
 def index_content_for_source_files(
@@ -93,6 +105,371 @@ def delete_content_index_rows_for_source_files(
             source_files_to_replace,
         )
     _rebuild_content_fts(conn)
+
+
+def search_content_fragments(
+    conn: sqlite3.Connection,
+    *,
+    query: str,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 20,
+    offset: int = 0,
+    max_snippet_chars: int | None = DEFAULT_SEARCH_SNIPPET_CHARS,
+) -> ContentSearchResult:
+    """Search the local content index and return bounded local snippets."""
+
+    normalized_query = query.strip()
+    if not normalized_query:
+        raise ValueError("query is required")
+    normalized_limit = _normalize_search_limit(limit)
+    normalized_offset = _normalize_search_offset(offset)
+    try:
+        return _search_content_fts(
+            conn,
+            query=normalized_query,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            include_archived=include_archived,
+            limit=normalized_limit,
+            offset=normalized_offset,
+            max_snippet_chars=max_snippet_chars,
+        )
+    except sqlite3.DatabaseError:
+        return _search_content_like(
+            conn,
+            query=normalized_query,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            include_archived=include_archived,
+            limit=normalized_limit,
+            offset=normalized_offset,
+            max_snippet_chars=max_snippet_chars,
+        )
+
+
+def _search_content_fts(
+    conn: sqlite3.Connection,
+    *,
+    query: str,
+    since: str | None,
+    until: str | None,
+    model: str | None,
+    effort: str | None,
+    thread: str | None,
+    include_archived: bool,
+    limit: int | None,
+    offset: int,
+    max_snippet_chars: int | None,
+) -> ContentSearchResult:
+    usage_clause, usage_params = _search_usage_clause(
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        include_archived=include_archived,
+    )
+    match_query = _fts_match_query(query)
+    from_sql = f"""
+        FROM content_fts
+        JOIN content_fragments AS cf ON cf.fragment_rowid = content_fts.rowid
+        JOIN usage_events AS u ON u.record_id = cf.record_id
+        WHERE content_fts MATCH ?
+        {usage_clause}
+    """
+    params: list[object] = [match_query, *usage_params]
+    total_matched = _search_count(conn, from_sql=from_sql, params=params)
+    rows = conn.execute(
+        f"""
+        SELECT
+            bm25(content_fts) AS search_rank,
+            cf.fragment_id,
+            cf.record_id,
+            cf.turn_key,
+            cf.fragment_kind,
+            cf.role,
+            cf.safe_label,
+            cf.content_hash,
+            cf.content_size_bytes,
+            cf.fragment_text,
+            cf.includes_raw_fragment,
+            cf.source_file_id,
+            cf.line_start,
+            cf.line_end,
+            cf.token_link_record_id,
+            u.session_id,
+            u.thread_name,
+            u.parent_thread_name,
+            u.thread_key,
+            u.event_timestamp,
+            u.model,
+            u.effort,
+            u.total_tokens,
+            u.input_tokens,
+            u.cached_input_tokens,
+            u.uncached_input_tokens,
+            u.output_tokens,
+            u.reasoning_output_tokens,
+            u.is_archived
+        {from_sql}
+        ORDER BY search_rank ASC, u.event_timestamp DESC, cf.line_start ASC
+        {_limit_clause(limit)}
+        """,
+        [*params, *_limit_params(limit, offset)],
+    ).fetchall()
+    return ContentSearchResult(
+        rows=[
+            _content_search_row(
+                row,
+                query=query,
+                max_snippet_chars=max_snippet_chars,
+            )
+            for row in rows
+        ],
+        total_matched_rows=total_matched,
+        search_mode="fts5",
+    )
+
+
+def _search_content_like(
+    conn: sqlite3.Connection,
+    *,
+    query: str,
+    since: str | None,
+    until: str | None,
+    model: str | None,
+    effort: str | None,
+    thread: str | None,
+    include_archived: bool,
+    limit: int | None,
+    offset: int,
+    max_snippet_chars: int | None,
+) -> ContentSearchResult:
+    usage_clause, usage_params = _search_usage_clause(
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        include_archived=include_archived,
+    )
+    terms = _search_terms(query) or [query]
+    like_clauses = [
+        "(lower(cf.fragment_text) LIKE ? OR lower(cf.safe_label) LIKE ?)"
+        for _term in terms
+    ]
+    like_params: list[object] = []
+    for term in terms:
+        pattern = f"%{term.lower()}%"
+        like_params.extend([pattern, pattern])
+    from_sql = f"""
+        FROM content_fragments AS cf
+        JOIN usage_events AS u ON u.record_id = cf.record_id
+        WHERE {' AND '.join(like_clauses)}
+        {usage_clause}
+    """
+    params = [*like_params, *usage_params]
+    total_matched = _search_count(conn, from_sql=from_sql, params=params)
+    rows = conn.execute(
+        f"""
+        SELECT
+            NULL AS search_rank,
+            cf.fragment_id,
+            cf.record_id,
+            cf.turn_key,
+            cf.fragment_kind,
+            cf.role,
+            cf.safe_label,
+            cf.content_hash,
+            cf.content_size_bytes,
+            cf.fragment_text,
+            cf.includes_raw_fragment,
+            cf.source_file_id,
+            cf.line_start,
+            cf.line_end,
+            cf.token_link_record_id,
+            u.session_id,
+            u.thread_name,
+            u.parent_thread_name,
+            u.thread_key,
+            u.event_timestamp,
+            u.model,
+            u.effort,
+            u.total_tokens,
+            u.input_tokens,
+            u.cached_input_tokens,
+            u.uncached_input_tokens,
+            u.output_tokens,
+            u.reasoning_output_tokens,
+            u.is_archived
+        {from_sql}
+        ORDER BY u.event_timestamp DESC, cf.line_start ASC
+        {_limit_clause(limit)}
+        """,
+        [*params, *_limit_params(limit, offset)],
+    ).fetchall()
+    return ContentSearchResult(
+        rows=[
+            _content_search_row(
+                row,
+                query=query,
+                max_snippet_chars=max_snippet_chars,
+            )
+            for row in rows
+        ],
+        total_matched_rows=total_matched,
+        search_mode="like",
+    )
+
+
+def _search_usage_clause(
+    *,
+    since: str | None,
+    until: str | None,
+    model: str | None,
+    effort: str | None,
+    thread: str | None,
+    include_archived: bool,
+) -> tuple[str, list[object]]:
+    where_clause, params = usage_where_clause(
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        table_alias="u",
+        include_archived=include_archived,
+    )
+    if not where_clause:
+        return "", []
+    return f"AND {where_clause.removeprefix('WHERE ')}", params
+
+
+def _search_count(
+    conn: sqlite3.Connection,
+    *,
+    from_sql: str,
+    params: list[object],
+) -> int:
+    row = conn.execute(f"SELECT COUNT(*) AS row_count {from_sql}", params).fetchone()
+    return int(row["row_count"] if row is not None else 0)
+
+
+def _content_search_row(
+    row: sqlite3.Row,
+    *,
+    query: str,
+    max_snippet_chars: int | None,
+) -> dict[str, object]:
+    fragment_text = str(row["fragment_text"] or "")
+    snippet, truncated = _snippet(
+        fragment_text,
+        query=query,
+        max_chars=max_snippet_chars,
+    )
+    return {
+        "record_id": row["record_id"],
+        "session_id": row["session_id"],
+        "thread_name": row["thread_name"],
+        "parent_thread_name": row["parent_thread_name"],
+        "thread_key": row["thread_key"],
+        "event_timestamp": row["event_timestamp"],
+        "model": row["model"],
+        "effort": row["effort"],
+        "total_tokens": int(row["total_tokens"] or 0),
+        "input_tokens": int(row["input_tokens"] or 0),
+        "cached_input_tokens": int(row["cached_input_tokens"] or 0),
+        "uncached_input_tokens": int(row["uncached_input_tokens"] or 0),
+        "output_tokens": int(row["output_tokens"] or 0),
+        "reasoning_output_tokens": int(row["reasoning_output_tokens"] or 0),
+        "is_archived": bool(row["is_archived"]),
+        "fragment_id": row["fragment_id"],
+        "turn_key": row["turn_key"],
+        "fragment_kind": row["fragment_kind"],
+        "role": row["role"],
+        "safe_label": row["safe_label"],
+        "content_hash": row["content_hash"],
+        "content_size_bytes": int(row["content_size_bytes"] or 0),
+        "snippet": snippet,
+        "snippet_truncated": truncated,
+        "includes_raw_fragment": bool(row["includes_raw_fragment"]),
+        "source_file_id": row["source_file_id"],
+        "line_start": row["line_start"],
+        "line_end": row["line_end"],
+        "token_link_record_id": row["token_link_record_id"],
+        "search_rank": row["search_rank"],
+    }
+
+
+def _snippet(
+    text: str,
+    *,
+    query: str,
+    max_chars: int | None,
+) -> tuple[str, bool]:
+    if max_chars is None or max_chars <= 0 or len(text) <= max_chars:
+        return text, False
+    terms = _search_terms(query)
+    lower_text = text.lower()
+    positions = [lower_text.find(term.lower()) for term in terms]
+    match_positions = [position for position in positions if position >= 0]
+    center = min(match_positions) if match_positions else 0
+    start = max(0, center - max_chars // 3)
+    end = min(len(text), start + max_chars)
+    if end - start < max_chars:
+        start = max(0, end - max_chars)
+    excerpt = text[start:end].strip()
+    prefix = "... " if start > 0 else ""
+    suffix = " ..." if end < len(text) else ""
+    return f"{prefix}{excerpt}{suffix}", True
+
+
+def _search_terms(query: str) -> list[str]:
+    return [term for term in re.findall(r"[\w-]+", query) if term]
+
+
+def _fts_match_query(query: str) -> str:
+    terms = _search_terms(query)
+    if not terms:
+        return _fts_quote(query)
+    return " ".join(_fts_quote(term) for term in terms)
+
+
+def _fts_quote(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _normalize_search_limit(limit: int | None) -> int | None:
+    if limit is None or limit <= 0:
+        return None
+    return limit
+
+
+def _normalize_search_offset(offset: int) -> int:
+    return max(0, offset)
+
+
+def _limit_clause(limit: int | None) -> str:
+    if limit is None:
+        return ""
+    return "LIMIT ? OFFSET ?"
+
+
+def _limit_params(limit: int | None, offset: int) -> list[int]:
+    if limit is None:
+        return []
+    return [limit, offset]
 
 
 def _index_content_for_source_file(

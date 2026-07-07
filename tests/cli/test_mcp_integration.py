@@ -67,6 +67,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     pricing_coverage_json = mcp_server.usage_pricing_coverage(response_format="json")
     source_coverage = mcp_server.usage_source_coverage()
     source_coverage_json = mcp_server.usage_source_coverage(response_format="json")
+    content_search_json = mcp_server.usage_content_search(
+        query="SECRET RAW PROMPT",
+        limit=1,
+        max_snippet_chars=48,
+    )
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
@@ -110,6 +115,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         query_json,
         recommendations_json,
         pricing_coverage_json,
+        content_search_json,
         session_json,
         status_json,
         calls_json,
@@ -154,6 +160,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert source_coverage_json["content_mode"] == "aggregate_only"
     assert source_coverage_json["includes_indexed_content"] is False
     assert source_coverage_json["includes_raw_fragments"] is False
+    assert content_search_json["schema"] == "codex-usage-tracker-content-search-v1"
+    assert content_search_json["content_mode"] == "local_content_index"
+    assert content_search_json["includes_indexed_content"] is True
+    assert content_search_json["row_count"] == 1
+    assert "SECRET" in content_search_json["rows"][0]["snippet"]
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2

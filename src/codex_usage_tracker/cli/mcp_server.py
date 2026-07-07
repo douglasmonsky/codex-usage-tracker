@@ -44,6 +44,7 @@ from codex_usage_tracker.pricing.api import (
     write_pricing_template,
 )
 from codex_usage_tracker.reports.api import (
+    build_content_search_report,
     build_expensive_calls_report,
     build_pricing_coverage_report,
     build_query_report,
@@ -370,6 +371,38 @@ def usage_source_coverage(
     if response_format == "json":
         return report.payload
     return report.render(limit=limit)
+
+
+@mcp.tool()
+def usage_content_search(
+    query: str,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 20,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Search explicit local content index snippets with aggregate call metadata."""
+
+    return build_content_search_report(
+        db_path=DEFAULT_DB_PATH,
+        query=query,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+        privacy_mode=privacy_mode,
+    ).payload
 
 
 @mcp.tool()

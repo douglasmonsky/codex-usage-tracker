@@ -41,6 +41,7 @@ from codex_usage_tracker.reports.recommendation_builder import (
 )
 from codex_usage_tracker.reports.recommendations import annotate_rows_with_recommendations
 from codex_usage_tracker.store.api import (
+    query_content_search,
     query_dashboard_events,
     query_most_expensive_calls,
     query_source_record_coverage,
@@ -133,6 +134,13 @@ class SourceCoverageReport:
 
     def render(self, limit: int = 20) -> str:
         return format_source_coverage(self.payload, limit=limit)
+
+
+@dataclass(frozen=True)
+class ContentSearchReport:
+    """Stable machine-readable local content-index search result."""
+
+    payload: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -298,6 +306,78 @@ def build_source_coverage_report(
             "source_file_count": int(totals.get("source_file_count") or 0),
             "parser_version_count": int(totals.get("parser_version_count") or 0),
             "warning_record_count": int(totals.get("warning_record_count") or 0),
+            "rows": rows,
+        }
+    )
+
+
+def build_content_search_report(
+    *,
+    db_path: Path,
+    query: str,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 20,
+    offset: int = 0,
+    max_snippet_chars: int | None = 800,
+    privacy_mode: str = "normal",
+) -> ContentSearchReport:
+    """Build explicit local content-index search payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    result = query_content_search(
+        db_path=db_path,
+        query=query,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+        max_snippet_chars=max_snippet_chars,
+    )
+    rows = result["rows"]
+    normalized_limit = None if limit is None or limit <= 0 else limit
+    normalized_offset = max(0, offset)
+    total_matched = int(result["total_matched_rows"])
+    has_more = (
+        False
+        if normalized_limit is None
+        else normalized_offset + len(rows) < total_matched
+    )
+    return ContentSearchReport(
+        {
+            "schema": "codex-usage-tracker-content-search-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": True,
+            "privacy_mode": privacy_mode,
+            "query": query,
+            "filters": {
+                "since": since,
+                "until": until,
+                "model": model,
+                "effort": effort,
+                "thread": thread,
+                "include_archived": include_archived,
+                "limit": limit,
+                "offset": normalized_offset,
+                "max_snippet_chars": max_snippet_chars,
+            },
+            "search_mode": result["search_mode"],
+            "row_count": len(rows),
+            "total_matched_rows": total_matched,
+            "truncated": has_more,
+            "has_more": has_more,
+            "next_offset": (
+                normalized_offset + len(rows) if has_more else None
+            ),
             "rows": rows,
         }
     )

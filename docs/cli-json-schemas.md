@@ -1,6 +1,6 @@
 # CLI, MCP, and Dashboard JSON Schemas
 
-Codex Usage Tracker exposes aggregate-only JSON for automation through CLI `--json` flags, MCP tools, and the local dashboard server API. These payloads do not include prompts, assistant messages, tool output, or raw transcript snippets.
+Codex Usage Tracker exposes JSON for automation through CLI `--json` flags, MCP tools, and the local dashboard server API. Default shareable payloads are aggregate-first and do not include prompts, assistant messages, tool output, or raw transcript snippets. `usage_content_search` is the explicit local content-index exception and marks that it can include indexed snippets.
 
 ## Companion Skill Usage
 
@@ -78,6 +78,7 @@ Tracked schema ids:
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url` and legacy `legacy_dashboard_url` fallback |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
 | `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |
+| `codex-usage-tracker-content-search-v1` | MCP `usage_content_search(...)`; explicit local content-index search, may include indexed snippets |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
 | `codex-usage-tracker-update-pricing-v1` | CLI `update-pricing --json`, MCP `update_usage_pricing_config()` |
@@ -872,6 +873,45 @@ Schema: `codex-usage-tracker-source-coverage-v1`
       "warning_record_count": 0
     }
   ]
+}
+```
+
+## Content Search
+
+MCP:
+
+- `usage_content_search(query="token waste")`
+
+Schema: `codex-usage-tracker-content-search-v1`
+
+This is an explicit local content-index investigation surface. It can include indexed snippets from local Codex logs, so do not treat it as a default shareable aggregate report.
+
+```json
+{
+  "schema": "codex-usage-tracker-content-search-v1",
+  "content_mode": "local_content_index",
+  "includes_indexed_content": true,
+  "includes_raw_fragments": true,
+  "privacy_mode": "normal",
+  "query": "token waste",
+  "filters": {
+    "since": null,
+    "until": null,
+    "model": null,
+    "effort": null,
+    "thread": null,
+    "include_archived": false,
+    "limit": 20,
+    "offset": 0,
+    "max_snippet_chars": 800
+  },
+  "search_mode": "fts5",
+  "row_count": 0,
+  "total_matched_rows": 0,
+  "truncated": false,
+  "has_more": false,
+  "next_offset": null,
+  "rows": []
 }
 ```
 

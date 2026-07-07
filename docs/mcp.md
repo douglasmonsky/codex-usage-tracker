@@ -74,6 +74,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `most_expensive_usage_calls`
 - `usage_pricing_coverage`
 - `usage_source_coverage`
+- `usage_content_search`
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
@@ -104,6 +105,8 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `refresh_usage_index()` indexes aggregate usage rows and the local content index by default. Use `refresh_usage_index(aggregate_only=True)` when the user wants the older aggregate-only SQLite posture.
 
 `refresh_usage_index(include_archived=True)` and `generate_usage_dashboard(include_archived=True)` are explicit all-history opt-ins. The default dashboard view excludes archived session rows so older work does not inflate the current usage picture.
+
+`usage_content_search(query=...)` searches the explicit local content index and can return indexed snippets. Use it only when the user asks for local content exploration, pattern hunting, or diagnostics that need transcript-level evidence. Its payload marks `content_mode="local_content_index"`, `includes_indexed_content=true`, and `includes_raw_fragments=true`.
 
 ## Allowance Intelligence MCP Tools
 

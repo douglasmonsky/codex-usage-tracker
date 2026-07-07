@@ -5,15 +5,17 @@ description: Use when the user wants to discuss, investigate, compare, or explai
 
 # Codex Usage API Companion
 
-Use this companion skill as a conversational analyst for Codex Usage Tracker data. Prefer aggregate-only MCP JSON payloads, answer from evidence, and keep the user-facing output crisp instead of narrating tool discovery or local file spelunking.
+Use this companion skill as a conversational analyst for Codex Usage Tracker data. Prefer aggregate MCP JSON payloads first, answer from evidence, and keep the user-facing output crisp instead of narrating tool discovery or local file spelunking.
 
 ## Privacy Boundary
 
-Normal usage answers must use aggregate-only API data. Do not expose prompts, assistant messages, tool output, pasted secrets, or raw transcript snippets.
+Normal usage answers should start from aggregate API data. Do not expose prompts, assistant messages, tool output, pasted secrets, or raw transcript snippets.
 
 When the user plans to share JSON, CSV, dashboards, screenshots, or support bundles, prefer `privacy_mode="strict"` MCP calls or the CLI global option `--privacy-mode strict` before the subcommand. Configured project aliases are explicit display opt-ins.
 
-The only exception is `usage_call_context`, which reads one selected record's local source JSONL on demand. Use it only when the user explicitly asks to inspect actual logged context. State that returned text is local, redacted, size-limited, and not persisted by the tracker.
+Use `usage_content_search` only when the user asks for local content exploration, pattern hunting, or diagnostics that need indexed snippets; its payload can include local transcript snippets and is not a default shareable report.
+
+Use `usage_call_context` only when the user explicitly asks to inspect actual logged context for one selected record. State that returned text is local, redacted or size-limited when applicable, and not included in default shareable outputs.
 
 ## First Steps
 
@@ -34,6 +36,7 @@ The only exception is `usage_call_context`, which reads one selected record's lo
 - `usage_recommendations(..., response_format="json")`
 - `usage_pricing_coverage(..., response_format="json")`
 - `usage_source_coverage(..., response_format="json")`
+- `usage_content_search(...)` only for explicit local content-index exploration
 - `usage_allowance_diagnostics(..., privacy_mode="strict")`
  - `usage_allowance_history(..., privacy_mode="strict")`
  - `usage_allowance_export(...)`
@@ -47,6 +50,7 @@ The only exception is `usage_call_context`, which reads one selected record's lo
 - "What used most?" Use `usage_summary(group_by="thread", response_format="json")` for thread totals, then `most_expensive_usage_calls(response_format="json")` for supporting calls.
 - "Which project/thread/model is driving usage?" Use `usage_summary` grouped by `project`, `thread`, or `model`.
 - "Show/filter the calls table" Use `usage_calls(...)` with `limit`, `offset`, `search`, `since`, `model`, `effort`, `thread`, `pricing_status`, or `credit_confidence`. Report `row_count`, `total_matched_rows`, and `has_more`.
+- "Search my local usage content for X" Use `usage_content_search(query="X", limit=20)` and state snippets are local indexed content, not public-safe aggregate export.
 - "Open/investigate this call" Use `usage_call_detail(record_id=...)` for the aggregate call investigator payload. Use `usage_call_context` only if the user explicitly asks for raw local context.
 - "Show threads" Use `usage_threads(...)`, sorted by token impact by default.
 - "Give me dashboard report evidence" Use `usage_report_pack(...)` for report cards and compact evidence rows. Use `usage_dashboard_recommendations(...)` when the user specifically wants the dashboard recommendation payload.
@@ -69,6 +73,7 @@ When the user asks what they can look into, offer a short menu of concrete aggre
 - "Compare observed usage movement against estimated credits." Use `usage_allowance_diagnostics(privacy_mode="strict")`, then `usage_allowance_history(...)` only when user needs normalized rows.
 
 - "Look through my usage for token waste." Use `usage_report_pack(...)`, then `usage_calls(sort="tokens", direction="desc", limit=10)` and call out high-token calls, low cache ratios, high context-window percent, expensive estimates, or repeated same-thread spikes.
+- "Look through turns for recurring waste patterns." Start with aggregate `usage_report_pack(...)` and `usage_calls(...)`; use `usage_content_search(...)` only if the user wants transcript-level local pattern evidence.
 - "Find calls where context got bloated." Use `usage_calls(...)` sorted by tokens or filtered to recent rows, then rank by `context_window_percent`, `input_tokens`, and low `cache_ratio`.
 - "Show me where caching failed." Use `usage_calls(...)` and `usage_report_pack(...)`; prioritize rows with high `input_tokens`, low `cached_input_tokens`, or low `cache_ratio`.
 - "Which threads are draining the most?" Use `usage_threads(limit=10)` and `usage_summary(group_by="thread", response_format="json")`; include total tokens, estimated cost or credits, and whether archived rows are excluded.

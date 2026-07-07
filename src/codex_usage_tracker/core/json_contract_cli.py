@@ -212,9 +212,39 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "rows": list,
         }
     },
+    'codex-usage-tracker-content-search-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "query": str,
+            "filters": dict,
+            "search_mode": str,
+            "row_count": int,
+            "total_matched_rows": int,
+            "truncated": bool,
+            "has_more": bool,
+            "next_offset": (int, NoneType),
+            "rows": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "model": (str, NoneType),
+                "effort": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "limit": (int, NoneType),
+                "offset": int,
+                "max_snippet_chars": (int, NoneType),
+            }
+        },
+    },
     'codex-usage-tracker-export-v1': {
-            "required": {
-                "rows": int,
+        "required": {
+            "rows": int,
                 "csv_path": str,
                 "limit": (int, NoneType),
                 "privacy_mode": str,

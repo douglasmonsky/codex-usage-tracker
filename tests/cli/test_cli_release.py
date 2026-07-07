@@ -71,6 +71,7 @@ MCP_TOOL_NAMES = {
     "most_expensive_usage_calls",
     "usage_pricing_coverage",
     "usage_source_coverage",
+    "usage_content_search",
     "generate_usage_dashboard",
     "export_usage_csv",
     "init_usage_pricing_config",
