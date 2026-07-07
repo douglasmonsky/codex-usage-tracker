@@ -84,10 +84,10 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parsed_source_files"] == "0"
     assert meta["skipped_source_files"] == "3"
     assert meta["parser_adapter"] == "codex-jsonl-v2"
-    assert meta["schema_version"] == "12"
+    assert meta["schema_version"] == "13"
     assert meta["parser_skipped_events"] == "0"
     state = schema_state(db_path)
-    assert state["schema_version"] == 12
+    assert state["schema_version"] == 13
     assert state["checksum_matches"] is True
     assert [row["version"] for row in state["migrations"]] == [
         1,
@@ -102,6 +102,7 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
         10,
         11,
         12,
+        13,
     ]
     with connect(db_path) as conn:
         init_db(conn)
@@ -700,7 +701,7 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
 
     assert busy_timeout == 5000
     assert str(journal_mode).lower() == "wal"
-    assert user_version == 12
+    assert user_version == 13
 
 
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
@@ -788,7 +789,7 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     assert "used_percent" in allowance_columns
     assert "window_kind" in allowance_columns
     assert "idx_allowance_observations_window_time" in allowance_indexes
-    assert user_version == 12
+    assert user_version == 13
     assert [row["version"] for row in migrations] == [
         1,
         2,
@@ -802,6 +803,7 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
         10,
         11,
         12,
+        13,
     ]
 
 
