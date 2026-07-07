@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Iterable, Mapping
-from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,6 +24,10 @@ from codex_usage_tracker.store.allowance_observations import (
     query_allowance_observations as query_allowance_observations,
 )
 from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.content_index import (
+    clear_content_index_rows,
+    delete_content_index_rows_for_source_files,
+)
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,
 )
@@ -100,17 +103,11 @@ EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 SQLITE_VARIABLE_BATCH_SIZE = 500
-CONTENT_INDEX_TABLES = (
-    "content_fragments",
-    "file_events",
-    "command_runs",
-    "tool_calls",
-    "conversation_turns",
-)
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    aggregate_only: bool = False,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
@@ -122,6 +119,7 @@ def refresh_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
+        aggregate_only=aggregate_only,
     )
 
 
@@ -129,6 +127,7 @@ def rebuild_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    aggregate_only: bool = False,
 ) -> RefreshResult:
     """Drop and rebuild the usage index from all selected Codex logs."""
 
@@ -140,6 +139,7 @@ def rebuild_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
+        aggregate_only=aggregate_only,
     )
 
 
@@ -159,21 +159,6 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
-
-
-def clear_content_index_rows(conn: sqlite3.Connection) -> None:
-    """Clear normalized content index rows while tolerating unavailable FTS5."""
-
-    _clear_content_fts(conn)
-    for table_name in CONTENT_INDEX_TABLES:
-        conn.execute(f"DELETE FROM {table_name}")
-
-
-def _clear_content_fts(conn: sqlite3.Connection) -> None:
-    with suppress(sqlite3.DatabaseError):
-        conn.execute("INSERT INTO content_fts(content_fts) VALUES ('delete-all')")
-
-
 
 
 def record_refresh_metadata(
@@ -427,7 +412,7 @@ def _delete_usage_events_for_source_files(
     if not source_files_to_replace:
         return
     placeholders = ", ".join("?" for _source in source_files_to_replace)
-    _delete_content_index_rows_for_source_files(
+    delete_content_index_rows_for_source_files(
         conn,
         placeholders=placeholders,
         source_files_to_replace=source_files_to_replace,
@@ -458,24 +443,6 @@ def _delete_usage_events_for_source_files(
         f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
         source_files_to_replace,
     )
-
-
-def _delete_content_index_rows_for_source_files(
-    conn: sqlite3.Connection,
-    *,
-    placeholders: str,
-    source_files_to_replace: list[str],
-) -> None:
-    record_subquery = (
-        "SELECT record_id FROM usage_events "
-        f"WHERE source_file IN ({placeholders})"
-    )
-    _clear_content_fts(conn)
-    for table_name in CONTENT_INDEX_TABLES:
-        conn.execute(
-            f"DELETE FROM {table_name} WHERE record_id IN ({record_subquery})",
-            source_files_to_replace,
-        )
 
 
 def _thread_keys_for_source_files(

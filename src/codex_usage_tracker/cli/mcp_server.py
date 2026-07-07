@@ -135,13 +135,17 @@ def _live_call_rows(
 
 
 @mcp.tool()
-def refresh_usage_index(include_archived: bool = False) -> dict[str, Any]:
-    """Scan local Codex logs and upsert aggregate usage metrics into SQLite."""
+def refresh_usage_index(
+    include_archived: bool = False,
+    aggregate_only: bool = False,
+) -> dict[str, Any]:
+    """Scan local Codex logs into SQLite usage and content indexes."""
 
     result = refresh_index(
         codex_home=DEFAULT_CODEX_HOME,
         db_path=DEFAULT_DB_PATH,
         include_archived=include_archived,
+        aggregate_only=aggregate_only,
     )
     return refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1")
 

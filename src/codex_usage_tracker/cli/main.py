@@ -246,6 +246,7 @@ def _run_refresh(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        aggregate_only=args.aggregate_only,
     )
     if args.as_json:
         print_json(refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1"))
@@ -293,6 +294,7 @@ def _run_rebuild_index(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        aggregate_only=args.aggregate_only,
     )
     if args.as_json:
         print_json(refresh_result_payload(result, schema="codex-usage-tracker-rebuild-index-v1"))

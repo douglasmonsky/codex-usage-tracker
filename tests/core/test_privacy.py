@@ -77,8 +77,7 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
         privacy_mode="strict",
     )
 
-    aggregate_outputs = [
-        db_path.read_bytes().decode("utf-8", errors="ignore"),
+    shareable_outputs = [
         json.dumps(raw_rows),
         json.dumps(diagnostic_facts),
         json.dumps(strict_payload),
@@ -87,7 +86,7 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
         support_path.read_text(encoding="utf-8"),
     ]
     for sentinel in RAW_SENTINELS:
-        for output in aggregate_outputs:
+        for output in shareable_outputs:
             assert sentinel not in output
 
     strict_row = strict_payload["rows"][0]

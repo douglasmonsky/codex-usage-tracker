@@ -24,6 +24,7 @@ from codex_usage_tracker.store.api import (
     upsert_usage_events,
 )
 from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.content_index import index_content_for_source_files
 from codex_usage_tracker.store.sources import ParsedSourceFile, source_logs_requiring_parse
 
 vars(store_facade)["parse_usage_events_from_file_with_state"] = (
@@ -44,6 +45,7 @@ def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    aggregate_only: bool = False,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
@@ -79,6 +81,13 @@ def refresh_usage_index(
         diagnostic_facts=diagnostic_facts,
     )
     record_source_file_metadata(db_path=db_path, parsed_files=parsed_files)
+    if not aggregate_only:
+        with connect(db_path) as conn:
+            init_db(conn)
+            index_content_for_source_files(
+                conn,
+                source_files=(path for path, _events, _diagnostics, _state in parsed_files),
+            )
     skipped_events = stats.get("skipped_events", 0)
     diagnostics = compact_parser_diagnostics(stats)
     record_refresh_metadata(
@@ -105,6 +114,7 @@ def rebuild_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
+    aggregate_only: bool = False,
 ) -> RefreshResult:
     """Clear aggregate rows and rescan local Codex logs."""
 
@@ -122,4 +132,5 @@ def rebuild_usage_index(
         codex_home=codex_home,
         db_path=db_path,
         include_archived=include_archived,
+        aggregate_only=aggregate_only,
     )

@@ -242,9 +242,9 @@ git push origin v0.4.0
 ## Privacy Rules
 
 - Never commit real Codex session logs.
-- Never store raw prompts, assistant text, tool outputs, pasted secrets, or message snippets.
-- Raw context may be read only on demand from original local JSONL files; never persist it to SQLite, CSV, generated HTML, fixtures based on real logs, or commits.
-- Store only selected aggregate session metadata for subagents, including parent thread labels; do not persist raw session instructions or source JSON.
+- Never commit real prompts, assistant text, tool outputs, pasted secrets, message snippets, or raw Codex logs.
+- The local content index may store bounded snippets in the user-owned SQLite database by approved design. Do not expose indexed/raw content through default CSV, generated HTML, support bundles, screenshots, aggregate JSON, fixtures based on real logs, or commits.
+- Raw context may be read during refresh/content indexing or explicit selected-call context loading. Keep shareable outputs aggregate-first unless a command is explicitly documented as a local raw/content export.
 - Keep fixture data synthetic.
 - Keep local SQLite databases, CSV exports, HTML dashboards, caches, and virtualenvs out of git.
 - Do not hard-code real current USD model pricing in source; refresh the local config from OpenAI's published pricing docs or use manual local overrides. Internal Codex model estimates must be explicitly marked as estimates with source and rationale metadata.
@@ -252,10 +252,10 @@ git push origin v0.4.0
 
 ## Definition Of Done
 
-- Parser handles synthetic session logs without reading raw message content.
+- Parser and content-index handling are covered by synthetic session logs.
 - SQLite refresh is idempotent.
-- MCP tool functions return concise aggregate data.
-- Dashboard is generated from aggregate-only JSON.
+- MCP tool functions return concise aggregate data by default; content-aware tools must be explicit local investigation surfaces.
+- Dashboard generated HTML is aggregate-first and does not embed indexed/raw content.
 - Doctor, summary presets, dashboard, and expensive-call views work from CLI and MCP wrappers.
 - `codex-usage-tracker install-plugin` can register the installed package without relying on a source-checkout symlink.
 - `python -m codex_usage_tracker` and `codex-usage-tracker --version` both work.
@@ -263,8 +263,8 @@ git push origin v0.4.0
 - `scripts/check_release.py --dist` passes before any public release.
 - Pricing coverage clearly separates configured, estimated, and unpriced model usage.
 - Codex credit coverage clearly separates exact rate-card matches, inferred aliases, and missing credit rates.
-- Dashboard Calls and Threads views share filters, totals, and aggregate-only hover details.
+- Dashboard Calls and Threads views share filters, totals, and aggregate-first hover details.
 - Dashboard usage docs are updated when the visible dashboard workflow changes, and screenshots must be generated from synthetic data only.
-- Dashboard aggregate refresh is localhost-only and keeps generated HTML aggregate-only; context loading is lazy, localhost-only, explicit, redacted, and not embedded in the static HTML payload.
+- Dashboard refresh is localhost-only, generated HTML stays aggregate-first, and context loading is lazy, localhost-only, explicit, redacted, and not embedded in the static HTML payload.
 - Subagent calls preserve logged parent-session metadata, latch to parent thread labels when available, and auto-review attachment is clearly marked when inferred.
 - Tests and compile checks pass.

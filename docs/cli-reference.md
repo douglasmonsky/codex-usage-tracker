@@ -10,21 +10,25 @@ Run first-time setup:
 codex-usage-tracker setup
 ```
 
-`setup` installs or refreshes the local plugin wrapper, initializes local config templates when needed, refreshes the aggregate index, runs `doctor`, and prints whether Codex needs a restart for plugin discovery.
+`setup` installs or refreshes the local plugin wrapper, initializes local config templates when needed, refreshes the local usage index, runs `doctor`, and prints whether Codex needs a restart for plugin discovery.
 
-Refresh the local aggregate index:
+Refresh the local usage index:
 
 ```bash
 codex-usage-tracker refresh
+codex-usage-tracker refresh --aggregate-only
 ```
 
-Rebuild the local aggregate index after parser or schema changes:
+By default, `refresh` stores aggregate usage rows plus the local content index used by future content-aware MCP/API investigation. Use `--aggregate-only` to skip content indexing and keep the older aggregate-only SQLite posture for that refresh.
+
+Rebuild local indexes after parser or schema changes:
 
 ```bash
 codex-usage-tracker rebuild-index
+codex-usage-tracker rebuild-index --aggregate-only
 ```
 
-`rebuild-index` clears only the local aggregate `usage_events` and refresh metadata tables, then rescans local Codex logs.
+`rebuild-index` clears tracker-owned aggregate rows, content-index rows, and refresh metadata, then rescans local Codex logs. It does not delete raw Codex logs. Use `--aggregate-only` to rebuild only aggregate rows.
 
 Inspect one Codex log without writing to SQLite:
 
@@ -33,7 +37,7 @@ codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl
 codex-usage-tracker inspect-log ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl --json
 ```
 
-`inspect-log` reports parser adapter, aggregate token-count events, session ids, models, and parser diagnostics. It does not store raw prompts, assistant messages, tool output, or transcript snippets.
+`inspect-log` reports parser adapter, aggregate token-count events, session ids, models, and parser diagnostics. It does not write prompts, assistant messages, tool output, or transcript snippets to SQLite.
 
 Check setup without writing files:
 
@@ -44,13 +48,13 @@ codex-usage-tracker doctor --suggest-repair
 
 `doctor` validates local paths, database state, parser diagnostics, pricing and allowance config, dashboard output, plugin files, and MCP importability. `--suggest-repair` adds likely next commands without making changes.
 
-Reset only the local aggregate database:
+Reset only the local tracker database:
 
 ```bash
 codex-usage-tracker reset-db --yes
 ```
 
-`reset-db` deletes tracker-owned aggregate SQLite rows. It does not delete raw Codex logs and requires `--yes`.
+`reset-db` deletes tracker-owned SQLite rows, including aggregate and content-index rows. It does not delete raw Codex logs and requires `--yes`.
 
 ## Plugin Lifecycle
 
