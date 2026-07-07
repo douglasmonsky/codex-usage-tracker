@@ -47,6 +47,7 @@ from codex_usage_tracker.reports.api import (
     build_content_search_report,
     build_expensive_calls_report,
     build_investigation_walk_report,
+    build_local_evidence_export_report,
     build_pattern_scan_report,
     build_pricing_coverage_report,
     build_query_report,
@@ -583,6 +584,30 @@ def usage_investigation_walk(
         min_occurrences=min_occurrences,
         evidence_limit=evidence_limit,
         privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_local_evidence_export(
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+) -> dict[str, Any]:
+    """Return a strict shareable local evidence summary without raw content."""
+
+    return build_local_evidence_export_report(
+        db_path=DEFAULT_DB_PATH,
+        question=question,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        evidence_limit=evidence_limit,
     ).payload
 
 

@@ -167,6 +167,13 @@ class InvestigationWalkReport:
 
 
 @dataclass(frozen=True)
+class LocalEvidenceExportReport:
+    """Stable shareable local evidence export without raw/indexed content."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class QueryReport:
     """Stable machine-readable aggregate usage query result."""
 
@@ -703,6 +710,112 @@ def _recommended_investigation_tools(supported: list[dict[str, Any]]) -> list[di
             }
         )
     return tools
+
+
+def build_local_evidence_export_report(
+    *,
+    db_path: Path,
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+) -> LocalEvidenceExportReport:
+    """Build shareable local evidence summary without raw/indexed records."""
+
+    walk = build_investigation_walk_report(
+        db_path=db_path,
+        question=question,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        evidence_limit=evidence_limit,
+        privacy_mode="strict",
+    ).payload
+    branches = [_export_branch(branch) for branch in walk["branches"]]
+    return LocalEvidenceExportReport(
+        {
+            "schema": "codex-usage-tracker-local-evidence-export-v1",
+            "content_mode": "shareable_local_evidence",
+            "includes_indexed_content": False,
+            "includes_raw_fragments": False,
+            "privacy_mode": "strict",
+            "question": question,
+            "filters": walk["filters"],
+            "summary": {
+                **walk["summary"],
+                "export_branch_count": len(branches),
+            },
+            "branches": branches,
+            "omitted_fields": [
+                "record_id",
+                "session_id",
+                "thread_name",
+                "raw_fragment",
+                "snippet",
+                "raw_command",
+                "raw_tool_output",
+                "full_path",
+                "path_basename",
+                "command_label",
+            ],
+            "caveats": [
+                "Local evidence only; not an official OpenAI ledger.",
+                "Counts are derived from local Codex logs and normalized tracker indexes.",
+                "Export intentionally omits prompts, snippets, thread names, record ids, raw command output, and file names.",
+            ],
+        }
+    )
+
+
+def _export_branch(branch: dict[str, Any]) -> dict[str, Any]:
+    evidence = branch.get("evidence")
+    evidence_rows = evidence if isinstance(evidence, list) else []
+    return {
+        "scan_type": branch["scan_type"],
+        "hypothesis": branch["hypothesis"],
+        "status": branch["status"],
+        "score_bucket": _score_bucket(int(branch.get("score") or 0)),
+        "evidence_count": int(branch.get("evidence_count") or 0),
+        "pruned": branch["status"] == "no_evidence",
+        "pruned_reason": branch.get("pruned_reason"),
+        "aggregate_evidence": {
+            "total_tokens": sum(int(row.get("total_tokens") or 0) for row in evidence_rows),
+            "occurrences": sum(int(row.get("occurrences") or 0) for row in evidence_rows),
+            "call_count": sum(int(row.get("call_count") or 0) for row in evidence_rows),
+            "thread_count": sum(int(row.get("thread_count") or 0) for row in evidence_rows),
+            "first_seen_date": _date_bucket(_first_seen(evidence_rows)),
+            "last_seen_date": _date_bucket(_last_seen(evidence_rows)),
+        },
+    }
+
+
+def _score_bucket(score: int) -> str:
+    if score >= 100_000:
+        return "100k_plus"
+    if score >= 10_000:
+        return "10k_to_100k"
+    if score > 0:
+        return "under_10k"
+    return "none"
+
+
+def _first_seen(rows: list[dict[str, Any]]) -> str | None:
+    values = [str(row["first_seen_at"]) for row in rows if row.get("first_seen_at")]
+    return min(values) if values else None
+
+
+def _last_seen(rows: list[dict[str, Any]]) -> str | None:
+    values = [str(row["last_seen_at"]) for row in rows if row.get("last_seen_at")]
+    return max(values) if values else None
+
+
+def _date_bucket(value: str | None) -> str | None:
+    return value[:10] if value else None
 
 
 def build_query_report(

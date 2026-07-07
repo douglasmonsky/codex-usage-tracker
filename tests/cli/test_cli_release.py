@@ -78,6 +78,7 @@ MCP_TOOL_NAMES = {
     "usage_file_churn_scan",
     "usage_context_bloat_scan",
     "usage_investigation_walk",
+    "usage_local_evidence_export",
     "generate_usage_dashboard",
     "export_usage_csv",
     "init_usage_pricing_config",

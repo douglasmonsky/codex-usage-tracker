@@ -82,6 +82,7 @@ Tracked schema ids:
 | `codex-usage-tracker-thread-trace-v1` | MCP `usage_thread_trace(...)`; explicit local content-index thread/session timeline |
 | `codex-usage-tracker-pattern-scan-v1` | MCP `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, `usage_context_bloat_scan(...)`; explicit local content/event-index pattern diagnostics |
 | `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
+| `codex-usage-tracker-local-evidence-export-v1` | MCP `usage_local_evidence_export(question=...)`; strict shareable local evidence summary without raw/indexed content |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
 | `codex-usage-tracker-update-pricing-v1` | CLI `update-pricing --json`, MCP `update_usage_pricing_config()` |
@@ -987,6 +988,20 @@ Runs a bounded local hypothesis walk over normalized pattern scans, ranks candid
 
 ```json
 {"schema":"codex-usage-tracker-investigation-walk-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","question":"look for token waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":4,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence"},"branches":[],"recommended_next_tools":[]}
+```
+
+## Local Evidence Export
+
+MCP:
+
+- `usage_local_evidence_export(question="share token waste evidence")`
+
+Schema: `codex-usage-tracker-local-evidence-export-v1`
+
+Strict shareable summary derived from local investigation evidence. It omits raw fragments, snippets, record ids, thread names, command labels, file basenames, full paths, raw commands, and raw tool output.
+
+```json
+{"schema":"codex-usage-tracker-local-evidence-export-v1","content_mode":"shareable_local_evidence","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"strict","question":"share token waste evidence","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":4,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence","export_branch_count":0},"branches":[],"omitted_fields":["record_id","session_id","thread_name","raw_fragment","snippet","raw_command","raw_tool_output","full_path","path_basename","command_label"],"caveats":["Local evidence only; not an official OpenAI ledger."]}
 ```
 
 ## Lifecycle Commands

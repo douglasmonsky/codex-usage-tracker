@@ -7,6 +7,7 @@ from codex_usage_tracker.core.json_contracts import validate_json_payload_contra
 from codex_usage_tracker.reports.api import (
     build_content_search_report,
     build_investigation_walk_report,
+    build_local_evidence_export_report,
     build_pattern_scan_report,
     build_thread_trace_report,
 )
@@ -186,6 +187,21 @@ def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None
     assert walk["branches"][0]["evidence_count"] >= 1
     assert walk["recommended_next_tools"]
 
+    export = build_local_evidence_export_report(
+        db_path=db_path,
+        question="Share local token waste evidence",
+        min_occurrences=1,
+    ).payload
+    assert validate_json_payload_contract(export) == []
+    assert export["schema"] == "codex-usage-tracker-local-evidence-export-v1"
+    assert export["content_mode"] == "shareable_local_evidence"
+    assert export["includes_indexed_content"] is False
+    assert export["includes_raw_fragments"] is False
+    assert export["privacy_mode"] == "strict"
+    serialized_export = json.dumps(export)
+    for forbidden in _private_export_sentinels():
+        assert forbidden not in serialized_export
+
 
 def test_refresh_aggregate_only_skips_content_index(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
@@ -261,4 +277,16 @@ def test_thread_trace_returns_calls_with_indexed_fragments(tmp_path: Path) -> No
         "SECRET" in fragment["snippet"]
         for call in payload["calls"]
         for fragment in call["fragments"]
+    )
+
+
+def _private_export_sentinels() -> tuple[str, ...]:
+    return (
+        "SECRET",
+        "docs/private_notes.md",
+        "private_notes.md",
+        "src/app.py",
+        "app.py",
+        "call-read",
+        "call-patch",
     )

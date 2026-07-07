@@ -81,6 +81,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_file_churn_scan`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
+- `usage_local_evidence_export`
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
@@ -119,6 +120,8 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, and `usage_context_bloat_scan(...)` run explicit local content/event-index diagnostics over normalized fragment hashes, command roots/labels, file hashes/basenames, and aggregate token rows. These payloads set `includes_indexed_content=true` and `includes_raw_fragments=false`.
 
 `usage_investigation_walk(question=...)` runs a bounded local hypothesis walk over those normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. It is local-index evidence, not a shareable aggregate-only report.
+
+`usage_local_evidence_export(question=...)` returns a strict shareable summary derived from the investigation walk. It omits prompts, indexed snippets, record ids, thread names, raw commands, raw tool output, full paths, file basenames, and command labels.
 
 ## Allowance Intelligence MCP Tools
 

@@ -71,7 +71,7 @@ When the user asks what they can look into, offer a short menu of concrete aggre
 
 - "Did my Codex allowance or limit change?" Use `usage_allowance_diagnostics(window_kind="weekly", privacy_mode="strict")`. Lead with `primary_evidence_grade`, candidate change count, weekly observation count, and caveat local logs are not OpenAI official ledger.
 - "Why does the 5-hour counter look weird?" Use `usage_allowance_diagnostics(window_kind="five_hour", privacy_mode="strict")` and explain rolling-window noise before claiming allowance changes.
-- "Can I share allowance evidence?" Use `usage_allowance_export(...)`. Do not use raw context, CSV, or non-strict reports for public sharing unless user explicitly wants local-only detail.
+- "Can I share allowance evidence?" Use `usage_allowance_export(...)`. Do not use raw context, CSV, or non-strict reports for public sharing unless user explicitly wants local-only detail. For local content-pattern evidence, use `usage_local_evidence_export(...)` instead of raw context or content search.
 - "Compare observed usage movement against estimated credits." Use `usage_allowance_diagnostics(privacy_mode="strict")`, then `usage_allowance_history(...)` only when user needs normalized rows.
 
 - "Look through my usage for token waste." Use `usage_report_pack(...)`, then `usage_calls(sort="tokens", direction="desc", limit=10)` and call out high-token calls, low cache ratios, high context-window percent, expensive estimates, or repeated same-thread spikes.

@@ -86,6 +86,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         min_occurrences=1,
         evidence_limit=2,
     )
+    local_evidence_export_json = mcp_server.usage_local_evidence_export(
+        question="Share local token waste evidence",
+        min_occurrences=1,
+        evidence_limit=2,
+    )
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
@@ -136,6 +141,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         file_scan_json,
         context_scan_json,
         investigation_walk_json,
+        local_evidence_export_json,
         session_json,
         status_json,
         calls_json,
@@ -205,6 +211,10 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert investigation_walk_json["includes_indexed_content"] is True
     assert investigation_walk_json["includes_raw_fragments"] is False
     assert investigation_walk_json["branches"]
+    assert local_evidence_export_json["schema"] == "codex-usage-tracker-local-evidence-export-v1"
+    assert local_evidence_export_json["content_mode"] == "shareable_local_evidence"
+    assert local_evidence_export_json["includes_indexed_content"] is False
+    assert local_evidence_export_json["includes_raw_fragments"] is False
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2

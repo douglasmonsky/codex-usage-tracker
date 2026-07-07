@@ -318,6 +318,30 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    'codex-usage-tracker-local-evidence-export-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "question": str,
+            "filters": dict,
+            "summary": dict,
+            "branches": list,
+            "omitted_fields": list,
+            "caveats": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "min_occurrences": int,
+                "evidence_limit": int,
+            }
+        },
+    },
     'codex-usage-tracker-export-v1': {
         "required": {
             "rows": int,
