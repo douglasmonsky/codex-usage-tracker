@@ -17,6 +17,7 @@ from codex_usage_tracker.parser.api import (
 )
 from codex_usage_tracker.parser.state import compact_parser_diagnostics
 from codex_usage_tracker.store.api import (
+    clear_content_index_rows,
     init_db,
     record_refresh_metadata,
     record_source_file_metadata,
@@ -109,6 +110,7 @@ def rebuild_usage_index(
 
     with connect(db_path) as conn:
         init_db(conn)
+        clear_content_index_rows(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM source_records")

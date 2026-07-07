@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from codex_usage_tracker.parser.state import ParserState
+from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION, ParserState
 from codex_usage_tracker.reports.api import build_source_coverage_report
 from codex_usage_tracker.store.api import (
+    connect,
+    init_db,
     query_source_record_coverage,
     query_source_records,
     record_source_file_metadata,
+    reset_usage_database,
     upsert_usage_events,
 )
 from tests.store_dashboard_helpers import _usage_event
@@ -111,3 +114,71 @@ def test_source_file_metadata_refreshes_source_record_parser_details(
     assert rows[0]["line_number"] == 7
     assert rows[0]["parser_adapter"] == "codex-jsonl"
     assert rows[0]["parser_version"] == "codex-jsonl-v2"
+
+
+def test_reset_usage_database_clears_content_index_tables(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    event = _usage_event(
+        record_id="content-reset",
+        session_id="session-reset",
+        thread_key="thread:Content Reset",
+        event_timestamp="2026-05-17T20:00:00Z",
+        cumulative_total_tokens=400,
+    )
+    upsert_usage_events([event], db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute(
+            """
+            INSERT INTO conversation_turns (
+                turn_key,
+                record_id,
+                session_id,
+                role,
+                parser_adapter,
+                parser_version
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "turn:content-reset",
+                event.record_id,
+                event.session_id,
+                "user",
+                "codex-jsonl",
+                PARSER_ADAPTER_VERSION,
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO content_fragments (
+                fragment_id,
+                record_id,
+                turn_key,
+                fragment_kind,
+                content_hash,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "fragment:content-reset",
+                event.record_id,
+                "turn:content-reset",
+                "message",
+                "hash",
+                "2026-05-17T20:00:00Z",
+            ),
+        )
+
+    reset_usage_database(db_path=db_path)
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        turn_count = conn.execute("SELECT COUNT(*) FROM conversation_turns").fetchone()
+        fragment_count = conn.execute("SELECT COUNT(*) FROM content_fragments").fetchone()
+
+    assert turn_count is not None
+    assert fragment_count is not None
+    assert turn_count[0] == 0
+    assert fragment_count[0] == 0
