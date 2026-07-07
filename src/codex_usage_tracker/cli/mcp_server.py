@@ -46,6 +46,7 @@ from codex_usage_tracker.pricing.api import (
 from codex_usage_tracker.reports.api import (
     build_content_search_report,
     build_expensive_calls_report,
+    build_pattern_scan_report,
     build_pricing_coverage_report,
     build_query_report,
     build_recommendations_report,
@@ -436,6 +437,126 @@ def usage_thread_trace(
         max_snippet_chars=max_snippet_chars,
         privacy_mode=privacy_mode,
     ).payload
+
+
+def _pattern_scan_payload(
+    *,
+    scan_type: str,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    min_occurrences: int,
+    limit: int | None,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    return build_pattern_scan_report(
+        db_path=DEFAULT_DB_PATH,
+        scan_type=scan_type,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_repetition_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find repeated local content fragment hashes."""
+
+    return _pattern_scan_payload(
+        scan_type="repetition",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+@mcp.tool()
+def usage_command_loop_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find repeated command roots/labels and failing command loops."""
+
+    return _pattern_scan_payload(
+        scan_type="command_loop",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+@mcp.tool()
+def usage_file_churn_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find repeated normalized file read/modify events."""
+
+    return _pattern_scan_payload(
+        scan_type="file_churn",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+@mcp.tool()
+def usage_context_bloat_scan(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find high-token threads with local content/event density."""
+
+    return _pattern_scan_payload(
+        scan_type="context_bloat",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    )
 
 
 @mcp.tool()

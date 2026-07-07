@@ -6,6 +6,7 @@ from pathlib import Path
 from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
 from codex_usage_tracker.reports.api import (
     build_content_search_report,
+    build_pattern_scan_report,
     build_thread_trace_report,
 )
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
@@ -138,6 +139,37 @@ def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None
     assert {row["path_basename"] for row in file_rows} == {"app.py", "private_notes.md"}
     assert all("/" not in row["path_basename"] for row in file_rows)
     assert all(row["path_identity"] == row["path_identity"][:12] for row in file_rows)
+
+    command_scan = build_pattern_scan_report(
+        db_path=db_path,
+        scan_type="command_loop",
+        min_occurrences=1,
+    ).payload
+    file_scan = build_pattern_scan_report(
+        db_path=db_path,
+        scan_type="file_churn",
+        min_occurrences=1,
+    ).payload
+    context_scan = build_pattern_scan_report(
+        db_path=db_path,
+        scan_type="context_bloat",
+        min_occurrences=1,
+    ).payload
+
+    for payload in (command_scan, file_scan, context_scan):
+        assert validate_json_payload_contract(payload) == []
+        assert payload["schema"] == "codex-usage-tracker-pattern-scan-v1"
+        assert payload["content_mode"] == "local_content_index"
+        assert payload["includes_indexed_content"] is True
+        assert payload["includes_raw_fragments"] is False
+        assert payload["pattern_count"] >= 1
+
+    assert command_scan["patterns"][0]["details"]["command_root"] == "cat"
+    assert {row["details"]["path_basename"] for row in file_scan["patterns"]} >= {
+        "app.py",
+        "private_notes.md",
+    }
+    assert context_scan["patterns"][0]["details"]["fragment_count"] >= 1
 
 
 def test_refresh_aggregate_only_skips_content_index(tmp_path: Path) -> None:

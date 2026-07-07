@@ -44,6 +44,7 @@ from codex_usage_tracker.store.api import (
     query_content_search,
     query_dashboard_events,
     query_most_expensive_calls,
+    query_pattern_scan,
     query_source_record_coverage,
     query_source_record_totals,
     query_summary,
@@ -147,6 +148,13 @@ class ContentSearchReport:
 @dataclass(frozen=True)
 class ThreadTraceReport:
     """Stable machine-readable local content-index thread trace."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PatternScanReport:
+    """Stable machine-readable local content/event-index pattern scan."""
 
     payload: dict[str, Any]
 
@@ -458,6 +466,56 @@ def build_thread_trace_report(
                 normalized_offset + len(calls) if has_more else None
             ),
             "calls": calls,
+        }
+    )
+
+
+def build_pattern_scan_report(
+    *,
+    db_path: Path,
+    scan_type: str = "all",
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> PatternScanReport:
+    """Build local content/event-index pattern scan payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    result = query_pattern_scan(
+        db_path=db_path,
+        scan_type=scan_type,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+    )
+    patterns = result["patterns"]
+    return PatternScanReport(
+        {
+            "schema": "codex-usage-tracker-pattern-scan-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": False,
+            "privacy_mode": privacy_mode,
+            "scan_type": scan_type,
+            "scan_types": list(result["scan_types"]),
+            "filters": {
+                "since": since,
+                "until": until,
+                "thread": thread,
+                "include_archived": include_archived,
+                "min_occurrences": max(1, min_occurrences),
+                "limit": limit,
+            },
+            "pattern_count": len(patterns),
+            "total_patterns": result["total_patterns"],
+            "patterns": patterns,
         }
     )
 

@@ -76,6 +76,10 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_source_coverage`
 - `usage_content_search`
 - `usage_thread_trace`
+- `usage_repetition_scan`
+- `usage_command_loop_scan`
+- `usage_file_churn_scan`
+- `usage_context_bloat_scan`
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
@@ -110,6 +114,8 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `usage_content_search(query=...)` searches the explicit local content index and can return indexed snippets. Use it only when the user asks for local content exploration, pattern hunting, or diagnostics that need transcript-level evidence. Its payload marks `content_mode="local_content_index"`, `includes_indexed_content=true`, and `includes_raw_fragments=true`.
 
 `usage_thread_trace(...)` returns a paged call timeline for one thread, thread key, session id, or seed record id, with local indexed fragments attached when present. It is also an explicit local content-index surface and carries the same indexed-content flags.
+
+`usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, and `usage_context_bloat_scan(...)` run explicit local content/event-index diagnostics over normalized fragment hashes, command roots/labels, file hashes/basenames, and aggregate token rows. These payloads set `includes_indexed_content=true` and `includes_raw_fragments=false`.
 
 ## Allowance Intelligence MCP Tools
 

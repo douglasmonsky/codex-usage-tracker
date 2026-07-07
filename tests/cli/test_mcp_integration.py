@@ -77,6 +77,10 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         limit=5,
         max_snippet_chars=48,
     )
+    repetition_scan_json = mcp_server.usage_repetition_scan(min_occurrences=1, limit=2)
+    command_scan_json = mcp_server.usage_command_loop_scan(min_occurrences=1, limit=2)
+    file_scan_json = mcp_server.usage_file_churn_scan(min_occurrences=1, limit=2)
+    context_scan_json = mcp_server.usage_context_bloat_scan(min_occurrences=1, limit=2)
     session = mcp_server.session_usage(session_id=SESSION_ID)
     session_json = mcp_server.session_usage(session_id=SESSION_ID, response_format="json")
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
@@ -122,6 +126,10 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         pricing_coverage_json,
         content_search_json,
         thread_trace_json,
+        repetition_scan_json,
+        command_scan_json,
+        file_scan_json,
+        context_scan_json,
         session_json,
         status_json,
         calls_json,
@@ -176,6 +184,16 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert thread_trace_json["includes_indexed_content"] is True
     assert thread_trace_json["call_count"] >= 1
     assert any(call["fragment_count"] > 0 for call in thread_trace_json["calls"])
+    for payload in (
+        repetition_scan_json,
+        command_scan_json,
+        file_scan_json,
+        context_scan_json,
+    ):
+        assert payload["schema"] == "codex-usage-tracker-pattern-scan-v1"
+        assert payload["content_mode"] == "local_content_index"
+        assert payload["includes_indexed_content"] is True
+        assert payload["includes_raw_fragments"] is False
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2

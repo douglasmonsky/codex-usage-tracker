@@ -30,6 +30,7 @@ from codex_usage_tracker.store.content_index import (
     search_content_fragments,
     trace_thread_content,
 )
+from codex_usage_tracker.store.content_patterns import query_local_pattern_scan
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,
 )
@@ -236,6 +237,33 @@ def query_thread_trace(
         "calls": result.calls,
         "total_matched_calls": result.total_matched_calls,
     }
+
+
+def query_pattern_scan(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    scan_type: str = "all",
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+) -> dict[str, Any]:
+    """Return local content/event-index pattern scan rows."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        return query_local_pattern_scan(
+            conn,
+            scan_type=scan_type,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_occurrences=min_occurrences,
+            limit=limit,
+        )
 
 
 def record_refresh_metadata(

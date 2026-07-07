@@ -271,6 +271,30 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    'codex-usage-tracker-pattern-scan-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "scan_type": str,
+            "scan_types": list,
+            "filters": dict,
+            "pattern_count": int,
+            "total_patterns": int,
+            "patterns": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "min_occurrences": int,
+                "limit": (int, NoneType),
+            }
+        },
+    },
     'codex-usage-tracker-export-v1': {
         "required": {
             "rows": int,
