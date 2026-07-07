@@ -6,6 +6,7 @@ from pathlib import Path
 from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
 from codex_usage_tracker.reports.api import (
     build_content_search_report,
+    build_investigation_walk_report,
     build_pattern_scan_report,
     build_thread_trace_report,
 )
@@ -170,6 +171,20 @@ def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None
         "private_notes.md",
     }
     assert context_scan["patterns"][0]["details"]["fragment_count"] >= 1
+
+    walk = build_investigation_walk_report(
+        db_path=db_path,
+        question="Look for local token waste patterns",
+        min_occurrences=1,
+    ).payload
+    assert validate_json_payload_contract(walk) == []
+    assert walk["schema"] == "codex-usage-tracker-investigation-walk-v1"
+    assert walk["content_mode"] == "local_content_index"
+    assert walk["includes_indexed_content"] is True
+    assert walk["includes_raw_fragments"] is False
+    assert walk["summary"]["supported_branch_count"] >= 1
+    assert walk["branches"][0]["evidence_count"] >= 1
+    assert walk["recommended_next_tools"]
 
 
 def test_refresh_aggregate_only_skips_content_index(tmp_path: Path) -> None:

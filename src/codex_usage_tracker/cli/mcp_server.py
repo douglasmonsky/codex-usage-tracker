@@ -46,6 +46,7 @@ from codex_usage_tracker.pricing.api import (
 from codex_usage_tracker.reports.api import (
     build_content_search_report,
     build_expensive_calls_report,
+    build_investigation_walk_report,
     build_pattern_scan_report,
     build_pricing_coverage_report,
     build_query_report,
@@ -557,6 +558,32 @@ def usage_context_bloat_scan(
         limit=limit,
         privacy_mode=privacy_mode,
     )
+
+
+@mcp.tool()
+def usage_investigation_walk(
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Run a bounded local hypothesis walk over normalized usage evidence."""
+
+    return build_investigation_walk_report(
+        db_path=DEFAULT_DB_PATH,
+        question=question,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        evidence_limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    ).payload
 
 
 @mcp.tool()

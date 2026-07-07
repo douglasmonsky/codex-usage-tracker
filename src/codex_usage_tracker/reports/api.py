@@ -160,6 +160,13 @@ class PatternScanReport:
 
 
 @dataclass(frozen=True)
+class InvestigationWalkReport:
+    """Stable machine-readable local investigation walk."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class QueryReport:
     """Stable machine-readable aggregate usage query result."""
 
@@ -518,6 +525,184 @@ def build_pattern_scan_report(
             "patterns": patterns,
         }
     )
+
+
+def build_investigation_walk_report(
+    *,
+    db_path: Path,
+    question: str,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> InvestigationWalkReport:
+    """Build a bounded local investigation walk over normalized pattern evidence."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    normalized_evidence_limit = max(1, evidence_limit)
+    pattern_result = query_pattern_scan(
+        db_path=db_path,
+        scan_type="all",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=normalized_evidence_limit * 4,
+    )
+    patterns = pattern_result["patterns"]
+    branches = _investigation_branches(patterns=patterns, evidence_limit=normalized_evidence_limit)
+    supported = [branch for branch in branches if branch["status"] != "no_evidence"]
+    return InvestigationWalkReport(
+        {
+            "schema": "codex-usage-tracker-investigation-walk-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": False,
+            "privacy_mode": privacy_mode,
+            "question": question,
+            "filters": {
+                "since": since,
+                "until": until,
+                "thread": thread,
+                "include_archived": include_archived,
+                "min_occurrences": max(1, min_occurrences),
+                "evidence_limit": normalized_evidence_limit,
+            },
+            "summary": {
+                "branch_count": len(branches),
+                "supported_branch_count": len(supported),
+                "top_hypothesis": supported[0]["hypothesis"] if supported else None,
+                "confidence": _walk_confidence(supported),
+            },
+            "branches": branches,
+            "recommended_next_tools": _recommended_investigation_tools(supported),
+        }
+    )
+
+
+def _investigation_branches(
+    *,
+    patterns: list[dict[str, Any]],
+    evidence_limit: int,
+) -> list[dict[str, Any]]:
+    specs = (
+        (
+            "context_bloat",
+            "High-token thread/context bloat",
+            "Threads with concentrated token use or dense local evidence may be driving usage.",
+        ),
+        (
+            "command_loop",
+            "Repeated or failing command loop",
+            "Repeated command roots/labels can indicate retry loops or avoidable automation waste.",
+        ),
+        (
+            "file_churn",
+            "Repeated file rediscovery or churn",
+            "Repeated reads or edits of the same path hash can indicate rediscovery or unstable workflow loops.",
+        ),
+        (
+            "repetition",
+            "Repeated local content pattern",
+            "Repeated fragment hashes can indicate recurring prompts, summaries, or copied context.",
+        ),
+    )
+    branches: list[dict[str, Any]] = []
+    for scan_type, hypothesis, rationale in specs:
+        evidence = [row for row in patterns if row.get("scan_type") == scan_type]
+        evidence.sort(key=lambda row: (-int(row.get("total_tokens") or 0), -int(row.get("occurrences") or 0)))
+        selected = evidence[:evidence_limit]
+        score = _branch_score(selected)
+        branches.append(
+            {
+                "scan_type": scan_type,
+                "hypothesis": hypothesis,
+                "rationale": rationale,
+                "status": _branch_status(score, selected),
+                "score": score,
+                "evidence_count": len(selected),
+                "evidence": selected,
+                "pruned_reason": None if selected else "No matching normalized local evidence at this threshold.",
+            }
+        )
+    branches.sort(key=lambda branch: (-int(branch["score"]), str(branch["scan_type"])))
+    return branches
+
+
+def _branch_score(evidence: list[dict[str, Any]]) -> int:
+    total = 0
+    for row in evidence:
+        total += int(row.get("total_tokens") or 0)
+        total += int(row.get("occurrences") or 0) * 100
+        total += int(row.get("call_count") or 0) * 50
+    return total
+
+
+def _branch_status(score: int, evidence: list[dict[str, Any]]) -> str:
+    if not evidence:
+        return "no_evidence"
+    if score >= 10_000:
+        return "strong_local_signal"
+    return "candidate"
+
+
+def _walk_confidence(supported: list[dict[str, Any]]) -> str:
+    if not supported:
+        return "insufficient_local_evidence"
+    if supported[0]["status"] == "strong_local_signal":
+        return "moderate_local_evidence"
+    return "weak_local_evidence"
+
+
+def _recommended_investigation_tools(supported: list[dict[str, Any]]) -> list[dict[str, str]]:
+    tools = [
+        {
+            "tool": "usage_calls",
+            "reason": "Inspect the aggregate call rows behind high-token evidence.",
+        }
+    ]
+    if not supported:
+        tools.append(
+            {
+                "tool": "usage_report_pack",
+                "reason": "Start from aggregate report cards when local pattern evidence is sparse.",
+            }
+        )
+        return tools
+    top_scan = str(supported[0]["scan_type"])
+    if top_scan == "context_bloat":
+        tools.append(
+            {
+                "tool": "usage_thread_trace",
+                "reason": "Trace the highest-scoring thread to inspect call sequence and indexed fragments.",
+            }
+        )
+    elif top_scan == "command_loop":
+        tools.append(
+            {
+                "tool": "usage_command_loop_scan",
+                "reason": "Raise limit or lower occurrence threshold to inspect repeated command families.",
+            }
+        )
+    elif top_scan == "file_churn":
+        tools.append(
+            {
+                "tool": "usage_file_churn_scan",
+                "reason": "Inspect repeated file path hashes and linked aggregate calls.",
+            }
+        )
+    else:
+        tools.append(
+            {
+                "tool": "usage_content_search",
+                "reason": "Use explicit local snippet search only when transcript-level evidence is needed.",
+            }
+        )
+    return tools
 
 
 def build_query_report(

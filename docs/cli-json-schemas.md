@@ -81,6 +81,7 @@ Tracked schema ids:
 | `codex-usage-tracker-content-search-v1` | MCP `usage_content_search(...)`; explicit local content-index search, may include indexed snippets |
 | `codex-usage-tracker-thread-trace-v1` | MCP `usage_thread_trace(...)`; explicit local content-index thread/session timeline |
 | `codex-usage-tracker-pattern-scan-v1` | MCP `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, `usage_context_bloat_scan(...)`; explicit local content/event-index pattern diagnostics |
+| `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
 | `codex-usage-tracker-update-pricing-v1` | CLI `update-pricing --json`, MCP `update_usage_pricing_config()` |
@@ -972,6 +973,20 @@ This explicit local content/event-index diagnostic surface scans normalized frag
 
 ```json
 {"schema":"codex-usage-tracker-pattern-scan-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","scan_type":"command_loop","scan_types":["command_loop"],"filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"limit":20},"pattern_count":0,"total_patterns":0,"patterns":[]}
+```
+
+## Investigation Walk
+
+MCP:
+
+- `usage_investigation_walk(question="look for token waste")`
+
+Schema: `codex-usage-tracker-investigation-walk-v1`
+
+Runs a bounded local hypothesis walk over normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. Does not include raw fragments.
+
+```json
+{"schema":"codex-usage-tracker-investigation-walk-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","question":"look for token waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":4,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence"},"branches":[],"recommended_next_tools":[]}
 ```
 
 ## Lifecycle Commands
