@@ -14,6 +14,7 @@ from codex_usage_tracker.reports.api import (
     build_shell_churn_report,
     build_thread_trace_report,
 )
+from codex_usage_tracker.store import content_index
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
 from codex_usage_tracker.store.content_index_events import _command_root_and_label
 from codex_usage_tracker.store.shell_churn import (
@@ -48,6 +49,56 @@ def test_refresh_populates_normalized_content_index_by_default(tmp_path: Path) -
     assert any(row["fragment_kind"] == "reasoning_summary" for row in fragment_rows)
     assert all(row["includes_raw_fragment"] == 1 for row in fragment_rows)
     assert all("SECRET RAW PROMPT" not in row["safe_label"] for row in fragment_rows)
+
+
+def test_refresh_incrementally_indexes_appended_content(
+    tmp_path: Path, monkeypatch
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    source_path = next((codex_home / "sessions").glob("**/*.jsonl"))
+
+    def fail_if_rebuild(*args: object, **kwargs: object) -> None:
+        raise AssertionError("append-only content indexing should not rebuild source rows")
+
+    monkeypatch.setattr(
+        content_index,
+        "delete_content_index_rows_for_source_files",
+        fail_if_rebuild,
+    )
+
+    with source_path.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                _entry(
+                    "response_item",
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "APPENDED INCREMENTAL CONTENT SENTINEL",
+                            }
+                        ],
+                    },
+                )
+            )
+            + "\n"
+        )
+        handle.write(json.dumps(_token_event(8_000, 400)) + "\n")
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    report = build_content_search_report(
+        db_path=db_path,
+        query="APPENDED INCREMENTAL CONTENT SENTINEL",
+        limit=5,
+    ).payload
+
+    assert report["total_matched_rows"] == 1
 
 
 def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None:
