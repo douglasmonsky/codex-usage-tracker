@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.17.0 - 2026-07-08
+
+- Add agentic MCP investigation tools for hypothesis-driven usage diagnostics, compact evidence briefs, and actionable recommendation reports.
+- Add repeated file rediscovery, shell churn, and large low-output usage diagnostics to identify avoidable local workflow waste.
+- Improve bundled skill guidance so Codex can route vague usage questions into concrete tracker endpoints, Headroom suggestions, and custom remediation ideas.
+- Add async dogfood progress polling and warm result caching so longer usage investigations can report progress and rerun faster.
+- Speed up content indexing with incremental append metadata, parallel source parsing, and batched FTS rebuilds.
+- Add dashboard refresh progress bars, no-cap paged loading, loaded-call metrics, token breakdowns, persisted loading preferences, and restored usage-drain chart data.
+
 ## 0.16.2 - 2026-07-08
 
 - Restore Usage Drain, Investigator Workbench, Reports, and related dashboard charts by deriving shared usage-drain series from loaded aggregate rows again.
