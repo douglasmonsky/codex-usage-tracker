@@ -347,6 +347,8 @@ def test_repeated_file_rediscovery_ranks_safe_path_hashes(tmp_path: Path) -> Non
     assert top["candidate_kind"] == "repeated_read_rediscovery"
     assert top["operation_mix"]["read"] == 3
     assert top["call_count"] == 3
+    assert "repeated_notes.md" in top["recommendation"]
+    assert "3 reads" in top["recommendation"]
     assert top["trace_handles"][0]["next_tool"] == "usage_thread_trace"
     serialized = json.dumps(payload)
     assert "docs/repeated_notes.md" not in serialized

@@ -16,10 +16,14 @@ from codex_usage_tracker.store.api import (
     refresh_usage_index,
 )
 from tests.store_dashboard_helpers import (
+    ARCHIVED_SESSION_ID,
     SESSION_ID,
     _assert_contract,
+    _entry,
     _fake_pricing_update,
     _make_codex_home,
+    _token_event,
+    _write_jsonl,
     _write_pricing,
 )
 
@@ -298,6 +302,15 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert local_evidence_export_json["content_mode"] == "shareable_local_evidence"
     assert local_evidence_export_json["includes_indexed_content"] is False
     assert local_evidence_export_json["includes_raw_fragments"] is False
+    supported_export_branches = [
+        branch for branch in local_evidence_export_json["branches"] if not branch["pruned"]
+    ]
+    assert supported_export_branches
+    for branch in supported_export_branches:
+        aggregate = branch["aggregate_evidence"]
+        assert aggregate["evidence_row_count"] == branch["evidence_count"]
+        assert aggregate["occurrences"] >= branch["evidence_count"]
+        assert aggregate["call_count"] >= branch["evidence_count"]
     assert SESSION_ID in session
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2
@@ -334,6 +347,116 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert allowance_path.exists()
     assert "Codex Usage Tracker doctor" in doctor
     assert doctor_json["schema"] == "codex-usage-tracker-doctor-v1"
+
+
+def test_agentic_mcp_reports_default_active_scope_excludes_archived(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from codex_usage_tracker.cli import mcp_server
+
+    codex_home = _make_codex_home(tmp_path)
+    archived_log_path = (
+        codex_home
+        / "archived_sessions"
+        / f"rollout-2026-05-17T17-00-00-{ARCHIVED_SESSION_ID}.jsonl"
+    )
+    _write_jsonl(
+        archived_log_path,
+        [
+            _entry("session_meta", {"id": ARCHIVED_SESSION_ID}),
+            _entry(
+                "turn_context",
+                {
+                    "turn_id": "turn-archived",
+                    "model": "gpt-5.5",
+                    "effort": "low",
+                    "cwd": "/tmp/codex-usage-tracker",
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "call_id": "archived-sed-1",
+                    "name": "functions.exec_command",
+                    "arguments": json.dumps({"cmd": "sed -n '1,80p' src/archived-only.py"}),
+                },
+            ),
+            _entry(
+                "response_item",
+                {
+                    "type": "function_call",
+                    "call_id": "archived-sed-2",
+                    "name": "functions.exec_command",
+                    "arguments": json.dumps({"cmd": "sed -n '80,160p' src/archived-only.py"}),
+                },
+            ),
+            _token_event(60_000, 60_000),
+        ],
+    )
+
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    allowance_path = tmp_path / "allowance.json"
+    projects_path = tmp_path / "projects.json"
+    monkeypatch.setattr(mcp_server, "DEFAULT_DB_PATH", db_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PRICING_PATH", pricing_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_ALLOWANCE_PATH", allowance_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PROJECTS_PATH", projects_path)
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path, include_archived=True)
+
+    active_large = mcp_server.usage_large_low_output_calls(
+        min_total_tokens=0,
+        max_output_tokens=1000,
+        limit=100,
+    )
+    all_large = mcp_server.usage_large_low_output_calls(
+        include_archived=True,
+        min_total_tokens=0,
+        max_output_tokens=1000,
+        limit=100,
+    )
+    active_shell = mcp_server.usage_shell_churn(min_occurrences=1, limit=100)
+    all_shell = mcp_server.usage_shell_churn(
+        include_archived=True,
+        min_occurrences=1,
+        limit=100,
+    )
+    active_files = mcp_server.usage_repeated_file_rediscovery(min_occurrences=1, limit=100)
+    all_files = mcp_server.usage_repeated_file_rediscovery(
+        include_archived=True,
+        min_occurrences=1,
+        limit=100,
+    )
+    active_agentic = mcp_server.usage_investigate(goal="token_waste", evidence_limit=10)
+    active_export = mcp_server.usage_local_evidence_export(
+        question="token waste",
+        min_occurrences=1,
+        evidence_limit=10,
+    )
+    active_hypotheses = mcp_server.usage_test_hypotheses(
+        question="Look for token waste",
+        hypotheses=["Token waste is concentrated in large low-output calls."],
+        evidence_limit=10,
+    )
+
+    assert ARCHIVED_SESSION_ID in json.dumps(all_large)
+    assert ARCHIVED_SESSION_ID in json.dumps(all_shell)
+    assert "archived-only.py" in json.dumps(all_files)
+    for payload in (
+        active_large,
+        active_shell,
+        active_files,
+        active_agentic,
+        active_export,
+        active_hypotheses,
+    ):
+        encoded = json.dumps(payload)
+        assert ARCHIVED_SESSION_ID not in encoded
+        assert "archived-only.py" not in encoded
+        assert payload["filters"]["include_archived"] is False
 
 
 def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:

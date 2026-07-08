@@ -73,6 +73,7 @@ def recommendations_payload(
         effort=first_query_value(params.get("effort")),
         thread=first_query_value(params.get("thread")),
         project=first_query_value(params.get("project")),
+        include_archived=first_query_value(params.get("include_archived")) in {"1", "true", "yes", "on"},
         min_score=parse_optional_float(first_query_value(params.get("min_score")), "min_score"),
         limit=parse_report_limit(first_query_value(params.get("limit")), 20),
         privacy_mode=privacy_mode,

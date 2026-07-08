@@ -147,7 +147,15 @@ def _file_candidate(
         },
         "first_seen_at": row["first_seen_at"],
         "last_seen_at": row["last_seen_at"],
-        "recommendation": _recommendation(candidate_kind, adjacent_count),
+        "recommendation": _recommendation(
+            candidate_kind,
+            adjacent_count,
+            path_basename=str(row["path_basename"] or "file"),
+            path_extension=str(row["path_extension"] or ""),
+            read_count=read_count,
+            write_count=write_count,
+            other_count=other_count,
+        ),
         "trace_handles": trace_handles,
     }
 
@@ -249,12 +257,26 @@ def _candidate_sort_key(row: dict[str, Any]) -> tuple[int, int, int, int]:
     )
 
 
-def _recommendation(candidate_kind: str, adjacent_retouch_count: int) -> str:
+def _recommendation(
+    candidate_kind: str,
+    adjacent_retouch_count: int,
+    *,
+    path_basename: str,
+    path_extension: str,
+    read_count: int,
+    write_count: int,
+    other_count: int,
+) -> str:
+    file_label = path_basename or f"{path_extension or 'file'} file"
+    operation_mix = f"{read_count} reads, {write_count} writes, {other_count} other events"
     if candidate_kind == "repeated_read_rediscovery":
         if adjacent_retouch_count:
-            return "Cache or summarize this file once before continuing."
-        return "Use thread handoffs or notes to avoid rediscovering the same file."
-    return "Batch edits or inspect the thread trace before continuing churn."
+            return (
+                f"Cache or summarize {file_label} once before continuing; "
+                f"{adjacent_retouch_count} adjacent retouches and {operation_mix} suggest rediscovery."
+            )
+        return f"Use thread handoff notes for {file_label}; operation mix is {operation_mix}."
+    return f"Batch edits for {file_label} or inspect thread trace; operation mix is {operation_mix}."
 
 
 def _normalize_limit(limit: int | None) -> int | None:

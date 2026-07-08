@@ -415,7 +415,7 @@ def test_parser_classifies_richer_diagnostic_detectors_without_raw_content(
     assert {
         ("activity", "search_read_command"),
         ("command_family", "pytest"),
-        ("command_family", "unknown_command"),
+        ("command_family", "rg"),
         ("function", "functions.exec_command"),
         ("loop", "retry_or_abort_loop"),
         ("loop", "search_read_loop"),

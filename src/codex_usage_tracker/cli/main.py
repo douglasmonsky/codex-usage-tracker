@@ -383,6 +383,7 @@ def _run_recommendations(args: argparse.Namespace) -> int:
         effort=args.effort,
         thread=args.thread,
         project=args.project,
+        include_archived=getattr(args, "include_archived", False),
         min_score=args.min_score,
         limit=args.limit,
         privacy_mode=args.privacy_mode,

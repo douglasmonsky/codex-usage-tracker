@@ -34,6 +34,9 @@ SHELL_TOOL_NAMES = frozenset(
         "terminal",
     }
 )
+SHELL_EXEC_WRAPPERS = frozenset({"bash", "fish", "sh", "zsh"})
+SHELL_EXEC_COMMAND_OPTIONS = frozenset({"-c", "-lc", "-cl"})
+RUN_WRAPPERS = frozenset({"npx", "pipenv", "poetry", "uv"})
 
 SEARCH_READ_COMMANDS = frozenset(
     {
@@ -304,14 +307,21 @@ def _command_family(command: str) -> str:
         module_family = _python_module_family(tokens)
         return module_family or "python"
     normalized = {
+        "cat": "cat",
+        "grep": "grep",
         "git": "git",
+        "nl": "nl",
         "mypy": "mypy",
         "node": "node",
         "npm": "npm",
         "pnpm": "pnpm",
+        "rg": "rg",
         "ruff": "ruff",
+        "sed": "sed",
     }.get(base)
-    return normalized or "unknown_command"
+    if normalized:
+        return normalized
+    return _safe_structured_label(base) or "unknown_command"
 
 
 def _command_tokens(command: str) -> list[str]:
@@ -332,12 +342,34 @@ def _strip_command_wrappers(tokens: list[str]) -> list[str]:
         if base in {"command", "env", "sudo"}:
             remaining.pop(0)
             continue
+        if base in SHELL_EXEC_WRAPPERS:
+            nested = _shell_exec_nested_tokens(remaining)
+            if nested:
+                remaining = nested
+                continue
+        if base in RUN_WRAPPERS and len(remaining) > 2 and remaining[1] == "run":
+            remaining = remaining[2:]
+            continue
+        if base == "npx" and len(remaining) > 1:
+            remaining = remaining[1:]
+            continue
         break
     return remaining
 
 
 def _looks_like_assignment(token: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", token))
+
+
+def _shell_exec_nested_tokens(tokens: list[str]) -> list[str] | None:
+    for index, token in enumerate(tokens[1:], start=1):
+        if token not in SHELL_EXEC_COMMAND_OPTIONS:
+            continue
+        if index + 1 >= len(tokens):
+            return None
+        nested = _command_tokens(tokens[index + 1])
+        return nested or [tokens[index + 1]]
+    return None
 
 
 def _python_module_family(tokens: list[str]) -> str | None:
@@ -361,7 +393,7 @@ def _is_python_command(base: str) -> bool:
 
 
 def _command_basename(token: str) -> str:
-    return re.split(r"[\\/]", token)[-1].lower()
+    return re.split(r"[\\/]", token)[-1].lower().lstrip("$")
 
 
 def _is_shell_tool_label(label: str) -> bool:

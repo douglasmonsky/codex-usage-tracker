@@ -923,6 +923,7 @@ def build_agentic_investigation_report(
             since=since,
             until=until,
             thread=thread,
+            include_archived=include_archived,
             limit=normalized_limit,
             privacy_mode=privacy_mode,
         ).payload
@@ -1300,6 +1301,7 @@ def _evaluate_token_waste_hypothesis(
         since=since,
         until=until,
         thread=thread,
+        include_archived=include_archived,
         limit=evidence_limit,
         privacy_mode=privacy_mode,
     ).payload
@@ -2343,14 +2345,29 @@ def _export_branch(branch: dict[str, Any]) -> dict[str, Any]:
         "evidence_count": int(branch.get("evidence_count") or 0),
         "pruned": branch["status"] == "no_evidence",
         "pruned_reason": branch.get("pruned_reason"),
-        "aggregate_evidence": {
-            "total_tokens": sum(int(row.get("total_tokens") or 0) for row in evidence_rows),
-            "occurrences": sum(int(row.get("occurrences") or 0) for row in evidence_rows),
-            "call_count": sum(int(row.get("call_count") or 0) for row in evidence_rows),
-            "thread_count": sum(int(row.get("thread_count") or 0) for row in evidence_rows),
-            "first_seen_date": _date_bucket(_first_seen(evidence_rows)),
-            "last_seen_date": _date_bucket(_last_seen(evidence_rows)),
-        },
+        "aggregate_evidence": _export_aggregate_evidence(evidence_rows),
+    }
+
+
+def _export_aggregate_evidence(evidence_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    row_count = len(evidence_rows)
+    occurrences = sum(int(row.get("occurrences") or 0) for row in evidence_rows)
+    call_count = sum(int(row.get("call_count") or 0) for row in evidence_rows)
+    thread_count = sum(int(row.get("thread_count") or 0) for row in evidence_rows)
+    record_ids = {str(row.get("record_id")) for row in evidence_rows if row.get("record_id")}
+    thread_keys = {
+        str(row.get("thread_key") or row.get("thread_name"))
+        for row in evidence_rows
+        if row.get("thread_key") or row.get("thread_name")
+    }
+    return {
+        "evidence_row_count": row_count,
+        "total_tokens": sum(int(row.get("total_tokens") or 0) for row in evidence_rows),
+        "occurrences": occurrences or row_count,
+        "call_count": call_count or len(record_ids) or row_count,
+        "thread_count": thread_count or len(thread_keys),
+        "first_seen_date": _date_bucket(_first_seen(evidence_rows)),
+        "last_seen_date": _date_bucket(_last_seen(evidence_rows)),
     }
 
 
@@ -2481,6 +2498,7 @@ def build_recommendations_report(
     effort: str | None = None,
     thread: str | None = None,
     project: str | None = None,
+    include_archived: bool = False,
     min_score: float | None = None,
     limit: int = 20,
     privacy_mode: str = "normal",
@@ -2495,6 +2513,7 @@ def build_recommendations_report(
         model=model,
         effort=effort,
         thread=thread,
+        include_archived=include_archived,
     )
     rows = _annotated_recommendation_rows(
         rows,
@@ -2525,6 +2544,7 @@ def build_recommendations_report(
                 "effort": effort,
                 "thread": thread,
                 "project": project,
+                "include_archived": include_archived,
                 "min_score": min_score,
                 "limit": normalized_limit,
                 "privacy_mode": privacy_mode,
@@ -2546,6 +2566,7 @@ def _recommendation_source_rows(
     model: str | None,
     effort: str | None,
     thread: str | None,
+    include_archived: bool,
 ) -> list[dict[str, Any]]:
     return annotate_thread_attachments(
         query_dashboard_events(
@@ -2556,6 +2577,7 @@ def _recommendation_source_rows(
             model=model,
             effort=effort,
             thread=thread,
+            include_archived=include_archived,
         )
     )
 
