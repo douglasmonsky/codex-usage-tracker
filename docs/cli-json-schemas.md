@@ -1027,14 +1027,14 @@ Ranks high-token calls that produced little output, including token totals, cach
 
 MCP:
 
-- `usage_suggest_investigations(goal="token_waste")`
+- `usage_suggest_investigations(goal="token_waste", limit=2)`
 
 Schema: `codex-usage-tracker-investigation-suggestions-v1`
 
-Returns a short menu of goal-led investigations an agent can run, including the primary MCP tool, default arguments, follow-up tools, and privacy notes. It does not include raw/indexed content.
+Returns a short menu of goal-led investigations an agent can run, including the primary MCP tool, default arguments, follow-up tools, and privacy notes. Goal-specific requests include adjacent useful investigations so agents can keep exploring without guessing the next tool. It does not include raw/indexed content.
 
 ```json
-{"schema":"codex-usage-tracker-investigation-suggestions-v1","content_mode":"aggregate_guidance","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","goal":"token_waste","available_goals":["overview","token_waste","allowance_change","cache_failure","workflow_churn"],"filters":{"since":null,"until":null,"thread":null,"include_archived":false,"limit":10},"summary":{"suggestion_count":1,"total_suggestions":1,"top_goal":"token_waste"},"suggestions":[{"goal":"token_waste","label":"Find obvious token-waste candidates","primary_tool":"usage_investigate","default_arguments":{"goal":"token_waste","evidence_limit":5},"follow_up_tools":["usage_large_low_output_calls","usage_shell_churn"],"privacy_notes":"Aggregate-first; no raw prompts, tool output, or full paths."}]}
+{"schema":"codex-usage-tracker-investigation-suggestions-v1","content_mode":"aggregate_guidance","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","goal":"token_waste","available_goals":["overview","token_waste","allowance_change","cache_failure","workflow_churn"],"filters":{"since":null,"until":null,"thread":null,"include_archived":false,"limit":2},"summary":{"suggestion_count":2,"total_suggestions":4,"top_goal":"token_waste"},"suggestions":[{"goal":"token_waste","label":"Find obvious token-waste candidates","primary_tool":"usage_investigate","default_arguments":{"goal":"token_waste","evidence_limit":5},"follow_up_tools":["usage_large_low_output_calls","usage_shell_churn"],"privacy_notes":"Aggregate-first; no raw prompts, tool output, or full paths."},{"goal":"cache_failure","label":"Diagnose cache and context waste","primary_tool":"usage_investigate","default_arguments":{"goal":"cache_failure","evidence_limit":5},"follow_up_tools":["usage_large_low_output_calls","usage_calls","usage_report_pack"],"privacy_notes":"Aggregate-first; no raw prompt or transcript text."}]}
 ```
 
 ## Agentic Investigation
@@ -1045,10 +1045,10 @@ MCP:
 
 Schema: `codex-usage-tracker-agentic-investigation-v1`
 
-Runs a goal-led aggregate investigation over existing tracker reports and returns normalized findings with evidence, confidence, why it matters, recommended action, verification tools, privacy notes, and caveats.
+Runs a goal-led aggregate investigation over existing tracker reports and returns normalized findings with compact evidence, evidence summaries, confidence, why it matters, missing-access notes, recommended action, verification tools, privacy notes, and caveats. `detail_mode="compact"` is the default. Use `detail_mode="full"` only when the full underlying diagnostic rows are needed.
 
 ```json
-{"schema":"codex-usage-tracker-agentic-investigation-v1","content_mode":"aggregate_investigation","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","goal":"token_waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"evidence_limit":5},"summary":{"finding_count":1,"top_finding":"No strong local signal at default thresholds","confidence":"insufficient_local_evidence","source_reports":[]},"findings":[{"finding":"No strong local signal at default thresholds","evidence_count":0,"evidence":[],"confidence":"insufficient_local_evidence","recommended_action":"Lower thresholds, widen the time window, include archived sessions, or inspect top aggregate calls.","verify_with":["usage_calls","usage_report_pack"]}],"recommended_next_tools":[],"caveats":["Local Codex logs only; this is not an official OpenAI usage ledger."]}
+{"schema":"codex-usage-tracker-agentic-investigation-v1","content_mode":"aggregate_investigation","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","goal":"token_waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"evidence_limit":5,"detail_mode":"compact"},"summary":{"finding_count":1,"top_finding":"No strong local signal at default thresholds","confidence":"insufficient_local_evidence","source_reports":[]},"findings":[{"finding":"No strong local signal at default thresholds","evidence_count":0,"evidence_summary":{"row_count":0},"evidence":[],"confidence":"insufficient_local_evidence","recommended_action":"Lower thresholds, widen the time window, include archived sessions, or inspect top aggregate calls.","verify_with":["usage_calls","usage_report_pack"],"missing_access":"No supported aggregate signal was found at the selected thresholds.","privacy_notes":"No raw context needed for this follow-up."}],"recommended_next_tools":[],"caveats":["Local Codex logs only; this is not an official OpenAI usage ledger."]}
 ```
 
 ## Investigation Walk

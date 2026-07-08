@@ -406,6 +406,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "thread": (str, NoneType),
                 "include_archived": bool,
                 "evidence_limit": int,
+                "detail_mode": str,
             }
         },
     },

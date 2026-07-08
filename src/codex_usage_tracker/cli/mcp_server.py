@@ -651,6 +651,7 @@ def usage_investigate(
     thread: str | None = None,
     include_archived: bool = False,
     evidence_limit: int = 5,
+    detail_mode: str = "compact",
     privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Run a goal-led aggregate usage investigation."""
@@ -666,6 +667,7 @@ def usage_investigate(
         thread=thread,
         include_archived=include_archived,
         evidence_limit=evidence_limit,
+        detail_mode=detail_mode,
         privacy_mode=privacy_mode,
     ).payload
 

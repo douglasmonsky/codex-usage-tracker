@@ -47,9 +47,9 @@ The API skill should refresh the local index, use MCP JSON tools, state scope an
 
 ## Agentic Investigation Tools
 
-Use `usage_suggest_investigations(...)` when the user wants ideas, is unsure what to inspect, or asks what the tracker can help with. It returns goal-led investigation options such as token waste, allowance change, cache failure, workflow churn, and overview.
+Use `usage_suggest_investigations(...)` when the user wants ideas, is unsure what to inspect, or asks what the tracker can help with. It returns a short menu of related goal-led investigations such as token waste, allowance change, cache failure, workflow churn, and overview. Goal-specific requests still include adjacent useful investigations instead of a one-item answer.
 
-Use `usage_investigate(...)` as the first stop for broad requests such as "look through my usage for token waste" or "what should I change?" It returns normalized findings, evidence, confidence, recommended actions, verification tools, and caveats.
+Use `usage_investigate(...)` as the first stop for broad requests such as "look through my usage for token waste" or "what should I change?" It returns normalized findings with compact evidence, evidence summaries, confidence, missing-access notes, recommended actions, verification tools, and caveats. Compact evidence is the default. Pass `detail_mode="full"` only when the caller needs the full underlying report rows.
 
 Use lower-level diagnostics when the investigation report recommends them:
 

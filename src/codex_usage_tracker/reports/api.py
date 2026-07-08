@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -786,6 +787,7 @@ def build_agentic_investigation_report(
     thread: str | None = None,
     include_archived: bool = False,
     evidence_limit: int = 5,
+    detail_mode: str = "compact",
     privacy_mode: str = "normal",
 ) -> AgenticInvestigationReport:
     """Build a compact goal-led investigation using existing reports."""
@@ -793,6 +795,7 @@ def build_agentic_investigation_report(
     privacy_mode = validate_privacy_mode(privacy_mode)
     normalized_goal = _normalize_agentic_goal(goal) or "token_waste"
     normalized_limit = max(1, evidence_limit)
+    normalized_detail_mode = _normalize_agentic_detail_mode(detail_mode)
     findings: list[dict[str, Any]] = []
     source_reports: list[str] = []
     recommended_next_tools: list[dict[str, Any]] = []
@@ -817,6 +820,7 @@ def build_agentic_investigation_report(
                 _agentic_finding(
                     finding="Large calls produced little output",
                     evidence=large_low_output["rows"][:normalized_limit],
+                    detail_mode=normalized_detail_mode,
                     confidence=_count_confidence(int(large_low_output["total_candidates"])),
                     why_it_matters=(
                         "Large input/context usage with low output is a strong candidate for "
@@ -828,6 +832,10 @@ def build_agentic_investigation_report(
                     ),
                     verify_with=["usage_large_low_output_calls", "usage_call_detail", "usage_thread_trace"],
                     privacy_notes="Aggregate token/activity counts only; no raw fragments or command output.",
+                    missing_access=(
+                        "The aggregate report cannot prove why output was low without a thread trace "
+                        "or explicit raw-context inspection."
+                    ),
                 )
             )
 
@@ -847,6 +855,7 @@ def build_agentic_investigation_report(
                 _agentic_finding(
                     finding="Repeated shell command churn",
                     evidence=shell_churn["rows"][:normalized_limit],
+                    detail_mode=normalized_detail_mode,
                     confidence=_count_confidence(int(shell_churn["total_candidates"])),
                     why_it_matters=(
                         "Repeated shell roots, failures, or adjacent retries can waste turns and "
@@ -857,6 +866,10 @@ def build_agentic_investigation_report(
                     ),
                     verify_with=["usage_shell_churn", "usage_thread_trace"],
                     privacy_notes="Command roots and bounded labels only; raw command output is omitted.",
+                    missing_access=(
+                        "Strict aggregate evidence cannot always recover the exact shell intent "
+                        "or full command arguments."
+                    ),
                 )
             )
 
@@ -875,6 +888,7 @@ def build_agentic_investigation_report(
                 _agentic_finding(
                     finding="Repeated file rediscovery",
                     evidence=repeated_files["rows"][:normalized_limit],
+                    detail_mode=normalized_detail_mode,
                     confidence=_count_confidence(int(repeated_files["total_candidates"])),
                     why_it_matters=(
                         "Repeated safe file identities can indicate the agent keeps rediscovering "
@@ -885,6 +899,10 @@ def build_agentic_investigation_report(
                     ),
                     verify_with=["usage_repeated_file_rediscovery", "usage_thread_trace"],
                     privacy_notes="Safe path hashes, basenames, and aggregates only; full paths are omitted.",
+                    missing_access=(
+                        "The report can rank repeated safe file identities, but cannot tell whether "
+                        "each reread was necessary without task intent."
+                    ),
                 )
             )
 
@@ -906,11 +924,15 @@ def build_agentic_investigation_report(
                 _agentic_finding(
                     finding="Ranked aggregate usage recommendations",
                     evidence=recommendations["rows"][:normalized_limit],
+                    detail_mode=normalized_detail_mode,
                     confidence="medium",
                     why_it_matters="Existing recommendation scoring combines aggregate cost, cache, context, and pricing signals.",
                     recommended_action="Start with the highest recommendation score, then verify with the specific diagnostic tool.",
                     verify_with=["usage_recommendations", "usage_calls", "usage_call_detail"],
                     privacy_notes="Aggregate recommendations only; no prompt or tool-output text.",
+                    missing_access=(
+                        "Recommendation scores do not know whether an expensive call produced high-value work."
+                    ),
                 )
             )
 
@@ -953,11 +975,13 @@ def build_agentic_investigation_report(
             _agentic_finding(
                 finding="No strong local signal at default thresholds",
                 evidence=[],
+                detail_mode=normalized_detail_mode,
                 confidence="insufficient_local_evidence",
                 why_it_matters="The current aggregate diagnostics did not find a clear candidate at the default threshold.",
                 recommended_action="Lower thresholds, widen the time window, include archived sessions, or inspect top aggregate calls.",
                 verify_with=["usage_calls", "usage_report_pack", "usage_investigation_walk"],
                 privacy_notes="No raw context needed for this follow-up.",
+                missing_access="No supported aggregate signal was found at the selected thresholds.",
             )
         )
 
@@ -975,6 +999,7 @@ def build_agentic_investigation_report(
             "thread": thread,
             "include_archived": include_archived,
             "evidence_limit": normalized_limit,
+            "detail_mode": normalized_detail_mode,
         },
         "summary": {
             "finding_count": len(findings),
@@ -1069,29 +1094,162 @@ def _investigation_suggestions(goal: str | None) -> list[dict[str, Any]]:
     ]
     if goal is None:
         return suggestions
-    return [row for row in suggestions if row["goal"] == goal] or suggestions
+    related_goals = {
+        "overview": ["overview", "token_waste", "cache_failure", "workflow_churn", "allowance_change"],
+        "token_waste": ["token_waste", "cache_failure", "workflow_churn", "overview"],
+        "cache_failure": ["cache_failure", "token_waste", "overview"],
+        "workflow_churn": ["workflow_churn", "token_waste", "cache_failure", "overview"],
+        "allowance_change": ["allowance_change", "overview", "token_waste"],
+    }.get(goal, [goal])
+    by_goal = {row["goal"]: row for row in suggestions}
+    return [by_goal[row_goal] for row_goal in related_goals if row_goal in by_goal] or suggestions
+
+
+def _normalize_agentic_detail_mode(detail_mode: str | None) -> str:
+    normalized = (detail_mode or "compact").strip().lower().replace("-", "_")
+    if normalized in {"full", "verbose", "raw", "rows"}:
+        return "full"
+    return "compact"
 
 
 def _agentic_finding(
     *,
     finding: str,
     evidence: list[dict[str, Any]],
+    detail_mode: str,
     confidence: str,
     why_it_matters: str,
     recommended_action: str,
     verify_with: list[str],
     privacy_notes: str,
+    missing_access: str,
 ) -> dict[str, Any]:
+    evidence_rows = evidence if detail_mode == "full" else [_compact_agentic_evidence_row(row) for row in evidence]
     return {
         "finding": finding,
         "evidence_count": len(evidence),
-        "evidence": evidence,
+        "evidence_summary": _agentic_evidence_summary(evidence),
+        "evidence": evidence_rows,
         "confidence": confidence,
         "why_it_matters": why_it_matters,
         "recommended_action": recommended_action,
         "verify_with": verify_with,
+        "missing_access": missing_access,
         "privacy_notes": privacy_notes,
     }
+
+
+def _compact_agentic_evidence_row(row: dict[str, Any]) -> dict[str, Any]:
+    keep_fields = (
+        "record_id",
+        "session_id",
+        "thread_key",
+        "thread_name",
+        "event_timestamp",
+        "model",
+        "effort",
+        "total_tokens",
+        "input_tokens",
+        "cached_input_tokens",
+        "uncached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "cache_ratio",
+        "context_window_percent",
+        "candidate_explanation",
+        "explanation_reasons",
+        "command_root",
+        "command_label",
+        "command_family",
+        "churn_kind",
+        "occurrences",
+        "call_count",
+        "thread_count",
+        "session_count",
+        "failure_count",
+        "path_hash",
+        "path_identity",
+        "path_basename",
+        "path_extension",
+        "candidate_kind",
+        "operation_mix",
+        "recommendation",
+        "primary_signal",
+        "secondary_signals",
+        "recommended_action",
+        "usage_credits",
+        "estimated_cost_usd",
+        "next_tool",
+    )
+    compact = {key: row[key] for key in keep_fields if key in row and row[key] is not None}
+    if "primary_recommendation" in row and isinstance(row["primary_recommendation"], dict):
+        primary = row["primary_recommendation"]
+        compact["primary_recommendation"] = {
+            key: primary[key]
+            for key in ("key", "severity", "title", "action")
+            if key in primary and primary[key] is not None
+        }
+    if "nearby_activity" in row and isinstance(row["nearby_activity"], dict):
+        compact["nearby_activity"] = {
+            key: row["nearby_activity"].get(key)
+            for key in ("tool_call_count", "command_run_count", "failed_command_count", "file_event_count")
+            if row["nearby_activity"].get(key) is not None
+        }
+    if "trace_handles" in row and isinstance(row["trace_handles"], list):
+        compact["trace_handles"] = [
+            {
+                key: handle.get(key)
+                for key in ("thread_key", "thread", "session_id", "call_count", "total_tokens", "next_tool")
+                if isinstance(handle, dict) and handle.get(key) is not None
+            }
+            for handle in row["trace_handles"][:3]
+            if isinstance(handle, dict)
+        ]
+    return compact
+
+
+def _agentic_evidence_summary(evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    token_values = [int(row["total_tokens"]) for row in evidence if isinstance(row.get("total_tokens"), int | float)]
+    timestamps = [str(row["event_timestamp"]) for row in evidence if row.get("event_timestamp")]
+    threads = _ordered_unique(str(row.get("thread_name") or row.get("thread") or row.get("thread_key")) for row in evidence)
+    models = _ordered_unique(str(row.get("model")) for row in evidence if row.get("model"))
+    efforts = _ordered_unique(str(row.get("effort")) for row in evidence if row.get("effort"))
+    explanations = _ordered_unique(str(row.get("candidate_explanation")) for row in evidence if row.get("candidate_explanation"))
+    recommendations = _ordered_unique(str(row.get("recommendation") or row.get("recommended_action")) for row in evidence if row.get("recommendation") or row.get("recommended_action"))
+    summary: dict[str, Any] = {
+        "row_count": len(evidence),
+        "total_tokens": sum(token_values),
+        "max_total_tokens": max(token_values) if token_values else None,
+        "threads": threads[:5],
+        "models": models[:5],
+        "efforts": efforts[:5],
+        "candidate_explanations": explanations[:5],
+        "recommendations": recommendations[:5],
+    }
+    if timestamps:
+        summary["first_event_timestamp"] = min(timestamps)
+        summary["last_event_timestamp"] = max(timestamps)
+    occurrence_values = [int(row["occurrences"]) for row in evidence if isinstance(row.get("occurrences"), int | float)]
+    call_count_values = [int(row["call_count"]) for row in evidence if isinstance(row.get("call_count"), int | float)]
+    failure_values = [int(row["failure_count"]) for row in evidence if isinstance(row.get("failure_count"), int | float)]
+    if occurrence_values:
+        summary["total_occurrences"] = sum(occurrence_values)
+    if call_count_values:
+        summary["total_call_count"] = sum(call_count_values)
+    if failure_values:
+        summary["total_failure_count"] = sum(failure_values)
+    return {key: value for key, value in summary.items() if value not in (None, [], {})}
+
+
+def _ordered_unique(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        if not value or value == "None" or value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return ordered
 
 
 def _count_confidence(count: int) -> str:
