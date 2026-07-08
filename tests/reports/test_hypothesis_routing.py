@@ -18,6 +18,13 @@ def test_hypothesis_family_routing_handles_exploratory_usage_phrases() -> None:
     )
     assert (
         _classify_hypothesis_family(
+            "Cache misses and cold resumes are inflating large calls.",
+            question,
+        )
+        == "cache_failure"
+    )
+    assert (
+        _classify_hypothesis_family(
             "The MCP needs local content-index or thread-trace follow-up to explain intent "
             "behind repeated reads.",
             question,

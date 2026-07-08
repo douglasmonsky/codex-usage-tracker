@@ -23,6 +23,7 @@ from codex_usage_tracker.core.paths import (
 )
 from codex_usage_tracker.core.projects import PRIVACY_MODE_CHOICES
 from codex_usage_tracker.pricing.api import OPENAI_PRICING_MD_URL, VALID_PRICING_TIERS
+from codex_usage_tracker.reports.agentic_dogfood import DEFAULT_AGENTIC_DOGFOOD_DIR
 from codex_usage_tracker.reports.api import (
     EXPENSIVE_PRESET_CHOICES,
     QUERY_CREDIT_CONFIDENCE_CHOICES,
@@ -67,6 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_refresh_parser(subparsers)
     _add_inspect_log_parser(subparsers)
     _add_rebuild_index_parser(subparsers)
+    _add_dogfood_agentic_parser(subparsers)
     _add_reset_db_parser(subparsers)
     _add_summary_parser(subparsers)
     _add_query_parser(subparsers)
@@ -221,6 +223,35 @@ def _add_rebuild_index_parser(
         help="Rebuild aggregate usage rows without local content indexing.",
     )
     rebuild.add_argument("--json", action="store_true", dest="as_json")
+
+
+def _add_dogfood_agentic_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    dogfood = subparsers.add_parser(
+        "dogfood-agentic",
+        help="Run repeatable local dogfood checks for agentic MCP investigation reports",
+    )
+    dogfood.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
+    dogfood.add_argument("--output-dir", type=Path, default=DEFAULT_AGENTIC_DOGFOOD_DIR)
+    dogfood.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    dogfood.add_argument("--until", help="Only include calls at or before this ISO date/time")
+    dogfood.add_argument("--thread")
+    dogfood.add_argument("--include-archived", action="store_true")
+    dogfood.add_argument("--evidence-limit", type=int, default=5)
+    dogfood.add_argument(
+        "--refresh",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Refresh active local usage before running the dogfood report.",
+    )
+    dogfood.add_argument(
+        "--markdown",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Write a compact Markdown summary next to summary.json.",
+    )
+    dogfood.add_argument("--json", action="store_true", dest="as_json")
 
 
 def _add_reset_db_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:

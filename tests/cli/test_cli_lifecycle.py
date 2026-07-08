@@ -640,6 +640,58 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     assert "/tmp/private-diagnostics" not in json.dumps(fact_calls_payload)
 
 
+def test_dogfood_agentic_cli_writes_compact_artifacts(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = tmp_path / "pricing.json"
+    allowance_path = tmp_path / "allowance.json"
+    output_dir = tmp_path / "dogfood"
+    pricing_path.write_text(
+        json.dumps(
+            {
+                "models": {
+                    "gpt-5.5": {
+                        "input_per_million": 2.0,
+                        "cached_input_per_million": 0.5,
+                        "output_per_million": 10.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "--pricing",
+        str(pricing_path),
+        "--allowance",
+        str(allowance_path),
+        "--privacy-mode",
+        "strict",
+        "dogfood-agentic",
+        "--codex-home",
+        str(codex_home),
+        "--output-dir",
+        str(output_dir),
+        "--evidence-limit",
+        "2",
+        "--json",
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
+    assert payload["family_checks"]["old_passed"] is True
+    assert payload["family_checks"]["new_passed"] is True
+    assert payload["privacy_checks"]["passed"] is True
+    assert Path(payload["artifacts"]["summary_json_path"]).exists()
+    assert Path(payload["artifacts"]["summary_markdown_path"]).exists()
+    assert "SECRET" not in result.stdout
+
+
 def _assert_contract(payload: object) -> None:
     assert validate_json_payload_contract(payload) == []
 
