@@ -7,6 +7,7 @@ from codex_usage_tracker.core.json_contracts import validate_json_payload_contra
 from codex_usage_tracker.reports.api import (
     build_content_search_report,
     build_investigation_walk_report,
+    build_large_low_output_report,
     build_local_evidence_export_report,
     build_pattern_scan_report,
     build_repeated_file_rediscovery_report,
@@ -461,6 +462,139 @@ def test_thread_trace_returns_calls_with_indexed_fragments(tmp_path: Path) -> No
         "SECRET" in fragment["snippet"]
         for call in payload["calls"]
         for fragment in call["fragments"]
+    )
+
+
+def test_large_low_output_calls_flags_cold_resume_candidates(tmp_path: Path) -> None:
+    codex_home = tmp_path / ".codex"
+    session_id = "019e3911-c0de-7777-8afe-333333333333"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "20"
+        / f"rollout-2026-05-20T10-00-00-{session_id}.jsonl"
+    )
+    rows = [
+        _entry("session_meta", {"id": session_id}),
+        _entry("turn_context", {"turn_id": "turn-cold", "model": "gpt-5.5"}),
+        _entry(
+            "response_item",
+            {
+                "type": "function_call",
+                "call_id": "call-cold-rg",
+                "name": "exec_command",
+                "arguments": json.dumps({"cmd": "rg TODO src/private_low_output.py"}),
+            },
+        ),
+        _entry(
+            "response_item",
+            {
+                "type": "function_call_output",
+                "call_id": "call-cold-rg",
+                "output": (
+                    "Chunk ID: abc123\n"
+                    "Wall time: 0.0000 seconds\n"
+                    "Process exited with code 0\n"
+                    "Original token count: 4\n"
+                    "Output:\n"
+                    "PRIVATE LOW OUTPUT MATCH"
+                ),
+            },
+        ),
+        _custom_token_event(
+            50_100,
+            last_input_tokens=50_000,
+            last_cached_input_tokens=500,
+            last_output_tokens=100,
+            last_reasoning_output_tokens=20,
+        ),
+        _entry("turn_context", {"turn_id": "turn-high-output", "model": "gpt-5.5"}),
+        _custom_token_event(
+            108_100,
+            last_input_tokens=50_000,
+            last_cached_input_tokens=45_000,
+            last_output_tokens=8_000,
+            last_reasoning_output_tokens=200,
+        ),
+        _entry("turn_context", {"turn_id": "turn-small", "model": "gpt-5.5"}),
+        _custom_token_event(
+            109_000,
+            last_input_tokens=850,
+            last_cached_input_tokens=0,
+            last_output_tokens=50,
+        ),
+    ]
+    _write_jsonl(log_path, rows)
+
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    payload = build_large_low_output_report(
+        db_path=db_path,
+        min_total_tokens=20_000,
+        max_output_tokens=500,
+        limit=None,
+    ).payload
+
+    assert validate_json_payload_contract(payload) == []
+    assert payload["schema"] == "codex-usage-tracker-large-low-output-v1"
+    assert payload["content_mode"] == "aggregate_with_local_activity"
+    assert payload["includes_indexed_content"] is False
+    assert payload["includes_raw_fragments"] is False
+    assert payload["row_count"] == 1
+    candidate = payload["rows"][0]
+    assert candidate["total_tokens"] == 50_100
+    assert candidate["output_tokens"] == 100
+    assert candidate["cache_ratio"] < 0.02
+    assert candidate["command_run_count"] == 1
+    assert candidate["candidate_explanation"] == "cold_resume_or_cache_miss"
+    assert "large_uncached_input" in candidate["explanation_reasons"]
+    serialized = json.dumps(payload)
+    assert "src/private_low_output.py" not in serialized
+    assert "PRIVATE LOW OUTPUT MATCH" not in serialized
+
+    walk = build_investigation_walk_report(
+        db_path=db_path,
+        question="look for token waste",
+        min_occurrences=1,
+    ).payload
+    assert validate_json_payload_contract(walk) == []
+    assert any(branch["scan_type"] == "large_low_output" for branch in walk["branches"])
+    assert any(tool["tool"] == "usage_large_low_output_calls" for tool in walk["recommended_next_tools"])
+
+
+def _custom_token_event(
+    cumulative_total: int,
+    *,
+    last_input_tokens: int,
+    last_cached_input_tokens: int,
+    last_output_tokens: int,
+    last_reasoning_output_tokens: int = 0,
+) -> dict[str, object]:
+    return _entry(
+        "event_msg",
+        {
+            "type": "token_count",
+            "info": {
+                "total_token_usage": {
+                    "input_tokens": max(cumulative_total - last_output_tokens, 0),
+                    "cached_input_tokens": last_cached_input_tokens,
+                    "output_tokens": last_output_tokens,
+                    "reasoning_output_tokens": last_reasoning_output_tokens,
+                    "total_tokens": cumulative_total,
+                },
+                "last_token_usage": {
+                    "input_tokens": last_input_tokens,
+                    "cached_input_tokens": last_cached_input_tokens,
+                    "output_tokens": last_output_tokens,
+                    "reasoning_output_tokens": last_reasoning_output_tokens,
+                    "total_tokens": last_input_tokens + last_output_tokens,
+                },
+                "model_context_window": 100_000,
+            },
+        },
     )
 
 

@@ -83,6 +83,7 @@ Tracked schema ids:
 | `codex-usage-tracker-pattern-scan-v1` | MCP `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, `usage_context_bloat_scan(...)`; explicit local content/event-index pattern diagnostics |
 | `codex-usage-tracker-repeated-file-rediscovery-v1` | MCP `usage_repeated_file_rediscovery(...)`; repeated safe file identity rediscovery candidates without full paths |
 | `codex-usage-tracker-shell-churn-v1` | MCP `usage_shell_churn(...)`; repeated shell command family diagnostics without raw command output |
+| `codex-usage-tracker-large-low-output-v1` | MCP `usage_large_low_output_calls(...)`; high-token low-output call candidates without raw fragments |
 | `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
 | `codex-usage-tracker-local-evidence-export-v1` | MCP `usage_local_evidence_export(question=...)`; strict shareable local evidence summary without raw/indexed content |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
@@ -1006,6 +1007,20 @@ Ranks repeated shell command roots and bounded command labels by failures, adjac
 {"schema":"codex-usage-tracker-shell-churn-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":3,"limit":20,"sample_limit":3},"row_count":0,"total_candidates":0,"rows":[]}
 ```
 
+## Large Low-Output Calls
+
+MCP:
+
+- `usage_large_low_output_calls(min_total_tokens=20000,max_output_tokens=1000)`
+
+Schema: `codex-usage-tracker-large-low-output-v1`
+
+Ranks high-token calls that produced little output, including token totals, cache ratio, context-window percent, nearby activity counts, candidate explanations, and `usage_thread_trace` handles. It omits raw fragments, command output, and full file paths.
+
+```json
+{"schema":"codex-usage-tracker-large-low-output-v1","content_mode":"aggregate_with_local_activity","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_total_tokens":20000,"max_output_tokens":1000,"limit":20},"row_count":0,"total_candidates":0,"rows":[]}
+```
+
 ## Investigation Walk
 
 MCP:
@@ -1017,7 +1032,7 @@ Schema: `codex-usage-tracker-investigation-walk-v1`
 Runs a bounded local hypothesis walk over normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. Does not include raw fragments.
 
 ```json
-{"schema":"codex-usage-tracker-investigation-walk-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","question":"look for token waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":4,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence"},"branches":[],"recommended_next_tools":[]}
+{"schema":"codex-usage-tracker-investigation-walk-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","question":"look for token waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":5,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence"},"branches":[],"recommended_next_tools":[]}
 ```
 
 ## Local Evidence Export
@@ -1031,7 +1046,7 @@ Schema: `codex-usage-tracker-local-evidence-export-v1`
 Strict shareable summary derived from local investigation evidence. It omits raw fragments, snippets, record ids, thread names, command labels, file basenames, full paths, raw commands, and raw tool output.
 
 ```json
-{"schema":"codex-usage-tracker-local-evidence-export-v1","content_mode":"shareable_local_evidence","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"strict","question":"share token waste evidence","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":4,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence","export_branch_count":0},"branches":[],"omitted_fields":["record_id","session_id","thread_name","raw_fragment","snippet","raw_command","raw_tool_output","full_path","path_basename","command_label"],"caveats":["Local evidence only; not an official OpenAI ledger."]}
+{"schema":"codex-usage-tracker-local-evidence-export-v1","content_mode":"shareable_local_evidence","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"strict","question":"share token waste evidence","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"evidence_limit":5},"summary":{"branch_count":5,"supported_branch_count":0,"top_hypothesis":null,"confidence":"insufficient_local_evidence","export_branch_count":0},"branches":[],"omitted_fields":["record_id","session_id","thread_name","raw_fragment","snippet","raw_command","raw_tool_output","full_path","path_basename","command_label"],"caveats":["Local evidence only; not an official OpenAI ledger."]}
 ```
 
 ## Lifecycle Commands

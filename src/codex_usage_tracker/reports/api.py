@@ -43,6 +43,7 @@ from codex_usage_tracker.reports.recommendations import annotate_rows_with_recom
 from codex_usage_tracker.store.api import (
     query_content_search,
     query_dashboard_events,
+    query_large_low_output_calls,
     query_most_expensive_calls,
     query_pattern_scan,
     query_repeated_file_rediscovery,
@@ -172,6 +173,13 @@ class RepeatedFileRediscoveryReport:
 @dataclass(frozen=True)
 class ShellChurnReport:
     """Stable machine-readable repeated shell command churn report."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LargeLowOutputReport:
+    """Stable machine-readable large low-output call report."""
 
     payload: dict[str, Any]
 
@@ -649,6 +657,57 @@ def build_shell_churn_report(
     )
 
 
+def build_large_low_output_report(
+    *,
+    db_path: Path,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_total_tokens: int = 20_000,
+    max_output_tokens: int = 1_000,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> LargeLowOutputReport:
+    """Build aggregate-first large low-output call payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    normalized_min_total = max(0, min_total_tokens)
+    normalized_max_output = max(0, max_output_tokens)
+    result = query_large_low_output_calls(
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_total_tokens=normalized_min_total,
+        max_output_tokens=normalized_max_output,
+        limit=limit,
+    )
+    rows = result["rows"]
+    return LargeLowOutputReport(
+        {
+            "schema": "codex-usage-tracker-large-low-output-v1",
+            "content_mode": "aggregate_with_local_activity",
+            "includes_indexed_content": False,
+            "includes_raw_fragments": False,
+            "privacy_mode": privacy_mode,
+            "filters": {
+                "since": since,
+                "until": until,
+                "thread": thread,
+                "include_archived": include_archived,
+                "min_total_tokens": normalized_min_total,
+                "max_output_tokens": normalized_max_output,
+                "limit": limit,
+            },
+            "row_count": len(rows),
+            "total_candidates": int(result["total_candidates"]),
+            "rows": rows,
+        }
+    )
+
+
 def build_investigation_walk_report(
     *,
     db_path: Path,
@@ -675,8 +734,25 @@ def build_investigation_walk_report(
         min_occurrences=min_occurrences,
         limit=normalized_evidence_limit * 4,
     )
+    large_low_output_result = query_large_low_output_calls(
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_total_tokens=20_000,
+        max_output_tokens=1_000,
+        limit=normalized_evidence_limit,
+    )
     patterns = pattern_result["patterns"]
     branches = _investigation_branches(patterns=patterns, evidence_limit=normalized_evidence_limit)
+    branches.append(
+        _large_low_output_branch(
+            rows=large_low_output_result["rows"],
+            evidence_limit=normalized_evidence_limit,
+        )
+    )
+    branches.sort(key=lambda branch: (-int(branch["score"]), str(branch["scan_type"])))
     supported = [branch for branch in branches if branch["status"] != "no_evidence"]
     payload = {
         "schema": "codex-usage-tracker-investigation-walk-v1",
@@ -755,6 +831,28 @@ def _investigation_branches(
     return branches
 
 
+def _large_low_output_branch(
+    *,
+    rows: list[dict[str, Any]],
+    evidence_limit: int,
+) -> dict[str, Any]:
+    selected = [dict(row, scan_type="large_low_output") for row in rows[:evidence_limit]]
+    score = _branch_score(selected)
+    return {
+        "scan_type": "large_low_output",
+        "hypothesis": "Large calls with little output",
+        "rationale": (
+            "Large input/context usage with low output can indicate cold resumes, "
+            "tool-output pressure, stale thread continuation, or low-value continuation."
+        ),
+        "status": _branch_status(score, selected),
+        "score": score,
+        "evidence_count": len(selected),
+        "evidence": selected,
+        "pruned_reason": None if selected else "No calls matched large low-output thresholds.",
+    }
+
+
 def _branch_score(evidence: list[dict[str, Any]]) -> int:
     total = 0
     for row in evidence:
@@ -817,11 +915,27 @@ def _recommended_investigation_tools(supported: list[dict[str, Any]]) -> list[di
                 "reason": "Inspect repeated file path hashes and linked aggregate calls.",
             }
         )
+    elif top_scan == "large_low_output":
+        tools.append(
+            {
+                "tool": "usage_large_low_output_calls",
+                "reason": "Inspect large input/context calls that produced little output.",
+            }
+        )
     else:
         tools.append(
             {
                 "tool": "usage_content_search",
                 "reason": "Use explicit local snippet search only when transcript-level evidence is needed.",
+            }
+        )
+    if any(str(branch["scan_type"]) == "large_low_output" for branch in supported) and all(
+        tool["tool"] != "usage_large_low_output_calls" for tool in tools
+    ):
+        tools.append(
+            {
+                "tool": "usage_large_low_output_calls",
+                "reason": "Inspect large input/context calls that produced little output.",
             }
         )
     return tools

@@ -15,6 +15,8 @@ When the user plans to share JSON, CSV, dashboards, screenshots, or support bund
 
 Use `usage_investigation_walk(question=...)` first when user asks for broad local waste discovery; it ranks normalized pattern branches and recommends next tools. Use local pattern scans (`usage_repetition_scan`, `usage_command_loop_scan`, `usage_file_churn_scan`, `usage_context_bloat_scan`) when user asks for recurring waste, command loops, repeated file churn, or context bloat. Use `usage_repeated_file_rediscovery(...)` when user asks which files are rediscovered or reread repeatedly; it ranks safe path hashes/basenames without full paths. Use `usage_shell_churn(...)` when the user asks about repeated shell probing, command loops, failing retries, or repeated sed/rg/git/nl/test/package commands. Use `usage_content_search` only when user asks local content exploration, pattern hunting, diagnostics need indexed snippets; its payload can include local transcript snippets is not default shareable report.
 
+Use `usage_large_low_output_calls(...)` when the user asks for obvious token-waste candidates, cold resumes, cache misses, stale high-context continuations, or large calls that produced little output.
+
 Use `usage_call_context` only when the user explicitly asks to inspect actual logged context for one selected record. State that returned text is local, redacted or size-limited when applicable, and not included in default shareable outputs.
 
 ## First Steps

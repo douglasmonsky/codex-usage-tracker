@@ -81,6 +81,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_file_churn_scan`
 - `usage_repeated_file_rediscovery`
 - `usage_shell_churn`
+- `usage_large_low_output_calls`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
 - `usage_local_evidence_export`
@@ -124,6 +125,8 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `usage_repeated_file_rediscovery(...)` ranks repeated exact safe file identities by path hash/identity, basename, extension, operation mix, adjacent retouches, aggregate token totals, and `usage_thread_trace` handles. Use it when the user asks which files are being rediscovered or reread repeatedly. It does not expose full paths or raw fragments.
 
 `usage_shell_churn(...)` ranks repeated shell command roots and bounded command labels by failures, adjacent repeats, output bytes, aggregate token totals, and `usage_thread_trace` handles. Use it when the user asks about repeated `sed`, `rg`, `git`, `nl`, test, package, or unknown shell command loops. It does not expose raw command output.
+
+`usage_large_low_output_calls(...)` ranks high-token calls that produced little output, with token totals, cache ratio, context-window percent, nearby tool/command/file counts, and candidate explanations such as cold resume, tool-output pressure, stale thread, or low-value continuation. It stays aggregate-first and does not expose raw fragments, command output, or full file paths.
 
 `usage_investigation_walk(question=...)` runs a bounded local hypothesis walk over those normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. It is local-index evidence, not a shareable aggregate-only report.
 
