@@ -186,7 +186,7 @@ def plugin_manifest() -> dict[str, Any]:
     return {
         "name": PLUGIN_NAME,
         "version": __version__,
-        "description": "Unofficial local tracker for aggregate Codex token usage from local session logs.",
+        "description": "Unofficial local Codex usage dashboard and MCP diagnostics from local session logs.",
         "author": {"name": "Douglas Monsky"},
         "homepage": "https://github.com/douglasmonsky/codex-usage-tracker",
         "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
@@ -196,13 +196,12 @@ def plugin_manifest() -> dict[str, Any]:
         "mcpServers": "./.mcp.json",
         "interface": {
             "displayName": "Codex Usage Tracker",
-            "shortDescription": "Unofficial local aggregate token usage analytics for Codex",
+            "shortDescription": "Local Codex usage dashboard, MCP diagnostics, and token-waste investigations",
             "longDescription": (
                 "Unofficial independent project, not made by, affiliated with, endorsed by, "
-                "sponsored by, or supported by OpenAI. Reads local Codex session logs, "
-                "aggregates exact token usage counters, and generates summaries, CSV "
-                "exports, and a hoverable dashboard with optional localhost-only raw "
-                "context loading."
+                "sponsored by, or supported by OpenAI. Reads local Codex session logs "
+                "to power a local dashboard, MCP tools, allowance diagnostics, token-waste "
+                "investigations, and shareable aggregate reports without uploading logs."
             ),
             "developerName": "Douglas Monsky",
             "category": "Productivity",
@@ -212,8 +211,9 @@ def plugin_manifest() -> dict[str, Any]:
             "termsOfServiceURL": "https://github.com/douglasmonsky/codex-usage-tracker",
             "defaultPrompt": [
                 "Open dashboard",
-                "Heaviest thread?",
-                "Thread leaderboard",
+                "Look through my usage for token waste",
+                "Suggest usage investigations",
+                "Check whether my weekly allowance changed",
             ],
             "brandColor": "#2563EB",
             "composerIcon": "./assets/icon.svg",
