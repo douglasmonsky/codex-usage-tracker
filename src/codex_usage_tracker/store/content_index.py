@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION, optional_str
-from codex_usage_tracker.store.content_index_event_store import flush_pending_event_rows
+from codex_usage_tracker.store.content_index_event_store import (
+    PendingEventRows,
+    pending_event_rows,
+    upsert_pending_event_rows,
+)
 from codex_usage_tracker.store.content_index_events import (
     PendingCommandRun,
     PendingFileEvent,
@@ -25,6 +29,7 @@ from codex_usage_tracker.store.query_sql import usage_where_clause
 MAX_FRAGMENT_CHARS = 4000
 DEFAULT_SEARCH_SNIPPET_CHARS = 800
 PARSER_ADAPTER_NAME = "codex-jsonl"
+_CONTENT_WRITE_BATCH_RECORDS = 250
 CONTENT_INDEX_TABLES = (
     "content_fragments",
     "file_events",
@@ -65,6 +70,14 @@ class _PendingFragment:
     turn_id: str | None
     turn_index: int
     event_timestamp: str | None
+
+
+@dataclass
+class _PendingContentRows:
+    turn_rows: list[dict[str, object]]
+    fragment_rows: list[dict[str, object]]
+    event_rows: PendingEventRows
+    linked_records: int = 0
 
 
 @dataclass(frozen=True)
@@ -828,6 +841,7 @@ def _index_content_for_source_file(
     pending_tool_calls: list[PendingToolCall] = []
     pending_command_runs: list[PendingCommandRun] = []
     pending_file_events: list[PendingFileEvent] = []
+    pending_rows = _empty_pending_content_rows()
     turn_id: str | None = None
     turn_index = 0
     parse_warnings = 0
@@ -857,33 +871,31 @@ def _index_content_for_source_file(
                 if _is_token_count(entry_type, payload):
                     usage_row = usage_rows.get(line_number)
                     if usage_row is not None:
-                        _flush_pending_fragments(
-                            conn,
+                        _append_pending_content_rows(
+                            pending_rows,
                             pending=pending,
-                            usage_row=usage_row,
-                        )
-                        flush_pending_event_rows(
-                            conn,
                             tool_calls=pending_tool_calls,
                             command_runs=pending_command_runs,
                             file_events=pending_file_events,
                             usage_row=usage_row,
                         )
-                    pending = []
-                    pending_tool_calls = []
-                    pending_command_runs = []
-                    pending_file_events = []
+                        if pending_rows.linked_records >= _CONTENT_WRITE_BATCH_RECORDS:
+                            _flush_pending_content_rows(conn, pending_rows)
+                        pending = []
+                        pending_tool_calls = []
+                        pending_command_runs = []
+                        pending_file_events = []
                     continue
                 pending.extend(
-                    _extract_pending_fragments(
-                        envelope=envelope,
-                        payload=payload,
-                        line_number=line_number,
-                        timestamp=timestamp,
-                        turn_id=turn_id,
-                        turn_index=turn_index,
+                        _extract_pending_fragments(
+                            envelope=envelope,
+                            payload=payload,
+                            line_number=line_number,
+                            timestamp=timestamp,
+                            turn_id=turn_id,
+                            turn_index=turn_index,
+                        )
                     )
-                )
                 events = extract_pending_local_events(
                     envelope=envelope,
                     payload=payload,
@@ -895,6 +907,8 @@ def _index_content_for_source_file(
                 pending_file_events.extend(events.file_events)
     except OSError:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
+
+    _flush_pending_content_rows(conn, pending_rows)
 
     if sync_fts:
         if replace_existing:
@@ -1100,8 +1114,77 @@ def _flush_pending_fragments(
     pending: list[_PendingFragment],
     usage_row: sqlite3.Row,
 ) -> None:
+    turn_rows, fragment_rows = _pending_fragment_rows(
+        pending=pending,
+        usage_row=usage_row,
+    )
+    _upsert_turn_rows(conn, turn_rows)
+    _upsert_fragment_rows(conn, fragment_rows)
+
+
+def _empty_pending_content_rows() -> _PendingContentRows:
+    return _PendingContentRows(
+        turn_rows=[],
+        fragment_rows=[],
+        event_rows=PendingEventRows(
+            tool_call_rows=[],
+            command_run_rows=[],
+            file_event_rows=[],
+        ),
+    )
+
+
+def _append_pending_content_rows(
+    batch: _PendingContentRows,
+    *,
+    pending: list[_PendingFragment],
+    tool_calls: list[PendingToolCall],
+    command_runs: list[PendingCommandRun],
+    file_events: list[PendingFileEvent],
+    usage_row: sqlite3.Row,
+) -> None:
+    turn_rows, fragment_rows = _pending_fragment_rows(
+        pending=pending,
+        usage_row=usage_row,
+    )
+    event_rows = pending_event_rows(
+        tool_calls=tool_calls,
+        command_runs=command_runs,
+        file_events=file_events,
+        usage_row=usage_row,
+    )
+    batch.turn_rows.extend(turn_rows)
+    batch.fragment_rows.extend(fragment_rows)
+    batch.event_rows.tool_call_rows.extend(event_rows.tool_call_rows)
+    batch.event_rows.command_run_rows.extend(event_rows.command_run_rows)
+    batch.event_rows.file_event_rows.extend(event_rows.file_event_rows)
+    batch.linked_records += 1
+
+
+def _flush_pending_content_rows(
+    conn: sqlite3.Connection,
+    batch: _PendingContentRows,
+) -> None:
+    if batch.turn_rows:
+        _upsert_turn_rows(conn, batch.turn_rows)
+    if batch.fragment_rows:
+        _upsert_fragment_rows(conn, batch.fragment_rows)
+    upsert_pending_event_rows(conn, batch.event_rows)
+    batch.turn_rows.clear()
+    batch.fragment_rows.clear()
+    batch.event_rows.tool_call_rows.clear()
+    batch.event_rows.command_run_rows.clear()
+    batch.event_rows.file_event_rows.clear()
+    batch.linked_records = 0
+
+
+def _pending_fragment_rows(
+    *,
+    pending: list[_PendingFragment],
+    usage_row: sqlite3.Row,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     if not pending:
-        return
+        return [], []
     turn_rows: list[dict[str, object]] = []
     fragment_rows: list[dict[str, object]] = []
     for index, fragment in enumerate(pending):
@@ -1119,8 +1202,7 @@ def _flush_pending_fragments(
                 usage_row=usage_row,
             )
         )
-    _upsert_turn_rows(conn, turn_rows)
-    _upsert_fragment_rows(conn, fragment_rows)
+    return turn_rows, fragment_rows
 
 
 def _turn_row(

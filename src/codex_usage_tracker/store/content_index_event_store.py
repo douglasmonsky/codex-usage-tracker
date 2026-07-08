@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+from collections.abc import Mapping
+from dataclasses import dataclass
 
 from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION
 from codex_usage_tracker.store.content_index_events import (
@@ -14,6 +16,15 @@ from codex_usage_tracker.store.content_index_events import (
 
 PARSER_ADAPTER_NAME = "codex-jsonl"
 
+UsageRow = sqlite3.Row | Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class PendingEventRows:
+    tool_call_rows: list[dict[str, object]]
+    command_run_rows: list[dict[str, object]]
+    file_event_rows: list[dict[str, object]]
+
 
 def flush_pending_event_rows(
     conn: sqlite3.Connection,
@@ -23,23 +34,49 @@ def flush_pending_event_rows(
     file_events: list[PendingFileEvent],
     usage_row: sqlite3.Row,
 ) -> None:
-    """Persist normalized local events against one usage row."""
+    """Persist normalized local events for one usage row."""
 
-    if tool_calls:
-        _upsert_tool_call_rows(conn, _tool_call_rows(tool_calls=tool_calls, usage_row=usage_row))
-    if command_runs:
-        _upsert_command_run_rows(
-            conn,
-            _command_run_rows(command_runs=command_runs, usage_row=usage_row),
-        )
-    if file_events:
-        _upsert_file_event_rows(conn, _file_event_rows(file_events=file_events, usage_row=usage_row))
+    upsert_pending_event_rows(
+        conn,
+        pending_event_rows(
+            tool_calls=tool_calls,
+            command_runs=command_runs,
+            file_events=file_events,
+            usage_row=usage_row,
+        ),
+    )
+
+
+def pending_event_rows(
+    *,
+    tool_calls: list[PendingToolCall],
+    command_runs: list[PendingCommandRun],
+    file_events: list[PendingFileEvent],
+    usage_row: UsageRow,
+) -> PendingEventRows:
+    return PendingEventRows(
+        tool_call_rows=_tool_call_rows(tool_calls=tool_calls, usage_row=usage_row),
+        command_run_rows=_command_run_rows(command_runs=command_runs, usage_row=usage_row),
+        file_event_rows=_file_event_rows(file_events=file_events, usage_row=usage_row),
+    )
+
+
+def upsert_pending_event_rows(
+    conn: sqlite3.Connection,
+    rows: PendingEventRows,
+) -> None:
+    if rows.tool_call_rows:
+        _upsert_tool_call_rows(conn, rows.tool_call_rows)
+    if rows.command_run_rows:
+        _upsert_command_run_rows(conn, rows.command_run_rows)
+    if rows.file_event_rows:
+        _upsert_file_event_rows(conn, rows.file_event_rows)
 
 
 def _tool_call_rows(
     *,
     tool_calls: list[PendingToolCall],
-    usage_row: sqlite3.Row,
+    usage_row: UsageRow,
 ) -> list[dict[str, object]]:
     rows_by_key: dict[str, dict[str, object]] = {}
     for index, tool_call in enumerate(tool_calls):
@@ -62,7 +99,7 @@ def _tool_call_row(
     *,
     tool_call_key: str,
     tool_call: PendingToolCall,
-    usage_row: sqlite3.Row,
+    usage_row: UsageRow,
 ) -> dict[str, object]:
     return {
         "tool_call_key": tool_call_key,
@@ -103,7 +140,7 @@ def _merge_tool_call_row(existing: dict[str, object], row: dict[str, object]) ->
 def _command_run_rows(
     *,
     command_runs: list[PendingCommandRun],
-    usage_row: sqlite3.Row,
+    usage_row: UsageRow,
 ) -> list[dict[str, object]]:
     rows_by_key: dict[str, dict[str, object]] = {}
     for index, command_run in enumerate(command_runs):
@@ -129,7 +166,7 @@ def _command_run_row(
     *,
     command_run_key: str,
     command_run: PendingCommandRun,
-    usage_row: sqlite3.Row,
+    usage_row: UsageRow,
 ) -> dict[str, object]:
     return {
         "command_run_key": command_run_key,
@@ -169,7 +206,7 @@ def _merge_command_run_row(existing: dict[str, object], row: dict[str, object]) 
 def _file_event_rows(
     *,
     file_events: list[PendingFileEvent],
-    usage_row: sqlite3.Row,
+    usage_row: UsageRow,
 ) -> list[dict[str, object]]:
     rows_by_key: dict[str, dict[str, object]] = {}
     for index, file_event in enumerate(file_events):
