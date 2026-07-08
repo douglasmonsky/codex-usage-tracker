@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -101,18 +101,31 @@ def index_content_for_source_files(
     )
 
 
+ContentIndexProgressCallback = Callable[[dict[str, object]], None]
+
+
 def index_content_for_source_plans(
     conn: sqlite3.Connection,
     *,
     plans: Iterable[ContentIndexPlan],
+    progress_callback: ContentIndexProgressCallback | None = None,
 ) -> ContentIndexResult:
     """Populate normalized bounded local content rows using refresh parse plans."""
 
     source_plans = list(_dedupe_content_index_plans(plans))
     totals = ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
+    total_sources = len(source_plans)
+    _emit_content_index_progress(
+        progress_callback,
+        status="running",
+        completed=0,
+        total=total_sources,
+        message="Indexing local content",
+        content_fragments=0,
+    )
     defer_full_fts_rebuild = any(plan.replace_existing for plan in source_plans)
     needs_full_fts_rebuild = False
-    for plan in source_plans:
+    for index, plan in enumerate(source_plans, start=1):
         result = _index_content_for_source_file(
             conn,
             source_path=plan.source_path,
@@ -130,10 +143,44 @@ def index_content_for_source_plans(
             content_fragments=totals.content_fragments + result.content_fragments,
             parse_warnings=totals.parse_warnings + result.parse_warnings,
         )
+        _emit_content_index_progress(
+            progress_callback,
+            status="running" if index < total_sources else "completed",
+            completed=index,
+            total=total_sources,
+            message="Indexed local content",
+            content_fragments=totals.content_fragments,
+            conversation_turns=totals.conversation_turns,
+        )
     if needs_full_fts_rebuild:
         _rebuild_content_fts(conn)
     return totals
 
+
+
+def _emit_content_index_progress(
+    progress_callback: ContentIndexProgressCallback | None,
+    *,
+    status: str,
+    completed: int,
+    total: int,
+    message: str,
+    **extra: object,
+) -> None:
+    if progress_callback is None:
+        return
+    percent = 100.0 if total <= 0 else round(min(100.0, (completed / total) * 100.0), 1)
+    payload: dict[str, object] = {
+        "schema": "codex-usage-tracker-refresh-progress-v1",
+        "phase": "indexing_content",
+        "status": status,
+        "message": message,
+        "completed": completed,
+        "total": total,
+        "percent": percent,
+    }
+    payload.update(extra)
+    progress_callback(payload)
 
 def _dedupe_content_index_plans(
     plans: Iterable[ContentIndexPlan],

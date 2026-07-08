@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
@@ -66,20 +67,47 @@ class _ParsedRefreshFile:
     final_line_number: int
 
 
+RefreshProgressCallback = Callable[[dict[str, object]], None]
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    progress_callback: RefreshProgressCallback | None = None,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
+    _emit_refresh_progress(
+        progress_callback,
+        phase="discovering",
+        status="running",
+        completed=0,
+        total=None,
+        message="Finding Codex session logs",
+    )
     logs = find_session_logs(codex_home=codex_home, include_archived=include_archived)
     session_index = load_session_index(codex_home)
     with connect(db_path) as conn:
         init_db(conn)
         parse_plans = source_logs_requiring_parse(conn, logs)
-    parsed_refresh_files = _parse_refresh_plans(parse_plans, session_index)
+    _emit_refresh_progress(
+        progress_callback,
+        phase="discovering",
+        status="completed",
+        completed=len(logs),
+        total=len(logs),
+        message="Planned source log refresh",
+        scanned_files=len(logs),
+        parsed_source_files=len(parse_plans),
+        skipped_source_files=len(logs) - len(parse_plans),
+    )
+    parsed_refresh_files = _parse_refresh_plans(
+        parse_plans,
+        session_index,
+        progress_callback=progress_callback,
+    )
     stats: dict[str, int] = {}
     events: list[UsageEvent] = []
     diagnostic_facts: list[DiagnosticFact] = []
@@ -99,13 +127,47 @@ def refresh_usage_index(
         )
         for key, value in parsed_refresh_file.stats.items():
             stats[key] = stats.get(key, 0) + int(value)
+    _emit_refresh_progress(
+        progress_callback,
+        phase="upserting",
+        status="running",
+        completed=0,
+        total=len(events),
+        message="Writing aggregate usage rows",
+        parsed_events=len(events),
+    )
     inserted = upsert_usage_events(
         events,
         db_path=db_path,
         replace_source_files=(plan.path for plan in parse_plans if plan.replace_existing),
         diagnostic_facts=diagnostic_facts,
     )
+    _emit_refresh_progress(
+        progress_callback,
+        phase="upserting",
+        status="completed",
+        completed=len(events),
+        total=len(events),
+        message="Wrote aggregate usage rows",
+        inserted_or_updated_events=inserted,
+    )
+    _emit_refresh_progress(
+        progress_callback,
+        phase="metadata",
+        status="running",
+        completed=0,
+        total=len(parsed_files),
+        message="Updating source metadata",
+    )
     record_source_file_metadata(db_path=db_path, parsed_files=parsed_files)
+    _emit_refresh_progress(
+        progress_callback,
+        phase="metadata",
+        status="completed",
+        completed=len(parsed_files),
+        total=len(parsed_files),
+        message="Updated source metadata",
+    )
     if not aggregate_only:
         with connect(db_path) as conn:
             init_db(conn)
@@ -120,9 +182,27 @@ def refresh_usage_index(
                     )
                     for plan in parse_plans
                 ),
+                progress_callback=progress_callback,
             )
+    else:
+        _emit_refresh_progress(
+            progress_callback,
+            phase="indexing_content",
+            status="skipped",
+            completed=0,
+            total=0,
+            message="Skipped content index for aggregate-only refresh",
+        )
     skipped_events = stats.get("skipped_events", 0)
     diagnostics = compact_parser_diagnostics(stats)
+    _emit_refresh_progress(
+        progress_callback,
+        phase="finalizing",
+        status="running",
+        completed=0,
+        total=1,
+        message="Recording refresh metadata",
+    )
     record_refresh_metadata(
         db_path=db_path,
         scanned_files=len(logs),
@@ -133,7 +213,7 @@ def refresh_usage_index(
         parsed_source_files=len(parse_plans),
         skipped_source_files=len(logs) - len(parse_plans),
     )
-    return RefreshResult(
+    result = RefreshResult(
         scanned_files=len(logs),
         parsed_events=len(events),
         inserted_or_updated_events=inserted,
@@ -141,38 +221,137 @@ def refresh_usage_index(
         skipped_events=skipped_events,
         parser_diagnostics=diagnostics,
     )
+    _emit_refresh_progress(
+        progress_callback,
+        phase="finalizing",
+        status="completed",
+        completed=1,
+        total=1,
+        message="Refresh complete",
+        result={
+            "scanned_files": result.scanned_files,
+            "parsed_events": result.parsed_events,
+            "skipped_events": result.skipped_events,
+            "inserted_or_updated_events": result.inserted_or_updated_events,
+            "db_path": result.db_path,
+            "parser_diagnostics": result.parser_diagnostics,
+        },
+    )
+    return result
 
+
+
+def _emit_refresh_progress(
+    progress_callback: RefreshProgressCallback | None,
+    *,
+    phase: str,
+    status: str,
+    completed: int | None,
+    total: int | None,
+    message: str,
+    **extra: object,
+) -> None:
+    if progress_callback is None:
+        return
+    payload: dict[str, object] = {
+        "schema": "codex-usage-tracker-refresh-progress-v1",
+        "phase": phase,
+        "status": status,
+        "message": message,
+    }
+    if completed is not None:
+        payload["completed"] = completed
+    if total is not None:
+        payload["total"] = total
+        payload["percent"] = _refresh_progress_percent(completed or 0, total)
+    payload.update(extra)
+    progress_callback(payload)
+
+
+def _refresh_progress_percent(completed: int, total: int) -> float:
+    if total <= 0:
+        return 100.0
+    return round(min(100.0, max(0.0, (completed / total) * 100.0)), 1)
 
 def _parse_refresh_plans(
     parse_plans: list[SourceParsePlan],
     session_index: dict[str, Any],
+    *,
+    progress_callback: RefreshProgressCallback | None = None,
 ) -> list[_ParsedRefreshFile]:
     worker_count = _parallel_parse_worker_count(len(parse_plans))
     if worker_count <= 1 or not _default_parser_is_active():
-        return [
-            _parse_source_plan_with_facade(plan, session_index=session_index)
-            for plan in parse_plans
-        ]
+        return _parse_refresh_plans_serial(
+            parse_plans,
+            session_index=session_index,
+            progress_callback=progress_callback,
+        )
     try:
         return _parse_refresh_plans_parallel(
             parse_plans,
             session_index=session_index,
             worker_count=worker_count,
+            progress_callback=progress_callback,
         )
     except BrokenProcessPool:
-        return [
-            _parse_source_plan_with_facade(plan, session_index=session_index)
-            for plan in parse_plans
-        ]
+        return _parse_refresh_plans_serial(
+            parse_plans,
+            session_index=session_index,
+            progress_callback=progress_callback,
+        )
 
+
+
+def _parse_refresh_plans_serial(
+    parse_plans: list[SourceParsePlan],
+    *,
+    session_index: dict[str, Any],
+    progress_callback: RefreshProgressCallback | None,
+) -> list[_ParsedRefreshFile]:
+    results: list[_ParsedRefreshFile] = []
+    total = len(parse_plans)
+    _emit_refresh_progress(
+        progress_callback,
+        phase="parsing",
+        status="running",
+        completed=0,
+        total=total,
+        message="Parsing source logs",
+    )
+    for index, plan in enumerate(parse_plans, start=1):
+        parsed = _parse_source_plan_with_facade(plan, session_index=session_index)
+        results.append(parsed)
+        _emit_refresh_progress(
+            progress_callback,
+            phase="parsing",
+            status="running" if index < total else "completed",
+            completed=index,
+            total=total,
+            message="Parsed source logs",
+            parsed_events=sum(len(result.events) for result in results),
+        )
+    return results
 
 def _parse_refresh_plans_parallel(
     parse_plans: list[SourceParsePlan],
     *,
     session_index: dict[str, Any],
     worker_count: int,
+    progress_callback: RefreshProgressCallback | None,
 ) -> list[_ParsedRefreshFile]:
     results: list[_ParsedRefreshFile | None] = [None] * len(parse_plans)
+    total = len(parse_plans)
+    completed = 0
+    parsed_events = 0
+    _emit_refresh_progress(
+        progress_callback,
+        phase="parsing",
+        status="running",
+        completed=0,
+        total=total,
+        message=f"Parsing source logs with {worker_count} workers",
+        workers=worker_count,
+    )
     with ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = {
             executor.submit(
@@ -183,7 +362,20 @@ def _parse_refresh_plans_parallel(
             for index, plan in enumerate(parse_plans)
         }
         for future in as_completed(futures):
-            results[futures[future]] = future.result()
+            result = future.result()
+            results[futures[future]] = result
+            completed += 1
+            parsed_events += len(result.events)
+            _emit_refresh_progress(
+                progress_callback,
+                phase="parsing",
+                status="running" if completed < total else "completed",
+                completed=completed,
+                total=total,
+                message="Parsed source logs",
+                workers=worker_count,
+                parsed_events=parsed_events,
+            )
     return [result for result in results if result is not None]
 
 

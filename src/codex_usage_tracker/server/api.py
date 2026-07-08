@@ -28,6 +28,7 @@ from codex_usage_tracker.server.context_settings import (
     ContextApiState,
 )
 from codex_usage_tracker.server.handler import _UsageDashboardHandler
+from codex_usage_tracker.server.usage_refresh import RefreshJobRegistry
 
 _first = server_utils.first_query_value
 _matches_live_derived_filters = server_utils.matches_live_derived_filters
@@ -91,6 +92,7 @@ def serve_dashboard(
         language=selected_language,
         include_rows=False,
     )
+    refresh_jobs = RefreshJobRegistry()
     handler = partial(
         _UsageDashboardHandler,
         directory=str(output.parent),
@@ -112,6 +114,7 @@ def serve_dashboard(
         context_api_state=context_api_state,
         language=selected_language,
         refresh_lock=threading.Lock(),
+        refresh_jobs=refresh_jobs,
     )
     server = ThreadingHTTPServer((host, port), handler)
     legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"

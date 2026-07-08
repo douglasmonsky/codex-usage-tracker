@@ -121,6 +121,7 @@ def refresh_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    progress_callback: object | None = None,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
@@ -133,6 +134,7 @@ def refresh_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        progress_callback=progress_callback,
     )
 
 

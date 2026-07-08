@@ -34,6 +34,8 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType({
     "/api/diagnostics/guided-summary": "_handle_diagnostics_guided_summary",
     "/api/diagnostics/usage-drain": "_handle_diagnostics_usage_drain",
     "/api/usage": "_handle_usage",
+    "/api/refresh/start": "_handle_refresh_start",
+    "/api/refresh/status": "_handle_refresh_status",
 })
 
 GET_DIAGNOSTIC_FACT_ROUTES: Mapping[str, Mapping[str, str]] = MappingProxyType({

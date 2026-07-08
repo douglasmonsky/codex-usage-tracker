@@ -54,6 +54,8 @@ STABLE_CLI_COMMANDS = {
 
 MCP_TOOL_NAMES = {
     "refresh_usage_index",
+    "usage_refresh_start",
+    "usage_refresh_status",
     "usage_doctor",
     "usage_summary",
     "usage_query",
