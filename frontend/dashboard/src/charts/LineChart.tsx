@@ -1,7 +1,7 @@
 import { max } from 'd3-array';
 import { scaleLinear, scalePoint } from 'd3-scale';
 import { line } from 'd3-shape';
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import type { Series } from '../api/types';
 
@@ -16,9 +16,10 @@ const dateLabelWidth = 38;
 
 export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, height = 280 }: LineChartProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const labels = series[0]?.points.map(point => point.label) ?? [];
   const minWidth = labels.length <= 1 ? 360 : labels.length <= 4 ? 520 : 760;
-  const width = Math.max(minWidth, labels.length * dateLabelWidth);
+  const width = Math.max(minWidth, labels.length * dateLabelWidth, viewportWidth);
   const margin = { top: 24, right: 56, bottom: 54, left: 72 };
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
@@ -38,7 +39,24 @@ export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, h
     .x(point => x(point.label) ?? margin.left)
     .y(point => y(point.value));
   const ticks = y.ticks(4);
-  const hasScrollableHistory = labels.length > 1;
+  const hasScrollableHistory = labels.length > 1 && (viewportWidth <= 0 || width > viewportWidth + 1);
+
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) {
+      return;
+    }
+    const measure = () => {
+      const nextWidth = Math.round(scroller.clientWidth);
+      if (nextWidth > 0) {
+        setViewportWidth(currentWidth => (currentWidth === nextWidth ? currentWidth : nextWidth));
+      }
+    };
+    measure();
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    resizeObserver?.observe(scroller);
+    return () => resizeObserver?.disconnect();
+  }, []);
 
   useLayoutEffect(() => {
     const scroller = scrollRef.current;
