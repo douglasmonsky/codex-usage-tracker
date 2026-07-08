@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from typing import Any
 
@@ -21,6 +22,10 @@ SHELL_CHURN_ROOTS = {
     "python",
     "python3",
     "node",
+    "ruff",
+    "mypy",
+    "eslint",
+    "tsc",
 }
 
 
@@ -152,7 +157,14 @@ def _shell_churn_candidate(
     top_labels: list[dict[str, Any]],
     trace_handles: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    command_root = str(row["command_root"] or "unknown")
+    raw_command_root = str(row["command_root"] or "unknown")
+    sample_command_label = str(row["sample_command_label"] or "")
+    distinct_label_count = int(row["distinct_label_count"] or 0)
+    command_root = _display_command_root(
+        raw_command_root,
+        sample_command_label,
+        distinct_label_count=distinct_label_count,
+    )
     occurrences = int(row["occurrences"] or 0)
     failure_count = int(row["failure_count"] or 0)
     adjacent_root_count = int(row["adjacent_root_repeat_count"] or 0)
@@ -161,7 +173,7 @@ def _shell_churn_candidate(
     output_size_bytes = int(row["output_size_bytes"] or 0)
     return {
         "command_root": command_root,
-        "command_label": row["sample_command_label"],
+        "command_label": _display_command_label(command_root, sample_command_label),
         "command_family": _command_family(command_root),
         "churn_kind": _churn_kind(failure_count, adjacent_root_count),
         "occurrences": occurrences,
@@ -172,7 +184,7 @@ def _shell_churn_candidate(
         "output_size_bytes": output_size_bytes,
         "success_count": int(row["success_count"] or 0),
         "failure_count": failure_count,
-        "distinct_label_count": int(row["distinct_label_count"] or 0),
+        "distinct_label_count": distinct_label_count,
         "adjacent_root_repeat_count": adjacent_root_count,
         "adjacent_label_repeat_count": adjacent_label_count,
         "retry_group_count": int(row["retry_group_count"] or 0),
@@ -321,6 +333,53 @@ def _usage_filters(
     return "WHERE " + " AND ".join(clauses), params
 
 
+def _display_command_root(
+    raw_command_root: str,
+    sample_command_label: str,
+    *,
+    distinct_label_count: int = 1,
+) -> str:
+    command_root = _safe_shell_label(raw_command_root)
+    if command_root not in {"unknown", "unknown_command"}:
+        return command_root
+    if distinct_label_count > 1:
+        return "unclassified_shell_script"
+    label_root = _first_safe_label_part(sample_command_label)
+    if label_root is not None and label_root not in {"unknown", "unknown_command"}:
+        return label_root
+    return "unclassified_shell_script"
+
+
+def _display_command_label(command_root: str, sample_command_label: str) -> str:
+    if command_root == "unclassified_shell_script":
+        return command_root
+    safe_parts = [
+        label_part
+        for label_part in (_safe_shell_label(part.lstrip("$")) for part in sample_command_label.split()[:2])
+        if label_part not in {"unknown", "unknown_command"}
+    ]
+    if not safe_parts:
+        return command_root
+    if safe_parts[0] != command_root:
+        return command_root
+    return " ".join(safe_parts)
+
+
+def _first_safe_label_part(value: str) -> str | None:
+    for part in value.split():
+        label = _safe_shell_label(part.lstrip("$"))
+        if label not in {"unknown", "unknown_command"}:
+            return label
+    return None
+
+
+def _safe_shell_label(value: str) -> str:
+    lowered = value.strip().lower()
+    if re.fullmatch(r"[a-z0-9_.:-]{1,80}", lowered):
+        return lowered
+    return "unknown_command"
+
+
 def _candidate_sort_key(row: dict[str, Any]) -> tuple[int, int, int, int]:
     return (
         int(row["failure_count"]),
@@ -337,13 +396,19 @@ def _command_family(command_root: str) -> str:
         return "vcs"
     if command_root in {"pytest"}:
         return "test"
+    if command_root in {"ruff", "mypy", "eslint", "tsc"}:
+        return "quality"
     if command_root in {"npm", "pnpm", "yarn", "pip"}:
         return "package"
     if command_root in {"python", "python3", "node"}:
         return "runtime"
     if command_root in SHELL_CHURN_ROOTS:
         return "known_shell"
-    return "unknown"
+    if command_root == "unclassified_shell_script":
+        return "unclassified_shell"
+    if command_root in {"unknown", "unknown_command"}:
+        return "unknown"
+    return "custom_command"
 
 
 def _churn_kind(failure_count: int, adjacent_root_repeat_count: int) -> str:
