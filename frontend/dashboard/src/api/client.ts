@@ -1,7 +1,7 @@
 import { fixtureModel } from '../test-fixtures/dashboardFixture';
 import { buildFindings, buildModelCosts, buildReports } from './modelInsights';
 import { buildOverviewSeriesFromDailyValues } from './overviewSeries';
-import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, ThreadRow, UsageRow } from './types';
+import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, Series, ThreadRow, UsageRow, WeeklyWindow } from './types';
 
 declare global {
   interface Window {
@@ -248,8 +248,9 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
     : summaryNumber(payload, 'reasoning_output_tokens');
   const cachePct = inputTokens > 0 ? (cachedTokens / inputTokens) * 100 : 0;
   const totalCalls = calls.length || Math.max(0, Number(payload.loaded_row_count ?? 0));
-  const overviewSeries = buildOverviewSeries(rows);
-  const cards = buildCards({
+const overviewSeries = buildOverviewSeries(rows);
+const usageDrainSeries = buildUsageDrainSeries(rows);
+const cards = buildCards({
     cachePct,
     cachedTokens,
     estimatedCost,
@@ -270,6 +271,7 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
 contextRuntime: contextRuntimeFromBootPayload(payload),
 cards,
 ...overviewSeries,
+...usageDrainSeries,
 calls,
 threads: buildThreads(calls),
 findings: buildFindings(calls),
@@ -306,20 +308,134 @@ return {
 }
 
 function buildOverviewSeries(rows: UsageRow[]): Pick<DashboardModel, 'tokenSeries' | 'costSeries' | 'cacheSeries'> {
-return buildOverviewSeriesFromDailyValues(
-rows.map(row => ({
-timestamp: rowTimestamp(row),
-cached: Number(row.cached_input_tokens ?? 0),
+  return buildOverviewSeriesFromDailyValues(
+    rows.map(row => ({
+      timestamp: rowTimestamp(row),
+      cached: Number(row.cached_input_tokens ?? 0),
 cost: Number(row.estimated_cost_usd ?? 0),
 input: Number(row.input_tokens ?? 0),
 output: Number(row.output_tokens ?? 0),
 })),
-);
+  );
+}
+
+function buildUsageDrainSeries(
+  rows: UsageRow[],
+): Pick<DashboardModel, 'weeklyCreditSeries' | 'usageRemainingSeries' | 'actualVsPredictedSeries' | 'weeklyWindows'> {
+  const dailyRows = [...rows]
+    .map(row => ({ row, timestamp: rowTimestamp(row) }))
+    .filter(entry => Number.isFinite(entry.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+  const daily = new Map<string, { timestamp: number; credits: number; weeklyUsedPercent: number | null }>();
+  for (const { row, timestamp } of dailyRows) {
+    const label = formatChartDate(timestamp);
+    const current = daily.get(label) ?? { timestamp, credits: 0, weeklyUsedPercent: null };
+    current.credits += Math.max(0, Number(row.usage_credits ?? 0));
+    const usedPercent = percentNumber(row.rate_limit_secondary_used_percent);
+    if (usedPercent !== null) current.weeklyUsedPercent = usedPercent;
+    daily.set(label, current);
+  }
+  const dailyPoints = [...daily.entries()].map(([label, value]) => ({ label, ...value }));
+  let cumulativeCredits = 0;
+  const observedPoints = dailyPoints.map(point => {
+    cumulativeCredits += point.credits;
+    return { label: point.label, value: cumulativeCredits };
+  });
+  const predictedPoints = observedPoints.map((point, index) => ({
+    label: point.label,
+    value: observedPoints.length > 1 ? (observedPoints.at(-1)?.value ?? 0) * ((index + 1) / observedPoints.length) : point.value,
+  }));
+  const remainingPoints = dailyPoints
+    .filter(point => point.weeklyUsedPercent !== null)
+    .map(point => ({ label: point.label, value: clampPercent(100 - (point.weeklyUsedPercent ?? 0)) }));
+  const weeklyWindows = buildWeeklyWindows(rows);
+  return {
+    weeklyCreditSeries: buildWeeklyCreditSeries(weeklyWindows),
+    usageRemainingSeries: remainingPoints.length
+      ? [{ id: 'weekly-remaining', label: 'Weekly remaining', color: '#059669', points: remainingPoints }]
+      : [],
+    actualVsPredictedSeries: observedPoints.length
+      ? [
+          { id: 'observed-drain', label: 'Observed drain', color: '#2563eb', points: observedPoints },
+          { id: 'loaded-baseline', label: 'Loaded-row baseline', color: '#1d4ed8', dashed: true, points: predictedPoints },
+        ]
+      : [],
+    weeklyWindows,
+  };
+}
+
+function buildWeeklyWindows(rows: UsageRow[]): WeeklyWindow[] {
+  const weeklyBuckets = new Map<string, { rows: UsageRow[]; latestTimestamp: number; latestUsedPercent: number | null }>();
+  for (const row of rows) {
+    const timestamp = rowTimestamp(row);
+    if (!Number.isFinite(timestamp)) continue;
+    const key = weeklyWindowKey(row, timestamp);
+    const bucket = weeklyBuckets.get(key) ?? { rows: [], latestTimestamp: 0, latestUsedPercent: null };
+    bucket.rows.push(row);
+    if (timestamp >= bucket.latestTimestamp) {
+      bucket.latestTimestamp = timestamp;
+      bucket.latestUsedPercent = percentNumber(row.rate_limit_secondary_used_percent);
+    }
+    weeklyBuckets.set(key, bucket);
+  }
+  return [...weeklyBuckets.entries()]
+    .map(([week, bucket]) => {
+      const credits = bucket.rows.reduce((sum, row) => sum + Math.max(0, Number(row.usage_credits ?? 0)), 0);
+      const observedPct = bucket.latestUsedPercent ?? 0;
+      return {
+        week,
+        plan: String(bucket.rows[0]?.rate_limit_plan_type ?? 'unknown'),
+        observedPct,
+        credits,
+        projected: observedPct > 0 ? credits / (observedPct / 100) : credits,
+        ciLow: observedPct > 0 ? credits / (observedPct / 100) * 0.85 : credits,
+        ciHigh: observedPct > 0 ? credits / (observedPct / 100) * 1.15 : credits,
+        confidence: bucket.rows.length >= 20 ? 'Medium' : 'Low',
+        note: `Loaded ${formatNumber(bucket.rows.length)} rows`,
+      } satisfies WeeklyWindow;
+    })
+    .sort((left, right) => left.week.localeCompare(right.week));
+}
+
+function buildWeeklyCreditSeries(weeklyWindows: WeeklyWindow[]): Series[] {
+  if (!weeklyWindows.length) return [];
+  return [
+    {
+      id: 'weekly-projected',
+      label: 'Projected weekly credits',
+      color: '#2563eb',
+      points: weeklyWindows.map(window => ({
+        label: window.week,
+        value: window.projected,
+        low: window.ciLow,
+        high: window.ciHigh,
+      })),
+    },
+    {
+      id: 'loaded-credits',
+      label: 'Loaded-row credits',
+      color: '#0f766e',
+      dashed: true,
+      points: weeklyWindows.map(window => ({ label: window.week, value: window.credits })),
+    },
+  ];
+}
+
+function weeklyWindowKey(row: UsageRow, timestamp: number): string {
+  const resetSeconds = numericValue(row.rate_limit_secondary_resets_at);
+  if (resetSeconds !== null && resetSeconds > 0) {
+    return formatChartDate(resetSeconds * 1000);
+  }
+  return formatChartDate(timestamp);
+}
+
+function formatChartDate(timestamp: number): string {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(timestamp));
 }
 
 function summaryNumber(payload: DashboardBootPayload, key: string): number {
- const value = Number(payload.summary?.[key] ?? 0);
- return Number.isFinite(value) ? value : 0;
+  const value = Number(payload.summary?.[key] ?? 0);
+  return Number.isFinite(value) ? value : 0;
 }
 
 function contextRuntimeFromBootPayload(payload: DashboardBootPayload | null): ContextRuntime {

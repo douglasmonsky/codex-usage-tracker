@@ -1,8 +1,33 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LineChart } from './LineChart';
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('LineChart', () => {
+  it('fills the available viewport for sparse chart data', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(920);
+
+    render(
+      <LineChart
+        yLabel="Credits"
+        series={[
+          {
+            id: 'weekly',
+            label: 'Projected',
+            color: '#2563eb',
+            points: [],
+          },
+        ]}
+      />,
+    );
+
+    const chart = screen.getByRole('img', { name: 'Credits line chart' });
+    expect(chart.querySelector('svg.chart')).toHaveAttribute('width', '920');
+  });
+
   it('shows recent-history scroll affordance while keeping dense date labels available', () => {
     const points = Array.from({ length: 14 }, (_, index) => ({
       label: `Jul ${index + 1}`,
