@@ -48,6 +48,7 @@ from codex_usage_tracker.core.projects import apply_project_privacy_to_rows
 from codex_usage_tracker.diagnostics.api import run_doctor
 from codex_usage_tracker.parser.api import inspect_log, load_session_index
 from codex_usage_tracker.pricing.api import update_pricing_from_openai_docs, write_pricing_template
+from codex_usage_tracker.reports.agentic_dogfood import build_agentic_dogfood_report
 from codex_usage_tracker.reports.api import (
     build_expensive_calls_report,
     build_pricing_coverage_report,
@@ -311,6 +312,40 @@ def _run_rebuild_index(args: argparse.Namespace) -> int:
             f"{key}={value}" for key, value in result.parser_diagnostics.items()
         )
         print(f"Parser diagnostics: {diagnostics}")
+    return 0
+
+
+def _run_dogfood_agentic(args: argparse.Namespace) -> int:
+    report = build_agentic_dogfood_report(
+        codex_home=args.codex_home,
+        db_path=args.db,
+        pricing_path=args.pricing,
+        allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        projects_path=args.projects,
+        output_dir=args.output_dir,
+        since=args.since,
+        until=args.until,
+        thread=args.thread,
+        include_archived=args.include_archived,
+        evidence_limit=args.evidence_limit,
+        privacy_mode=args.privacy_mode,
+        refresh=args.refresh,
+        write_markdown=args.markdown,
+    )
+    if args.as_json:
+        print_json(report)
+        return 0
+    artifacts = report["artifacts"]
+    print(f"Wrote agentic dogfood summary {artifacts['summary_json_path']}")
+    if artifacts.get("summary_markdown_path"):
+        print(f"Wrote agentic dogfood brief {artifacts['summary_markdown_path']}")
+    print(
+        "Family checks: "
+        f"old={report['family_checks']['old_passed']} "
+        f"new={report['family_checks']['new_passed']}"
+    )
+    print(f"Privacy checks: {report['privacy_checks']['passed']}")
     return 0
 
 
@@ -600,6 +635,7 @@ _COMMAND_HANDLERS = {
     "refresh": _run_refresh,
     "inspect-log": _run_inspect_log,
     "rebuild-index": _run_rebuild_index,
+    "dogfood-agentic": _run_dogfood_agentic,
     "reset-db": _run_reset_db,
     "summary": _run_summary,
     "query": _run_query,

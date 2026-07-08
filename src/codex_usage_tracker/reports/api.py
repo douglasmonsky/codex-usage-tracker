@@ -1180,6 +1180,8 @@ def _classify_hypothesis_text(text: str) -> str | None:
         ),
     ):
         return "allowance_change"
+    if _has_any_phrase(text, ("cache", "cold resume", "cold resumes", "cold", "resume")):
+        return "cache_failure"
     if _has_any_phrase(
         text,
         (
@@ -1200,8 +1202,6 @@ def _classify_hypothesis_text(text: str) -> str | None:
         ),
     ):
         return "token_waste"
-    if _has_any_phrase(text, ("cache", "cold resume", "cold resumes", "cold", "resume")):
-        return "cache_failure"
     if _has_any_phrase(
         text,
         (
