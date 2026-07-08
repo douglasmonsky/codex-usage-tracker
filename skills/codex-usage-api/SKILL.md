@@ -27,7 +27,7 @@ Use this loop for "look through my usage", "make recommendations", "test hypothe
 4. Recommend concrete fixes, not just summaries: shorter handoff, split thread, preserved cache context, lower effort on routine tasks, targeted script, repo note, skill update, or an existing tool such as Headroom when available and relevant.
 5. End with the verification tool/query the user should run after changing behavior.
 
-For maintainer dogfood or plugin-quality checks, prefer the MCP polling flow when available: call `usage_dogfood_start(privacy_mode="strict")`, poll `usage_dogfood_status(job_id)` until completed or failed, then call `usage_dogfood_result(job_id)`. Use the blocking CLI fallback only when MCP polling tools are unavailable: `codex-usage-tracker dogfood-agentic --privacy-mode strict --json`. Treat the output as a compact aggregate QA artifact that must not include raw prompts, raw tool output, full paths, or indexed fragments.
+For maintainer dogfood or plugin-quality checks, prefer the MCP polling flow when available: call `usage_dogfood_start(privacy_mode="strict")`, poll `usage_dogfood_status(job_id)` until completed or failed, then call `usage_dogfood_result(job_id)`. After one fresh run, use `usage_dogfood_start(refresh=False, use_cache=True, privacy_mode="strict")` for repeated checks on unchanged data and confirm `result_cache.hit`. Use the blocking CLI fallback only when MCP polling tools are unavailable: `codex-usage-tracker dogfood-agentic --privacy-mode strict --json`. Treat the output as a compact aggregate QA artifact that must not include raw prompts, raw tool output, full paths, or indexed fragments.
 
 ## Router
 
