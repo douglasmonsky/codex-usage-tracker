@@ -1161,19 +1161,80 @@ def _classify_hypothesis_family(hypothesis: str, question: str) -> str:
 
 
 def _classify_hypothesis_text(text: str) -> str | None:
-    if any(term in text for term in ("allowance", "limit", "throttle", "weekly", "5-hour", "5 hour")):
+    if _has_any_phrase(
+        text,
+        (
+            "allowance",
+            "usage allowance",
+            "allowance change",
+            "limit change",
+            "limit changed",
+            "codex limit",
+            "usage limit",
+            "weekly allowance",
+            "weekly limit",
+            "5-hour",
+            "5 hour",
+            "throttle",
+            "throttled",
+        ),
+    ):
         return "allowance_change"
-    if any(term in text for term in ("token waste", "expensive", "cost")):
+    if _has_any_phrase(
+        text,
+        (
+            "token waste",
+            "wasting tokens",
+            "waste",
+            "expensive",
+            "cost",
+            "large low-output",
+            "large low output",
+            "low-output",
+            "low output",
+            "output length",
+            "context pressure",
+            "large call",
+            "large calls",
+            "cleanup target",
+        ),
+    ):
         return "token_waste"
-    if any(term in text for term in ("cache", "cold", "resume", "context")):
+    if _has_any_phrase(text, ("cache", "cold resume", "cold resumes", "cold", "resume")):
         return "cache_failure"
-    if any(term in text for term in ("file", "rediscover", "reread", "path")):
+    if _has_any_phrase(
+        text,
+        (
+            "file",
+            "rediscover",
+            "rediscovery",
+            "reread",
+            "rereads",
+            "re-read",
+            "re-reads",
+            "repeated read",
+            "repeated reads",
+            "path",
+            "content-index",
+            "content index",
+            "thread-trace",
+            "thread trace",
+        ),
+    ):
         return "repeated_file_rediscovery"
     if _has_shell_hypothesis_signal(text):
         return "shell_churn"
-    if any(term in text for term in ("effort", "model", "xhigh", "high", "medium", "gpt")):
+    if _has_any_word(text, ("effort", "model", "xhigh", "high", "medium", "gpt")):
         return "effort_model_choice"
     return None
+
+
+def _has_any_phrase(text: str, phrases: tuple[str, ...]) -> bool:
+    return any(phrase in text for phrase in phrases)
+
+
+def _has_any_word(text: str, words: tuple[str, ...]) -> bool:
+    return any(re.search(rf"(?<![a-z0-9_-]){re.escape(word)}(?![a-z0-9_-])", text) for word in words)
 
 
 def _has_shell_hypothesis_signal(text: str) -> bool:

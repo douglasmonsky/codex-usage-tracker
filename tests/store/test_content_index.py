@@ -15,6 +15,12 @@ from codex_usage_tracker.reports.api import (
     build_thread_trace_report,
 )
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
+from codex_usage_tracker.store.content_index_events import _command_root_and_label
+from codex_usage_tracker.store.shell_churn import (
+    _command_family,
+    _display_command_label,
+    _display_command_root,
+)
 from tests.store_dashboard_helpers import _entry, _make_codex_home, _token_event, _write_jsonl
 
 
@@ -372,10 +378,13 @@ def test_shell_churn_detects_repeated_command_families(tmp_path: Path) -> None:
         ("sed -n '41,60p' src/app.py", 0),
         ("rg TODO src", 1),
         ("rg TODO tests", 1),
+        ("bash -lc 'rg TODO wrapped'", 1),
         ("git status --short", 0),
         ("git diff --stat", 0),
         ("nl -ba src/app.py", 0),
         ("nl -ba tests/test_app.py", 0),
+        ("$PWCLI status", 0),
+        ("$PWCLI status --json", 0),
         ("echo one-off", 0),
     ]
     rows: list[dict[str, object]] = [_entry("session_meta", {"id": session_id})]
@@ -426,18 +435,48 @@ def test_shell_churn_detects_repeated_command_families(tmp_path: Path) -> None:
     assert payload["content_mode"] == "local_content_index"
     assert payload["includes_raw_fragments"] is False
     roots = {row["command_root"]: row for row in payload["rows"]}
-    assert {"sed", "rg", "git", "nl"} <= set(roots)
+    assert {"sed", "rg", "git", "nl", "pwcli"} <= set(roots)
     assert "echo" not in roots
+    assert "unknown_command" not in roots
     assert roots["sed"]["churn_kind"] == "successful_loop_churn"
     assert roots["sed"]["success_count"] == 3
     assert roots["sed"]["adjacent_root_repeat_count"] >= 2
     assert roots["rg"]["churn_kind"] == "failure_retry_churn"
-    assert roots["rg"]["failure_count"] == 2
+    assert roots["rg"]["failure_count"] == 3
     assert roots["rg"]["top_labels"][0]["exit_code"] == 1
+    assert roots["pwcli"]["command_family"] == "custom_command"
+    assert roots["pwcli"]["command_label"] == "pwcli status"
     assert roots["sed"]["trace_handles"][0]["next_tool"] == "usage_thread_trace"
     serialized = json.dumps(payload)
     assert "src/app.py" not in serialized
     assert "safe synthetic output" not in serialized
+    assert "$PWCLI" not in serialized
+
+
+def test_command_root_and_label_uses_shared_safe_normalizer() -> None:
+    assert _command_root_and_label("$PWCLI status --json") == ("pwcli", "pwcli status")
+    assert _command_root_and_label("bash -lc 'rg SECRET_TERM src'") == ("rg", "rg")
+    assert _command_root_and_label("poetry run python -m pytest tests/test_private.py") == (
+        "pytest",
+        "pytest",
+    )
+    assert _command_root_and_label("git -C /private/repo status --short") == ("git", "git status")
+
+
+def test_shell_churn_display_labels_repair_legacy_unknown_command_rows() -> None:
+    recovered_root = _display_command_root("unknown_command", "$PWCLI", distinct_label_count=1)
+
+    assert recovered_root == "pwcli"
+    assert _display_command_label(recovered_root, "$PWCLI") == "pwcli"
+    assert _command_family(recovered_root) == "custom_command"
+
+    fallback_root = _display_command_root("unknown_command", "$PWCLI", distinct_label_count=2)
+    assert fallback_root == "unclassified_shell_script"
+
+    fallback_root = _display_command_root("unknown_command", "unknown_command", distinct_label_count=1)
+    assert fallback_root == "unclassified_shell_script"
+    assert _display_command_label(fallback_root, "unknown_command") == "unclassified_shell_script"
+    assert _command_family(fallback_root) == "unclassified_shell"
 
 
 def test_thread_trace_returns_calls_with_indexed_fragments(tmp_path: Path) -> None:

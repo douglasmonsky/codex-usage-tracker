@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.diagnostics.snapshot_events import command_root_and_child
+
 _SHELL_TOOL_NAMES = {
     "bash",
     "exec_command",
@@ -293,23 +295,23 @@ def _command_from_mapping(mapping: dict[str, Any]) -> str | None:
 
 
 def _command_root_and_label(command: str) -> tuple[str, str]:
-    tokens = _command_tokens(command)
-    if not tokens:
+    root, child = command_root_and_child(command)
+    safe_root = _safe_command_label(root)
+    if safe_root == "unknown_command":
         return "unknown_command", "unknown_command"
-    tokens = _strip_assignment_prefixes(tokens)
-    if not tokens:
-        return "unknown_command", "unknown_command"
-    root = Path(tokens[0]).name
-    if _is_python_root(root) and len(tokens) >= 3 and tokens[1] == "-m":
-        module_root = _safe_command_label(tokens[2])
-        return module_root, f"{root} -m {module_root}"
-    if root == "uv" and len(tokens) >= 3 and tokens[1] == "run":
-        run_root = _safe_command_label(tokens[2])
-        return run_root, f"uv run {run_root}"
-    label = root
-    if root in {"git", "gh"} and len(tokens) >= 2:
-        label = f"{root} {_safe_command_label(tokens[1])}"
-    return _safe_command_label(root), label
+    safe_child = _safe_command_child(safe_root, child)
+    if safe_child is None:
+        return safe_root, safe_root
+    return safe_root, f"{safe_root} {safe_child}"
+
+
+def _safe_command_child(root: str, child: str) -> str | None:
+    if root in _READ_COMMAND_ROOTS:
+        return None
+    if child in {"<none>", "<arg>", "<target>", "unknown"} or child.startswith("-"):
+        return None
+    safe_child = _safe_command_label(child)
+    return None if safe_child == "unknown_command" else safe_child
 
 
 def _command_tokens(command: str) -> list[str]:
