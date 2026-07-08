@@ -104,6 +104,62 @@ describe('dashboard API model builder', () => {
       }),
     );
   });
+
+  it('uses loaded calls and call-level token fields for overview cards', () => {
+    const payload: DashboardBootPayload = {
+      loaded_row_count: 2,
+      total_available_rows: 500,
+      summary: {
+        visible_calls: 500,
+        total_tokens: 999_999,
+      },
+      rows: [
+        {
+          record_id: 'loaded-card-a',
+          call_started_at: '2026-07-02T10:00:00Z',
+          thread_name: 'thread-a',
+          model: 'codex-1',
+          effort: 'high',
+          input_tokens: 1_000,
+          cached_input_tokens: 400,
+          output_tokens: 250,
+          reasoning_output_tokens: 75,
+          total_tokens: 1_325,
+        },
+        {
+          record_id: 'loaded-card-b',
+          call_started_at: '2026-07-02T11:00:00Z',
+          thread_name: 'thread-b',
+          model: 'codex-1',
+          effort: 'medium',
+          input_tokens: 500,
+          cached_input_tokens: 100,
+          output_tokens: 125,
+          reasoning_output_tokens: 25,
+          total_tokens: 650,
+        },
+      ],
+    };
+
+    const model = modelFromBootPayload(payload);
+    expect(model.cards.find(card => card.label === 'Total Calls')).toEqual(
+      expect.objectContaining({
+        value: '2',
+        detail: 'loaded calls in this dashboard',
+      }),
+    );
+    expect(model.cards.find(card => card.label === 'Total Tokens')).toEqual(
+      expect.objectContaining({
+        value: '1.98K',
+        breakdown: [
+          { label: 'Cached', value: '500' },
+          { label: 'Uncached', value: '1K' },
+          { label: 'Output', value: '375' },
+          { label: 'Reasoning', value: '100' },
+        ],
+      }),
+    );
+  });
 });
 
 describe('dashboard live usage client', () => {
@@ -159,6 +215,7 @@ describe('dashboard live usage client', () => {
   });
 
   it('loads uncapped usage rows in finite pages', async () => {
+    const progress = vi.fn();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('offset=10000')) {
@@ -192,7 +249,7 @@ describe('dashboard live usage client', () => {
         total_available_rows: 10001,
         rows: [],
       },
-      { refresh: false, limit: 0 },
+      { refresh: false, limit: 0, onProgress: progress },
     );
 
     expect(payload.rows).toHaveLength(10001);
@@ -201,6 +258,12 @@ describe('dashboard live usage client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0][0])).toContain('limit=10000');
     expect(String(fetchMock.mock.calls[1][0])).toContain('offset=10000');
+    expect(progress).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'loading_rows', completed: 10000, total: 10001, percent: 99 }),
+    );
+    expect(progress).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'loading_rows', completed: 10001, total: 10001, percent: 100 }),
+    );
   });
 });
 

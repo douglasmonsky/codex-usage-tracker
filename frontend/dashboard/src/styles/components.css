@@ -110,6 +110,33 @@ margin-bottom: 14px;
   line-height: 1.1;
 }
 
+.metric-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+  margin: 8px 0 0;
+}
+
+.metric-breakdown div {
+  min-width: 0;
+}
+
+.metric-breakdown dt {
+  color: var(--dashboard-muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.metric-breakdown dd {
+  margin: 2px 0 0;
+  color: var(--dashboard-text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
 .metric-copy small,
 .muted {
   color: var(--dashboard-muted);

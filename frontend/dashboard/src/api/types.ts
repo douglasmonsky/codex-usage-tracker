@@ -239,6 +239,7 @@ export type MetricCard = {
   detail: string;
   trend: string;
   tone: MetricTone;
+  breakdown?: Array<{ label: string; value: string }>;
 };
 
 export type ChartPoint = {

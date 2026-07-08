@@ -137,6 +137,9 @@ function deriveDashboardModelFromCalls(model: DashboardModel, calls: CallRow[], 
   const totalTokens = calls.reduce((sum, call) => sum + call.totalTokens, 0);
   const estimatedCost = calls.reduce((sum, call) => sum + call.cost, 0);
   const cachedTokens = calls.reduce((sum, call) => sum + call.cachedInput, 0);
+  const uncachedTokens = calls.reduce((sum, call) => sum + call.uncachedInput, 0);
+  const outputTokens = calls.reduce((sum, call) => sum + call.output, 0);
+  const reasoningOutputTokens = calls.reduce((sum, call) => sum + call.reasoningOutput, 0);
   const inputTokens = calls.reduce((sum, call) => sum + call.input, 0);
   const cachePct = inputTokens > 0 ? (cachedTokens / inputTokens) * 100 : 0;
   const usageRemainingCard = model.cards.find(card => card.label === 'Usage Remaining') ?? {
@@ -148,7 +151,21 @@ function deriveDashboardModelFromCalls(model: DashboardModel, calls: CallRow[], 
   };
   return {
     ...model,
-    cards: filteredCards({ cachePct, cachedTokens, estimatedCost, historyScope, totalCalls: calls.length, totalTokens, usageRemainingCard }),
+    cards: filteredCards({
+      cachePct,
+      cachedTokens,
+      estimatedCost,
+      historyScope,
+      totalCalls: calls.length,
+      totalTokens,
+      tokenBreakdown: {
+        cachedInput: cachedTokens,
+        uncachedInput: uncachedTokens,
+        output: outputTokens,
+        reasoningOutput: reasoningOutputTokens,
+      },
+      usageRemainingCard,
+    }),
     ...overviewSeriesFromCalls(calls),
     calls,
     threads: buildThreads(calls),
@@ -169,6 +186,7 @@ function filteredCards({
   historyScope,
   totalCalls,
   totalTokens,
+  tokenBreakdown,
   usageRemainingCard,
 }: {
   cachePct: number;
@@ -177,6 +195,12 @@ function filteredCards({
   historyScope: string;
   totalCalls: number;
   totalTokens: number;
+  tokenBreakdown: {
+    cachedInput: number;
+    uncachedInput: number;
+    output: number;
+    reasoningOutput: number;
+  };
   usageRemainingCard: MetricCard;
 }): MetricCard[] {
   return [
@@ -186,6 +210,12 @@ function filteredCards({
       detail: `${historyScope} history scope`,
       trend: 'filtered aggregate rows',
       tone: 'blue',
+      breakdown: [
+        { label: 'Cached', value: compact(tokenBreakdown.cachedInput) },
+        { label: 'Uncached', value: compact(tokenBreakdown.uncachedInput) },
+        { label: 'Output', value: compact(tokenBreakdown.output) },
+        { label: 'Reasoning', value: compact(tokenBreakdown.reasoningOutput) },
+      ],
     },
     {
       label: 'Estimated Cost',
@@ -204,7 +234,7 @@ function filteredCards({
     {
       label: 'Total Calls',
       value: wholeNumber(totalCalls),
-      detail: 'filtered aggregate rows',
+      detail: 'loaded calls matching filters',
       trend: 'legacy shell filters',
       tone: 'blue',
     },

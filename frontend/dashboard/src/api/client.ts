@@ -126,13 +126,14 @@ async function loadAllUsagePayloadPaged(
     latestPayload = payload;
     rows.push(...pageRows);
     totalRows = Number(payload.total_available_rows ?? totalRows ?? rows.length);
+    const pageComplete = rows.length >= totalRows || !payload.has_more;
     options.onProgress?.({
-      status: rows.length >= totalRows || !payload.has_more ? 'completed' : 'running',
+      status: pageComplete ? 'completed' : 'running',
       phase: 'loading_rows',
       message: 'Loading all rows',
       completed: rows.length,
       total: totalRows,
-      percent: totalRows > 0 ? Math.min(100, Math.round((rows.length / totalRows) * 100)) : 100,
+      percent: pageComplete ? 100 : totalRows > 0 ? Math.min(99, Math.floor((rows.length / totalRows) * 100)) : 0,
     } as RefreshProgressPayload);
     offset += pageRows.length;
     if (!payload.has_more || pageRows.length === 0 || rows.length >= totalRows) {
@@ -230,20 +231,37 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
 
  const rows = payload.rows ?? [];
  const calls = rows.map(usageRowToCall);
- const totalTokens = rows.length ? sumRows(rows, row => Number(row.total_tokens ?? 0)) : summaryNumber(payload, 'total_tokens');
- const estimatedCost = rows.length ? sumRows(rows, row => Number(row.estimated_cost_usd ?? 0)) : summaryNumber(payload, 'estimated_cost_usd');
- const cachedTokens = rows.length ? sumRows(rows, row => Number(row.cached_input_tokens ?? 0)) : summaryNumber(payload, 'cached_input_tokens');
- const inputTokens = rows.length ? sumRows(rows, row => Number(row.input_tokens ?? 0)) : summaryNumber(payload, 'input_tokens');
- const cachePct = inputTokens > 0 ? (cachedTokens / inputTokens) * 100 : 0;
-const totalCalls = summaryNumber(payload, 'visible_calls') || payload.loaded_row_count || payload.total_available_rows || calls.length;
-const overviewSeries = buildOverviewSeries(rows);
-const cards = buildCards({
+  const totalTokens = rows.length ? sumRows(rows, row => Number(row.total_tokens ?? 0)) : summaryNumber(payload, 'total_tokens');
+  const estimatedCost = rows.length ? sumRows(rows, row => Number(row.estimated_cost_usd ?? 0)) : summaryNumber(payload, 'estimated_cost_usd');
+  const cachedTokens = rows.length ? sumRows(rows, row => Number(row.cached_input_tokens ?? 0)) : summaryNumber(payload, 'cached_input_tokens');
+  const inputTokens = rows.length ? sumRows(rows, row => Number(row.input_tokens ?? 0)) : summaryNumber(payload, 'input_tokens');
+  const uncachedTokens = rows.length
+    ? sumRows(rows, row => {
+        const input = Number(row.input_tokens ?? 0);
+        const cached = Number(row.cached_input_tokens ?? 0);
+        return Number(row.uncached_input_tokens ?? Math.max(input - cached, 0));
+      })
+    : Math.max(inputTokens - cachedTokens, 0);
+  const outputTokens = rows.length ? sumRows(rows, row => Number(row.output_tokens ?? 0)) : summaryNumber(payload, 'output_tokens');
+  const reasoningOutputTokens = rows.length
+    ? sumRows(rows, row => Number(row.reasoning_output_tokens ?? 0))
+    : summaryNumber(payload, 'reasoning_output_tokens');
+  const cachePct = inputTokens > 0 ? (cachedTokens / inputTokens) * 100 : 0;
+  const totalCalls = calls.length || Math.max(0, Number(payload.loaded_row_count ?? 0));
+  const overviewSeries = buildOverviewSeries(rows);
+  const cards = buildCards({
     cachePct,
     cachedTokens,
     estimatedCost,
     historyScope: payload.history_scope ?? 'active',
     totalCalls,
     totalTokens,
+    tokenBreakdown: {
+      cachedInput: cachedTokens,
+      uncachedInput: uncachedTokens,
+      output: outputTokens,
+      reasoningOutput: reasoningOutputTokens,
+    },
     usageRemainingCard: buildUsageRemainingCard(payload),
   });
 
@@ -319,6 +337,12 @@ function buildCards(input: {
   historyScope: string;
   totalCalls: number;
   totalTokens: number;
+  tokenBreakdown: {
+    cachedInput: number;
+    uncachedInput: number;
+    output: number;
+    reasoningOutput: number;
+  };
   usageRemainingCard: MetricCard;
 }): MetricCard[] {
   return [
@@ -328,6 +352,12 @@ function buildCards(input: {
       detail: `${input.historyScope} history scope`,
       trend: 'loaded aggregate rows',
       tone: 'blue',
+      breakdown: [
+        { label: 'Cached', value: formatCompact(input.tokenBreakdown.cachedInput) },
+        { label: 'Uncached', value: formatCompact(input.tokenBreakdown.uncachedInput) },
+        { label: 'Output', value: formatCompact(input.tokenBreakdown.output) },
+        { label: 'Reasoning', value: formatCompact(input.tokenBreakdown.reasoningOutput) },
+      ],
     },
     {
       label: 'Estimated Cost',
@@ -346,7 +376,7 @@ function buildCards(input: {
     {
       label: 'Total Calls',
       value: formatNumber(input.totalCalls),
-      detail: 'visible aggregate rows',
+      detail: 'loaded calls in this dashboard',
       trend: 'privacy-safe',
       tone: 'blue',
     },
