@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -116,12 +116,13 @@ EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 SQLITE_VARIABLE_BATCH_SIZE = 500
+RefreshProgressCallback = Callable[[dict[str, object]], None]
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    progress_callback: object | None = None,
+    progress_callback: RefreshProgressCallback | None = None,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 

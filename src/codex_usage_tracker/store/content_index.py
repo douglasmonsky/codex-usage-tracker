@@ -130,6 +130,7 @@ def index_content_for_source_files(
 
 
 ContentIndexProgressCallback = Callable[[dict[str, object]], None]
+UsageContentRow = sqlite3.Row | Mapping[str, object]
 
 
 def index_content_for_source_plans(
@@ -1395,7 +1396,7 @@ def _flush_pending_fragments(
     conn: sqlite3.Connection,
     *,
     pending: list[_PendingFragment],
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> None:
     turn_rows, fragment_rows = _pending_fragment_rows(
         pending=pending,
@@ -1424,7 +1425,7 @@ def _append_pending_content_rows(
     tool_calls: list[PendingToolCall],
     command_runs: list[PendingCommandRun],
     file_events: list[PendingFileEvent],
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> None:
     turn_rows, fragment_rows = _pending_fragment_rows(
         pending=pending,
@@ -1464,7 +1465,7 @@ def _flush_pending_content_rows(
 def _pending_fragment_rows(
     *,
     pending: list[_PendingFragment],
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     if not pending:
         return [], []
@@ -1492,7 +1493,7 @@ def _turn_row(
     *,
     turn_key: str,
     fragment: _PendingFragment,
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> dict[str, object]:
     return {
         "turn_key": turn_key,
@@ -1520,7 +1521,7 @@ def _fragment_row(
     fragment_id: str,
     turn_key: str,
     fragment: _PendingFragment,
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> dict[str, object]:
     return {
         "fragment_id": fragment_id,
