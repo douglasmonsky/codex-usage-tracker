@@ -86,6 +86,18 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         goal="token_waste",
         evidence_limit=2,
     )
+    hypothesis_test_json = mcp_server.usage_test_hypotheses(
+        question="Look for actionable token waste",
+        hypotheses=[
+            "Token waste is concentrated in large low-output calls.",
+            "Repeated shell probing is creating workflow churn.",
+        ],
+        evidence_limit=2,
+    )
+    default_hypothesis_json = mcp_server.usage_test_hypotheses(
+        question="What usage hypotheses should I test?",
+        evidence_limit=1,
+    )
     investigation_walk_json = mcp_server.usage_investigation_walk(
         question="Look for local token waste patterns",
         min_occurrences=1,
@@ -147,6 +159,8 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         context_scan_json,
         suggestions_json,
         agentic_investigation_json,
+        hypothesis_test_json,
+        default_hypothesis_json,
         investigation_walk_json,
         local_evidence_export_json,
         session_json,
@@ -250,6 +264,36 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     )
     assert full_investigation_json["filters"]["detail_mode"] == "full"
     assert full_investigation_json["findings"][0]["evidence_summary"]["row_count"] == 1
+    assert hypothesis_test_json["schema"] == "codex-usage-tracker-hypothesis-test-v1"
+    assert hypothesis_test_json["content_mode"] == "aggregate_with_local_index_signals"
+    assert hypothesis_test_json["includes_raw_fragments"] is False
+    assert hypothesis_test_json["question"] == "Look for actionable token waste"
+    assert hypothesis_test_json["summary"]["hypothesis_count"] == 2
+    assert hypothesis_test_json["hypotheses"]
+    first_hypothesis = hypothesis_test_json["hypotheses"][0]
+    assert first_hypothesis["family"] == "token_waste"
+    assert hypothesis_test_json["hypotheses"][1]["family"] == "shell_churn"
+    assert first_hypothesis["status"] in {
+        "true",
+        "false",
+        "partially_true",
+        "insufficient_evidence",
+    }
+    assert first_hypothesis["i_would_like_to_be_able_to"]
+    assert first_hypothesis["i_will_accomplish_this_using"]
+    assert first_hypothesis["i_am_missing_access_to"]
+    assert first_hypothesis["evidence_summary"]
+    assert first_hypothesis["next_action"]
+    assert hypothesis_test_json["recommended_next_tools"]
+    assert default_hypothesis_json["summary"]["hypothesis_count"] == 6
+    assert {row["family"] for row in default_hypothesis_json["hypotheses"]} == {
+        "token_waste",
+        "cache_failure",
+        "repeated_file_rediscovery",
+        "shell_churn",
+        "effort_model_choice",
+        "allowance_change",
+    }
     assert local_evidence_export_json["schema"] == "codex-usage-tracker-local-evidence-export-v1"
     assert local_evidence_export_json["content_mode"] == "shareable_local_evidence"
     assert local_evidence_export_json["includes_indexed_content"] is False

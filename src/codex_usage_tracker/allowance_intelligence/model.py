@@ -573,6 +573,8 @@ def _sum_number(rows: list[dict[str, Any]], field: str) -> float:
 def _number(value: object) -> float | None:
     if isinstance(value, bool) or value is None:
         return None
+    if not isinstance(value, int | float | str):
+        return None
     try:
         return float(value)
     except (TypeError, ValueError):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -195,6 +196,13 @@ class InvestigationSuggestionsReport:
 @dataclass(frozen=True)
 class AgenticInvestigationReport:
     """Stable machine-readable agentic investigation report."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class HypothesisTestReport:
+    """Stable machine-readable agentic hypothesis test report."""
 
     payload: dict[str, Any]
 
@@ -1012,6 +1020,709 @@ def build_agentic_investigation_report(
         "caveats": caveats,
     }
     return AgenticInvestigationReport(payload)
+
+
+HYPOTHESIS_TEST_FAMILIES = (
+    "token_waste",
+    "cache_failure",
+    "repeated_file_rediscovery",
+    "shell_churn",
+    "effort_model_choice",
+    "allowance_change",
+)
+
+_DEFAULT_HYPOTHESES = {
+    "token_waste": "Token waste is concentrated in obvious high-token low-output calls.",
+    "cache_failure": "Cache misses or cold resumes are inflating large calls.",
+    "repeated_file_rediscovery": "Repeated file rediscovery is wasting tokens.",
+    "shell_churn": "Repeated shell probing is creating workflow churn.",
+    "effort_model_choice": "Model or effort choices are a meaningful usage driver.",
+    "allowance_change": "Weekly allowance behavior may have changed.",
+}
+
+
+def build_hypothesis_test_report(
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path = DEFAULT_PROJECTS_PATH,
+    question: str,
+    hypotheses: list[str] | str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> HypothesisTestReport:
+    """Test usage hypotheses using bounded existing diagnostics."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    normalized_limit = max(1, evidence_limit)
+    requested = _normalize_hypothesis_inputs(hypotheses)
+    hypothesis_specs = (
+        [
+            {
+                "id": f"hypothesis-{index}",
+                "hypothesis": hypothesis,
+                "family": _classify_hypothesis_family(hypothesis, question),
+            }
+            for index, hypothesis in enumerate(requested, start=1)
+        ]
+        if requested
+        else [
+            {
+                "id": family,
+                "hypothesis": _DEFAULT_HYPOTHESES[family],
+                "family": family,
+            }
+            for family in HYPOTHESIS_TEST_FAMILIES
+        ]
+    )
+
+    context: dict[str, Any] = {}
+    tested = [
+        _evaluate_hypothesis_spec(
+            spec,
+            context=context,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=normalized_limit,
+            privacy_mode=privacy_mode,
+        )
+        for spec in hypothesis_specs
+    ]
+    status_counts: dict[str, int] = {}
+    for result in tested:
+        status = str(result["status"])
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    payload = {
+        "schema": "codex-usage-tracker-hypothesis-test-v1",
+        "content_mode": "aggregate_with_local_index_signals",
+        "includes_indexed_content": True,
+        "includes_raw_fragments": False,
+        "privacy_mode": privacy_mode,
+        "question": question,
+        "filters": {
+            "since": since,
+            "until": until,
+            "thread": thread,
+            "include_archived": include_archived,
+            "evidence_limit": normalized_limit,
+        },
+        "summary": {
+            "hypothesis_count": len(tested),
+            "status_counts": status_counts,
+            "top_status": tested[0]["status"] if tested else None,
+        },
+        "hypotheses": tested,
+        "recommended_next_tools": _dedupe_next_tools(
+            [
+                tool
+                for result in tested
+                for tool in result.get("recommended_next_tools", [])
+                if isinstance(tool, dict)
+            ]
+        ),
+        "caveats": [
+            "Local Codex logs only; this is not an official OpenAI usage ledger.",
+            "Hypothesis results are local evidence classifications, not proof of user intent.",
+            "Raw prompts, assistant text, tool output, raw commands, and full paths are not included.",
+        ],
+    }
+    return HypothesisTestReport(payload)
+
+
+def _normalize_hypothesis_inputs(hypotheses: list[str] | str | None) -> list[str]:
+    if hypotheses is None:
+        return []
+    if isinstance(hypotheses, str):
+        return [hypotheses.strip()] if hypotheses.strip() else []
+    return [str(hypothesis).strip() for hypothesis in hypotheses if str(hypothesis).strip()]
+
+
+def _classify_hypothesis_family(hypothesis: str, question: str) -> str:
+    hypothesis_family = _classify_hypothesis_text(hypothesis.lower())
+    if hypothesis_family is not None:
+        return hypothesis_family
+    question_family = _classify_hypothesis_text(question.lower())
+    if question_family is not None:
+        return question_family
+    return "token_waste"
+
+
+def _classify_hypothesis_text(text: str) -> str | None:
+    if any(term in text for term in ("allowance", "limit", "throttle", "weekly", "5-hour", "5 hour")):
+        return "allowance_change"
+    if any(term in text for term in ("token waste", "expensive", "cost")):
+        return "token_waste"
+    if any(term in text for term in ("cache", "cold", "resume", "context")):
+        return "cache_failure"
+    if any(term in text for term in ("file", "rediscover", "reread", "path")):
+        return "repeated_file_rediscovery"
+    if _has_shell_hypothesis_signal(text):
+        return "shell_churn"
+    if any(term in text for term in ("effort", "model", "xhigh", "high", "medium", "gpt")):
+        return "effort_model_choice"
+    return None
+
+
+def _has_shell_hypothesis_signal(text: str) -> bool:
+    if "shell" in text or "command" in text:
+        return True
+    tokens = {token for token in re.split(r"[^a-z0-9]+", text) if token}
+    return bool(tokens & {"sed", "rg", "git", "nl", "npm", "python", "pytest"})
+
+
+def _evaluate_hypothesis_spec(
+    spec: dict[str, str],
+    *,
+    context: dict[str, Any],
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    family = spec["family"]
+    if family == "cache_failure":
+        result = _evaluate_cache_failure_hypothesis(
+            context,
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        )
+    elif family == "repeated_file_rediscovery":
+        result = _evaluate_repeated_file_hypothesis(
+            context,
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        )
+    elif family == "shell_churn":
+        result = _evaluate_shell_churn_hypothesis(
+            context,
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        )
+    elif family == "effort_model_choice":
+        result = _evaluate_effort_model_hypothesis(
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+        )
+    elif family == "allowance_change":
+        result = _evaluate_allowance_hypothesis(
+            db_path=db_path,
+            allowance_path=allowance_path,
+            include_archived=include_archived,
+        )
+    else:
+        result = _evaluate_token_waste_hypothesis(
+            context,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        )
+
+    return {
+        "id": spec["id"],
+        "hypothesis": spec["hypothesis"],
+        "family": family,
+        **result,
+    }
+
+
+def _evaluate_token_waste_hypothesis(
+    context: dict[str, Any],
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    large = _hypothesis_large_low_output(
+        context,
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    )
+    recommendations = build_recommendations_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+        since=since,
+        until=until,
+        thread=thread,
+        limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+    large_count = int(large["total_candidates"])
+    recommendation_count = len(recommendations.get("rows", []))
+    if large_count:
+        status = "true"
+        confidence = _count_confidence(large_count)
+    elif recommendation_count:
+        status = "partially_true"
+        confidence = "low"
+    else:
+        status = "false"
+        confidence = "low"
+    return _hypothesis_result(
+        status=status,
+        confidence=confidence,
+        i_would_like_to_be_able_to="Find obvious token-waste candidates without reading raw conversations.",
+        i_will_accomplish_this_using="Rank large low-output calls and aggregate recommendation rows.",
+        i_am_missing_access_to="Whether each expensive call produced valuable work or was intentionally exploratory.",
+        evidence_summary=_merge_evidence_summaries(
+            _agentic_evidence_summary(large.get("rows", [])),
+            {
+                "recommendation_count": recommendation_count,
+                "large_low_output_candidate_count": large_count,
+            },
+        ),
+        evidence=[_compact_agentic_evidence_row(row) for row in large.get("rows", [])[:evidence_limit]],
+        counter_evidence=(
+            []
+            if large_count
+            else ["No large low-output calls crossed the default threshold in the selected scope."]
+        ),
+        next_action="Inspect the largest low-output rows, then verify whether a shorter handoff or smaller context would have avoided them.",
+        recommended_next_tools=[
+            _next_tool("usage_large_low_output_calls", "Inspect the highest-token low-output calls."),
+            _next_tool("usage_recommendations", "Compare aggregate recommendation scoring."),
+            _next_tool("usage_calls", "Open the underlying aggregate call rows."),
+        ],
+    )
+
+
+def _evaluate_cache_failure_hypothesis(
+    context: dict[str, Any],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    large = _hypothesis_large_low_output(
+        context,
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    )
+    rows = large.get("rows", [])
+    signal_rows = [row for row in rows if _row_has_cache_failure_signal(row)]
+    if signal_rows:
+        status = "true"
+        confidence = _count_confidence(len(signal_rows))
+    elif rows:
+        status = "partially_true"
+        confidence = "low"
+    else:
+        status = "false"
+        confidence = "low"
+    return _hypothesis_result(
+        status=status,
+        confidence=confidence,
+        i_would_like_to_be_able_to="Tell whether cache misses, cold resumes, or context pressure explain expensive calls.",
+        i_will_accomplish_this_using="Look for large low-output calls with low cache ratios, high context-window use, or cache/context explanations.",
+        i_am_missing_access_to="The exact task intent and raw turn context unless the user explicitly enables raw context inspection.",
+        evidence_summary=_agentic_evidence_summary(signal_rows or rows),
+        evidence=[_compact_agentic_evidence_row(row) for row in (signal_rows or rows)[:evidence_limit]],
+        counter_evidence=(
+            []
+            if signal_rows
+            else ["No selected large low-output row had a direct cache/context signal."]
+        ),
+        next_action="Verify the candidate rows in Call Investigator and compare nearby thread traces before changing workflow.",
+        recommended_next_tools=[
+            _next_tool("usage_large_low_output_calls", "Check cache ratio and context-window percent."),
+            _next_tool("usage_call_detail", "Inspect one aggregate call in Call Investigator."),
+            _next_tool("usage_thread_trace", "Trace local indexed thread activity if deeper context is needed."),
+        ],
+    )
+
+
+def _evaluate_repeated_file_hypothesis(
+    context: dict[str, Any],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    report = context.get("repeated_file_rediscovery")
+    if report is None:
+        report = build_repeated_file_rediscovery_report(
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_occurrences=2,
+            limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        ).payload
+        context["repeated_file_rediscovery"] = report
+    rows = report.get("rows", [])
+    total = int(report["total_candidates"])
+    status = "true" if total >= 3 else "partially_true" if total else "false"
+    return _hypothesis_result(
+        status=status,
+        confidence=_count_confidence(total) if total else "low",
+        i_would_like_to_be_able_to="Find repeated file rediscovery without exposing full local paths.",
+        i_will_accomplish_this_using="Rank safe path hashes, basenames, extensions, operation mixes, and associated token totals.",
+        i_am_missing_access_to="Whether each reread was necessary for task correctness without task-level intent.",
+        evidence_summary=_agentic_evidence_summary(rows),
+        evidence=[_compact_agentic_evidence_row(row) for row in rows[:evidence_limit]],
+        counter_evidence=[] if total else ["No repeated file rediscovery candidates crossed the threshold."],
+        next_action="Turn recurring lookups into a durable project note, helper command, or narrower read path.",
+        recommended_next_tools=[
+            _next_tool("usage_repeated_file_rediscovery", "Rank repeated safe file identities."),
+            _next_tool("usage_thread_trace", "Check whether the same thread repeats the rediscovery loop."),
+        ],
+    )
+
+
+def _evaluate_shell_churn_hypothesis(
+    context: dict[str, Any],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    report = context.get("shell_churn")
+    if report is None:
+        report = build_shell_churn_report(
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_occurrences=2,
+            limit=evidence_limit,
+            sample_limit=3,
+            privacy_mode=privacy_mode,
+        ).payload
+        context["shell_churn"] = report
+    rows = report.get("rows", [])
+    total = int(report["total_candidates"])
+    unknown_count = sum(1 for row in rows if str(row.get("command_root") or "").startswith("unknown"))
+    status = "true" if total >= 3 else "partially_true" if total else "false"
+    counter_evidence = []
+    if unknown_count:
+        counter_evidence.append("Some shell rows still have cloudy command labels; normalization needs more hardening.")
+    if not total:
+        counter_evidence.append("No repeated shell churn candidates crossed the threshold.")
+    return _hypothesis_result(
+        status=status,
+        confidence=_count_confidence(total) if total else "low",
+        i_would_like_to_be_able_to="Detect repeated command probing without storing raw command output.",
+        i_will_accomplish_this_using="Rank command roots, bounded labels, occurrence counts, failures, and associated token totals.",
+        i_am_missing_access_to="Full raw command arguments and the developer's intent for each probe.",
+        evidence_summary=_merge_evidence_summaries(
+            _agentic_evidence_summary(rows),
+            {"unknown_command_row_count": unknown_count},
+        ),
+        evidence=[_compact_agentic_evidence_row(row) for row in rows[:evidence_limit]],
+        counter_evidence=counter_evidence,
+        next_action="If the same command family repeats, replace exploratory loops with a helper command, test selector, or saved project note.",
+        recommended_next_tools=[
+            _next_tool("usage_shell_churn", "Inspect repeated shell command families."),
+            _next_tool("usage_thread_trace", "Trace whether command churn clusters in one thread."),
+        ],
+    )
+
+
+def _evaluate_effort_model_hypothesis(
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+) -> dict[str, Any]:
+    rows = query_dashboard_events(
+        db_path,
+        limit=0,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+    )
+    total_tokens = sum(_number(row.get("total_tokens")) for row in rows)
+    effort_totals = _token_totals_by(rows, "effort")
+    model_totals = _token_totals_by(rows, "model")
+    high_effort_tokens = sum(
+        value
+        for effort, value in effort_totals.items()
+        if effort.lower() in {"high", "xhigh", "maximum"}
+    )
+    high_effort_ratio = high_effort_tokens / total_tokens if total_tokens else 0.0
+    if not rows or not total_tokens:
+        status = "insufficient_evidence"
+        confidence = "insufficient_local_evidence"
+    elif high_effort_ratio >= 0.5:
+        status = "true"
+        confidence = "medium"
+    elif high_effort_ratio >= 0.2:
+        status = "partially_true"
+        confidence = "low"
+    else:
+        status = "false"
+        confidence = "low"
+    return _hypothesis_result(
+        status=status,
+        confidence=confidence,
+        i_would_like_to_be_able_to="Tell whether model or effort selection materially drives usage.",
+        i_will_accomplish_this_using="Aggregate selected calls by effort and model, then compare high-effort token share.",
+        i_am_missing_access_to="Whether high effort was required for the task quality target.",
+        evidence_summary={
+            "row_count": len(rows),
+            "total_tokens": int(total_tokens),
+            "high_effort_token_ratio": round(high_effort_ratio, 6),
+            "top_efforts": _top_token_totals(effort_totals),
+            "top_models": _top_token_totals(model_totals),
+        },
+        evidence=[],
+        counter_evidence=[] if high_effort_ratio else ["No high-effort token share found in the selected scope."],
+        next_action="Compare high-effort calls against task type, then use lower effort for routine edits and reserve higher effort for uncertain design work.",
+        recommended_next_tools=[
+            _next_tool("usage_summary", "Summarize usage by model or effort."),
+            _next_tool("usage_calls", "Filter calls by effort and inspect outliers."),
+            _next_tool("usage_recommendations", "Compare effort choices with aggregate recommendations."),
+        ],
+    )
+
+
+def _evaluate_allowance_hypothesis(
+    *,
+    db_path: Path,
+    allowance_path: Path,
+    include_archived: bool,
+) -> dict[str, Any]:
+    from codex_usage_tracker.allowance_intelligence import build_allowance_diagnostics_report
+
+    diagnostics = build_allowance_diagnostics_report(
+        db_path=db_path,
+        allowance_path=allowance_path,
+        include_archived=include_archived,
+        window_kind="weekly",
+        limit=1000,
+        privacy_mode="strict",
+    ).payload
+    summary = diagnostics.get("summary", {})
+    grade = str(summary.get("primary_evidence_grade") or "insufficient_data")
+    if grade in {"strong_local_evidence"}:
+        status = "true"
+        confidence = "high"
+    elif grade in {"possible_regime_change"}:
+        status = "partially_true"
+        confidence = "medium"
+    elif grade in {"counter_noise_likely"}:
+        status = "false"
+        confidence = "medium"
+    else:
+        status = "insufficient_evidence"
+        confidence = "insufficient_local_evidence"
+    return _hypothesis_result(
+        status=status,
+        confidence=confidence,
+        i_would_like_to_be_able_to="Distinguish real weekly allowance movement from rolling-window noise.",
+        i_will_accomplish_this_using="Read weekly allowance diagnostics and evidence grades from observed usage snapshots.",
+        i_am_missing_access_to="OpenAI's official internal ledger and usage from other surfaces sharing the same allowance.",
+        evidence_summary={
+            "primary_evidence_grade": grade,
+            "observation_count": summary.get("observation_count"),
+            "weekly_observation_count": summary.get("weekly_observation_count"),
+            "candidate_change_count": summary.get("candidate_change_count"),
+            "research_readiness": summary.get("research_readiness"),
+        },
+        evidence=[],
+        counter_evidence=[
+            "Outside usage and missing observations can explain observed movement unless weekly evidence is strong."
+        ],
+        next_action="Run full weekly allowance diagnostics and export strict evidence before making any public claim.",
+        recommended_next_tools=[
+            _next_tool("usage_allowance_diagnostics", "Run evidence-graded weekly allowance diagnostics."),
+            _next_tool("usage_allowance_export", "Create a strict local evidence bundle for sharing."),
+        ],
+    )
+
+
+def _hypothesis_large_low_output(
+    context: dict[str, Any],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    report = context.get("large_low_output")
+    if report is None:
+        report = build_large_low_output_report(
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        ).payload
+        context["large_low_output"] = report
+    return report
+
+
+def _hypothesis_result(
+    *,
+    status: str,
+    confidence: str,
+    i_would_like_to_be_able_to: str,
+    i_will_accomplish_this_using: str,
+    i_am_missing_access_to: str,
+    evidence_summary: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    counter_evidence: list[str],
+    next_action: str,
+    recommended_next_tools: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "confidence": confidence,
+        "i_would_like_to_be_able_to": i_would_like_to_be_able_to,
+        "i_will_accomplish_this_using": i_will_accomplish_this_using,
+        "i_am_missing_access_to": i_am_missing_access_to,
+        "evidence_summary": evidence_summary,
+        "evidence": evidence,
+        "counter_evidence": counter_evidence,
+        "next_action": next_action,
+        "recommended_next_tools": recommended_next_tools,
+    }
+
+
+def _row_has_cache_failure_signal(row: dict[str, Any]) -> bool:
+    cache_ratio = _optional_number(row.get("cache_ratio"))
+    context_window = _optional_number(row.get("context_window_percent"))
+    explanation = " ".join(
+        str(value)
+        for value in (
+            row.get("candidate_explanation"),
+            row.get("explanation_reasons"),
+            row.get("primary_signal"),
+            row.get("secondary_signals"),
+        )
+        if value is not None
+    ).lower()
+    return (
+        (cache_ratio is not None and cache_ratio < 0.25)
+        or (context_window is not None and context_window >= 80)
+        or any(term in explanation for term in ("cache", "cold", "resume", "context"))
+    )
+
+
+def _merge_evidence_summaries(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    return {**base, **extra}
+
+
+def _next_tool(tool: str, reason: str, default_arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "tool": tool,
+        "reason": reason,
+        "default_arguments": default_arguments or {},
+    }
+
+
+def _number(value: Any) -> float:
+    return _optional_number(value) or 0.0
+
+
+def _optional_number(value: Any) -> float | None:
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _token_totals_by(rows: list[dict[str, Any]], field: str) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for row in rows:
+        key = str(row.get(field) or "unknown")
+        totals[key] = totals.get(key, 0.0) + _number(row.get("total_tokens"))
+    return totals
+
+
+def _top_token_totals(totals: dict[str, float], *, limit: int = 5) -> list[dict[str, Any]]:
+    return [
+        {"label": label, "total_tokens": int(value)}
+        for label, value in sorted(totals.items(), key=lambda item: item[1], reverse=True)[:limit]
+    ]
 
 
 def _normalize_agentic_goal(goal: str | None) -> str | None:

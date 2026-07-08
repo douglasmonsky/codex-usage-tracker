@@ -21,17 +21,19 @@ Act as an evidence-first analyst for Codex Usage Tracker data. Prefer MCP JSON p
 
 1. If the user asks what to inspect, wants suggestions, or is unsure where to start, call `usage_suggest_investigations(goal=...)`.
 2. If the user asks broadly to look through usage, find waste, explain expensive usage, improve efficiency, or recommend changes, call `usage_investigate(goal="token_waste")` or `usage_investigate(goal="overview")` first, then drill into its `recommended_next_tools`.
-3. If the user asks whether limits/allowance changed, whether they are throttled, why weekly usage moved, or why the 5-hour counter looks weird, call `usage_investigate(goal="allowance_change")`, then `usage_allowance_diagnostics(window_kind="weekly", privacy_mode="strict")` when evidence is needed. Use `usage_allowance_export(...)` for manually shareable evidence.
-4. If the user asks about cache misses, cold resumes, context bloat, or low-output expensive calls, call `usage_investigate(goal="cache_failure")`, then inspect `usage_large_low_output_calls(...)`, `usage_calls(...)`, `usage_report_pack(...)`, or `usage_context_bloat_scan(...)`.
-5. If the user asks about repeated shell probing, repeated file rediscovery, or workflow churn, call `usage_investigate(goal="workflow_churn")`, then inspect `usage_shell_churn(...)`, `usage_repeated_file_rediscovery(...)`, or `usage_investigation_walk(question=...)`.
-6. If the user asks a precise dashboard/API question, use the direct tool: `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_summary`, `usage_query`, `session_usage`, `usage_report_pack`, `usage_dashboard_recommendations`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`.
-7. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
-8. Use `usage_call_context(...)` only when the user explicitly asks for raw local context and the MCP server has raw context enabled.
+3. If the user frames the work as hypotheses, asks for true/false/partial decisions, or wants "I'd like to / I will use / I'm missing / hypothesis result" output, call `usage_test_hypotheses(question=..., hypotheses=...)`.
+4. If the user asks whether limits/allowance changed, whether they are throttled, why weekly usage moved, or why the 5-hour counter looks weird, call `usage_investigate(goal="allowance_change")`, then `usage_allowance_diagnostics(window_kind="weekly", privacy_mode="strict")` when evidence is needed. Use `usage_allowance_export(...)` for manually shareable evidence.
+5. If the user asks about cache misses, cold resumes, context bloat, or low-output expensive calls, call `usage_investigate(goal="cache_failure")`, then inspect `usage_large_low_output_calls(...)`, `usage_calls(...)`, `usage_report_pack(...)`, or `usage_context_bloat_scan(...)`.
+6. If the user asks about repeated shell probing, repeated file rediscovery, or workflow churn, call `usage_investigate(goal="workflow_churn")`, then inspect `usage_shell_churn(...)`, `usage_repeated_file_rediscovery(...)`, or `usage_investigation_walk(question=...)`.
+7. If the user asks a precise dashboard/API question, use the direct tool: `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_summary`, `usage_query`, `session_usage`, `usage_report_pack`, `usage_dashboard_recommendations`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`.
+8. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
+9. Use `usage_call_context(...)` only when the user explicitly asks for raw local context and the MCP server has raw context enabled.
 
 ## Tool Stance
 
 - `usage_suggest_investigations` is the front door for ideas. It should return a short, goal-led menu with adjacent safe next options.
 - `usage_investigate` is the first stop for broad agentic analysis. The default `detail_mode="compact"` returns evidence summaries and compact rows; use `detail_mode="full"` only when full underlying diagnostic rows are necessary.
+- `usage_test_hypotheses` is the first-class hypothesis runner. Use it when the user wants explicit `true`, `false`, `partially_true`, or `insufficient_evidence` decisions and the "I would like / I will use / I'm missing" framing.
 - `usage_allowance_diagnostics` is the main allowance-change evidence tool. Treat weekly windows as the primary signal and 5-hour windows as noisy rolling-window context.
 - `usage_large_low_output_calls`, `usage_shell_churn`, and `usage_repeated_file_rediscovery` are the most actionable token-waste probes. Use them to turn broad findings into concrete next steps.
 - `usage_investigation_walk` can use local content/event-index signals for deeper pattern scans, but it is not the default shareable report.
