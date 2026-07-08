@@ -30,7 +30,10 @@ class SourceParsePlan:
     replace_existing: bool = True
 
 
-ParsedSourceFile = tuple[Path, list[UsageEvent], dict[str, int], ParserState]
+ParsedSourceFile = (
+    tuple[Path, list[UsageEvent], dict[str, int], ParserState]
+    | tuple[Path, list[UsageEvent], dict[str, int], ParserState, int]
+)
 
 
 def source_logs_requiring_parse(
@@ -124,13 +127,17 @@ def upsert_source_file_metadata(
         return
     indexed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     rows: list[dict[str, Any]] = []
-    for path, events, diagnostics, parser_state in parsed:
+    for parsed_file in parsed:
+        path, events, diagnostics, parser_state, final_line_number = _parsed_source_file_parts(
+            parsed_file
+        )
         row = _source_file_metadata_row(
             path=path,
             events=events,
             diagnostics=diagnostics,
             parser_state=parser_state,
             indexed_at=indexed_at,
+            final_line_number=final_line_number,
         )
         if row is not None:
             rows.append(row)
@@ -166,6 +173,14 @@ def upsert_source_file_metadata(
     )
 
 
+def _parsed_source_file_parts(
+    parsed_file: ParsedSourceFile,
+) -> tuple[Path, list[UsageEvent], dict[str, int], ParserState, int | None]:
+    path, events, diagnostics, parser_state, *rest = parsed_file
+    final_line_number = rest[0] if rest else None
+    return path, events, diagnostics, parser_state, final_line_number
+
+
 def _source_file_metadata_row(
     *,
     path: Path,
@@ -173,6 +188,7 @@ def _source_file_metadata_row(
     diagnostics: dict[str, int],
     parser_state: ParserState,
     indexed_at: str,
+    final_line_number: int | None = None,
 ) -> dict[str, Any] | None:
     metadata = _source_file_metadata(path)
     if metadata is None:
@@ -185,7 +201,7 @@ def _source_file_metadata_row(
         "is_archived": int(metadata["is_archived"]),
         "size_bytes": int(metadata["size_bytes"]),
         "mtime_ns": int(metadata["mtime_ns"]),
-        "parsed_until_line": _count_lines(path),
+        "parsed_until_line": final_line_number or _count_lines(path),
         "parsed_until_byte": int(metadata["size_bytes"]),
         "latest_record_id": _latest_source_record_id(latest_event, parser_state),
         "latest_event_timestamp": _latest_source_event_timestamp(

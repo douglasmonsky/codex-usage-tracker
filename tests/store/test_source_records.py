@@ -5,6 +5,7 @@ from pathlib import Path
 
 from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION, ParserState
 from codex_usage_tracker.reports.api import build_source_coverage_report
+from codex_usage_tracker.store import sources
 from codex_usage_tracker.store.api import (
     connect,
     init_db,
@@ -114,6 +115,53 @@ def test_source_file_metadata_refreshes_source_record_parser_details(
     assert rows[0]["line_number"] == 7
     assert rows[0]["parser_adapter"] == "codex-jsonl"
     assert rows[0]["parser_version"] == "codex-jsonl-v2"
+
+
+def test_source_file_metadata_uses_parser_final_line_number(
+    tmp_path: Path, monkeypatch
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    source_path = tmp_path / "sessions" / "fast-metadata.jsonl"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_text("{}\n", encoding="utf-8")
+    event = replace(
+        _usage_event(
+            record_id="source-fast-metadata",
+            session_id="session-fast-metadata",
+            thread_key="thread:Fast Metadata",
+            event_timestamp="2026-05-17T19:30:00Z",
+            cumulative_total_tokens=350,
+        ),
+        source_file=str(source_path),
+        line_number=7,
+    )
+    upsert_usage_events([event], db_path=db_path)
+
+    def fail_count_lines(_path: Path) -> int:
+        raise AssertionError("final parser line number should avoid recounting source file")
+
+    monkeypatch.setattr(sources, "_count_lines", fail_count_lines)
+
+    record_source_file_metadata(
+        db_path=db_path,
+        parsed_files=[
+            (
+                source_path,
+                [event],
+                {},
+                ParserState(
+                    latest_record_id=event.record_id,
+                    latest_event_timestamp=event.event_timestamp,
+                ),
+                7,
+            )
+        ],
+    )
+
+    rows = query_source_records(db_path=db_path, limit=0)
+    assert len(rows) == 1
+    assert rows[0]["record_id"] == "source-fast-metadata"
+    assert rows[0]["line_number"] == 7
 
 
 def test_reset_usage_database_clears_content_index_tables(tmp_path: Path) -> None:
