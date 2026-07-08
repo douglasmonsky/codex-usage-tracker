@@ -61,7 +61,13 @@ Phrase the final answer as "what happened, why it likely matters, what to try ne
 
 ## Agentic Dogfood
 
-When the maintainer asks whether MCP/skill recommendations are getting more useful, run the aggregate dogfood harness from a source checkout or installed CLI:
+When the maintainer asks whether MCP/skill recommendations are getting more useful, prefer the MCP polling flow when available:
+
+1. Call `usage_dogfood_start(privacy_mode="strict")`.
+2. Poll `usage_dogfood_status(job_id)` until completed or failed.
+3. Call `usage_dogfood_result(job_id)` for the compact aggregate artifact.
+
+Use the source checkout or installed CLI only as fallback:
 
 ```bash
 codex-usage-tracker dogfood-agentic --privacy-mode strict --json

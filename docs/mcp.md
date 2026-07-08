@@ -55,6 +55,8 @@ Use `usage_action_brief(...)` when the user wants a concise "what should I actua
 
 Use `usage_test_hypotheses(...)` when the user frames the task as hypotheses, wants true/false/partial decisions, or asks for the "I'd like to / I will use / I'm missing / hypothesis result" structure. It tests supplied hypotheses or built-in defaults for token waste, cache failure, repeated file rediscovery, shell churn, effort/model choice, and allowance change. It uses aggregate and local-index signals but does not include raw fragments.
 
+Use `usage_dogfood_start(...)`, `usage_dogfood_status(job_id)`, and `usage_dogfood_result(job_id)` for maintainer dogfood checks that may run longer than a normal MCP call. Start returns a job id, status reports percent/stage/cache keys, and result returns the compact aggregate dogfood payload after completion. Jobs are in-process and cleared when the MCP server restarts.
+
 Use lower-level diagnostics when the investigation report recommends them:
 
 - `usage_large_low_output_calls(...)`: high-token calls that produced little output, with cache/context clues and likely explanations.
@@ -97,6 +99,9 @@ Waste-discovery answers should not stop at "interesting." Tie recommendations to
 - `usage_suggest_investigations`
 - `usage_investigate`
 - `usage_action_brief`
+- `usage_dogfood_start`
+- `usage_dogfood_status`
+- `usage_dogfood_result`
 - `usage_test_hypotheses`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`

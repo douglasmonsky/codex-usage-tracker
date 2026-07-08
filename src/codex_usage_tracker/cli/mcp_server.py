@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -42,6 +45,10 @@ from codex_usage_tracker.pricing.allowance import write_allowance_template
 from codex_usage_tracker.pricing.api import (
     update_pricing_from_openai_docs,
     write_pricing_template,
+)
+from codex_usage_tracker.reports.agentic_dogfood import (
+    DEFAULT_AGENTIC_DOGFOOD_DIR,
+    build_agentic_dogfood_report,
 )
 from codex_usage_tracker.reports.api import (
     build_action_brief_report,
@@ -82,6 +89,148 @@ from codex_usage_tracker.store.api import (
 )
 
 mcp = FastMCP("codex-usage-tracker")
+
+_DOGFOOD_JOBS: dict[str, dict[str, Any]] = {}
+_DOGFOOD_JOB_LOCK = threading.Lock()
+_DOGFOOD_MAX_JOBS = 25
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _copy_jsonable(value: dict[str, Any]) -> dict[str, Any]:
+    return json.loads(json.dumps(value))
+
+
+def _prune_dogfood_jobs() -> None:
+    if len(_DOGFOOD_JOBS) <= _DOGFOOD_MAX_JOBS:
+        return
+    removable = sorted(
+        (
+            job
+            for job in _DOGFOOD_JOBS.values()
+            if job.get("status") not in {"queued", "running"}
+        ),
+        key=lambda row: str(row.get("updated_at") or row.get("created_at") or ""),
+    )
+    for job in removable[: max(0, len(_DOGFOOD_JOBS) - _DOGFOOD_MAX_JOBS)]:
+        _DOGFOOD_JOBS.pop(str(job["job_id"]), None)
+
+
+def _dogfood_job_status_payload(
+    job_id: str,
+    *,
+    include_result: bool = False,
+) -> dict[str, Any]:
+    with _DOGFOOD_JOB_LOCK:
+        job = _DOGFOOD_JOBS.get(job_id)
+        if job is None:
+            return {
+                "schema": "codex-usage-tracker-async-job-status-v1",
+                "job_id": job_id,
+                "job_type": "agentic_dogfood",
+                "status": "not_found",
+                "percent_complete": 0,
+                "error": "Unknown dogfood job_id. Jobs are in-process and cleared when the MCP server restarts.",
+            }
+        payload = {
+            "schema": "codex-usage-tracker-async-job-status-v1",
+            "job_id": job["job_id"],
+            "job_type": job["job_type"],
+            "status": job["status"],
+            "percent_complete": job["percent_complete"],
+            "current_stage": job.get("current_stage"),
+            "stages": list(job.get("stages", [])),
+            "created_at": job["created_at"],
+            "updated_at": job["updated_at"],
+            "started_at": job.get("started_at"),
+            "completed_at": job.get("completed_at"),
+            "error": job.get("error"),
+            "filters": dict(job.get("filters", {})),
+            "cache": dict(job.get("cache", {})),
+            "artifacts": dict(job.get("artifacts", {})),
+            "result_available": bool(job.get("result")),
+            "polling_note": (
+                "Poll usage_dogfood_status until status is completed or failed, then call usage_dogfood_result."
+            ),
+        }
+        if include_result and job.get("result") is not None:
+            payload["result"] = job["result"]
+        return _copy_jsonable(payload)
+
+
+def _update_dogfood_job(job_id: str, **updates: Any) -> None:
+    with _DOGFOOD_JOB_LOCK:
+        job = _DOGFOOD_JOBS[job_id]
+        job.update(updates)
+        job["updated_at"] = _utc_now()
+
+
+def _append_dogfood_stage(job_id: str, stage: dict[str, Any]) -> None:
+    with _DOGFOOD_JOB_LOCK:
+        job = _DOGFOOD_JOBS[job_id]
+        stages = list(job.get("stages", []))
+        stages.append(stage)
+        job["stages"] = stages
+        job["current_stage"] = stage.get("stage")
+        job["percent_complete"] = int(stage.get("percent") or job.get("percent_complete") or 0)
+        if stage.get("cache_keys") is not None:
+            job["cache"] = {
+                "scope": "single_run_shared_reports",
+                "cache_keys": list(stage["cache_keys"]),
+            }
+        job["updated_at"] = _utc_now()
+
+
+def _run_dogfood_job(job_id: str, params: dict[str, Any]) -> None:
+    _update_dogfood_job(
+        job_id,
+        status="running",
+        percent_complete=1,
+        current_stage="start",
+        started_at=_utc_now(),
+    )
+    try:
+        payload = build_agentic_dogfood_report(
+            codex_home=params["codex_home"],
+            db_path=params["db_path"],
+            pricing_path=params["pricing_path"],
+            allowance_path=params["allowance_path"],
+            rate_card_path=params["rate_card_path"],
+            projects_path=params["projects_path"],
+            output_dir=params["output_dir"],
+            since=params["since"],
+            until=params["until"],
+            thread=params["thread"],
+            include_archived=params["include_archived"],
+            evidence_limit=params["evidence_limit"],
+            privacy_mode=params["privacy_mode"],
+            refresh=params["refresh"],
+            run_hypotheses=params["run_hypotheses"],
+            run_deep_investigations=params["run_deep_investigations"],
+            write_markdown=params["write_markdown"],
+            progress_callback=lambda stage: _append_dogfood_stage(job_id, stage),
+        )
+    except Exception as exc:  # pragma: no cover - exercised through integration failure paths.
+        _update_dogfood_job(
+            job_id,
+            status="failed",
+            current_stage="failed",
+            error=f"{type(exc).__name__}: {exc}",
+            completed_at=_utc_now(),
+        )
+        return
+    _update_dogfood_job(
+        job_id,
+        status="completed",
+        percent_complete=100,
+        current_stage="write_artifacts",
+        completed_at=_utc_now(),
+        result=payload,
+        cache=payload.get("cache", {}),
+        artifacts=payload.get("artifacts", {}),
+    )
 
 
 def _query_string(**values: object) -> str:
@@ -701,6 +850,96 @@ def usage_action_brief(
         evidence_limit=evidence_limit,
         privacy_mode=privacy_mode,
     ).payload
+
+
+@mcp.tool()
+def usage_dogfood_start(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    evidence_limit: int = 5,
+    privacy_mode: str = "strict",
+    refresh: bool = True,
+    run_hypotheses: bool = False,
+    run_deep_investigations: bool = False,
+    write_markdown: bool = True,
+) -> dict[str, Any]:
+    """Start async aggregate dogfood diagnostics and return a polling job id."""
+    job_id = uuid.uuid4().hex
+    now = _utc_now()
+    params = {
+        "codex_home": DEFAULT_CODEX_HOME,
+        "db_path": DEFAULT_DB_PATH,
+        "pricing_path": DEFAULT_PRICING_PATH,
+        "allowance_path": DEFAULT_ALLOWANCE_PATH,
+        "rate_card_path": DEFAULT_RATE_CARD_PATH,
+        "projects_path": DEFAULT_PROJECTS_PATH,
+        "output_dir": DEFAULT_AGENTIC_DOGFOOD_DIR / "jobs" / job_id,
+        "since": since,
+        "until": until,
+        "thread": thread,
+        "include_archived": include_archived,
+        "evidence_limit": max(1, evidence_limit),
+        "privacy_mode": privacy_mode,
+        "refresh": refresh,
+        "run_hypotheses": run_hypotheses,
+        "run_deep_investigations": run_deep_investigations,
+        "write_markdown": write_markdown,
+    }
+    with _DOGFOOD_JOB_LOCK:
+        _DOGFOOD_JOBS[job_id] = {
+            "job_id": job_id,
+            "job_type": "agentic_dogfood",
+            "status": "queued",
+            "percent_complete": 0,
+            "current_stage": "queued",
+            "stages": [],
+            "created_at": now,
+            "updated_at": now,
+            "started_at": None,
+            "completed_at": None,
+            "error": None,
+            "filters": {
+                "since": since,
+                "until": until,
+                "thread": thread,
+                "include_archived": include_archived,
+                "evidence_limit": max(1, evidence_limit),
+                "privacy_mode": privacy_mode,
+                "refresh": refresh,
+                "run_hypotheses": run_hypotheses,
+                "run_deep_investigations": run_deep_investigations,
+            },
+            "cache": {},
+            "artifacts": {},
+            "result": None,
+        }
+        _prune_dogfood_jobs()
+    worker = threading.Thread(
+        target=_run_dogfood_job,
+        args=(job_id, params),
+        name=f"codex-usage-dogfood-{job_id[:8]}",
+        daemon=True,
+    )
+    worker.start()
+    return _dogfood_job_status_payload(job_id)
+
+
+@mcp.tool()
+def usage_dogfood_status(job_id: str, include_result: bool = False) -> dict[str, Any]:
+    """Poll async dogfood progress percent, stage, cache keys, and completion state."""
+    return _dogfood_job_status_payload(job_id, include_result=include_result)
+
+
+@mcp.tool()
+def usage_dogfood_result(job_id: str) -> dict[str, Any]:
+    """Return completed async dogfood payload or current status when still running."""
+    status = _dogfood_job_status_payload(job_id, include_result=True)
+    if status.get("status") != "completed":
+        return status
+    result = status.get("result")
+    return result if isinstance(result, dict) else status
 
 
 @mcp.tool()

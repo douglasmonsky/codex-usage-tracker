@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -88,6 +89,7 @@ def build_agentic_dogfood_report(
     run_hypotheses: bool = False,
     run_deep_investigations: bool = False,
     write_markdown: bool = True,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run the repeatable agentic MCP dogfood battery and write compact artifacts."""
 
@@ -96,6 +98,11 @@ def build_agentic_dogfood_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     progress_stages: list[dict[str, Any]] = []
     report_cache: dict[str, dict[str, Any]] = {}
+
+    def record_stage(stage: dict[str, Any]) -> None:
+        progress_stages.append(stage)
+        if progress_callback is not None:
+            progress_callback(stage)
 
     refresh_payload: dict[str, Any] | None = None
     if refresh:
@@ -109,7 +116,7 @@ def build_agentic_dogfood_report(
             refresh_result,
             schema="codex-usage-tracker-refresh-v1",
         )
-    progress_stages.append(_dogfood_stage("refresh", 10, completed=True, skipped=not refresh))
+    record_stage(_dogfood_stage("refresh", 10, completed=True, skipped=not refresh))
 
     if run_hypotheses:
         old_hypotheses = build_hypothesis_test_report(
@@ -169,12 +176,8 @@ def build_agentic_dogfood_report(
             evidence_limit=normalized_limit,
             privacy_mode=privacy_mode,
         )
-    progress_stages.append(
-        _dogfood_stage("old_hypotheses", 25, completed=True, skipped=not run_hypotheses)
-    )
-    progress_stages.append(
-        _dogfood_stage("new_hypotheses", 40, completed=True, skipped=not run_hypotheses)
-    )
+    record_stage(_dogfood_stage("old_hypotheses", 25, completed=True, skipped=not run_hypotheses))
+    record_stage(_dogfood_stage("new_hypotheses", 40, completed=True, skipped=not run_hypotheses))
 
     large_low_output = build_large_low_output_report(
         db_path=db_path,
@@ -222,7 +225,7 @@ def build_agentic_dogfood_report(
         privacy_mode=privacy_mode,
     ).payload
     report_cache["recommendations"] = recommendations
-    progress_stages.append(_dogfood_stage("direct_reports", 60, completed=True))
+    record_stage(_dogfood_stage("direct_reports", 60, completed=True))
     action_brief = build_action_brief_report(
         db_path=db_path,
         pricing_path=pricing_path,
@@ -238,7 +241,7 @@ def build_agentic_dogfood_report(
         precomputed_reports=report_cache,
     ).payload
     report_cache["action_brief"] = action_brief
-    progress_stages.append(
+    record_stage(
         _dogfood_stage("action_brief", 70, completed=True, cache_keys=sorted(report_cache))
     )
     allowance = build_allowance_diagnostics_report(
@@ -249,7 +252,7 @@ def build_agentic_dogfood_report(
         limit=50,
         privacy_mode=privacy_mode,
     ).payload
-    progress_stages.append(_dogfood_stage("allowance", 78, completed=True))
+    record_stage(_dogfood_stage("allowance", 78, completed=True))
     suggestions = build_investigation_suggestions_report(
         goal=None,
         since=since,
@@ -259,7 +262,7 @@ def build_agentic_dogfood_report(
         limit=10,
         privacy_mode=privacy_mode,
     ).payload
-    progress_stages.append(_dogfood_stage("suggestions", 84, completed=True))
+    record_stage(_dogfood_stage("suggestions", 84, completed=True))
     if run_deep_investigations:
         token_waste = build_agentic_investigation_report(
             db_path=db_path,
@@ -300,7 +303,7 @@ def build_agentic_dogfood_report(
             goal="workflow_churn",
             families={"repeated_file_rediscovery", "shell_churn"},
         )
-    progress_stages.append(
+    record_stage(
         _dogfood_stage(
             "investigation_findings",
             92,
@@ -343,6 +346,8 @@ def build_agentic_dogfood_report(
         markdown_path.write_text(render_agentic_dogfood_markdown(payload), encoding="utf-8")
         payload["artifacts"]["summary_markdown_path"] = str(markdown_path)
         json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if progress_callback is not None:
+        progress_callback(_dogfood_stage("write_artifacts", 100, completed=True))
     return payload
 
 
