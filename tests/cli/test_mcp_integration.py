@@ -81,6 +81,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     command_scan_json = mcp_server.usage_command_loop_scan(min_occurrences=1, limit=2)
     file_scan_json = mcp_server.usage_file_churn_scan(min_occurrences=1, limit=2)
     context_scan_json = mcp_server.usage_context_bloat_scan(min_occurrences=1, limit=2)
+    suggestions_json = mcp_server.usage_suggest_investigations(goal="token_waste", limit=2)
+    agentic_investigation_json = mcp_server.usage_investigate(
+        goal="token_waste",
+        evidence_limit=2,
+    )
     investigation_walk_json = mcp_server.usage_investigation_walk(
         question="Look for local token waste patterns",
         min_occurrences=1,
@@ -140,6 +145,8 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         command_scan_json,
         file_scan_json,
         context_scan_json,
+        suggestions_json,
+        agentic_investigation_json,
         investigation_walk_json,
         local_evidence_export_json,
         session_json,
@@ -211,6 +218,15 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert investigation_walk_json["includes_indexed_content"] is True
     assert investigation_walk_json["includes_raw_fragments"] is False
     assert investigation_walk_json["branches"]
+    assert suggestions_json["schema"] == "codex-usage-tracker-investigation-suggestions-v1"
+    assert suggestions_json["content_mode"] == "aggregate_guidance"
+    assert suggestions_json["includes_raw_fragments"] is False
+    assert suggestions_json["suggestions"]
+    assert agentic_investigation_json["schema"] == "codex-usage-tracker-agentic-investigation-v1"
+    assert agentic_investigation_json["content_mode"] == "aggregate_investigation"
+    assert agentic_investigation_json["includes_indexed_content"] is False
+    assert agentic_investigation_json["includes_raw_fragments"] is False
+    assert agentic_investigation_json["findings"]
     assert local_evidence_export_json["schema"] == "codex-usage-tracker-local-evidence-export-v1"
     assert local_evidence_export_json["content_mode"] == "shareable_local_evidence"
     assert local_evidence_export_json["includes_indexed_content"] is False

@@ -364,6 +364,51 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
+    'codex-usage-tracker-investigation-suggestions-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "goal": (str, NoneType),
+            "available_goals": list,
+            "filters": dict,
+            "summary": dict,
+            "suggestions": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "limit": (int, NoneType),
+            }
+        },
+    },
+    'codex-usage-tracker-agentic-investigation-v1': {
+        "required": {
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "privacy_mode": str,
+            "goal": str,
+            "filters": dict,
+            "summary": dict,
+            "findings": list,
+            "recommended_next_tools": list,
+            "caveats": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "thread": (str, NoneType),
+                "include_archived": bool,
+                "evidence_limit": int,
+            }
+        },
+    },
     'codex-usage-tracker-investigation-walk-v1': {
         "required": {
             "content_mode": str,

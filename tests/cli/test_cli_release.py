@@ -79,6 +79,8 @@ MCP_TOOL_NAMES = {
     "usage_repeated_file_rediscovery",
     "usage_shell_churn",
     "usage_large_low_output_calls",
+    "usage_suggest_investigations",
+    "usage_investigate",
     "usage_context_bloat_scan",
     "usage_investigation_walk",
     "usage_local_evidence_export",
