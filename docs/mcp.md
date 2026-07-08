@@ -79,6 +79,7 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_repetition_scan`
 - `usage_command_loop_scan`
 - `usage_file_churn_scan`
+- `usage_repeated_file_rediscovery`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
 - `usage_local_evidence_export`
@@ -118,6 +119,8 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `usage_thread_trace(...)` returns a paged call timeline for one thread, thread key, session id, or seed record id, with local indexed fragments attached when present. It is also an explicit local content-index surface and carries the same indexed-content flags.
 
 `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, and `usage_context_bloat_scan(...)` run explicit local content/event-index diagnostics over normalized fragment hashes, command roots/labels, file hashes/basenames, and aggregate token rows. These payloads set `includes_indexed_content=true` and `includes_raw_fragments=false`.
+
+`usage_repeated_file_rediscovery(...)` ranks repeated exact safe file identities by path hash/identity, basename, extension, operation mix, adjacent retouches, aggregate token totals, and `usage_thread_trace` handles. Use it when the user asks which files are being rediscovered or reread repeatedly. It does not expose full paths or raw fragments.
 
 `usage_investigation_walk(question=...)` runs a bounded local hypothesis walk over those normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. It is local-index evidence, not a shareable aggregate-only report.
 

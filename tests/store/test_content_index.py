@@ -9,6 +9,7 @@ from codex_usage_tracker.reports.api import (
     build_investigation_walk_report,
     build_local_evidence_export_report,
     build_pattern_scan_report,
+    build_repeated_file_rediscovery_report,
     build_thread_trace_report,
 )
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
@@ -268,6 +269,86 @@ def test_content_search_returns_explicit_local_snippets(tmp_path: Path) -> None:
     assert payload["rows"][0]["includes_raw_fragment"] is True
     assert "SECRET" in payload["rows"][0]["snippet"]
     assert payload["rows"][0]["snippet_truncated"] is True
+
+
+def test_repeated_file_rediscovery_ranks_safe_path_hashes(tmp_path: Path) -> None:
+    codex_home = tmp_path / ".codex"
+    session_id = "019e3911-c0de-7777-8afe-111111111111"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "19"
+        / f"rollout-2026-05-19T10-00-00-{session_id}.jsonl"
+    )
+    rows: list[dict[str, object]] = [_entry("session_meta", {"id": session_id})]
+    for index, path in enumerate(
+        [
+            "docs/repeated_notes.md",
+            "docs/repeated_notes.md",
+            "docs/repeated_notes.md",
+            "docs/unrelated_notes.md",
+        ],
+        start=1,
+    ):
+        rows.extend(
+            [
+                _entry("turn_context", {"turn_id": f"turn-{index}", "model": "gpt-5.5"}),
+                _entry(
+                    "response_item",
+                    {
+                        "type": "function_call",
+                        "call_id": f"call-read-{index}",
+                        "name": "exec_command",
+                        "arguments": json.dumps({"cmd": f"cat {path}"}),
+                    },
+                ),
+                _entry(
+                    "response_item",
+                    {
+                        "type": "function_call_output",
+                        "call_id": f"call-read-{index}",
+                        "output": (
+                            "Chunk ID: abc123\n"
+                            "Wall time: 0.0000 seconds\n"
+                            "Process exited with code 0\n"
+                            "Original token count: 4\n"
+                            "Output:\n"
+                            "safe synthetic output"
+                        ),
+                    },
+                ),
+                _token_event(500 + index * 100, 100 + index * 10),
+            ]
+        )
+    _write_jsonl(log_path, rows)
+
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    payload = build_repeated_file_rediscovery_report(
+        db_path=db_path,
+        min_occurrences=2,
+        limit=5,
+    ).payload
+
+    assert validate_json_payload_contract(payload) == []
+    assert payload["schema"] == "codex-usage-tracker-repeated-file-rediscovery-v1"
+    assert payload["content_mode"] == "local_content_index"
+    assert payload["includes_indexed_content"] is True
+    assert payload["includes_raw_fragments"] is False
+    assert payload["row_count"] == 1
+    top = payload["rows"][0]
+    assert top["path_basename"] == "repeated_notes.md"
+    assert top["path_extension"] == ".md"
+    assert top["candidate_kind"] == "repeated_read_rediscovery"
+    assert top["operation_mix"]["read"] == 3
+    assert top["call_count"] == 3
+    assert top["trace_handles"][0]["next_tool"] == "usage_thread_trace"
+    serialized = json.dumps(payload)
+    assert "docs/repeated_notes.md" not in serialized
+    assert "docs/unrelated_notes.md" not in serialized
 
 
 def test_thread_trace_returns_calls_with_indexed_fragments(tmp_path: Path) -> None:

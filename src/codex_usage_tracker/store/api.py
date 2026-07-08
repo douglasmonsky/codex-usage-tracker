@@ -60,6 +60,9 @@ from codex_usage_tracker.store.diagnostic_queries import (
 )
 from codex_usage_tracker.store.exports import export_usage_csv as export_usage_csv
 from codex_usage_tracker.store.investigation_runs import insert_investigation_run
+from codex_usage_tracker.store.repeated_files import (
+    query_repeated_file_rediscovery as query_repeated_file_rediscovery_rows,
+)
 from codex_usage_tracker.store.rows import (
     row_to_dict as _row_to_dict,
 )
@@ -263,7 +266,34 @@ def query_pattern_scan(
             thread=thread,
             include_archived=include_archived,
             min_occurrences=min_occurrences,
+        limit=limit,
+    )
+
+
+def query_repeated_file_rediscovery(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 2,
+    limit: int | None = 20,
+    sample_limit: int = 3,
+) -> dict[str, Any]:
+    """Return repeated safe file-identity rediscovery candidates."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        return query_repeated_file_rediscovery_rows(
+            conn,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_occurrences=min_occurrences,
             limit=limit,
+            sample_limit=sample_limit,
         )
 
 
