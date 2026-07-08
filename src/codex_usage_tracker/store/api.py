@@ -559,10 +559,11 @@ def record_source_file_metadata(
     with connect(db_path) as conn:
         init_db(conn)
         upsert_source_file_metadata(conn, parsed_files=parsed)
-        sync_source_records(
-            conn,
-            source_files=[str(path) for path, _events, _diagnostics, _state in parsed],
-        )
+        record_ids = [
+            event.record_id for _path, events, *_rest in parsed for event in events
+        ]
+        if record_ids:
+            sync_source_records(conn, record_ids=record_ids)
 
 
 def upsert_usage_events(

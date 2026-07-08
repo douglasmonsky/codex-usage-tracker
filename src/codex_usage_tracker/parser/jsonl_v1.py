@@ -61,6 +61,7 @@ class ParsedUsageFile:
     events: list[UsageEvent]
     diagnostic_facts: list[DiagnosticFact]
     state: ParserState
+    final_line_number: int = 0
 
 
 @dataclass
@@ -96,11 +97,13 @@ def parse_codex_jsonl_v1(
 
     previous_state = initial_state or ParserState()
     state = _initial_jsonl_parse_state(previous_state, file_session_id, index)
+    final_line_number = start_line
 
     with path.open("rb") as handle:
         if start_byte > 0:
             handle.seek(start_byte)
         for line_number, raw_line in enumerate(handle, start_line + 1):
+            final_line_number = line_number
             _handle_jsonl_line(
                 path=path,
                 index=index,
@@ -123,6 +126,7 @@ def parse_codex_jsonl_v1(
             latest_record_id=state.latest_record_id,
             latest_event_timestamp=state.latest_event_timestamp,
         ),
+        final_line_number=final_line_number,
     )
 
 

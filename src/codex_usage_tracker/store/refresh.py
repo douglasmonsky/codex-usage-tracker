@@ -74,7 +74,15 @@ def refresh_usage_index(
         file_events = parsed_file.events
         events.extend(file_events)
         diagnostic_facts.extend(parsed_file.diagnostic_facts)
-        parsed_files.append((plan.path, file_events, file_stats, parsed_file.state))
+        parsed_files.append(
+            (
+                plan.path,
+                file_events,
+                file_stats,
+                parsed_file.state,
+                parsed_file.final_line_number,
+            )
+        )
         for key, value in file_stats.items():
             stats[key] = stats.get(key, 0) + int(value)
     inserted = upsert_usage_events(
