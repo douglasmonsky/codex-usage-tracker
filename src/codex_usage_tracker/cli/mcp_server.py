@@ -47,6 +47,7 @@ from codex_usage_tracker.reports.api import (
     build_content_search_report,
     build_expensive_calls_report,
     build_investigation_walk_report,
+    build_large_low_output_report,
     build_local_evidence_export_report,
     build_pattern_scan_report,
     build_pricing_coverage_report,
@@ -587,6 +588,32 @@ def usage_shell_churn(
         min_occurrences=min_occurrences,
         limit=limit,
         sample_limit=sample_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_large_low_output_calls(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_total_tokens: int = 20_000,
+    max_output_tokens: int = 1_000,
+    limit: int | None = 20,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Find high-token calls with low output as token-waste candidates."""
+
+    return build_large_low_output_report(
+        db_path=DEFAULT_DB_PATH,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_total_tokens=min_total_tokens,
+        max_output_tokens=max_output_tokens,
+        limit=limit,
         privacy_mode=privacy_mode,
     ).payload
 
