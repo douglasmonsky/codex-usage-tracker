@@ -222,11 +222,34 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert suggestions_json["content_mode"] == "aggregate_guidance"
     assert suggestions_json["includes_raw_fragments"] is False
     assert suggestions_json["suggestions"]
+    suggestion_goals = [row["goal"] for row in suggestions_json["suggestions"]]
+    assert suggestion_goals == ["token_waste", "cache_failure"]
+    overview_suggestions = mcp_server.usage_suggest_investigations(goal="overview", limit=5)
+    assert [row["goal"] for row in overview_suggestions["suggestions"]] == [
+        "overview",
+        "token_waste",
+        "cache_failure",
+        "workflow_churn",
+        "allowance_change",
+    ]
     assert agentic_investigation_json["schema"] == "codex-usage-tracker-agentic-investigation-v1"
     assert agentic_investigation_json["content_mode"] == "aggregate_investigation"
     assert agentic_investigation_json["includes_indexed_content"] is False
     assert agentic_investigation_json["includes_raw_fragments"] is False
+    assert agentic_investigation_json["filters"]["detail_mode"] == "compact"
     assert agentic_investigation_json["findings"]
+    first_finding = agentic_investigation_json["findings"][0]
+    assert first_finding["evidence_summary"]["row_count"] == first_finding["evidence_count"]
+    assert first_finding["missing_access"]
+    if first_finding["evidence"]:
+        assert "source_file" not in first_finding["evidence"][0]
+    full_investigation_json = mcp_server.usage_investigate(
+        goal="token_waste",
+        evidence_limit=1,
+        detail_mode="full",
+    )
+    assert full_investigation_json["filters"]["detail_mode"] == "full"
+    assert full_investigation_json["findings"][0]["evidence_summary"]["row_count"] == 1
     assert local_evidence_export_json["schema"] == "codex-usage-tracker-local-evidence-export-v1"
     assert local_evidence_export_json["content_mode"] == "shareable_local_evidence"
     assert local_evidence_export_json["includes_indexed_content"] is False

@@ -9,11 +9,11 @@ Act as an evidence-first analyst for Codex Usage Tracker data. Prefer MCP JSON p
 
 ## Operating Rules
 
-- For "Open dashboard" or similar requests, start the live localhost dashboard with `codex-usage-tracker serve-dashboard --context-api explicit --open`. Refresh is the default for dashboard launch commands; use `open-dashboard` only when the user explicitly asks for a static/offline snapshot or the environment cannot keep a server alive. Say the result is static and Live requires `serve-dashboard`.
+- For "Open dashboard" style requests, start the live localhost dashboard with `codex-usage-tracker serve-dashboard --context-api explicit --open`. Refresh is the default for dashboard launch commands. Use `open-dashboard` only when the user explicitly wants a static/offline snapshot or the environment cannot keep a server alive. Say the result is static and Live requires `serve-dashboard`.
 - Refresh with `refresh_usage_index` unless the user asks for a static historical snapshot.
 - Start with aggregate/shareable tools. Do not expose prompts, assistant messages, raw tool output, pasted secrets, raw commands, full paths, or transcript snippets unless the user explicitly asks for local content or raw context.
 - Check top-level `schema`, `content_mode`, `includes_indexed_content`, `includes_raw_fragments`, row counts, truncation, and caveats before interpreting payloads.
-- Name the scope: time window, project/thread/model filters, included archived state, row limit, and whether results are estimates.
+- Name scope: time window, project/thread/model filters, included archived state, row limit, detail mode, and whether results are estimates.
 - Separate exact facts from estimates. Call out `pricing_estimated`, missing `pricing_model`, `usage_credit_confidence`, missing allowance windows, and outside-usage caveats.
 - For broad asks, give diagnosis plus remediation: `Evidence`, `Likely waste pattern`, `Next action`, `How to verify`.
 
@@ -25,16 +25,16 @@ Act as an evidence-first analyst for Codex Usage Tracker data. Prefer MCP JSON p
 4. If the user asks about cache misses, cold resumes, context bloat, or low-output expensive calls, call `usage_investigate(goal="cache_failure")`, then inspect `usage_large_low_output_calls(...)`, `usage_calls(...)`, `usage_report_pack(...)`, or `usage_context_bloat_scan(...)`.
 5. If the user asks about repeated shell probing, repeated file rediscovery, or workflow churn, call `usage_investigate(goal="workflow_churn")`, then inspect `usage_shell_churn(...)`, `usage_repeated_file_rediscovery(...)`, or `usage_investigation_walk(question=...)`.
 6. If the user asks a precise dashboard/API question, use the direct tool: `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_summary`, `usage_query`, `session_usage`, `usage_report_pack`, `usage_dashboard_recommendations`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`.
-7. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration or when the user agrees transcript-level indexed snippets are needed.
+7. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
 8. Use `usage_call_context(...)` only when the user explicitly asks for raw local context and the MCP server has raw context enabled.
 
 ## Tool Stance
 
-- `usage_suggest_investigations` is the front door for ideas. It should return short, goal-led options and safe defaults.
-- `usage_investigate` is the first stop for broad agentic analysis. It returns normalized findings, confidence, recommended actions, verification tools, and caveats.
+- `usage_suggest_investigations` is the front door for ideas. It should return a short, goal-led menu with adjacent safe next options.
+- `usage_investigate` is the first stop for broad agentic analysis. The default `detail_mode="compact"` returns evidence summaries and compact rows; use `detail_mode="full"` only when full underlying diagnostic rows are necessary.
 - `usage_allowance_diagnostics` is the main allowance-change evidence tool. Treat weekly windows as the primary signal and 5-hour windows as noisy rolling-window context.
-- `usage_large_low_output_calls`, `usage_shell_churn`, and `usage_repeated_file_rediscovery` are token-waste diagnostics. They should produce actionable next steps before resorting to raw context.
-- `usage_investigation_walk` and local pattern scans can use the content/event index. They are useful for deeper local diagnosis, but not default shareable reports.
+- `usage_large_low_output_calls`, `usage_shell_churn`, and `usage_repeated_file_rediscovery` are the most actionable token-waste probes. Use them to turn broad findings into concrete next steps.
+- `usage_investigation_walk` can use local content/event-index signals for deeper pattern scans, but it is not the default shareable report.
 - If MCP tools are unavailable, use CLI JSON equivalents documented in `docs/cli-json-schemas.md`.
 
 ## Remediation Guidance
@@ -42,9 +42,9 @@ Act as an evidence-first analyst for Codex Usage Tracker data. Prefer MCP JSON p
 Recommend fixes only when supported by evidence. Useful categories include:
 
 - Dashboard inspection: open Calls, Threads, Call Investigator, Diagnostics Notebook, or Allowance Intelligence around specific evidence rows.
-- Workflow changes: split long threads after planning, preserve handoff summaries, avoid broad rediscovery, lower effort for routine tasks, narrow test selection before final gates.
-- Existing tools: suggest Headroom when context pressure or handoff timing is the likely issue and the tool is available.
-- Custom local solutions: suggest a small script, command, repo note, or skill when the same file discovery, shell loop, or validation sequence keeps recurring.
+- Workflow changes: split long threads after planning, preserve handoff summaries, avoid broad rediscovery, lower effort for routine tasks, and narrow test selection before final gates.
+- Existing tools: suggest Headroom when context pressure or handoff timing appears relevant and the tool is available.
+- Custom local solutions: suggest a small script, command, repo note, or skill update when the same file discovery, shell loop, or validation sequence keeps recurring.
 
 ## Answer Style
 
