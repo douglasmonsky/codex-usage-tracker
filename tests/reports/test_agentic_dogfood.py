@@ -32,6 +32,13 @@ def test_agentic_dogfood_report_writes_compact_private_artifacts(tmp_path: Path)
     assert payload["family_checks"]["old_passed"] is True
     assert payload["family_checks"]["new_passed"] is True
     assert payload["privacy_checks"]["passed"] is True
+    assert payload["progress"]["percent_complete"] == 100
+    assert payload["progress"]["stages"][-1]["stage"] == "write_artifacts"
+    assert payload["cache"]["scope"] == "single_run_shared_reports"
+    assert payload["cache"]["hypotheses"] is False
+    assert payload["cache"]["deep_investigations"] is False
+    assert "large_low_output" in payload["cache"]["cache_keys"]
+    assert payload["old_hypotheses"][0]["status"] == "skipped_quick_mode"
     assert "action_brief" in payload["direct_reports"]
     assert payload["direct_reports"]["action_brief"]["action_count"] is not None
     assert payload["refresh"]["parsed_events"] > 0

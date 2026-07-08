@@ -1043,11 +1043,13 @@ def build_action_brief_report(
     include_archived: bool = False,
     evidence_limit: int = 5,
     privacy_mode: str = "normal",
+    precomputed_reports: dict[str, dict[str, Any]] | None = None,
 ) -> ActionBriefReport:
     """Build a compact remediation brief from aggregate diagnostics."""
     privacy_mode = validate_privacy_mode(privacy_mode)
     normalized_goal = _normalize_agentic_goal(goal) or "token_waste"
     normalized_limit = max(1, evidence_limit)
+    report_cache = precomputed_reports if precomputed_reports is not None else {}
     actions: list[dict[str, Any]] = []
     source_reports: list[str] = []
     caveats = [
@@ -1057,15 +1059,18 @@ def build_action_brief_report(
     ]
 
     if normalized_goal in {"overview", "token_waste", "cache_failure"}:
-        large_low_output = build_large_low_output_report(
-            db_path=db_path,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
+        large_low_output = report_cache.get("large_low_output")
+        if large_low_output is None:
+            large_low_output = build_large_low_output_report(
+                db_path=db_path,
+                since=since,
+                until=until,
+                thread=thread,
+                include_archived=include_archived,
+                limit=normalized_limit,
+                privacy_mode=privacy_mode,
+            ).payload
+            report_cache["large_low_output"] = large_low_output
         source_reports.append(str(large_low_output["schema"]))
         if large_low_output["rows"]:
             actions.append(
@@ -1103,30 +1108,36 @@ def build_action_brief_report(
                 )
             )
 
-        recommendations = build_recommendations_report(
-            db_path=db_path,
-            pricing_path=pricing_path,
-            allowance_path=allowance_path,
-            projects_path=projects_path,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
+        recommendations = report_cache.get("recommendations")
+        if recommendations is None:
+            recommendations = build_recommendations_report(
+                db_path=db_path,
+                pricing_path=pricing_path,
+                allowance_path=allowance_path,
+                projects_path=projects_path,
+                since=since,
+                until=until,
+                thread=thread,
+                include_archived=include_archived,
+                limit=normalized_limit,
+                privacy_mode=privacy_mode,
+            ).payload
+            report_cache["recommendations"] = recommendations
         source_reports.append(str(recommendations["schema"]))
 
     if normalized_goal in {"overview", "token_waste", "cache_failure", "workflow_churn"}:
-        repeated_files = build_repeated_file_rediscovery_report(
-            db_path=db_path,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
+        repeated_files = report_cache.get("repeated_files")
+        if repeated_files is None:
+            repeated_files = build_repeated_file_rediscovery_report(
+                db_path=db_path,
+                since=since,
+                until=until,
+                thread=thread,
+                include_archived=include_archived,
+                limit=normalized_limit,
+                privacy_mode=privacy_mode,
+            ).payload
+            report_cache["repeated_files"] = repeated_files
         source_reports.append(str(repeated_files["schema"]))
         if repeated_files["rows"]:
             actions.append(
@@ -1160,16 +1171,19 @@ def build_action_brief_report(
                 )
             )
 
-        shell_churn = build_shell_churn_report(
-            db_path=db_path,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            min_occurrences=2,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
+        shell_churn = report_cache.get("shell_churn")
+        if shell_churn is None:
+            shell_churn = build_shell_churn_report(
+                db_path=db_path,
+                since=since,
+                until=until,
+                thread=thread,
+                include_archived=include_archived,
+                min_occurrences=2,
+                limit=normalized_limit,
+                privacy_mode=privacy_mode,
+            ).payload
+            report_cache["shell_churn"] = shell_churn
         source_reports.append(str(shell_churn["schema"]))
         if shell_churn["rows"]:
             actions.append(
@@ -1266,6 +1280,7 @@ def build_action_brief_report(
             "action_count": len(actions),
             "top_action_family": actions[0]["family"] if actions else None,
             "source_reports": source_reports,
+            "shared_report_cache_keys": sorted(report_cache),
         },
         "actions": actions,
         "recommended_next_tools": _dedupe_action_tools(actions),
@@ -1480,26 +1495,6 @@ def _classify_hypothesis_text(text: str) -> str | None:
     if _has_any_phrase(
         text,
         (
-            "token waste",
-            "wasting tokens",
-            "waste",
-            "expensive",
-            "cost",
-            "large low-output",
-            "large low output",
-            "low-output",
-            "low output",
-            "output length",
-            "context pressure",
-            "large call",
-            "large calls",
-            "cleanup target",
-        ),
-    ):
-        return "token_waste"
-    if _has_any_phrase(
-        text,
-        (
             "file",
             "rediscover",
             "rediscovery",
@@ -1521,6 +1516,26 @@ def _classify_hypothesis_text(text: str) -> str | None:
         return "shell_churn"
     if _has_any_word(text, ("effort", "model", "xhigh", "high", "medium", "gpt")):
         return "effort_model_choice"
+    if _has_any_phrase(
+        text,
+        (
+            "token waste",
+            "wasting tokens",
+            "waste",
+            "expensive",
+            "cost",
+            "large low-output",
+            "large low output",
+            "low-output",
+            "low output",
+            "output length",
+            "context pressure",
+            "large call",
+            "large calls",
+            "cleanup target",
+        ),
+    ):
+        return "token_waste"
     return None
 
 
@@ -2857,6 +2872,7 @@ def build_recommendations_report(
     include_archived: bool = False,
     min_score: float | None = None,
     limit: int = 20,
+    source_limit: int | None = None,
     privacy_mode: str = "normal",
 ) -> RecommendationsReport:
     """Build ranked aggregate recommendations for usage investigations."""
@@ -2870,6 +2886,7 @@ def build_recommendations_report(
         effort=effort,
         thread=thread,
         include_archived=include_archived,
+        source_limit=source_limit,
     )
     rows = _annotated_recommendation_rows(
         rows,
@@ -2901,10 +2918,11 @@ def build_recommendations_report(
                 "thread": thread,
                 "project": project,
                 "include_archived": include_archived,
-                "min_score": min_score,
-                "limit": normalized_limit,
-                "privacy_mode": privacy_mode,
-            },
+            "min_score": min_score,
+            "limit": normalized_limit,
+            "source_limit": source_limit,
+            "privacy_mode": privacy_mode,
+        },
             "row_count": len(private_rows),
             "total_matched_rows": len(scored_rows),
             "truncated": normalized_limit is not None and len(scored_rows) > normalized_limit,
@@ -2923,11 +2941,12 @@ def _recommendation_source_rows(
     effort: str | None,
     thread: str | None,
     include_archived: bool,
+    source_limit: int | None = None,
 ) -> list[dict[str, Any]]:
     return annotate_thread_attachments(
         query_dashboard_events(
             db_path,
-            limit=0,
+            limit=0 if source_limit is None else source_limit,
             since=since,
             until=until,
             model=model,

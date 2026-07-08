@@ -24,6 +24,7 @@ from codex_usage_tracker.reports.api import (
     build_hypothesis_test_report,
     build_investigation_suggestions_report,
     build_large_low_output_report,
+    build_recommendations_report,
     build_repeated_file_rediscovery_report,
     build_shell_churn_report,
 )
@@ -84,6 +85,8 @@ def build_agentic_dogfood_report(
     evidence_limit: int = 5,
     privacy_mode: str = "strict",
     refresh: bool = True,
+    run_hypotheses: bool = False,
+    run_deep_investigations: bool = False,
     write_markdown: bool = True,
 ) -> dict[str, Any]:
     """Run the repeatable agentic MCP dogfood battery and write compact artifacts."""
@@ -91,6 +94,8 @@ def build_agentic_dogfood_report(
     privacy_mode = validate_privacy_mode(privacy_mode)
     normalized_limit = max(1, evidence_limit)
     output_dir.mkdir(parents=True, exist_ok=True)
+    progress_stages: list[dict[str, Any]] = []
+    report_cache: dict[str, dict[str, Any]] = {}
 
     refresh_payload: dict[str, Any] | None = None
     if refresh:
@@ -104,38 +109,72 @@ def build_agentic_dogfood_report(
             refresh_result,
             schema="codex-usage-tracker-refresh-v1",
         )
+    progress_stages.append(_dogfood_stage("refresh", 10, completed=True, skipped=not refresh))
 
-    old_hypotheses = build_hypothesis_test_report(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        allowance_path=allowance_path,
-        projects_path=projects_path,
-        question="Re-test prior usage-efficiency hypotheses against current local aggregate data.",
-        hypotheses=OLD_AGENTIC_HYPOTHESES,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        evidence_limit=normalized_limit,
-        privacy_mode=privacy_mode,
-    ).payload
-    new_hypotheses = build_hypothesis_test_report(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        allowance_path=allowance_path,
-        projects_path=projects_path,
-        question=(
-            "Test newer MCP investigation hypotheses around repeated files, shell churn, "
-            "local evidence, and allowance readiness."
-        ),
-        hypotheses=NEW_AGENTIC_HYPOTHESES,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        evidence_limit=normalized_limit,
-        privacy_mode=privacy_mode,
-    ).payload
+    if run_hypotheses:
+        old_hypotheses = build_hypothesis_test_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            question="Re-test prior usage-efficiency hypotheses against current local aggregate data.",
+            hypotheses=OLD_AGENTIC_HYPOTHESES,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=normalized_limit,
+            privacy_mode=privacy_mode,
+        ).payload
+        new_hypotheses = build_hypothesis_test_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            question=(
+                "Test newer MCP investigation hypotheses around repeated files, shell churn, "
+                "local evidence, and allowance readiness."
+            ),
+            hypotheses=NEW_AGENTIC_HYPOTHESES,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=normalized_limit,
+            privacy_mode=privacy_mode,
+        ).payload
+    else:
+        old_hypotheses = _lightweight_hypothesis_payload(
+            OLD_AGENTIC_HYPOTHESES,
+            EXPECTED_OLD_FAMILIES,
+            question="Re-test prior usage-efficiency hypotheses against current local aggregate data.",
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=normalized_limit,
+            privacy_mode=privacy_mode,
+        )
+        new_hypotheses = _lightweight_hypothesis_payload(
+            NEW_AGENTIC_HYPOTHESES,
+            EXPECTED_NEW_FAMILIES,
+            question=(
+                "Test newer MCP investigation hypotheses around repeated files, shell churn, "
+                "local evidence, and allowance readiness."
+            ),
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=normalized_limit,
+            privacy_mode=privacy_mode,
+        )
+    progress_stages.append(
+        _dogfood_stage("old_hypotheses", 25, completed=True, skipped=not run_hypotheses)
+    )
+    progress_stages.append(
+        _dogfood_stage("new_hypotheses", 40, completed=True, skipped=not run_hypotheses)
+    )
 
     large_low_output = build_large_low_output_report(
         db_path=db_path,
@@ -146,6 +185,7 @@ def build_agentic_dogfood_report(
         limit=normalized_limit,
         privacy_mode=privacy_mode,
     ).payload
+    report_cache["large_low_output"] = large_low_output
     shell_churn = build_shell_churn_report(
         db_path=db_path,
         since=since,
@@ -156,6 +196,7 @@ def build_agentic_dogfood_report(
         limit=normalized_limit,
         privacy_mode=privacy_mode,
     ).payload
+    report_cache["shell_churn"] = shell_churn
     repeated_files = build_repeated_file_rediscovery_report(
         db_path=db_path,
         since=since,
@@ -166,6 +207,22 @@ def build_agentic_dogfood_report(
         limit=normalized_limit,
         privacy_mode=privacy_mode,
     ).payload
+    report_cache["repeated_files"] = repeated_files
+    recommendations = build_recommendations_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        limit=normalized_limit,
+        source_limit=max(200, normalized_limit * 100),
+        privacy_mode=privacy_mode,
+    ).payload
+    report_cache["recommendations"] = recommendations
+    progress_stages.append(_dogfood_stage("direct_reports", 60, completed=True))
     action_brief = build_action_brief_report(
         db_path=db_path,
         pricing_path=pricing_path,
@@ -178,7 +235,12 @@ def build_agentic_dogfood_report(
         include_archived=include_archived,
         evidence_limit=normalized_limit,
         privacy_mode=privacy_mode,
+        precomputed_reports=report_cache,
     ).payload
+    report_cache["action_brief"] = action_brief
+    progress_stages.append(
+        _dogfood_stage("action_brief", 70, completed=True, cache_keys=sorted(report_cache))
+    )
     allowance = build_allowance_diagnostics_report(
         db_path=db_path,
         allowance_path=allowance_path,
@@ -187,6 +249,7 @@ def build_agentic_dogfood_report(
         limit=50,
         privacy_mode=privacy_mode,
     ).payload
+    progress_stages.append(_dogfood_stage("allowance", 78, completed=True))
     suggestions = build_investigation_suggestions_report(
         goal=None,
         since=since,
@@ -196,38 +259,64 @@ def build_agentic_dogfood_report(
         limit=10,
         privacy_mode=privacy_mode,
     ).payload
-    token_waste = build_agentic_investigation_report(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        allowance_path=allowance_path,
-        projects_path=projects_path,
-        goal="token_waste",
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        evidence_limit=normalized_limit,
-        detail_mode="compact",
-        privacy_mode=privacy_mode,
-    ).payload
-    workflow_churn = build_agentic_investigation_report(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        allowance_path=allowance_path,
-        projects_path=projects_path,
-        goal="workflow_churn",
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        evidence_limit=normalized_limit,
-        detail_mode="compact",
-        privacy_mode=privacy_mode,
-    ).payload
+    progress_stages.append(_dogfood_stage("suggestions", 84, completed=True))
+    if run_deep_investigations:
+        token_waste = build_agentic_investigation_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            goal="token_waste",
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=normalized_limit,
+            detail_mode="compact",
+            privacy_mode=privacy_mode,
+        ).payload
+        workflow_churn = build_agentic_investigation_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            goal="workflow_churn",
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=normalized_limit,
+            detail_mode="compact",
+            privacy_mode=privacy_mode,
+        ).payload
+    else:
+        token_waste = _lightweight_investigation_from_action_brief(
+            action_brief,
+            goal="token_waste",
+            families=None,
+        )
+        workflow_churn = _lightweight_investigation_from_action_brief(
+            action_brief,
+            goal="workflow_churn",
+            families={"repeated_file_rediscovery", "shell_churn"},
+        )
+    progress_stages.append(
+        _dogfood_stage(
+            "investigation_findings",
+            92,
+            completed=True,
+            skipped=not run_deep_investigations,
+            source="deep_investigations" if run_deep_investigations else "reused_action_brief",
+        )
+    )
 
     payload = _compact_dogfood_payload(
         refresh=refresh_payload,
         output_dir=output_dir,
+        progress_stages=progress_stages,
+        report_cache=report_cache,
+        run_hypotheses=run_hypotheses,
+        run_deep_investigations=run_deep_investigations,
         old_hypotheses=old_hypotheses,
         new_hypotheses=new_hypotheses,
         large_low_output=large_low_output,
@@ -261,6 +350,10 @@ def _compact_dogfood_payload(
     *,
     refresh: dict[str, Any] | None,
     output_dir: Path,
+    progress_stages: list[dict[str, Any]],
+    report_cache: dict[str, dict[str, Any]],
+    run_hypotheses: bool,
+    run_deep_investigations: bool,
     old_hypotheses: dict[str, Any],
     new_hypotheses: dict[str, Any],
     large_low_output: dict[str, Any],
@@ -295,6 +388,21 @@ def _compact_dogfood_payload(
             "evidence_limit": evidence_limit,
         },
         "refresh": refresh,
+        "progress": {
+            "mode": "synchronous_staged",
+            "percent_complete": 100,
+            "stages": [*progress_stages, _dogfood_stage("write_artifacts", 100, completed=True)],
+            "polling_note": (
+                "This synchronous CLI/MCP payload reports completed stages after return. "
+                "Live percent updates require an async job endpoint."
+            ),
+        },
+        "cache": {
+            "scope": "single_run_shared_reports",
+            "cache_keys": sorted(report_cache),
+            "hypotheses": run_hypotheses,
+            "deep_investigations": run_deep_investigations,
+        },
         "summary": {
             "old_hypothesis_count": len(old_summary),
             "new_hypothesis_count": len(new_summary),
@@ -358,6 +466,142 @@ def _compact_dogfood_payload(
         ],
     }
     return payload
+
+
+def _dogfood_stage(
+    stage: str,
+    percent: int,
+    *,
+    completed: bool,
+    skipped: bool = False,
+    source: str | None = None,
+    cache_keys: list[str] | None = None,
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "stage": stage,
+        "percent": percent,
+        "status": "skipped" if skipped else "completed" if completed else "pending",
+    }
+    if source is not None:
+        row["source"] = source
+    if cache_keys is not None:
+        row["cache_keys"] = cache_keys
+    return row
+
+
+def _lightweight_hypothesis_payload(
+    hypotheses: list[str],
+    families: list[str],
+    *,
+    question: str,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for hypothesis, family in zip(hypotheses, families, strict=True):
+        rows.append(
+            {
+                "hypothesis": hypothesis,
+                "family": family,
+                "status": "skipped_quick_mode",
+                "confidence": "not_evaluated",
+                "row_count": None,
+                "total_tokens": None,
+                "max_total_tokens": None,
+                "candidate_count": None,
+                "evidence_summary": {},
+                "evidence": [],
+                "counter_evidence": [],
+                "i_would_like_to_be_able_to": (
+                    "Keep the agentic dogfood flow fast enough to run on large local datasets."
+                ),
+                "i_will_accomplish_this_using": (
+                    "Family-routing checks plus shared reports instead of full evidence scans."
+                ),
+                "i_am_missing_access_to": (
+                    "Full hypothesis evidence because quick dogfood mode intentionally skipped it."
+                ),
+                "next_action": (
+                    "Run `codex-usage-tracker dogfood-agentic --hypotheses` "
+                    "to evaluate this hypothesis battery."
+                ),
+                "recommended_next_tools": [],
+                "missing_access": (
+                    "Quick dogfood mode skipped expensive hypothesis evidence scans."
+                ),
+            }
+        )
+    return {
+        "schema": "codex-usage-tracker-hypothesis-test-v1",
+        "content_mode": "aggregate_hypothesis_routing_quick_check",
+        "includes_indexed_content": False,
+        "includes_raw_fragments": False,
+        "privacy_mode": privacy_mode,
+        "question": question,
+        "filters": {
+            "since": since,
+            "until": until,
+            "thread": thread,
+            "include_archived": include_archived,
+            "evidence_limit": evidence_limit,
+        },
+        "summary": {
+            "hypothesis_count": len(rows),
+            "status_counts": {"skipped_quick_mode": len(rows)} if rows else {},
+            "top_status": rows[0]["status"] if rows else None,
+        },
+        "hypotheses": rows,
+        "recommended_next_tools": [],
+        "caveats": [
+            "Quick dogfood mode checks hypothesis routing and family coverage only; use --hypotheses for full evidence evaluation."
+        ],
+    }
+
+
+def _lightweight_investigation_from_action_brief(
+    action_brief: dict[str, Any],
+    *,
+    goal: str,
+    families: set[str] | None,
+) -> dict[str, Any]:
+    actions = [
+        action
+        for action in action_brief.get("actions", [])
+        if families is None or str(action.get("family")) in families
+    ]
+    findings = [
+        {
+            "finding": action.get("finding"),
+            "confidence": action.get("confidence"),
+            "evidence_count": action.get("evidence_count"),
+            "recommended_action": action.get("recommended_workflow_change"),
+            "verify_with": action.get("recommended_next_tools"),
+            "source_action_family": action.get("family"),
+        }
+        for action in actions
+    ]
+    return {
+        "schema": "codex-usage-tracker-agentic-investigation-v1",
+        "content_mode": "aggregate_investigation_reused_action_brief",
+        "includes_indexed_content": False,
+        "includes_raw_fragments": False,
+        "privacy_mode": action_brief.get("privacy_mode"),
+        "goal": goal,
+        "summary": {
+            "finding_count": len(findings),
+            "top_finding": findings[0]["finding"] if findings else None,
+            "source_reports": ["codex-usage-tracker-action-brief-v1"],
+        },
+        "findings": findings,
+        "recommended_next_tools": action_brief.get("recommended_next_tools", []),
+        "caveats": [
+            "Reused action brief findings to keep dogfood bounded; run with deep investigations for full investigation payloads."
+        ],
+    }
 
 
 def _compact_hypotheses(payload: dict[str, Any]) -> list[dict[str, Any]]:

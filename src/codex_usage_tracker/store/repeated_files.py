@@ -90,6 +90,8 @@ def query_repeated_file_rediscovery(
         [*params, normalized_min],
     ).fetchall()
 
+    sorted_rows = sorted(rows, key=_candidate_row_sort_key, reverse=True)
+    sliced_rows = sorted_rows if normalized_limit is None else sorted_rows[:normalized_limit]
     candidates = [
         _file_candidate(row, trace_handles=_trace_handles_for_path(
             conn,
@@ -100,13 +102,11 @@ def query_repeated_file_rediscovery(
             include_archived=include_archived,
             limit=normalized_sample_limit,
         ))
-        for row in rows
+        for row in sliced_rows
     ]
-    candidates.sort(key=_candidate_sort_key, reverse=True)
-    sliced = candidates if normalized_limit is None else candidates[:normalized_limit]
     return {
-        "rows": sliced,
-        "total_candidates": len(candidates),
+        "rows": candidates,
+        "total_candidates": len(sorted_rows),
     }
 
 
@@ -247,13 +247,12 @@ def _usage_filters(
     return "WHERE " + " AND ".join(clauses), params
 
 
-def _candidate_sort_key(row: dict[str, Any]) -> tuple[int, int, int, int]:
-    mix = row["operation_mix"]
+def _candidate_row_sort_key(row: sqlite3.Row) -> tuple[int, int, int, int]:
     return (
-        int(mix.get("read") or 0),
-        int(row["adjacent_retouch_count"]),
-        int(row["occurrences"]),
-        int(row["total_tokens"]),
+        int(row["read_count"] or 0),
+        int(row["adjacent_retouch_count"] or 0),
+        int(row["occurrences"] or 0),
+        int(row["total_tokens"] or 0),
     )
 
 
