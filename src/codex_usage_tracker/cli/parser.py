@@ -73,6 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_summary_parser(subparsers)
     _add_query_parser(subparsers)
     _add_recommendations_parser(subparsers)
+    _add_action_brief_parser(subparsers)
     add_diagnostics_parser(subparsers)
     _add_session_parser(subparsers)
     _add_context_parser(subparsers)
@@ -326,6 +327,27 @@ def _add_recommendations_parser(
     recommendations.add_argument("--json", action="store_true", dest="as_json")
 
 
+
+
+def _add_action_brief_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    action_brief = subparsers.add_parser(
+        "action-brief",
+        help="Build compact aggregate remediation brief for usage-waste investigations",
+    )
+    action_brief.add_argument("--goal", default="token_waste")
+    action_brief.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    action_brief.add_argument("--until", help="Only include calls at or before this ISO date/time")
+    action_brief.add_argument("--thread")
+    action_brief.add_argument("--include-archived", action="store_true")
+    action_brief.add_argument("--evidence-limit", type=int, default=5)
+    action_brief.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Accepted for consistency; action-brief always returns JSON.",
+    )
 
 
 def _add_session_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:

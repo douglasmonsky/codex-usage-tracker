@@ -47,6 +47,7 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
+| `codex-usage-tracker-action-brief-v1` | CLI `action-brief --json`, MCP `usage_action_brief(...)`; compact aggregate remediation brief |
 | `codex-usage-tracker-allowance-history-v1` | CLI `allowance-history --json`, MCP `usage_allowance_history(...)`, dashboard server `/api/allowance/history` |
 | `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
 | `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
@@ -229,6 +230,36 @@ Schema: `codex-usage-tracker-recommendations-v1`
 ```
 
 Rows include `recommendation_score`, `primary_recommendation`, `secondary_recommendations`, `primary_signal`, `secondary_signals`, `recommended_action`, and `flag_explanations`. Thread rollups summarize the highest-priority threads using the same aggregate-only signals.
+
+## Action Brief Command
+
+```bash
+codex-usage-tracker action-brief --goal token_waste --evidence-limit 5 --json
+```
+
+MCP:
+
+- `usage_action_brief(...)`
+
+Schema: `codex-usage-tracker-action-brief-v1`
+
+```json
+{
+  "schema": "codex-usage-tracker-action-brief-v1",
+  "content_mode": "aggregate_action_brief",
+  "includes_indexed_content": false,
+  "includes_raw_fragments": false,
+  "privacy_mode": "normal",
+  "goal": "token_waste",
+  "filters": { "since": null, "until": null, "thread": null, "include_archived": false, "evidence_limit": 5 },
+  "summary": { "action_count": 1, "top_action_family": "large_low_output_context_pressure", "source_reports": [] },
+  "actions": [],
+  "recommended_next_tools": [],
+  "caveats": []
+}
+```
+
+Actions translate aggregate diagnostics into concrete workflow changes. Each action includes `finding`, `confidence`, compact `evidence`, `likely_waste_pattern`, `recommended_workflow_change`, `recommended_existing_tool`, `recommended_custom_solution`, `how_to_verify`, and `recommended_next_tools`. The default payload is shareable aggregate evidence and does not include prompts, assistant messages, raw command output, full paths, or indexed fragments.
 
 ## Allowance Intelligence
 

@@ -50,6 +50,7 @@ from codex_usage_tracker.parser.api import inspect_log, load_session_index
 from codex_usage_tracker.pricing.api import update_pricing_from_openai_docs, write_pricing_template
 from codex_usage_tracker.reports.agentic_dogfood import build_agentic_dogfood_report
 from codex_usage_tracker.reports.api import (
+    build_action_brief_report,
     build_expensive_calls_report,
     build_pricing_coverage_report,
     build_query_report,
@@ -430,6 +431,24 @@ def _run_recommendations(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_action_brief(args: argparse.Namespace) -> int:
+    report = build_action_brief_report(
+        db_path=args.db,
+        pricing_path=args.pricing,
+        allowance_path=args.allowance,
+        projects_path=args.projects,
+        goal=args.goal,
+        since=args.since,
+        until=args.until,
+        thread=args.thread,
+        include_archived=args.include_archived,
+        evidence_limit=args.evidence_limit,
+        privacy_mode=args.privacy_mode,
+    )
+    print_json(report.payload)
+    return 0
+
+
 def _run_session(args: argparse.Namespace) -> int:
     rows = query_session_usage(args.db, args.session_id, args.limit)
     rows = apply_project_privacy_to_rows(rows, privacy_mode=args.privacy_mode)
@@ -640,6 +659,7 @@ _COMMAND_HANDLERS = {
     "summary": _run_summary,
     "query": _run_query,
     "recommendations": _run_recommendations,
+    "action-brief": _run_action_brief,
     "diagnostics": run_diagnostics,
     "session": _run_session,
     "context": _run_context,

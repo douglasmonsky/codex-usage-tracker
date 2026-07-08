@@ -49,6 +49,7 @@ CLI_HELP_SUBCOMMANDS = [
     "summary",
     "query",
     "recommendations",
+    "action-brief",
     "diagnostics",
     "session",
     "context",

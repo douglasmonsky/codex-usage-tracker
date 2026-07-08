@@ -32,6 +32,8 @@ def test_agentic_dogfood_report_writes_compact_private_artifacts(tmp_path: Path)
     assert payload["family_checks"]["old_passed"] is True
     assert payload["family_checks"]["new_passed"] is True
     assert payload["privacy_checks"]["passed"] is True
+    assert "action_brief" in payload["direct_reports"]
+    assert payload["direct_reports"]["action_brief"]["action_count"] is not None
     assert payload["refresh"]["parsed_events"] > 0
     assert Path(payload["artifacts"]["summary_json_path"]).exists()
     assert Path(payload["artifacts"]["summary_markdown_path"]).exists()
