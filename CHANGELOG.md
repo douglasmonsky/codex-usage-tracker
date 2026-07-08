@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.16.1 - 2026-07-08
+
+- Add async refresh progress polling and dashboard progress bars for long all-row loads.
+- Speed up local content index refreshes with batched writes and parallel source extraction.
+- Load uncapped dashboard rows in finite pages so no-cap mode stays responsive on large histories.
+- Show loaded-call counts and call-level token breakdowns on Overview metric cards.
+- Restore session row/history loading preferences after browser refresh without storing large row payloads.
+
 ## 0.16.0 - 2026-07-07
 
 - Add allowance intelligence foundation with normalized allowance history, evidence-graded change diagnostics, local evidence exports, and API/MCP report surfaces for weekly-vs-5-hour usage analysis.
