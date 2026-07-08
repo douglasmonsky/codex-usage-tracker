@@ -46,6 +46,7 @@ from codex_usage_tracker.store.api import (
     query_most_expensive_calls,
     query_pattern_scan,
     query_repeated_file_rediscovery,
+    query_shell_churn,
     query_source_record_coverage,
     query_source_record_totals,
     query_summary,
@@ -164,6 +165,13 @@ class PatternScanReport:
 @dataclass(frozen=True)
 class RepeatedFileRediscoveryReport:
     """Stable machine-readable repeated safe file-identity report."""
+
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ShellChurnReport:
+    """Stable machine-readable repeated shell command churn report."""
 
     payload: dict[str, Any]
 
@@ -572,6 +580,55 @@ def build_repeated_file_rediscovery_report(
     return RepeatedFileRediscoveryReport(
         {
             "schema": "codex-usage-tracker-repeated-file-rediscovery-v1",
+            "content_mode": "local_content_index",
+            "includes_indexed_content": True,
+            "includes_raw_fragments": False,
+            "privacy_mode": privacy_mode,
+            "filters": {
+                "since": since,
+                "until": until,
+                "thread": thread,
+                "include_archived": include_archived,
+                "min_occurrences": max(1, min_occurrences),
+                "limit": limit,
+                "sample_limit": max(1, sample_limit),
+            },
+            "row_count": len(rows),
+            "total_candidates": int(result["total_candidates"]),
+            "rows": rows,
+        }
+    )
+
+
+def build_shell_churn_report(
+    *,
+    db_path: Path,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 3,
+    limit: int | None = 20,
+    sample_limit: int = 3,
+    privacy_mode: str = "normal",
+) -> ShellChurnReport:
+    """Build repeated shell command family churn payload."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    result = query_shell_churn(
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        sample_limit=sample_limit,
+    )
+    rows = result["rows"]
+    return ShellChurnReport(
+        {
+            "schema": "codex-usage-tracker-shell-churn-v1",
             "content_mode": "local_content_index",
             "includes_indexed_content": True,
             "includes_raw_fragments": False,
