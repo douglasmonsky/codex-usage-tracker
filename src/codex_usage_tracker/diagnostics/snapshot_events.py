@@ -22,6 +22,9 @@ SHELL_TOOL_NAMES = {
     "terminal",
     "write_stdin",
 }
+SHELL_EXEC_WRAPPERS = {"bash", "fish", "sh", "zsh"}
+SHELL_EXEC_COMMAND_OPTIONS = {"-c", "-lc", "-cl"}
+RUN_WRAPPERS = {"npx", "pipenv", "poetry", "uv"}
 READ_COMMAND_ROOTS = {"cat", "find", "grep", "head", "nl", "rg", "sed", "strings", "tail", "wc"}
 SEARCH_READ_ROOTS = {"find", "rg"}
 GIT_COMMAND_ROOTS = {"git", "gh"}
@@ -470,6 +473,17 @@ def _strip_command_wrappers(tokens: list[str]) -> list[str]:
         if base in {"command", "env", "sudo"}:
             remaining.pop(0)
             continue
+        if base in SHELL_EXEC_WRAPPERS:
+            nested = _shell_exec_nested_tokens(remaining)
+            if nested:
+                remaining = nested
+                continue
+        if base in RUN_WRAPPERS and len(remaining) > 2 and remaining[1] == "run":
+            remaining = remaining[2:]
+            continue
+        if base == "npx" and len(remaining) > 1:
+            remaining = remaining[1:]
+            continue
         break
     return remaining
 
@@ -478,18 +492,26 @@ def _command_root(tokens: list[str]) -> str:
     base = _basename(tokens[0])
     if base in {"py.test", "pytest"}:
         return "pytest"
+    module_root = _python_module_root(tokens)
+    if module_root:
+        return module_root
     if base == "py" or base == "python" or base.startswith("python"):
         return "python"
     return safe_label(base) or "unknown_command"
 
 
 def _command_child(root: str, tokens: list[str]) -> str:
+    module_child = _python_module_child(root, tokens)
+    if module_child is not None:
+        return module_child
     if root == "python":
         for index, token in enumerate(tokens[:-1]):
             if token == "-m":
                 module = safe_label(_basename(tokens[index + 1]).split(".", 1)[0])
                 return f"-m:{module}" if module else "-m:unknown"
         return tokens[1] if len(tokens) > 1 and tokens[1].startswith("-") else "<script>"
+    if root in GIT_COMMAND_ROOTS:
+        return _git_operation(tokens, root=root) or "<none>"
     if len(tokens) <= 1:
         return "<none>"
     child = safe_label(_basename(tokens[1]))
@@ -516,6 +538,21 @@ def _git_operation(tokens: list[str], *, root: str) -> str | None:
     return "<none>"
 
 
+def _python_module_child(root: str, tokens: list[str]) -> str | None:
+    if root not in {"mypy", "pytest", "ruff"}:
+        return None
+    for index, token in enumerate(tokens[:-1]):
+        if token != "-m":
+            continue
+        if index + 2 < len(tokens):
+            child = tokens[index + 2]
+            if child.startswith("-"):
+                return child
+            return "<target>"
+        return "<none>"
+    return None
+
+
 def _is_shell_separator(token: str) -> bool:
     return token in {"&&", "||", ";", "|"}
 
@@ -524,5 +561,30 @@ def _looks_like_assignment(token: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", token))
 
 
+def _shell_exec_nested_tokens(tokens: list[str]) -> list[str] | None:
+    for index, token in enumerate(tokens[1:], start=1):
+        if token not in SHELL_EXEC_COMMAND_OPTIONS:
+            continue
+        if index + 1 >= len(tokens):
+            return None
+        nested = _command_tokens(tokens[index + 1])
+        return nested or [tokens[index + 1]]
+    return None
+
+
+def _python_module_root(tokens: list[str]) -> str | None:
+    base = _basename(tokens[0]) if tokens else ""
+    if not (base == "py" or base == "python" or base.startswith("python")):
+        return None
+    for index, token in enumerate(tokens[:-1]):
+        if token != "-m":
+            continue
+        module = safe_label(_basename(tokens[index + 1]).split(".", 1)[0])
+        if module in {"mypy", "pytest", "ruff"}:
+            return module
+        return None
+    return None
+
+
 def _basename(token: str) -> str:
-    return re.split(r"[\\/]", token)[-1].lower()
+    return re.split(r"[\\/]", token)[-1].lower().lstrip("$")

@@ -346,8 +346,8 @@ def test_tool_output_and_command_snapshots_use_safe_aggregate_labels(
     assert command_rows["git"]["total"] == 1
     assert command_rows["git"]["representative_record_id"] == record_id
     assert command_rows["git"]["children"][0] == {"child": "diff", "count": 1}
-    assert command_rows["python"]["children"][0] == {"child": "-m:pytest", "count": 1}
-    assert command_rows["python"]["representative_record_id"] == record_id
+    assert command_rows["pytest"]["children"][0] == {"child": "<target>", "count": 1}
+    assert command_rows["pytest"]["representative_record_id"] == record_id
     assert commands["summary"]["missing_command"] == 1
 
     serialized = json.dumps([tool_output, commands], sort_keys=True)

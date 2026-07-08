@@ -215,6 +215,7 @@ Schema: `codex-usage-tracker-recommendations-v1`
     "effort": null,
     "thread": null,
     "project": null,
+    "include_archived": false,
     "min_score": null,
     "limit": 10,
     "privacy_mode": "normal"

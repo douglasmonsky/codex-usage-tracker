@@ -104,6 +104,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                     "effort": (str, NoneType),
                     "thread": (str, NoneType),
                     "project": (str, NoneType),
+                    "include_archived": bool,
                     "min_score": (int, float, NoneType),
                     "limit": (int, NoneType),
                     "privacy_mode": str,
