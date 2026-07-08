@@ -4,16 +4,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION, optional_str
-from codex_usage_tracker.store.content_index_event_store import flush_pending_event_rows
+from codex_usage_tracker.store.content_index_event_store import (
+    PendingEventRows,
+    pending_event_rows,
+    upsert_pending_event_rows,
+)
 from codex_usage_tracker.store.content_index_events import (
     PendingCommandRun,
     PendingFileEvent,
@@ -25,6 +31,10 @@ from codex_usage_tracker.store.query_sql import usage_where_clause
 MAX_FRAGMENT_CHARS = 4000
 DEFAULT_SEARCH_SNIPPET_CHARS = 800
 PARSER_ADAPTER_NAME = "codex-jsonl"
+_CONTENT_WRITE_BATCH_RECORDS = 250
+_PARALLEL_CONTENT_INDEX_WORKERS_ENV = "CODEX_USAGE_TRACKER_CONTENT_INDEX_WORKERS"
+_PARALLEL_CONTENT_INDEX_MIN_FILES = 4
+_PARALLEL_CONTENT_INDEX_MAX_WORKERS = 8
 CONTENT_INDEX_TABLES = (
     "content_fragments",
     "file_events",
@@ -67,6 +77,24 @@ class _PendingFragment:
     event_timestamp: str | None
 
 
+@dataclass
+class _PendingContentRows:
+    turn_rows: list[dict[str, object]]
+    fragment_rows: list[dict[str, object]]
+    event_rows: PendingEventRows
+    linked_records: int = 0
+
+
+@dataclass(frozen=True)
+class _ExtractedContentRows:
+    source_path: str
+    has_usage_rows: bool
+    turn_rows: list[dict[str, object]]
+    fragment_rows: list[dict[str, object]]
+    event_rows: PendingEventRows
+    parse_warnings: int = 0
+
+
 @dataclass(frozen=True)
 class ContentSearchResult:
     """Content-index search result rows and paging metadata."""
@@ -101,39 +129,172 @@ def index_content_for_source_files(
     )
 
 
+ContentIndexProgressCallback = Callable[[dict[str, object]], None]
+UsageContentRow = sqlite3.Row | Mapping[str, object]
+
+
 def index_content_for_source_plans(
     conn: sqlite3.Connection,
     *,
     plans: Iterable[ContentIndexPlan],
+    progress_callback: ContentIndexProgressCallback | None = None,
 ) -> ContentIndexResult:
     """Populate normalized bounded local content rows using refresh parse plans."""
 
     source_plans = list(_dedupe_content_index_plans(plans))
-    totals = ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
+    total_sources = len(source_plans)
+    _emit_content_index_progress(
+        progress_callback,
+        status="running",
+        completed=0,
+        total=total_sources,
+        message="Indexing local content",
+        content_fragments=0,
+    )
     defer_full_fts_rebuild = any(plan.replace_existing for plan in source_plans)
+    worker_count = _parallel_content_index_worker_count(len(source_plans))
+    if worker_count > 1:
+        return _index_content_for_source_plans_parallel(
+            conn,
+            source_plans=source_plans,
+            sync_fts=not defer_full_fts_rebuild,
+            progress_callback=progress_callback,
+            worker_count=worker_count,
+        )
+    return _index_content_for_source_plans_serial(
+        conn,
+        source_plans=source_plans,
+        sync_fts=not defer_full_fts_rebuild,
+        progress_callback=progress_callback,
+    )
+
+
+def _index_content_for_source_plans_serial(
+    conn: sqlite3.Connection,
+    *,
+    source_plans: list[ContentIndexPlan],
+    sync_fts: bool,
+    progress_callback: ContentIndexProgressCallback | None,
+) -> ContentIndexResult:
+    totals = ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
     needs_full_fts_rebuild = False
-    for plan in source_plans:
+    total_sources = len(source_plans)
+    for index, plan in enumerate(source_plans, start=1):
         result = _index_content_for_source_file(
             conn,
             source_path=plan.source_path,
             replace_existing=plan.replace_existing,
             start_byte=plan.start_byte,
             start_line=plan.start_line,
-            sync_fts=not defer_full_fts_rebuild,
+            sync_fts=sync_fts,
         )
         needs_full_fts_rebuild = needs_full_fts_rebuild or (
             plan.replace_existing and result.source_files > 0
         )
-        totals = ContentIndexResult(
-            source_files=totals.source_files + result.source_files,
-            conversation_turns=totals.conversation_turns + result.conversation_turns,
-            content_fragments=totals.content_fragments + result.content_fragments,
-            parse_warnings=totals.parse_warnings + result.parse_warnings,
+        totals = _add_content_index_result(totals, result)
+        _emit_content_index_progress(
+            progress_callback,
+            status="running" if index < total_sources else "completed",
+            completed=index,
+            total=total_sources,
+            message="Indexed local content",
+            content_fragments=totals.content_fragments,
+            conversation_turns=totals.conversation_turns,
         )
     if needs_full_fts_rebuild:
         _rebuild_content_fts(conn)
     return totals
 
+
+def _index_content_for_source_plans_parallel(
+    conn: sqlite3.Connection,
+    *,
+    source_plans: list[ContentIndexPlan],
+    sync_fts: bool,
+    progress_callback: ContentIndexProgressCallback | None,
+    worker_count: int,
+) -> ContentIndexResult:
+    usage_rows_by_path = _content_usage_rows_for_plans(conn, source_plans=source_plans)
+    totals = ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
+    needs_full_fts_rebuild = False
+    completed = 0
+    total_sources = len(source_plans)
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = {
+            executor.submit(
+                _extract_content_rows_for_source_file,
+                source_path=plan.source_path,
+                usage_rows=usage_rows_by_path.get(str(plan.source_path), {}),
+                start_byte=0 if plan.replace_existing else plan.start_byte,
+                start_line=0 if plan.replace_existing else plan.start_line,
+            ): plan
+            for plan in source_plans
+        }
+        for future in as_completed(futures):
+            plan = futures[future]
+            extracted = future.result()
+            result = _write_extracted_content_rows(
+                conn,
+                extracted=extracted,
+                replace_existing=plan.replace_existing,
+                sync_fts=sync_fts,
+                start_line=0 if plan.replace_existing else plan.start_line,
+            )
+            needs_full_fts_rebuild = needs_full_fts_rebuild or (
+                plan.replace_existing and result.source_files > 0
+            )
+            totals = _add_content_index_result(totals, result)
+            completed += 1
+            _emit_content_index_progress(
+                progress_callback,
+                status="running" if completed < total_sources else "completed",
+                completed=completed,
+                total=total_sources,
+                message="Indexed local content",
+                content_fragments=totals.content_fragments,
+                conversation_turns=totals.conversation_turns,
+                workers=worker_count,
+            )
+    if needs_full_fts_rebuild:
+        _rebuild_content_fts(conn)
+    return totals
+
+
+def _add_content_index_result(
+    left: ContentIndexResult,
+    right: ContentIndexResult,
+) -> ContentIndexResult:
+    return ContentIndexResult(
+        source_files=left.source_files + right.source_files,
+        conversation_turns=left.conversation_turns + right.conversation_turns,
+        content_fragments=left.content_fragments + right.content_fragments,
+        parse_warnings=left.parse_warnings + right.parse_warnings,
+    )
+
+
+def _emit_content_index_progress(
+    progress_callback: ContentIndexProgressCallback | None,
+    *,
+    status: str,
+    completed: int,
+    total: int,
+    message: str,
+    **extra: object,
+) -> None:
+    if progress_callback is None:
+        return
+    percent = 100.0 if total <= 0 else round(min(100.0, (completed / total) * 100.0), 1)
+    payload: dict[str, object] = {
+        "schema": "codex-usage-tracker-refresh-progress-v1",
+        "phase": "indexing_content",
+        "status": status,
+        "message": message,
+        "completed": completed,
+        "total": total,
+        "percent": percent,
+    }
+    payload.update(extra)
+    progress_callback(payload)
 
 def _dedupe_content_index_plans(
     plans: Iterable[ContentIndexPlan],
@@ -751,6 +912,189 @@ def _limit_params(limit: int | None, offset: int) -> list[int]:
     return [limit, offset]
 
 
+
+def _content_usage_rows_for_plans(
+    conn: sqlite3.Connection,
+    *,
+    source_plans: list[ContentIndexPlan],
+) -> dict[str, dict[int, dict[str, object]]]:
+    rows_by_path: dict[str, dict[int, dict[str, object]]] = {}
+    for plan in source_plans:
+        rows_by_path[str(plan.source_path)] = {
+            line_number: dict(row)
+            for line_number, row in _usage_rows_by_token_line(
+                conn,
+                source_file=str(plan.source_path),
+                min_line_number=None if plan.replace_existing else plan.start_line + 1,
+            ).items()
+        }
+    return rows_by_path
+
+
+def _extract_content_rows_for_source_file(
+    *,
+    source_path: Path,
+    usage_rows: Mapping[int, Mapping[str, object]],
+    start_byte: int,
+    start_line: int,
+) -> _ExtractedContentRows:
+    if not usage_rows:
+        return _empty_extracted_content_rows(source_path=source_path, has_usage_rows=False)
+
+    pending: list[_PendingFragment] = []
+    pending_tool_calls: list[PendingToolCall] = []
+    pending_command_runs: list[PendingCommandRun] = []
+    pending_file_events: list[PendingFileEvent] = []
+    pending_rows = _empty_pending_content_rows()
+    turn_id: str | None = None
+    turn_index = 0
+    parse_warnings = 0
+    try:
+        with source_path.open("rb") as handle:
+            if start_byte > 0:
+                handle.seek(start_byte)
+            for line_number, raw_line in enumerate(handle, start_line + 1):
+                try:
+                    envelope = json.loads(raw_line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    parse_warnings += 1
+                    continue
+                if not isinstance(envelope, dict):
+                    parse_warnings += 1
+                    continue
+                payload = envelope.get("payload")
+                if not isinstance(payload, dict):
+                    parse_warnings += 1
+                    continue
+                entry_type = envelope.get("type")
+                timestamp = optional_str(envelope.get("timestamp"))
+                if entry_type == "turn_context":
+                    turn_id = optional_str(payload.get("turn_id"))
+                    turn_index += 1
+                    continue
+                if _is_token_count(entry_type, payload):
+                    usage_row = usage_rows.get(line_number)
+                    if usage_row is not None:
+                        _append_pending_content_rows(
+                            pending_rows,
+                            pending=pending,
+                            tool_calls=pending_tool_calls,
+                            command_runs=pending_command_runs,
+                            file_events=pending_file_events,
+                            usage_row=usage_row,
+                        )
+                        pending = []
+                        pending_tool_calls = []
+                        pending_command_runs = []
+                        pending_file_events = []
+                    continue
+                pending.extend(
+                    _extract_pending_fragments(
+                        envelope=envelope,
+                        payload=payload,
+                        line_number=line_number,
+                        timestamp=timestamp,
+                        turn_id=turn_id,
+                        turn_index=turn_index,
+                    )
+                )
+                events = extract_pending_local_events(
+                    envelope=envelope,
+                    payload=payload,
+                    line_number=line_number,
+                    timestamp=timestamp,
+                )
+                pending_tool_calls.extend(events.tool_calls)
+                pending_command_runs.extend(events.command_runs)
+                pending_file_events.extend(events.file_events)
+    except OSError:
+        return _empty_extracted_content_rows(source_path=source_path, has_usage_rows=False)
+
+    return _ExtractedContentRows(
+        source_path=str(source_path),
+        has_usage_rows=True,
+        turn_rows=pending_rows.turn_rows,
+        fragment_rows=pending_rows.fragment_rows,
+        event_rows=pending_rows.event_rows,
+        parse_warnings=parse_warnings,
+    )
+
+
+def _empty_extracted_content_rows(
+    *,
+    source_path: Path,
+    has_usage_rows: bool,
+) -> _ExtractedContentRows:
+    empty_rows = _empty_pending_content_rows()
+    return _ExtractedContentRows(
+        source_path=str(source_path),
+        has_usage_rows=has_usage_rows,
+        turn_rows=[],
+        fragment_rows=[],
+        event_rows=empty_rows.event_rows,
+    )
+
+
+def _write_extracted_content_rows(
+    conn: sqlite3.Connection,
+    *,
+    extracted: _ExtractedContentRows,
+    replace_existing: bool,
+    sync_fts: bool,
+    start_line: int,
+) -> ContentIndexResult:
+    if not extracted.has_usage_rows:
+        return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
+
+    if replace_existing:
+        delete_content_index_rows_for_source_files(
+            conn,
+            placeholders="?",
+            source_files_to_replace=[extracted.source_path],
+            sync_fts=sync_fts,
+        )
+    if extracted.turn_rows:
+        _upsert_turn_rows(conn, extracted.turn_rows)
+    if extracted.fragment_rows:
+        _upsert_fragment_rows(conn, extracted.fragment_rows)
+    upsert_pending_event_rows(conn, extracted.event_rows)
+
+    if sync_fts:
+        if replace_existing:
+            _rebuild_content_fts(conn)
+        else:
+            _sync_content_fts_for_source_file(
+                conn,
+                source_file=extracted.source_path,
+                min_line_start=start_line + 1,
+            )
+    counts = _content_counts_for_source_file(conn, source_file=extracted.source_path)
+    return ContentIndexResult(
+        source_files=1,
+        conversation_turns=counts["conversation_turns"],
+        content_fragments=counts["content_fragments"],
+        parse_warnings=extracted.parse_warnings,
+    )
+
+
+def _parallel_content_index_worker_count(plan_count: int) -> int:
+    if plan_count < _PARALLEL_CONTENT_INDEX_MIN_FILES:
+        return 1
+    configured = _configured_parallel_content_index_workers()
+    if configured is not None:
+        return min(plan_count, configured)
+    return min(plan_count, max(1, os.cpu_count() or 1), _PARALLEL_CONTENT_INDEX_MAX_WORKERS)
+
+
+def _configured_parallel_content_index_workers() -> int | None:
+    raw_value = os.environ.get(_PARALLEL_CONTENT_INDEX_WORKERS_ENV)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    try:
+        return max(1, int(raw_value))
+    except ValueError:
+        return None
+
 def _index_content_for_source_file(
     conn: sqlite3.Connection,
     *,
@@ -781,6 +1125,7 @@ def _index_content_for_source_file(
     pending_tool_calls: list[PendingToolCall] = []
     pending_command_runs: list[PendingCommandRun] = []
     pending_file_events: list[PendingFileEvent] = []
+    pending_rows = _empty_pending_content_rows()
     turn_id: str | None = None
     turn_index = 0
     parse_warnings = 0
@@ -810,33 +1155,31 @@ def _index_content_for_source_file(
                 if _is_token_count(entry_type, payload):
                     usage_row = usage_rows.get(line_number)
                     if usage_row is not None:
-                        _flush_pending_fragments(
-                            conn,
+                        _append_pending_content_rows(
+                            pending_rows,
                             pending=pending,
-                            usage_row=usage_row,
-                        )
-                        flush_pending_event_rows(
-                            conn,
                             tool_calls=pending_tool_calls,
                             command_runs=pending_command_runs,
                             file_events=pending_file_events,
                             usage_row=usage_row,
                         )
-                    pending = []
-                    pending_tool_calls = []
-                    pending_command_runs = []
-                    pending_file_events = []
+                        if pending_rows.linked_records >= _CONTENT_WRITE_BATCH_RECORDS:
+                            _flush_pending_content_rows(conn, pending_rows)
+                        pending = []
+                        pending_tool_calls = []
+                        pending_command_runs = []
+                        pending_file_events = []
                     continue
                 pending.extend(
-                    _extract_pending_fragments(
-                        envelope=envelope,
-                        payload=payload,
-                        line_number=line_number,
-                        timestamp=timestamp,
-                        turn_id=turn_id,
-                        turn_index=turn_index,
+                        _extract_pending_fragments(
+                            envelope=envelope,
+                            payload=payload,
+                            line_number=line_number,
+                            timestamp=timestamp,
+                            turn_id=turn_id,
+                            turn_index=turn_index,
+                        )
                     )
-                )
                 events = extract_pending_local_events(
                     envelope=envelope,
                     payload=payload,
@@ -848,6 +1191,8 @@ def _index_content_for_source_file(
                 pending_file_events.extend(events.file_events)
     except OSError:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
+
+    _flush_pending_content_rows(conn, pending_rows)
 
     if sync_fts:
         if replace_existing:
@@ -1051,10 +1396,79 @@ def _flush_pending_fragments(
     conn: sqlite3.Connection,
     *,
     pending: list[_PendingFragment],
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> None:
+    turn_rows, fragment_rows = _pending_fragment_rows(
+        pending=pending,
+        usage_row=usage_row,
+    )
+    _upsert_turn_rows(conn, turn_rows)
+    _upsert_fragment_rows(conn, fragment_rows)
+
+
+def _empty_pending_content_rows() -> _PendingContentRows:
+    return _PendingContentRows(
+        turn_rows=[],
+        fragment_rows=[],
+        event_rows=PendingEventRows(
+            tool_call_rows=[],
+            command_run_rows=[],
+            file_event_rows=[],
+        ),
+    )
+
+
+def _append_pending_content_rows(
+    batch: _PendingContentRows,
+    *,
+    pending: list[_PendingFragment],
+    tool_calls: list[PendingToolCall],
+    command_runs: list[PendingCommandRun],
+    file_events: list[PendingFileEvent],
+    usage_row: UsageContentRow,
+) -> None:
+    turn_rows, fragment_rows = _pending_fragment_rows(
+        pending=pending,
+        usage_row=usage_row,
+    )
+    event_rows = pending_event_rows(
+        tool_calls=tool_calls,
+        command_runs=command_runs,
+        file_events=file_events,
+        usage_row=usage_row,
+    )
+    batch.turn_rows.extend(turn_rows)
+    batch.fragment_rows.extend(fragment_rows)
+    batch.event_rows.tool_call_rows.extend(event_rows.tool_call_rows)
+    batch.event_rows.command_run_rows.extend(event_rows.command_run_rows)
+    batch.event_rows.file_event_rows.extend(event_rows.file_event_rows)
+    batch.linked_records += 1
+
+
+def _flush_pending_content_rows(
+    conn: sqlite3.Connection,
+    batch: _PendingContentRows,
+) -> None:
+    if batch.turn_rows:
+        _upsert_turn_rows(conn, batch.turn_rows)
+    if batch.fragment_rows:
+        _upsert_fragment_rows(conn, batch.fragment_rows)
+    upsert_pending_event_rows(conn, batch.event_rows)
+    batch.turn_rows.clear()
+    batch.fragment_rows.clear()
+    batch.event_rows.tool_call_rows.clear()
+    batch.event_rows.command_run_rows.clear()
+    batch.event_rows.file_event_rows.clear()
+    batch.linked_records = 0
+
+
+def _pending_fragment_rows(
+    *,
+    pending: list[_PendingFragment],
+    usage_row: UsageContentRow,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     if not pending:
-        return
+        return [], []
     turn_rows: list[dict[str, object]] = []
     fragment_rows: list[dict[str, object]] = []
     for index, fragment in enumerate(pending):
@@ -1072,15 +1486,14 @@ def _flush_pending_fragments(
                 usage_row=usage_row,
             )
         )
-    _upsert_turn_rows(conn, turn_rows)
-    _upsert_fragment_rows(conn, fragment_rows)
+    return turn_rows, fragment_rows
 
 
 def _turn_row(
     *,
     turn_key: str,
     fragment: _PendingFragment,
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> dict[str, object]:
     return {
         "turn_key": turn_key,
@@ -1108,7 +1521,7 @@ def _fragment_row(
     fragment_id: str,
     turn_key: str,
     fragment: _PendingFragment,
-    usage_row: sqlite3.Row,
+    usage_row: UsageContentRow,
 ) -> dict[str, object]:
     return {
         "fragment_id": fragment_id,

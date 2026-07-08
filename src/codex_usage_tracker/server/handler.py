@@ -113,6 +113,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
         context_chars: int,
         api_token: str,
         refresh_lock: threading.Lock,
+        refresh_jobs: server_usage_refresh.RefreshJobRegistry | None = None,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: ContextApiState | None = None,
@@ -143,6 +144,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
         self._api_token = api_token
         self._context_api_state = context_api_state or ContextApiState(context_api_enabled)
         self._refresh_lock = refresh_lock
+        self._refresh_jobs = refresh_jobs or server_usage_refresh.RefreshJobRegistry()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
@@ -528,6 +530,28 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
             thresholds_path=self._thresholds_path,
             projects_path=self._projects_path,
             privacy_mode=self._privacy_mode,
+        )
+
+    def _handle_refresh_start(self, query: str) -> None:
+        server_usage_refresh.handle_refresh_job_start_request(
+            query,
+            codex_home=self._codex_home,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            refresh_lock=self._refresh_lock,
+            refresh_jobs=self._refresh_jobs,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_json=self._send_json,
+        )
+
+    def _handle_refresh_status(self, query: str) -> None:
+        server_usage_refresh.handle_refresh_job_status_request(
+            query,
+            refresh_jobs=self._refresh_jobs,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_json=self._send_json,
         )
 
     def _handle_usage(self, query: str) -> None:

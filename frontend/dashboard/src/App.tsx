@@ -32,7 +32,7 @@ import {
   type HistoryScope,
   viewFromUrlParam,
 } from './app/shellUrl';
-import { loadUsagePayload, modelFromBootPayload, readBootPayload } from './api/client';
+import { loadUsagePayload, modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
 import { EnvironmentStatus } from './components/EnvironmentStatus';
@@ -58,6 +58,7 @@ type RefreshOptions = {
 };
 
 const autoRefreshIntervalMs = 10_000;
+const usageLoadSessionKey = 'codexUsageDashboardLoadSettings';
 const keyboardShortcutViews: Record<string, ViewId> = {
   '1': 'overview',
   '2': 'calls',
@@ -71,8 +72,37 @@ export function shouldAutoRefreshUsageView(view: ViewId): boolean {
 }
 
 function isKeyboardShortcutTarget(target: EventTarget | null) {
-if (!(target instanceof Element)) return false;
-return Boolean(target.closest('input, select, textarea, button, [contenteditable="true"]'));
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('input, select, textarea, button, [contenteditable="true"]'));
+}
+
+function readUsageLoadSessionSettings(): RefreshOptions | null {
+  try {
+    const rawValue = window.sessionStorage?.getItem(usageLoadSessionKey);
+    if (!rawValue) return null;
+    const parsed = JSON.parse(rawValue) as { loadLimit?: unknown; historyScope?: unknown };
+    const loadLimit =
+      typeof parsed.loadLimit === 'number' && Number.isFinite(parsed.loadLimit)
+        ? normalizeRowLimit(parsed.loadLimit)
+        : undefined;
+    const historyScope: HistoryScope | undefined =
+      parsed.historyScope === 'all' || parsed.historyScope === 'active' ? parsed.historyScope : undefined;
+    if (loadLimit === undefined && historyScope === undefined) return null;
+    return { loadLimit, historyScope };
+  } catch {
+    return null;
+  }
+}
+
+function storeUsageLoadSessionSettings(loadLimit: number, historyScope: HistoryScope) {
+  try {
+    window.sessionStorage?.setItem(
+      usageLoadSessionKey,
+      JSON.stringify({ loadLimit: normalizeRowLimit(loadLimit), historyScope }),
+    );
+  } catch {
+    // Storage can be disabled in private or embedded browser contexts.
+  }
 }
 
 export function App() {
@@ -91,8 +121,9 @@ const [callReturnView, setCallReturnView] = useState<ViewId>(() => callReturnVie
 const [callReturnViewExplicit, setCallReturnViewExplicit] = useState(() => hasCallReturnViewParam());
 const [globalQuery, setGlobalQuery] = useState(() => new URLSearchParams(window.location.search).get('q') ?? '');
 const [activePreset, setActivePreset] = useState(() => new URLSearchParams(window.location.search).get('preset') ?? '');
-const [locationSearch, setLocationSearch] = useState(() => window.location.search);
-const [refreshState, setRefreshState] = useState('Stored snapshot loaded just now');
+  const [locationSearch, setLocationSearch] = useState(() => window.location.search);
+  const [refreshState, setRefreshState] = useState('Stored snapshot loaded just now');
+  const [refreshProgress, setRefreshProgress] = useState<RefreshProgressPayload | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
 const [showBackToTop, setShowBackToTop] = useState(false);
@@ -141,11 +172,18 @@ limit: loadLimit,
 totalRows: totalAvailableRows,
 });
 const rowLoadModeLabel = loadLimit === rowLimitNoCap ? 'All rows mode' : `Most recent ${loadLimit.toLocaleString()} calls`;
-const rowLoadingLabel =
-loadLimit === rowLimitNoCap || pendingLoadLimitUncapped
-? 'Loading all rows...'
-: `Loading ${finitePendingLoadLimit.toLocaleString()} rows...`;
-const canLoadAllRows = canUseLiveApi && !refreshing && loadLimit !== rowLimitNoCap;
+  const rowLoadingLabel =
+    loadLimit === rowLimitNoCap || pendingLoadLimitUncapped
+      ? 'Loading all rows...'
+      : `Loading ${finitePendingLoadLimit.toLocaleString()} rows...`;
+  const refreshProgressPercent =
+    refreshing && typeof refreshProgress?.percent === 'number'
+      ? Math.max(0, Math.min(100, refreshProgress.percent))
+      : null;
+  const refreshProgressText = refreshProgress
+    ? refreshProgressLabel(refreshProgress, historyScope)
+    : rowLoadingLabel;
+  const canLoadAllRows = canUseLiveApi && !refreshing && loadLimit !== rowLimitNoCap;
 const historyScopeDetail = historyScopeStatusLabel({
 historyScope,
 activeRows: dashboardPayload?.active_available_rows,
@@ -270,38 +308,59 @@ replaceShellUrl(url);
 }
 
 async function refreshDashboard(options: RefreshOptions = {}) {
- if (refreshing) return;
- const nextLoadLimit = options.loadLimit ?? loadLimit;
- const nextHistoryScope = options.historyScope ?? historyScope;
- const shouldRefreshIndex = options.refresh ?? true;
- setRefreshing(true);
- setRefreshState(
- `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${nextHistoryScope === 'all' ? 'all history' : 'active'} aggregate rows...`,
- );
+  if (refreshing) return;
+  initialLiveLoadAttempted.current = true;
+  const nextLoadLimit = options.loadLimit ?? loadLimit;
+  const nextHistoryScope = options.historyScope ?? historyScope;
+  const shouldRefreshIndex = options.refresh ?? true;
+  const shouldShowProgress = nextLoadLimit === rowLimitNoCap || Boolean(dashboardPayload?.refresh_jobs_available);
+  setRefreshing(true);
+  setRefreshProgress(
+    shouldShowProgress
+      ? {
+          status: 'running',
+          phase: shouldRefreshIndex ? 'refreshing_index' : 'loading_rows',
+          message: `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${
+            nextHistoryScope === 'all' ? 'all history' : 'active'
+          } aggregate rows`,
+        }
+      : null,
+  );
+  setRefreshState(
+    `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${nextHistoryScope === 'all' ? 'all history' : 'active'} aggregate rows...`,
+  );
  try {
- const payload = await loadUsagePayload(dashboardPayload, {
- refresh: shouldRefreshIndex,
- limit: nextLoadLimit,
- includeArchived: nextHistoryScope === 'all',
- });
+      const payload = await loadUsagePayload(dashboardPayload, {
+      refresh: shouldRefreshIndex,
+      limit: nextLoadLimit,
+      includeArchived: nextHistoryScope === 'all',
+      onProgress: progress => {
+        setRefreshProgress(progress);
+        setRefreshState(refreshProgressLabel(progress, nextHistoryScope));
+      },
+      });
     clearDiagnosticApiCache();
     setDashboardPayload(payload);
       setModel(modelFromBootPayload(payload));
       setContextApiEnabled(Boolean(payload.context_api_enabled));
-      const appliedLoadLimit = loadLimitFromPayload(payload, nextLoadLimit);
-      setLoadLimit(appliedLoadLimit);
-      setPendingLoadLimit(appliedLoadLimit);
-      setHistoryScope(historyScopeFromPayload(payload, nextHistoryScope));
-      const loaded = payload.loaded_row_count ?? payload.rows?.length ?? 0;
-      const total = payload.total_available_rows ?? loaded;
-      setRefreshState(`Live refresh loaded ${loaded} of ${total} aggregate rows`);
-} catch (error) {
-const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-setRefreshState(`${errorMessage(error)} Stored snapshot kept at ${timestamp}`);
- } finally {
- setRefreshing(false);
- }
- }
+    const appliedLoadLimit = loadLimitFromPayload(payload, nextLoadLimit);
+    setLoadLimit(appliedLoadLimit);
+    setPendingLoadLimit(appliedLoadLimit);
+    const appliedHistoryScope = historyScopeFromPayload(payload, nextHistoryScope);
+    setHistoryScope(appliedHistoryScope);
+    storeUsageLoadSessionSettings(appliedLoadLimit, appliedHistoryScope);
+    const loaded = payload.loaded_row_count ?? payload.rows?.length ?? 0;
+    const total = payload.total_available_rows ?? loaded;
+    setRefreshState(`Live refresh loaded ${loaded} of ${total} aggregate rows`);
+  } catch (error) {
+    setRefreshProgress(null);
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setRefreshState(`${errorMessage(error)} Stored snapshot kept at ${timestamp}`);
+  } finally {
+    setRefreshProgress(null);
+    setRefreshing(false);
+  }
+}
 
 useEffect(() => {
 document.documentElement.lang = shellI18n.language;
@@ -309,14 +368,33 @@ document.documentElement.dir = shellI18n.direction;
 }, [shellI18n.direction, shellI18n.language]);
 
 useEffect(() => {
-const availableRows = Number(dashboardPayload?.total_available_rows ?? 0);
- const hasLoadedRows = Boolean(dashboardPayload?.rows?.length);
- if (!canUseLiveApi || hasLoadedRows || availableRows <= 0 || refreshing || initialLiveLoadAttempted.current) {
- return;
- }
- initialLiveLoadAttempted.current = true;
- void refreshDashboard({ refresh: false });
- }, [canUseLiveApi, dashboardPayload, historyScope, loadLimit, refreshing]);
+  const availableRows = Number(dashboardPayload?.total_available_rows ?? 0);
+  const loadedRows = Number(dashboardPayload?.loaded_row_count ?? dashboardPayload?.rows?.length ?? 0);
+  const sessionSettings = readUsageLoadSessionSettings();
+  const nextHistoryScope = sessionSettings?.historyScope ?? historyScope;
+  const nextLoadLimit = sessionSettings?.loadLimit ?? loadLimit;
+  const needsSessionRestore =
+    Boolean(sessionSettings) &&
+    (nextHistoryScope !== historyScope || nextLoadLimit !== loadLimit || nextLoadLimit === rowLimitNoCap);
+  const hasLoadedRows = loadedRows > 0;
+  if (
+    !canUseLiveApi ||
+    (!needsSessionRestore && hasLoadedRows) ||
+    availableRows <= 0 ||
+    refreshing ||
+    initialLiveLoadAttempted.current
+  ) {
+    return;
+  }
+  initialLiveLoadAttempted.current = true;
+  if (needsSessionRestore) {
+    setHistoryScope(nextHistoryScope);
+    setLoadLimit(nextLoadLimit);
+    setPendingLoadLimit(nextLoadLimit);
+    replaceShellUrl(historyScopeUrl(nextHistoryScope));
+  }
+  void refreshDashboard({ refresh: false, historyScope: nextHistoryScope, loadLimit: nextLoadLimit });
+}, [canUseLiveApi, dashboardPayload, historyScope, loadLimit, refreshing]);
 
  useEffect(() => {
  if (!canUseLiveApi && autoRefreshEnabled) {
@@ -580,10 +658,10 @@ aria-label="History scope"
 </div>
 <div className={`row-limit-status${refreshing ? ' is-loading' : ''}`} role="status" aria-live="polite">
 {refreshing ? (
-<>
-<span className="row-loading-dot" aria-hidden="true" />
-<span>{rowLoadingLabel}</span>
-</>
+                <>
+                  <span className="row-loading-dot" aria-hidden="true" />
+                  <span>{refreshProgressText}</span>
+                </>
 ) : (
 <>
 <span>{rowLoadModeLabel}</span>
@@ -631,13 +709,27 @@ disabled={refreshing || !canUseLiveApi}
                   />
                 <span>No cap</span>
               </label>
-                <button type="button" onClick={applyLoadLimitChange} disabled={refreshing || !canUseLiveApi || !rowLimitChanged}>
+            <button type="button" onClick={applyLoadLimitChange} disabled={refreshing || !canUseLiveApi || !rowLimitChanged}>
               {pendingLoadLimitUncapped ? 'Load all' : shellI18n.t('nav.load', 'Load')}
-</button>
-</div>
-<button className="row-limit-load-all" type="button" onClick={loadAllRows} disabled={!canLoadAllRows}>
-Load all rows
-</button>
+            </button>
+          </div>
+          {refreshing ? (
+            <div className="row-load-progress" aria-label="Row loading progress">
+              <div
+                className="row-load-progress-track"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={refreshProgressPercent ?? undefined}
+              >
+                <span style={{ width: `${refreshProgressPercent ?? 8}%` }} />
+              </div>
+              <span>{refreshProgressPercent === null ? 'Preparing...' : `${Math.round(refreshProgressPercent)}% loaded`}</span>
+            </div>
+          ) : null}
+          <button className="row-limit-load-all" type="button" onClick={loadAllRows} disabled={!canLoadAllRows}>
+            Load all rows
+          </button>
 <p id="row-limit-entry-help" className="row-limit-hint">
 Use Load all rows for the full history, or type any finite row count.
 </p>
@@ -876,4 +968,11 @@ return (
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function refreshProgressLabel(progress: RefreshProgressPayload, historyScope: HistoryScope): string {
+  const scope = historyScope === 'all' ? 'all history' : 'active history';
+  const message = progress.message || 'Refreshing usage index';
+  const percent = typeof progress.percent === 'number' ? ` ${Math.round(progress.percent)}%` : '';
+  return `${message}${percent} (${scope})`;
 }

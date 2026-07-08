@@ -66,9 +66,10 @@ export type UsageRow = {
 };
 
 export type DashboardBootPayload = {
-api_token?: string;
-context_api_enabled?: boolean;
-language?: string;
+  api_token?: string;
+  context_api_enabled?: boolean;
+  refresh_jobs_available?: boolean;
+  language?: string;
 language_direction?: string;
 available_languages?: DashboardLanguage[];
 translations?: Record<string, string>;
@@ -238,6 +239,7 @@ export type MetricCard = {
   detail: string;
   trend: string;
   tone: MetricTone;
+  breakdown?: Array<{ label: string; value: string }>;
 };
 
 export type ChartPoint = {

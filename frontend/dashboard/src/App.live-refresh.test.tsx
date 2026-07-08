@@ -395,7 +395,7 @@ fireEvent.click(screen.getByLabelText('No row cap'));
 
   expect(await screen.findByText('row-limit-after-thread-a')).toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=0');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=10000');
   expect(screen.getAllByText(/no row cap/i).length).toBeGreaterThan(0);
 });
 

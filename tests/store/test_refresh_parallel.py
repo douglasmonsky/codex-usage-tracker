@@ -96,3 +96,33 @@ def test_refresh_falls_back_to_serial_parse_when_worker_pool_breaks(
         row = conn.execute("SELECT COUNT(*) AS event_count FROM usage_events").fetchone()
     assert row is not None
     assert row["event_count"] == result.inserted_or_updated_events
+
+
+def test_refresh_reports_phase_progress(tmp_path: Path, monkeypatch) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    events: list[dict[str, object]] = []
+    monkeypatch.setenv("CODEX_USAGE_TRACKER_REFRESH_WORKERS", "1")
+
+    result = refresh_module.refresh_usage_index(
+        codex_home=codex_home,
+        db_path=db_path,
+        progress_callback=events.append,
+    )
+
+    phases = [event["phase"] for event in events]
+    assert "discovering" in phases
+    assert "parsing" in phases
+    assert "upserting" in phases
+    assert "metadata" in phases
+    assert "indexing_content" in phases
+    assert phases[-1] == "finalizing"
+    assert events[-1]["status"] == "completed"
+    assert events[-1]["result"]["parsed_events"] == result.parsed_events
+    content_events = [
+        event for event in events if event["phase"] == "indexing_content"
+    ]
+    assert content_events
+    assert content_events[-1]["status"] == "completed"
+    assert content_events[-1]["percent"] == 100.0
+    assert content_events[-1]["content_fragments"] > 0

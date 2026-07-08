@@ -26,43 +26,200 @@ export function readBootPayload(): DashboardBootPayload | null {
   }
 }
 
+export type RefreshProgressPayload = {
+  schema?: string;
+  job_id?: string;
+  status?: string;
+  phase?: string;
+  message?: string;
+  completed?: number;
+  total?: number;
+  percent?: number;
+  error?: string;
+  result?: Record<string, unknown>;
+};
+
 export type UsagePayloadRequest = {
   refresh?: boolean;
   limit?: number;
+  offset?: number;
   includeArchived?: boolean;
+  onProgress?: (progress: RefreshProgressPayload) => void;
 };
+
+const uncappedUsagePageSize = 10_000;
 
 export async function loadUsagePayload(
   currentPayload: DashboardBootPayload | null,
   options: UsagePayloadRequest = {},
 ): Promise<DashboardBootPayload> {
-  if (window.location.protocol === 'file:') {
-    throw new Error('Live refresh requires the localhost dashboard server.');
+  if (options.refresh && currentPayload?.refresh_jobs_available) {
+    const refreshed = await tryRefreshUsageIndex(currentPayload, options);
+    const nextOptions = { ...options, refresh: !refreshed };
+    return nextOptions.limit === 0
+      ? loadAllUsagePayloadPaged(currentPayload, nextOptions)
+      : requestUsagePayload(currentPayload, nextOptions);
   }
-  if (!currentPayload?.api_token) {
-    throw new Error('Live refresh requires localhost dashboard API token.');
+  return options.limit === 0
+    ? loadAllUsagePayloadPaged(currentPayload, options)
+    : requestUsagePayload(currentPayload, options);
+}
+
+async function tryRefreshUsageIndex(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest,
+): Promise<boolean> {
+  try {
+    await refreshUsageIndex(currentPayload, options);
+    return true;
+  } catch (error) {
+    if (error instanceof UsageRefreshJobFailedError) {
+      throw error;
+    }
+    return false;
   }
+}
+
+async function requestUsagePayload(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest = {},
+): Promise<DashboardBootPayload> {
+  assertLiveUsagePayloadAvailable(currentPayload);
 
   const params = new URLSearchParams({
     refresh: options.refresh ? '1' : '0',
-    limit: String(options.limit ?? currentPayload.limit ?? currentPayload.loaded_row_count ?? 500),
+    limit: String(options.limit ?? currentPayload?.limit ?? currentPayload?.loaded_row_count ?? 500),
     _: String(Date.now()),
   });
+  if (options.offset && options.offset > 0) {
+    params.set('offset', String(options.offset));
+  }
   const includeArchived = options.includeArchived ?? payloadIncludesArchived(currentPayload);
   if (includeArchived) {
     params.set('include_archived', '1');
   }
 
   const response = await fetch(`/api/usage?${params.toString()}`, {
-    headers: {
-      Accept: 'application/json',
-      'X-Codex-Usage-Token': currentPayload.api_token,
-    },
+    headers: liveUsageHeaders(currentPayload),
     cache: 'no-store',
   });
   const payload = await readJsonResponse(response, 'Usage refresh');
   return payload as DashboardBootPayload;
 }
+
+async function loadAllUsagePayloadPaged(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest = {},
+): Promise<DashboardBootPayload> {
+  const rows: UsageRow[] = [];
+  let offset = 0;
+  let latestPayload: DashboardBootPayload | null = null;
+  let totalRows = Number(currentPayload?.total_available_rows ?? 0);
+  for (let pageIndex = 0; pageIndex < 1000; pageIndex += 1) {
+    const payload = await requestUsagePayload(currentPayload, {
+      ...options,
+      refresh: pageIndex === 0 ? options.refresh : false,
+      limit: uncappedUsagePageSize,
+      offset,
+    });
+    const pageRows = payload.rows ?? [];
+    latestPayload = payload;
+    rows.push(...pageRows);
+    totalRows = Number(payload.total_available_rows ?? totalRows ?? rows.length);
+    const pageComplete = rows.length >= totalRows || !payload.has_more;
+    options.onProgress?.({
+      status: pageComplete ? 'completed' : 'running',
+      phase: 'loading_rows',
+      message: 'Loading all rows',
+      completed: rows.length,
+      total: totalRows,
+      percent: pageComplete ? 100 : totalRows > 0 ? Math.min(99, Math.floor((rows.length / totalRows) * 100)) : 0,
+    } as RefreshProgressPayload);
+    offset += pageRows.length;
+    if (!payload.has_more || pageRows.length === 0 || rows.length >= totalRows) {
+      break;
+    }
+  }
+  return {
+    ...(latestPayload ?? currentPayload ?? {}),
+    rows,
+    loaded_row_count: rows.length,
+    limit: null,
+    limit_label: 'All',
+    has_more: false,
+    total_available_rows: totalRows || rows.length,
+  } as DashboardBootPayload;
+}
+
+async function refreshUsageIndex(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest,
+): Promise<RefreshProgressPayload> {
+  assertLiveUsagePayloadAvailable(currentPayload);
+  const params = new URLSearchParams({ _: String(Date.now()) });
+  const includeArchived = options.includeArchived ?? payloadIncludesArchived(currentPayload);
+  if (includeArchived) {
+    params.set('include_archived', '1');
+  }
+  const startResponse = await fetch(`/api/refresh/start?${params.toString()}`, {
+    headers: liveUsageHeaders(currentPayload),
+    cache: 'no-store',
+  });
+  const started = (await readJsonResponse(startResponse, 'Usage refresh start')) as RefreshProgressPayload;
+  options.onProgress?.(started);
+  const jobId = typeof started.job_id === 'string' ? started.job_id : '';
+  if (!jobId) {
+    throw new Error('Usage refresh start did not return a job id.');
+  }
+  return pollUsageRefreshJob(currentPayload, jobId, options.onProgress);
+}
+
+async function pollUsageRefreshJob(
+  currentPayload: DashboardBootPayload,
+  jobId: string,
+  onProgress?: (progress: RefreshProgressPayload) => void,
+): Promise<RefreshProgressPayload> {
+  for (let attempt = 0; attempt < 600; attempt += 1) {
+    const params = new URLSearchParams({ job_id: jobId, _: String(Date.now()) });
+    const response = await fetch(`/api/refresh/status?${params.toString()}`, {
+      headers: liveUsageHeaders(currentPayload),
+      cache: 'no-store',
+    });
+    const progress = (await readJsonResponse(response, 'Usage refresh status')) as RefreshProgressPayload;
+    onProgress?.(progress);
+    if (progress.status === 'completed') {
+      return progress;
+    }
+    if (progress.status === 'failed') {
+      throw new UsageRefreshJobFailedError(progress.error || progress.message || 'Usage refresh failed.');
+    }
+    await delay(Math.min(1000, 150 + attempt * 50));
+  }
+  throw new Error('Usage refresh did not complete before the polling timeout.');
+}
+
+function assertLiveUsagePayloadAvailable(currentPayload: DashboardBootPayload | null): asserts currentPayload is DashboardBootPayload {
+  if (window.location.protocol === 'file:') {
+    throw new Error('Live refresh requires the localhost dashboard server.');
+  }
+  if (!currentPayload?.api_token) {
+    throw new Error('Live refresh requires localhost dashboard API token.');
+  }
+}
+
+function liveUsageHeaders(currentPayload: DashboardBootPayload): HeadersInit {
+  return {
+    Accept: 'application/json',
+    'X-Codex-Usage-Token': currentPayload.api_token || '',
+  };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+class UsageRefreshJobFailedError extends Error {}
+
 
 export function modelFromBootPayload(payload: DashboardBootPayload | null): DashboardModel {
  if (!payload) {
@@ -74,20 +231,37 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
 
  const rows = payload.rows ?? [];
  const calls = rows.map(usageRowToCall);
- const totalTokens = rows.length ? sumRows(rows, row => Number(row.total_tokens ?? 0)) : summaryNumber(payload, 'total_tokens');
- const estimatedCost = rows.length ? sumRows(rows, row => Number(row.estimated_cost_usd ?? 0)) : summaryNumber(payload, 'estimated_cost_usd');
- const cachedTokens = rows.length ? sumRows(rows, row => Number(row.cached_input_tokens ?? 0)) : summaryNumber(payload, 'cached_input_tokens');
- const inputTokens = rows.length ? sumRows(rows, row => Number(row.input_tokens ?? 0)) : summaryNumber(payload, 'input_tokens');
- const cachePct = inputTokens > 0 ? (cachedTokens / inputTokens) * 100 : 0;
-const totalCalls = summaryNumber(payload, 'visible_calls') || payload.loaded_row_count || payload.total_available_rows || calls.length;
-const overviewSeries = buildOverviewSeries(rows);
-const cards = buildCards({
+  const totalTokens = rows.length ? sumRows(rows, row => Number(row.total_tokens ?? 0)) : summaryNumber(payload, 'total_tokens');
+  const estimatedCost = rows.length ? sumRows(rows, row => Number(row.estimated_cost_usd ?? 0)) : summaryNumber(payload, 'estimated_cost_usd');
+  const cachedTokens = rows.length ? sumRows(rows, row => Number(row.cached_input_tokens ?? 0)) : summaryNumber(payload, 'cached_input_tokens');
+  const inputTokens = rows.length ? sumRows(rows, row => Number(row.input_tokens ?? 0)) : summaryNumber(payload, 'input_tokens');
+  const uncachedTokens = rows.length
+    ? sumRows(rows, row => {
+        const input = Number(row.input_tokens ?? 0);
+        const cached = Number(row.cached_input_tokens ?? 0);
+        return Number(row.uncached_input_tokens ?? Math.max(input - cached, 0));
+      })
+    : Math.max(inputTokens - cachedTokens, 0);
+  const outputTokens = rows.length ? sumRows(rows, row => Number(row.output_tokens ?? 0)) : summaryNumber(payload, 'output_tokens');
+  const reasoningOutputTokens = rows.length
+    ? sumRows(rows, row => Number(row.reasoning_output_tokens ?? 0))
+    : summaryNumber(payload, 'reasoning_output_tokens');
+  const cachePct = inputTokens > 0 ? (cachedTokens / inputTokens) * 100 : 0;
+  const totalCalls = calls.length || Math.max(0, Number(payload.loaded_row_count ?? 0));
+  const overviewSeries = buildOverviewSeries(rows);
+  const cards = buildCards({
     cachePct,
     cachedTokens,
     estimatedCost,
     historyScope: payload.history_scope ?? 'active',
     totalCalls,
     totalTokens,
+    tokenBreakdown: {
+      cachedInput: cachedTokens,
+      uncachedInput: uncachedTokens,
+      output: outputTokens,
+      reasoningOutput: reasoningOutputTokens,
+    },
     usageRemainingCard: buildUsageRemainingCard(payload),
   });
 
@@ -163,6 +337,12 @@ function buildCards(input: {
   historyScope: string;
   totalCalls: number;
   totalTokens: number;
+  tokenBreakdown: {
+    cachedInput: number;
+    uncachedInput: number;
+    output: number;
+    reasoningOutput: number;
+  };
   usageRemainingCard: MetricCard;
 }): MetricCard[] {
   return [
@@ -172,6 +352,12 @@ function buildCards(input: {
       detail: `${input.historyScope} history scope`,
       trend: 'loaded aggregate rows',
       tone: 'blue',
+      breakdown: [
+        { label: 'Cached', value: formatCompact(input.tokenBreakdown.cachedInput) },
+        { label: 'Uncached', value: formatCompact(input.tokenBreakdown.uncachedInput) },
+        { label: 'Output', value: formatCompact(input.tokenBreakdown.output) },
+        { label: 'Reasoning', value: formatCompact(input.tokenBreakdown.reasoningOutput) },
+      ],
     },
     {
       label: 'Estimated Cost',
@@ -190,7 +376,7 @@ function buildCards(input: {
     {
       label: 'Total Calls',
       value: formatNumber(input.totalCalls),
-      detail: 'visible aggregate rows',
+      detail: 'loaded calls in this dashboard',
       trend: 'privacy-safe',
       tone: 'blue',
     },
@@ -514,10 +700,13 @@ function sumRows(rows: UsageRow[], selector: (row: UsageRow) => number): number 
 }
 
 async function readJsonResponse(response: Response, label: string): Promise<Record<string, unknown>> {
-  let payload: Record<string, unknown> = {};
+  let payload: Record<string, unknown>;
   try {
     payload = await response.json() as Record<string, unknown>;
-  } catch {
+  } catch (error) {
+    if (response.ok) {
+      throw new Error(`${label} response could not be read as JSON: ${errorMessage(error)}`);
+    }
     payload = {};
   }
   if (!response.ok) {
@@ -525,6 +714,10 @@ async function readJsonResponse(response: Response, label: string): Promise<Reco
     throw new Error(message);
   }
   return payload;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function formatNumber(value: number): string {

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import secrets
 import sqlite3
+import threading
 from collections.abc import Callable
 from http import HTTPStatus
 from pathlib import Path
@@ -32,6 +34,180 @@ ErrorSender = Callable[[HTTPStatus, str], None]
 ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
 TokenValidator = Callable[[dict[str, list[str]]], bool]
+
+
+class RefreshJobRegistry:
+    """In-process async refresh job registry for live dashboard polling."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._jobs: dict[str, dict[str, object]] = {}
+
+    def start_refresh(
+        self,
+        *,
+        codex_home: Path,
+        db_path: Path,
+        include_archived: bool,
+        aggregate_only: bool,
+        refresh_lock: Any,
+    ) -> dict[str, object]:
+        job_id = secrets.token_urlsafe(12)
+        started_at = utc_now()
+        job: dict[str, object] = {
+            "schema": "codex-usage-tracker-refresh-job-v1",
+            "job_id": job_id,
+            "status": "running",
+            "started_at": started_at,
+            "updated_at": started_at,
+            "include_archived": include_archived,
+            "aggregate_only": aggregate_only,
+            "progress": {
+                "schema": "codex-usage-tracker-refresh-progress-v1",
+                "phase": "queued",
+                "status": "running",
+                "message": "Refresh queued",
+                "completed": 0,
+                "total": 1,
+                "percent": 0.0,
+            },
+        }
+        with self._lock:
+            self._jobs[job_id] = job
+        thread = threading.Thread(
+            target=self._run_refresh,
+            kwargs={
+                "job_id": job_id,
+                "codex_home": codex_home,
+                "db_path": db_path,
+                "include_archived": include_archived,
+                "aggregate_only": aggregate_only,
+                "refresh_lock": refresh_lock,
+            },
+            daemon=True,
+        )
+        thread.start()
+        return self.status(job_id)
+
+    def status(self, job_id: str) -> dict[str, object]:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return {
+                    "schema": "codex-usage-tracker-refresh-job-v1",
+                    "job_id": job_id,
+                    "status": "missing",
+                    "error": "Unknown refresh job_id. Jobs are in-process and cleared when the server restarts.",
+                }
+            return dict(job)
+
+    def _run_refresh(
+        self,
+        *,
+        job_id: str,
+        codex_home: Path,
+        db_path: Path,
+        include_archived: bool,
+        aggregate_only: bool,
+        refresh_lock: Any,
+    ) -> None:
+        started = perf_counter()
+
+        def on_progress(progress: dict[str, object]) -> None:
+            self._update_job(job_id, progress=progress, status="running")
+
+        try:
+            with refresh_lock:
+                result = refresh_usage_index(
+                    codex_home=codex_home,
+                    db_path=db_path,
+                    include_archived=include_archived,
+                    aggregate_only=aggregate_only,
+                    progress_callback=on_progress,
+                )
+            self._update_job(
+                job_id,
+                status="completed",
+                finished_at=utc_now(),
+                elapsed_ms=elapsed_ms(started),
+                result={
+                    "scanned_files": result.scanned_files,
+                    "parsed_events": result.parsed_events,
+                    "skipped_events": result.skipped_events,
+                    "inserted_or_updated_events": result.inserted_or_updated_events,
+                    "db_path": result.db_path,
+                    "parser_diagnostics": result.parser_diagnostics,
+                    "include_archived": include_archived,
+                    "aggregate_only": aggregate_only,
+                },
+            )
+        except BaseException as exc:  # noqa: BLE001 - background jobs must capture failures.
+            self._update_job(
+                job_id,
+                status="failed",
+                finished_at=utc_now(),
+                elapsed_ms=elapsed_ms(started),
+                error=f"{type(exc).__name__}: {exc}",
+            )
+
+    def _update_job(self, job_id: str, **updates: object) -> None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return
+            job.update(updates)
+            job["updated_at"] = utc_now()
+
+
+def handle_refresh_job_start_request(
+    query: str,
+    *,
+    codex_home: Path,
+    db_path: Path,
+    include_archived_default: bool,
+    refresh_lock: Any,
+    refresh_jobs: RefreshJobRegistry,
+    has_valid_api_token: TokenValidator,
+    send_error: ErrorSender,
+    send_json: JsonSender,
+) -> None:
+    """Start an async refresh job and return its initial status."""
+    params = parse_qs(query)
+    if not has_valid_api_token(params):
+        send_error(HTTPStatus.FORBIDDEN, "Valid API token is required for refresh")
+        return
+    include_archived = parse_bool_query_value(
+        first_query_value(params.get("include_archived")), include_archived_default
+    )
+    aggregate_only = parse_bool_query_value(first_query_value(params.get("aggregate_only")), False)
+    payload = refresh_jobs.start_refresh(
+        codex_home=codex_home,
+        db_path=db_path,
+        include_archived=include_archived,
+        aggregate_only=aggregate_only,
+        refresh_lock=refresh_lock,
+    )
+    send_json(HTTPStatus.ACCEPTED, payload)
+
+
+def handle_refresh_job_status_request(
+    query: str,
+    *,
+    refresh_jobs: RefreshJobRegistry,
+    has_valid_api_token: TokenValidator,
+    send_error: ErrorSender,
+    send_json: JsonSender,
+) -> None:
+    """Return async refresh job progress/result."""
+    params = parse_qs(query)
+    if not has_valid_api_token(params):
+        send_error(HTTPStatus.FORBIDDEN, "Valid API token is required for refresh")
+        return
+    job_id = first_query_value(params.get("job_id"))
+    if not job_id:
+        send_error(HTTPStatus.BAD_REQUEST, "job_id is required")
+        return
+    send_json(HTTPStatus.OK, refresh_jobs.status(job_id))
 
 
 def handle_usage_request(

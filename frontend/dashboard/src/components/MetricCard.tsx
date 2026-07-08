@@ -22,6 +22,16 @@ export function MetricCard({ card }: { card: MetricCardModel }) {
       <div className="metric-copy">
         <p>{card.label}</p>
         <strong>{card.value}</strong>
+        {card.breakdown?.length ? (
+          <dl className="metric-breakdown" aria-label={`${card.label} breakdown`}>
+            {card.breakdown.map(item => (
+              <div key={item.label}>
+                <dt>{item.label}</dt>
+                <dd>{item.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
         <span className={`trend ${trendTone}`}>{card.trend}</span>
         <small>{card.detail}</small>
       </div>

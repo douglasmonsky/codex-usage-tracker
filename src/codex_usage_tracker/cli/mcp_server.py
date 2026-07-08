@@ -79,6 +79,7 @@ from codex_usage_tracker.server.recommendations import recommendations_payload
 from codex_usage_tracker.server.reports import reports_pack_payload
 from codex_usage_tracker.server.status import status_payload
 from codex_usage_tracker.server.threads import threads_payload
+from codex_usage_tracker.server.usage_refresh import RefreshJobRegistry
 from codex_usage_tracker.store.api import (
     export_usage_csv as export_csv,
 )
@@ -94,6 +95,8 @@ mcp = FastMCP("codex-usage-tracker")
 _DOGFOOD_JOBS: dict[str, dict[str, Any]] = {}
 _DOGFOOD_RESULT_CACHE: dict[str, dict[str, Any]] = {}
 _DOGFOOD_JOB_LOCK = threading.Lock()
+_REFRESH_JOB_REGISTRY = RefreshJobRegistry()
+_REFRESH_JOB_LOCK = threading.Lock()
 _DOGFOOD_MAX_JOBS = 25
 _DOGFOOD_MAX_RESULT_CACHE = 25
 
@@ -418,6 +421,29 @@ def refresh_usage_index(
         aggregate_only=aggregate_only,
     )
     return refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1")
+
+@mcp.tool()
+def usage_refresh_start(
+    include_archived: bool = False,
+    aggregate_only: bool = False,
+) -> dict[str, Any]:
+    """Start an async local usage refresh job and return a pollable job_id."""
+
+    return _REFRESH_JOB_REGISTRY.start_refresh(
+        codex_home=DEFAULT_CODEX_HOME,
+        db_path=DEFAULT_DB_PATH,
+        include_archived=include_archived,
+        aggregate_only=aggregate_only,
+        refresh_lock=_REFRESH_JOB_LOCK,
+    )
+
+
+@mcp.tool()
+def usage_refresh_status(job_id: str) -> dict[str, Any]:
+    """Poll an async local usage refresh job for phase progress and result."""
+
+    return _REFRESH_JOB_REGISTRY.status(job_id)
+
 
 
 @mcp.tool()

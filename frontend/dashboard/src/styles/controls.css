@@ -313,6 +313,36 @@
   }
 }
 
+.row-load-progress {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 100%;
+  min-width: 0;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.row-load-progress-track {
+  position: relative;
+  min-width: 0;
+  height: 8px;
+  overflow: hidden;
+  background: #dbeafe;
+  border-radius: 999px;
+}
+
+.row-load-progress-track span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 8px;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
 .row-limit-load-all {
   min-height: 28px;
   padding: 0 10px;

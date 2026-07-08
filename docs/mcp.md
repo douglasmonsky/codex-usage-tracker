@@ -70,6 +70,8 @@ Waste-discovery answers should not stop at "interesting." Tie recommendations to
 ## Tools
 
 - `refresh_usage_index`
+- `usage_refresh_start`
+- `usage_refresh_status`
 - `usage_doctor`
 - `usage_summary`
 - `usage_query`

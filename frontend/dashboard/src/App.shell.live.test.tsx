@@ -266,4 +266,81 @@ it('windows large table hydrates and syncs page URL state', async () => {
   });
   expect(screen.queryByText('Showing 500 of 520 table rows')).not.toBeInTheDocument();
 });
+
+it('restores session row loading preferences on browser refresh', async () => {
+  window.sessionStorage.setItem(
+    'codexUsageDashboardLoadSettings',
+    JSON.stringify({ loadLimit: 1500, historyScope: 'all' }),
+  );
+  window.__CODEX_USAGE_BOOT__ = {
+    api_token: 'session-restore-token',
+    context_api_enabled: true,
+    loaded_row_count: 500,
+    total_available_rows: 2_000,
+    all_history_available_rows: 2_000,
+    active_available_rows: 500,
+    limit: 500,
+    history_scope: 'active',
+    include_archived: false,
+    rows: [
+      {
+        record_id: 'session-before',
+        call_started_at: '2026-07-01T10:00:00Z',
+        thread_name: 'session-before-thread',
+        model: 'o4-mini',
+        effort: 'medium',
+        input_tokens: 100,
+        cached_input_tokens: 50,
+        output_tokens: 10,
+        total_tokens: 110,
+        estimated_cost_usd: 0.01,
+      },
+    ],
+  };
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    void init;
+    const url = String(input);
+    if (!url.includes('/api/usage?')) throw new Error(`Unexpected request: ${url}`);
+    return {
+      ok: true,
+      json: async () => ({
+        api_token: 'session-restore-token',
+        context_api_enabled: true,
+        loaded_row_count: 1_500,
+        total_available_rows: 2_000,
+        all_history_available_rows: 2_000,
+        active_available_rows: 500,
+        limit: 1_500,
+        history_scope: 'all',
+        include_archived: true,
+        rows: [
+          {
+            record_id: 'session-after',
+            call_started_at: '2026-07-01T11:00:00Z',
+            thread_name: 'session-after-thread',
+            model: 'o5',
+            effort: 'high',
+            input_tokens: 200,
+            cached_input_tokens: 20,
+            output_tokens: 25,
+            total_tokens: 225,
+            estimated_cost_usd: 0.02,
+          },
+        ],
+      }),
+    } as Response;
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByText('session-after-thread')).toBeInTheDocument();
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=1500');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('include_archived=1');
+  expect(screen.getByLabelText('History scope')).toHaveValue('all');
+  expect(screen.getByLabelText('Rows to load')).toHaveValue(1500);
+  expect(window.sessionStorage.getItem('codexUsageDashboardLoadSettings')).toContain('"loadLimit":1500');
+});
 });
