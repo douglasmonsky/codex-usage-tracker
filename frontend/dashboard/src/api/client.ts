@@ -32,6 +32,8 @@ export type RefreshProgressPayload = {
   status?: string;
   phase?: string;
   message?: string;
+  completed?: number;
+  total?: number;
   percent?: number;
   error?: string;
   result?: Record<string, unknown>;
@@ -40,9 +42,12 @@ export type RefreshProgressPayload = {
 export type UsagePayloadRequest = {
   refresh?: boolean;
   limit?: number;
+  offset?: number;
   includeArchived?: boolean;
   onProgress?: (progress: RefreshProgressPayload) => void;
 };
+
+const uncappedUsagePageSize = 10_000;
 
 export async function loadUsagePayload(
   currentPayload: DashboardBootPayload | null,
@@ -50,9 +55,14 @@ export async function loadUsagePayload(
 ): Promise<DashboardBootPayload> {
   if (options.refresh && currentPayload?.refresh_jobs_available) {
     const refreshed = await tryRefreshUsageIndex(currentPayload, options);
-    return requestUsagePayload(currentPayload, { ...options, refresh: !refreshed });
+    const nextOptions = { ...options, refresh: !refreshed };
+    return nextOptions.limit === 0
+      ? loadAllUsagePayloadPaged(currentPayload, nextOptions)
+      : requestUsagePayload(currentPayload, nextOptions);
   }
-  return requestUsagePayload(currentPayload, options);
+  return options.limit === 0
+    ? loadAllUsagePayloadPaged(currentPayload, options)
+    : requestUsagePayload(currentPayload, options);
 }
 
 async function tryRefreshUsageIndex(
@@ -81,6 +91,9 @@ async function requestUsagePayload(
     limit: String(options.limit ?? currentPayload?.limit ?? currentPayload?.loaded_row_count ?? 500),
     _: String(Date.now()),
   });
+  if (options.offset && options.offset > 0) {
+    params.set('offset', String(options.offset));
+  }
   const includeArchived = options.includeArchived ?? payloadIncludesArchived(currentPayload);
   if (includeArchived) {
     params.set('include_archived', '1');
@@ -92,6 +105,49 @@ async function requestUsagePayload(
   });
   const payload = await readJsonResponse(response, 'Usage refresh');
   return payload as DashboardBootPayload;
+}
+
+async function loadAllUsagePayloadPaged(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest = {},
+): Promise<DashboardBootPayload> {
+  const rows: UsageRow[] = [];
+  let offset = 0;
+  let latestPayload: DashboardBootPayload | null = null;
+  let totalRows = Number(currentPayload?.total_available_rows ?? 0);
+  for (let pageIndex = 0; pageIndex < 1000; pageIndex += 1) {
+    const payload = await requestUsagePayload(currentPayload, {
+      ...options,
+      refresh: pageIndex === 0 ? options.refresh : false,
+      limit: uncappedUsagePageSize,
+      offset,
+    });
+    const pageRows = payload.rows ?? [];
+    latestPayload = payload;
+    rows.push(...pageRows);
+    totalRows = Number(payload.total_available_rows ?? totalRows ?? rows.length);
+    options.onProgress?.({
+      status: rows.length >= totalRows || !payload.has_more ? 'completed' : 'running',
+      phase: 'loading_rows',
+      message: 'Loading all rows',
+      completed: rows.length,
+      total: totalRows,
+      percent: totalRows > 0 ? Math.min(100, Math.round((rows.length / totalRows) * 100)) : 100,
+    } as RefreshProgressPayload);
+    offset += pageRows.length;
+    if (!payload.has_more || pageRows.length === 0 || rows.length >= totalRows) {
+      break;
+    }
+  }
+  return {
+    ...(latestPayload ?? currentPayload ?? {}),
+    rows,
+    loaded_row_count: rows.length,
+    limit: null,
+    limit_label: 'All',
+    has_more: false,
+    total_available_rows: totalRows || rows.length,
+  } as DashboardBootPayload;
 }
 
 async function refreshUsageIndex(
@@ -614,10 +670,13 @@ function sumRows(rows: UsageRow[], selector: (row: UsageRow) => number): number 
 }
 
 async function readJsonResponse(response: Response, label: string): Promise<Record<string, unknown>> {
-  let payload: Record<string, unknown> = {};
+  let payload: Record<string, unknown>;
   try {
     payload = await response.json() as Record<string, unknown>;
-  } catch {
+  } catch (error) {
+    if (response.ok) {
+      throw new Error(`${label} response could not be read as JSON: ${errorMessage(error)}`);
+    }
     payload = {};
   }
   if (!response.ok) {
@@ -625,6 +684,10 @@ async function readJsonResponse(response: Response, label: string): Promise<Reco
     throw new Error(message);
   }
   return payload;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function formatNumber(value: number): string {

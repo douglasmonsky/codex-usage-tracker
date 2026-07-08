@@ -144,6 +144,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
         self._api_token = api_token
         self._context_api_state = context_api_state or ContextApiState(context_api_enabled)
         self._refresh_lock = refresh_lock
+        self._refresh_jobs = refresh_jobs or server_usage_refresh.RefreshJobRegistry()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name

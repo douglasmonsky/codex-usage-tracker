@@ -157,6 +157,51 @@ describe('dashboard live usage client', () => {
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ status: 'running' }));
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed', percent: 100 }));
   });
+
+  it('loads uncapped usage rows in finite pages', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('offset=10000')) {
+        return jsonResponse({
+          api_token: 'token',
+          loaded_row_count: 1,
+          total_available_rows: 10001,
+          limit: 10000,
+          has_more: false,
+          rows: [{ record_id: 'row-b', total_tokens: 2 }],
+        });
+      }
+      return jsonResponse({
+        api_token: 'token',
+        loaded_row_count: 10000,
+        total_available_rows: 10001,
+        limit: 10000,
+        has_more: true,
+        rows: Array.from({ length: 10000 }, (_, index) => ({
+          record_id: `row-a-${index}`,
+          total_tokens: 1,
+        })),
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const payload = await loadUsagePayload(
+      {
+        api_token: 'token',
+        loaded_row_count: 500,
+        total_available_rows: 10001,
+        rows: [],
+      },
+      { refresh: false, limit: 0 },
+    );
+
+    expect(payload.rows).toHaveLength(10001);
+    expect(payload.loaded_row_count).toBe(10001);
+    expect(payload.limit).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('limit=10000');
+    expect(String(fetchMock.mock.calls[1][0])).toContain('offset=10000');
+  });
 });
 
 function jsonResponse(payload: Record<string, unknown>) {
