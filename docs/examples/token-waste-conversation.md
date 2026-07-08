@@ -1,20 +1,20 @@
 # Token Waste Review Conversation
 
-This is a synthetic, aggregate-only example of using the Codex Usage Tracker companion skill. It does not include prompts, assistant messages, tool output, pasted secrets, raw transcript text, real thread names, or real usage totals.
+This is a synthetic, aggregate-only example using the Codex Usage Tracker companion skill. It does not include prompts, assistant messages, tool output, pasted secrets, raw transcript text, real thread names, or real usage totals.
 
 ## User
 
 Look through my usage for token waste and recommend what I should change.
 
-## Codex With Codex Usage Tracker
+## Codex
 
-I refreshed the local aggregate index and ranked recent calls by total tokens, context-window pressure, cache ratio, and thread totals.
+I refreshed the local aggregate index and started with `usage_investigate(goal="token_waste")`, then checked the recommended supporting Calls and Threads rows.
 
 ## Evidence
 
 - One long implementation thread accounts for most recent tokens.
-- Several calls have high input tokens with low cached input, which means repeated context was not being reused efficiently.
-- The most expensive rows cluster around broad file discovery plus full test reruns.
+- Several calls have high input tokens and low cached input, which means repeated context was not reused efficiently.
+- The highest-confidence finding points to broad file discovery and repeated validation as the main waste pattern.
 
 ## Likely Waste Pattern
 
@@ -23,6 +23,7 @@ Codex is rediscovering project context and rerunning broad checks in the same wo
 ## Next Actions
 
 - Use Calls to open the top three expensive rows.
+- Follow the investigation report's `recommended_next_tools` before drilling into raw context.
 - If Headroom is available, use it to estimate whether the thread is near context pressure before continuing.
 - Move stable project facts into docs or an `AGENTS.md` note so Codex does not need to infer them repeatedly.
 - Create a repo-specific validation command or test-selection checklist if broad checks are happening every turn.

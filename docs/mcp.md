@@ -1,6 +1,6 @@
 # MCP And Codex Skills
 
-Codex Usage Tracker can be installed as a local Codex plugin and exposes MCP tools for local usage analysis, aggregate reports, allowance diagnostics, source coverage, and future content-index investigation.
+Codex Usage Tracker can be installed as a local Codex plugin. It exposes MCP tools for local usage analysis, dashboard-shaped aggregate payloads, allowance diagnostics, source coverage, and opt-in local content-index investigations.
 
 ## Local Plugin
 
@@ -16,45 +16,50 @@ For a source checkout:
 codex-usage-tracker install-plugin --python .venv/bin/python
 ```
 
-Restart Codex after registration so it can discover the plugin.
+Restart Codex after registration so the plugin and skills are discovered.
 
-Marketplace installs use the bundled MCP launcher at `skills/codex-usage-tracker/scripts/run_mcp.py`. On first MCP startup it creates a cached runtime under `~/.cache/codex-usage-tracker/mcp-runtime/` and installs the exact pinned Python package, so it does not require a `.venv` inside the plugin directory.
+Marketplace installs use the bundled MCP launcher at `skills/codex-usage-tracker/scripts/run_mcp.py`. On first MCP startup it creates a cached runtime under `~/.cache/codex-usage-tracker/mcp-runtime/` and installs the exact pinned Python package, so the plugin does not need a `.venv` inside its directory.
 
-This is intentional: normal user installs come from the PyPI distribution `codex-usage-tracking`, and the plugin bootstrapper pins an exact reviewed package version so MCP startup does not accidentally track `main`.
-
-The launcher stores the package spec used for that runtime and reinstalls when the bundled package pin changes. Set `CODEX_USAGE_TRACKER_PACKAGE_SPEC` to test a different package version or Git ref, or set `CODEX_USAGE_TRACKER_RUNTIME_DIR` to use a separate cache while debugging plugin startup.
+The launcher intentionally pins a reviewed package version instead of tracking `main`. Set `CODEX_USAGE_TRACKER_PACKAGE_SPEC` to test another package version or Git ref, and set `CODEX_USAGE_TRACKER_RUNTIME_DIR` to use a separate cache while debugging plugin startup.
 
 ## Companion Skills
 
-The plugin installs two companion skills. They are local instruction files that help Codex use this package; they do not create another hosted service or send usage data outside the machine.
+The plugin installs two companion skills:
 
-- `codex-usage-tracker`: operational setup and direct tracker work, including refresh, dashboards, CSV export, doctor checks, and MCP tools.
-- `codex-usage-api`: conversational usage analysis using stable usage APIs first, with content-index tools treated as explicit local investigation tools when they are available.
+- `codex-usage-tracker`: operational setup, dashboard launch, refresh, CSV export, doctor checks, and direct tracker commands.
+- `codex-usage-api`: conversational usage analysis using stable MCP/API payloads first, with content-index tools reserved for explicit local investigation.
 
-Good prompts for the API companion skill:
+Good starter prompts:
 
 ```text
 Open dashboard.
-Use my Codex Usage Tracker data to explain what drove usage this week.
-Heaviest thread?
-Thread leaderboard.
-Look through my usage for token waste and recommend fixes.
-Find low-cache or high-context calls from today and suggest what to inspect next.
+Suggest usage investigations.
 Look through my usage for token waste.
-Find calls where context got bloated.
-Show me where caching failed.
-Find expensive calls worth opening in the investigator.
-Compare usage by project for the last 7 days.
-Show me what is estimated or unpriced before I trust the cost numbers.
+Find high-context, low-cache calls worth opening in investigator.
+Which threads are draining the most, and what would reduce that next time?
+Check whether my weekly allowance changed.
+Explain why the 5-hour counter looks noisy.
+Compare usage by model and effort, then suggest safer defaults.
+Show me what is estimated or unpriced before I trust cost numbers.
 ```
 
-The API skill should refresh the local index, call stable tools such as `usage_status`, `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_report_pack`, `usage_summary`, `usage_query`, `session_usage`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`, then explain the answer with the data scope and estimate caveats. Content-aware tools should be used only when the user asks for local content exploration or a diagnostic clearly needs indexed snippets.
+The API skill should refresh the local index, use MCP JSON tools, state scope and caveats, and recommend practical next actions. If MCP tools are unavailable, use the CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
 
-If MCP tools are not available, the same questions can be answered through CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
+## Agentic Investigation Tools
 
-Waste-discovery answers should include remediation ideas when evidence supports them: dashboard rows to inspect, Headroom if available for context/headroom checks, workflow changes such as thread splitting or lower effort for routine work, and small custom local commands or skill updates Codex can build when the same waste pattern keeps recurring.
+Use `usage_suggest_investigations(...)` when the user wants ideas, is unsure what to inspect, or asks what the tracker can help with. It returns goal-led investigation options such as token waste, allowance change, cache failure, workflow churn, and overview.
 
-The companion skill cannot read your logged-in Codex account plan, native remaining allowance, or usage from other agentic surfaces. Remaining allowance context is only as accurate as the values you manually copy into `~/.codex-usage-tracker/allowance.json`.
+Use `usage_investigate(...)` as the first stop for broad requests such as "look through my usage for token waste" or "what should I change?" It returns normalized findings, evidence, confidence, recommended actions, verification tools, and caveats.
+
+Use lower-level diagnostics when the investigation report recommends them:
+
+- `usage_large_low_output_calls(...)`: high-token calls that produced little output, with cache/context clues and likely explanations.
+- `usage_shell_churn(...)`: repeated shell command roots such as `sed`, `rg`, `git`, `nl`, test, and package commands.
+- `usage_repeated_file_rediscovery(...)`: repeated safe file identities using hashes, basenames, extensions, and operation mixes without exposing full paths.
+- `usage_investigation_walk(question=...)`: deeper local hypothesis walk over normalized content/event-index signals.
+- `usage_local_evidence_export(question=...)`: strict shareable summary from the local investigation walk, omitting raw/private records.
+
+Waste-discovery answers should not stop at "interesting." Tie recommendations to evidence and suggest verification in Calls, Threads, Call Investigator, Diagnostics Notebook, or Allowance Intelligence. Mention Headroom only when context pressure or handoff timing is relevant and the tool is available. Suggest custom local commands, scripts, repo notes, or skill updates when the same waste pattern keeps recurring.
 
 ## Tools
 
@@ -68,6 +73,9 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_threads`
 - `usage_report_pack`
 - `usage_dashboard_recommendations`
+- `usage_allowance_history`
+- `usage_allowance_diagnostics`
+- `usage_allowance_export`
 - `usage_recommendations`
 - `session_usage`
 - `usage_call_context`
@@ -87,73 +95,45 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
 - `usage_local_evidence_export`
-- `usage_allowance_history`
-- `usage_allowance_diagnostics`
-- `usage_allowance_export`
 - `generate_usage_dashboard`
 - `export_usage_csv`
 - `init_usage_pricing_config`
 - `update_usage_pricing_config`
 - `init_usage_allowance_config`
 
+## Tool Notes
+
 `usage_doctor`, `usage_summary`, `usage_recommendations`, `session_usage`, `most_expensive_usage_calls`, `usage_pricing_coverage`, and `usage_source_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown.
 
-Dashboard-shaped MCP tools return JSON dictionaries directly and reuse the same aggregate schemas as the local React dashboard API:
+Dashboard-shaped MCP tools return JSON dictionaries that reuse the same aggregate schemas as the local React dashboard API:
 
-Status: `usage_status()` returns `/api/status` freshness, row counts, parser diagnostics, and observed allowance windows.
+- `usage_status()` mirrors `/api/status`.
+- `usage_calls(...)` mirrors `/api/calls`, including filters, pagination, `total_matched_rows`, `has_more`, and `next_offset`.
+- `usage_call_detail(record_id=...)` mirrors `/api/call` for aggregate Call Investigator data without raw transcript context.
+- `usage_threads(...)` mirrors `/api/threads`.
+- `usage_report_pack(...)` mirrors `/api/reports/pack`.
+- `usage_dashboard_recommendations(...)` returns dashboard recommendation payloads.
 
-Calls: `usage_calls(...)` returns `/api/calls` rows with filters, pagination, `total_matched_rows`, `has_more`, and `next_offset`.
+`refresh_usage_index()` indexes aggregate usage rows plus the local content index by default. Use `refresh_usage_index(aggregate_only=True)` when the user wants the older aggregate-only SQLite posture. Use `include_archived=True` only when the user explicitly wants all history; the dashboard defaults to active sessions so older work does not inflate current usage.
 
-Call detail: `usage_call_detail(record_id=...)` returns `/api/call` data for the Call Investigator without raw transcript context.
+## Allowance Intelligence
 
-Threads: `usage_threads(...)` returns `/api/threads` aggregate thread rows.
+- `usage_allowance_history(...)` returns normalized observed weekly and 5-hour allowance snapshots.
+- `usage_allowance_diagnostics(...)` returns evidence grades comparing observed usage movement against estimated local credits. Weekly windows are the primary long-range signal; 5-hour windows are noisy rolling-window context.
+- `usage_allowance_export(...)` returns strict-privacy evidence bundles for manual sharing.
 
-Report pack: `usage_report_pack(...)` returns `/api/reports/pack` report cards and compact evidence rows.
+Use allowance tools when users ask whether limits changed, whether weekly allowance behavior shifted, why the 5-hour counter looks noisy, or how to share aggregate allowance evidence safely. The tracker cannot read the user's logged-in Codex account plan, native remaining allowance, or usage from other agentic surfaces. Remaining allowance context is only as accurate as values manually copied into `~/.codex-usage-tracker/allowance.json`.
 
-Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the dashboard recommendation payload.
-
-`refresh_usage_index`, `usage_query`, `generate_usage_dashboard`, `export_usage_csv`, and config-writing MCP tools return JSON dictionaries directly.
-
-`refresh_usage_index()` indexes aggregate usage rows and the local content index by default. Use `refresh_usage_index(aggregate_only=True)` when the user wants the older aggregate-only SQLite posture.
-
-`refresh_usage_index(include_archived=True)` and `generate_usage_dashboard(include_archived=True)` are explicit all-history opt-ins. The default dashboard view excludes archived session rows so older work does not inflate the current usage picture.
+## Local Content And Raw Context
 
 `usage_content_search(query=...)` searches the explicit local content index and can return indexed snippets. Use it only when the user asks for local content exploration, pattern hunting, or diagnostics that need transcript-level evidence. Its payload marks `content_mode="local_content_index"`, `includes_indexed_content=true`, and `includes_raw_fragments=true`.
 
-`usage_thread_trace(...)` returns a paged call timeline for one thread, thread key, session id, or seed record id, with local indexed fragments attached when present. It is also an explicit local content-index surface and carries the same indexed-content flags.
+`usage_thread_trace(...)` returns a paged call timeline for one thread/session/seed record and may include local indexed fragments. Treat it as an explicit local content-index surface, not a default shareable report.
 
-`usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, and `usage_context_bloat_scan(...)` run explicit local content/event-index diagnostics over normalized fragment hashes, command roots/labels, file hashes/basenames, and aggregate token rows. These payloads set `includes_indexed_content=true` and `includes_raw_fragments=false`.
-
-`usage_repeated_file_rediscovery(...)` ranks repeated exact safe file identities by path hash/identity, basename, extension, operation mix, adjacent retouches, aggregate token totals, and `usage_thread_trace` handles. Use it when the user asks which files are being rediscovered or reread repeatedly. It does not expose full paths or raw fragments.
-
-`usage_shell_churn(...)` ranks repeated shell command roots and bounded command labels by failures, adjacent repeats, output bytes, aggregate token totals, and `usage_thread_trace` handles. Use it when the user asks about repeated `sed`, `rg`, `git`, `nl`, test, package, or unknown shell command loops. It does not expose raw command output.
-
-`usage_large_low_output_calls(...)` ranks high-token calls that produced little output, with token totals, cache ratio, context-window percent, nearby tool/command/file counts, and candidate explanations such as cold resume, tool-output pressure, stale thread, or low-value continuation. It stays aggregate-first and does not expose raw fragments, command output, or full file paths.
-
-`usage_suggest_investigations(...)` gives agents a short menu of goal-led investigations such as token waste, allowance change, cache failure, workflow churn, and overview. Use it when the user asks what to look into or wants ideas.
-
-`usage_investigate(...)` runs a compact aggregate-first investigation for one goal and returns normalized findings, evidence, confidence, recommended actions, verification tools, and caveats. Use it as the first stop for broad questions like "look through my usage for token waste" before drilling into lower-level reports.
-
-`usage_investigation_walk(question=...)` runs a bounded local hypothesis walk over those normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. It is local-index evidence, not a shareable aggregate-only report.
-
-`usage_local_evidence_export(question=...)` returns a strict shareable summary derived from the investigation walk. It omits prompts, indexed snippets, record ids, thread names, raw commands, raw tool output, full paths, file basenames, and command labels.
-
-## Allowance Intelligence MCP Tools
-
-- `usage_allowance_history(...)` returns normalized observed weekly and 5-hour allowance snapshots.
-- `usage_allowance_diagnostics(...)` returns evidence grades comparing observed usage movement against estimated local credits. Weekly candidates include `nonparametric-v1` statistical evidence plus `summary.research_readiness`; weekly windows are primary and 5-hour windows are noisy rolling-window context.
-- `usage_allowance_export(...)` returns a strict-privacy evidence bundle for manual sharing.
-
-Use these when users ask whether limits changed, whether weekly allowance behavior shifted, why the 5-hour counter looks noisy, or how to share aggregate allowance evidence safely.
-
-## Raw Context Guard
-
-`usage_call_context` is disabled by default in MCP server processes. To enable it explicitly:
+`usage_call_context` is disabled by default in MCP server processes. Enable it explicitly only when the user asks to inspect raw local log context:
 
 ```bash
 CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1
 ```
 
-Normal aggregate tools do not need this variable. Keep raw context disabled unless the user specifically asks to inspect local log context.
-
-When raw context is enabled, `usage_call_context` accepts `max_entries`, `max_chars`, `include_tool_output`, and `include_compaction_history`. Use `0` for either limit only when the user explicitly asks for all matching entries or no character cap for that local context request. Compacted replacement history is transcript-like content; request it only for a specific call investigation, and keep the aggregate tools as the default path.
+Normal aggregate tools do not need that variable. When raw context is enabled, `usage_call_context` accepts `max_entries`, `max_chars`, `include_tool_output`, and `include_compaction_history`. Use `0` limits only when the user explicitly asks for all matching entries or no character cap on local context.
