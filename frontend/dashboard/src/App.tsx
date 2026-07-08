@@ -32,7 +32,7 @@ import {
   type HistoryScope,
   viewFromUrlParam,
 } from './app/shellUrl';
-import { loadUsagePayload, modelFromBootPayload, readBootPayload } from './api/client';
+import { loadUsagePayload, modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
 import { EnvironmentStatus } from './components/EnvironmentStatus';
@@ -279,11 +279,14 @@ async function refreshDashboard(options: RefreshOptions = {}) {
  `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${nextHistoryScope === 'all' ? 'all history' : 'active'} aggregate rows...`,
  );
  try {
- const payload = await loadUsagePayload(dashboardPayload, {
- refresh: shouldRefreshIndex,
- limit: nextLoadLimit,
- includeArchived: nextHistoryScope === 'all',
- });
+      const payload = await loadUsagePayload(dashboardPayload, {
+        refresh: shouldRefreshIndex,
+        limit: nextLoadLimit,
+        includeArchived: nextHistoryScope === 'all',
+        onProgress: shouldRefreshIndex
+          ? progress => setRefreshState(refreshProgressLabel(progress, nextHistoryScope))
+          : undefined,
+      });
     clearDiagnosticApiCache();
     setDashboardPayload(payload);
       setModel(modelFromBootPayload(payload));
@@ -876,4 +879,11 @@ return (
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function refreshProgressLabel(progress: RefreshProgressPayload, historyScope: HistoryScope): string {
+  const scope = historyScope === 'all' ? 'all history' : 'active history';
+  const message = progress.message || 'Refreshing usage index';
+  const percent = typeof progress.percent === 'number' ? ` ${Math.round(progress.percent)}%` : '';
+  return `${message}${percent} (${scope})`;
 }

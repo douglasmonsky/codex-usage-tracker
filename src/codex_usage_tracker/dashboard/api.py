@@ -159,6 +159,7 @@ def dashboard_payload(
         "payload_cache_version": 1,
         "api_token": api_token or "",
         "context_api_enabled": context_api_enabled,
+        "refresh_jobs_available": bool(api_token),
         "action_thresholds": thresholds.thresholds,
         "thresholds_configured": thresholds.loaded and not thresholds.error,
         "thresholds_error": thresholds.error,

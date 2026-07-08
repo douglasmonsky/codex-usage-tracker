@@ -26,26 +26,59 @@ export function readBootPayload(): DashboardBootPayload | null {
   }
 }
 
+export type RefreshProgressPayload = {
+  schema?: string;
+  job_id?: string;
+  status?: string;
+  phase?: string;
+  message?: string;
+  percent?: number;
+  error?: string;
+  result?: Record<string, unknown>;
+};
+
 export type UsagePayloadRequest = {
   refresh?: boolean;
   limit?: number;
   includeArchived?: boolean;
+  onProgress?: (progress: RefreshProgressPayload) => void;
 };
 
 export async function loadUsagePayload(
   currentPayload: DashboardBootPayload | null,
   options: UsagePayloadRequest = {},
 ): Promise<DashboardBootPayload> {
-  if (window.location.protocol === 'file:') {
-    throw new Error('Live refresh requires the localhost dashboard server.');
+  if (options.refresh && currentPayload?.refresh_jobs_available) {
+    const refreshed = await tryRefreshUsageIndex(currentPayload, options);
+    return requestUsagePayload(currentPayload, { ...options, refresh: !refreshed });
   }
-  if (!currentPayload?.api_token) {
-    throw new Error('Live refresh requires localhost dashboard API token.');
+  return requestUsagePayload(currentPayload, options);
+}
+
+async function tryRefreshUsageIndex(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest,
+): Promise<boolean> {
+  try {
+    await refreshUsageIndex(currentPayload, options);
+    return true;
+  } catch (error) {
+    if (error instanceof UsageRefreshJobFailedError) {
+      throw error;
+    }
+    return false;
   }
+}
+
+async function requestUsagePayload(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest = {},
+): Promise<DashboardBootPayload> {
+  assertLiveUsagePayloadAvailable(currentPayload);
 
   const params = new URLSearchParams({
     refresh: options.refresh ? '1' : '0',
-    limit: String(options.limit ?? currentPayload.limit ?? currentPayload.loaded_row_count ?? 500),
+    limit: String(options.limit ?? currentPayload?.limit ?? currentPayload?.loaded_row_count ?? 500),
     _: String(Date.now()),
   });
   const includeArchived = options.includeArchived ?? payloadIncludesArchived(currentPayload);
@@ -54,15 +87,82 @@ export async function loadUsagePayload(
   }
 
   const response = await fetch(`/api/usage?${params.toString()}`, {
-    headers: {
-      Accept: 'application/json',
-      'X-Codex-Usage-Token': currentPayload.api_token,
-    },
+    headers: liveUsageHeaders(currentPayload),
     cache: 'no-store',
   });
   const payload = await readJsonResponse(response, 'Usage refresh');
   return payload as DashboardBootPayload;
 }
+
+async function refreshUsageIndex(
+  currentPayload: DashboardBootPayload | null,
+  options: UsagePayloadRequest,
+): Promise<RefreshProgressPayload> {
+  assertLiveUsagePayloadAvailable(currentPayload);
+  const params = new URLSearchParams({ _: String(Date.now()) });
+  const includeArchived = options.includeArchived ?? payloadIncludesArchived(currentPayload);
+  if (includeArchived) {
+    params.set('include_archived', '1');
+  }
+  const startResponse = await fetch(`/api/refresh/start?${params.toString()}`, {
+    headers: liveUsageHeaders(currentPayload),
+    cache: 'no-store',
+  });
+  const started = (await readJsonResponse(startResponse, 'Usage refresh start')) as RefreshProgressPayload;
+  options.onProgress?.(started);
+  const jobId = typeof started.job_id === 'string' ? started.job_id : '';
+  if (!jobId) {
+    throw new Error('Usage refresh start did not return a job id.');
+  }
+  return pollUsageRefreshJob(currentPayload, jobId, options.onProgress);
+}
+
+async function pollUsageRefreshJob(
+  currentPayload: DashboardBootPayload,
+  jobId: string,
+  onProgress?: (progress: RefreshProgressPayload) => void,
+): Promise<RefreshProgressPayload> {
+  for (let attempt = 0; attempt < 600; attempt += 1) {
+    const params = new URLSearchParams({ job_id: jobId, _: String(Date.now()) });
+    const response = await fetch(`/api/refresh/status?${params.toString()}`, {
+      headers: liveUsageHeaders(currentPayload),
+      cache: 'no-store',
+    });
+    const progress = (await readJsonResponse(response, 'Usage refresh status')) as RefreshProgressPayload;
+    onProgress?.(progress);
+    if (progress.status === 'completed') {
+      return progress;
+    }
+    if (progress.status === 'failed') {
+      throw new UsageRefreshJobFailedError(progress.error || progress.message || 'Usage refresh failed.');
+    }
+    await delay(Math.min(1000, 150 + attempt * 50));
+  }
+  throw new Error('Usage refresh did not complete before the polling timeout.');
+}
+
+function assertLiveUsagePayloadAvailable(currentPayload: DashboardBootPayload | null): asserts currentPayload is DashboardBootPayload {
+  if (window.location.protocol === 'file:') {
+    throw new Error('Live refresh requires the localhost dashboard server.');
+  }
+  if (!currentPayload?.api_token) {
+    throw new Error('Live refresh requires localhost dashboard API token.');
+  }
+}
+
+function liveUsageHeaders(currentPayload: DashboardBootPayload): HeadersInit {
+  return {
+    Accept: 'application/json',
+    'X-Codex-Usage-Token': currentPayload.api_token || '',
+  };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+class UsageRefreshJobFailedError extends Error {}
+
 
 export function modelFromBootPayload(payload: DashboardBootPayload | null): DashboardModel {
  if (!payload) {
