@@ -241,6 +241,16 @@ def _add_dogfood_agentic_parser(
     dogfood.add_argument("--include-archived", action="store_true")
     dogfood.add_argument("--evidence-limit", type=int, default=5)
     dogfood.add_argument(
+        "--hypotheses",
+        action="store_true",
+        help="Run slower full hypothesis evidence scans instead of quick routing checks.",
+    )
+    dogfood.add_argument(
+        "--deep-investigations",
+        action="store_true",
+        help="Also run the slower full usage_investigate dogfood paths instead of reusing action brief findings.",
+    )
+    dogfood.add_argument(
         "--refresh",
         action=argparse.BooleanOptionalAction,
         default=True,

@@ -707,6 +707,9 @@ def test_dogfood_agentic_cli_writes_compact_artifacts(tmp_path: Path) -> None:
     assert payload["family_checks"]["old_passed"] is True
     assert payload["family_checks"]["new_passed"] is True
     assert payload["privacy_checks"]["passed"] is True
+    assert payload["progress"]["percent_complete"] == 100
+    assert payload["cache"]["hypotheses"] is False
+    assert payload["cache"]["deep_investigations"] is False
     assert Path(payload["artifacts"]["summary_json_path"]).exists()
     assert Path(payload["artifacts"]["summary_markdown_path"]).exists()
     assert "SECRET" not in result.stdout

@@ -33,6 +33,13 @@ def test_hypothesis_family_routing_handles_exploratory_usage_phrases() -> None:
     )
     assert (
         _classify_hypothesis_family(
+            "Repeated file rediscovery is wasting tokens.",
+            question,
+        )
+        == "repeated_file_rediscovery"
+    )
+    assert (
+        _classify_hypothesis_family(
             "Allowance-change claims are not ready for public posting without more weekly positive spans.",
             question,
         )

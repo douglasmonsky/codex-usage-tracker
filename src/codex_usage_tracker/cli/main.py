@@ -332,6 +332,8 @@ def _run_dogfood_agentic(args: argparse.Namespace) -> int:
         evidence_limit=args.evidence_limit,
         privacy_mode=args.privacy_mode,
         refresh=args.refresh,
+        run_hypotheses=args.hypotheses,
+        run_deep_investigations=args.deep_investigations,
         write_markdown=args.markdown,
     )
     if args.as_json:
@@ -346,6 +348,8 @@ def _run_dogfood_agentic(args: argparse.Namespace) -> int:
         f"old={report['family_checks']['old_passed']} "
         f"new={report['family_checks']['new_passed']}"
     )
+    print(f"Progress: {report['progress']['percent_complete']}%")
+    print(f"Cache keys: {', '.join(report['cache']['cache_keys']) or 'none'}")
     print(f"Privacy checks: {report['privacy_checks']['passed']}")
     return 0
 
