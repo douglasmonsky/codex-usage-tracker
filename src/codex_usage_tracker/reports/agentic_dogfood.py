@@ -19,6 +19,7 @@ from codex_usage_tracker.core.paths import (
 )
 from codex_usage_tracker.core.projects import validate_privacy_mode
 from codex_usage_tracker.reports.api import (
+    build_action_brief_report,
     build_agentic_investigation_report,
     build_hypothesis_test_report,
     build_investigation_suggestions_report,
@@ -165,6 +166,19 @@ def build_agentic_dogfood_report(
         limit=normalized_limit,
         privacy_mode=privacy_mode,
     ).payload
+    action_brief = build_action_brief_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+        goal="token_waste",
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=normalized_limit,
+        privacy_mode=privacy_mode,
+    ).payload
     allowance = build_allowance_diagnostics_report(
         db_path=db_path,
         allowance_path=allowance_path,
@@ -219,6 +233,7 @@ def build_agentic_dogfood_report(
         large_low_output=large_low_output,
         shell_churn=shell_churn,
         repeated_files=repeated_files,
+        action_brief=action_brief,
         allowance=allowance,
         suggestions=suggestions,
         token_waste=token_waste,
@@ -251,6 +266,7 @@ def _compact_dogfood_payload(
     large_low_output: dict[str, Any],
     shell_churn: dict[str, Any],
     repeated_files: dict[str, Any],
+    action_brief: dict[str, Any],
     allowance: dict[str, Any],
     suggestions: dict[str, Any],
     token_waste: dict[str, Any],
@@ -285,6 +301,7 @@ def _compact_dogfood_payload(
             "large_low_output_candidates": large_low_output.get("total_candidates"),
             "shell_churn_candidates": shell_churn.get("total_candidates"),
             "repeated_file_candidates": repeated_files.get("total_candidates"),
+            "action_brief_actions": len(action_brief.get("actions") or []),
             "allowance_primary_evidence_grade": (allowance.get("summary") or {}).get(
                 "primary_evidence_grade"
             ),
@@ -303,6 +320,7 @@ def _compact_dogfood_payload(
             "large_low_output": _compact_large_low_output(large_low_output),
             "shell_churn": _compact_shell_churn(shell_churn),
             "repeated_files": _compact_repeated_files(repeated_files),
+            "action_brief": _compact_action_brief(action_brief),
             "allowance": _compact_allowance(allowance),
         },
         "suggestion_goals": [
@@ -318,10 +336,11 @@ def _compact_dogfood_payload(
             [
                 old_hypotheses,
                 new_hypotheses,
-                large_low_output,
-                shell_churn,
-                repeated_files,
-                allowance,
+            large_low_output,
+            shell_churn,
+            repeated_files,
+            action_brief,
+            allowance,
                 suggestions,
                 token_waste,
                 workflow_churn,
@@ -421,6 +440,24 @@ def _compact_repeated_files(payload: dict[str, Any]) -> dict[str, Any]:
                 "recommendation": row.get("recommendation"),
             }
             for row in payload.get("rows", [])
+        ],
+    }
+
+
+def _compact_action_brief(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "goal": payload.get("goal"),
+        "action_count": (payload.get("summary") or {}).get("action_count"),
+        "top_action_family": (payload.get("summary") or {}).get("top_action_family"),
+        "actions": [
+            {
+                "family": row.get("family"),
+                "finding": row.get("finding"),
+                "confidence": row.get("confidence"),
+                "evidence_count": row.get("evidence_count"),
+                "recommended_next_tools": row.get("recommended_next_tools"),
+            }
+            for row in payload.get("actions", [])
         ],
     }
 

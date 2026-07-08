@@ -261,6 +261,21 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
         "1",
         "--json",
     )
+    action_brief = _run_cli(
+        tmp_path,
+        "--db",
+        str(db_path),
+        "--pricing",
+        str(pricing_path),
+        "--allowance",
+        str(allowance_path),
+        "--privacy-mode",
+        "strict",
+        "action-brief",
+        "--evidence-limit",
+        "2",
+        "--json",
+    )
     session = _run_cli(
         tmp_path,
         "--db",
@@ -298,12 +313,14 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     summary_payload = json.loads(summary.stdout)
     query_payload = json.loads(query.stdout)
     recommendations_payload = json.loads(recommendations.stdout)
+    action_brief_payload = json.loads(action_brief.stdout)
     session_payload = json.loads(session.stdout)
     expensive_payload = json.loads(expensive.stdout)
     _assert_contract(refresh_payload)
     _assert_contract(summary_payload)
     _assert_contract(query_payload)
     _assert_contract(recommendations_payload)
+    _assert_contract(action_brief_payload)
     _assert_contract(session_payload)
     _assert_contract(expensive_payload)
     assert refresh_payload["schema"] == "codex-usage-tracker-refresh-v1"
@@ -319,6 +336,9 @@ def test_report_json_and_query_cli(tmp_path: Path) -> None:
     assert query_payload["rows"][0]["project_relative_cwd"] is None
     assert "/tmp/codex-usage-tracker" not in query.stdout
     assert "SECRET RAW PROMPT" not in query.stdout
+    assert action_brief_payload["schema"] == "codex-usage-tracker-action-brief-v1"
+    assert action_brief_payload["content_mode"] == "aggregate_action_brief"
+    assert action_brief_payload["includes_raw_fragments"] is False
     assert recommendations_payload["schema"] == "codex-usage-tracker-recommendations-v1"
     assert recommendations_payload["row_count"] == 1
     assert recommendations_payload["rows"][0]["primary_signal"] == "pricing-gap"

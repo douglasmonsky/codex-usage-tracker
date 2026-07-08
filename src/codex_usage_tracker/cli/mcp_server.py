@@ -44,6 +44,7 @@ from codex_usage_tracker.pricing.api import (
     write_pricing_template,
 )
 from codex_usage_tracker.reports.api import (
+    build_action_brief_report,
     build_agentic_investigation_report,
     build_content_search_report,
     build_expensive_calls_report,
@@ -671,6 +672,33 @@ def usage_investigate(
         include_archived=include_archived,
         evidence_limit=evidence_limit,
         detail_mode=detail_mode,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_action_brief(
+    goal: str = "token_waste",
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Return compact aggregate remediation brief with concrete next actions."""
+
+    return build_action_brief_report(
+        db_path=DEFAULT_DB_PATH,
+        pricing_path=DEFAULT_PRICING_PATH,
+        allowance_path=DEFAULT_ALLOWANCE_PATH,
+        projects_path=DEFAULT_PROJECTS_PATH,
+        goal=goal,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=evidence_limit,
         privacy_mode=privacy_mode,
     ).payload
 

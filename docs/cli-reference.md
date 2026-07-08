@@ -104,6 +104,7 @@ codex-usage-tracker summary --preset expensive
 codex-usage-tracker summary --preset by-subagent-role
 codex-usage-tracker expensive --limit 10
 codex-usage-tracker recommendations --limit 10
+codex-usage-tracker action-brief --goal token_waste --json
 codex-usage-tracker pricing-coverage
 codex-usage-tracker source-coverage
 codex-usage-tracker allowance-history --window-kind weekly --json
@@ -119,6 +120,7 @@ Useful investigations:
 - Use `summary --preset by-subagent-role` to see whether delegated work is driving a large share of usage.
 - Use `expensive --limit 10` for a quick list of the highest-cost calls.
 - Use `recommendations --json` for ranked action rows and thread rollups with severity score, primary recommendation, and secondary signals.
+- Use `action-brief --json` for a compact remediation brief with likely waste pattern, workflow change, existing/custom tool ideas, and verification tools.
 
 - Use `allowance-diagnostics --window-kind weekly --json` when investigating allowance-change claims; 5-hour diagnostics are rolling-window context. Read `summary.research_readiness` and candidate `statistical_evidence` before making stronger claims.
 
@@ -155,6 +157,7 @@ Diagnostic payloads are aggregate-only. They do not include prompts, assistant t
 codex-usage-tracker query --since 2026-06-01 --project codex-usage-tracker --min-credits 1
 codex-usage-tracker query --pricing-status unpriced --limit 0
 codex-usage-tracker recommendations --since 2026-06-01 --json
+codex-usage-tracker action-brief --goal workflow_churn --json
 codex-usage-tracker summary --group-by model --json
 codex-usage-tracker session <session-id> --json
 ```
