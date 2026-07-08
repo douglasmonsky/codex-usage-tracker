@@ -41,6 +41,14 @@ export type UsageRow = {
   uncached_input_tokens?: number;
   estimated_cost_usd?: number;
   usage_credits?: number;
+  rate_limit_plan_type?: string | null;
+  rate_limit_limit_id?: string | null;
+  rate_limit_primary_used_percent?: number | null;
+  rate_limit_primary_window_minutes?: number | null;
+  rate_limit_primary_resets_at?: number | null;
+  rate_limit_secondary_used_percent?: number | null;
+  rate_limit_secondary_window_minutes?: number | null;
+  rate_limit_secondary_resets_at?: number | null;
   duration_seconds?: number;
   call_duration_seconds?: number;
   previous_call_event_timestamp?: string | null;

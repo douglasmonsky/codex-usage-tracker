@@ -160,6 +160,67 @@ describe('dashboard API model builder', () => {
       }),
     );
   });
+
+  it('builds usage drain series from loaded rows', () => {
+    const payload: DashboardBootPayload = {
+      loaded_row_count: 2,
+      total_available_rows: 2,
+      rows: [
+        {
+          record_id: 'drain-a',
+          event_timestamp: '2026-07-01T10:00:00Z',
+          call_started_at: '2026-07-01T10:00:00Z',
+          thread_name: 'thread-a',
+          model: 'codex-1',
+          effort: 'high',
+          input_tokens: 1_000,
+          cached_input_tokens: 400,
+          output_tokens: 250,
+          total_tokens: 1_250,
+          usage_credits: 25,
+          rate_limit_plan_type: 'pro',
+          rate_limit_secondary_used_percent: 60,
+          rate_limit_secondary_resets_at: 1_783_707_267,
+        },
+        {
+          record_id: 'drain-b',
+          event_timestamp: '2026-07-02T10:00:00Z',
+          call_started_at: '2026-07-02T10:00:00Z',
+          thread_name: 'thread-b',
+          model: 'codex-1',
+          effort: 'medium',
+          input_tokens: 500,
+          cached_input_tokens: 100,
+          output_tokens: 125,
+          total_tokens: 625,
+          usage_credits: 75,
+          rate_limit_plan_type: 'pro',
+          rate_limit_secondary_used_percent: 65,
+          rate_limit_secondary_resets_at: 1_783_707_267,
+        },
+      ],
+    };
+
+    const model = modelFromBootPayload(payload);
+
+    expect(model.actualVsPredictedSeries).toHaveLength(2);
+    expect(model.actualVsPredictedSeries[0].points.map(point => point.value)).toEqual([25, 100]);
+    expect(model.usageRemainingSeries[0].points.map(point => point.value)).toEqual([40, 35]);
+    expect(model.weeklyWindows).toEqual([
+      expect.objectContaining({
+        plan: 'pro',
+        observedPct: 65,
+        credits: 100,
+      }),
+    ]);
+    expect(model.weeklyCreditSeries[0].points[0]).toEqual(
+      expect.objectContaining({
+        value: expect.any(Number),
+        low: expect.any(Number),
+        high: expect.any(Number),
+      }),
+    );
+  });
 });
 
 describe('dashboard live usage client', () => {
