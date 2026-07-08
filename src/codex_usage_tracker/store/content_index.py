@@ -110,6 +110,8 @@ def index_content_for_source_plans(
 
     source_plans = list(_dedupe_content_index_plans(plans))
     totals = ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
+    defer_full_fts_rebuild = any(plan.replace_existing for plan in source_plans)
+    needs_full_fts_rebuild = False
     for plan in source_plans:
         result = _index_content_for_source_file(
             conn,
@@ -117,6 +119,10 @@ def index_content_for_source_plans(
             replace_existing=plan.replace_existing,
             start_byte=plan.start_byte,
             start_line=plan.start_line,
+            sync_fts=not defer_full_fts_rebuild,
+        )
+        needs_full_fts_rebuild = needs_full_fts_rebuild or (
+            plan.replace_existing and result.source_files > 0
         )
         totals = ContentIndexResult(
             source_files=totals.source_files + result.source_files,
@@ -124,6 +130,8 @@ def index_content_for_source_plans(
             content_fragments=totals.content_fragments + result.content_fragments,
             parse_warnings=totals.parse_warnings + result.parse_warnings,
         )
+    if needs_full_fts_rebuild:
+        _rebuild_content_fts(conn)
     return totals
 
 
@@ -151,19 +159,22 @@ def delete_content_index_rows_for_source_files(
     *,
     placeholders: str,
     source_files_to_replace: list[str],
+    sync_fts: bool = True,
 ) -> None:
     """Delete normalized content rows linked to source files."""
 
     record_subquery = (
         "SELECT record_id FROM usage_events " f"WHERE source_file IN ({placeholders})"
     )
-    _clear_content_fts(conn)
+    if sync_fts:
+        _clear_content_fts(conn)
     for table_name in CONTENT_INDEX_TABLES:
         conn.execute(
             f"DELETE FROM {table_name} WHERE record_id IN ({record_subquery})",
             source_files_to_replace,
         )
-    _rebuild_content_fts(conn)
+    if sync_fts:
+        _rebuild_content_fts(conn)
 
 
 def search_content_fragments(
@@ -747,6 +758,7 @@ def _index_content_for_source_file(
     replace_existing: bool = True,
     start_byte: int = 0,
     start_line: int = 0,
+    sync_fts: bool = True,
 ) -> ContentIndexResult:
     usage_rows = _usage_rows_by_token_line(
         conn,
@@ -763,6 +775,7 @@ def _index_content_for_source_file(
             conn,
             placeholders="?",
             source_files_to_replace=[str(source_path)],
+            sync_fts=sync_fts,
         )
     pending: list[_PendingFragment] = []
     pending_tool_calls: list[PendingToolCall] = []
@@ -836,14 +849,15 @@ def _index_content_for_source_file(
     except OSError:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
 
-    if replace_existing:
-        _rebuild_content_fts(conn)
-    else:
-        _sync_content_fts_for_source_file(
-            conn,
-            source_file=str(source_path),
-            min_line_start=start_line + 1,
-        )
+    if sync_fts:
+        if replace_existing:
+            _rebuild_content_fts(conn)
+        else:
+            _sync_content_fts_for_source_file(
+                conn,
+                source_file=str(source_path),
+                min_line_start=start_line + 1,
+            )
     counts = _content_counts_for_source_file(conn, source_file=str(source_path))
     return ContentIndexResult(
         source_files=1,

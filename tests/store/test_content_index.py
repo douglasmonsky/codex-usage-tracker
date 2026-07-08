@@ -101,6 +101,36 @@ def test_refresh_incrementally_indexes_appended_content(
     assert report["total_matched_rows"] == 1
 
 
+def test_refresh_batches_full_content_fts_rebuild(
+    tmp_path: Path, monkeypatch
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path, aggregate_only=True)
+    source_paths = sorted((codex_home / "sessions").glob("**/*.jsonl"))
+    rebuild_calls = 0
+    original_rebuild = content_index._rebuild_content_fts
+
+    def counting_rebuild(conn) -> None:
+        nonlocal rebuild_calls
+        rebuild_calls += 1
+        original_rebuild(conn)
+
+    monkeypatch.setattr(content_index, "_rebuild_content_fts", counting_rebuild)
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        content_index.index_content_for_source_plans(
+            conn,
+            plans=(
+                content_index.ContentIndexPlan(source_path=source_path)
+                for source_path in source_paths
+            ),
+        )
+
+    assert rebuild_calls == 1
+
+
 def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
