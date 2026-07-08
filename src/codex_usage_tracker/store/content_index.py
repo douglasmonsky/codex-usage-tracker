@@ -45,6 +45,16 @@ class ContentIndexResult:
 
 
 @dataclass(frozen=True)
+class ContentIndexPlan:
+    """Plan for full or append-only content indexing of a source log."""
+
+    source_path: Path
+    replace_existing: bool = True
+    start_byte: int = 0
+    start_line: int = 0
+
+
+@dataclass(frozen=True)
 class _PendingFragment:
     role: str
     fragment_kind: str
@@ -82,9 +92,32 @@ def index_content_for_source_files(
     """Populate normalized bounded local content rows for source files."""
 
     source_paths = list(dict.fromkeys(source_files))
+    return index_content_for_source_plans(
+        conn,
+        plans=(
+            ContentIndexPlan(source_path=source_path, replace_existing=True)
+            for source_path in source_paths
+        ),
+    )
+
+
+def index_content_for_source_plans(
+    conn: sqlite3.Connection,
+    *,
+    plans: Iterable[ContentIndexPlan],
+) -> ContentIndexResult:
+    """Populate normalized bounded local content rows using refresh parse plans."""
+
+    source_plans = list(_dedupe_content_index_plans(plans))
     totals = ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
-    for source_path in source_paths:
-        result = _index_content_for_source_file(conn, source_path=source_path)
+    for plan in source_plans:
+        result = _index_content_for_source_file(
+            conn,
+            source_path=plan.source_path,
+            replace_existing=plan.replace_existing,
+            start_byte=plan.start_byte,
+            start_line=plan.start_line,
+        )
         totals = ContentIndexResult(
             source_files=totals.source_files + result.source_files,
             conversation_turns=totals.conversation_turns + result.conversation_turns,
@@ -92,6 +125,17 @@ def index_content_for_source_files(
             parse_warnings=totals.parse_warnings + result.parse_warnings,
         )
     return totals
+
+
+def _dedupe_content_index_plans(
+    plans: Iterable[ContentIndexPlan],
+) -> Iterable[ContentIndexPlan]:
+    by_path: dict[Path, ContentIndexPlan] = {}
+    for plan in plans:
+        existing = by_path.get(plan.source_path)
+        if existing is None or plan.replace_existing or plan.start_byte < existing.start_byte:
+            by_path[plan.source_path] = plan
+    return by_path.values()
 
 
 def clear_content_index_rows(conn: sqlite3.Connection) -> None:
@@ -700,16 +744,22 @@ def _index_content_for_source_file(
     conn: sqlite3.Connection,
     *,
     source_path: Path,
+    replace_existing: bool = True,
+    start_byte: int = 0,
+    start_line: int = 0,
 ) -> ContentIndexResult:
     usage_rows = _usage_rows_by_token_line(conn, source_file=str(source_path))
     if not usage_rows:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
 
-    delete_content_index_rows_for_source_files(
-        conn,
-        placeholders="?",
-        source_files_to_replace=[str(source_path)],
-    )
+    if replace_existing:
+        start_byte = 0
+        start_line = 0
+        delete_content_index_rows_for_source_files(
+            conn,
+            placeholders="?",
+            source_files_to_replace=[str(source_path)],
+        )
     pending: list[_PendingFragment] = []
     pending_tool_calls: list[PendingToolCall] = []
     pending_command_runs: list[PendingCommandRun] = []
@@ -719,7 +769,9 @@ def _index_content_for_source_file(
     parse_warnings = 0
     try:
         with source_path.open("rb") as handle:
-            for line_number, raw_line in enumerate(handle, 1):
+            if start_byte > 0:
+                handle.seek(start_byte)
+            for line_number, raw_line in enumerate(handle, start_line + 1):
                 try:
                     envelope = json.loads(raw_line.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError):
@@ -780,7 +832,14 @@ def _index_content_for_source_file(
     except OSError:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
 
-    _rebuild_content_fts(conn)
+    if replace_existing:
+        _rebuild_content_fts(conn)
+    else:
+        _sync_content_fts_for_source_file(
+            conn,
+            source_file=str(source_path),
+            min_line_start=start_line + 1,
+        )
     counts = _content_counts_for_source_file(conn, source_file=str(source_path))
     return ContentIndexResult(
         source_files=1,
@@ -1118,6 +1177,29 @@ def _rebuild_content_fts(conn: sqlite3.Connection) -> None:
             FROM content_fragments
             WHERE fragment_text != ''
             """
+        )
+    except sqlite3.DatabaseError:
+        return
+
+
+def _sync_content_fts_for_source_file(
+    conn: sqlite3.Connection,
+    *,
+    source_file: str,
+    min_line_start: int,
+) -> None:
+    try:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO content_fts(rowid, fragment_text, safe_label, fragment_kind)
+            SELECT cf.fragment_rowid, cf.fragment_text, cf.safe_label, cf.fragment_kind
+            FROM content_fragments cf
+            JOIN usage_events u ON u.record_id = cf.record_id
+            WHERE u.source_file = ?
+              AND cf.line_start >= ?
+              AND cf.fragment_text != ''
+            """,
+            (source_file, min_line_start),
         )
     except sqlite3.DatabaseError:
         return

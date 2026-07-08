@@ -24,7 +24,10 @@ from codex_usage_tracker.store.api import (
     upsert_usage_events,
 )
 from codex_usage_tracker.store.connection import connect
-from codex_usage_tracker.store.content_index import index_content_for_source_files
+from codex_usage_tracker.store.content_index import (
+    ContentIndexPlan,
+    index_content_for_source_plans,
+)
 from codex_usage_tracker.store.sources import ParsedSourceFile, source_logs_requiring_parse
 
 vars(store_facade)["parse_usage_events_from_file_with_state"] = (
@@ -84,9 +87,17 @@ def refresh_usage_index(
     if not aggregate_only:
         with connect(db_path) as conn:
             init_db(conn)
-            index_content_for_source_files(
+            index_content_for_source_plans(
                 conn,
-                source_files=(path for path, _events, _diagnostics, _state in parsed_files),
+                plans=(
+                    ContentIndexPlan(
+                        source_path=plan.path,
+                        replace_existing=plan.replace_existing,
+                        start_byte=plan.start_byte,
+                        start_line=plan.start_line,
+                    )
+                    for plan in parse_plans
+                ),
             )
     skipped_events = stats.get("skipped_events", 0)
     diagnostics = compact_parser_diagnostics(stats)
