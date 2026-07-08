@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +19,7 @@ from codex_usage_tracker.parser.api import (
 from codex_usage_tracker.parser.api import (
     parse_usage_events_from_file_with_state as _parse_usage_events_from_file_with_state,
 )
-from codex_usage_tracker.parser.state import compact_parser_diagnostics
+from codex_usage_tracker.parser.state import ParserState, compact_parser_diagnostics
 from codex_usage_tracker.store.api import (
     clear_content_index_rows,
     init_db,
@@ -28,7 +32,15 @@ from codex_usage_tracker.store.content_index import (
     ContentIndexPlan,
     index_content_for_source_plans,
 )
-from codex_usage_tracker.store.sources import ParsedSourceFile, source_logs_requiring_parse
+from codex_usage_tracker.store.sources import (
+    ParsedSourceFile,
+    SourceParsePlan,
+    source_logs_requiring_parse,
+)
+
+_PARALLEL_PARSE_WORKERS_ENV = "CODEX_USAGE_TRACKER_REFRESH_WORKERS"
+_PARALLEL_PARSE_MIN_FILES = 4
+_PARALLEL_PARSE_MAX_WORKERS = 8
 
 vars(store_facade)["parse_usage_events_from_file_with_state"] = (
     _parse_usage_events_from_file_with_state
@@ -44,6 +56,16 @@ def _parse_usage_events_from_file(*args: Any, **kwargs: Any) -> Any:
     return parser(*args, **kwargs)
 
 
+@dataclass(frozen=True)
+class _ParsedRefreshFile:
+    plan: SourceParsePlan
+    events: list[UsageEvent]
+    diagnostic_facts: list[DiagnosticFact]
+    stats: dict[str, int]
+    state: ParserState
+    final_line_number: int
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
@@ -57,33 +79,25 @@ def refresh_usage_index(
     with connect(db_path) as conn:
         init_db(conn)
         parse_plans = source_logs_requiring_parse(conn, logs)
+    parsed_refresh_files = _parse_refresh_plans(parse_plans, session_index)
     stats: dict[str, int] = {}
     events: list[UsageEvent] = []
     diagnostic_facts: list[DiagnosticFact] = []
     parsed_files: list[ParsedSourceFile] = []
-    for plan in parse_plans:
-        file_stats: dict[str, int] = {}
-        parsed_file = _parse_usage_events_from_file(
-            plan.path,
-            session_index=session_index,
-            stats=file_stats,
-            start_byte=plan.start_byte,
-            start_line=plan.start_line,
-            initial_state=plan.initial_state,
-        )
-        file_events = parsed_file.events
+    for parsed_refresh_file in parsed_refresh_files:
+        file_events = parsed_refresh_file.events
         events.extend(file_events)
-        diagnostic_facts.extend(parsed_file.diagnostic_facts)
+        diagnostic_facts.extend(parsed_refresh_file.diagnostic_facts)
         parsed_files.append(
             (
-                plan.path,
+                parsed_refresh_file.plan.path,
                 file_events,
-                file_stats,
-                parsed_file.state,
-                parsed_file.final_line_number,
+                parsed_refresh_file.stats,
+                parsed_refresh_file.state,
+                parsed_refresh_file.final_line_number,
             )
         )
-        for key, value in file_stats.items():
+        for key, value in parsed_refresh_file.stats.items():
             stats[key] = stats.get(key, 0) + int(value)
     inserted = upsert_usage_events(
         events,
@@ -126,6 +140,132 @@ def refresh_usage_index(
         db_path=str(db_path),
         skipped_events=skipped_events,
         parser_diagnostics=diagnostics,
+    )
+
+
+def _parse_refresh_plans(
+    parse_plans: list[SourceParsePlan],
+    session_index: dict[str, Any],
+) -> list[_ParsedRefreshFile]:
+    worker_count = _parallel_parse_worker_count(len(parse_plans))
+    if worker_count <= 1 or not _default_parser_is_active():
+        return [
+            _parse_source_plan_with_facade(plan, session_index=session_index)
+            for plan in parse_plans
+        ]
+    try:
+        return _parse_refresh_plans_parallel(
+            parse_plans,
+            session_index=session_index,
+            worker_count=worker_count,
+        )
+    except BrokenProcessPool:
+        return [
+            _parse_source_plan_with_facade(plan, session_index=session_index)
+            for plan in parse_plans
+        ]
+
+
+def _parse_refresh_plans_parallel(
+    parse_plans: list[SourceParsePlan],
+    *,
+    session_index: dict[str, Any],
+    worker_count: int,
+) -> list[_ParsedRefreshFile]:
+    results: list[_ParsedRefreshFile | None] = [None] * len(parse_plans)
+    with ProcessPoolExecutor(max_workers=worker_count) as executor:
+        futures = {
+            executor.submit(
+                _parse_source_plan_default,
+                plan,
+                session_index,
+            ): index
+            for index, plan in enumerate(parse_plans)
+        }
+        for future in as_completed(futures):
+            results[futures[future]] = future.result()
+    return [result for result in results if result is not None]
+
+
+def _parallel_parse_worker_count(plan_count: int) -> int:
+    if plan_count <= 1:
+        return 1
+    configured_workers = _configured_parallel_parse_workers()
+    if configured_workers is not None:
+        return min(plan_count, configured_workers)
+    if plan_count < _PARALLEL_PARSE_MIN_FILES:
+        return 1
+    cpu_count = os.cpu_count() or 1
+    return min(plan_count, cpu_count, _PARALLEL_PARSE_MAX_WORKERS)
+
+
+def _configured_parallel_parse_workers() -> int | None:
+    raw_workers = os.environ.get(_PARALLEL_PARSE_WORKERS_ENV)
+    if raw_workers is None:
+        return None
+    try:
+        workers = int(raw_workers)
+    except ValueError:
+        return None
+    return max(1, workers)
+
+
+def _default_parser_is_active() -> bool:
+    return (
+        getattr(
+            store_facade,
+            "parse_usage_events_from_file_with_state",
+            _parse_usage_events_from_file_with_state,
+        )
+        is _parse_usage_events_from_file_with_state
+    )
+
+
+def _parse_source_plan_with_facade(
+    plan: SourceParsePlan,
+    *,
+    session_index: dict[str, Any],
+) -> _ParsedRefreshFile:
+    return _parse_source_plan(
+        plan,
+        session_index=session_index,
+        parser=_parse_usage_events_from_file,
+    )
+
+
+def _parse_source_plan_default(
+    plan: SourceParsePlan,
+    session_index: dict[str, Any],
+) -> _ParsedRefreshFile:
+    return _parse_source_plan(
+        plan,
+        session_index=session_index,
+        parser=_parse_usage_events_from_file_with_state,
+    )
+
+
+def _parse_source_plan(
+    plan: SourceParsePlan,
+    *,
+    session_index: dict[str, Any],
+    parser: Any,
+) -> _ParsedRefreshFile:
+    file_stats: dict[str, int] = {}
+    parsed_file = parser(
+        plan.path,
+        session_index=session_index,
+        stats=file_stats,
+        start_byte=plan.start_byte,
+        start_line=plan.start_line,
+        initial_state=plan.initial_state,
+    )
+    return _ParsedRefreshFile(
+        plan=plan,
+        events=parsed_file.events,
+        diagnostic_facts=parsed_file.diagnostic_facts,
+        stats=file_stats,
+        state=parsed_file.state,
+        final_line_number=parsed_file.final_line_number,
     )
 
 
