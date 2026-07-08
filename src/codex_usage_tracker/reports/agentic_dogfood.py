@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -266,7 +266,7 @@ def _compact_dogfood_payload(
     new_summary = _compact_hypotheses(new_hypotheses)
     payload: dict[str, Any] = {
         "schema": "codex-usage-tracker-agentic-dogfood-v1",
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "content_mode": "compact_aggregate_dogfood_summary",
         "includes_indexed_content": False,
         "includes_raw_fragments": False,
