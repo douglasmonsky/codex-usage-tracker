@@ -82,6 +82,7 @@ Tracked schema ids:
 | `codex-usage-tracker-thread-trace-v1` | MCP `usage_thread_trace(...)`; explicit local content-index thread/session timeline |
 | `codex-usage-tracker-pattern-scan-v1` | MCP `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, `usage_context_bloat_scan(...)`; explicit local content/event-index pattern diagnostics |
 | `codex-usage-tracker-repeated-file-rediscovery-v1` | MCP `usage_repeated_file_rediscovery(...)`; repeated safe file identity rediscovery candidates without full paths |
+| `codex-usage-tracker-shell-churn-v1` | MCP `usage_shell_churn(...)`; repeated shell command family diagnostics without raw command output |
 | `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
 | `codex-usage-tracker-local-evidence-export-v1` | MCP `usage_local_evidence_export(question=...)`; strict shareable local evidence summary without raw/indexed content |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
@@ -989,6 +990,20 @@ Ranks repeated safe file identities by path hash/identity, basename, extension, 
 
 ```json
 {"schema":"codex-usage-tracker-repeated-file-rediscovery-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":2,"limit":20,"sample_limit":3},"row_count":0,"total_candidates":0,"rows":[]}
+```
+
+## Shell Churn
+
+MCP:
+
+- `usage_shell_churn(min_occurrences=3)`
+
+Schema: `codex-usage-tracker-shell-churn-v1`
+
+Ranks repeated shell command roots and bounded command labels by failures, adjacent repeats, output bytes, aggregate token totals, and `usage_thread_trace` handles. It omits raw command output.
+
+```json
+{"schema":"codex-usage-tracker-shell-churn-v1","content_mode":"local_content_index","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_occurrences":3,"limit":20,"sample_limit":3},"row_count":0,"total_candidates":0,"rows":[]}
 ```
 
 ## Investigation Walk

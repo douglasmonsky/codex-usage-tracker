@@ -53,6 +53,7 @@ from codex_usage_tracker.reports.api import (
     build_query_report,
     build_recommendations_report,
     build_repeated_file_rediscovery_report,
+    build_shell_churn_report,
     build_source_coverage_report,
     build_summary_report,
     build_thread_trace_report,
@@ -552,6 +553,32 @@ def usage_repeated_file_rediscovery(
     """Rank repeated safe file identities likely rediscovered across calls."""
 
     return build_repeated_file_rediscovery_report(
+        db_path=DEFAULT_DB_PATH,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=min_occurrences,
+        limit=limit,
+        sample_limit=sample_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_shell_churn(
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_occurrences: int = 3,
+    limit: int | None = 20,
+    sample_limit: int = 3,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Rank repeated shell command families and adjacent command loops."""
+
+    return build_shell_churn_report(
         db_path=DEFAULT_DB_PATH,
         since=since,
         until=until,

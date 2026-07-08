@@ -10,6 +10,7 @@ from codex_usage_tracker.reports.api import (
     build_local_evidence_export_report,
     build_pattern_scan_report,
     build_repeated_file_rediscovery_report,
+    build_shell_churn_report,
     build_thread_trace_report,
 )
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
@@ -349,6 +350,91 @@ def test_repeated_file_rediscovery_ranks_safe_path_hashes(tmp_path: Path) -> Non
     serialized = json.dumps(payload)
     assert "docs/repeated_notes.md" not in serialized
     assert "docs/unrelated_notes.md" not in serialized
+
+
+def test_shell_churn_detects_repeated_command_families(tmp_path: Path) -> None:
+    codex_home = tmp_path / ".codex"
+    session_id = "019e3911-c0de-7777-8afe-222222222222"
+    log_path = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "19"
+        / f"rollout-2026-05-19T11-00-00-{session_id}.jsonl"
+    )
+    commands = [
+        ("sed -n '1,20p' src/app.py", 0),
+        ("sed -n '21,40p' src/app.py", 0),
+        ("sed -n '41,60p' src/app.py", 0),
+        ("rg TODO src", 1),
+        ("rg TODO tests", 1),
+        ("git status --short", 0),
+        ("git diff --stat", 0),
+        ("nl -ba src/app.py", 0),
+        ("nl -ba tests/test_app.py", 0),
+        ("echo one-off", 0),
+    ]
+    rows: list[dict[str, object]] = [_entry("session_meta", {"id": session_id})]
+    for index, (command, exit_code) in enumerate(commands, start=1):
+        rows.extend(
+            [
+                _entry("turn_context", {"turn_id": f"turn-{index}", "model": "gpt-5.5"}),
+                _entry(
+                    "response_item",
+                    {
+                        "type": "function_call",
+                        "call_id": f"call-shell-{index}",
+                        "name": "exec_command",
+                        "arguments": json.dumps({"cmd": command}),
+                    },
+                ),
+                _entry(
+                    "response_item",
+                    {
+                        "type": "function_call_output",
+                        "call_id": f"call-shell-{index}",
+                        "output": (
+                            "Chunk ID: abc123\n"
+                            "Wall time: 0.0000 seconds\n"
+                            f"Process exited with code {exit_code}\n"
+                            "Original token count: 4\n"
+                            "Output:\n"
+                            "safe synthetic output"
+                        ),
+                    },
+                ),
+                _token_event(800 + index * 100, 100 + index * 10),
+            ]
+        )
+    _write_jsonl(log_path, rows)
+
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    payload = build_shell_churn_report(
+        db_path=db_path,
+        min_occurrences=2,
+        limit=10,
+    ).payload
+
+    assert validate_json_payload_contract(payload) == []
+    assert payload["schema"] == "codex-usage-tracker-shell-churn-v1"
+    assert payload["content_mode"] == "local_content_index"
+    assert payload["includes_raw_fragments"] is False
+    roots = {row["command_root"]: row for row in payload["rows"]}
+    assert {"sed", "rg", "git", "nl"} <= set(roots)
+    assert "echo" not in roots
+    assert roots["sed"]["churn_kind"] == "successful_loop_churn"
+    assert roots["sed"]["success_count"] == 3
+    assert roots["sed"]["adjacent_root_repeat_count"] >= 2
+    assert roots["rg"]["churn_kind"] == "failure_retry_churn"
+    assert roots["rg"]["failure_count"] == 2
+    assert roots["rg"]["top_labels"][0]["exit_code"] == 1
+    assert roots["sed"]["trace_handles"][0]["next_tool"] == "usage_thread_trace"
+    serialized = json.dumps(payload)
+    assert "src/app.py" not in serialized
+    assert "safe synthetic output" not in serialized
 
 
 def test_thread_trace_returns_calls_with_indexed_fragments(tmp_path: Path) -> None:
