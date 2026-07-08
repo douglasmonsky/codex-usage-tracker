@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.16.2 - 2026-07-08
+
+- Restore Usage Drain, Investigator Workbench, Reports, and related dashboard charts by deriving shared usage-drain series from loaded aggregate rows again.
+- Keep sparse line charts expanded to their panel width so low-point datasets do not collapse into the left edge.
+
 ## 0.16.1 - 2026-07-08
 
 - Add async refresh progress polling and dashboard progress bars for long all-row loads.
