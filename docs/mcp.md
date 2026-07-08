@@ -51,6 +51,8 @@ Use `usage_suggest_investigations(...)` when the user wants ideas, is unsure wha
 
 Use `usage_investigate(...)` as the first stop for broad requests such as "look through my usage for token waste" or "what should I change?" It returns normalized findings with compact evidence, evidence summaries, confidence, missing-access notes, recommended actions, verification tools, and caveats. Compact evidence is the default. Pass `detail_mode="full"` only when the caller needs the full underlying report rows.
 
+Use `usage_test_hypotheses(...)` when the user frames the task as hypotheses, wants true/false/partial decisions, or asks for the "I'd like to / I will use / I'm missing / hypothesis result" structure. It tests supplied hypotheses or built-in defaults for token waste, cache failure, repeated file rediscovery, shell churn, effort/model choice, and allowance change. It uses aggregate and local-index signals but does not include raw fragments.
+
 Use lower-level diagnostics when the investigation report recommends them:
 
 - `usage_large_low_output_calls(...)`: high-token calls that produced little output, with cache/context clues and likely explanations.
@@ -92,6 +94,7 @@ Waste-discovery answers should not stop at "interesting." Tie recommendations to
 - `usage_large_low_output_calls`
 - `usage_suggest_investigations`
 - `usage_investigate`
+- `usage_test_hypotheses`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
 - `usage_local_evidence_export`

@@ -86,6 +86,7 @@ Tracked schema ids:
 | `codex-usage-tracker-large-low-output-v1` | MCP `usage_large_low_output_calls(...)`; high-token low-output call candidates without raw fragments |
 | `codex-usage-tracker-investigation-suggestions-v1` | MCP `usage_suggest_investigations(...)`; goal-led usage investigation suggestions for agents |
 | `codex-usage-tracker-agentic-investigation-v1` | MCP `usage_investigate(...)`; goal-led aggregate investigation findings and next tools |
+| `codex-usage-tracker-hypothesis-test-v1` | MCP `usage_test_hypotheses(...)`; explicit true/false/partial/insufficient hypothesis tests |
 | `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
 | `codex-usage-tracker-local-evidence-export-v1` | MCP `usage_local_evidence_export(question=...)`; strict shareable local evidence summary without raw/indexed content |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
@@ -1049,6 +1050,20 @@ Runs a goal-led aggregate investigation over existing tracker reports and return
 
 ```json
 {"schema":"codex-usage-tracker-agentic-investigation-v1","content_mode":"aggregate_investigation","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","goal":"token_waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"evidence_limit":5,"detail_mode":"compact"},"summary":{"finding_count":1,"top_finding":"No strong local signal at default thresholds","confidence":"insufficient_local_evidence","source_reports":[]},"findings":[{"finding":"No strong local signal at default thresholds","evidence_count":0,"evidence_summary":{"row_count":0},"evidence":[],"confidence":"insufficient_local_evidence","recommended_action":"Lower thresholds, widen the time window, include archived sessions, or inspect top aggregate calls.","verify_with":["usage_calls","usage_report_pack"],"missing_access":"No supported aggregate signal was found at the selected thresholds.","privacy_notes":"No raw context needed for this follow-up."}],"recommended_next_tools":[],"caveats":["Local Codex logs only; this is not an official OpenAI usage ledger."]}
+```
+
+## Hypothesis Test
+
+MCP:
+
+- `usage_test_hypotheses(question="Look for actionable token waste", hypotheses=["Token waste is concentrated in large low-output calls."], evidence_limit=2)`
+
+Schema: `codex-usage-tracker-hypothesis-test-v1`
+
+Tests supplied hypotheses, or built-in defaults when none are supplied, against aggregate and local-index diagnostics. Each result includes `status` (`true`, `false`, `partially_true`, or `insufficient_evidence`), confidence, the "I would like / I will use / I'm missing" investigation framing, compact evidence, counter-evidence, and next tools. It does not include raw fragments.
+
+```json
+{"schema":"codex-usage-tracker-hypothesis-test-v1","content_mode":"aggregate_with_local_index_signals","includes_indexed_content":true,"includes_raw_fragments":false,"privacy_mode":"normal","question":"Look for actionable token waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"evidence_limit":2},"summary":{"hypothesis_count":1,"status_counts":{"true":1},"top_status":"true"},"hypotheses":[{"id":"hypothesis-1","hypothesis":"Token waste is concentrated in large low-output calls.","family":"token_waste","status":"true","confidence":"medium","i_would_like_to_be_able_to":"Find obvious token-waste candidates without reading raw conversations.","i_will_accomplish_this_using":"Rank large low-output calls and aggregate recommendation rows.","i_am_missing_access_to":"Whether each expensive call produced valuable work or was intentionally exploratory.","evidence_summary":{"row_count":2,"large_low_output_candidate_count":2},"evidence":[],"counter_evidence":[],"next_action":"Inspect the largest low-output rows, then verify whether a shorter handoff or smaller context would have avoided them.","recommended_next_tools":[{"tool":"usage_large_low_output_calls","reason":"Inspect the highest-token low-output calls.","default_arguments":{}}]}],"recommended_next_tools":[{"tool":"usage_large_low_output_calls","reason":"Inspect the highest-token low-output calls.","default_arguments":{}}],"caveats":["Local Codex logs only; this is not an official OpenAI usage ledger."]}
 ```
 
 ## Investigation Walk

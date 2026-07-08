@@ -47,6 +47,7 @@ from codex_usage_tracker.reports.api import (
     build_agentic_investigation_report,
     build_content_search_report,
     build_expensive_calls_report,
+    build_hypothesis_test_report,
     build_investigation_suggestions_report,
     build_investigation_walk_report,
     build_large_low_output_report,
@@ -668,6 +669,34 @@ def usage_investigate(
         include_archived=include_archived,
         evidence_limit=evidence_limit,
         detail_mode=detail_mode,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_test_hypotheses(
+    question: str,
+    hypotheses: list[str] | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Test usage hypotheses against aggregate/local-index diagnostics."""
+    return build_hypothesis_test_report(
+        db_path=DEFAULT_DB_PATH,
+        pricing_path=DEFAULT_PRICING_PATH,
+        allowance_path=DEFAULT_ALLOWANCE_PATH,
+        projects_path=DEFAULT_PROJECTS_PATH,
+        question=question,
+        hypotheses=hypotheses,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=evidence_limit,
         privacy_mode=privacy_mode,
     ).payload
 
