@@ -84,6 +84,8 @@ Tracked schema ids:
 | `codex-usage-tracker-repeated-file-rediscovery-v1` | MCP `usage_repeated_file_rediscovery(...)`; repeated safe file identity rediscovery candidates without full paths |
 | `codex-usage-tracker-shell-churn-v1` | MCP `usage_shell_churn(...)`; repeated shell command family diagnostics without raw command output |
 | `codex-usage-tracker-large-low-output-v1` | MCP `usage_large_low_output_calls(...)`; high-token low-output call candidates without raw fragments |
+| `codex-usage-tracker-investigation-suggestions-v1` | MCP `usage_suggest_investigations(...)`; goal-led usage investigation suggestions for agents |
+| `codex-usage-tracker-agentic-investigation-v1` | MCP `usage_investigate(...)`; goal-led aggregate investigation findings and next tools |
 | `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
 | `codex-usage-tracker-local-evidence-export-v1` | MCP `usage_local_evidence_export(question=...)`; strict shareable local evidence summary without raw/indexed content |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
@@ -1019,6 +1021,34 @@ Ranks high-token calls that produced little output, including token totals, cach
 
 ```json
 {"schema":"codex-usage-tracker-large-low-output-v1","content_mode":"aggregate_with_local_activity","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"min_total_tokens":20000,"max_output_tokens":1000,"limit":20},"row_count":0,"total_candidates":0,"rows":[]}
+```
+
+## Investigation Suggestions
+
+MCP:
+
+- `usage_suggest_investigations(goal="token_waste")`
+
+Schema: `codex-usage-tracker-investigation-suggestions-v1`
+
+Returns a short menu of goal-led investigations an agent can run, including the primary MCP tool, default arguments, follow-up tools, and privacy notes. It does not include raw/indexed content.
+
+```json
+{"schema":"codex-usage-tracker-investigation-suggestions-v1","content_mode":"aggregate_guidance","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","goal":"token_waste","available_goals":["overview","token_waste","allowance_change","cache_failure","workflow_churn"],"filters":{"since":null,"until":null,"thread":null,"include_archived":false,"limit":10},"summary":{"suggestion_count":1,"total_suggestions":1,"top_goal":"token_waste"},"suggestions":[{"goal":"token_waste","label":"Find obvious token-waste candidates","primary_tool":"usage_investigate","default_arguments":{"goal":"token_waste","evidence_limit":5},"follow_up_tools":["usage_large_low_output_calls","usage_shell_churn"],"privacy_notes":"Aggregate-first; no raw prompts, tool output, or full paths."}]}
+```
+
+## Agentic Investigation
+
+MCP:
+
+- `usage_investigate(goal="token_waste")`
+
+Schema: `codex-usage-tracker-agentic-investigation-v1`
+
+Runs a goal-led aggregate investigation over existing tracker reports and returns normalized findings with evidence, confidence, why it matters, recommended action, verification tools, privacy notes, and caveats.
+
+```json
+{"schema":"codex-usage-tracker-agentic-investigation-v1","content_mode":"aggregate_investigation","includes_indexed_content":false,"includes_raw_fragments":false,"privacy_mode":"normal","goal":"token_waste","filters":{"since":null,"until":null,"thread":null,"include_archived":false,"evidence_limit":5},"summary":{"finding_count":1,"top_finding":"No strong local signal at default thresholds","confidence":"insufficient_local_evidence","source_reports":[]},"findings":[{"finding":"No strong local signal at default thresholds","evidence_count":0,"evidence":[],"confidence":"insufficient_local_evidence","recommended_action":"Lower thresholds, widen the time window, include archived sessions, or inspect top aggregate calls.","verify_with":["usage_calls","usage_report_pack"]}],"recommended_next_tools":[],"caveats":["Local Codex logs only; this is not an official OpenAI usage ledger."]}
 ```
 
 ## Investigation Walk

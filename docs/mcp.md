@@ -82,6 +82,8 @@ The companion skill cannot read your logged-in Codex account plan, native remain
 - `usage_repeated_file_rediscovery`
 - `usage_shell_churn`
 - `usage_large_low_output_calls`
+- `usage_suggest_investigations`
+- `usage_investigate`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
 - `usage_local_evidence_export`
@@ -127,6 +129,10 @@ Dashboard recommendations: `usage_dashboard_recommendations(...)` returns the da
 `usage_shell_churn(...)` ranks repeated shell command roots and bounded command labels by failures, adjacent repeats, output bytes, aggregate token totals, and `usage_thread_trace` handles. Use it when the user asks about repeated `sed`, `rg`, `git`, `nl`, test, package, or unknown shell command loops. It does not expose raw command output.
 
 `usage_large_low_output_calls(...)` ranks high-token calls that produced little output, with token totals, cache ratio, context-window percent, nearby tool/command/file counts, and candidate explanations such as cold resume, tool-output pressure, stale thread, or low-value continuation. It stays aggregate-first and does not expose raw fragments, command output, or full file paths.
+
+`usage_suggest_investigations(...)` gives agents a short menu of goal-led investigations such as token waste, allowance change, cache failure, workflow churn, and overview. Use it when the user asks what to look into or wants ideas.
+
+`usage_investigate(...)` runs a compact aggregate-first investigation for one goal and returns normalized findings, evidence, confidence, recommended actions, verification tools, and caveats. Use it as the first stop for broad questions like "look through my usage for token waste" before drilling into lower-level reports.
 
 `usage_investigation_walk(question=...)` runs a bounded local hypothesis walk over those normalized pattern scans, ranks candidate branches, prunes branches without evidence, and returns recommended next MCP tools. It is local-index evidence, not a shareable aggregate-only report.
 

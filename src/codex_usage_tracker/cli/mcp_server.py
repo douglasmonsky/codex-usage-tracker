@@ -44,8 +44,10 @@ from codex_usage_tracker.pricing.api import (
     write_pricing_template,
 )
 from codex_usage_tracker.reports.api import (
+    build_agentic_investigation_report,
     build_content_search_report,
     build_expensive_calls_report,
+    build_investigation_suggestions_report,
     build_investigation_walk_report,
     build_large_low_output_report,
     build_local_evidence_export_report,
@@ -614,6 +616,56 @@ def usage_large_low_output_calls(
         min_total_tokens=min_total_tokens,
         max_output_tokens=max_output_tokens,
         limit=limit,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_suggest_investigations(
+    goal: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    limit: int | None = 10,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Suggest goal-led usage investigations and next MCP tools."""
+
+    return build_investigation_suggestions_report(
+        goal=goal,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        limit=limit,
+        privacy_mode=privacy_mode,
+    ).payload
+
+
+@mcp.tool()
+def usage_investigate(
+    goal: str = "token_waste",
+    since: str | None = None,
+    until: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    evidence_limit: int = 5,
+    privacy_mode: str = "normal",
+) -> dict[str, Any]:
+    """Run a goal-led aggregate usage investigation."""
+
+    return build_agentic_investigation_report(
+        db_path=DEFAULT_DB_PATH,
+        pricing_path=DEFAULT_PRICING_PATH,
+        allowance_path=DEFAULT_ALLOWANCE_PATH,
+        projects_path=DEFAULT_PROJECTS_PATH,
+        goal=goal,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=evidence_limit,
         privacy_mode=privacy_mode,
     ).payload
 
