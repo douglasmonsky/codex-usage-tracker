@@ -66,6 +66,7 @@ When the maintainer asks whether MCP/skill recommendations are getting more usef
 1. Call `usage_dogfood_start(privacy_mode="strict")`.
 2. Poll `usage_dogfood_status(job_id)` until completed or failed.
 3. Call `usage_dogfood_result(job_id)` for the compact aggregate artifact.
+4. For repeated checks on unchanged data after one fresh run, call `usage_dogfood_start(refresh=False, use_cache=True, privacy_mode="strict")` and confirm `result_cache.hit`.
 
 Use the source checkout or installed CLI only as fallback:
 

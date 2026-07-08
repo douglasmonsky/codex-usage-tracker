@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -91,8 +92,10 @@ from codex_usage_tracker.store.api import (
 mcp = FastMCP("codex-usage-tracker")
 
 _DOGFOOD_JOBS: dict[str, dict[str, Any]] = {}
+_DOGFOOD_RESULT_CACHE: dict[str, dict[str, Any]] = {}
 _DOGFOOD_JOB_LOCK = threading.Lock()
 _DOGFOOD_MAX_JOBS = 25
+_DOGFOOD_MAX_RESULT_CACHE = 25
 
 
 def _utc_now() -> str:
@@ -101,6 +104,100 @@ def _utc_now() -> str:
 
 def _copy_jsonable(value: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(value))
+
+
+def _dogfood_file_fingerprint(path: Path) -> dict[str, Any]:
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return {"path": str(path), "exists": False}
+    return {
+        "path": str(path),
+        "exists": True,
+        "mtime_ns": stat.st_mtime_ns,
+        "size": stat.st_size,
+    }
+
+
+def _dogfood_cache_fingerprint(params: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "db": _dogfood_file_fingerprint(params["db_path"]),
+        "pricing": _dogfood_file_fingerprint(params["pricing_path"]),
+        "allowance": _dogfood_file_fingerprint(params["allowance_path"]),
+        "rate_card": _dogfood_file_fingerprint(params["rate_card_path"]),
+        "projects": _dogfood_file_fingerprint(params["projects_path"]),
+    }
+
+
+def _dogfood_cache_request(params: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "since": params["since"],
+        "until": params["until"],
+        "thread": params["thread"],
+        "include_archived": params["include_archived"],
+        "evidence_limit": params["evidence_limit"],
+        "privacy_mode": params["privacy_mode"],
+        "run_hypotheses": params["run_hypotheses"],
+        "run_deep_investigations": params["run_deep_investigations"],
+        "write_markdown": params["write_markdown"],
+    }
+
+
+def _dogfood_cache_key(params: dict[str, Any]) -> str:
+    material = {
+        "kind": "dogfood-cache-key-v1",
+        "request": _dogfood_cache_request(params),
+        "fingerprint": _dogfood_cache_fingerprint(params),
+    }
+    encoded = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _dogfood_cache_path(params: dict[str, Any], cache_key: str) -> Path:
+    return params["cache_root"] / cache_key / "summary.json"
+
+
+def _prune_dogfood_result_cache() -> None:
+    if len(_DOGFOOD_RESULT_CACHE) <= _DOGFOOD_MAX_RESULT_CACHE:
+        return
+    removable = sorted(
+        _DOGFOOD_RESULT_CACHE.items(),
+        key=lambda item: str(item[1].get("stored_at") or ""),
+    )
+    for cache_key, _entry in removable[: max(0, len(_DOGFOOD_RESULT_CACHE) - _DOGFOOD_MAX_RESULT_CACHE)]:
+        _DOGFOOD_RESULT_CACHE.pop(cache_key, None)
+
+
+def _load_cached_dogfood_result(params: dict[str, Any], cache_key: str) -> tuple[dict[str, Any] | None, str]:
+    cached = _DOGFOOD_RESULT_CACHE.get(cache_key)
+    if cached is not None:
+        return _copy_jsonable(cached["result"]), "memory"
+    cache_path = _dogfood_cache_path(params, cache_key)
+    if not cache_path.exists():
+        return None, "miss"
+    try:
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "invalid"
+    _DOGFOOD_RESULT_CACHE[cache_key] = {
+        "stored_at": _utc_now(),
+        "result": payload,
+    }
+    _prune_dogfood_result_cache()
+    return _copy_jsonable(payload), "disk"
+
+
+def _store_cached_dogfood_result(params: dict[str, Any], payload: dict[str, Any]) -> str:
+    cache_key = _dogfood_cache_key(params)
+    _DOGFOOD_RESULT_CACHE[cache_key] = {
+        "stored_at": _utc_now(),
+        "result": _copy_jsonable(payload),
+    }
+    _prune_dogfood_result_cache()
+    cache_path = _dogfood_cache_path(params, cache_key)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return cache_key
 
 
 def _prune_dogfood_jobs() -> None:
@@ -149,6 +246,7 @@ def _dogfood_job_status_payload(
             "error": job.get("error"),
             "filters": dict(job.get("filters", {})),
             "cache": dict(job.get("cache", {})),
+            "result_cache": dict(job.get("result_cache", {})),
             "artifacts": dict(job.get("artifacts", {})),
             "result_available": bool(job.get("result")),
             "polling_note": (
@@ -221,6 +319,16 @@ def _run_dogfood_job(job_id: str, params: dict[str, Any]) -> None:
             completed_at=_utc_now(),
         )
         return
+    result_cache: dict[str, Any] = {
+        "enabled": params["use_cache"],
+        "cacheable": True,
+        "hit": False,
+        "source": None,
+    }
+    if params["use_cache"]:
+        cache_key = _store_cached_dogfood_result(params, payload)
+        result_cache["cache_key"] = cache_key
+        result_cache["source"] = "stored"
     _update_dogfood_job(
         job_id,
         status="completed",
@@ -229,6 +337,7 @@ def _run_dogfood_job(job_id: str, params: dict[str, Any]) -> None:
         completed_at=_utc_now(),
         result=payload,
         cache=payload.get("cache", {}),
+        result_cache=result_cache,
         artifacts=payload.get("artifacts", {}),
     )
 
@@ -864,6 +973,7 @@ def usage_dogfood_start(
     run_hypotheses: bool = False,
     run_deep_investigations: bool = False,
     write_markdown: bool = True,
+    use_cache: bool = True,
 ) -> dict[str, Any]:
     """Start async aggregate dogfood diagnostics and return a polling job id."""
     job_id = uuid.uuid4().hex
@@ -886,9 +996,61 @@ def usage_dogfood_start(
         "run_hypotheses": run_hypotheses,
         "run_deep_investigations": run_deep_investigations,
         "write_markdown": write_markdown,
+        "use_cache": use_cache,
+        "cache_root": DEFAULT_AGENTIC_DOGFOOD_DIR / "cache",
     }
+    cache_key = _dogfood_cache_key(params)
+    cache_hit_payload: dict[str, Any] | None = None
+    cache_source = "disabled"
+    if use_cache and not refresh:
+        cache_hit_payload, cache_source = _load_cached_dogfood_result(params, cache_key)
     with _DOGFOOD_JOB_LOCK:
-        _DOGFOOD_JOBS[job_id] = {
+        if cache_hit_payload is not None:
+            _DOGFOOD_JOBS[job_id] = {
+                "job_id": job_id,
+                "job_type": "agentic_dogfood",
+                "status": "completed",
+                "percent_complete": 100,
+                "current_stage": "result_cache",
+                "stages": [
+                    {
+                        "stage": "result_cache",
+                        "percent": 100,
+                        "status": "completed",
+                        "source": cache_source,
+                    }
+                ],
+                "created_at": now,
+                "updated_at": now,
+                "started_at": now,
+                "completed_at": now,
+                "error": None,
+                "filters": {
+                    "since": since,
+                    "until": until,
+                    "thread": thread,
+                    "include_archived": include_archived,
+                    "evidence_limit": max(1, evidence_limit),
+                    "privacy_mode": privacy_mode,
+                    "refresh": refresh,
+                    "run_hypotheses": run_hypotheses,
+                    "run_deep_investigations": run_deep_investigations,
+                    "use_cache": use_cache,
+                },
+                "cache": cache_hit_payload.get("cache", {}),
+                "result_cache": {
+                    "enabled": use_cache,
+                    "cacheable": True,
+                    "hit": True,
+                    "source": cache_source,
+                    "cache_key": cache_key,
+                },
+                "artifacts": cache_hit_payload.get("artifacts", {}),
+                "result": cache_hit_payload,
+            }
+            _prune_dogfood_jobs()
+        else:
+            _DOGFOOD_JOBS[job_id] = {
             "job_id": job_id,
             "job_type": "agentic_dogfood",
             "status": "queued",
@@ -910,12 +1072,25 @@ def usage_dogfood_start(
                 "refresh": refresh,
                 "run_hypotheses": run_hypotheses,
                 "run_deep_investigations": run_deep_investigations,
+                "use_cache": use_cache,
             },
             "cache": {},
+            "result_cache": {
+                "enabled": use_cache,
+                "cacheable": True,
+                "hit": False,
+                "source": cache_source if use_cache and not refresh else None,
+                "cache_key": cache_key,
+                "miss_reason": cache_source
+                if use_cache and not refresh
+                else "refresh_requested" if use_cache else "disabled",
+            },
             "artifacts": {},
             "result": None,
-        }
+            }
         _prune_dogfood_jobs()
+    if cache_hit_payload is not None:
+        return _dogfood_job_status_payload(job_id)
     worker = threading.Thread(
         target=_run_dogfood_job,
         args=(job_id, params),

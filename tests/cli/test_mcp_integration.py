@@ -480,6 +480,7 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     monkeypatch.setattr(mcp_server, "DEFAULT_AGENTIC_DOGFOOD_DIR", output_dir)
     with mcp_server._DOGFOOD_JOB_LOCK:
         mcp_server._DOGFOOD_JOBS.clear()
+        mcp_server._DOGFOOD_RESULT_CACHE.clear()
 
     started = mcp_server.usage_dogfood_start(
         evidence_limit=1,
@@ -509,6 +510,33 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
     assert result["progress"]["percent_complete"] == 100
     assert result["cache"]["scope"] == "single_run_shared_reports"
+
+    cached = mcp_server.usage_dogfood_start(
+        evidence_limit=1,
+        privacy_mode="strict",
+        refresh=False,
+        write_markdown=False,
+    )
+    assert cached["status"] == "completed"
+    assert cached["percent_complete"] == 100
+    assert cached["current_stage"] == "result_cache"
+    assert cached["result_cache"]["hit"] is True
+    assert cached["result_cache"]["source"] in {"memory", "disk"}
+    assert cached["stages"][-1]["stage"] == "result_cache"
+    cached_result = mcp_server.usage_dogfood_result(cached["job_id"])
+    assert cached_result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
+
+    with mcp_server._DOGFOOD_JOB_LOCK:
+        mcp_server._DOGFOOD_RESULT_CACHE.clear()
+    disk_cached = mcp_server.usage_dogfood_start(
+        evidence_limit=1,
+        privacy_mode="strict",
+        refresh=False,
+        write_markdown=False,
+    )
+    assert disk_cached["status"] == "completed"
+    assert disk_cached["result_cache"]["hit"] is True
+    assert disk_cached["result_cache"]["source"] == "disk"
 
 
 def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
