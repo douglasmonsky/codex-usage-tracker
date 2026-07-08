@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 from codex_usage_tracker.dashboard.api import generate_dashboard
@@ -457,6 +458,57 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
         assert ARCHIVED_SESSION_ID not in encoded
         assert "archived-only.py" not in encoded
         assert payload["filters"]["include_archived"] is False
+
+
+def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> None:
+    from codex_usage_tracker.cli import mcp_server
+
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    allowance_path = tmp_path / "allowance.json"
+    projects_path = tmp_path / "projects.json"
+    rate_card_path = tmp_path / "rate-card.json"
+    output_dir = tmp_path / "dogfood-jobs"
+
+    monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
+    monkeypatch.setattr(mcp_server, "DEFAULT_DB_PATH", db_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PRICING_PATH", pricing_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_ALLOWANCE_PATH", allowance_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PROJECTS_PATH", projects_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_RATE_CARD_PATH", rate_card_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_AGENTIC_DOGFOOD_DIR", output_dir)
+    with mcp_server._DOGFOOD_JOB_LOCK:
+        mcp_server._DOGFOOD_JOBS.clear()
+
+    started = mcp_server.usage_dogfood_start(
+        evidence_limit=1,
+        privacy_mode="strict",
+        refresh=True,
+        write_markdown=False,
+    )
+    assert started["schema"] == "codex-usage-tracker-async-job-status-v1"
+    assert started["status"] in {"queued", "running", "completed"}
+    job_id = started["job_id"]
+
+    status = started
+    for _ in range(100):
+        status = mcp_server.usage_dogfood_status(job_id)
+        if status["status"] in {"completed", "failed"}:
+            break
+        time.sleep(0.05)
+
+    assert status["status"] == "completed", status.get("error")
+    assert status["percent_complete"] == 100
+    assert status["result_available"] is True
+    assert status["cache"]["cache_keys"]
+    assert status["stages"][-1]["stage"] == "write_artifacts"
+    assert Path(status["artifacts"]["summary_json_path"]).exists()
+
+    result = mcp_server.usage_dogfood_result(job_id)
+    assert result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
+    assert result["progress"]["percent_complete"] == 100
+    assert result["cache"]["scope"] == "single_run_shared_reports"
 
 
 def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:

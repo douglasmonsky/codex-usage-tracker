@@ -49,8 +49,16 @@ SERVER_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     'codex-usage-tracker-live-api-v1': {"required": {}},
+    'codex-usage-tracker-async-job-status-v1': {
+        "required": {
+            "job_id": str,
+            "job_type": str,
+            "status": str,
+            "percent_complete": int,
+        }
+    },
     'codex-usage-tracker-status-v1': {
-            "required": {
+        "required": {
                 "payload_schema": str,
                 "latest_refresh_at": (str, NoneType),
                 "include_archived": bool,
