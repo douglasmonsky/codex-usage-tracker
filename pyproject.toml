@@ -147,6 +147,16 @@ pyright_type_checking_mode = "standard"
 enable_pip_audit = false
 enable_secret_scanning = true
 enable_yamllint = true
+enable_taplo = true
+enable_markdownlint = true
+enable_check_jsonschema = true
+check_jsonschema_args = [
+  "--builtin-schema",
+  "vendor.github-workflows",
+  ".github/workflows/ci.yml",
+  ".github/workflows/pricing-compat.yml",
+  ".github/workflows/publish.yml",
+]
 enable_wemake = false
 enable_interrogate = false
 

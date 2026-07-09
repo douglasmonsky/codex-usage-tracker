@@ -16,6 +16,8 @@ checks without mixing in broad Python refactors or large documentation cleanup.
 - Fix the publish workflow glob flagged by `actionlint`.
 - Format TOML configuration with Taplo.
 - Enable repo-configured `yamllint`.
+- Add a repo-specific Markdown lint config and enable the gate with historical
+  prose/layout rules disabled.
 
 ## Finish On This Branch
 
@@ -26,8 +28,8 @@ checks without mixing in broad Python refactors or large documentation cleanup.
 
 ## Follow-Up PRs
 
-- Markdown linting: needs a dedicated docs cleanup because the current repo has
-  hundreds of historical spacing and inline-HTML findings.
+- Markdown linting: tighten disabled historical rules only in a dedicated docs
+  cleanup PR.
 - pip-audit: needs a pinned dependency input or lock/constraints strategy before
   it can be enabled safely.
 - Bandit: needs triage for SQL construction warnings and false-positive string

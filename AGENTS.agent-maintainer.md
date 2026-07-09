@@ -48,7 +48,10 @@ Do not read it during normal coding unless changing guidance.
 ## Active Gates
 
 - Secret scanning: gitleaks
+- Markdown linting
 - YAML linting
+- TOML formatting
+- Schema validation
 
 ## Failure Loop
 
