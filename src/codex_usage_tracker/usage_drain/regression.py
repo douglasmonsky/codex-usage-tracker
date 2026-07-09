@@ -15,9 +15,7 @@ def prepare_design(
 ) -> tuple[list[str], dict[str, float], dict[str, float], dict[str, list[str]]] | None:
     if not rows:
         return None
-    numeric_features, means, stddevs = _numeric_design_features(
-        rows, spec.numeric_features
-    )
+    numeric_features, means, stddevs = _numeric_design_features(rows, spec.numeric_features)
     categorical_features, category_levels = _categorical_design_features(
         rows, spec.categorical_features
     )
@@ -35,9 +33,7 @@ def _numeric_design_features(
     return list(features), means, stddevs
 
 
-def _numeric_feature_stats(
-    rows: list[dict[str, Any]], feature: str
-) -> tuple[float, float]:
+def _numeric_feature_stats(rows: list[dict[str, Any]], feature: str) -> tuple[float, float]:
     values = [number(row.get(feature)) for row in rows]
     mean = sum(values) / len(values)
     variance = sum((value - mean) ** 2 for value in values) / len(values)
@@ -126,9 +122,7 @@ def solve_linear_system(lhs: list[list[float]], rhs: list[float]) -> list[float]
                 continue
             matrix[row_index] = [
                 value - factor * pivot_component
-                for value, pivot_component in zip(
-                    matrix[row_index], matrix[column], strict=True
-                )
+                for value, pivot_component in zip(matrix[row_index], matrix[column], strict=True)
             ]
     return [matrix[row][size] for row in range(size)]
 
@@ -139,7 +133,6 @@ def predict(x_rows: list[list[float]], coefficients: list[float]) -> list[float]
         + sum(value * coefficient for value, coefficient in zip(row, coefficients[1:], strict=True))
         for row in x_rows
     ]
-
 
 
 def fit_linear_coefficients(
@@ -286,9 +279,7 @@ def fit_one_feature_no_intercept(x_values: list[float], y_values: list[float]) -
     return sum(x * y for x, y in zip(x_values, y_values, strict=True)) / denominator
 
 
-def documented_weighted_multiplier(
-    spans: list[UsageDeltaSpan], proxy: str
-) -> float | None:
+def documented_weighted_multiplier(spans: list[UsageDeltaSpan], proxy: str) -> float | None:
     candidate = sum(span.candidate_standard_credits.get(proxy, 0.0) for span in spans)
     if candidate <= 0:
         return None
@@ -324,9 +315,7 @@ def drain_stats(spans: list[UsageDeltaSpan]) -> dict[str, float | int | None]:
         "spans": len(spans),
         "median_delta_percent": rounded(median(deltas) if deltas else None),
         "median_drain_per_standard_credit": rounded(median(drains) if drains else None),
-        "mean_drain_per_standard_credit": rounded(
-            sum(drains) / len(drains) if drains else None
-        ),
+        "mean_drain_per_standard_credit": rounded(sum(drains) / len(drains) if drains else None),
     }
 
 
@@ -337,10 +326,7 @@ def r2(y_values: list[float], y_hat: list[float] | None) -> float | None:
     sst = sum((value - mean_y) ** 2 for value in y_values)
     if sst <= 0:
         return None
-    sse = sum(
-        (actual - predicted) ** 2
-        for actual, predicted in zip(y_values, y_hat, strict=True)
-    )
+    sse = sum((actual - predicted) ** 2 for actual, predicted in zip(y_values, y_hat, strict=True))
     return 1.0 - (sse / sst)
 
 
@@ -349,10 +335,7 @@ def pearson(x_values: list[float], y_values: list[float]) -> float | None:
         return None
     mean_x = sum(x_values) / len(x_values)
     mean_y = sum(y_values) / len(y_values)
-    covariance = sum(
-        (x - mean_x) * (y - mean_y)
-        for x, y in zip(x_values, y_values, strict=True)
-    )
+    covariance = sum((x - mean_x) * (y - mean_y) for x, y in zip(x_values, y_values, strict=True))
     x_var = sum((x - mean_x) ** 2 for x in x_values)
     y_var = sum((y - mean_y) ** 2 for y in y_values)
     denominator = math.sqrt(x_var * y_var)
@@ -373,10 +356,7 @@ def rank_values(values: list[float]) -> list[float]:
     index = 0
     while index < len(ordered):
         end_index = index
-        while (
-            end_index + 1 < len(ordered)
-            and ordered[end_index + 1][0] == ordered[index][0]
-        ):
+        while end_index + 1 < len(ordered) and ordered[end_index + 1][0] == ordered[index][0]:
             end_index += 1
         rank = ((index + 1) + (end_index + 1)) / 2.0
         for rank_index in range(index, end_index + 1):

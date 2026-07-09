@@ -24,12 +24,8 @@ def history_state_for_span(
     previous_deltas: list[float],
 ) -> dict[str, Any]:
     if previous_deltas:
-        one_percent_streak = tail_streak(
-            previous_deltas, predicate=is_one_percent_delta
-        )
-        low_delta_streak = tail_streak(
-            previous_deltas, predicate=lambda value: value <= 1.0
-        )
+        one_percent_streak = tail_streak(previous_deltas, predicate=is_one_percent_delta)
+        low_delta_streak = tail_streak(previous_deltas, predicate=lambda value: value <= 1.0)
         same_delta_streak = same_value_tail_streak(previous_deltas)
         previous_delta_value = previous_deltas[-1]
         previous_delta_bucket = delta_bucket(previous_deltas[-1])
@@ -49,9 +45,7 @@ def history_state_for_span(
         "low_delta_streak_bucket": streak_bucket(low_delta_streak),
         "same_delta_streak_count": same_delta_streak,
         "same_delta_streak_bucket": streak_bucket(same_delta_streak),
-        "previous_span_wall_time_bucket": previous_span_wall_time_bucket(
-            spans, index
-        ),
+        "previous_span_wall_time_bucket": previous_span_wall_time_bucket(spans, index),
         "previous_call_duration_bucket": previous_call_duration_bucket(spans, index),
     }
 
@@ -65,9 +59,7 @@ def previous_span_wall_time_bucket(spans: list[UsageDeltaSpan], index: int) -> s
 def previous_call_duration_bucket(spans: list[UsageDeltaSpan], index: int) -> str:
     if index <= 0:
         return "missing"
-    return second_bucket(
-        spans[index - 1].timing_totals.get("call_duration_seconds", 0.0)
-    )
+    return second_bucket(spans[index - 1].timing_totals.get("call_duration_seconds", 0.0))
 
 
 def delta_bucket(value: float) -> str:

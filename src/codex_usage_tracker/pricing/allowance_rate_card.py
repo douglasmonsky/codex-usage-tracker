@@ -27,6 +27,7 @@ DEFAULT_SOURCE = {
     "tier": "standard",
 }
 
+
 @dataclass(frozen=True)
 class RateCardUpdateResult:
     """Result from writing a local Codex credit rate-card snapshot."""
@@ -37,6 +38,7 @@ class RateCardUpdateResult:
     model_count: int
     alias_count: int
     backup_path: Path | None = None
+
 
 def load_bundled_rate_card() -> dict[str, Any]:
     """Load the package-bundled Codex credit rate-card snapshot."""
@@ -51,6 +53,7 @@ def load_bundled_rate_card() -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("bundled Codex rate card must be a JSON object")
     return raw
+
 
 def update_rate_card(
     path: Path = DEFAULT_RATE_CARD_PATH,
@@ -86,6 +89,7 @@ def update_rate_card(
         backup_path=backup_path,
     )
 
+
 def parse_credit_rates(raw: object) -> dict[str, dict[str, float]]:
     if not isinstance(raw, dict):
         return {}
@@ -102,6 +106,7 @@ def parse_credit_rates(raw: object) -> dict[str, dict[str, float]]:
             "output_per_million": _required_rate(rates, "output_per_million", normalized),
         }
     return parsed
+
 
 def parse_aliases(raw: object) -> dict[str, dict[str, str]]:
     if not isinstance(raw, dict):
@@ -136,6 +141,7 @@ def _parse_alias_entry(source_model: str, target: object) -> dict[str, str] | No
         or f"Mapped from {source_model} by local allowance config.",
     }
 
+
 def parse_rate_card_source(raw: object) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return dict(DEFAULT_SOURCE)
@@ -143,6 +149,7 @@ def parse_rate_card_source(raw: object) -> dict[str, Any]:
     if not isinstance(source, dict):
         return dict(DEFAULT_SOURCE)
     return {**DEFAULT_SOURCE, **source}
+
 
 def parse_credit_rate_metadata(
     raw: object,
@@ -176,10 +183,12 @@ def _credit_rate_metadata_entry(
         or optional_str(source.get("name"))
         or "Codex credit rates",
         "source_url": optional_str(rates.get("source_url")) or optional_str(source.get("url")),
-        "fetched_at": optional_str(rates.get("fetched_at")) or optional_str(source.get("fetched_at")),
+        "fetched_at": optional_str(rates.get("fetched_at"))
+        or optional_str(source.get("fetched_at")),
         "tier": optional_str(rates.get("tier")) or optional_str(source.get("tier")),
         "note": optional_str(rates.get("note")),
     }
+
 
 def parse_alias_metadata(raw: object, *, source: dict[str, Any]) -> dict[str, dict[str, Any]]:
     if not isinstance(raw, dict):
@@ -227,17 +236,20 @@ def _mapping_alias_metadata(target: dict[str, Any], source: dict[str, Any]) -> d
         or optional_str(source.get("name"))
         or "Codex credit rates",
         "source_url": optional_str(target.get("source_url")) or optional_str(source.get("url")),
-        "fetched_at": optional_str(target.get("fetched_at")) or optional_str(source.get("fetched_at")),
+        "fetched_at": optional_str(target.get("fetched_at"))
+        or optional_str(source.get("fetched_at")),
         "tier": optional_str(target.get("tier")) or optional_str(source.get("tier")),
         "note": optional_str(target.get("note")),
         "alias_reason": optional_str(target.get("alias_reason")),
     }
+
 
 def load_json_file(path: Path) -> dict[str, Any]:
     raw = json.loads(path.expanduser().read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"JSON config must be an object: {path}")
     return raw
+
 
 def _backup_existing_rate_card(path: Path) -> Path | None:
     if not path.exists():
@@ -247,16 +259,19 @@ def _backup_existing_rate_card(path: Path) -> Path | None:
     shutil.copy2(path, backup_path)
     return backup_path
 
+
 def normalize_model(value: object) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
     return value.strip().lower().replace("_", "-")
+
 
 def _required_rate(raw: dict[str, Any], key: str, model: str) -> float:
     parsed = optional_positive_number(raw.get(key))
     if parsed is None:
         raise ValueError(f"missing {key} for Codex credit model {model}")
     return parsed
+
 
 def optional_positive_number(value: object) -> float | None:
     if value is None or value == "":
@@ -266,8 +281,10 @@ def optional_positive_number(value: object) -> float | None:
         raise ValueError("allowance values cannot be negative")
     return number
 
+
 def optional_str(value: object) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
+
 
 def number_value(value: object) -> float:
     if isinstance(value, bool):

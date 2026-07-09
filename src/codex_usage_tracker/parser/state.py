@@ -122,8 +122,7 @@ def parser_state_to_json(state: ParserState) -> str:
                 for flags in state.call_origin_segment
             ],
             "diagnostic_facts_segment": [
-                diagnostic_fact_to_json(fact)
-                for fact in state.diagnostic_facts_segment
+                diagnostic_fact_to_json(fact) for fact in state.diagnostic_facts_segment
             ],
             "latest_record_id": state.latest_record_id,
             "latest_event_timestamp": state.latest_event_timestamp,
@@ -141,11 +140,7 @@ def empty_parser_diagnostics() -> dict[str, int]:
 def compact_parser_diagnostics(stats: MutableMapping[str, int]) -> dict[str, int]:
     """Return non-zero parser diagnostics in stable key order."""
 
-    return {
-        key: int(stats.get(key, 0))
-        for key in PARSER_DIAGNOSTIC_KEYS
-        if stats.get(key, 0)
-    }
+    return {key: int(stats.get(key, 0)) for key in PARSER_DIAGNOSTIC_KEYS if stats.get(key, 0)}
 
 
 def optional_str(value: object) -> str | None:

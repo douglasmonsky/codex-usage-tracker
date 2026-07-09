@@ -14,18 +14,18 @@ NoneType = type(None)
 Number = (int, float)
 
 CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
-    'codex-usage-tracker-setup-v1': {
-            "required": {
-                "codex_home": str,
-                "codex_home_exists": bool,
-                "plugin": dict,
-                "pricing": dict,
-                "refresh": dict,
-                "doctor": dict,
-                "restart_required": bool,
-            }
-        },
-    'codex-usage-tracker-doctor-v1': {
+    "codex-usage-tracker-setup-v1": {
+        "required": {
+            "codex_home": str,
+            "codex_home_exists": bool,
+            "plugin": dict,
+            "pricing": dict,
+            "refresh": dict,
+            "doctor": dict,
+            "restart_required": bool,
+        }
+    },
+    "codex-usage-tracker-doctor-v1": {
         "required": {
             "status": str,
             "failures": int,
@@ -34,80 +34,80 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "checks": list,
         }
     },
-    'codex-usage-tracker-plugin-install-v1': {"required": PLUGIN_INSTALL_FIELDS},
-    'codex-usage-tracker-plugin-upgrade-v1': {"required": PLUGIN_INSTALL_FIELDS},
-    'codex-usage-tracker-plugin-uninstall-v1': {
-            "required": {
-                "plugin_dir": str,
-                "marketplace_path": str,
-                "removed_plugin_path": bool,
-                "removed_marketplace_entry": bool,
-                "restart_required": bool,
-            }
-        },
-    'codex-usage-tracker-refresh-v1': {"required": REFRESH_RESULT_FIELDS},
-    'codex-usage-tracker-rebuild-index-v1': {"required": REFRESH_RESULT_FIELDS},
-    'codex-usage-tracker-reset-db-v1': {
-            "required": {
-                "db_path": str,
-                "deleted_usage_events": int,
-            }
-        },
-    'codex-usage-tracker-summary-v1': {
-            "required": {
-                "group_by": str,
-                "is_expensive": bool,
-                "privacy_mode": str,
-                "row_count": int,
-                "rows": list,
-            }
-        },
-    'codex-usage-tracker-query-v1': {
-            "required": {
-                "filters": dict,
-                "row_count": int,
-                "total_matched_rows": int,
-                "truncated": bool,
-                "rows": list,
-            },
-            "nested": {
-                "filters": {
-                    "since": (str, NoneType),
-                    "until": (str, NoneType),
-                    "model": (str, NoneType),
-                    "effort": (str, NoneType),
-                    "thread": (str, NoneType),
-                    "project": (str, NoneType),
-                    "pricing_status": (str, NoneType),
-                    "credit_confidence": (str, NoneType),
-                    "min_tokens": (int, NoneType),
-                    "min_credits": (int, float, NoneType),
-                    "limit": (int, NoneType),
-                    "privacy_mode": str,
-                }
-            },
-        },
-    'codex-usage-tracker-recommendations-v1': {
+    "codex-usage-tracker-plugin-install-v1": {"required": PLUGIN_INSTALL_FIELDS},
+    "codex-usage-tracker-plugin-upgrade-v1": {"required": PLUGIN_INSTALL_FIELDS},
+    "codex-usage-tracker-plugin-uninstall-v1": {
+        "required": {
+            "plugin_dir": str,
+            "marketplace_path": str,
+            "removed_plugin_path": bool,
+            "removed_marketplace_entry": bool,
+            "restart_required": bool,
+        }
+    },
+    "codex-usage-tracker-refresh-v1": {"required": REFRESH_RESULT_FIELDS},
+    "codex-usage-tracker-rebuild-index-v1": {"required": REFRESH_RESULT_FIELDS},
+    "codex-usage-tracker-reset-db-v1": {
+        "required": {
+            "db_path": str,
+            "deleted_usage_events": int,
+        }
+    },
+    "codex-usage-tracker-summary-v1": {
+        "required": {
+            "group_by": str,
+            "is_expensive": bool,
+            "privacy_mode": str,
+            "row_count": int,
+            "rows": list,
+        }
+    },
+    "codex-usage-tracker-query-v1": {
         "required": {
             "filters": dict,
-                "row_count": int,
-                "total_matched_rows": int,
-                "truncated": bool,
-                "threads": list,
-                "rows": list,
-            },
-            "nested": {
-                "filters": {
-                    "since": (str, NoneType),
-                    "until": (str, NoneType),
-                    "model": (str, NoneType),
-                    "effort": (str, NoneType),
-                    "thread": (str, NoneType),
-                    "project": (str, NoneType),
-                    "include_archived": bool,
-                    "min_score": (int, float, NoneType),
-                    "limit": (int, NoneType),
-                    "privacy_mode": str,
+            "row_count": int,
+            "total_matched_rows": int,
+            "truncated": bool,
+            "rows": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "model": (str, NoneType),
+                "effort": (str, NoneType),
+                "thread": (str, NoneType),
+                "project": (str, NoneType),
+                "pricing_status": (str, NoneType),
+                "credit_confidence": (str, NoneType),
+                "min_tokens": (int, NoneType),
+                "min_credits": (int, float, NoneType),
+                "limit": (int, NoneType),
+                "privacy_mode": str,
+            }
+        },
+    },
+    "codex-usage-tracker-recommendations-v1": {
+        "required": {
+            "filters": dict,
+            "row_count": int,
+            "total_matched_rows": int,
+            "truncated": bool,
+            "threads": list,
+            "rows": list,
+        },
+        "nested": {
+            "filters": {
+                "since": (str, NoneType),
+                "until": (str, NoneType),
+                "model": (str, NoneType),
+                "effort": (str, NoneType),
+                "thread": (str, NoneType),
+                "project": (str, NoneType),
+                "include_archived": bool,
+                "min_score": (int, float, NoneType),
+                "limit": (int, NoneType),
+                "privacy_mode": str,
             }
         },
     },
@@ -146,61 +146,61 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "notes": list,
         },
     },
-    'codex-usage-tracker-dashboard-v1': {
+    "codex-usage-tracker-dashboard-v1": {
         "required": {
             "dashboard_path": str,
-                "file_url": str,
-                "opened": bool,
-                "limit": (int, NoneType),
-                "since": (str, NoneType),
-                "privacy_mode": str,
-                "include_archived": bool,
-            }
-        },
-    'codex-usage-tracker-open-dashboard-v1': {
-            "required": {
-                "dashboard_path": str,
-                "file_url": str,
-                "opened": bool,
-                "limit": (int, NoneType),
-                "since": (str, NoneType),
-                "refresh": (dict, NoneType),
-                "privacy_mode": str,
-                "include_archived": bool,
-            }
-        },
-    'codex-usage-tracker-serve-dashboard-v1': {
-            "required": {
-                "host": str,
-                "port": int,
-                "dashboard_path": str,
-                "dashboard_url": str,
-                "legacy_dashboard_url": str,
-                "limit": (int, NoneType),
-                "since": (str, NoneType),
-                "context_api": str,
-                "refresh_before_start": bool,
-                "privacy_mode": str,
-                "include_archived": bool,
-            }
-        },
-    'codex-usage-tracker-pricing-coverage-v1': {
+            "file_url": str,
+            "opened": bool,
+            "limit": (int, NoneType),
+            "since": (str, NoneType),
+            "privacy_mode": str,
+            "include_archived": bool,
+        }
+    },
+    "codex-usage-tracker-open-dashboard-v1": {
+        "required": {
+            "dashboard_path": str,
+            "file_url": str,
+            "opened": bool,
+            "limit": (int, NoneType),
+            "since": (str, NoneType),
+            "refresh": (dict, NoneType),
+            "privacy_mode": str,
+            "include_archived": bool,
+        }
+    },
+    "codex-usage-tracker-serve-dashboard-v1": {
+        "required": {
+            "host": str,
+            "port": int,
+            "dashboard_path": str,
+            "dashboard_url": str,
+            "legacy_dashboard_url": str,
+            "limit": (int, NoneType),
+            "since": (str, NoneType),
+            "context_api": str,
+            "refresh_before_start": bool,
+            "privacy_mode": str,
+            "include_archived": bool,
+        }
+    },
+    "codex-usage-tracker-pricing-coverage-v1": {
         "required": {
             "model_count": int,
-                "priced_model_count": int,
-                "unpriced_model_count": int,
-                "total_tokens": Number,
-                "priced_tokens": Number,
-                "unpriced_tokens": Number,
-                "estimated_cost_usd": Number,
-                "priced_token_ratio": Number,
-                "pricing_loaded": bool,
-                "pricing_path": str,
-                "pricing_source": (dict, NoneType),
+            "priced_model_count": int,
+            "unpriced_model_count": int,
+            "total_tokens": Number,
+            "priced_tokens": Number,
+            "unpriced_tokens": Number,
+            "estimated_cost_usd": Number,
+            "priced_token_ratio": Number,
+            "pricing_loaded": bool,
+            "pricing_path": str,
+            "pricing_source": (dict, NoneType),
             "rows": list,
         }
     },
-    'codex-usage-tracker-source-coverage-v1': {
+    "codex-usage-tracker-source-coverage-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -213,7 +213,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "rows": list,
         }
     },
-    'codex-usage-tracker-content-search-v1': {
+    "codex-usage-tracker-content-search-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -243,7 +243,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-thread-trace-v1': {
+    "codex-usage-tracker-thread-trace-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -272,7 +272,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-pattern-scan-v1': {
+    "codex-usage-tracker-pattern-scan-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -296,7 +296,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-repeated-file-rediscovery-v1': {
+    "codex-usage-tracker-repeated-file-rediscovery-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -319,7 +319,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-shell-churn-v1': {
+    "codex-usage-tracker-shell-churn-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -342,7 +342,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-large-low-output-v1': {
+    "codex-usage-tracker-large-low-output-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -365,7 +365,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-investigation-suggestions-v1': {
+    "codex-usage-tracker-investigation-suggestions-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -387,7 +387,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-agentic-investigation-v1': {
+    "codex-usage-tracker-agentic-investigation-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -411,7 +411,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-action-brief-v1': {
+    "codex-usage-tracker-action-brief-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -434,7 +434,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-hypothesis-test-v1': {
+    "codex-usage-tracker-hypothesis-test-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -457,7 +457,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-investigation-walk-v1': {
+    "codex-usage-tracker-investigation-walk-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -480,7 +480,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-local-evidence-export-v1': {
+    "codex-usage-tracker-local-evidence-export-v1": {
         "required": {
             "content_mode": str,
             "includes_indexed_content": bool,
@@ -504,60 +504,60 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             }
         },
     },
-    'codex-usage-tracker-export-v1': {
+    "codex-usage-tracker-export-v1": {
         "required": {
             "rows": int,
-                "csv_path": str,
-                "limit": (int, NoneType),
-                "privacy_mode": str,
-            }
-        },
-    'codex-usage-tracker-init-pricing-v1': {
-            "required": {"pricing_path": str, **PATH_CREATED_FIELDS}
-        },
-    'codex-usage-tracker-update-pricing-v1': {
-            "required": {
-                "pricing_path": str,
-                "source_url": str,
-                "tier": str,
-                "fetched_at": str,
-                "model_count": int,
-                "estimated_model_count": int,
-                "backup_path": (str, NoneType),
-            }
-        },
-    'codex-usage-tracker-pin-pricing-v1': {
-            "required": {
-                "pricing_path": str,
-                "source_pricing_path": str,
-            }
-        },
-    'codex-usage-tracker-init-allowance-v1': {
-            "required": {"allowance_path": str, **PATH_CREATED_FIELDS}
-        },
-    'codex-usage-tracker-parse-allowance-v1': {
-            "required": {
-                "allowance_path": str,
-                "updated": bool,
-            }
-        },
-    'codex-usage-tracker-update-rate-card-v1': {
-            "required": {
-                "rate_card_path": str,
-                "source_url": (str, NoneType),
-                "fetched_at": (str, NoneType),
-                "model_count": int,
-                "alias_count": int,
-                "backup_path": (str, NoneType),
-            }
-        },
-    'codex-usage-tracker-init-thresholds-v1': {
-            "required": {"thresholds_path": str, **PATH_CREATED_FIELDS}
-        },
-    'codex-usage-tracker-init-projects-v1': {
-            "required": {"projects_path": str, **PATH_CREATED_FIELDS}
-        },
-    'codex-usage-tracker-support-bundle-v1': {
+            "csv_path": str,
+            "limit": (int, NoneType),
+            "privacy_mode": str,
+        }
+    },
+    "codex-usage-tracker-init-pricing-v1": {
+        "required": {"pricing_path": str, **PATH_CREATED_FIELDS}
+    },
+    "codex-usage-tracker-update-pricing-v1": {
+        "required": {
+            "pricing_path": str,
+            "source_url": str,
+            "tier": str,
+            "fetched_at": str,
+            "model_count": int,
+            "estimated_model_count": int,
+            "backup_path": (str, NoneType),
+        }
+    },
+    "codex-usage-tracker-pin-pricing-v1": {
+        "required": {
+            "pricing_path": str,
+            "source_pricing_path": str,
+        }
+    },
+    "codex-usage-tracker-init-allowance-v1": {
+        "required": {"allowance_path": str, **PATH_CREATED_FIELDS}
+    },
+    "codex-usage-tracker-parse-allowance-v1": {
+        "required": {
+            "allowance_path": str,
+            "updated": bool,
+        }
+    },
+    "codex-usage-tracker-update-rate-card-v1": {
+        "required": {
+            "rate_card_path": str,
+            "source_url": (str, NoneType),
+            "fetched_at": (str, NoneType),
+            "model_count": int,
+            "alias_count": int,
+            "backup_path": (str, NoneType),
+        }
+    },
+    "codex-usage-tracker-init-thresholds-v1": {
+        "required": {"thresholds_path": str, **PATH_CREATED_FIELDS}
+    },
+    "codex-usage-tracker-init-projects-v1": {
+        "required": {"projects_path": str, **PATH_CREATED_FIELDS}
+    },
+    "codex-usage-tracker-support-bundle-v1": {
         "required": {
             "support_bundle_path": str,
             "privacy": dict,
@@ -580,7 +580,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
                 "cli_hint_fields": list,
                 "do_not_add": list,
                 "note": str,
-            }
+            },
         },
     },
 }

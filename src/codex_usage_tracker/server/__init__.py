@@ -12,6 +12,7 @@ _COMPAT_MODULES = {
     "server_utils": "codex_usage_tracker.server.utils",
 }
 
+
 def __getattr__(name: str) -> Any:
     if name in _COMPAT_MODULES:
         return import_module(_COMPAT_MODULES[name])

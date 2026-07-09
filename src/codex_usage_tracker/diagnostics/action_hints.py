@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-_DEFAULT_ACTION_HINT = (
-    "Open associated high-cost calls when the pattern needs more context."
-)
+_DEFAULT_ACTION_HINT = "Open associated high-cost calls when the pattern needs more context."
 _COMMAND_FAMILY_HINT = (
     "Review repeated validation or command loops when associated uncached input is high."
 )
 _UNKNOWN_COMMAND_HINT = (
     "Open associated calls when shell activity is high; command text is intentionally not stored."
 )
-_COMPACTION_HINT = (
-    "Review associated calls to see whether compaction reduced context or a fresh handoff would be cleaner."
-)
+_COMPACTION_HINT = "Review associated calls to see whether compaction reduced context or a fresh handoff would be cleaner."
 _FACT_TYPE_ACTION_HINTS = {
     "mcp_server": (
         "Inspect repeated MCP activity and narrow tool result scope when associated costs are high."
@@ -27,9 +23,7 @@ _FACT_TYPE_ACTION_HINTS = {
     "function": (
         "Check whether repeated function calls are carrying more context forward than needed."
     ),
-    "tool": (
-        "Check whether repeated tool activity is carrying forward more context than needed."
-    ),
+    "tool": ("Check whether repeated tool activity is carrying forward more context than needed."),
 }
 _FACT_NAME_ACTION_HINTS = {
     "search_read_command": (
@@ -44,15 +38,9 @@ _FACT_NAME_ACTION_HINTS = {
     "function_call_output": (
         "Inspect repeated large tool results when associated uncached input is high."
     ),
-    "patch_applied": (
-        "Likely productive work; verify tests or commit state captured the change."
-    ),
-    "task_complete": (
-        "Consider archiving or writing a handoff before reviving the thread later."
-    ),
-    "turn_aborted": (
-        "Inspect associated calls for interrupted work or retry loops."
-    ),
+    "patch_applied": ("Likely productive work; verify tests or commit state captured the change."),
+    "task_complete": ("Consider archiving or writing a handoff before reviving the thread later."),
+    "turn_aborted": ("Inspect associated calls for interrupted work or retry loops."),
 }
 
 

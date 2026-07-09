@@ -17,10 +17,7 @@ from codex_usage_tracker.usage_drain.utils import number, rounded
 
 
 def transition_target_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    actual = [
-        0 if is_one_percent_delta(number(row.get("actual"))) else 1
-        for row in rows
-    ]
+    actual = [0 if is_one_percent_delta(number(row.get("actual"))) else 1 for row in rows]
     risk_models = transition_risk_model_names(rows)
     return {
         "n": len(rows),
@@ -29,10 +26,7 @@ def transition_target_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "models": {
             model_name: binary_risk_metrics(
                 actual,
-                [
-                    number((row.get("transition_risks") or {}).get(model_name))
-                    for row in rows
-                ],
+                [number((row.get("transition_risks") or {}).get(model_name)) for row in rows],
             )
             for model_name in risk_models
         },
@@ -43,15 +37,17 @@ def transition_target_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         },
     }
 
+
 def transition_risk_model_names(rows: list[dict[str, Any]]) -> list[str]:
     if not rows:
         return []
     names: list[str] = []
     for row in rows:
-        for name in (row.get("transition_risks") or {}):
+        for name in row.get("transition_risks") or {}:
             if name not in names:
                 names.append(str(name))
     return names
+
 
 def binary_risk_metrics(actual: list[int], scores: list[float]) -> dict[str, Any]:
     if not actual or len(actual) != len(scores):
@@ -95,9 +91,7 @@ def _clipped_scores(scores: list[float]) -> list[float]:
     return [min(max(score, 0.0), 1.0) for score in scores]
 
 
-def _score_groups(
-    actual: list[int], scores: list[float]
-) -> tuple[list[float], list[float]]:
+def _score_groups(actual: list[int], scores: list[float]) -> tuple[list[float], list[float]]:
     positives: list[float] = []
     negatives: list[float] = []
     for value, score in zip(actual, scores, strict=True):
@@ -110,9 +104,7 @@ def _score_groups(
 
 def _top_risk_rows(actual: list[int], scores: list[float]) -> list[tuple[int, float]]:
     top_count = max(1, math.ceil(len(actual) * 0.1))
-    ranked = sorted(
-        zip(actual, scores, strict=True), key=lambda item: item[1], reverse=True
-    )
+    ranked = sorted(zip(actual, scores, strict=True), key=lambda item: item[1], reverse=True)
     return ranked[:top_count]
 
 
@@ -121,15 +113,16 @@ def _top_positive_count(top_rows: list[tuple[int, float]]) -> int:
 
 
 def _brier_score(actual: list[int], scores: list[float]) -> float:
-    return sum(
-        (score - value) ** 2 for value, score in zip(actual, scores, strict=True)
-    ) / len(actual)
+    return sum((score - value) ** 2 for value, score in zip(actual, scores, strict=True)) / len(
+        actual
+    )
 
 
 def _mean_score(scores: list[float]) -> float | None:
     if not scores:
         return None
     return rounded(sum(scores) / len(scores))
+
 
 def binary_auc(actual: list[int], scores: list[float]) -> float | None:
     positive_count = sum(actual)
@@ -151,13 +144,12 @@ def binary_auc(actual: list[int], scores: list[float]) -> float | None:
         positive_count * negative_count
     )
 
+
 def average_precision(actual: list[int], scores: list[float]) -> float | None:
     positive_count = sum(actual)
     if positive_count == 0:
         return None
-    ranked = sorted(
-        zip(actual, scores, strict=True), key=lambda item: item[1], reverse=True
-    )
+    ranked = sorted(zip(actual, scores, strict=True), key=lambda item: item[1], reverse=True)
     seen_positive = 0
     precision_sum = 0.0
     for rank, (value, _score) in enumerate(ranked, start=1):
@@ -177,8 +169,7 @@ def transition_risk_predictions(
         "overall_prior_rate": prior_rate,
         "stable_one_percent_rule": (
             0.0
-            if int(state.get("one_percent_streak_count") or 0)
-            >= REGIME_GRACE_STREAK_THRESHOLD
+            if int(state.get("one_percent_streak_count") or 0) >= REGIME_GRACE_STREAK_THRESHOLD
             else prior_rate
         ),
     }
@@ -189,8 +180,7 @@ def transition_risk_predictions(
         },
         "stable_one_percent_rule": {
             "source": "long_one_percent_streak"
-            if int(state.get("one_percent_streak_count") or 0)
-            >= REGIME_GRACE_STREAK_THRESHOLD
+            if int(state.get("one_percent_streak_count") or 0) >= REGIME_GRACE_STREAK_THRESHOLD
             else "fallback_prior_rate",
             "support": len(previous_state_rows),
         },
@@ -207,9 +197,7 @@ def transition_risk_predictions(
     return risks, details
 
 
-def transition_risk_summary(
-    rows: list[dict[str, Any]], scopes: dict[str, int]
-) -> dict[str, Any]:
+def transition_risk_summary(rows: list[dict[str, Any]], scopes: dict[str, int]) -> dict[str, Any]:
     target_definitions = {
         "non_one_percent_delta": (
             "Next visible positive delta is not exactly 1%, across all scoped spans."
@@ -241,9 +229,7 @@ def transition_risk_summary(
     }
 
 
-def transition_risk_scope(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> dict[str, Any]:
+def transition_risk_scope(rows: list[dict[str, Any]], *, start_index: int) -> dict[str, Any]:
     scope_rows = [row for row in rows if int(row["index"]) >= start_index]
     long_run_rows = [
         row
@@ -253,7 +239,5 @@ def transition_risk_scope(
     ]
     return {
         "non_one_percent_delta": transition_target_metrics(scope_rows),
-        "break_after_long_one_percent_run": transition_target_metrics(
-            long_run_rows
-        ),
+        "break_after_long_one_percent_run": transition_target_metrics(long_run_rows),
     }

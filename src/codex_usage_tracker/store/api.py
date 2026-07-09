@@ -117,6 +117,8 @@ DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 SQLITE_VARIABLE_BATCH_SIZE = 500
 RefreshProgressCallback = Callable[[dict[str, object]], None]
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
@@ -275,8 +277,8 @@ def query_pattern_scan(
             thread=thread,
             include_archived=include_archived,
             min_occurrences=min_occurrences,
-        limit=limit,
-    )
+            limit=limit,
+        )
 
 
 def query_repeated_file_rediscovery(
@@ -329,8 +331,8 @@ def query_shell_churn(
             include_archived=include_archived,
             min_occurrences=min_occurrences,
             limit=limit,
-        sample_limit=sample_limit,
-    )
+            sample_limit=sample_limit,
+        )
 
 
 def query_large_low_output_calls(
@@ -562,9 +564,7 @@ def record_source_file_metadata(
     with connect(db_path) as conn:
         init_db(conn)
         upsert_source_file_metadata(conn, parsed_files=parsed)
-        record_ids = [
-            event.record_id for _path, events, *_rest in parsed for event in events
-        ]
+        record_ids = [event.record_id for _path, events, *_rest in parsed for event in events]
         if record_ids:
             sync_source_records(conn, record_ids=record_ids)
 
@@ -720,9 +720,7 @@ def _usage_event_record_ids(rows: list[dict[str, object]]) -> list[str]:
 def _usage_event_upsert_sql() -> str:
     placeholders = ", ".join("?" for _column in EVENT_COLUMNS)
     update_clause = ", ".join(
-        f"{column}=excluded.{column}"
-        for column in EVENT_COLUMNS
-        if column != "record_id"
+        f"{column}=excluded.{column}" for column in EVENT_COLUMNS if column != "record_id"
     )
     return (
         f"INSERT INTO usage_events ({', '.join(EVENT_COLUMNS)}) "
@@ -812,8 +810,7 @@ def _refresh_usage_event_links_for_threads(
     return _refresh_usage_event_links_scoped(
         conn,
         where_clause=(
-            "WHERE coalesce(nullif(thread_key, ''), 'session:' || session_id) "
-            f"IN ({placeholders})"
+            f"WHERE coalesce(nullif(thread_key, ''), 'session:' || session_id) IN ({placeholders})"
         ),
         params=thread_keys,
     )

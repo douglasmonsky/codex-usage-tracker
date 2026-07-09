@@ -63,11 +63,21 @@ def test_weekly_projection_uses_high_water_usage_deltas(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     events = [
-        _event("base", "thread:Alpha", "2026-06-01T00:00:00Z", 100, 0.0, secondary_used_percent=0.0),
-        _event("up-1", "thread:Alpha", "2026-06-01T00:01:00Z", 220, 1.0, secondary_used_percent=1.0),
-        _event("down", "thread:Alpha", "2026-06-01T00:02:00Z", 340, 0.0, secondary_used_percent=0.0),
-        _event("repeat", "thread:Alpha", "2026-06-01T00:03:00Z", 460, 1.0, secondary_used_percent=1.0),
-        _event("up-2", "thread:Alpha", "2026-06-01T00:04:00Z", 580, 2.0, secondary_used_percent=2.0),
+        _event(
+            "base", "thread:Alpha", "2026-06-01T00:00:00Z", 100, 0.0, secondary_used_percent=0.0
+        ),
+        _event(
+            "up-1", "thread:Alpha", "2026-06-01T00:01:00Z", 220, 1.0, secondary_used_percent=1.0
+        ),
+        _event(
+            "down", "thread:Alpha", "2026-06-01T00:02:00Z", 340, 0.0, secondary_used_percent=0.0
+        ),
+        _event(
+            "repeat", "thread:Alpha", "2026-06-01T00:03:00Z", 460, 1.0, secondary_used_percent=1.0
+        ),
+        _event(
+            "up-2", "thread:Alpha", "2026-06-01T00:04:00Z", 580, 2.0, secondary_used_percent=2.0
+        ),
     ]
     upsert_usage_events(events, db_path=db_path)
 
@@ -96,7 +106,9 @@ def test_weekly_time_series_ignores_stale_reset_window_snapshots(tmp_path: Path)
             50.0,
             secondary_used_percent=90.0,
         ),
-        _event("base", "thread:Alpha", "2026-06-01T00:00:00Z", 220, 0.0, secondary_used_percent=0.0),
+        _event(
+            "base", "thread:Alpha", "2026-06-01T00:00:00Z", 220, 0.0, secondary_used_percent=0.0
+        ),
         _event("up", "thread:Alpha", "2026-06-01T00:01:00Z", 340, 1.0, secondary_used_percent=1.0),
     ]
     upsert_usage_events(events, db_path=db_path)

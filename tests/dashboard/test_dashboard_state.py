@@ -13,7 +13,14 @@ def test_dashboard_url_state_round_trips() -> None:
     if node is None:
         pytest.skip("node is required for dashboard_state.js round-trip test")
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "dashboard_state.js"
+    script_path = (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_state.js"
+    )
     script = f"""
 const fs = require('fs');
 const vm = require('vm');

@@ -41,5 +41,7 @@ def has_valid_api_token(
     api_token: str,
 ) -> bool:
     """Validate API token from header first, then query string fallback."""
-    provided = headers.get("X-Codex-Usage-Token") or first_query_value(params.get("api_token")) or ""
+    provided = (
+        headers.get("X-Codex-Usage-Token") or first_query_value(params.get("api_token")) or ""
+    )
     return hmac.compare_digest(str(provided), api_token)

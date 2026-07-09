@@ -68,6 +68,5 @@ def test_diagnostic_snapshot_report_renders_unavailable_snapshot() -> None:
     ).render()
 
     assert rendered == (
-        "No diagnostic tool-output snapshot. "
-        "Run diagnostics tool-output --refresh first."
+        "No diagnostic tool-output snapshot. Run diagnostics tool-output --refresh first."
     )

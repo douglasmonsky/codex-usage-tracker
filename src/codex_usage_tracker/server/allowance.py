@@ -188,9 +188,7 @@ def allowance_export_payload(
     return report.payload
 
 
-def _include_archived(
-    params: dict[str, list[str]], include_archived_default: bool
-) -> bool:
+def _include_archived(params: dict[str, list[str]], include_archived_default: bool) -> bool:
     return parse_bool_query_value(
         first_query_value(params.get("include_archived")),
         include_archived_default,

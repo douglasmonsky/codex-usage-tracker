@@ -73,7 +73,6 @@ def test_json_contract_validation_reports_schema_and_type_errors() -> None:
     assert "codex-usage-tracker-query-v1.row_count must be int, got bool" in errors
     assert "codex-usage-tracker-query-v1.filters.since is required" in errors
 
-
     nested_type_payload = {
         **payload,
         "row_count": 0,

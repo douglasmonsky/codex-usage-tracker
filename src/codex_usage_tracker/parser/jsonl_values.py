@@ -15,6 +15,7 @@ SESSION_ID_RE = re.compile(
     r"rollout-[^-]+-[0-9T:-]+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
 )
 
+
 def build_usage_event(
     path: Path,
     line_number: int,
@@ -33,9 +34,7 @@ def build_usage_event(
     input_tokens = required_usage_int(last_usage, "input_tokens", stats=stats)
     cached_input_tokens = required_usage_int(last_usage, "cached_input_tokens", stats=stats)
     output_tokens = required_usage_int(last_usage, "output_tokens", stats=stats)
-    reasoning_output_tokens = required_usage_int(
-        last_usage, "reasoning_output_tokens", stats=stats
-    )
+    reasoning_output_tokens = required_usage_int(last_usage, "reasoning_output_tokens", stats=stats)
     total_tokens = required_usage_int(last_usage, "total_tokens", stats=stats)
     cumulative_total_tokens = required_usage_int(
         total_usage,

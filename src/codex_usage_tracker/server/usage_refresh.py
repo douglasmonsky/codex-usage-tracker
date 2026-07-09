@@ -325,7 +325,9 @@ def usage_payload(
         include_archived_default,
     )
     language = normalize_language(first_query_value(params.get("lang")) or language_default)
-    diagnostics_enabled = parse_bool_query_value(first_query_value(params.get("diagnostics")), False)
+    diagnostics_enabled = parse_bool_query_value(
+        first_query_value(params.get("diagnostics")), False
+    )
     shell_only = parse_bool_query_value(first_query_value(params.get("shell")), False)
     refresh_result = None
     refresh_ms: float | None = None

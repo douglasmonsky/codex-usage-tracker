@@ -175,9 +175,7 @@ def _model_family_rows_for_validation(
             continue
         mae = holdout_metric(matched_model, "mae")
         r2 = holdout_metric(matched_model, "r2")
-        rows.append(
-            _model_family_row(family, matched_model, mae, r2, previous_mae, previous_r2)
-        )
+        rows.append(_model_family_row(family, matched_model, mae, r2, previous_mae, previous_r2))
         previous_mae = mae
         previous_r2 = r2
     return rows
@@ -207,9 +205,7 @@ def _model_metric_delta(previous: float | None, current: float | None) -> float 
     return rounded(current - previous)
 
 
-def _model_metric_improvement(
-    previous: float | None, current: float | None
-) -> float | None:
+def _model_metric_improvement(previous: float | None, current: float | None) -> float | None:
     if previous is None or current is None:
         return None
     return rounded(previous - current)
@@ -236,9 +232,11 @@ def holdout_metric(model: dict[str, Any], metric: str) -> float | None:
 def best_holdout_model(models: list[dict[str, Any]]) -> dict[str, Any] | None:
     return min(
         models,
-        key=lambda result: number(result.get("holdout", {}).get("mae"))
-        if result.get("holdout", {}).get("mae") is not None
-        else math.inf,
+        key=lambda result: (
+            number(result.get("holdout", {}).get("mae"))
+            if result.get("holdout", {}).get("mae") is not None
+            else math.inf
+        ),
         default=None,
     )
 
@@ -249,9 +247,7 @@ def span_correlation_row(span: UsageDeltaSpan) -> dict[str, float]:
         "row_count": float(span.row_count),
         "standard_usage_credits": span.standard_usage_credits,
         "call_duration_seconds": span.timing_totals.get("call_duration_seconds", 0.0),
-        "previous_call_delta_seconds": span.timing_totals.get(
-            "previous_call_delta_seconds", 0.0
-        ),
+        "previous_call_delta_seconds": span.timing_totals.get("previous_call_delta_seconds", 0.0),
         "span_wall_time_seconds": span_wall_time_seconds(span),
         "baseline_used_percent": span.baseline_used_percent,
     }
@@ -276,12 +272,8 @@ def correlation_report(
     correlations = [
         {
             "feature": feature_name,
-            "pearson": rounded(
-                pearson([row[feature_name] for row in rows], target_values)
-            ),
-            "spearman": rounded(
-                spearman([row[feature_name] for row in rows], target_values)
-            ),
+            "pearson": rounded(pearson([row[feature_name] for row in rows], target_values)),
+            "spearman": rounded(spearman([row[feature_name] for row in rows], target_values)),
         }
         for feature_name in feature_names
         if feature_name != target
@@ -328,9 +320,7 @@ def delta_distribution(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
             "count": count,
             "share": rounded(count / len(values)),
         }
-        for value, count in sorted(
-            counts.items(), key=lambda item: (-item[1], item[0])
-        )[:8]
+        for value, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:8]
     ]
     return {
         "spans": len(values),

@@ -43,16 +43,10 @@ def source_logs_requiring_parse(
     paths = list(logs)
     if not paths:
         return []
-    return [
-        plan
-        for plan in (_source_parse_plan(conn, path) for path in paths)
-        if plan is not None
-    ]
+    return [plan for plan in (_source_parse_plan(conn, path) for path in paths) if plan is not None]
 
 
-def _source_parse_plan(
-    conn: sqlite3.Connection, path: Path
-) -> SourceParsePlan | None:
+def _source_parse_plan(conn: sqlite3.Connection, path: Path) -> SourceParsePlan | None:
     metadata = _source_file_metadata(path)
     if metadata is None:
         return None
@@ -93,9 +87,7 @@ def _source_parse_plan_from_row(
     return SourceParsePlan(path=path)
 
 
-def _requires_full_source_parse(
-    row: sqlite3.Row, previous_state: ParserState | None
-) -> bool:
+def _requires_full_source_parse(row: sqlite3.Row, previous_state: ParserState | None) -> bool:
     previous_adapter = str(row["parser_adapter"] or "")
     return previous_adapter != PARSER_ADAPTER_VERSION or previous_state is None
 
@@ -107,9 +99,7 @@ def _source_metadata_matches(row: sqlite3.Row, metadata: dict[str, int]) -> bool
     )
 
 
-def _can_incrementally_parse_source(
-    metadata: dict[str, int], row: sqlite3.Row
-) -> bool:
+def _can_incrementally_parse_source(metadata: dict[str, int], row: sqlite3.Row) -> bool:
     previous_size = int(row["size_bytes"])
     previous_byte = int(row["parsed_until_byte"])
     return metadata["size_bytes"] > previous_size and 0 < previous_byte <= previous_size
@@ -204,9 +194,7 @@ def _source_file_metadata_row(
         "parsed_until_line": final_line_number or _count_lines(path),
         "parsed_until_byte": int(metadata["size_bytes"]),
         "latest_record_id": _latest_source_record_id(latest_event, parser_state),
-        "latest_event_timestamp": _latest_source_event_timestamp(
-            latest_event, parser_state
-        ),
+        "latest_event_timestamp": _latest_source_event_timestamp(latest_event, parser_state),
         "parser_adapter": PARSER_ADAPTER_VERSION,
         "parser_diagnostics_json": json.dumps(
             compact_parser_diagnostics(diagnostics),
@@ -226,11 +214,7 @@ def _latest_source_record_id(
 def _latest_source_event_timestamp(
     latest_event: UsageEvent | None, parser_state: ParserState
 ) -> str | None:
-    return (
-        latest_event.event_timestamp
-        if latest_event
-        else parser_state.latest_event_timestamp
-    )
+    return latest_event.event_timestamp if latest_event else parser_state.latest_event_timestamp
 
 
 def _latest_source_usage_event(events: list[UsageEvent]) -> UsageEvent | None:

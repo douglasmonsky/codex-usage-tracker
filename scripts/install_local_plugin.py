@@ -26,7 +26,9 @@ def main() -> int:
     )
     parser.add_argument("--plugin-dir", type=Path, default=DEFAULT_PLUGIN_LINK)
     parser.add_argument("--marketplace", type=Path, default=DEFAULT_MARKETPLACE_PATH)
-    parser.add_argument("--python", type=Path, default=Path(sys.executable), dest="python_executable")
+    parser.add_argument(
+        "--python", type=Path, default=Path(sys.executable), dest="python_executable"
+    )
     parser.add_argument(
         "--force",
         action="store_true",

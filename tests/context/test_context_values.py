@@ -18,13 +18,16 @@ def test_redact_json_value_recurses_through_lists_and_dicts() -> None:
 
 
 def test_content_text_extracts_nested_text_pieces() -> None:
-    assert context_values.content_text(
-        [
-            {"type": "input_text", "text": "first"},
-            {"type": "output_text", "content": "second"},
-            "third",
-        ]
-    ) == "first\nsecond\nthird"
+    assert (
+        context_values.content_text(
+            [
+                {"type": "input_text", "text": "first"},
+                {"type": "output_text", "content": "second"},
+                "third",
+            ]
+        )
+        == "first\nsecond\nthird"
+    )
 
 
 def test_numeric_helpers_reject_invalid_values() -> None:

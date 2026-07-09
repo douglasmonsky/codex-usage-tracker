@@ -49,9 +49,7 @@ def allowance_breakpoint_analysis(spans: list[UsageDeltaSpan]) -> dict[str, Any]
 
     global_sse = _allowance_capacity_sse(rows, 0, len(rows))
     segments = _allowance_capacity_segments(rows)
-    piecewise_sse = sum(
-        _allowance_capacity_sse(rows, start, end) for start, end in segments
-    )
+    piecewise_sse = sum(_allowance_capacity_sse(rows, start, end) for start, end in segments)
     return {
         "target": "standard_usage_credits_per_visible_percent",
         "target_description": (
@@ -125,9 +123,7 @@ def _allowance_breakpoint_rows(spans: list[UsageDeltaSpan]) -> list[dict[str, An
 
 
 def _allowance_capacity_distribution(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    return _value_distribution(
-        [_number(row.get("credits_per_visible_percent")) for row in rows]
-    )
+    return _value_distribution([_number(row.get("credits_per_visible_percent")) for row in rows])
 
 
 def _allowance_capacity_segments(rows: list[dict[str, Any]]) -> list[tuple[int, int]]:
@@ -152,10 +148,7 @@ def _allowance_capacity_segments(rows: list[dict[str, Any]]) -> list[tuple[int, 
             candidates,
             key=lambda item: _number(item[1].get("sse_reduction")),
         )
-        if (
-            _number(split.get("sse_reduction_share"))
-            < ALLOWANCE_BREAKPOINT_MIN_REDUCTION_SHARE
-        ):
+        if _number(split.get("sse_reduction_share")) < ALLOWANCE_BREAKPOINT_MIN_REDUCTION_SHARE:
             break
         start, end = segments[segment_index]
         split_index = int(split["split_index"])
@@ -198,9 +191,7 @@ def _best_allowance_capacity_split(
 
 
 def _allowance_capacity_sse(rows: list[dict[str, Any]], start: int, end: int) -> float:
-    values = [
-        _number(row.get("credits_per_visible_percent")) for row in rows[start:end]
-    ]
+    values = [_number(row.get("credits_per_visible_percent")) for row in rows[start:end]]
     if not values:
         return 0.0
     mean_value = sum(values) / len(values)
@@ -225,9 +216,7 @@ def _allowance_split_record(
         "left_end_event_timestamp": left[-1]["end_event_timestamp"] if left else None,
         "right_start_event_timestamp": right[0]["start_event_timestamp"] if right else None,
         "right_end_event_timestamp": right[-1]["end_event_timestamp"] if right else None,
-        "left_mean_credits_per_percent": _rounded(
-            _mean_field(left, "credits_per_visible_percent")
-        ),
+        "left_mean_credits_per_percent": _rounded(_mean_field(left, "credits_per_visible_percent")),
         "right_mean_credits_per_percent": _rounded(
             _mean_field(right, "credits_per_visible_percent")
         ),
@@ -250,17 +239,11 @@ def _allowance_segment_record(
         "end_index": end - 1,
         "span_start_index": int(segment_rows[0]["span_index"]) if segment_rows else None,
         "span_end_index": int(segment_rows[-1]["span_index"]) if segment_rows else None,
-        "start_event_timestamp": segment_rows[0]["start_event_timestamp"]
-        if segment_rows
-        else None,
-        "end_event_timestamp": segment_rows[-1]["end_event_timestamp"]
-        if segment_rows
-        else None,
+        "start_event_timestamp": segment_rows[0]["start_event_timestamp"] if segment_rows else None,
+        "end_event_timestamp": segment_rows[-1]["end_event_timestamp"] if segment_rows else None,
         "n": len(segment_rows),
         "credits_per_visible_percent": _allowance_capacity_distribution(segment_rows),
-        "mean_delta_usage_percent": _rounded(
-            _mean_field(segment_rows, "delta_usage_percent")
-        ),
+        "mean_delta_usage_percent": _rounded(_mean_field(segment_rows, "delta_usage_percent")),
         "mean_standard_usage_credits": _rounded(
             _mean_field(segment_rows, "standard_usage_credits")
         ),

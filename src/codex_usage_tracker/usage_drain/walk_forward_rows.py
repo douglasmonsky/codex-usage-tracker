@@ -94,9 +94,7 @@ def walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str, 
         previous_state_rows.append(
             {
                 "actual": actual,
-                "state": _history_state_for_span(
-                    spans, index, metadata, previous_deltas
-                ),
+                "state": _history_state_for_span(spans, index, metadata, previous_deltas),
             }
         )
         previous_deltas.append(actual)
@@ -161,9 +159,7 @@ def _walk_forward_history_metrics(previous_deltas: list[float]) -> dict[str, Any
     recent3 = previous_deltas[-3:]
     recent10 = previous_deltas[-10:]
     rolling10_mode = _value_mode(recent10)
-    one_percent_streak = _tail_streak(
-        previous_deltas, predicate=_is_one_percent_delta
-    )
+    one_percent_streak = _tail_streak(previous_deltas, predicate=_is_one_percent_delta)
     same_delta_streak = _same_value_tail_streak(previous_deltas)
     return {
         "recent3": recent3,
@@ -172,9 +168,7 @@ def _walk_forward_history_metrics(previous_deltas: list[float]) -> dict[str, Any
         "rolling10_stddev": _value_stddev(recent10),
         "rolling10_low_share": _low_delta_share(recent10),
         "one_percent_streak": one_percent_streak,
-        "low_delta_streak": _tail_streak(
-            previous_deltas, predicate=lambda value: value <= 1.0
-        ),
+        "low_delta_streak": _tail_streak(previous_deltas, predicate=lambda value: value <= 1.0),
         "same_delta_streak": same_delta_streak,
         "hybrid_streak": _hybrid_streak_prediction(
             previous_deltas=previous_deltas,
@@ -230,12 +224,8 @@ def _walk_forward_state(
         "low_delta_streak_bucket": _streak_bucket(low_delta_streak),
         "same_delta_streak_count": same_delta_streak,
         "same_delta_streak_bucket": _streak_bucket(same_delta_streak),
-        "previous_span_wall_time_bucket": _previous_span_wall_time_bucket(
-            spans, index
-        ),
-        "previous_call_duration_bucket": _previous_call_duration_bucket(
-            spans, index
-        ),
+        "previous_span_wall_time_bucket": _previous_span_wall_time_bucket(spans, index),
+        "previous_call_duration_bucket": _previous_call_duration_bucket(spans, index),
     }
 
 
@@ -300,11 +290,9 @@ def _walk_forward_transition_predictions(
     history_state_prediction = _number(predictions.get("empirical_history_state_mode"))
     continuation_prediction = _number(predictions.get("one_percent_regime_grace"))
     history_state_risk = _number(transition_risks.get("history_state_risk"))
-    adaptive_threshold, adaptive_threshold_detail = (
-        _best_transition_delta_gate_threshold_from_sums(
-            transition_gate_absolute_error_sums,
-            training_count=training_count,
-        )
+    adaptive_threshold, adaptive_threshold_detail = _best_transition_delta_gate_threshold_from_sums(
+        transition_gate_absolute_error_sums,
+        training_count=training_count,
     )
     transition_predictions = _transition_delta_predictions(
         continuation_prediction=continuation_prediction,

@@ -285,9 +285,7 @@ def build_summary_report(
         rows = query_most_expensive_calls(db_path, limit=limit, since=since_filter)
         return SummaryReport(
             rows=apply_project_privacy_to_rows(
-                annotate_rows_with_recommendations(
-                    annotate_rows_with_efficiency(rows, pricing)
-                ),
+                annotate_rows_with_recommendations(annotate_rows_with_efficiency(rows, pricing)),
                 privacy_mode=privacy_mode,
             ),
             group_by=resolved_group_by,
@@ -431,11 +429,7 @@ def build_content_search_report(
     normalized_limit = None if limit is None or limit <= 0 else limit
     normalized_offset = max(0, offset)
     total_matched = int(result["total_matched_rows"])
-    has_more = (
-        False
-        if normalized_limit is None
-        else normalized_offset + len(rows) < total_matched
-    )
+    has_more = False if normalized_limit is None else normalized_offset + len(rows) < total_matched
     return ContentSearchReport(
         {
             "schema": "codex-usage-tracker-content-search-v1",
@@ -460,9 +454,7 @@ def build_content_search_report(
             "total_matched_rows": total_matched,
             "truncated": has_more,
             "has_more": has_more,
-            "next_offset": (
-                normalized_offset + len(rows) if has_more else None
-            ),
+            "next_offset": (normalized_offset + len(rows) if has_more else None),
             "rows": rows,
         }
     )
@@ -503,11 +495,7 @@ def build_thread_trace_report(
     normalized_limit = None if limit is None or limit <= 0 else limit
     normalized_offset = max(0, offset)
     total_matched = int(result["total_matched_calls"])
-    has_more = (
-        False
-        if normalized_limit is None
-        else normalized_offset + len(calls) < total_matched
-    )
+    has_more = False if normalized_limit is None else normalized_offset + len(calls) < total_matched
     return ThreadTraceReport(
         {
             "schema": "codex-usage-tracker-thread-trace-v1",
@@ -531,9 +519,7 @@ def build_thread_trace_report(
             "total_matched_calls": total_matched,
             "truncated": has_more,
             "has_more": has_more,
-            "next_offset": (
-                normalized_offset + len(calls) if has_more else None
-            ),
+            "next_offset": (normalized_offset + len(calls) if has_more else None),
             "calls": calls,
         }
     )
@@ -845,7 +831,11 @@ def build_agentic_investigation_report(
                         "Open the top calls, check whether a smaller fresh thread or preserved handoff "
                         "would avoid resending large context."
                     ),
-                    verify_with=["usage_large_low_output_calls", "usage_call_detail", "usage_thread_trace"],
+                    verify_with=[
+                        "usage_large_low_output_calls",
+                        "usage_call_detail",
+                        "usage_thread_trace",
+                    ],
                     privacy_notes="Aggregate token/activity counts only; no raw fragments or command output.",
                     missing_access=(
                         "The aggregate report cannot prove why output was low without a thread trace "
@@ -967,16 +957,26 @@ def build_agentic_investigation_report(
                 },
             ]
         )
-        caveats.append("Weekly allowance evidence is the primary signal; 5-hour counters are rolling-window context.")
+        caveats.append(
+            "Weekly allowance evidence is the primary signal; 5-hour counters are rolling-window context."
+        )
 
     if normalized_goal == "overview":
         recommended_next_tools.extend(
             [
-                {"tool": "usage_status", "reason": "Confirm index freshness and row counts.", "default_arguments": {}},
+                {
+                    "tool": "usage_status",
+                    "reason": "Confirm index freshness and row counts.",
+                    "default_arguments": {},
+                },
                 {
                     "tool": "usage_summary",
                     "reason": "Rank projects, threads, models, or dates depending on the user's next question.",
-                    "default_arguments": {"group_by": "thread", "limit": 10, "response_format": "json"},
+                    "default_arguments": {
+                        "group_by": "thread",
+                        "limit": 10,
+                        "response_format": "json",
+                    },
                 },
                 {
                     "tool": "usage_report_pack",
@@ -1234,8 +1234,8 @@ def build_action_brief_report(
                     "Keep a local strict evidence export for Reddit/issues rather than sharing screenshots or raw logs."
                 ),
                 how_to_verify=(
-                    "Run `usage_allowance_diagnostics(window_kind=\"weekly\", privacy_mode=\"strict\")` and "
-                    "`usage_allowance_export(window_kind=\"weekly\")`."
+                    'Run `usage_allowance_diagnostics(window_kind="weekly", privacy_mode="strict")` and '
+                    '`usage_allowance_export(window_kind="weekly")`.'
                 ),
                 recommended_next_tools=["usage_allowance_diagnostics", "usage_allowance_export"],
                 missing_access="OpenAI's internal ledger and other-surface account usage are not available locally.",
@@ -1257,7 +1257,11 @@ def build_action_brief_report(
                 recommended_existing_tool=None,
                 recommended_custom_solution="Create a narrower hypothesis and test it with direct aggregate tools.",
                 how_to_verify="Run `usage_suggest_investigations` or `usage_investigate` with a more specific goal.",
-                recommended_next_tools=["usage_suggest_investigations", "usage_investigate", "usage_calls"],
+                recommended_next_tools=[
+                    "usage_suggest_investigations",
+                    "usage_investigate",
+                    "usage_calls",
+                ],
                 missing_access="The brief needs stronger aggregate signals or a narrower user question.",
             )
         )
@@ -1544,7 +1548,9 @@ def _has_any_phrase(text: str, phrases: tuple[str, ...]) -> bool:
 
 
 def _has_any_word(text: str, words: tuple[str, ...]) -> bool:
-    return any(re.search(rf"(?<![a-z0-9_-]){re.escape(word)}(?![a-z0-9_-])", text) for word in words)
+    return any(
+        re.search(rf"(?<![a-z0-9_-]){re.escape(word)}(?![a-z0-9_-])", text) for word in words
+    )
 
 
 def _has_shell_hypothesis_signal(text: str) -> bool:
@@ -1700,7 +1706,9 @@ def _evaluate_token_waste_hypothesis(
                 "large_low_output_candidate_count": large_count,
             },
         ),
-        evidence=[_compact_agentic_evidence_row(row) for row in large.get("rows", [])[:evidence_limit]],
+        evidence=[
+            _compact_agentic_evidence_row(row) for row in large.get("rows", [])[:evidence_limit]
+        ],
         counter_evidence=(
             []
             if large_count
@@ -1708,7 +1716,9 @@ def _evaluate_token_waste_hypothesis(
         ),
         next_action="Inspect the largest low-output rows, then verify whether a shorter handoff or smaller context would have avoided them.",
         recommended_next_tools=[
-            _next_tool("usage_large_low_output_calls", "Inspect the highest-token low-output calls."),
+            _next_tool(
+                "usage_large_low_output_calls", "Inspect the highest-token low-output calls."
+            ),
             _next_tool("usage_recommendations", "Compare aggregate recommendation scoring."),
             _next_tool("usage_calls", "Open the underlying aggregate call rows."),
         ],
@@ -1754,7 +1764,9 @@ def _evaluate_cache_failure_hypothesis(
         i_will_accomplish_this_using="Look for large low-output calls with low cache ratios, high context-window use, or cache/context explanations.",
         i_am_missing_access_to="The exact task intent and raw turn context unless the user explicitly enables raw context inspection.",
         evidence_summary=_agentic_evidence_summary(signal_rows or rows),
-        evidence=[_compact_agentic_evidence_row(row) for row in (signal_rows or rows)[:evidence_limit]],
+        evidence=[
+            _compact_agentic_evidence_row(row) for row in (signal_rows or rows)[:evidence_limit]
+        ],
         counter_evidence=(
             []
             if signal_rows
@@ -1762,9 +1774,14 @@ def _evaluate_cache_failure_hypothesis(
         ),
         next_action="Verify the candidate rows in Call Investigator and compare nearby thread traces before changing workflow.",
         recommended_next_tools=[
-            _next_tool("usage_large_low_output_calls", "Check cache ratio and context-window percent."),
+            _next_tool(
+                "usage_large_low_output_calls", "Check cache ratio and context-window percent."
+            ),
             _next_tool("usage_call_detail", "Inspect one aggregate call in Call Investigator."),
-            _next_tool("usage_thread_trace", "Trace local indexed thread activity if deeper context is needed."),
+            _next_tool(
+                "usage_thread_trace",
+                "Trace local indexed thread activity if deeper context is needed.",
+            ),
         ],
     )
 
@@ -1804,11 +1821,15 @@ def _evaluate_repeated_file_hypothesis(
         i_am_missing_access_to="Whether each reread was necessary for task correctness without task-level intent.",
         evidence_summary=_agentic_evidence_summary(rows),
         evidence=[_compact_agentic_evidence_row(row) for row in rows[:evidence_limit]],
-        counter_evidence=[] if total else ["No repeated file rediscovery candidates crossed the threshold."],
+        counter_evidence=[]
+        if total
+        else ["No repeated file rediscovery candidates crossed the threshold."],
         next_action="Turn recurring lookups into a durable project note, helper command, or narrower read path.",
         recommended_next_tools=[
             _next_tool("usage_repeated_file_rediscovery", "Rank repeated safe file identities."),
-            _next_tool("usage_thread_trace", "Check whether the same thread repeats the rediscovery loop."),
+            _next_tool(
+                "usage_thread_trace", "Check whether the same thread repeats the rediscovery loop."
+            ),
         ],
     )
 
@@ -1840,11 +1861,15 @@ def _evaluate_shell_churn_hypothesis(
         context["shell_churn"] = report
     rows = report.get("rows", [])
     total = int(report["total_candidates"])
-    unknown_count = sum(1 for row in rows if str(row.get("command_root") or "").startswith("unknown"))
+    unknown_count = sum(
+        1 for row in rows if str(row.get("command_root") or "").startswith("unknown")
+    )
     status = "true" if total >= 3 else "partially_true" if total else "false"
     counter_evidence = []
     if unknown_count:
-        counter_evidence.append("Some shell rows still have cloudy command labels; normalization needs more hardening.")
+        counter_evidence.append(
+            "Some shell rows still have cloudy command labels; normalization needs more hardening."
+        )
     if not total:
         counter_evidence.append("No repeated shell churn candidates crossed the threshold.")
     return _hypothesis_result(
@@ -1918,12 +1943,16 @@ def _evaluate_effort_model_hypothesis(
             "top_models": _top_token_totals(model_totals),
         },
         evidence=[],
-        counter_evidence=[] if high_effort_ratio else ["No high-effort token share found in the selected scope."],
+        counter_evidence=[]
+        if high_effort_ratio
+        else ["No high-effort token share found in the selected scope."],
         next_action="Compare high-effort calls against task type, then use lower effort for routine edits and reserve higher effort for uncertain design work.",
         recommended_next_tools=[
             _next_tool("usage_summary", "Summarize usage by model or effort."),
             _next_tool("usage_calls", "Filter calls by effort and inspect outliers."),
-            _next_tool("usage_recommendations", "Compare effort choices with aggregate recommendations."),
+            _next_tool(
+                "usage_recommendations", "Compare effort choices with aggregate recommendations."
+            ),
         ],
     )
 
@@ -1977,8 +2006,12 @@ def _evaluate_allowance_hypothesis(
         ],
         next_action="Run full weekly allowance diagnostics and export strict evidence before making any public claim.",
         recommended_next_tools=[
-            _next_tool("usage_allowance_diagnostics", "Run evidence-graded weekly allowance diagnostics."),
-            _next_tool("usage_allowance_export", "Create a strict local evidence bundle for sharing."),
+            _next_tool(
+                "usage_allowance_diagnostics", "Run evidence-graded weekly allowance diagnostics."
+            ),
+            _next_tool(
+                "usage_allowance_export", "Create a strict local evidence bundle for sharing."
+            ),
         ],
     )
 
@@ -2060,7 +2093,9 @@ def _merge_evidence_summaries(base: dict[str, Any], extra: dict[str, Any]) -> di
     return {**base, **extra}
 
 
-def _next_tool(tool: str, reason: str, default_arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+def _next_tool(
+    tool: str, reason: str, default_arguments: dict[str, Any] | None = None
+) -> dict[str, Any]:
     return {
         "tool": tool,
         "reason": reason,
@@ -2163,7 +2198,11 @@ def _investigation_suggestions(goal: str | None) -> list[dict[str, Any]]:
             "why_it_matters": "Repeated probes, command failures, and rereads suggest automation or documentation opportunities.",
             "primary_tool": "usage_investigate",
             "default_arguments": {"goal": "workflow_churn", "evidence_limit": 5},
-            "follow_up_tools": ["usage_shell_churn", "usage_repeated_file_rediscovery", "usage_thread_trace"],
+            "follow_up_tools": [
+                "usage_shell_churn",
+                "usage_repeated_file_rediscovery",
+                "usage_thread_trace",
+            ],
             "privacy_notes": "Uses safe command labels and path identities, not raw command output or full paths.",
         },
         {
@@ -2172,14 +2211,25 @@ def _investigation_suggestions(goal: str | None) -> list[dict[str, Any]]:
             "why_it_matters": "Starts with index freshness, thread/model/project summaries, and existing recommendation cards.",
             "primary_tool": "usage_investigate",
             "default_arguments": {"goal": "overview", "evidence_limit": 5},
-            "follow_up_tools": ["usage_status", "usage_summary", "usage_report_pack", "usage_recommendations"],
+            "follow_up_tools": [
+                "usage_status",
+                "usage_summary",
+                "usage_report_pack",
+                "usage_recommendations",
+            ],
             "privacy_notes": "Aggregate dashboard/report-pack evidence.",
         },
     ]
     if goal is None:
         return suggestions
     related_goals = {
-        "overview": ["overview", "token_waste", "cache_failure", "workflow_churn", "allowance_change"],
+        "overview": [
+            "overview",
+            "token_waste",
+            "cache_failure",
+            "workflow_churn",
+            "allowance_change",
+        ],
         "token_waste": ["token_waste", "cache_failure", "workflow_churn", "overview"],
         "cache_failure": ["cache_failure", "token_waste", "overview"],
         "workflow_churn": ["workflow_churn", "token_waste", "cache_failure", "overview"],
@@ -2208,7 +2258,11 @@ def _agentic_finding(
     privacy_notes: str,
     missing_access: str,
 ) -> dict[str, Any]:
-    evidence_rows = evidence if detail_mode == "full" else [_compact_agentic_evidence_row(row) for row in evidence]
+    evidence_rows = (
+        evidence
+        if detail_mode == "full"
+        else [_compact_agentic_evidence_row(row) for row in evidence]
+    )
     return {
         "finding": finding,
         "evidence_count": len(evidence),
@@ -2276,14 +2330,26 @@ def _compact_agentic_evidence_row(row: dict[str, Any]) -> dict[str, Any]:
     if "nearby_activity" in row and isinstance(row["nearby_activity"], dict):
         compact["nearby_activity"] = {
             key: row["nearby_activity"].get(key)
-            for key in ("tool_call_count", "command_run_count", "failed_command_count", "file_event_count")
+            for key in (
+                "tool_call_count",
+                "command_run_count",
+                "failed_command_count",
+                "file_event_count",
+            )
             if row["nearby_activity"].get(key) is not None
         }
     if "trace_handles" in row and isinstance(row["trace_handles"], list):
         compact["trace_handles"] = [
             {
                 key: handle.get(key)
-                for key in ("thread_key", "thread", "session_id", "call_count", "total_tokens", "next_tool")
+                for key in (
+                    "thread_key",
+                    "thread",
+                    "session_id",
+                    "call_count",
+                    "total_tokens",
+                    "next_tool",
+                )
                 if isinstance(handle, dict) and handle.get(key) is not None
             }
             for handle in row["trace_handles"][:3]
@@ -2293,13 +2359,28 @@ def _compact_agentic_evidence_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _agentic_evidence_summary(evidence: list[dict[str, Any]]) -> dict[str, Any]:
-    token_values = [int(row["total_tokens"]) for row in evidence if isinstance(row.get("total_tokens"), int | float)]
+    token_values = [
+        int(row["total_tokens"])
+        for row in evidence
+        if isinstance(row.get("total_tokens"), int | float)
+    ]
     timestamps = [str(row["event_timestamp"]) for row in evidence if row.get("event_timestamp")]
-    threads = _ordered_unique(str(row.get("thread_name") or row.get("thread") or row.get("thread_key")) for row in evidence)
+    threads = _ordered_unique(
+        str(row.get("thread_name") or row.get("thread") or row.get("thread_key"))
+        for row in evidence
+    )
     models = _ordered_unique(str(row.get("model")) for row in evidence if row.get("model"))
     efforts = _ordered_unique(str(row.get("effort")) for row in evidence if row.get("effort"))
-    explanations = _ordered_unique(str(row.get("candidate_explanation")) for row in evidence if row.get("candidate_explanation"))
-    recommendations = _ordered_unique(str(row.get("recommendation") or row.get("recommended_action")) for row in evidence if row.get("recommendation") or row.get("recommended_action"))
+    explanations = _ordered_unique(
+        str(row.get("candidate_explanation"))
+        for row in evidence
+        if row.get("candidate_explanation")
+    )
+    recommendations = _ordered_unique(
+        str(row.get("recommendation") or row.get("recommended_action"))
+        for row in evidence
+        if row.get("recommendation") or row.get("recommended_action")
+    )
     summary: dict[str, Any] = {
         "row_count": len(evidence),
         "total_tokens": sum(token_values),
@@ -2313,9 +2394,19 @@ def _agentic_evidence_summary(evidence: list[dict[str, Any]]) -> dict[str, Any]:
     if timestamps:
         summary["first_event_timestamp"] = min(timestamps)
         summary["last_event_timestamp"] = max(timestamps)
-    occurrence_values = [int(row["occurrences"]) for row in evidence if isinstance(row.get("occurrences"), int | float)]
-    call_count_values = [int(row["call_count"]) for row in evidence if isinstance(row.get("call_count"), int | float)]
-    failure_values = [int(row["failure_count"]) for row in evidence if isinstance(row.get("failure_count"), int | float)]
+    occurrence_values = [
+        int(row["occurrences"])
+        for row in evidence
+        if isinstance(row.get("occurrences"), int | float)
+    ]
+    call_count_values = [
+        int(row["call_count"]) for row in evidence if isinstance(row.get("call_count"), int | float)
+    ]
+    failure_values = [
+        int(row["failure_count"])
+        for row in evidence
+        if isinstance(row.get("failure_count"), int | float)
+    ]
     if occurrence_values:
         summary["total_occurrences"] = sum(occurrence_values)
     if call_count_values:
@@ -2355,7 +2446,10 @@ def _overall_agentic_confidence(findings: list[dict[str, Any]]) -> str:
     }
     if not findings:
         return "insufficient_local_evidence"
-    return max((str(row.get("confidence") or "") for row in findings), key=lambda value: priorities.get(value, 0))
+    return max(
+        (str(row.get("confidence") or "") for row in findings),
+        key=lambda value: priorities.get(value, 0),
+    )
 
 
 def _goal_next_tools(goal: str) -> list[dict[str, Any]]:
@@ -2516,7 +2610,9 @@ def _investigation_branches(
     branches: list[dict[str, Any]] = []
     for scan_type, hypothesis, rationale in specs:
         evidence = [row for row in patterns if row.get("scan_type") == scan_type]
-        evidence.sort(key=lambda row: (-int(row.get("total_tokens") or 0), -int(row.get("occurrences") or 0)))
+        evidence.sort(
+            key=lambda row: (-int(row.get("total_tokens") or 0), -int(row.get("occurrences") or 0))
+        )
         selected = evidence[:evidence_limit]
         score = _branch_score(selected)
         branches.append(
@@ -2528,7 +2624,9 @@ def _investigation_branches(
                 "score": score,
                 "evidence_count": len(selected),
                 "evidence": selected,
-                "pruned_reason": None if selected else "No matching normalized local evidence at this threshold.",
+                "pruned_reason": None
+                if selected
+                else "No matching normalized local evidence at this threshold.",
             }
         )
     branches.sort(key=lambda branch: (-int(branch["score"]), str(branch["scan_type"])))
@@ -2918,11 +3016,11 @@ def build_recommendations_report(
                 "thread": thread,
                 "project": project,
                 "include_archived": include_archived,
-            "min_score": min_score,
-            "limit": normalized_limit,
-            "source_limit": source_limit,
-            "privacy_mode": privacy_mode,
-        },
+                "min_score": min_score,
+                "limit": normalized_limit,
+                "source_limit": source_limit,
+                "privacy_mode": privacy_mode,
+            },
             "row_count": len(private_rows),
             "total_matched_rows": len(scored_rows),
             "truncated": normalized_limit is not None and len(scored_rows) > normalized_limit,

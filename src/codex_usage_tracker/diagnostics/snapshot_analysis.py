@@ -62,7 +62,9 @@ def analyze_indexed_source_logs(
     meta["usage_rows_scanned"] = usage_rows_scanned
 
     for source_log in source_logs:
-        _scan_source_log(source_log, counters=counters, meta=meta, source_record_index=source_record_index)
+        _scan_source_log(
+            source_log, counters=counters, meta=meta, source_record_index=source_record_index
+        )
 
     return _analysis_payload(counters=counters, meta=meta)
 
@@ -231,7 +233,9 @@ def _source_log_line_may_have_diagnostic_payload(line: str) -> bool:
     return '"response_item"' in line or '"patch_apply_end"' in line
 
 
-def _record_id_for_order(source_log: Path, order: int, source_record_index: SourceRecordIndex) -> str | None:
+def _record_id_for_order(
+    source_log: Path, order: int, source_record_index: SourceRecordIndex
+) -> str | None:
     rows = source_record_index.get(str(source_log))
     if not rows:
         return None
@@ -371,7 +375,9 @@ def _tool_output_payload(counters: dict[str, Any]) -> dict[str, Any]:
             "function_calls": int(sum(counters["function_calls"].values())),
             "function_outputs": int(sum(counters["function_outputs"].values())),
             "outputs_with_original_token_count": int(sum(counters["output_with_count"].values())),
-            "outputs_missing_original_token_count": int(sum(counters["output_missing_count"].values())),
+            "outputs_missing_original_token_count": int(
+                sum(counters["output_missing_count"].values())
+            ),
             "original_token_sum": int(sum(counters["output_token_sum"].values())),
         },
         "functions": function_rows(
@@ -431,7 +437,9 @@ def _git_interactions_payload(counters: dict[str, Any]) -> dict[str, Any]:
             git_interaction_token_sum=counters["git_interaction_token_sum"],
         ),
         "categories": simple_rows(counters["git_interactions_by_category"], key_name="category"),
-        "mutability": simple_rows(counters["git_interactions_by_mutability"], key_name="mutability"),
+        "mutability": simple_rows(
+            counters["git_interactions_by_mutability"], key_name="mutability"
+        ),
     }
 
 
@@ -441,8 +449,12 @@ def _file_reads_payload(counters: dict[str, Any]) -> dict[str, Any]:
             "read_commands": counters["read_command_count"],
             "read_events": len(counters["read_events"]),
             "unique_paths_read": len(counters["read_path_refs"]),
-            "read_events_with_output_count": int(sum(counters["read_events_with_count_by_reader"].values())),
-            "read_events_missing_output_count": int(sum(counters["read_events_missing_count_by_reader"].values())),
+            "read_events_with_output_count": int(
+                sum(counters["read_events_with_count_by_reader"].values())
+            ),
+            "read_events_missing_output_count": int(
+                sum(counters["read_events_missing_count_by_reader"].values())
+            ),
             "allocated_output_token_sum": int(sum(counters["read_tokens_by_reader"].values())),
         },
         "by_reader": read_reader_rows(
@@ -495,7 +507,9 @@ def _read_productivity_payload(counters: dict[str, Any]) -> dict[str, Any]:
         "summary": {
             "read_events": len(counters["read_events"]),
             "read_events_modified_later": read_modified_count,
-            "read_events_modified_later_pct": ratio(read_modified_count, len(counters["read_events"])),
+            "read_events_modified_later_pct": ratio(
+                read_modified_count, len(counters["read_events"])
+            ),
             "unique_paths_read": len(counters["read_path_refs"]),
             "unique_paths_modified_later": len(counters["read_modified_by_path"]),
             "unique_path_modified_later_pct": ratio(

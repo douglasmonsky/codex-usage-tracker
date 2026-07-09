@@ -76,7 +76,14 @@ def main() -> int:
         return _main()
     except BrokenPipeError:
         return 1
-    except (FileExistsError, FileNotFoundError, PermissionError, RuntimeError, ValueError, OSError) as exc:
+    except (
+        FileExistsError,
+        FileNotFoundError,
+        PermissionError,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
         print(f"Error: [{error_code(exc)}] {exc}", file=sys.stderr)
         return 1
 

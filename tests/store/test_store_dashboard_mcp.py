@@ -129,7 +129,9 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
-    log_path = next(path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name)
+    log_path = next(
+        path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name
+    )
     corrupt = _token_event(600, 300)
     corrupt["payload"]["info"]["last_token_usage"]["total_tokens"] = "bad-total"  # type: ignore[index]
     valid = _token_event(650, 50)
@@ -512,9 +514,7 @@ def test_refresh_persists_diagnostic_facts_without_raw_content(tmp_path: Path) -
                         {
                             "type": "message",
                             "role": "assistant",
-                            "content": [
-                                {"type": "output_text", "text": "SECRET COMPACTION TEXT"}
-                            ],
+                            "content": [{"type": "output_text", "text": "SECRET COMPACTION TEXT"}],
                         }
                     ],
                 },
@@ -613,9 +613,7 @@ def test_refresh_persists_richer_diagnostic_detectors_without_command_text(
     assert tools_payload["filters"]["fact_group"] == "tools"
     assert by_key[("command_family", "pytest")]["associated_total_tokens"] == 120
     assert by_key[("function", "functions.exec_command")]["associated_total_tokens"] == 120
-    assert by_key[("mcp_tool", "mcp__calendar__search_events")][
-        "associated_total_tokens"
-    ] == 120
+    assert by_key[("mcp_tool", "mcp__calendar__search_events")]["associated_total_tokens"] == 120
     assert by_key[("mcp_server", "google-calendar")]["associated_total_tokens"] == 120
     assert by_key[("skill", "brooks-test")]["associated_total_tokens"] == 120
     serialized = json.dumps(facts, sort_keys=True)
@@ -741,12 +739,10 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     with connect(db_path) as conn:
         init_db(conn)
         columns = {
-            row["name"]
-            for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+            row["name"] for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
         }
         indexes = {
-            row["name"]
-            for row in conn.execute("PRAGMA index_list(usage_events)").fetchall()
+            row["name"] for row in conn.execute("PRAGMA index_list(usage_events)").fetchall()
         }
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
         migrations = [
@@ -757,15 +753,11 @@ def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
         ]
         allowance_columns = {
             row["name"]
-            for row in conn.execute(
-                "PRAGMA table_info(allowance_observations)"
-            ).fetchall()
+            for row in conn.execute("PRAGMA table_info(allowance_observations)").fetchall()
         }
         allowance_indexes = {
             row["name"]
-            for row in conn.execute(
-                "PRAGMA index_list(allowance_observations)"
-            ).fetchall()
+            for row in conn.execute("PRAGMA index_list(allowance_observations)").fetchall()
         }
 
     assert {
@@ -1251,6 +1243,7 @@ def test_thread_summaries_keep_active_and_all_history_scopes_separate(
     assert sum(row["call_count"] for row in all_summaries) == 5
     assert sum(row["archived_call_count"] for row in active_summaries) == 0
     assert sum(row["archived_call_count"] for row in all_summaries) == 1
+
 
 def test_dashboard_query_limit_zero_loads_all_rows(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)

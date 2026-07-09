@@ -135,7 +135,9 @@ def test_install_plugin_force_replaces_existing_symlink(tmp_path: Path) -> None:
     assert (plugin_dir / ".codex-plugin" / "plugin.json").exists()
 
 
-def test_uninstall_plugin_removes_only_tracker_wrapper_and_marketplace_entry(tmp_path: Path) -> None:
+def test_uninstall_plugin_removes_only_tracker_wrapper_and_marketplace_entry(
+    tmp_path: Path,
+) -> None:
     plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
     marketplace_path = tmp_path / "marketplace.json"
     install_plugin(
@@ -215,7 +217,10 @@ def test_doctor_detects_mcp_python_that_cannot_import_server(tmp_path: Path) -> 
     assert report["status"] == "fail"
     assert checks["MCP runtime"]["status"] == "fail"
     assert "cannot import the server" in checks["MCP runtime"]["detail"]
-    assert any("install-plugin --python .venv/bin/python --force" in suggestion for suggestion in report["repair_suggestions"])
+    assert any(
+        "install-plugin --python .venv/bin/python --force" in suggestion
+        for suggestion in report["repair_suggestions"]
+    )
 
 
 def _fake_python(tmp_path: Path, *, exit_code: int = 0) -> Path:

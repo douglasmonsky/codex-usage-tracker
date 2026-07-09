@@ -21,13 +21,21 @@ def test_context_scan_counts_parse_errors_without_losing_selected_turn(tmp_path:
     )
     _write_jsonl(
         codex_home / "session_index.jsonl",
-        [{"id": session_id, "thread_name": "Parse error context", "updated_at": "2026-06-11T22:55:00Z"}],
+        [
+            {
+                "id": session_id,
+                "thread_name": "Parse error context",
+                "updated_at": "2026-06-11T22:55:00Z",
+            }
+        ],
     )
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(json.dumps(_entry("session_meta", {"id": session_id})) + "\n")
         handle.write("{not valid json\n")
-        handle.write(json.dumps(_entry("turn_context", {"turn_id": "parse-turn", "model": "gpt-5.5"})) + "\n")
+        handle.write(
+            json.dumps(_entry("turn_context", {"turn_id": "parse-turn", "model": "gpt-5.5"})) + "\n"
+        )
         handle.write(
             json.dumps(
                 _entry(

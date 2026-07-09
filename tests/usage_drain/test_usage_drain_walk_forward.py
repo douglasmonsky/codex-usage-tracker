@@ -55,7 +55,5 @@ def test_walk_forward_summary_preserves_scope_metric_contract() -> None:
     assert all_scope["actual"]["n"] == 3
     assert "previous_delta" in all_scope["models"]
     assert "previous_delta" in all_scope["error_diagnostics"]
-    assert "transition_gated_history_state_mode" in all_scope[
-        "transition_gate_diagnostics"
-    ]
+    assert "transition_gated_history_state_mode" in all_scope["transition_gate_diagnostics"]
     assert "empirical_history_state_mode" in all_scope["state_bucket_diagnostics"]

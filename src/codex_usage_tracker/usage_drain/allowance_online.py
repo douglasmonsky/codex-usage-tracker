@@ -222,12 +222,8 @@ def _allowance_online_capacity_error_diagnostics(
         predicted,
         segment_start_indexes=segment_start_indexes,
     )
-    breakpoint_errors = _allowance_online_abs_errors(
-        errors, is_known_breakpoint=True
-    )
-    non_breakpoint_errors = _allowance_online_abs_errors(
-        errors, is_known_breakpoint=False
-    )
+    breakpoint_errors = _allowance_online_abs_errors(errors, is_known_breakpoint=True)
+    non_breakpoint_errors = _allowance_online_abs_errors(errors, is_known_breakpoint=False)
     return {
         "known_breakpoint_row_count": len(breakpoint_errors),
         "non_breakpoint_row_count": len(non_breakpoint_errors),
@@ -267,11 +263,7 @@ def _allowance_online_error_rows(
 def _allowance_online_abs_errors(
     errors: list[dict[str, Any]], *, is_known_breakpoint: bool
 ) -> list[float]:
-    return [
-        row["abs_error"]
-        for row in errors
-        if row["is_known_breakpoint"] is is_known_breakpoint
-    ]
+    return [row["abs_error"] for row in errors if row["is_known_breakpoint"] is is_known_breakpoint]
 
 
 def _known_breakpoint_abs_error_share(
@@ -306,12 +298,8 @@ def _allowance_online_error_record(
         "actual_delta_percent": _rounded(_number(item["actual"])),
         "predicted_delta_percent": _rounded(_number(item["predicted"])),
         "abs_error": _rounded(_number(item["abs_error"])),
-        "credits_per_visible_percent": _rounded(
-            _number(row.get("credits_per_visible_percent"))
-        ),
-        "standard_usage_credits": _rounded(
-            _number(row.get("standard_usage_credits"))
-        ),
+        "credits_per_visible_percent": _rounded(_number(row.get("credits_per_visible_percent"))),
+        "standard_usage_credits": _rounded(_number(row.get("standard_usage_credits"))),
         "start_event_timestamp": row.get("start_event_timestamp"),
         "end_event_timestamp": row.get("end_event_timestamp"),
     }

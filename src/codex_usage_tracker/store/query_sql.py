@@ -145,11 +145,7 @@ def _extend_thread_filter(
     if not thread:
         return
     clauses.append(
-        "("
-        f"{prefix}thread_name = ? OR "
-        f"{prefix}parent_thread_name = ? OR "
-        f"{prefix}session_id = ?"
-        ")"
+        f"({prefix}thread_name = ? OR {prefix}parent_thread_name = ? OR {prefix}session_id = ?)"
     )
     params.extend([thread, thread, thread])
 
@@ -179,9 +175,7 @@ def _extend_archive_filter(
     archived_path_clause = " OR ".join(
         f"{prefix}source_file LIKE ?" for _pattern in _ARCHIVED_SOURCE_PATTERNS
     )
-    clauses.append(
-        f"(coalesce({prefix}is_archived, 0) = 0 AND NOT ({archived_path_clause}))"
-    )
+    clauses.append(f"(coalesce({prefix}is_archived, 0) = 0 AND NOT ({archived_path_clause}))")
     params.extend(_ARCHIVED_SOURCE_PATTERNS)
 
 

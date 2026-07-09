@@ -86,7 +86,9 @@ def test_context_loads_raw_log_only_on_demand(tmp_path: Path) -> None:
     assert any(entry["label"] == "message / user" for entry in context["entries"])
     token_entry = next(entry for entry in context["entries"] if entry["label"] == "Token count")
     assert token_entry["token_usage"]["last_token_usage"]["uncached_input_tokens"] >= 0
-    compaction_entries = [entry for entry in context["entries"] if entry["label"] == "Compaction detected"]
+    compaction_entries = [
+        entry for entry in context["entries"] if entry["label"] == "Compaction detected"
+    ]
     assert len(compaction_entries) == 2
     compaction_entry = next(
         entry for entry in compaction_entries if entry["compaction"]["replacement_entry_count"] == 2
@@ -339,7 +341,9 @@ def test_context_carries_incoming_compaction_history_into_selected_turn(tmp_path
         db_path=db_path,
         include_compaction_history=True,
     )
-    compaction_entries = [entry for entry in context["entries"] if entry["label"] == "Compaction detected"]
+    compaction_entries = [
+        entry for entry in context["entries"] if entry["label"] == "Compaction detected"
+    ]
 
     assert [entry["line_number"] for entry in compaction_entries] == [4, 6]
     assert compaction_entries[0]["compaction"]["replacement_entry_count"] == 1

@@ -132,8 +132,7 @@ def test_upsert_source_file_metadata_uses_parser_state_when_no_events(
     upsert_source_file_metadata(conn, parsed_files=[(source_path, [], {}, state)])
 
     row = conn.execute(
-        "SELECT latest_record_id, latest_event_timestamp FROM source_files "
-        "WHERE source_file = ?",
+        "SELECT latest_record_id, latest_event_timestamp FROM source_files WHERE source_file = ?",
         (str(source_path),),
     ).fetchone()
     assert dict(row) == {

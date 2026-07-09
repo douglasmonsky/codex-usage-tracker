@@ -13,9 +13,7 @@ def test_allowance_intelligence_cli_commands_parse() -> None:
     diagnostics = parser.parse_args(
         ["allowance-diagnostics", "--window-kind", "weekly", "--limit", "0", "--json"]
     )
-    export = parser.parse_args(
-        ["allowance-export", "--output", "/tmp/allowance-evidence.json"]
-    )
+    export = parser.parse_args(["allowance-export", "--output", "/tmp/allowance-evidence.json"])
 
     assert diagnostics.command == "allowance-diagnostics"
     assert diagnostics.window_kind == "weekly"
@@ -25,9 +23,7 @@ def test_allowance_intelligence_cli_commands_parse() -> None:
     assert export.output == Path("/tmp/allowance-evidence.json")
 
 
-def test_usage_allowance_mcp_tools_return_contracts(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_usage_allowance_mcp_tools_return_contracts(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker.cli import mcp_server
 
     db_path = tmp_path / "usage.sqlite3"

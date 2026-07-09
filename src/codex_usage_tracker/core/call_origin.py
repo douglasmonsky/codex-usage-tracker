@@ -18,12 +18,7 @@ class CallOriginFlags:
 
     @property
     def has_signal(self) -> bool:
-        return (
-            self.user_message
-            or self.compaction
-            or self.tool_result
-            or self.codex_activity
-        )
+        return self.user_message or self.compaction or self.tool_result or self.codex_activity
 
 
 def event_flags_from_envelope(envelope: object) -> CallOriginFlags:
@@ -49,9 +44,7 @@ def _payload_mapping(envelope: Mapping[str, Any]) -> Mapping[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def _is_user_message_event(
-    entry_type: object, payload_type: object, role: object
-) -> bool:
+def _is_user_message_event(entry_type: object, payload_type: object, role: object) -> bool:
     return (
         entry_type == "event_msg"
         and payload_type == "user_message"
@@ -73,9 +66,7 @@ def _is_tool_result_event(entry_type: object, payload_type: object) -> bool:
     )
 
 
-def _is_codex_activity_event(
-    entry_type: object, payload_type: object, role: object
-) -> bool:
+def _is_codex_activity_event(entry_type: object, payload_type: object, role: object) -> bool:
     return (
         entry_type == "event_msg"
         and payload_type in {"agent_message", "mcp_tool_call_begin"}

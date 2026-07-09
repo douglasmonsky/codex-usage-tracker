@@ -35,6 +35,7 @@ TRANSITION_DELTA_RISK_GATE_THRESHOLD = 0.5
 
 TRANSITION_DELTA_RISK_GATE_THRESHOLDS = RISK_GATE_THRESHOLDS
 
+
 def risk_gated_transition_delta_prediction(
     *,
     continuation_prediction: float,
@@ -45,6 +46,7 @@ def risk_gated_transition_delta_prediction(
     if risk >= threshold:
         return alternate_prediction
     return continuation_prediction
+
 
 def best_transition_delta_gate_threshold_from_sums(
     error_sums: dict[float, float],
@@ -59,8 +61,7 @@ def best_transition_delta_gate_threshold_from_sums(
             "error": None,
         }
     candidates = [
-        (threshold, error_sum / training_count)
-        for threshold, error_sum in error_sums.items()
+        (threshold, error_sum / training_count) for threshold, error_sum in error_sums.items()
     ]
     threshold, error_value = min(
         candidates,
@@ -76,6 +77,7 @@ def best_transition_delta_gate_threshold_from_sums(
         "support": training_count,
         "error": rounded(error_value),
     }
+
 
 def update_transition_delta_gate_threshold_sums(
     absolute_error_sums: dict[float, float],
@@ -97,6 +99,7 @@ def update_transition_delta_gate_threshold_sums(
             threshold=threshold,
         )
         absolute_error_sums[threshold] += abs(prediction - actual)
+
 
 def transition_delta_gate_diagnostics(
     rows: list[dict[str, Any]], model_name: str
@@ -120,9 +123,7 @@ def transition_delta_gate_diagnostics(
 def _transition_delta_gate_details(
     rows: list[dict[str, Any]], model_name: str
 ) -> list[dict[str, Any]]:
-    return [
-        (row.get("prediction_details") or {}).get(model_name) or {} for row in rows
-    ]
+    return [(row.get("prediction_details") or {}).get(model_name) or {} for row in rows]
 
 
 def _empty_transition_delta_gate_diagnostics() -> dict[str, Any]:
@@ -156,9 +157,7 @@ def _transition_delta_gate_detail_summary(
 
 def _override_share(source_counts: dict[str, int], detail_count: int) -> float | None:
     override_count = sum(
-        count
-        for source, count in source_counts.items()
-        if source.endswith("_history_state_mode")
+        count for source, count in source_counts.items() if source.endswith("_history_state_mode")
     )
     return rounded(override_count / detail_count)
 
@@ -178,7 +177,5 @@ def _transition_delta_gate_source_rows(
             "count": count,
             "share": rounded(count / detail_count),
         }
-        for source, count in sorted(
-            source_counts.items(), key=lambda item: (-item[1], item[0])
-        )
+        for source, count in sorted(source_counts.items(), key=lambda item: (-item[1], item[0]))
     ]

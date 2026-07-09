@@ -47,8 +47,12 @@ def test_open_investigator_payload_preserves_fragment() -> None:
     )
 
     assert payload["opened"] is False
-    assert payload["url"] == "http://localhost:8898/react-dashboard.html?view=call&record=abc#section"
-    assert opened_urls == ["http://localhost:8898/react-dashboard.html?view=call&record=abc#section"]
+    assert (
+        payload["url"] == "http://localhost:8898/react-dashboard.html?view=call&record=abc#section"
+    )
+    assert opened_urls == [
+        "http://localhost:8898/react-dashboard.html?view=call&record=abc#section"
+    ]
 
 
 def test_open_investigator_payload_accepts_preferred_react_dashboard_url() -> None:
@@ -75,7 +79,10 @@ def test_open_investigator_payload_accepts_preferred_react_dashboard_url() -> No
     ("query", "message"),
     [
         ("", "url is required"),
-        ("url=ftp://127.0.0.1/dashboard.html?view=call&record=abc", "Only dashboard URLs can be opened"),
+        (
+            "url=ftp://127.0.0.1/dashboard.html?view=call&record=abc",
+            "Only dashboard URLs can be opened",
+        ),
         (
             "url=http://example.com/dashboard.html?view=call&record=abc",
             "Only loopback dashboard URLs can be opened",

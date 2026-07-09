@@ -160,9 +160,8 @@ def dashboard_i18n_payload(language: str | None = None) -> dict[str, object]:
 def _cached_raw_catalog(language: str) -> dict[str, str]:
     if language not in SUPPORTED_LANGUAGES:
         language = DEFAULT_LANGUAGE
-    resource = (
-        resources.files("codex_usage_tracker.plugin_data")
-        .joinpath("dashboard", "locales", f"{language}.json")
+    resource = resources.files("codex_usage_tracker.plugin_data").joinpath(
+        "dashboard", "locales", f"{language}.json"
     )
     try:
         data = json.loads(resource.read_text(encoding="utf-8"))
@@ -177,6 +176,8 @@ def _cached_raw_catalog(language: str) -> dict[str, str]:
         if not isinstance(key, str) or not key:
             raise ValueError(f"dashboard locale catalog contains an invalid key: {language}")
         if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"dashboard locale catalog contains an invalid value for {key!r}: {language}")
+            raise ValueError(
+                f"dashboard locale catalog contains an invalid value for {key!r}: {language}"
+            )
         catalog[key] = value
     return catalog

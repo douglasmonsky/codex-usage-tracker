@@ -223,9 +223,7 @@ def query_usage_status(
         "total_rows": int(total_row["count"] if total_row is not None else 0),
         "active_rows": int(active_row["count"] if active_row is not None else 0),
         "scoped_rows": int(scoped_row["count"] if scoped_row is not None else 0),
-        "max_event_timestamp": (
-            max_row["max_event_timestamp"] if max_row is not None else None
-        ),
+        "max_event_timestamp": (max_row["max_event_timestamp"] if max_row is not None else None),
     }
 
 
@@ -242,9 +240,7 @@ def query_latest_observed_usage(
         "OR rate_limit_secondary_used_percent IS NOT NULL"
     )
     scoped_where = (
-        f"{where_clause} AND ({observed_clause})"
-        if where_clause
-        else f"WHERE {observed_clause}"
+        f"{where_clause} AND ({observed_clause})" if where_clause else f"WHERE {observed_clause}"
     )
     with connect(db_path) as conn:
         init_db(conn)
@@ -313,9 +309,7 @@ def observed_usage_reconciliation(
         scoped_where=scoped_where,
         params=params,
     )
-    consecutive_alternate_rows, latest_alternate = _alternate_usage_limit_streak(
-        recent_rows
-    )
+    consecutive_alternate_rows, latest_alternate = _alternate_usage_limit_streak(recent_rows)
     selected = row_to_dict(selected_row) if selected_row is not None else {}
     recommended = _observed_usage_reconciliation_recommended(
         consecutive_alternate_rows=consecutive_alternate_rows,
@@ -399,9 +393,7 @@ def _observed_usage_reconciliation_payload(
         "latest_plan_type": latest_alternate.get("rate_limit_plan_type")
         if latest_alternate
         else None,
-        "latest_observed_at": latest_alternate.get("event_timestamp")
-        if latest_alternate
-        else None,
+        "latest_observed_at": latest_alternate.get("event_timestamp") if latest_alternate else None,
         "selected_observed_at": selected.get("event_timestamp"),
         "selected_limit_id": selected.get("rate_limit_limit_id"),
     }

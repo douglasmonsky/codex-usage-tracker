@@ -116,7 +116,9 @@ def context_payload(
             first_query_value(params.get("max_entries")),
             DEFAULT_CONTEXT_ENTRIES,
         ),
-        include_tool_output=truthy_query_value(first_query_value(params.get("include_tool_output"))),
+        include_tool_output=truthy_query_value(
+            first_query_value(params.get("include_tool_output"))
+        ),
         include_compaction_history=truthy_query_value(
             first_query_value(params.get("include_compaction_history")),
         ),

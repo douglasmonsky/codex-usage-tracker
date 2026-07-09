@@ -80,10 +80,7 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     assert "capacity_history_state_interactions_ridge100__time_ordered_80_20" in model_names
     assert "capacity_same_span_shape_buckets__time_ordered_80_20" in model_names
     assert "capacity_same_span_shape_interactions__time_ordered_80_20" in model_names
-    assert (
-        "capacity_same_span_shape_interactions_ridge30__time_ordered_80_20"
-        in model_names
-    )
+    assert "capacity_same_span_shape_interactions_ridge30__time_ordered_80_20" in model_names
     shape_bucket_model = next(
         model
         for model in capacity["models"]
@@ -91,14 +88,11 @@ def test_one_percent_capacity_modeling_reports_tick_capacity_models() -> None:
     )
     assert "row_count_bucket" in shape_bucket_model["categorical_features"]
     assert "span_wall_time_bucket" in shape_bucket_model["categorical_features"]
-    assert "row_count_x_call_duration_bucket" in shape_bucket_model[
-        "categorical_features"
-    ]
+    assert "row_count_x_call_duration_bucket" in shape_bucket_model["categorical_features"]
     ridge_model = next(
         model
         for model in capacity["models"]
-        if model["name"]
-        == "capacity_same_span_shape_interactions_ridge30__time_ordered_80_20"
+        if model["name"] == "capacity_same_span_shape_interactions_ridge30__time_ordered_80_20"
     )
     assert ridge_model["ridge_alpha"] == 30.0
     diagnostics = ridge_model["holdout_error_diagnostics"]

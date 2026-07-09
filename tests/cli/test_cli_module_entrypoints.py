@@ -31,5 +31,7 @@ def _subprocess_env() -> dict[str, str]:
     repo_root = Path(__file__).resolve().parents[2]
     env = os.environ.copy()
     src = str(repo_root / "src")
-    env["PYTHONPATH"] = src if not env.get("PYTHONPATH") else f"{src}{os.pathsep}{env['PYTHONPATH']}"
+    env["PYTHONPATH"] = (
+        src if not env.get("PYTHONPATH") else f"{src}{os.pathsep}{env['PYTHONPATH']}"
+    )
     return env

@@ -69,6 +69,7 @@ ALLOWANCE_TEMPLATE = {
     "aliases": {},
 }
 
+
 @dataclass(frozen=True)
 class AllowanceWindow:
     """One configured usage-limit window from the user's local allowance file."""
@@ -98,6 +99,7 @@ class UsageAllowanceConfig:
     source: dict[str, Any]
     error: str | None = None
     rate_card_error: str | None = None
+
 
 def load_allowance_config(
     path: Path = DEFAULT_ALLOWANCE_PATH,
@@ -198,9 +200,7 @@ def load_allowance_config(
     )
 
 
-def write_allowance_template(
-    path: Path = DEFAULT_ALLOWANCE_PATH, force: bool = False
-) -> Path:
+def write_allowance_template(path: Path = DEFAULT_ALLOWANCE_PATH, force: bool = False) -> Path:
     """Write a local template for optional allowance-window settings."""
 
     if path.exists() and not force:
@@ -266,6 +266,7 @@ def write_allowance_from_text(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
 
 def parse_windows(raw: object) -> list[AllowanceWindow]:
     windows: list[AllowanceWindow] = []

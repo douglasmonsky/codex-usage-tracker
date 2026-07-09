@@ -68,7 +68,9 @@ def write_threshold_template(path: Path = DEFAULT_THRESHOLDS_PATH, force: bool =
     if path.exists() and not force:
         raise FileExistsError(f"{path} already exists. Use --force to replace it.")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(DEFAULT_THRESHOLDS, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(DEFAULT_THRESHOLDS, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return path
 
 
@@ -97,12 +99,12 @@ def annotate_rows_with_recommendations(
             else "No aggregate action is flagged; continue monitoring usage patterns."
         )
         copy["recommended_action_key"] = (
-            recommendations[0]["action_key"]
-            if recommendations
-            else "recommendation.none.action"
+            recommendations[0]["action_key"] if recommendations else "recommendation.none.action"
         )
         copy["flag_explanations"] = [recommendation["why"] for recommendation in recommendations]
-        copy["flag_explanation_keys"] = [recommendation["why_key"] for recommendation in recommendations]
+        copy["flag_explanation_keys"] = [
+            recommendation["why_key"] for recommendation in recommendations
+        ]
         annotated.append(copy)
     return annotated
 
@@ -124,11 +126,7 @@ def action_recommendations(
         _large_thread_recommendation(row, limits),
         _subagent_recommendation(row),
     ]
-    return [
-        recommendation
-        for recommendation in candidates
-        if recommendation is not None
-    ]
+    return [recommendation for recommendation in candidates if recommendation is not None]
 
 
 def _pricing_recommendation(row: dict[str, Any]) -> dict[str, Any] | None:

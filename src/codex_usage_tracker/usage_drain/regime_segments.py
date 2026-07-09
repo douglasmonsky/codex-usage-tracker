@@ -38,6 +38,7 @@ SEGMENT_POSITION_BUCKETS = (
     "sixth_plus_span",
 )
 
+
 def delta_regime_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
     train_size = max(1, min(len(spans) - 1, int(len(spans) * 0.8))) if spans else 0
     return {
@@ -93,9 +94,7 @@ def _current_one_percent_run(
     return current_run
 
 
-def _top_one_percent_runs(
-    one_percent_runs: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def _top_one_percent_runs(one_percent_runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(one_percent_runs, key=lambda run: -run["span_count"])[:10]
 
 
@@ -127,8 +126,7 @@ def piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
     }
     segments = _piecewise_regime_segments(spans)
     segment_records = [
-        _piecewise_segment_record(spans, prediction_rows, segment)
-        for segment in segments
+        _piecewise_segment_record(spans, prediction_rows, segment) for segment in segments
     ]
     label_rows: dict[str, list[dict[str, Any]]] = {}
     for row in prediction_rows.values():
@@ -138,25 +136,18 @@ def piecewise_regime_segment_summary(spans: list[UsageDeltaSpan]) -> dict[str, A
         "segment_count": len(segment_records),
         "segment_label_counts": _count_segment_labels(segment_records),
         "latest_segment": segment_records[-1] if segment_records else None,
-        "longest_segments": sorted(
-            segment_records, key=lambda row: -int(row["span_count"])
-        )[:10],
+        "longest_segments": sorted(segment_records, key=lambda row: -int(row["span_count"]))[:10],
         "largest_mean_delta_segments": sorted(
             segment_records,
-            key=lambda row: _number(
-                (row.get("distribution") or {}).get("mean_delta_percent")
-            ),
+            key=lambda row: _number((row.get("distribution") or {}).get("mean_delta_percent")),
             reverse=True,
         )[:10],
-        "adaptation_by_position": _piecewise_adaptation_by_position(
-            prediction_rows, segments
-        ),
+        "adaptation_by_position": _piecewise_adaptation_by_position(prediction_rows, segments),
         "boundary_diagnostics": boundary_summary.piecewise_boundary_diagnostics(
             spans, prediction_rows
         ),
         "by_label": {
-            label: _piecewise_label_record(rows)
-            for label, rows in sorted(label_rows.items())
+            label: _piecewise_label_record(rows) for label, rows in sorted(label_rows.items())
         },
     }
 
@@ -243,9 +234,7 @@ def _piecewise_adaptation_by_position(
             all_rows_by_position=all_rows_by_position,
             label_rows_by_position=label_rows_by_position,
         )
-    return _piecewise_adaptation_position_report(
-        all_rows_by_position, label_rows_by_position
-    )
+    return _piecewise_adaptation_position_report(all_rows_by_position, label_rows_by_position)
 
 
 def _empty_segment_position_rows() -> dict[str, list[dict[str, Any]]]:
@@ -262,9 +251,7 @@ def _collect_piecewise_position_rows(
     label = str(segment.get("label") or "missing")
     start_index = int(segment["start_index"])
     end_index = int(segment["end_index"])
-    label_rows = label_rows_by_position.setdefault(
-        label, _empty_segment_position_rows()
-    )
+    label_rows = label_rows_by_position.setdefault(label, _empty_segment_position_rows())
     for index in range(start_index, end_index + 1):
         row = prediction_rows.get(index)
         if row is not None:
@@ -322,17 +309,12 @@ def _piecewise_position_record(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-
-
 def _segment_prediction_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     actual = [_number(row.get("actual")) for row in rows]
     return {
         model_name: _regression_metrics(
             actual,
-            [
-                _number((row.get("predictions") or {}).get(model_name))
-                for row in rows
-            ],
+            [_number((row.get("predictions") or {}).get(model_name)) for row in rows],
         )
         for model_name in SEGMENT_PREDICTION_MODELS
     }
@@ -361,8 +343,6 @@ def _count_segment_labels(segment_records: list[dict[str, Any]]) -> dict[str, in
     return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
 
 
-
-
 def _one_percent_runs(spans: list[UsageDeltaSpan]) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     run_start: int | None = None
@@ -379,9 +359,7 @@ def _one_percent_runs(spans: list[UsageDeltaSpan]) -> list[dict[str, Any]]:
     return runs
 
 
-def _run_record(
-    spans: list[UsageDeltaSpan], start_index: int, end_index: int
-) -> dict[str, Any]:
+def _run_record(spans: list[UsageDeltaSpan], start_index: int, end_index: int) -> dict[str, Any]:
     start_span = spans[start_index]
     end_span = spans[end_index]
     return {
@@ -395,9 +373,7 @@ def _run_record(
     }
 
 
-def _run_break_record(
-    spans: list[UsageDeltaSpan], run: dict[str, Any]
-) -> dict[str, Any]:
+def _run_break_record(spans: list[UsageDeltaSpan], run: dict[str, Any]) -> dict[str, Any]:
     break_index = int(run["end_index"]) + 1
     break_span = spans[break_index]
     return {

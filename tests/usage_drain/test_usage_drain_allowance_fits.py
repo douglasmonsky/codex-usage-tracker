@@ -180,9 +180,7 @@ def test_allowance_online_capacity_error_diagnostics_reports_largest_errors() ->
     }
 
 
-def _allowance_row(
-    span_index: int, *, credits_per_visible_percent: float
-) -> dict[str, object]:
+def _allowance_row(span_index: int, *, credits_per_visible_percent: float) -> dict[str, object]:
     return {
         "span_index": span_index,
         "credits_per_visible_percent": credits_per_visible_percent,

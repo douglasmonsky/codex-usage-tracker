@@ -81,7 +81,7 @@ MCP_TOOL_NAMES = {
     "usage_file_churn_scan",
     "usage_repeated_file_rediscovery",
     "usage_shell_churn",
-        "usage_large_low_output_calls",
+    "usage_large_low_output_calls",
     "usage_suggest_investigations",
     "usage_investigate",
     "usage_action_brief",
@@ -89,7 +89,7 @@ MCP_TOOL_NAMES = {
     "usage_dogfood_status",
     "usage_dogfood_result",
     "usage_test_hypotheses",
-        "usage_context_bloat_scan",
+    "usage_context_bloat_scan",
     "usage_investigation_walk",
     "usage_local_evidence_export",
     "generate_usage_dashboard",
@@ -361,6 +361,7 @@ def test_dashboard_history_scope_labels_remain_user_facing() -> None:
     assert "history.all_includes" in live_runtime
 
     from codex_usage_tracker.core.i18n import translations_for
+
     en_trans = translations_for("en")
     assert en_trans["history.active_only"] == "Active sessions only"
     assert "All history" in en_trans["history.all_includes"]
@@ -539,9 +540,7 @@ def _subprocess_env() -> dict[str, str]:
     repo_root = Path(__file__).resolve().parents[2]
     src_path = str(repo_root / "src")
     env["PYTHONPATH"] = (
-        f"{src_path}{os.pathsep}{env['PYTHONPATH']}"
-        if env.get("PYTHONPATH")
-        else src_path
+        f"{src_path}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else src_path
     )
     return env
 

@@ -483,7 +483,11 @@ def _check_plugin_link(plugin_link: Path, repo_root: Path | None) -> DoctorCheck
     if plugin_link.is_symlink():
         target = plugin_link.resolve()
         if _looks_like_plugin_root(target):
-            kind = "source checkout" if repo_root and target == repo_root.resolve() else "plugin wrapper"
+            kind = (
+                "source checkout"
+                if repo_root and target == repo_root.resolve()
+                else "plugin wrapper"
+            )
             return DoctorCheck(
                 "Plugin registration",
                 "pass",
@@ -549,24 +553,6 @@ def _check_marketplace(marketplace_path: Path) -> DoctorCheck:
         f"No {PLUGIN_NAME} entry found in {marketplace_path}.",
         "Run: codex-usage-tracker install-plugin",
     )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _safe_int(value: object) -> int:

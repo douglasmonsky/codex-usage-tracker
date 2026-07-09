@@ -13,7 +13,14 @@ def _run_dashboard_data_script(script: str) -> dict[str, object]:
     if node is None:
         pytest.skip("node is required for dashboard data helper tests")
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "dashboard_data.js"
+    script_path = (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_data.js"
+    )
     wrapped = f"""
 const fs = require('fs');
 const vm = require('vm');
@@ -38,7 +45,14 @@ def _run_dashboard_format_script(script: str) -> dict[str, object]:
     if node is None:
         pytest.skip("node is required for dashboard format helper tests")
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "dashboard_format.js"
+    script_path = (
+        repo_root
+        / "src"
+        / "codex_usage_tracker"
+        / "plugin_data"
+        / "dashboard"
+        / "dashboard_format.js"
+    )
     wrapped = f"""
 const fs = require('fs');
 const vm = require('vm');

@@ -29,7 +29,14 @@ def test_add_causal_history_features_only_uses_prior_rows() -> None:
     rows = [
         _feature_row(target=1.0, credits=100.0),
         _feature_row(target=2.0, credits=200.0),
-        _feature_row(target=1.0, credits=150.0, limit_id="limit-b", date="2026-06-02", hour="10", day="Tuesday"),
+        _feature_row(
+            target=1.0,
+            credits=150.0,
+            limit_id="limit-b",
+            date="2026-06-02",
+            hour="10",
+            day="Tuesday",
+        ),
         _feature_row(target=1.0, credits=100.0),
     ]
 

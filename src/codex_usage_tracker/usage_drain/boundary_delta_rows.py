@@ -55,18 +55,22 @@ def _initial_boundary_delta_predictions(
         previous_state_rows,
         previous_delta,
     )
-    return previous_delta, {
-        "previous_delta": previous_delta,
-        "prior_mode_delta": prior_mode,
-    }, {
-        "previous_delta": {
-            "source": "previous_delta",
-            "signature": [],
-            "support": 1,
-            "matched_mode": _rounded(previous_delta),
+    return (
+        previous_delta,
+        {
+            "previous_delta": previous_delta,
+            "prior_mode_delta": prior_mode,
         },
-        "prior_mode_delta": prior_mode_detail,
-    }
+        {
+            "previous_delta": {
+                "source": "previous_delta",
+                "signature": [],
+                "support": 1,
+                "matched_mode": _rounded(previous_delta),
+            },
+            "prior_mode_delta": prior_mode_detail,
+        },
+    )
 
 
 def _add_state_delta_predictions(
@@ -213,13 +217,11 @@ def _add_risk_adjusted_delta_predictions(
             training_count=threshold_training_count,
         )
     )
-    predictions["risk_gated_label_segment_age_mode"] = (
-        risk_gated_boundary_delta_prediction(
-            previous_delta=previous_delta,
-            alternate_prediction=label_prediction,
-            risk=risk,
-            threshold=BOUNDARY_DELTA_RISK_GATE_THRESHOLD,
-        )
+    predictions["risk_gated_label_segment_age_mode"] = risk_gated_boundary_delta_prediction(
+        previous_delta=previous_delta,
+        alternate_prediction=label_prediction,
+        risk=risk,
+        threshold=BOUNDARY_DELTA_RISK_GATE_THRESHOLD,
     )
     predictions["risk_weighted_label_segment_age_mode"] = _risk_weighted_prediction(
         previous_delta=previous_delta,
@@ -231,21 +233,17 @@ def _add_risk_adjusted_delta_predictions(
         alternate_prediction=boundary_conditioned_prediction,
         risk=risk,
     )
-    predictions["adaptive_mae_gate_label_segment_age_mode"] = (
-        risk_gated_boundary_delta_prediction(
-            previous_delta=previous_delta,
-            alternate_prediction=label_prediction,
-            risk=risk,
-            threshold=mae_threshold,
-        )
+    predictions["adaptive_mae_gate_label_segment_age_mode"] = risk_gated_boundary_delta_prediction(
+        previous_delta=previous_delta,
+        alternate_prediction=label_prediction,
+        risk=risk,
+        threshold=mae_threshold,
     )
-    predictions["adaptive_rmse_gate_label_segment_age_mode"] = (
-        risk_gated_boundary_delta_prediction(
-            previous_delta=previous_delta,
-            alternate_prediction=label_prediction,
-            risk=risk,
-            threshold=rmse_threshold,
-        )
+    predictions["adaptive_rmse_gate_label_segment_age_mode"] = risk_gated_boundary_delta_prediction(
+        previous_delta=previous_delta,
+        alternate_prediction=label_prediction,
+        risk=risk,
+        threshold=rmse_threshold,
     )
     details["risk_gated_label_segment_age_mode"] = _risk_gate_detail(
         source="risk_gate_override"

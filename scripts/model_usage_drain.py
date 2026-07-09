@@ -36,10 +36,7 @@ def main() -> int:
         "--plan-type",
         action="append",
         dest="plan_types",
-        help=(
-            "Filter rows to one rate_limit_plan_type. Repeat to include multiple "
-            "plan types."
-        ),
+        help=("Filter rows to one rate_limit_plan_type. Repeat to include multiple plan types."),
     )
     parser.add_argument("--thread")
     parser.add_argument("--include-archived", action="store_true")
@@ -159,8 +156,7 @@ def main() -> int:
                 best_mae = _best_metric_model(models, "mae")
                 best_rmse = _best_metric_model(models, "rmse")
                 print(
-                    "walk-forward {scope}: n={n} best_mae={best_mae} "
-                    "best_rmse={best_rmse}".format(
+                    "walk-forward {scope}: n={n} best_mae={best_mae} best_rmse={best_rmse}".format(
                         scope=scope_name,
                         n=actual.get("n"),
                         best_mae=best_mae,
@@ -168,9 +164,7 @@ def main() -> int:
                     )
                 )
                 state_models = {
-                    name: values
-                    for name, values in models.items()
-                    if name.startswith("empirical_")
+                    name: values for name, values in models.items() if name.startswith("empirical_")
                 }
                 best_state = _best_metric_model(state_models, "mae")
                 if best_state:
@@ -189,16 +183,14 @@ def main() -> int:
                     )
                 ambiguity = (
                     (
-                        ((walk_forward.get("state_ambiguity") or {}).get("scopes") or {})
-                        .get(scope_name)
+                        ((walk_forward.get("state_ambiguity") or {}).get("scopes") or {}).get(
+                            scope_name
+                        )
                         or {}
-                    )
-                    .get("signatures")
+                    ).get("signatures")
                     or {}
                 ).get("full_bucket_state") or {}
-                repeated_metrics = (
-                    ambiguity.get("repeated_oracle_mode_metrics") or {}
-                )
+                repeated_metrics = ambiguity.get("repeated_oracle_mode_metrics") or {}
                 if ambiguity:
                     print(
                         "state ambiguity {scope}: full_state_ambiguous={ambiguous} "
@@ -213,8 +205,7 @@ def main() -> int:
                     "adaptive_mae_transition_gate_history_state_mode"
                 ) or {}
                 transition_gate_model = (
-                    models.get("adaptive_mae_transition_gate_history_state_mode")
-                    or {}
+                    models.get("adaptive_mae_transition_gate_history_state_mode") or {}
                 )
                 if transition_gate_model:
                     print(
@@ -227,10 +218,8 @@ def main() -> int:
                         )
                     )
                 transition_scope = (
-                    ((walk_forward.get("transition_risk") or {}).get("scopes") or {})
-                    .get(scope_name)
-                    or {}
-                )
+                    (walk_forward.get("transition_risk") or {}).get("scopes") or {}
+                ).get(scope_name) or {}
                 transition_target = transition_scope.get("non_one_percent_delta") or {}
                 transition_models = transition_target.get("models") or {}
                 best_transition = _best_metric_model(transition_models, "brier")
@@ -267,9 +256,7 @@ def main() -> int:
                     best=longest.get("best_by_mae"),
                 )
             )
-        adaptation = (
-            (segments.get("adaptation_by_position") or {}).get("all_segments") or {}
-        )
+        adaptation = (segments.get("adaptation_by_position") or {}).get("all_segments") or {}
         if adaptation:
             first = adaptation.get("first_span") or {}
             second = adaptation.get("second_span") or {}
@@ -284,12 +271,9 @@ def main() -> int:
         boundary = segments.get("boundary_diagnostics") or {}
         if boundary:
             long_one_percent = boundary.get("after_long_one_percent_run") or {}
-            position_rows = (
-                (boundary.get("by_context") or {}).get(
-                    "previous_segment_position_bucket"
-                )
-                or []
-            )
+            position_rows = (boundary.get("by_context") or {}).get(
+                "previous_segment_position_bucket"
+            ) or []
             position_rates = {
                 row.get("previous_segment_position_bucket"): row.get("boundary_rate")
                 for row in position_rows
@@ -311,11 +295,8 @@ def main() -> int:
                 )
             )
             boundary_risk_scope = (
-                ((boundary.get("walk_forward_risk") or {}).get("scopes") or {}).get(
-                    "all_after_10"
-                )
-                or {}
-            )
+                (boundary.get("walk_forward_risk") or {}).get("scopes") or {}
+            ).get("all_after_10") or {}
             best_boundary_risk = _best_metric_model(
                 boundary_risk_scope.get("models") or {},
                 "brier",
@@ -328,12 +309,8 @@ def main() -> int:
                     )
                 )
             boundary_delta_scope = (
-                (
-                    (boundary.get("walk_forward_delta_prediction") or {}).get("scopes")
-                    or {}
-                ).get("all_after_10")
-                or {}
-            )
+                (boundary.get("walk_forward_delta_prediction") or {}).get("scopes") or {}
+            ).get("all_after_10") or {}
             best_boundary_delta = _best_metric_model(
                 boundary_delta_scope.get("models") or {},
                 "mae",
@@ -342,37 +319,22 @@ def main() -> int:
                 boundary_delta_scope.get("models") or {},
                 "rmse",
             )
-            gate_diagnostics = (
-                (boundary_delta_scope.get("risk_gate_diagnostics") or {}).get(
-                    "risk_gated_label_segment_age_mode"
-                )
-                or {}
-            )
+            gate_diagnostics = (boundary_delta_scope.get("risk_gate_diagnostics") or {}).get(
+                "risk_gated_label_segment_age_mode"
+            ) or {}
             adaptive_gate_diagnostics = (
-                (boundary_delta_scope.get("risk_gate_diagnostics") or {}).get(
-                    "adaptive_mae_gate_label_segment_age_mode"
-                )
-                or {}
-            )
+                boundary_delta_scope.get("risk_gate_diagnostics") or {}
+            ).get("adaptive_mae_gate_label_segment_age_mode") or {}
             if best_boundary_delta:
                 previous_delta_residuals = (
-                    (boundary_delta_scope.get("residual_diagnostics") or {}).get(
-                        "previous_delta"
-                    )
-                    or {}
-                )
+                    boundary_delta_scope.get("residual_diagnostics") or {}
+                ).get("previous_delta") or {}
                 boundary_state_errors = (
-                    (previous_delta_residuals.get("top_error_groups") or {}).get(
-                        "boundary_state"
-                    )
-                    or []
-                )
-                transition_errors = (
-                    (previous_delta_residuals.get("top_error_groups") or {}).get(
-                        "transition"
-                    )
-                    or []
-                )
+                    previous_delta_residuals.get("top_error_groups") or {}
+                ).get("boundary_state") or []
+                transition_errors = (previous_delta_residuals.get("top_error_groups") or {}).get(
+                    "transition"
+                ) or []
                 top_boundary_error = boundary_state_errors[0] if boundary_state_errors else {}
                 top_transition_error = transition_errors[0] if transition_errors else {}
                 print(
@@ -384,12 +346,8 @@ def main() -> int:
                         best=best_boundary_delta,
                         best_rmse=best_boundary_delta_rmse,
                         override=gate_diagnostics.get("override_share"),
-                        adaptive_override=adaptive_gate_diagnostics.get(
-                            "override_share"
-                        ),
-                        adaptive_threshold=adaptive_gate_diagnostics.get(
-                            "mean_threshold"
-                        ),
+                        adaptive_override=adaptive_gate_diagnostics.get("override_share"),
+                        adaptive_threshold=adaptive_gate_diagnostics.get("mean_threshold"),
                     )
                 )
                 print(
@@ -406,15 +364,9 @@ def main() -> int:
         variants = components.get("variants") or {}
         for variant_name in ("unweighted", "high_medium_fast_weighted"):
             variant = variants.get(variant_name) or {}
-            visible = (
-                (variant.get("visible_drain") or {})
-                .get("with_intercept", {})
-                .get("all", {})
-            )
+            visible = (variant.get("visible_drain") or {}).get("with_intercept", {}).get("all", {})
             credits = (
-                (variant.get("credit_accounting") or {})
-                .get("no_intercept", {})
-                .get("all", {})
+                (variant.get("credit_accounting") or {}).get("no_intercept", {}).get("all", {})
             )
             if visible or credits:
                 print(
@@ -456,8 +408,7 @@ def main() -> int:
                 if holdout:
                     diagnostics = model.get("holdout_error_diagnostics") or {}
                     print(
-                        "  {name}: r2={r2} mae={mae} within10={within10} "
-                        "large={large}".format(
+                        "  {name}: r2={r2} mae={mae} within10={within10} large={large}".format(
                             name=model_name,
                             r2=holdout.get("r2"),
                             mae=holdout.get("mae"),
@@ -478,15 +429,13 @@ def main() -> int:
                 sequence_name="same_span_capacity_controls",
                 validation="interleaved_every_5th",
             )
-            capacity_components = (
-                (capacity.get("token_component_regression") or {}).get("variants") or {}
-            )
+            capacity_components = (capacity.get("token_component_regression") or {}).get(
+                "variants"
+            ) or {}
             for variant_name in ("unweighted", "high_medium_fast_weighted"):
                 variant = capacity_components.get(variant_name) or {}
                 credits = (
-                    (variant.get("capacity_credits") or {})
-                    .get("no_intercept", {})
-                    .get("all", {})
+                    (variant.get("capacity_credits") or {}).get("no_intercept", {}).get("all", {})
                 )
                 if credits:
                     print(
@@ -500,48 +449,25 @@ def main() -> int:
                     )
         breakpoints = summary.get("allowance_breakpoint_analysis") or {}
         if breakpoints.get("span_count"):
-            global_fit = (
-                (breakpoints.get("global_credit_to_delta_fit") or {}).get("metrics")
-                or {}
-            )
-            piecewise_models = (
-                (breakpoints.get("piecewise_credit_to_delta_fit") or {}).get("models")
-                or {}
-            )
-            piecewise_fit = (
-                (
-                    piecewise_models.get("piecewise_mean_capacity_denominator")
-                    or {}
-                ).get("metrics")
-                or {}
-            )
+            global_fit = (breakpoints.get("global_credit_to_delta_fit") or {}).get("metrics") or {}
+            piecewise_models = (breakpoints.get("piecewise_credit_to_delta_fit") or {}).get(
+                "models"
+            ) or {}
+            piecewise_fit = (piecewise_models.get("piecewise_mean_capacity_denominator") or {}).get(
+                "metrics"
+            ) or {}
             ceiling_fit = (
-                (
-                    piecewise_models.get(
-                        "piecewise_ceiling_mean_capacity_denominator"
-                    )
-                    or {}
-                ).get("metrics")
-                or {}
-            )
-            online_models = (
-                (breakpoints.get("online_capacity_credit_to_delta_fit") or {}).get(
-                    "models"
-                )
-                or {}
-            )
-            online_previous = (
-                (online_models.get("previous_capacity_denominator") or {}).get(
-                    "metrics"
-                )
-                or {}
-            )
-            online_previous_errors = (
-                (
-                    online_models.get("previous_capacity_denominator") or {}
-                ).get("known_breakpoint_diagnostics")
-                or {}
-            )
+                piecewise_models.get("piecewise_ceiling_mean_capacity_denominator") or {}
+            ).get("metrics") or {}
+            online_models = (breakpoints.get("online_capacity_credit_to_delta_fit") or {}).get(
+                "models"
+            ) or {}
+            online_previous = (online_models.get("previous_capacity_denominator") or {}).get(
+                "metrics"
+            ) or {}
+            online_previous_errors = (online_models.get("previous_capacity_denominator") or {}).get(
+                "known_breakpoint_diagnostics"
+            ) or {}
             online_metric_models = {
                 name: (row.get("metrics") or {})
                 for name, row in online_models.items()
@@ -573,9 +499,7 @@ def main() -> int:
                         best=best_online,
                         r2=online_previous.get("r2"),
                         mae=online_previous.get("mae"),
-                        error_share=online_previous_errors.get(
-                            "known_breakpoint_abs_error_share"
-                        ),
+                        error_share=online_previous_errors.get("known_breakpoint_abs_error_share"),
                     )
                 )
     return 0
@@ -590,9 +514,7 @@ def _filter_rows_by_plan_type(
     if not allowed:
         return rows
     return [
-        row
-        for row in rows
-        if str(row.get("rate_limit_plan_type") or "").strip().lower() in allowed
+        row for row in rows if str(row.get("rate_limit_plan_type") or "").strip().lower() in allowed
     ]
 
 
@@ -603,17 +525,8 @@ def _print_feature_attribution(
     sequence_name: str,
     validation: str,
 ) -> None:
-    rows = (
-        ((attribution.get("sequences") or {}).get(sequence_name) or {}).get(
-            validation
-        )
-        or []
-    )
-    improvements = [
-        row
-        for row in rows
-        if row.get("mae_improvement_vs_previous") is not None
-    ]
+    rows = ((attribution.get("sequences") or {}).get(sequence_name) or {}).get(validation) or []
+    improvements = [row for row in rows if row.get("mae_improvement_vs_previous") is not None]
     if not improvements:
         return
     improvements.sort(

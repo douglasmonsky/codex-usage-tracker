@@ -5,13 +5,15 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Any
 
-BOUNDARY_RISK_SCOPE_STARTS = MappingProxyType({
-    "all_after_first": 1,
-    "all_after_10": 10,
-    "time_ordered_holdout_20": 0.8,
-    "latest_500": -500,
-    "latest_100": -100,
-})
+BOUNDARY_RISK_SCOPE_STARTS = MappingProxyType(
+    {
+        "all_after_first": 1,
+        "all_after_10": 10,
+        "time_ordered_holdout_20": 0.8,
+        "latest_500": -500,
+        "latest_100": -100,
+    }
+)
 
 
 def boundary_scope_start_index(rows: list[dict[str, Any]], start: int | float) -> int:

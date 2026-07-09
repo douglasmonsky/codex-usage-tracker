@@ -132,11 +132,7 @@ def next_row_offset(
     row_count: int,
     total_matched: int,
 ) -> int | None:
-    return (
-        offset + row_count
-        if has_more_rows(limit, offset, row_count, total_matched)
-        else None
-    )
+    return offset + row_count if has_more_rows(limit, offset, row_count, total_matched) else None
 
 
 def parse_context_limit(value: str | None, default: int) -> int:
@@ -187,9 +183,7 @@ def validate_loopback_host(host: str) -> None:
     try:
         address = ip_address(host)
     except ValueError as exc:
-        raise ValueError(
-            "serve-dashboard --host must be localhost, 127.0.0.1, or ::1"
-        ) from exc
+        raise ValueError("serve-dashboard --host must be localhost, 127.0.0.1, or ::1") from exc
     if not address.is_loopback:
         raise ValueError("serve-dashboard refuses to expose raw context off localhost")
 

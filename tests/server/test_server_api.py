@@ -47,4 +47,7 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     output = capsys.readouterr().out
     assert opened == ["http://127.0.0.1:8765/react-dashboard.html"]
     assert "Serving Codex usage dashboard at http://127.0.0.1:8765/react-dashboard.html" in output
-    assert "Legacy dashboard fallback remains available at http://127.0.0.1:8765/dashboard.html" in output
+    assert (
+        "Legacy dashboard fallback remains available at http://127.0.0.1:8765/dashboard.html"
+        in output
+    )

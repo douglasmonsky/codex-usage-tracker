@@ -418,10 +418,7 @@ def test_git_interaction_snapshot_uses_safe_aggregate_operations(tmp_path: Path)
     assert git_interactions["summary"]["interactions_missing_original_token_count"] == 1
     assert git_interactions["summary"]["original_token_sum"] == 118
 
-    rows = {
-        (row["root"], row["operation"]): row
-        for row in git_interactions["interactions"]
-    }
+    rows = {(row["root"], row["operation"]): row for row in git_interactions["interactions"]}
     assert rows[("git", "status")]["category"] == "read_only"
     assert rows[("git", "status")]["mutability"] == "read_only"
     assert rows[("git", "status")]["representative_record_id"] == record_id

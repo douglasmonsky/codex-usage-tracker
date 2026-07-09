@@ -108,6 +108,8 @@ ALLOWANCE_BREAKPOINT_MAX_SEGMENTS = 6
 ALLOWANCE_BREAKPOINT_MIN_REDUCTION_SHARE = 0.12
 
 USAGE_DRAIN_MODEL_SCHEMA = "codex-usage-tracker-usage-drain-model-v1"
+
+
 def summarize_usage_drain_model(
     rows: list[dict[str, Any]],
     *,
@@ -128,9 +130,11 @@ def summarize_usage_drain_model(
     )
     best_predictive_mae_model = min(
         predictive_models,
-        key=lambda result: _number(result.get("holdout", {}).get("mae"))
-        if result.get("holdout", {}).get("mae") is not None
-        else math.inf,
+        key=lambda result: (
+            _number(result.get("holdout", {}).get("mae"))
+            if result.get("holdout", {}).get("mae") is not None
+            else math.inf
+        ),
         default=None,
     )
     return {
@@ -224,9 +228,7 @@ def summarize_usage_drain_model(
 
 def _span_correlation_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
     rows = [_span_correlation_row(span) for span in spans]
-    one_percent_rows = [
-        row for row in rows if _is_one_percent_delta(row["delta_usage_percent"])
-    ]
+    one_percent_rows = [row for row in rows if _is_one_percent_delta(row["delta_usage_percent"])]
     latest_rows = rows[-500:]
     return {
         "delta_usage_percent": _correlation_report(
@@ -264,9 +266,7 @@ def _span_correlation_summary(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
 
 
 def _one_percent_capacity_modeling(spans: list[UsageDeltaSpan]) -> dict[str, Any]:
-    one_percent_spans = [
-        span for span in spans if _is_one_percent_delta(span.delta_usage_percent)
-    ]
+    one_percent_spans = [span for span in spans if _is_one_percent_delta(span.delta_usage_percent)]
     rows = [_one_percent_capacity_row(span) for span in one_percent_spans]
     if len(rows) < 10:
         return _empty_one_percent_capacity_modeling(one_percent_spans, rows)
@@ -302,14 +302,10 @@ def _prepare_one_percent_capacity_rows(rows: list[dict[str, Any]]) -> None:
 
 def _fit_one_percent_capacity_models(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     models: list[dict[str, Any]] = []
-    for split_name, train_rows, holdout_rows in _split_feature_rows(
-        rows, train_fraction=0.8
-    ):
+    for split_name, train_rows, holdout_rows in _split_feature_rows(rows, train_fraction=0.8):
         models.extend(_fit_capacity_baseline_models(train_rows, holdout_rows, split_name))
         models.extend(
-            _fit_one_percent_capacity_predictive_models(
-                train_rows, holdout_rows, split_name
-            )
+            _fit_one_percent_capacity_predictive_models(train_rows, holdout_rows, split_name)
         )
     return models
 
@@ -354,9 +350,7 @@ def _one_percent_capacity_modeling_report(
             "Aggregate standard usage credits inside exact 1% visible-counter spans."
         ),
         "span_count": len(rows),
-        "target_distribution": _value_distribution(
-            [_number(row.get("target")) for row in rows]
-        ),
+        "target_distribution": _value_distribution([_number(row.get("target")) for row in rows]),
         "splits": ["time_ordered_80_20", "interleaved_every_5th"],
         "best_by_holdout_mae": best_model["name"] if best_model else None,
         "best_causal_by_holdout_mae": best_causal["name"] if best_causal else None,
@@ -407,9 +401,7 @@ def _add_capacity_history_features(rows: list[dict[str, Any]]) -> None:
         row["rolling10_capacity_credits"] = _rolling_mean(previous_rows, "target", 10)
         row["rolling10_capacity_median"] = _rolling_median(previous_rows, "target", 10)
         row["rolling10_capacity_stddev"] = _rolling_stddev(previous_rows, "target", 10)
-        row["same_hour_rolling10_capacity_credits"] = _rolling_mean(
-            recent_hour_rows, "target", 10
-        )
+        row["same_hour_rolling10_capacity_credits"] = _rolling_mean(recent_hour_rows, "target", 10)
         row["same_hour_seen_count"] = float(len(recent_hour_rows))
         row["same_day_of_week_rolling10_capacity_credits"] = _rolling_mean(
             recent_day_of_week_rows, "target", 10
@@ -479,8 +471,6 @@ def _fit_capacity_baseline_models(
             }
         )
     return results
-
-
 
 
 def write_usage_drain_spans_csv(spans: list[UsageDeltaSpan], path: Path) -> Path:

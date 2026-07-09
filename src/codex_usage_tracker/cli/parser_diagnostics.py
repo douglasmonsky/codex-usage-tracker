@@ -207,7 +207,9 @@ def _add_diagnostics_fact_sort(
     *,
     default_limit: int,
 ) -> None:
-    parser.add_argument("--limit", type=int, default=default_limit, help="Maximum rows; use 0 for all")
+    parser.add_argument(
+        "--limit", type=int, default=default_limit, help="Maximum rows; use 0 for all"
+    )
     parser.add_argument("--sort", choices=DIAGNOSTIC_FACT_SORT_CHOICES, default="uncached")
     parser.add_argument("--direction", choices=DIAGNOSTIC_DIRECTION_CHOICES, default="desc")
     parser.add_argument("--json", action="store_true", dest="as_json")

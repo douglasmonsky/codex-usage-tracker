@@ -79,6 +79,7 @@ def _thread_curve_summary(
         "threads": thread_rows[:max_threads],
     }
 
+
 def _thread_curve_record(
     bucket: dict[str, Any],
     *,
@@ -125,6 +126,7 @@ def _thread_curve_record(
         "points": _sample_curve_points(points, max_points=max_curve_points),
     }
 
+
 def _representative_call(calls: list[dict[str, Any]]) -> dict[str, Any]:
     if not calls:
         return {}
@@ -156,10 +158,9 @@ def _sample_curve_points(
     if max_points == 1:
         return [points[0]]
     last_index = len(points) - 1
-    selected_indexes = {
-        round(index * last_index / (max_points - 1)) for index in range(max_points)
-    }
+    selected_indexes = {round(index * last_index / (max_points - 1)) for index in range(max_points)}
     return [points[index] for index in sorted(selected_indexes)]
+
 
 def _curve_shape(first_half_share: float, largest_call_share: float) -> str:
     if largest_call_share >= 0.2:
@@ -169,6 +170,7 @@ def _curve_shape(first_half_share: float, largest_call_share: float) -> str:
     if first_half_share > 0.6:
         return "front-loaded"
     return "near-linear"
+
 
 def _thread_label(row: dict[str, Any]) -> str:
     return str(
@@ -180,12 +182,14 @@ def _thread_label(row: dict[str, Any]) -> str:
         or "Unknown thread"
     )
 
+
 def _thread_curve_chronological_key(row: dict[str, Any]) -> tuple[str, int, str]:
     return (
         str(row.get("event_timestamp") or ""),
         int(number(row.get("cumulative_total_tokens"))),
         str(row.get("record_id") or ""),
     )
+
 
 def number(value: object) -> float:
     if isinstance(value, bool):

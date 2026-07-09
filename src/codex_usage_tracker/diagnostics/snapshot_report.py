@@ -227,9 +227,7 @@ def _signal_lines(signals: object) -> list[str]:
     if not rows:
         return ["- No signals available."]
     return [
-        f"- {row.get('title')}: {row.get('finding')}"
-        for row in rows
-        if isinstance(row, dict)
+        f"- {row.get('title')}: {row.get('finding')}" for row in rows if isinstance(row, dict)
     ] or ["- No signals available."]
 
 

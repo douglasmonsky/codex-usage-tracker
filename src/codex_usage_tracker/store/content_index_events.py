@@ -119,7 +119,9 @@ def _response_item_events(
     if payload_type == "function_call":
         return _function_call_events(payload=payload, line_number=line_number, timestamp=timestamp)
     if payload_type == "function_call_output":
-        return _function_output_events(payload=payload, line_number=line_number, timestamp=timestamp)
+        return _function_output_events(
+            payload=payload, line_number=line_number, timestamp=timestamp
+        )
     return PendingLocalEvents(tool_calls=[], command_runs=[], file_events=[])
 
 
@@ -188,9 +190,15 @@ def _function_call_events(
                 line_end=line_number,
             )
         )
-        file_events.extend(_file_events_from_command(command, root=command_root, line_number=line_number))
-    file_events.extend(_file_events_from_payload(payload=payload, operation="modify", line_number=line_number))
-    return PendingLocalEvents(tool_calls=[tool_call], command_runs=command_runs, file_events=file_events)
+        file_events.extend(
+            _file_events_from_command(command, root=command_root, line_number=line_number)
+        )
+    file_events.extend(
+        _file_events_from_payload(payload=payload, operation="modify", line_number=line_number)
+    )
+    return PendingLocalEvents(
+        tool_calls=[tool_call], command_runs=command_runs, file_events=file_events
+    )
 
 
 def _function_output_events(
@@ -323,7 +331,11 @@ def _command_tokens(command: str) -> list[str]:
 
 def _strip_assignment_prefixes(tokens: list[str]) -> list[str]:
     index = 0
-    while index < len(tokens) and "=" in tokens[index] and not tokens[index].startswith(("-", "./", "/")):
+    while (
+        index < len(tokens)
+        and "=" in tokens[index]
+        and not tokens[index].startswith(("-", "./", "/"))
+    ):
         index += 1
     return tokens[index:]
 

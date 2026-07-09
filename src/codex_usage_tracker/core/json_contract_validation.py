@@ -78,10 +78,7 @@ def _validate_contract_field(
 
 
 def _contract_type_error(field_path: str, value: object, expected: object) -> str:
-    return (
-        f"{field_path} must be {_describe_type(expected)}, "
-        f"got {type(value).__name__}"
-    )
+    return f"{field_path} must be {_describe_type(expected)}, got {type(value).__name__}"
 
 
 def _matches_type(value: object, expected: object) -> bool:

@@ -49,12 +49,8 @@ def _token_component_regression_variant(
 ) -> dict[str, Any]:
     x_rows = _token_component_x_rows(spans, weighted_proxy=weighted_proxy)
     visible_target = [span.delta_usage_percent for span in spans]
-    credit_target = _token_component_credit_target(
-        spans, weighted_proxy=weighted_proxy
-    )
-    candidate_counts = _weighted_proxy_candidate_counts(
-        spans, weighted_proxy=weighted_proxy
-    )
+    credit_target = _token_component_credit_target(spans, weighted_proxy=weighted_proxy)
+    candidate_counts = _weighted_proxy_candidate_counts(spans, weighted_proxy=weighted_proxy)
     return {
         "weighted_proxy": weighted_proxy,
         **candidate_counts,
@@ -73,9 +69,7 @@ def _token_component_x_rows(
     return [
         [
             value / 1_000_000.0
-            for value in _span_token_components(
-                span, weighted_proxy=weighted_proxy
-            ).values()
+            for value in _span_token_components(span, weighted_proxy=weighted_proxy).values()
         ]
         for span in spans
     ]
@@ -86,10 +80,7 @@ def _token_component_credit_target(
 ) -> list[float]:
     if weighted_proxy is None:
         return [span.standard_usage_credits for span in spans]
-    return [
-        span.documented_fast_weighted_credits.get(weighted_proxy, 0.0)
-        for span in spans
-    ]
+    return [span.documented_fast_weighted_credits.get(weighted_proxy, 0.0) for span in spans]
 
 
 def _weighted_proxy_candidate_counts(
@@ -98,50 +89,39 @@ def _weighted_proxy_candidate_counts(
     if weighted_proxy is None:
         return {"candidate_rows": 0, "candidate_spans": 0}
     return {
-        "candidate_rows": sum(
-            span.candidate_row_counts.get(weighted_proxy, 0) for span in spans
-        ),
+        "candidate_rows": sum(span.candidate_row_counts.get(weighted_proxy, 0) for span in spans),
         "candidate_spans": sum(
-            1
-            for span in spans
-            if span.candidate_row_counts.get(weighted_proxy, 0) > 0
+            1 for span in spans if span.candidate_row_counts.get(weighted_proxy, 0) > 0
         ),
     }
 
 
-def _span_token_components(
-    span: UsageDeltaSpan, *, weighted_proxy: str | None
-) -> dict[str, float]:
+def _span_token_components(span: UsageDeltaSpan, *, weighted_proxy: str | None) -> dict[str, float]:
     if weighted_proxy:
         weighted = span.documented_fast_weighted_token_totals.get(weighted_proxy)
         if weighted:
             return {
-                field_name: weighted.get(field_name, 0.0)
-                for field_name in TOKEN_COMPONENT_FIELDS
+                field_name: weighted.get(field_name, 0.0) for field_name in TOKEN_COMPONENT_FIELDS
             }
     return {
         "uncached_input_tokens": span.token_totals.get("uncached_input_tokens", 0.0),
         "cached_input_tokens": span.token_totals.get("cached_input_tokens", 0.0),
-        "reasoning_output_tokens": span.token_totals.get(
-            "reasoning_output_tokens", 0.0
-        ),
+        "reasoning_output_tokens": span.token_totals.get("reasoning_output_tokens", 0.0),
         "nonreasoning_output_tokens": max(
             span.token_totals.get("output_tokens", 0.0)
             - span.token_totals.get("reasoning_output_tokens", 0.0),
             0.0,
         ),
     }
+
+
 def _token_component_target_regression(
     x_rows: list[list[float]], y_values: list[float], *, target: str
 ) -> dict[str, Any]:
     return {
         "target": target,
-        "with_intercept": _token_component_fit_summary(
-            x_rows, y_values, intercept=True
-        ),
-        "no_intercept": _token_component_fit_summary(
-            x_rows, y_values, intercept=False
-        ),
+        "with_intercept": _token_component_fit_summary(x_rows, y_values, intercept=True),
+        "no_intercept": _token_component_fit_summary(x_rows, y_values, intercept=False),
     }
 
 
@@ -154,15 +134,11 @@ def _token_component_fit_summary(
             "time_ordered_holdout_20": _regression_metrics([], []),
         }
     train_size = max(1, min(len(x_rows) - 1, int(len(x_rows) * 0.8)))
-    all_coefficients = _fit_linear_regression_coefficients(
-        x_rows, y_values, intercept=intercept
-    )
+    all_coefficients = _fit_linear_regression_coefficients(x_rows, y_values, intercept=intercept)
     train_coefficients = _fit_linear_regression_coefficients(
         x_rows[:train_size], y_values[:train_size], intercept=intercept
     )
-    all_predictions = _linear_regression_predictions(
-        x_rows, all_coefficients, intercept=intercept
-    )
+    all_predictions = _linear_regression_predictions(x_rows, all_coefficients, intercept=intercept)
     holdout_x = x_rows[train_size:]
     holdout_y = y_values[train_size:]
     holdout_predictions = _linear_regression_predictions(
@@ -171,9 +147,7 @@ def _token_component_fit_summary(
     return {
         "all": {
             **_regression_metrics(y_values, all_predictions),
-            "coefficients": _component_coefficient_rows(
-                all_coefficients, intercept=intercept
-            ),
+            "coefficients": _component_coefficient_rows(all_coefficients, intercept=intercept),
         },
         "time_ordered_holdout_20": {
             **_regression_metrics(holdout_y, holdout_predictions),
@@ -184,8 +158,6 @@ def _token_component_fit_summary(
     }
 
 
-
-
 def _component_coefficient_rows(
     coefficients: list[float], *, intercept: bool
 ) -> list[dict[str, Any]]:
@@ -194,6 +166,7 @@ def _component_coefficient_rows(
         {"feature": name, "coefficient": _rounded(coefficient)}
         for name, coefficient in zip(names, coefficients, strict=True)
     ]
+
 
 def one_percent_capacity_component_regression(
     spans: list[UsageDeltaSpan],
@@ -230,9 +203,7 @@ def _one_percent_capacity_component_variant(
     x_rows = [
         [
             value / 1_000_000.0
-            for value in _span_token_components(
-                span, weighted_proxy=weighted_proxy
-            ).values()
+            for value in _span_token_components(span, weighted_proxy=weighted_proxy).values()
         ]
         for span in spans
     ]

@@ -61,9 +61,7 @@ def summarize_pricing_coverage(
         coverage_rows.append(copy)
 
     total_tokens = totals["total_tokens"]
-    totals["priced_token_ratio"] = (
-        totals["priced_tokens"] / total_tokens if total_tokens else 0.0
-    )
+    totals["priced_token_ratio"] = totals["priced_tokens"] / total_tokens if total_tokens else 0.0
     coverage_rows.sort(
         key=lambda row: (
             0 if row.get("priced") is False else 1,
@@ -132,9 +130,7 @@ def estimate_cost_usd(
     output_tokens = _number(row.get("output_tokens"))
 
     return (
-        (uncached_input * input_rate)
-        + (cached_input * cached_rate)
-        + (output_tokens * output_rate)
+        (uncached_input * input_rate) + (cached_input * cached_rate) + (output_tokens * output_rate)
     ) / 1_000_000
 
 

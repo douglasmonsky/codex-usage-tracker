@@ -190,7 +190,9 @@ def support_bundle_payload(
             "pricing_path": _support_path_value("pricing_path", pricing_path, privacy_mode),
             "allowance_path": _support_path_value("allowance_path", allowance_path, privacy_mode),
             "rate_card_path": _support_path_value("rate_card_path", rate_card_path, privacy_mode),
-            "thresholds_path": _support_path_value("thresholds_path", thresholds_path, privacy_mode),
+            "thresholds_path": _support_path_value(
+                "thresholds_path", thresholds_path, privacy_mode
+            ),
             "projects_path": _support_path_value("projects_path", projects_path, privacy_mode),
         },
         "issue_report": support_bundle_issue_guidance(privacy_mode),

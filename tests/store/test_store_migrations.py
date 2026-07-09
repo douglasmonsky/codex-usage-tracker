@@ -161,8 +161,7 @@ def test_init_db_does_not_rerun_applied_migrations(
         schema_module,
         "_schema_migrations",
         lambda: tuple(
-            (version, fail_if_rerun)
-            for version in range(1, schema_module.SCHEMA_VERSION + 1)
+            (version, fail_if_rerun) for version in range(1, schema_module.SCHEMA_VERSION + 1)
         ),
     )
 
@@ -206,9 +205,10 @@ def test_malformed_legacy_schema_reports_actionable_error_without_data_loss(
     db_path = tmp_path / "usage.sqlite3"
     _write_legacy_usage_database(db_path, omit_source_file=True)
 
-    with pytest.raises(SchemaMigrationError, match="missing required columns: source_file"), connect(
-        db_path
-    ) as conn:
+    with (
+        pytest.raises(SchemaMigrationError, match="missing required columns: source_file"),
+        connect(db_path) as conn,
+    ):
         init_db(conn)
 
     raw = sqlite3.connect(db_path)

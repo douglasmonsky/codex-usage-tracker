@@ -584,15 +584,9 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     assert overview_refresh_payload["status"] == "ready"
     assert overview_refresh_payload["overview"]["usage_rows"] == 2
     assert overview_refresh_payload["refreshed"] is True
-    assert (
-        tool_output_refresh_payload["schema"]
-        == "codex-usage-tracker-diagnostic-tool-output-v1"
-    )
+    assert tool_output_refresh_payload["schema"] == "codex-usage-tracker-diagnostic-tool-output-v1"
     assert tool_output_refresh_payload["summary"]["original_token_sum"] == 9
-    assert (
-        commands_refresh_payload["schema"]
-        == "codex-usage-tracker-diagnostic-commands-v1"
-    )
+    assert commands_refresh_payload["schema"] == "codex-usage-tracker-diagnostic-commands-v1"
     assert commands_refresh_payload["commands"][0]["root"] == "git"
     assert commands_refresh_payload["commands"][0]["children"][0] == {
         "child": "status",
@@ -604,10 +598,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     )
     assert git_interactions_refresh_payload["summary"]["git_shell_calls"] == 1
     assert git_interactions_refresh_payload["interactions"][0]["operation"] == "status"
-    assert (
-        file_reads_refresh_payload["schema"]
-        == "codex-usage-tracker-diagnostic-file-reads-v1"
-    )
+    assert file_reads_refresh_payload["schema"] == "codex-usage-tracker-diagnostic-file-reads-v1"
     assert file_reads_refresh_payload["summary"]["read_events"] == 0
     assert (
         file_modifications_refresh_payload["schema"]
@@ -620,8 +611,7 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     )
     assert read_productivity_refresh_payload["summary"]["read_events_modified_later"] == 0
     assert (
-        concentration_refresh_payload["schema"]
-        == "codex-usage-tracker-diagnostic-concentration-v1"
+        concentration_refresh_payload["schema"] == "codex-usage-tracker-diagnostic-concentration-v1"
     )
     assert concentration_refresh_payload["summary"]["usage_rows"] == 2
     assert concentration_refresh_payload["metrics"]
@@ -631,18 +621,12 @@ def test_diagnostics_cli_returns_aggregate_json(tmp_path: Path) -> None:
     )
     assert guided_summary_refresh_payload["summary"]["usage_rows"] == 2
     assert guided_summary_refresh_payload["drivers"]
-    assert (
-        usage_drain_refresh_payload["schema"]
-        == "codex-usage-tracker-diagnostic-usage-drain-v1"
-    )
+    assert usage_drain_refresh_payload["schema"] == "codex-usage-tracker-diagnostic-usage-drain-v1"
     assert usage_drain_refresh_payload["summary"]["usage_rows"] == 2
     assert "thread_cost_curves" in usage_drain_refresh_payload
     usage_drain_thread = usage_drain_refresh_payload["thread_cost_curves"]["threads"][0]
     assert usage_drain_thread["largest_record_id"]
-    assert (
-        usage_drain_thread["representative_record_id"]
-        == usage_drain_thread["largest_record_id"]
-    )
+    assert usage_drain_thread["representative_record_id"] == usage_drain_thread["largest_record_id"]
     assert fact_calls_payload["view"] == "fact-calls"
     assert fact_calls_payload["filters"]["privacy_mode"] == "strict"
     assert fact_calls_payload["rows"][0]["cwd"].startswith("[redacted cwd:")
@@ -829,9 +813,7 @@ def _make_diagnostics_codex_home(tmp_path: Path) -> Path:
                         {
                             "type": "message",
                             "role": "assistant",
-                            "content": [
-                                {"type": "output_text", "text": "SECRET COMPACTION TEXT"}
-                            ],
+                            "content": [{"type": "output_text", "text": "SECRET COMPACTION TEXT"}],
                         }
                     ],
                 },
@@ -889,8 +871,6 @@ def _subprocess_env() -> dict[str, str]:
     repo_root = Path(__file__).resolve().parents[2]
     src_path = str(repo_root / "src")
     env["PYTHONPATH"] = (
-        f"{src_path}{os.pathsep}{env['PYTHONPATH']}"
-        if env.get("PYTHONPATH")
-        else src_path
+        f"{src_path}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else src_path
     )
     return env

@@ -108,8 +108,6 @@ def diagnostic_facts_from_envelope(
     return ()
 
 
-
-
 def _with_derived_loop_facts(
     segment: tuple[DiagnosticFact, ...],
 ) -> tuple[DiagnosticFact, ...]:
@@ -151,9 +149,7 @@ def _derived_loop_specs(
     )
 
 
-def _loop_source_facts(
-    segment: tuple[DiagnosticFact, ...], *, kind: str
-) -> list[DiagnosticFact]:
+def _loop_source_facts(segment: tuple[DiagnosticFact, ...], *, kind: str) -> list[DiagnosticFact]:
     if kind == "search_read":
         return [fact for fact in segment if _is_search_read_fact(fact)]
     if kind == "retry":
@@ -178,8 +174,6 @@ def _fact_event_total(facts: list[DiagnosticFact]) -> int:
     return sum(fact.event_count for fact in facts)
 
 
-
-
 def _derived_loop_fact(
     *,
     fact_name: str,
@@ -187,9 +181,7 @@ def _derived_loop_fact(
     event_count: int,
     source_facts: list[DiagnosticFact],
 ) -> DiagnosticFact:
-    first_source_line = _min_optional_int(
-        *[fact.first_source_line for fact in source_facts]
-    )
+    first_source_line = _min_optional_int(*[fact.first_source_line for fact in source_facts])
     last_source_line = _max_optional_int(*[fact.last_source_line for fact in source_facts])
     return DiagnosticFact(
         record_id=None,

@@ -31,7 +31,9 @@ def open_investigator_payload(
 
     parsed_target = urlparse(target)
     if parsed_target.scheme:
-        _validate_absolute_target(parsed_target.scheme, parsed_target.hostname, parsed_target.port, server_port)
+        _validate_absolute_target(
+            parsed_target.scheme, parsed_target.hostname, parsed_target.port, server_port
+        )
     allowed_paths = {f"/{dashboard_name}", REACT_DASHBOARD_PATH}
     if parsed_target.path not in allowed_paths:
         raise OpenInvestigatorRequestError("Only dashboard investigator URLs can be opened")

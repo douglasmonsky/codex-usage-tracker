@@ -28,6 +28,5 @@ def test_pricing_snapshot_warning_prefers_timestamp_labels() -> None:
     )
 
     assert warning == (
-        "Pricing snapshot changed since the previous dashboard render: "
-        "2026-06-01 -> 2026-06-02."
+        "Pricing snapshot changed since the previous dashboard render: 2026-06-01 -> 2026-06-02."
     )

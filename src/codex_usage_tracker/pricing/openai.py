@@ -242,11 +242,7 @@ def _parse_openai_price_value(value: str) -> float | None:
     normalized = value.strip()
     if normalized in {"", "null", "undefined", "-", '""', "''", '"-"', "'-'"}:
         return None
-    if (
-        len(normalized) >= 2
-        and normalized[0] == normalized[-1]
-        and normalized[0] in {'"', "'"}
-    ):
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
         normalized = normalized[1:-1].strip()
     if normalized in {"", "-", "Free"}:
         return None
