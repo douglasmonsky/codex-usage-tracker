@@ -22,13 +22,15 @@ checks without mixing in broad Python refactors or large documentation cleanup.
   `yamllint`, Taplo, and GitHub workflow schema validation.
 - Fix pytest verifier imports by including the repository root in pytest's
   Python path.
-
-## Finish On This Branch
-
-- Enable Taplo as an Agent Maintainer gate now that TOML is formatted.
+- Enable Taplo as Agent Maintainer gate after formatting TOML configuration.
 - Enable GitHub workflow schema validation with explicit `check-jsonschema`
   arguments.
-- Re-run focused validation for the newly enabled gates.
+- Re-run focused validation for the enabled optional gates.
+
+## Branch Exit
+
+This branch is ready for PR once the latest commit is pushed and CI confirms the
+same hardening gates remotely.
 
 ## Follow-Up PRs
 
