@@ -48,6 +48,7 @@ Do not read it during normal coding unless changing guidance.
 ## Active Gates
 
 - Secret scanning: gitleaks
+- YAML linting
 
 ## Failure Loop
 
