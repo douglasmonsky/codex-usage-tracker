@@ -283,19 +283,30 @@ def _run_inspect_log(args: argparse.Namespace) -> int:
     print(f"Adapter: {payload['adapter']}")
     print(f"File session id: {payload['file_session_id'] or 'unknown'}")
     print(f"Parsed events: {payload['event_count']}")
-    if payload["session_ids"]:
-        print("Sessions: " + ", ".join(str(value) for value in payload["session_ids"]))
-    if payload["models"]:
-        print("Models: " + ", ".join(str(value) for value in payload["models"]))
-    diagnostics = payload["diagnostics"]
+    session_ids = _string_values(payload.get("session_ids"))
+    if session_ids:
+        print("Sessions: " + ", ".join(session_ids))
+    models = _string_values(payload.get("models"))
+    if models:
+        print("Models: " + ", ".join(models))
+    diagnostics = _mapping_items(payload.get("diagnostics"))
     if diagnostics:
-        print(
-            "Diagnostics: "
-            + ", ".join(f"{key}={value}" for key, value in dict(diagnostics).items())
-        )
+        print("Diagnostics: " + ", ".join(f"{key}={value}" for key, value in diagnostics))
     else:
         print("Diagnostics: none")
     return 0
+
+
+def _string_values(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item) for item in value]
+
+
+def _mapping_items(value: Any) -> list[tuple[str, Any]]:
+    if not isinstance(value, dict):
+        return []
+    return [(str(key), item) for key, item in value.items()]
 
 
 def _run_rebuild_index(args: argparse.Namespace) -> int:

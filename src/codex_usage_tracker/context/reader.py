@@ -214,7 +214,8 @@ def _scan_context_line(
 
 
 def _context_envelope_parts(envelope: dict[str, Any]) -> tuple[str, dict[str, Any], str | None]:
-    payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
+    raw_payload = envelope.get("payload")
+    payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
     return (
         optional_str(envelope.get("type")) or "unknown",
         payload,
