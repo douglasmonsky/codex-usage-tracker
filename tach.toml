@@ -11,3 +11,683 @@ source_roots = ["src"]
 root_module = "ignore"
 forbid_circular_dependencies = false
 layers_explicit_depends_on = true
+
+[[modules]]
+path = "codex_usage_tracker.__main__"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.allowance"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.allowance_intelligence.model"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.allowance_intelligence.reports"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.__main__"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.config"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.dashboard"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.diagnostics"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.main"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.mcp_server"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.output"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.parser"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.parser_diagnostics"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.cli.plugin_installer"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.action_timing"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.constants"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.loader"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.reader"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.serialized"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.summaries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.token_estimates"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.context.values"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.api_payloads"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.call_origin"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.formatting"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.i18n"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.json_contract_cli"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.json_contract_common"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.json_contract_diagnostics"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.json_contract_server"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.json_contract_validation"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.json_contracts"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.models"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.paths"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.projects"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.redaction"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.schema"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.core.threads"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.dashboard.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.dashboard.assets"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.dashboard.pricing_snapshot"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.action_hints"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.fact_classifiers"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.facts"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.guided_summary"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.mcp"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.reports"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_analysis"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_concentration"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_constants"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_events"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_payloads"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_report"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_rows"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_source_logs"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshot_source_scan"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.snapshots"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.diagnostics.types"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.mcp_server"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.parser.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.parser.jsonl_v1"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.parser.jsonl_values"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.parser.state"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.plugin_installer"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.allowance"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.allowance_config"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.allowance_rate_card"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.allowance_text"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.allowance_usage"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.config"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.costing"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.estimates"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.pricing.openai"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.reports.agentic_dogfood"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.reports.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.reports.filters"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.reports.project_summary"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.reports.recommendation_builder"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.reports.recommendations"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.reports.support"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.allowance"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.call_detail"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.call_lists"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.context"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.context_settings"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.dashboard_shell"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.diagnostic_facts"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.diagnostic_routes"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.diagnostic_snapshots"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.handler"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.live_queries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.live_rows"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.open_investigator"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.recommendations"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.reports"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.request_guards"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.responses"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.routes"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.status"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.summary"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.threads"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.usage_refresh"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.server.utils"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.allowance_observations"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.api"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.connection"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.content_index"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.content_index_event_store"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.content_index_events"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.content_patterns"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.dashboard_queries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.diagnostic_call_queries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.diagnostic_queries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.exports"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.investigation_runs"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.large_low_output"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.query_sql"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.refresh"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.repeated_files"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.rows"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.schema"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.shell_churn"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.source_records"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.sources"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.summary_queries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.thread_summaries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.usage_api_queries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.usage_record_queries"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.store.usage_timing"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.support"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.allowance_breakpoints"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.allowance_fits"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.allowance_online"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.boundary_delta"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.boundary_delta_core"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.boundary_delta_rows"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.boundary_delta_summary"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.boundary_scopes"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.boundary_summary"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.capacity_specs"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.error_diagnostics"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.feature_history"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.features"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.grace"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.history_state"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.model"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.predictive"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.predictive_specs"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.proxy_fit"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.regime_labels"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.regime_segments"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.regression"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.reports"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.spans"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.state_buckets"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.state_diagnostics"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.summary_metrics"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.thread_curves"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.time_series"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.token_components"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.transition_gates"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.transition_metrics"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.types"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.utils"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.walk_forward"
+depends_on = []
+
+[[modules]]
+path = "codex_usage_tracker.usage_drain.walk_forward_rows"
+depends_on = []
