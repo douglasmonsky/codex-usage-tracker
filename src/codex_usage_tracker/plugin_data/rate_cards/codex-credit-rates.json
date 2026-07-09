@@ -2,7 +2,7 @@
   "schema": "codex-usage-tracker-codex-rate-card-v1",
   "version": "2026-07-09",
   "source": {
-    "name": "OpenAI Codex pricing docs",
+    "name": "OpenAI Codex rate card",
     "url": "https://developers.openai.com/codex/pricing",
     "pricing_url": "https://developers.openai.com/codex/pricing",
     "fetched_at": "2026-07-09",

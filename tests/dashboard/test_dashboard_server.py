@@ -501,7 +501,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     )
     assert limited_payload["pricing_configured"] is True
     assert limited_payload["allowance_configured"] is False
-    assert limited_payload["allowance_source"]["name"] == "OpenAI Codex pricing docs"
+    assert limited_payload["allowance_source"]["name"] == "OpenAI Codex rate card"
     assert limited_payload["rows"][0]["usage_credits"] is not None
     assert "refreshed_at" in limited_payload
     assert limited_payload["parser_diagnostics"] == {}
