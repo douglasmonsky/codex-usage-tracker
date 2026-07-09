@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sqlite3
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -122,9 +123,96 @@ def _dogfood_file_fingerprint(path: Path) -> dict[str, Any]:
     }
 
 
+def _dogfood_db_table_signature(
+    connection: sqlite3.Connection,
+    table_name: str,
+    expressions: list[str],
+) -> dict[str, Any]:
+    exists = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    if exists is None:
+        return {"exists": False}
+    columns = ", ".join(expressions)
+    row = connection.execute(f"SELECT {columns} FROM {table_name}").fetchone()
+    return {"exists": True, "values": list(row or [])}
+
+
+def _dogfood_db_fingerprint(path: Path) -> dict[str, Any]:
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return {"path": str(path), "exists": False}
+
+    fingerprint: dict[str, Any] = {
+        "path": str(path),
+        "exists": True,
+        "size": stat.st_size,
+    }
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+            connection.execute("PRAGMA query_only = ON")
+            fingerprint["tables"] = {
+                "usage_events": _dogfood_db_table_signature(
+                    connection,
+                    "usage_events",
+                    [
+                        "COUNT(*)",
+                        "COALESCE(MAX(event_timestamp), '')",
+                        "COALESCE(MAX(record_id), '')",
+                        "COALESCE(SUM(total_tokens), 0)",
+                    ],
+                ),
+                "source_files": _dogfood_db_table_signature(
+                    connection,
+                    "source_files",
+                    [
+                        "COUNT(*)",
+                        "COALESCE(SUM(size_bytes), 0)",
+                        "COALESCE(MAX(mtime_ns), 0)",
+                        "COALESCE(MAX(parsed_until_line), 0)",
+                        "COALESCE(MAX(latest_event_timestamp), '')",
+                    ],
+                ),
+                "command_runs": _dogfood_db_table_signature(
+                    connection,
+                    "command_runs",
+                    ["COUNT(*)", "COALESCE(MAX(record_id), '')"],
+                ),
+                "file_events": _dogfood_db_table_signature(
+                    connection,
+                    "file_events",
+                    ["COUNT(*)", "COALESCE(MAX(record_id), '')"],
+                ),
+                "tool_calls": _dogfood_db_table_signature(
+                    connection,
+                    "tool_calls",
+                    ["COUNT(*)", "COALESCE(MAX(record_id), '')"],
+                ),
+                "content_fragments": _dogfood_db_table_signature(
+                    connection,
+                    "content_fragments",
+                    ["COUNT(*)", "COALESCE(MAX(record_id), '')"],
+                ),
+                "allowance_observations": _dogfood_db_table_signature(
+                    connection,
+                    "allowance_observations",
+                    [
+                        "COUNT(*)",
+                        "COALESCE(MAX(observed_at), '')",
+                        "COALESCE(MAX(source_record_id), '')",
+                    ],
+                ),
+            }
+    except sqlite3.Error as exc:
+        fingerprint["read_error"] = type(exc).__name__
+    return fingerprint
+
+
 def _dogfood_cache_fingerprint(params: dict[str, Any]) -> dict[str, Any]:
     return {
-        "db": _dogfood_file_fingerprint(params["db_path"]),
+        "db": _dogfood_db_fingerprint(params["db_path"]),
         "pricing": _dogfood_file_fingerprint(params["pricing_path"]),
         "allowance": _dogfood_file_fingerprint(params["allowance_path"]),
         "rate_card": _dogfood_file_fingerprint(params["rate_card_path"]),
