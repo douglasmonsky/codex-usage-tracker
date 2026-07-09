@@ -5,6 +5,46 @@ on:
   pull_request:
 
 jobs:
+  hardening:
+    name: Hardening gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+          npm ci
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          cargo install taplo-cli --version 0.9.0 --locked
+      - name: GitHub Actions lint
+        run: actionlint .github/workflows/*.yml
+      - name: Secret scan
+        run: gitleaks dir --no-banner --redact=100 --report-format json --report-path /tmp/gitleaks.json .
+      - name: Markdown lint
+        run: npx markdownlint-cli2
+      - name: YAML lint
+        run: yamllint .github .yamllint
+      - name: TOML format
+        run: taplo fmt --check pyproject.toml tach.toml
+      - name: Workflow schema validation
+        run: |
+          check-jsonschema \
+            --builtin-schema vendor.github-workflows \
+            .github/workflows/ci.yml \
+            .github/workflows/pricing-compat.yml \
+            .github/workflows/publish.yml
+
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest

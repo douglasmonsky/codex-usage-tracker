@@ -1,107 +1,101 @@
 # Generated Agent Maintainer Guidance
 
-This file is generated from `[tool.agent_maintainer]` by
-`python3 -m agent_maintainer guidance`. Do not edit it by hand; update
-configuration first, then regenerate it.
+Generated from `[tool.agent_maintainer]` by
+`python3 -m agent_maintainer guidance`. Do not edit by hand.
+Human reference: `docs/agent-maintainer-guidance.md`.
+Do not read it during normal coding unless changing guidance.
 
-## Operating Intent
+## Hard Rules
 
-- Prefer small, coherent commits that keep maintenance feedback easy to review.
-- Keep source, tests, documentation, and configuration moving together.
-- Treat failing checks as design feedback before reaching for suppressions.
-- Preserve the configured architecture boundaries instead of adding imports around them.
-- Add or update tests for behavior changes unless tests are explicitly disabled.
+- Keep commits small, tested, and aligned with configured boundaries.
+- Treat failing checks as design feedback before adding suppressions.
+- Update source, tests, docs, and config together when behavior changes.
+- Do not relax thresholds or architecture rules to make checks pass.
 
-## File Inspection Safety
+## Context Hygiene
 
-- Prefer `rg --files` or `git ls-files` when enumerating files to inspect.
-- Restrict bulk reads to relevant text/source globs instead of every file under a tree.
-- Do not read generated or binary artifacts unless the task explicitly targets them:
+- Check branch/worktree once at turn start and before staging.
+- Read long guidance files only when starting fresh, after compaction,
+ or when guidance/config changed.
+- If already read in current unchanged context, use targeted `rg`
+ for specific rules instead of re-reading whole guidance.
+- Prefer `rg --files` or `git ls-files` for file discovery.
+- Do not bulk-read generated/cache/binary paths:
   `__pycache__`, `*.pyc`, `.venv`, `venv`, `.verify-logs`, `.coverage`,
-  `coverage.xml`, `htmlcov`, `mutants`, `build`, and `dist`.
-- Agent Maintainer and hook subprocesses set `PYTHONDONTWRITEBYTECODE=1` by
-  default. Set `AGENT_MAINTAINER_WRITE_BYTECODE=true` only when explicitly
-  debugging bytecode-cache behavior.
-- Manual Mutmut runs remove `mutants` after success. Set
+  `coverage.xml`, `htmlcov`, `mutants`, `build`, `dist`.
+- Use `AGENT_MAINTAINER_WRITE_BYTECODE=true` or
   `AGENT_MAINTAINER_KEEP_MUTANTS=true` only when explicitly debugging
-  mutation artifacts.
-- When a broad command is unavoidable, exclude generated, binary, cache, and
-  virtualenv paths before printing file contents.
+  those artifacts.
 
-## Active Configuration
+## Repo Contract
 
 - Mode: `legacy-ratchet`
 - Source roots: `src`
-- Test roots: `tests`
-- Package paths: `src`
-- Coverage source: `src`
-- Architecture backend: `tach`
-- Tests required: `true`
-- Diagnostic artifacts: `enabled` at `.verify-logs`
-- Source-without-test-change errors in profiles: `<none>`
+- Tests: `tests`
+- Architecture: `tach` with Tach domain contracts
+- If Tach policy changes, add or update an ADR under
+  `docs/architecture/decisions/`.
+
+## Blocking Limits
+
+- Coverage floors: total `80%`, changed `90%`
+- File length: `600` physical / `450` source lines
+- Change budget blocks: `800` lines or `20` files
+- New suppression budget: `3`
+- Complexity: Ruff `10`, Xenon `B`
 - Source-only changes without test-file changes: `blocked`
 
-## Architecture Policy Changes
+## Active Gates
 
-- `tach.toml`, `tach.domain.toml`, and architecture boundary
- configuration are policy files.
-- If a policy file changes, add or update a decision note under
- `docs/architecture/decisions/`.
-- The note must explain why the policy change is intentional and why
- it is not architecture drift.
-- Prefer refactoring code to preserve an existing boundary before
- changing the boundary.
+- Secret scanning: gitleaks
+- Markdown linting
+- YAML linting
+- TOML formatting
+- Schema validation
 
-## Verification Flow
+## Failure Loop
 
-- Trusted agent hooks normally run fast checks after edits and the precommit profile
-  before completion.
-- Run the precommit profile manually when hooks are unavailable, after bypassing hooks,
-  or when reproducing a hook failure:
-  `python3 -m agent_maintainer verify --profile precommit`.
-- Run the full profile before merging larger changes or changing shared verifier logic:
-  `python3 -m agent_maintainer verify --profile full`.
-- After changing `[tool.agent_maintainer]`, run
-  `python3 -m agent_maintainer guidance` and `python3 -m agent_maintainer doctor`.
+- Keep chat updates summary-first: completed check, actionable failure,
+ or plan change.
+- Do not emit routine `still running` updates for expected long checks.
+- Use `apply_patch` for manual edits; avoid heredoc rewrite commands.
+- After a failed verifier or hook result, read the repair capsule or
+ `.verify-logs/LAST_FAILURE.md` before changing code or config.
+- Prefer run-scoped `context --log-dir ...` commands for failures.
+- Expand only if needed:
+ `python3 -m agent_maintainer context failures --limit 20`.
+- Fix the root cause; do not lower thresholds or add broad suppressions.
 
-## Thresholds To Preserve
+## Required Commands
 
-- Total coverage floor: `80%`
-- Changed-code coverage floor: `90%`
-- File length limits: `600` physical lines, `450` source lines
-- File length baseline: `.agent-maintainer/file-length-baseline.json`
-- Change budget warnings: `300` lines or `8` files
-- Change budget blocks: `800` lines or `20` files
-- Cohesive-change override: `disabled`; allowlist `<none>`; max `2000` lines / `40` files
-- New suppression budget: `3`
-- Ruff McCabe complexity: `10`
-- Xenon complexity: absolute `B`, modules `A`, average `A`
-- Pyright mode: `standard`
-- Interrogate floor: `80%`
-- Folder Python-file warning/block thresholds: `20` / `40` (block active in fresh-strict)
-- Structure hint patterns are advisory refactor prompts; split by responsibility when a folder no longer has one clear boundary.
-
-## Optional Gates
-
-- pip-audit: `disabled`
-- Mutmut: `disabled`
-- Semgrep: `disabled`
-- OSV Scanner: `disabled`
-- Trivy: `disabled`
-- Python SBOM: `disabled`
-- License checking: `disabled`
-- Secret scanning: `disabled`
-- wemake-python-styleguide: `disabled`
-- Interrogate: `disabled`
-- Markdown linting: `disabled`
-- YAML linting: `disabled`
-- TOML formatting: `disabled`
-- Schema validation: `disabled`
+- Prefer shortest repo wrappers when present: `just vp` (precommit),
+ `just v` (full), `just vc` (CI-equivalent),
+ `just wg <run-id>`, `just wp <pr-number>`, `just wv <run-id>`.
+- Readable forms remain valid: `just verify-precommit`,
+ `just verify`, `just verify-ci`, `just wait-github <run-id>`,
+ `just wait-pr <pr-number>`, `just wait-verifier <run-id>`.
+- Normal finish fallback: `just vp` only when trusted
+ hooks are unavailable, bypassed, or failure reproduction is needed.
+- Trusted hooks already run `fast` after edits and `precommit`
+ at stop; do not duplicate a same-state hook pass manually.
+- Larger/shared changes: after coherent final state, run one broad
+ local profile, usually `full`.
+- Use `ci` locally instead of `full` when diff/base-ref,
+ CI profile, or workflow behavior changed.
+- Run both `full` and `ci` only when verifier/profile/CI-diff
+ behavior is under test.
+- Run `security` or `manual` when touching those gates, before release,
+ or when explicitly requested.
+- For GitHub Actions or long verifier jobs, use
+ `just wait-github <run-id>`, `just wait-pr <pr-number>`,
+ or `just wait-verifier <run-id>`
+ so tools own polling.
+- Run `just doctor` after setup, config, toolchain, hook,
+ or initializer changes.
 
 ## Escape Hatches
 
-- Prefer config changes over one-off command drift when repository layout changes.
-- Keep temporary CLI or environment overrides out of committed config unless they are policy.
-- Use `require_tests = false` only for repositories that intentionally have no tests.
-- Use `allow_source_without_test_change = true` only when existing tests already cover the change.
-- If a check is wrong, make the smallest correction to the check, config, or docs.
+- Prefer config or code fixes over one-off environment overrides.
+- Use cohesive change plans for intentional large diffs; include a reason
+  and verification plan.
+- If a check is wrong, make the smallest fix to the check, config, or docs.

@@ -1,0 +1,13 @@
+title = "codex-usage-tracker gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentional local artifacts and fake secret fixtures"
+paths = [
+  '''(^|/)__pycache__/''',
+  '''^tmp/''',
+  '''^test-results/''',
+  '''^tests/store_dashboard_helpers\.py$''',
+]

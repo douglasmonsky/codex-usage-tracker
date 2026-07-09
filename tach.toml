@@ -1,11 +1,11 @@
 exclude = [
-    "**/*__pycache__",
-    "**/*egg-info",
-    "**/build",
-    "**/dist",
-    "**/docs",
-    "**/tests",
-    "**/venv",
+  "**/*__pycache__",
+  "**/*egg-info",
+  "**/build",
+  "**/dist",
+  "**/docs",
+  "**/tests",
+  "**/venv",
 ]
 source_roots = ["src"]
 root_module = "ignore"
