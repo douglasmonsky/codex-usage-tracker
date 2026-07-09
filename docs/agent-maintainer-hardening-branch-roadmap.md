@@ -22,10 +22,14 @@ checks without mixing in broad Python refactors or large documentation cleanup.
   `yamllint`, Taplo, and GitHub workflow schema validation.
 - Fix pytest verifier imports by including the repository root in pytest's
   Python path.
+- Run one mechanical `ruff format` PR to clear format gate without behavior
+  changes.
 - Enable Taplo as Agent Maintainer gate after formatting TOML configuration.
 - Enable GitHub workflow schema validation with explicit `check-jsonschema`
   arguments.
 - Re-run focused validation for the enabled optional gates.
+- Add explicit root Tach module inventory and ADR so architecture checks report
+  real dependency violations instead missing configuration.
 
 ## Branch Exit
 
@@ -37,33 +41,24 @@ same hardening gates remotely.
 ### 1. Stabilize The Existing Full Profile
 
 First fix failures that prevent the full profile from being a useful signal.
-These are not product refactors; they are verifier hygiene and should be kept in
-small mechanical PRs.
+These are not product refactors; verifier hygiene should be kept in small
+mechanical PRs.
 
-- Resolve `pytest-coverage` collection failures. This is the highest-priority
-  blocker because other quality gates are less trustworthy until the full test
-  suite can import cleanly under the verifier environment.
-- Run one mechanical `ruff format` PR, or add a deliberate formatting baseline if
-  the repo does not want to adopt Ruff formatting globally. Do not combine this
-  with behavior changes.
-- Fix the narrow Pyright errors already surfaced in `cli/main.py` and
+- Fix narrow Pyright errors already surfaced in `cli/main.py` and
   `context/reader.py`. These look like concrete typing issues, not broad strict
   mode migration.
 
 ### 2. Make Architecture And Dependency Checks Actionable
 
-After tests and mechanical formatting are stable, make the structural gates
-produce useful review feedback.
+After tests and mechanical formatting are stable, make structural gates produce
+useful review feedback.
 
-- Fix `tach-config` first. Current output says `tach.toml` does not explicitly
-  list source modules, so Tach cannot be trusted as a blocking architecture
-  signal yet.
-- Fix actual `tach` boundary violations only after the config is explicit.
+- Fix actual `tach` boundary violations only after config is explicit.
 - Triage `deptry` into three buckets: real unused dependencies, intentionally
-  optional/runtime dependencies, and packaging/test-only dependencies. Commit
+  optional/runtime dependencies, packaging/test-only dependencies. Commit
   configuration only with a short explanation.
 - Triage `vulture` similarly: delete true dead code, preserve public/CLI/MCP
-  entry points with explicit allowlists, and avoid broad suppressions.
+  entry points with explicit allowlists, avoid broad suppressions.
 
 ### 3. Security Hardening Pass
 
