@@ -39,7 +39,4 @@ def test_token_component_summary_reports_weighted_proxy_metadata() -> None:
     assert weighted["weighted_proxy"] == "high_medium_candidates"
     assert weighted["candidate_rows"] == 2
     assert weighted["candidate_spans"] == 1
-    assert (
-        weighted["credit_accounting"]["target"]
-        == "high_medium_fast_weighted_credits"
-    )
+    assert weighted["credit_accounting"]["target"] == "high_medium_fast_weighted_credits"

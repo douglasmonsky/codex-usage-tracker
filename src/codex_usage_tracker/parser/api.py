@@ -25,6 +25,7 @@ from codex_usage_tracker.parser.state import (
 
 PARSER_DIAGNOSTIC_KEYS = _parser_state.PARSER_DIAGNOSTIC_KEYS
 
+
 @dataclass(frozen=True)
 class ParserAdapter:
     """Versioned parser adapter for one Codex log format family."""

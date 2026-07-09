@@ -50,8 +50,6 @@ BOUNDARY_DELTA_ERROR_CONTEXT_FIELDS = (
 )
 
 
-
-
 def boundary_walk_forward_delta_prediction_summary(
     rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -61,9 +59,7 @@ def boundary_walk_forward_delta_prediction_summary(
         "prediction_models": {
             "previous_delta": "Predicts the previous visible usage delta.",
             "prior_mode_delta": "Predicts the modal prior next-span delta.",
-            "segment_age_mode": (
-                "Uses the modal prior next-span delta from matching segment age."
-            ),
+            "segment_age_mode": ("Uses the modal prior next-span delta from matching segment age."),
             "label_segment_age_mode": (
                 "Uses the modal prior next-span delta from matching previous label "
                 "plus segment-position age."
@@ -93,8 +89,7 @@ def boundary_walk_forward_delta_prediction_summary(
                 "between previous delta and matched label/segment-age mode."
             ),
             "boundary_conditioned_label_segment_age_mode": (
-                "Uses the modal prior next-span delta from matching prior boundary "
-                "rows only."
+                "Uses the modal prior next-span delta from matching prior boundary rows only."
             ),
             "risk_weighted_boundary_conditioned_mode": (
                 "Blends previous delta with the boundary-conditioned mode according "
@@ -109,7 +104,6 @@ def boundary_walk_forward_delta_prediction_summary(
             for scope_name, start in BOUNDARY_RISK_SCOPE_STARTS.items()
         },
     }
-
 
 
 def _boundary_delta_prediction_scope(
@@ -216,9 +210,6 @@ def _boundary_delta_model_names(rows: list[dict[str, Any]]) -> list[str]:
     return names
 
 
-
-
-
 def _boundary_delta_risk_gate_diagnostics(
     rows: list[dict[str, Any]], model_name: str
 ) -> dict[str, Any]:
@@ -228,17 +219,11 @@ def _boundary_delta_risk_gate_diagnostics(
     source_counts = _boundary_delta_risk_gate_source_counts(details)
     return {
         "n": len(details),
-        "override_share": _boundary_delta_risk_gate_override_share(
-            source_counts, len(details)
-        ),
+        "override_share": _boundary_delta_risk_gate_override_share(source_counts, len(details)),
         "mean_risk": _boundary_delta_risk_gate_mean_number(details, "risk"),
         "mean_support": _boundary_delta_risk_gate_mean_support(details),
-        "mean_threshold": _boundary_delta_risk_gate_mean_number(
-            details, "risk_threshold"
-        ),
-        "source_counts": _boundary_delta_risk_gate_source_count_rows(
-            source_counts, len(details)
-        ),
+        "mean_threshold": _boundary_delta_risk_gate_mean_number(details, "risk_threshold"),
+        "source_counts": _boundary_delta_risk_gate_source_count_rows(source_counts, len(details)),
     }
 
 
@@ -246,8 +231,7 @@ def _boundary_delta_risk_gate_details(
     rows: list[dict[str, Any]], model_name: str
 ) -> list[dict[str, Any]]:
     return [
-        (row.get("boundary_delta_prediction_details") or {}).get(model_name) or {}
-        for row in rows
+        (row.get("boundary_delta_prediction_details") or {}).get(model_name) or {} for row in rows
     ]
 
 
@@ -308,9 +292,7 @@ def _boundary_delta_risk_gate_source_count_rows(
             "count": count,
             "share": _rounded(count / total_count),
         }
-        for source, count in sorted(
-            source_counts.items(), key=lambda item: (-item[1], item[0])
-        )
+        for source, count in sorted(source_counts.items(), key=lambda item: (-item[1], item[0]))
     ]
 
 
@@ -335,9 +317,7 @@ def _boundary_delta_residual_error_rows(
     return [_boundary_delta_residual_error_row(row, model_name) for row in rows]
 
 
-def _boundary_delta_residual_error_row(
-    row: dict[str, Any], model_name: str
-) -> dict[str, Any]:
+def _boundary_delta_residual_error_row(row: dict[str, Any], model_name: str) -> dict[str, Any]:
     predicted = _number((row.get("boundary_delta_predictions") or {}).get(model_name))
     actual = _number(row.get("delta_percent"))
     error = predicted - actual
@@ -450,9 +430,7 @@ def _boundary_delta_error_group_row(
         field_name: key,
         "count": len(items),
         "count_share": _rounded(len(items) / total_count),
-        "share_abs_error": _rounded(
-            abs_error_sum / total_abs_error if total_abs_error else None
-        ),
+        "share_abs_error": _rounded(abs_error_sum / total_abs_error if total_abs_error else None),
         "mean_abs_error": _rounded(abs_error_sum / len(items)),
         "rmse": _rounded(_boundary_delta_rmse(items)),
         "max_abs_error": _rounded(max(item["abs_error"] for item in items)),
@@ -492,9 +470,7 @@ def _largest_boundary_delta_errors(errors: list[dict[str, Any]]) -> list[dict[st
             "previous_segment_position_bucket": item["metadata"].get(
                 "previous_segment_position_bucket"
             ),
-            "boundary_state": "boundary"
-            if item["metadata"].get("is_boundary")
-            else "same_label",
+            "boundary_state": "boundary" if item["metadata"].get("is_boundary") else "same_label",
             "previous_delta_percent": _rounded(item["previous_delta_percent"]),
             "actual_delta_percent": _rounded(item["actual"]),
             "predicted_delta_percent": _rounded(item["predicted"]),

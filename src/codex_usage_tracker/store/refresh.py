@@ -240,7 +240,6 @@ def refresh_usage_index(
     return result
 
 
-
 def _emit_refresh_progress(
     progress_callback: RefreshProgressCallback | None,
     *,
@@ -273,6 +272,7 @@ def _refresh_progress_percent(completed: int, total: int) -> float:
         return 100.0
     return round(min(100.0, max(0.0, (completed / total) * 100.0)), 1)
 
+
 def _parse_refresh_plans(
     parse_plans: list[SourceParsePlan],
     session_index: dict[str, Any],
@@ -299,7 +299,6 @@ def _parse_refresh_plans(
             session_index=session_index,
             progress_callback=progress_callback,
         )
-
 
 
 def _parse_refresh_plans_serial(
@@ -331,6 +330,7 @@ def _parse_refresh_plans_serial(
             parsed_events=sum(len(result.events) for result in results),
         )
     return results
+
 
 def _parse_refresh_plans_parallel(
     parse_plans: list[SourceParsePlan],

@@ -193,7 +193,12 @@ def _candidate_explanation(
     output_bytes = tool_output_size_bytes + command_output_size_bytes
     reasons: list[str] = []
 
-    if input_tokens and uncached_input_tokens >= 10_000 and uncached_ratio >= 0.65 and cache_ratio <= 0.35:
+    if (
+        input_tokens
+        and uncached_input_tokens >= 10_000
+        and uncached_ratio >= 0.65
+        and cache_ratio <= 0.35
+    ):
         reasons.append("large_uncached_input")
     if context_window_percent >= 0.60:
         reasons.append("high_context_window_share")
@@ -244,7 +249,9 @@ def _usage_filters(
         clauses.append(f"{alias}.event_timestamp <= ?")
         params.append(until)
     if thread:
-        clauses.append(f"({alias}.thread_name = ? OR {alias}.thread_key = ? OR {alias}.session_id = ?)")
+        clauses.append(
+            f"({alias}.thread_name = ? OR {alias}.thread_key = ? OR {alias}.session_id = ?)"
+        )
         params.extend([thread, thread, thread])
     if extra_clauses:
         clauses.extend(extra_clauses)

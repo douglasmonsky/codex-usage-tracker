@@ -42,9 +42,7 @@ def load_context_usage_record(
     return row
 
 
-def context_source_location(
-    row: dict[str, Any], *, record_id: str
-) -> tuple[Path, int, int]:
+def context_source_location(row: dict[str, Any], *, record_id: str) -> tuple[Path, int, int]:
     source_file = Path(str(row.get("source_file") or ""))
     if not source_file.exists():
         raise FileNotFoundError(f"Source log not found: {source_file}")
@@ -125,9 +123,7 @@ def attach_context_diagnostics(
     diagnostic_payload["serialized_estimate_ms"] = loaded.serialized_estimate_ms
     diagnostic_payload["source_file_bytes"] = source_file_bytes
     diagnostic_payload["source_line_number"] = line_number
-    diagnostic_payload["entries_before_limit"] = int(
-        loaded.omitted.get("total_entries") or 0
-    )
+    diagnostic_payload["entries_before_limit"] = int(loaded.omitted.get("total_entries") or 0)
     diagnostic_payload["entries_returned"] = len(loaded.entries)
     payload["diagnostics"] = diagnostic_payload
     diagnostic_payload["json_bytes"] = json_byte_count(payload)

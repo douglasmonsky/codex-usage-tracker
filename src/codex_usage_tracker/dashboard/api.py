@@ -376,9 +376,7 @@ def render_dashboard_html(
         "call_investigator_script_src": call_investigator_script_src,
         "script_src": script_src,
     }
-    script_srcs.update(
-        {key: value for key, value in script_overrides.items() if value is not None}
-    )
+    script_srcs.update({key: value for key, value in script_overrides.items() if value is not None})
     return render_dashboard_template(
         payload,
         guide_href=guide_href,
@@ -535,22 +533,6 @@ def _previous_dashboard_payload(output_path: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return raw if isinstance(raw, dict) else None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _safe_int(value: object) -> int:

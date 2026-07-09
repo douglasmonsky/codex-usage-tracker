@@ -86,9 +86,7 @@ USAGE_EVENT_SCHEMA_CHECKSUM = hashlib.sha256(
     )
 ).hexdigest()
 USAGE_EVENT_REPAIR_COLUMNS = {
-    column.name: column.alter_type
-    for column in USAGE_EVENT_COLUMNS
-    if column.repairable
+    column.name: column.alter_type for column in USAGE_EVENT_COLUMNS if column.repairable
 }
 
 DIAGNOSTIC_FACT_COLUMN_NAMES = (

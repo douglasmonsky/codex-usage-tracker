@@ -333,7 +333,9 @@ def _smoke_plugin_install(command: Path, temp_dir: Path) -> None:
     ]
     missing = [path for path in required_files if not path.exists()]
     if missing:
-        raise SystemExit("plugin install missing files: " + ", ".join(str(path) for path in missing))
+        raise SystemExit(
+            "plugin install missing files: " + ", ".join(str(path) for path in missing)
+        )
     manifest = json.loads((plugin_dir / ".codex-plugin" / "plugin.json").read_text())
     if manifest.get("name") != "codex-usage-tracker":
         raise SystemExit("plugin manifest name mismatch")
@@ -521,7 +523,9 @@ def _smoke_served_dashboard(
     try:
         react_html = _read_url_when_ready(react_url, process)
         legacy_html = _read_url(legacy_url)
-        react_js = _read_url(f"{root_url}/codex-usage-tracker-assets/react/assets/dashboard-react.js")
+        react_js = _read_url(
+            f"{root_url}/codex-usage-tracker-assets/react/assets/dashboard-react.js"
+        )
         react_css = _read_url(f"{root_url}/codex-usage-tracker-assets/react/assets/index.css")
     finally:
         process_output = _stop_process(process)
@@ -544,7 +548,9 @@ def _smoke_served_dashboard(
         raise SystemExit("served React CSS asset did not include dashboard shell styles")
 
 
-def _read_url_when_ready(url: str, process: subprocess.Popen[str], timeout_seconds: float = 15.0) -> str:
+def _read_url_when_ready(
+    url: str, process: subprocess.Popen[str], timeout_seconds: float = 15.0
+) -> str:
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
     while time.monotonic() < deadline:

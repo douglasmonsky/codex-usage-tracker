@@ -151,14 +151,20 @@ def _report_evidence_rows(
     if report_key == "fast-mode-proxy":
         return sorted(
             [row for row in rows if _is_fast_candidate(row)],
-            key=lambda row: (_duration_seconds(row), -_usage_credits(row), -_number(row, "total_tokens")),
+            key=lambda row: (
+                _duration_seconds(row),
+                -_usage_credits(row),
+                -_number(row, "total_tokens"),
+            ),
         )[:evidence_limit]
     if report_key == "cost-curves":
         return sorted(
             rows,
             key=lambda row: (-_number(row, "estimated_cost_usd"), -_number(row, "total_tokens")),
         )[:evidence_limit]
-    return sorted(rows, key=lambda row: (-_usage_credits(row), -_number(row, "total_tokens")))[:evidence_limit]
+    return sorted(rows, key=lambda row: (-_usage_credits(row), -_number(row, "total_tokens")))[
+        :evidence_limit
+    ]
 
 
 def _is_fast_candidate(row: dict[str, Any]) -> bool:

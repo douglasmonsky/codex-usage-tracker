@@ -25,10 +25,7 @@ def test_shell_command_from_payload_reads_supported_argument_shapes() -> None:
         )
         == "pytest -q"
     )
-    assert (
-        shell_command_from_payload({"cmd": "rg TODO"}, function_name="shell")
-        == "rg TODO"
-    )
+    assert shell_command_from_payload({"cmd": "rg TODO"}, function_name="shell") == "rg TODO"
     assert (
         shell_command_from_payload(
             {"arguments": "{not json", "command": "fallback"},
@@ -36,10 +33,7 @@ def test_shell_command_from_payload_reads_supported_argument_shapes() -> None:
         )
         == "fallback"
     )
-    assert (
-        shell_command_from_payload({"cmd": "git status"}, function_name="read_file")
-        is None
-    )
+    assert shell_command_from_payload({"cmd": "git status"}, function_name="read_file") is None
 
 
 @pytest.mark.parametrize(
@@ -57,6 +51,8 @@ def test_shell_command_from_payload_reads_supported_argument_shapes() -> None:
         ("$PWCLI status", "pwcli"),
     ],
 )
-def test_command_root_and_child_normalizes_common_wrappers(command: str, expected_root: str) -> None:
+def test_command_root_and_child_normalizes_common_wrappers(
+    command: str, expected_root: str
+) -> None:
     root, _child = command_root_and_child(command)
     assert root == expected_root

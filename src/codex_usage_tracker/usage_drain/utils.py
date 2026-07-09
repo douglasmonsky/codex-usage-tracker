@@ -41,19 +41,14 @@ def reset_phase_bucket(elapsed_fraction: float) -> str:
     return "fourth_quarter"
 
 
-def numeric_bucket(
-    value: float, *, width: float, max_value: float, suffix: str
-) -> str:
+def numeric_bucket(value: float, *, width: float, max_value: float, suffix: str) -> str:
     if value <= 0 or width <= 0:
         return f"0_{suffix}"
     if value >= max_value:
         return f"{format_bucket_number(max_value)}_plus_{suffix}"
     lower = math.floor(value / width) * width
     upper = lower + width
-    return (
-        f"{format_bucket_number(lower)}_"
-        f"{format_bucket_number(upper)}_{suffix}"
-    )
+    return f"{format_bucket_number(lower)}_{format_bucket_number(upper)}_{suffix}"
 
 
 def minute_bucket(minutes: float) -> str:

@@ -158,9 +158,7 @@ def _capacity_estimates(state: _CausalHistoryState) -> dict[str, float]:
         "previous": previous_capacity_per_visible_percent(previous_rows),
         "rolling3": rolling_capacity_per_visible_percent(previous_rows, 3),
         "rolling10": rolling_capacity_per_visible_percent(previous_rows, 10),
-        "rolling10_median": rolling_capacity_median_per_visible_percent(
-            previous_rows, 10
-        ),
+        "rolling10_median": rolling_capacity_median_per_visible_percent(previous_rows, 10),
         "ewma": state.ewma_capacity or 0.0,
     }
 
@@ -173,9 +171,7 @@ def _attach_capacity_features(
     row["previous_capacity_credits_per_percent"] = capacity_estimates["previous"]
     row["rolling3_capacity_credits_per_percent"] = capacity_estimates["rolling3"]
     row["rolling10_capacity_credits_per_percent"] = capacity_estimates["rolling10"]
-    row["rolling10_median_capacity_credits_per_percent"] = capacity_estimates[
-        "rolling10_median"
-    ]
+    row["rolling10_median_capacity_credits_per_percent"] = capacity_estimates["rolling10_median"]
     row["ewma_capacity_credits_per_percent"] = capacity_estimates["ewma"]
     for capacity_name, capacity in capacity_estimates.items():
         row[f"{capacity_name}_capacity_delta_prediction"] = (
@@ -280,9 +276,7 @@ def attach_remainder_features(
     row[f"{prefix}_remainder_floor_delta_prediction"] = (
         float(math.floor(accumulated + 1e-9)) if accumulated > 0 else 0.0
     )
-    row[f"{prefix}_remainder_ceiling_delta_prediction"] = ceil_to_visible_tick(
-        accumulated
-    )
+    row[f"{prefix}_remainder_ceiling_delta_prediction"] = ceil_to_visible_tick(accumulated)
 
 
 def updated_remainder_credits(
@@ -310,18 +304,14 @@ def previous_capacity_per_visible_percent(rows: list[dict[str, Any]]) -> float:
     return capacity_per_visible_percent(rows[-1])
 
 
-def rolling_capacity_per_visible_percent(
-    rows: list[dict[str, Any]], window: int
-) -> float:
+def rolling_capacity_per_visible_percent(rows: list[dict[str, Any]], window: int) -> float:
     selected = rows[-window:]
     if not selected:
         return 0.0
     return sum(capacity_per_visible_percent(row) for row in selected) / len(selected)
 
 
-def rolling_capacity_median_per_visible_percent(
-    rows: list[dict[str, Any]], window: int
-) -> float:
+def rolling_capacity_median_per_visible_percent(rows: list[dict[str, Any]], window: int) -> float:
     selected = rows[-window:]
     if not selected:
         return 0.0
@@ -383,9 +373,7 @@ def rolling_low_delta_share(rows: list[dict[str, Any]], window: int) -> float:
     return low_count / len(selected)
 
 
-def row_tail_streak(
-    rows: list[dict[str, Any]], *, predicate: Any
-) -> int:
+def row_tail_streak(rows: list[dict[str, Any]], *, predicate: Any) -> int:
     count = 0
     for row in reversed(rows):
         if not predicate(row):

@@ -86,12 +86,7 @@ def dashboard_template_text() -> str:
 def dashboard_js_text() -> str:
     repo_root = Path(__file__).resolve().parents[2]
     return (
-        repo_root
-        / "src"
-        / "codex_usage_tracker"
-        / "plugin_data"
-        / "dashboard"
-        / "dashboard.js"
+        repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "dashboard.js"
     ).read_text(encoding="utf-8")
 
 
@@ -233,7 +228,9 @@ def test_non_english_catalogs_translate_call_investigator_readout(language: str)
     ]
 
     untranslated = [key for key in readout_labels if current[key] == english[key]]
-    assert not untranslated, f"{language} leaves call investigator readout untranslated: {untranslated}"
+    assert not untranslated, (
+        f"{language} leaves call investigator readout untranslated: {untranslated}"
+    )
 
 
 def test_catalog_keys_use_expected_namespaces() -> None:
@@ -312,7 +309,9 @@ def test_unknown_language_falls_back_to_english() -> None:
         (None, "en"),
     ],
 )
-def test_normalize_language_aliases(raw: str | None, expected: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_normalize_language_aliases(
+    raw: str | None, expected: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.delenv(LANGUAGE_ENV_VAR, raising=False)
 
     assert normalize_language(raw) == expected
@@ -359,7 +358,9 @@ def test_dashboard_i18n_payload_shape_for_each_supported_language() -> None:
         payload = dashboard_i18n_payload(language)
         assert payload["language"] == normalize_language(language)
         assert payload["language_direction"] == language_direction(language)
-        assert {entry["code"] for entry in payload["available_languages"]} == set(SUPPORTED_LANGUAGES)  # type: ignore[index]
+        assert {entry["code"] for entry in payload["available_languages"]} == set(
+            SUPPORTED_LANGUAGES
+        )  # type: ignore[index]
         assert set(payload["translation_catalog"]) == set(SUPPORTED_LANGUAGES)  # type: ignore[arg-type]
         assert payload["translations"]["dashboard.title"]  # type: ignore[index]
 
@@ -436,7 +437,10 @@ def test_dashboard_js_generates_language_options_and_preserves_runtime_state() -
     assert "availableLanguages.map" in populate_options
     assert "language.native_name" in populate_options
     assert "document.documentElement.lang = i18n.currentLanguage" in apply_translations
-    assert "document.documentElement.dir = languageDirection(i18n.currentLanguage)" in apply_translations
+    assert (
+        "document.documentElement.dir = languageDirection(i18n.currentLanguage)"
+        in apply_translations
+    )
     assert "if (element === detailEl) return" in apply_translations
     assert "renderLiveStatus()" in apply_translations
     assert "i18n.setLanguage(language)" in set_language
@@ -483,7 +487,9 @@ def test_dashboard_js_runtime_i18n_uses_stable_keys() -> None:
     assert "'metric.usage_observed': 'Usage observed'" in i18n_js
     assert "'allowance.live_check_short': 'Verify live'" in i18n_js
     assert "'button.run': 'Run'" not in i18n_js
-    assert "translatedField(recommendation.title_key, recommendation.title)" in recommendation_summary
+    assert (
+        "translatedField(recommendation.title_key, recommendation.title)" in recommendation_summary
+    )
     assert "translatedField(recommendation.why_key, recommendation.why)" in recommendation_summary
     assert "translatedField(row.recommended_action_key, row.recommended_action)" in next_action
     assert "translatedField(explanationKeys[index], explanation)" in show_detail

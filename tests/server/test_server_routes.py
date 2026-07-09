@@ -10,13 +10,9 @@ from codex_usage_tracker.server.routes import (
 
 def test_server_route_tables_cover_dashboard_api_paths() -> None:
     assert GET_ROUTE_METHODS["/api/context"] == "_handle_context"
-    assert GET_ROUTE_METHODS["/api/diagnostics/usage-drain"] == (
-        "_handle_diagnostics_usage_drain"
-    )
+    assert GET_ROUTE_METHODS["/api/diagnostics/usage-drain"] == ("_handle_diagnostics_usage_drain")
     assert GET_ROUTE_METHODS["/api/allowance/history"] == "_handle_allowance_history"
-    assert GET_ROUTE_METHODS["/api/allowance/diagnostics"] == (
-        "_handle_allowance_diagnostics"
-    )
+    assert GET_ROUTE_METHODS["/api/allowance/diagnostics"] == ("_handle_allowance_diagnostics")
     assert GET_ROUTE_METHODS["/api/allowance/export"] == "_handle_allowance_export"
     assert GET_ROUTE_METHODS["/api/usage"] == "_handle_usage"
     assert GET_DIAGNOSTIC_FACT_ROUTES == {

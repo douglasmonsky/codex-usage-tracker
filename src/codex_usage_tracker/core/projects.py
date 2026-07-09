@@ -71,9 +71,7 @@ def _project_aliases(payload: dict[str, Any]) -> dict[str, str]:
 
 def _project_ignored_paths(payload: dict[str, Any]) -> list[str]:
     return [
-        str(value)
-        for value in _list_section(payload, "ignored_paths")
-        if isinstance(value, str)
+        str(value) for value in _list_section(payload, "ignored_paths") if isinstance(value, str)
     ]
 
 
@@ -353,7 +351,11 @@ def _apply_project_privacy_to_row(row: dict[str, Any], mode: str) -> dict[str, A
 
 def _redacted_cwd_label(value: object) -> str:
     key = str(value or "unknown")
-    digest = key[:8] if len(key) >= 8 and all(ch in "0123456789abcdef" for ch in key[:8].lower()) else _stable_hash(key)[:8]
+    digest = (
+        key[:8]
+        if len(key) >= 8 and all(ch in "0123456789abcdef" for ch in key[:8].lower())
+        else _stable_hash(key)[:8]
+    )
     return f"[redacted cwd:{digest}]"
 
 

@@ -63,9 +63,7 @@ def load_call_context(
         record_id=record_id,
         diagnostic_payload=diagnostic_payload,
     )
-    source_file, source_file_bytes, line_number = context_source_location(
-        row, record_id=record_id
-    )
+    source_file, source_file_bytes, line_number = context_source_location(row, record_id=record_id)
     loaded = _read_context_for_usage_record(
         row=row,
         source_file=source_file,

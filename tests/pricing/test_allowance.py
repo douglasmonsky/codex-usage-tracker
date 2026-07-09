@@ -29,7 +29,10 @@ def test_allowance_estimates_exact_codex_credit_usage() -> None:
 
     assert rows[0]["usage_credit_model"] == "gpt-5.5"
     assert rows[0]["usage_credit_confidence"] == "exact"
-    assert rows[0]["usage_credit_source_url"] == "https://help.openai.com/en/articles/20001106-codex-rate-card"
+    assert (
+        rows[0]["usage_credit_source_url"]
+        == "https://help.openai.com/en/articles/20001106-codex-rate-card"
+    )
     assert rows[0]["usage_credit_fetched_at"] == "2026-06-03"
     assert rows[0]["usage_credit_tier"] == "standard"
     assert rows[0]["usage_credits"] == 0.1775
@@ -51,7 +54,10 @@ def test_allowance_marks_inferred_auto_review_mapping() -> None:
 
     assert rows[0]["usage_credit_model"] == "gpt-5.3-codex"
     assert rows[0]["usage_credit_confidence"] == "estimated"
-    assert rows[0]["usage_credit_source_url"] == "https://help.openai.com/en/articles/20001106-codex-rate-card"
+    assert (
+        rows[0]["usage_credit_source_url"]
+        == "https://help.openai.com/en/articles/20001106-codex-rate-card"
+    )
     assert rows[0]["usage_credits"] == 0.0590625
 
 
@@ -157,7 +163,17 @@ def test_parse_allowance_text_reads_status_percentages() -> None:
 def test_write_allowance_from_text_preserves_local_overrides(tmp_path: Path) -> None:
     path = tmp_path / "allowance.json"
     path.write_text(
-        json.dumps({"credit_rates": {"local-codex": {"input_per_million": 1, "cached_input_per_million": 1, "output_per_million": 1}}}),
+        json.dumps(
+            {
+                "credit_rates": {
+                    "local-codex": {
+                        "input_per_million": 1,
+                        "cached_input_per_million": 1,
+                        "output_per_million": 1,
+                    }
+                }
+            }
+        ),
         encoding="utf-8",
     )
 

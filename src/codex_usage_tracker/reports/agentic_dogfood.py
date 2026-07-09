@@ -449,11 +449,11 @@ def _compact_dogfood_payload(
             [
                 old_hypotheses,
                 new_hypotheses,
-            large_low_output,
-            shell_churn,
-            repeated_files,
-            action_brief,
-            allowance,
+                large_low_output,
+                shell_churn,
+                repeated_files,
+                action_brief,
+                allowance,
                 suggestions,
                 token_waste,
                 workflow_churn,
@@ -806,6 +806,5 @@ def render_agentic_dogfood_markdown(payload: dict[str, Any]) -> str:
 
 def _hypothesis_lines(rows: list[dict[str, Any]]) -> list[str]:
     return [
-        f"- **{row.get('family')}**: {row.get('status')} ({row.get('confidence')})"
-        for row in rows
+        f"- **{row.get('family')}**: {row.get('status')} ({row.get('confidence')})" for row in rows
     ]

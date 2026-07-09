@@ -265,12 +265,8 @@ def test_boundary_delta_prediction_scope_summarizes_models_and_filters_rows() ->
         "risk_gated_label_segment_age_mode",
     ]
     assert result["models"]["previous_delta"]["mae"] == 1.0
-    assert sorted(result["risk_gate_diagnostics"]) == [
-        "risk_gated_label_segment_age_mode"
-    ]
-    assert result["risk_gate_diagnostics"]["risk_gated_label_segment_age_mode"][
-        "mean_risk"
-    ] == 0.45
+    assert sorted(result["risk_gate_diagnostics"]) == ["risk_gated_label_segment_age_mode"]
+    assert result["risk_gate_diagnostics"]["risk_gated_label_segment_age_mode"]["mean_risk"] == 0.45
     assert sorted(result["residual_diagnostics"]) == ["previous_delta"]
 
     filtered = _boundary_delta_prediction_scope(rows, start_index=1)

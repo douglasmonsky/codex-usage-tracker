@@ -61,17 +61,12 @@ STATE_BUCKET_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
 STATE_BUCKET_MIN_SUPPORT = 2
 
 TRANSITION_RISK_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
-    "history_state_risk": STATE_BUCKET_MODEL_SIGNATURES[
-        "empirical_history_state_mode"
-    ],
-    "calendar_state_risk": STATE_BUCKET_MODEL_SIGNATURES[
-        "empirical_calendar_state_mode"
-    ],
+    "history_state_risk": STATE_BUCKET_MODEL_SIGNATURES["empirical_history_state_mode"],
+    "calendar_state_risk": STATE_BUCKET_MODEL_SIGNATURES["empirical_calendar_state_mode"],
     "reset_state_risk": STATE_BUCKET_MODEL_SIGNATURES["empirical_reset_state_mode"],
-    "previous_work_state_risk": STATE_BUCKET_MODEL_SIGNATURES[
-        "empirical_previous_work_state_mode"
-    ],
+    "previous_work_state_risk": STATE_BUCKET_MODEL_SIGNATURES["empirical_previous_work_state_mode"],
 }
+
 
 def state_bucket_predictions(
     previous_state_rows: list[dict[str, Any]],
@@ -92,6 +87,7 @@ def state_bucket_predictions(
         details[model_name] = detail
     return predictions, details
 
+
 def state_bucket_transition_risk(
     previous_state_rows: list[dict[str, Any]],
     state: dict[str, Any],
@@ -103,8 +99,7 @@ def state_bucket_transition_risk(
         matches = [
             row
             for row in previous_state_rows
-            if state_signature(row.get("state", {}), signature)
-            == state_signature(state, signature)
+            if state_signature(row.get("state", {}), signature) == state_signature(state, signature)
         ]
         if len(matches) < STATE_BUCKET_MIN_SUPPORT:
             continue
@@ -122,10 +117,12 @@ def state_bucket_transition_risk(
         "risk": rounded(fallback_rate),
     }
 
+
 def transition_rate(rows: list[dict[str, Any]]) -> float:
     if not rows:
         return 0.0
     return sum(1 for row in rows if not is_one_percent_delta(number(row.get("actual")))) / len(rows)
+
 
 def state_bucket_prediction(
     previous_state_rows: list[dict[str, Any]],
@@ -138,8 +135,7 @@ def state_bucket_prediction(
         matches = [
             row
             for row in previous_state_rows
-            if state_signature(row.get("state", {}), signature)
-            == state_signature(state, signature)
+            if state_signature(row.get("state", {}), signature) == state_signature(state, signature)
         ]
         if len(matches) < STATE_BUCKET_MIN_SUPPORT:
             continue
@@ -158,9 +154,8 @@ def state_bucket_prediction(
         "matched_mode": None,
     }
 
-def state_bucket_model_diagnostics(
-    rows: list[dict[str, Any]], model_name: str
-) -> dict[str, Any]:
+
+def state_bucket_model_diagnostics(rows: list[dict[str, Any]], model_name: str) -> dict[str, Any]:
     details = _details_for_model(rows, model_name, field_name="prediction_details")
     if not details:
         return {
@@ -200,10 +195,7 @@ def transition_risk_detail_diagnostics(
 def _details_for_model(
     rows: list[dict[str, Any]], model_name: str, *, field_name: str
 ) -> list[dict[str, Any]]:
-    return [
-        (row.get(field_name) or {}).get(model_name) or {}
-        for row in rows
-    ]
+    return [(row.get(field_name) or {}).get(model_name) or {} for row in rows]
 
 
 def _matched_state_detail_summary(details: list[dict[str, Any]]) -> dict[str, Any]:

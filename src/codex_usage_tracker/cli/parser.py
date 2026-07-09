@@ -199,7 +199,9 @@ def _add_refresh_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     refresh.add_argument("--json", action="store_true", dest="as_json")
 
 
-def _add_inspect_log_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def _add_inspect_log_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
     inspect = subparsers.add_parser(
         "inspect-log",
         help="Inspect one Codex JSONL log through the parser without writing to SQLite",
@@ -310,7 +312,9 @@ def _add_query_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     query.add_argument("--credit-confidence", choices=QUERY_CREDIT_CONFIDENCE_CHOICES)
     query.add_argument("--min-tokens", type=int)
     query.add_argument("--min-credits", type=float)
-    query.add_argument("--limit", type=int, default=100, help="Maximum rows to return; use 0 for all")
+    query.add_argument(
+        "--limit", type=int, default=100, help="Maximum rows to return; use 0 for all"
+    )
     query.add_argument(
         "--json",
         action="store_true",
@@ -326,17 +330,21 @@ def _add_recommendations_parser(
         "recommendations",
         help="Rank aggregate usage rows and threads by action recommendation severity",
     )
-    recommendations.add_argument("--since", help="Only include calls at or after this ISO date/time")
-    recommendations.add_argument("--until", help="Only include calls at or before this ISO date/time")
+    recommendations.add_argument(
+        "--since", help="Only include calls at or after this ISO date/time"
+    )
+    recommendations.add_argument(
+        "--until", help="Only include calls at or before this ISO date/time"
+    )
     recommendations.add_argument("--model")
     recommendations.add_argument("--effort")
     recommendations.add_argument("--thread")
     recommendations.add_argument("--project")
     recommendations.add_argument("--min-score", type=float)
-    recommendations.add_argument("--limit", type=int, default=20, help="Maximum rows to return; use 0 for all")
+    recommendations.add_argument(
+        "--limit", type=int, default=20, help="Maximum rows to return; use 0 for all"
+    )
     recommendations.add_argument("--json", action="store_true", dest="as_json")
-
-
 
 
 def _add_action_brief_parser(
@@ -403,7 +411,9 @@ def _add_dashboard_parsers(
 ) -> None:
     dashboard = subparsers.add_parser("dashboard", help="Generate static dashboard")
     dashboard.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
-    dashboard.add_argument("--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all")
+    dashboard.add_argument(
+        "--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all"
+    )
     dashboard.add_argument("--since", help="Only include calls at or after this ISO date/time")
     dashboard.add_argument(
         "--include-archived",
@@ -417,7 +427,9 @@ def _add_dashboard_parsers(
         "open-dashboard", help="Generate the default dashboard and open it"
     )
     open_dashboard.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
-    open_dashboard.add_argument("--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all")
+    open_dashboard.add_argument(
+        "--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all"
+    )
     open_dashboard.add_argument("--since", help="Only include calls at or after this ISO date/time")
     open_dashboard.add_argument(
         "--include-archived",
@@ -441,7 +453,9 @@ def _add_dashboard_parsers(
         help="Serve dashboard with lazy localhost context loading",
     )
     serve.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
-    serve.add_argument("--limit", type=int, default=5000, help="Initial maximum calls to load; use 0 for all")
+    serve.add_argument(
+        "--limit", type=int, default=5000, help="Initial maximum calls to load; use 0 for all"
+    )
     serve.add_argument("--since", help="Only include calls at or after this ISO date/time")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
@@ -495,7 +509,9 @@ def _add_pricing_coverage_parser(
     pricing_coverage = subparsers.add_parser(
         "pricing-coverage", help="Show priced, estimated, and unpriced token coverage"
     )
-    pricing_coverage.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    pricing_coverage.add_argument(
+        "--since", help="Only include calls at or after this ISO date/time"
+    )
     pricing_coverage.add_argument("--limit", type=int, default=20)
     pricing_coverage.add_argument(
         "--json",

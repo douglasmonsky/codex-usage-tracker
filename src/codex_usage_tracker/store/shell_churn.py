@@ -355,7 +355,9 @@ def _display_command_label(command_root: str, sample_command_label: str) -> str:
         return command_root
     safe_parts = [
         label_part
-        for label_part in (_safe_shell_label(part.lstrip("$")) for part in sample_command_label.split()[:2])
+        for label_part in (
+            _safe_shell_label(part.lstrip("$")) for part in sample_command_label.split()[:2]
+        )
         if label_part not in {"unknown", "unknown_command"}
     ]
     if not safe_parts:

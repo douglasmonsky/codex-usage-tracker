@@ -25,6 +25,7 @@ __all__ = (
     "summarize_allowance_usage",
 )
 
+
 def annotate_rows_with_allowance(
     rows: list[dict[str, Any]],
     config: UsageAllowanceConfig | None = None,
@@ -176,8 +177,10 @@ def _resolve_alias_credit_rate(
         return None
     metadata = {**config.rate_metadata.get(target, {}), **config.alias_metadata.get(model, {})}
     confidence = alias.get("confidence") or optional_str(metadata.get("confidence")) or "estimated"
-    note = alias.get("note") or optional_str(metadata.get("note")) or (
-        f"Mapped from {model} to {target} by local alias."
+    note = (
+        alias.get("note")
+        or optional_str(metadata.get("note"))
+        or (f"Mapped from {model} to {target} by local alias.")
     )
     return target, rates, confidence, note, metadata
 
@@ -194,7 +197,5 @@ def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> floa
         uncached_input = max(number_value(row.get("input_tokens")) - cached_input, 0.0)
     output_tokens = number_value(row.get("output_tokens"))
     return (
-        (uncached_input * input_rate)
-        + (cached_input * cached_rate)
-        + (output_tokens * output_rate)
+        (uncached_input * input_rate) + (cached_input * cached_rate) + (output_tokens * output_rate)
     ) / 1_000_000

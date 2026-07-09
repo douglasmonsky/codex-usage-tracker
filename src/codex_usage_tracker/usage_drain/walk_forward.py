@@ -118,12 +118,6 @@ def walk_forward_prediction_rows(spans: list[UsageDeltaSpan]) -> list[dict[str, 
     return _walk_forward_prediction_rows(spans)
 
 
-
-
-
-
-
-
 ERROR_DIAGNOSTIC_MODELS = (
     "constant_one_percent",
     "previous_delta",
@@ -147,9 +141,8 @@ TRANSITION_GATE_DIAGNOSTIC_MODELS = (
     "adaptive_mae_transition_gate_history_state_mode",
 )
 
-def _walk_forward_scope_metrics(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> dict[str, Any]:
+
+def _walk_forward_scope_metrics(rows: list[dict[str, Any]], *, start_index: int) -> dict[str, Any]:
     scope_rows = _scope_rows(rows, start_index=start_index)
     actual = _scope_actual_values(scope_rows)
     model_names = _scope_model_names(scope_rows)
@@ -158,18 +151,12 @@ def _walk_forward_scope_metrics(
         "actual": _value_distribution(actual),
         "models": _scope_model_metrics(scope_rows, actual, model_names),
         "error_diagnostics": _scope_error_diagnostics(scope_rows, model_names),
-        "transition_gate_diagnostics": _scope_transition_gate_diagnostics(
-            scope_rows, model_names
-        ),
-        "state_bucket_diagnostics": _scope_state_bucket_diagnostics(
-            scope_rows, model_names
-        ),
+        "transition_gate_diagnostics": _scope_transition_gate_diagnostics(scope_rows, model_names),
+        "state_bucket_diagnostics": _scope_state_bucket_diagnostics(scope_rows, model_names),
     }
 
 
-def _scope_rows(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> list[dict[str, Any]]:
+def _scope_rows(rows: list[dict[str, Any]], *, start_index: int) -> list[dict[str, Any]]:
     return [row for row in rows if int(row["index"]) >= start_index]
 
 
@@ -187,19 +174,13 @@ def _scope_model_metrics(
     scope_rows: list[dict[str, Any]], actual: list[float], model_names: list[str]
 ) -> dict[str, Any]:
     return {
-        model_name: _regression_metrics(
-            actual, _scope_model_predictions(scope_rows, model_name)
-        )
+        model_name: _regression_metrics(actual, _scope_model_predictions(scope_rows, model_name))
         for model_name in model_names
     }
 
 
-def _scope_model_predictions(
-    scope_rows: list[dict[str, Any]], model_name: str
-) -> list[float]:
-    return [
-        _number(row.get("predictions", {}).get(model_name)) for row in scope_rows
-    ]
+def _scope_model_predictions(scope_rows: list[dict[str, Any]], model_name: str) -> list[float]:
+    return [_number(row.get("predictions", {}).get(model_name)) for row in scope_rows]
 
 
 def _scope_error_diagnostics(
@@ -229,8 +210,6 @@ def _scope_state_bucket_diagnostics(
     }
 
 
-def _included_models(
-    candidates: tuple[str, ...], model_names: list[str]
-) -> tuple[str, ...]:
+def _included_models(candidates: tuple[str, ...], model_names: list[str]) -> tuple[str, ...]:
     model_name_set = set(model_names)
     return tuple(model_name for model_name in candidates if model_name in model_name_set)

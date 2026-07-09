@@ -564,8 +564,7 @@ def _backfill_source_records(conn: sqlite3.Connection) -> None:
 
 def _source_record_backfill_columns_available(conn: sqlite3.Connection) -> bool:
     existing = {
-        str(row["name"])
-        for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+        str(row["name"]) for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
     }
     required = {"record_id", "source_file", "line_number", "event_timestamp"}
     return required.issubset(existing)
@@ -620,9 +619,7 @@ def _backfill_allowance_observations(conn: sqlite3.Connection) -> None:
     _backfill_allowance_observation_window(conn, "secondary")
 
 
-def _backfill_allowance_observation_window(
-    conn: sqlite3.Connection, window_key: str
-) -> None:
+def _backfill_allowance_observation_window(conn: sqlite3.Connection, window_key: str) -> None:
     used_col = f"rate_limit_{window_key}_used_percent"
     minutes_col = f"rate_limit_{window_key}_window_minutes"
     resets_col = f"rate_limit_{window_key}_resets_at"
@@ -738,8 +735,7 @@ def _ensure_table_columns(
     columns: dict[str, str],
 ) -> None:
     existing = {
-        str(row["name"])
-        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
     }
     for column, column_type in columns.items():
         if column not in existing:
@@ -752,8 +748,7 @@ def _ensure_table_columns(
 
 def _validate_usage_events_schema(conn: sqlite3.Connection) -> None:
     existing = {
-        str(row["name"])
-        for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+        str(row["name"]) for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
     }
     missing = [column for column in REQUIRED_USAGE_EVENT_COLUMNS if column not in existing]
     if missing:

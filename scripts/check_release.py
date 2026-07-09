@@ -266,10 +266,7 @@ def main() -> int:
 
 def _check_required_files() -> list[str]:
     failures: list[str] = []
-    tracked_files = {
-        path.relative_to(REPO_ROOT).as_posix()
-        for path in _tracked_files()
-    }
+    tracked_files = {path.relative_to(REPO_ROOT).as_posix() for path in _tracked_files()}
     for path in REQUIRED_FILES:
         if not (REPO_ROOT / path).exists():
             failures.append(f"missing required file: {path}")
@@ -337,7 +334,9 @@ def _check_package_naming_docs() -> list[str]:
     for relative_path in PACKAGE_NAMING_DOCS:
         text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
         if DISTRIBUTION_NAME not in text:
-            failures.append(f"{relative_path} must name the public PyPI package {DISTRIBUTION_NAME}")
+            failures.append(
+                f"{relative_path} must name the public PyPI package {DISTRIBUTION_NAME}"
+            )
         if relative_path in {"README.md", "docs/install.md"} and old_name_warning not in text:
             failures.append(
                 f"{relative_path} must warn that {OLD_PYPI_DISTRIBUTION_NAME} "
@@ -406,9 +405,11 @@ def _check_packaging_metadata() -> list[str]:
     failures: list[str] = []
     manifest = json.loads((REPO_ROOT / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
     if manifest != plugin_manifest():
-        failures.append(".codex-plugin/plugin.json does not match plugin_installer.plugin_manifest()")
+        failures.append(
+            ".codex-plugin/plugin.json does not match plugin_installer.plugin_manifest()"
+        )
     if project.get("license") != "MIT":
-        failures.append("pyproject.toml should use SPDX license = \"MIT\"")
+        failures.append('pyproject.toml should use SPDX license = "MIT"')
     if "license-files" not in project:
         failures.append("pyproject.toml should include license-files")
     if "urls" not in project:
@@ -427,7 +428,9 @@ def _check_packaging_metadata() -> list[str]:
     if mcp_server.get("args") != ["./skills/codex-usage-tracker/scripts/run_mcp.py"]:
         failures.append(".mcp.json should point at the bundled MCP bootstrap launcher")
     if mcp_server.get("startup_timeout_sec") != 120:
-        failures.append(".mcp.json should allow enough startup time for first-run runtime bootstrap")
+        failures.append(
+            ".mcp.json should allow enough startup time for first-run runtime bootstrap"
+        )
     manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     if "recursive-include skills *.md *.py" not in manifest:
         failures.append("MANIFEST.in should include Codex skill scripts in the source distribution")
@@ -453,7 +456,9 @@ def _check_packaging_metadata() -> list[str]:
     if "importlib.metadata.version('codex-usage-tracking')" not in launcher:
         failures.append("MCP runtime launcher must check the codex-usage-tracking distribution")
     if "PACKAGE_SPEC_MARKER" not in launcher:
-        failures.append("MCP runtime launcher should invalidate cached runtimes when package spec changes")
+        failures.append(
+            "MCP runtime launcher should invalidate cached runtimes when package spec changes"
+        )
     failures.extend(_check_python_support_metadata(project))
     failures.extend(_check_ci_workflow())
     failures.extend(_check_publish_workflow())
@@ -506,8 +511,8 @@ def _check_publish_workflow() -> list[str]:
         "python -m twine check dist/*",
         "if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'",
         "if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')",
-        "echo \"ref=$GITHUB_REF\"",
-        "echo \"sha=$GITHUB_SHA\"",
+        'echo "ref=$GITHUB_REF"',
+        'echo "sha=$GITHUB_SHA"',
         "refs/heads/main|refs/tags/*",
         "Manual PyPI publishing must run from main or a tag ref.",
         "name: testpypi",
@@ -518,7 +523,9 @@ def _check_publish_workflow() -> list[str]:
         "codex-usage-tracking {version} already exists on {index_name}; skipping upload.",
     ]:
         if required not in workflow:
-            failures.append(f"publish workflow is missing required Trusted Publishing text: {required}")
+            failures.append(
+                f"publish workflow is missing required Trusted Publishing text: {required}"
+            )
     if re.search(r"(?m)^\s*push\s*:", workflow):
         failures.append("publish workflow must not publish on ordinary pushes")
     if re.search(r"(?m)^\s*pull_request\s*:", workflow):
@@ -532,9 +539,9 @@ def _check_publish_workflow() -> list[str]:
             continue
         for required in [
             "Verify PyPI publish ref",
-            "echo \"event=$GITHUB_EVENT_NAME\"",
-            "echo \"ref=$GITHUB_REF\"",
-            "echo \"sha=$GITHUB_SHA\"",
+            'echo "event=$GITHUB_EVENT_NAME"',
+            'echo "ref=$GITHUB_REF"',
+            'echo "sha=$GITHUB_SHA"',
             "refs/heads/main|refs/tags/*",
             "Manual PyPI publishing must run from main or a tag ref.",
             "Check target package version",
@@ -578,7 +585,9 @@ def _check_ci_workflow() -> list[str]:
 def _check_skill_packaging() -> list[str]:
     failures: list[str] = []
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    package_data = set(pyproject["tool"]["setuptools"]["package-data"]["codex_usage_tracker.plugin_data"])
+    package_data = set(
+        pyproject["tool"]["setuptools"]["package-data"]["codex_usage_tracker.plugin_data"]
+    )
     if "dashboard/locales/*" not in package_data:
         failures.append("pyproject.toml package data is missing dashboard locale catalogs")
     for source_skill in sorted((REPO_ROOT / "skills").glob("*/SKILL.md")):

@@ -91,9 +91,7 @@ def _two_feature_fit(
         return beta_non, beta_candidate, implied_multiplier, None
     y_hat = [
         (beta_non * non_candidate) + (beta_candidate * candidate)
-        for non_candidate, candidate in zip(
-            non_candidate_values, candidate_values, strict=True
-        )
+        for non_candidate, candidate in zip(non_candidate_values, candidate_values, strict=True)
     ]
     return beta_non, beta_candidate, implied_multiplier, y_hat
 
@@ -113,9 +111,7 @@ def _proxy_grid_fit(
         key=lambda item: _number(item.get("r2_slope")),
         default=None,
     )
-    return grid, (
-        _number(best_grid.get("multiplier")) if best_grid is not None else None
-    )
+    return grid, (_number(best_grid.get("multiplier")) if best_grid is not None else None)
 
 
 def _candidate_drain_comparison(

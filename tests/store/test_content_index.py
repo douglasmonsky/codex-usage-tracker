@@ -51,9 +51,7 @@ def test_refresh_populates_normalized_content_index_by_default(tmp_path: Path) -
     assert all("SECRET RAW PROMPT" not in row["safe_label"] for row in fragment_rows)
 
 
-def test_refresh_incrementally_indexes_appended_content(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_refresh_incrementally_indexes_appended_content(tmp_path: Path, monkeypatch) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
 
@@ -101,9 +99,7 @@ def test_refresh_incrementally_indexes_appended_content(
     assert report["total_matched_rows"] == 1
 
 
-def test_refresh_batches_full_content_fts_rebuild(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_refresh_batches_full_content_fts_rebuild(tmp_path: Path, monkeypatch) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     refresh_usage_index(codex_home=codex_home, db_path=db_path, aggregate_only=True)
@@ -131,16 +127,11 @@ def test_refresh_batches_full_content_fts_rebuild(
     assert rebuild_calls == 1
 
 
-def test_refresh_batches_content_index_row_writes(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_refresh_batches_content_index_row_writes(tmp_path: Path, monkeypatch) -> None:
     codex_home = tmp_path / ".codex"
     log_dir = codex_home / "sessions" / "2026" / "05" / "17"
     log_dir.mkdir(parents=True)
-    log_path = log_dir / (
-        "rollout-2026-05-17T14-58-23-"
-        "019e374d-c19f-7da3-a44f-8de043a7a64e.jsonl"
-    )
+    log_path = log_dir / ("rollout-2026-05-17T14-58-23-019e374d-c19f-7da3-a44f-8de043a7a64e.jsonl")
     rows: list[dict[str, object]] = []
     for index in range(3):
         rows.extend(
@@ -179,9 +170,7 @@ def test_refresh_batches_content_index_row_writes(
     assert fragment_write_sizes == [2, 1]
 
 
-def test_refresh_indexes_content_sources_in_parallel(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_refresh_indexes_content_sources_in_parallel(tmp_path: Path, monkeypatch) -> None:
     codex_home = tmp_path / ".codex"
     log_dir = codex_home / "sessions" / "2026" / "05" / "17"
     log_dir.mkdir(parents=True)
@@ -242,7 +231,12 @@ def test_refresh_populates_normalized_local_event_tables(tmp_path: Path) -> None
     db_path = tmp_path / "usage.sqlite3"
     session_id = "019e37f1-15d4-76a5-bf68-9d7616f9b8db"
     log_path = (
-        codex_home / "sessions" / "2026" / "05" / "18" / f"rollout-2026-05-18T09-00-00-{session_id}.jsonl"
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "18"
+        / f"rollout-2026-05-18T09-00-00-{session_id}.jsonl"
     )
     _write_jsonl(
         log_path,
@@ -660,7 +654,9 @@ def test_shell_churn_display_labels_repair_legacy_unknown_command_rows() -> None
     fallback_root = _display_command_root("unknown_command", "$PWCLI", distinct_label_count=2)
     assert fallback_root == "unclassified_shell_script"
 
-    fallback_root = _display_command_root("unknown_command", "unknown_command", distinct_label_count=1)
+    fallback_root = _display_command_root(
+        "unknown_command", "unknown_command", distinct_label_count=1
+    )
     assert fallback_root == "unclassified_shell_script"
     assert _display_command_label(fallback_root, "unknown_command") == "unclassified_shell_script"
     assert _command_family(fallback_root) == "unclassified_shell"
@@ -790,7 +786,9 @@ def test_large_low_output_calls_flags_cold_resume_candidates(tmp_path: Path) -> 
     ).payload
     assert validate_json_payload_contract(walk) == []
     assert any(branch["scan_type"] == "large_low_output" for branch in walk["branches"])
-    assert any(tool["tool"] == "usage_large_low_output_calls" for tool in walk["recommended_next_tools"])
+    assert any(
+        tool["tool"] == "usage_large_low_output_calls" for tool in walk["recommended_next_tools"]
+    )
 
 
 def _custom_token_event(

@@ -249,11 +249,14 @@ def _mcp_import_failure(command: str, result: subprocess.CompletedProcess[str]) 
         ),
     )
 
+
 def _uses_direct_mcp_module(args: list[str]) -> bool:
     return "-m" in args and "codex_usage_tracker.mcp_server" in args
 
+
 def _uses_bootstrap_launcher(args: list[str]) -> bool:
     return any(arg.endswith("skills/codex-usage-tracker/scripts/run_mcp.py") for arg in args)
+
 
 def _check_mcp_launcher(repo_root: Path, args: list[str]) -> DoctorCheck:
     script_args = [
@@ -282,6 +285,7 @@ def _check_mcp_launcher(repo_root: Path, args: list[str]) -> DoctorCheck:
         "MCP bootstrap launcher is present; it validates or installs the runtime on startup.",
     )
 
+
 def _resolve_mcp_command(command: object, repo_root: Path) -> str | None:
     if not isinstance(command, str) or not command:
         return None
@@ -293,11 +297,13 @@ def _resolve_mcp_command(command: object, repo_root: Path) -> str | None:
         return str(resolved) if resolved.exists() else None
     return shutil.which(command)
 
+
 def _resolve_mcp_cwd(cwd: object, repo_root: Path) -> Path:
     if not isinstance(cwd, str) or not cwd:
         return repo_root
     cwd_path = Path(cwd)
     return cwd_path if cwd_path.is_absolute() else (repo_root / cwd_path).resolve()
+
 
 def _first_error_line(text: str) -> str:
     for line in text.splitlines():
@@ -305,6 +311,7 @@ def _first_error_line(text: str) -> str:
         if stripped:
             return stripped
     return ""
+
 
 def check_mcp_import() -> DoctorCheck:
     module_spec = importlib.util.find_spec("codex_usage_tracker.mcp_server")

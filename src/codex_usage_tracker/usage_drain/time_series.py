@@ -257,7 +257,9 @@ def _weekly_projection_trend(points: list[dict[str, Any]]) -> dict[str, Any]:
         "latest_projected_weekly_credits": _rounded(values[-1]),
         "change_from_first_credits": _rounded(change),
         "change_from_first_pct": _rounded(change / values[0] if values[0] else None),
-        "rate_limit_plan_type": trend_points[-1].get("rate_limit_plan_type") if trend_points else None,
+        "rate_limit_plan_type": trend_points[-1].get("rate_limit_plan_type")
+        if trend_points
+        else None,
     }
 
 
@@ -283,7 +285,9 @@ def _insufficient_weekly_projection_trend(
         "latest_projected_weekly_credits": _rounded(values[-1]) if values else None,
         "change_from_first_credits": None,
         "change_from_first_pct": None,
-        "rate_limit_plan_type": trend_points[0].get("rate_limit_plan_type") if trend_points else None,
+        "rate_limit_plan_type": trend_points[0].get("rate_limit_plan_type")
+        if trend_points
+        else None,
     }
 
 
@@ -307,12 +311,20 @@ def _weekly_projection_direction(slope: float) -> str:
 
 def _trend_points_for_latest_plan(points: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str]:
     latest_plan = next(
-        (point.get("rate_limit_plan_type") for point in reversed(points) if point.get("rate_limit_plan_type")),
+        (
+            point.get("rate_limit_plan_type")
+            for point in reversed(points)
+            if point.get("rate_limit_plan_type")
+        ),
         None,
     )
     if latest_plan is not None:
-        plan_points = [point for point in points if point.get("rate_limit_plan_type") == latest_plan]
-        confident = [point for point in plan_points if point.get("confidence") in {"medium", "high"}]
+        plan_points = [
+            point for point in points if point.get("rate_limit_plan_type") == latest_plan
+        ]
+        confident = [
+            point for point in plan_points if point.get("confidence") in {"medium", "high"}
+        ]
         if len(confident) >= 3:
             return confident, "latest_plan_medium_high_confidence"
         if len(plan_points) >= 3:
@@ -340,9 +352,7 @@ def _sample_curve_points(
     if max_points <= 0 or len(points) <= max_points:
         return points
     last_index = len(points) - 1
-    selected_indexes = {
-        round(index * last_index / (max_points - 1)) for index in range(max_points)
-    }
+    selected_indexes = {round(index * last_index / (max_points - 1)) for index in range(max_points)}
     return [points[index] for index in sorted(selected_indexes)]
 
 

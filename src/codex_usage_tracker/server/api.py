@@ -46,7 +46,6 @@ _validate_context_api_mode = server_utils.validate_context_api_mode
 _validate_loopback_host = server_utils.validate_loopback_host
 
 
-
 def serve_dashboard(
     db_path: Path,
     output_path: Path = DEFAULT_DASHBOARD_PATH,

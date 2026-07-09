@@ -39,6 +39,7 @@ def span_error_metadata(span: UsageDeltaSpan) -> dict[str, Any]:
         "usage_window_source": span.usage_window_source or "missing",
     }
 
+
 def _span_reset_remaining_minutes(span: UsageDeltaSpan, start_dt: Any) -> float:
     remaining_minutes = reset_remaining_minutes(start_dt, span_reset_timestamp(span))
     return remaining_minutes or 0.0
@@ -50,18 +51,14 @@ def _span_window_elapsed_fraction(span: UsageDeltaSpan, reset_minutes: float) ->
     return window_elapsed_fraction(elapsed_minutes, window_minutes)
 
 
-def prediction_error_diagnostics(
-    rows: list[dict[str, Any]], model_name: str
-) -> dict[str, Any]:
+def prediction_error_diagnostics(rows: list[dict[str, Any]], model_name: str) -> dict[str, Any]:
     errors = prediction_error_rows(rows, model_name)
     if not errors:
         return empty_prediction_error_diagnostics()
     return prediction_error_summary(errors)
 
 
-def prediction_error_rows(
-    rows: list[dict[str, Any]], model_name: str
-) -> list[dict[str, Any]]:
+def prediction_error_rows(rows: list[dict[str, Any]], model_name: str) -> list[dict[str, Any]]:
     return [_prediction_error_row(row, model_name) for row in rows]
 
 
@@ -112,14 +109,11 @@ def prediction_error_summary(errors: list[dict[str, Any]]) -> dict[str, Any]:
         "error_by_day_of_week": top_error_groups(errors, "day_of_week"),
         "error_by_hour": top_error_groups(errors, "hour_bucket"),
         "error_by_reset_phase": top_error_groups(errors, "reset_phase"),
-        "error_by_one_percent_streak": top_error_groups(
-            errors, "one_percent_streak_bucket"
-        ),
-        "error_by_same_delta_streak": top_error_groups(
-            errors, "same_delta_streak_bucket"
-        ),
+        "error_by_one_percent_streak": top_error_groups(errors, "one_percent_streak_bucket"),
+        "error_by_same_delta_streak": top_error_groups(errors, "same_delta_streak_bucket"),
         "largest_errors": largest_prediction_errors(errors),
     }
+
 
 def prediction_error_share(
     errors: list[dict[str, Any]],
@@ -151,9 +145,7 @@ def top_transition_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "previous_delta_percent": previous,
             "actual_delta_percent": actual,
             "count": len(items),
-            "mean_abs_error": rounded(
-                sum(item["abs_error"] for item in items) / len(items)
-            ),
+            "mean_abs_error": rounded(sum(item["abs_error"] for item in items) / len(items)),
             "max_abs_error": rounded(max(item["abs_error"] for item in items)),
         }
         for (previous, actual), items in grouped.items()
@@ -166,6 +158,7 @@ def top_transition_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
     return rows[:10]
 
+
 def top_error_groups(errors: list[dict[str, Any]], field_name: str) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in errors:
@@ -176,9 +169,7 @@ def top_error_groups(errors: list[dict[str, Any]], field_name: str) -> list[dict
         {
             field_name: key,
             "count": len(items),
-            "mean_abs_error": rounded(
-                sum(item["abs_error"] for item in items) / len(items)
-            ),
+            "mean_abs_error": rounded(sum(item["abs_error"] for item in items) / len(items)),
             "max_abs_error": rounded(max(item["abs_error"] for item in items)),
         }
         for key, items in grouped.items()
@@ -190,6 +181,7 @@ def top_error_groups(errors: list[dict[str, Any]], field_name: str) -> list[dict
         )
     )
     return rows[:10]
+
 
 def largest_prediction_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = sorted(errors, key=lambda item: item["abs_error"], reverse=True)[:10]
@@ -207,6 +199,7 @@ def largest_prediction_errors(errors: list[dict[str, Any]]) -> list[dict[str, An
         }
         for item in rows
     ]
+
 
 def value_distribution(values: list[float]) -> dict[str, Any]:
     if not values:

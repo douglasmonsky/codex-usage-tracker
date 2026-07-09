@@ -75,9 +75,7 @@ def call_detail_payload(
         "previous_record": previous_record,
         "next_record": next_record,
         "adjacent_records": [
-            candidate
-            for candidate in (previous_record, selected_row, next_record)
-            if candidate
+            candidate for candidate in (previous_record, selected_row, next_record) if candidate
         ],
         "previous_record_id": row.get("previous_record_id"),
         "next_record_id": row.get("next_record_id"),
@@ -87,7 +85,9 @@ def call_detail_payload(
 
 def _required_record_id(query: str) -> str:
     params = parse_qs(query)
-    record_id = first_query_value(params.get("record_id")) or first_query_value(params.get("record"))
+    record_id = first_query_value(params.get("record_id")) or first_query_value(
+        params.get("record")
+    )
     if not record_id:
         raise MissingRecordIdError("record_id required")
     return record_id

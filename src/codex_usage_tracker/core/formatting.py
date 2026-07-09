@@ -186,9 +186,7 @@ def format_doctor(report: dict[str, Any]) -> str:
         package = environment.get("package")
         if isinstance(package, dict):
             lines.append(
-                "Package: "
-                f"{package.get('name', 'unknown')} "
-                f"{package.get('version', 'unknown')}"
+                f"Package: {package.get('name', 'unknown')} {package.get('version', 'unknown')}"
             )
         python = environment.get("python")
         if isinstance(python, dict):
@@ -214,11 +212,7 @@ def format_doctor(report: dict[str, Any]) -> str:
         if isinstance(assets, dict):
             asset_status = "available" if assets.get("available") else "missing"
             missing = assets.get("missing")
-            suffix = (
-                f" ({len(missing)} missing)"
-                if isinstance(missing, list) and missing
-                else ""
-            )
+            suffix = f" ({len(missing)} missing)" if isinstance(missing, list) and missing else ""
             lines.append(f"Dashboard assets: {asset_status}{suffix}")
         lines.append("")
     for check in report.get("checks", []):
@@ -259,8 +253,7 @@ def format_pricing_coverage(report: dict[str, Any], limit: int = 20) -> str:
         elif row.get("priced_as"):
             status = f"priced as {row.get('priced_as')}"
         lines.append(
-            f"- {model}: {status}; {_fmt_int(row.get('total_tokens'))} tokens"
-            f"{_cost_suffix(row)}"
+            f"- {model}: {status}; {_fmt_int(row.get('total_tokens'))} tokens{_cost_suffix(row)}"
         )
     return "\n".join(lines)
 

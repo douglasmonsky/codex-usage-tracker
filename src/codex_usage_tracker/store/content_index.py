@@ -296,6 +296,7 @@ def _emit_content_index_progress(
     payload.update(extra)
     progress_callback(payload)
 
+
 def _dedupe_content_index_plans(
     plans: Iterable[ContentIndexPlan],
 ) -> Iterable[ContentIndexPlan]:
@@ -324,9 +325,7 @@ def delete_content_index_rows_for_source_files(
 ) -> None:
     """Delete normalized content rows linked to source files."""
 
-    record_subquery = (
-        "SELECT record_id FROM usage_events " f"WHERE source_file IN ({placeholders})"
-    )
+    record_subquery = f"SELECT record_id FROM usage_events WHERE source_file IN ({placeholders})"
     if sync_fts:
         _clear_content_fts(conn)
     for table_name in CONTENT_INDEX_TABLES:
@@ -538,9 +537,7 @@ def _trace_calls(
         if row["fragment_id"] is not None:
             fragments = call["fragments"]
             assert isinstance(fragments, list)
-            fragments.append(
-                _trace_fragment_row(row, max_snippet_chars=max_snippet_chars)
-            )
+            fragments.append(_trace_fragment_row(row, max_snippet_chars=max_snippet_chars))
     for call in calls_by_id.values():
         fragments = call["fragments"]
         assert isinstance(fragments, list)
@@ -706,8 +703,7 @@ def _search_content_like(
     )
     terms = _search_terms(query) or [query]
     like_clauses = [
-        "(lower(cf.fragment_text) LIKE ? OR lower(cf.safe_label) LIKE ?)"
-        for _term in terms
+        "(lower(cf.fragment_text) LIKE ? OR lower(cf.safe_label) LIKE ?)" for _term in terms
     ]
     like_params: list[object] = []
     for term in terms:
@@ -716,7 +712,7 @@ def _search_content_like(
     from_sql = f"""
         FROM content_fragments AS cf
         JOIN usage_events AS u ON u.record_id = cf.record_id
-        WHERE {' AND '.join(like_clauses)}
+        WHERE {" AND ".join(like_clauses)}
         {usage_clause}
     """
     params = [*like_params, *usage_params]
@@ -912,7 +908,6 @@ def _limit_params(limit: int | None, offset: int) -> list[int]:
     return [limit, offset]
 
 
-
 def _content_usage_rows_for_plans(
     conn: sqlite3.Connection,
     *,
@@ -1095,6 +1090,7 @@ def _configured_parallel_content_index_workers() -> int | None:
     except ValueError:
         return None
 
+
 def _index_content_for_source_file(
     conn: sqlite3.Connection,
     *,
@@ -1171,15 +1167,15 @@ def _index_content_for_source_file(
                         pending_file_events = []
                     continue
                 pending.extend(
-                        _extract_pending_fragments(
-                            envelope=envelope,
-                            payload=payload,
-                            line_number=line_number,
-                            timestamp=timestamp,
-                            turn_id=turn_id,
-                            turn_index=turn_index,
-                        )
+                    _extract_pending_fragments(
+                        envelope=envelope,
+                        payload=payload,
+                        line_number=line_number,
+                        timestamp=timestamp,
+                        turn_id=turn_id,
+                        turn_index=turn_index,
                     )
+                )
                 events = extract_pending_local_events(
                     envelope=envelope,
                     payload=payload,

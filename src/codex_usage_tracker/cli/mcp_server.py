@@ -255,11 +255,15 @@ def _prune_dogfood_result_cache() -> None:
         _DOGFOOD_RESULT_CACHE.items(),
         key=lambda item: str(item[1].get("stored_at") or ""),
     )
-    for cache_key, _entry in removable[: max(0, len(_DOGFOOD_RESULT_CACHE) - _DOGFOOD_MAX_RESULT_CACHE)]:
+    for cache_key, _entry in removable[
+        : max(0, len(_DOGFOOD_RESULT_CACHE) - _DOGFOOD_MAX_RESULT_CACHE)
+    ]:
         _DOGFOOD_RESULT_CACHE.pop(cache_key, None)
 
 
-def _load_cached_dogfood_result(params: dict[str, Any], cache_key: str) -> tuple[dict[str, Any] | None, str]:
+def _load_cached_dogfood_result(
+    params: dict[str, Any], cache_key: str
+) -> tuple[dict[str, Any] | None, str]:
     cached = _DOGFOOD_RESULT_CACHE.get(cache_key)
     if cached is not None:
         return _copy_jsonable(cached["result"]), "memory"
@@ -295,11 +299,7 @@ def _prune_dogfood_jobs() -> None:
     if len(_DOGFOOD_JOBS) <= _DOGFOOD_MAX_JOBS:
         return
     removable = sorted(
-        (
-            job
-            for job in _DOGFOOD_JOBS.values()
-            if job.get("status") not in {"queued", "running"}
-        ),
+        (job for job in _DOGFOOD_JOBS.values() if job.get("status") not in {"queued", "running"}),
         key=lambda row: str(row.get("updated_at") or row.get("created_at") or ""),
     )
     for job in removable[: max(0, len(_DOGFOOD_JOBS) - _DOGFOOD_MAX_JOBS)]:
@@ -510,6 +510,7 @@ def refresh_usage_index(
     )
     return refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1")
 
+
 @mcp.tool()
 def usage_refresh_start(
     include_archived: bool = False,
@@ -531,7 +532,6 @@ def usage_refresh_status(job_id: str) -> dict[str, Any]:
     """Poll an async local usage refresh job for phase progress and result."""
 
     return _REFRESH_JOB_REGISTRY.status(job_id)
-
 
 
 @mcp.tool()
@@ -1165,42 +1165,44 @@ def usage_dogfood_start(
             _prune_dogfood_jobs()
         else:
             _DOGFOOD_JOBS[job_id] = {
-            "job_id": job_id,
-            "job_type": "agentic_dogfood",
-            "status": "queued",
-            "percent_complete": 0,
-            "current_stage": "queued",
-            "stages": [],
-            "created_at": now,
-            "updated_at": now,
-            "started_at": None,
-            "completed_at": None,
-            "error": None,
-            "filters": {
-                "since": since,
-                "until": until,
-                "thread": thread,
-                "include_archived": include_archived,
-                "evidence_limit": max(1, evidence_limit),
-                "privacy_mode": privacy_mode,
-                "refresh": refresh,
-                "run_hypotheses": run_hypotheses,
-                "run_deep_investigations": run_deep_investigations,
-                "use_cache": use_cache,
-            },
-            "cache": {},
-            "result_cache": {
-                "enabled": use_cache,
-                "cacheable": True,
-                "hit": False,
-                "source": cache_source if use_cache and not refresh else None,
-                "cache_key": cache_key,
-                "miss_reason": cache_source
-                if use_cache and not refresh
-                else "refresh_requested" if use_cache else "disabled",
-            },
-            "artifacts": {},
-            "result": None,
+                "job_id": job_id,
+                "job_type": "agentic_dogfood",
+                "status": "queued",
+                "percent_complete": 0,
+                "current_stage": "queued",
+                "stages": [],
+                "created_at": now,
+                "updated_at": now,
+                "started_at": None,
+                "completed_at": None,
+                "error": None,
+                "filters": {
+                    "since": since,
+                    "until": until,
+                    "thread": thread,
+                    "include_archived": include_archived,
+                    "evidence_limit": max(1, evidence_limit),
+                    "privacy_mode": privacy_mode,
+                    "refresh": refresh,
+                    "run_hypotheses": run_hypotheses,
+                    "run_deep_investigations": run_deep_investigations,
+                    "use_cache": use_cache,
+                },
+                "cache": {},
+                "result_cache": {
+                    "enabled": use_cache,
+                    "cacheable": True,
+                    "hit": False,
+                    "source": cache_source if use_cache and not refresh else None,
+                    "cache_key": cache_key,
+                    "miss_reason": cache_source
+                    if use_cache and not refresh
+                    else "refresh_requested"
+                    if use_cache
+                    else "disabled",
+                },
+                "artifacts": {},
+                "result": None,
             }
         _prune_dogfood_jobs()
     if cache_hit_payload is not None:
@@ -1386,10 +1388,7 @@ def usage_calls(
             include_archived_default=include_archived,
             thread_key=thread_key,
         ),
-        live_call_rows=lambda *,
-        query_params,
-        pricing_status,
-        credit_confidence: _live_call_rows(
+        live_call_rows=lambda *, query_params, pricing_status, credit_confidence: _live_call_rows(
             query_params=query_params,
             pricing_status=pricing_status,
             credit_confidence=credit_confidence,
@@ -1519,10 +1518,7 @@ def usage_report_pack(
             include_archived_default=include_archived,
             thread_key=thread_key,
         ),
-        live_call_rows=lambda *,
-        query_params,
-        pricing_status,
-        credit_confidence: _live_call_rows(
+        live_call_rows=lambda *, query_params, pricing_status, credit_confidence: _live_call_rows(
             query_params=query_params,
             pricing_status=pricing_status,
             credit_confidence=credit_confidence,
@@ -1697,6 +1693,7 @@ def update_usage_pricing_config(
         "estimated_model_count": result.estimated_model_count,
         "backup_path": str(result.backup_path) if result.backup_path else None,
     }
+
 
 if __name__ == "__main__":
     mcp.run()

@@ -179,9 +179,11 @@ def main() -> int:
                 )
                 for failure in result["threshold_failures"]:
                     print(f"  FAIL {failure}")
-        return 1 if args.enforce_thresholds and any(
-            result["threshold_failures"] for result in results
-        ) else 0
+        return (
+            1
+            if args.enforce_thresholds and any(result["threshold_failures"] for result in results)
+            else 0
+        )
     finally:
         if temp_dir and not args.keep_dbs:
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -251,6 +253,7 @@ def benchmark_size(
             min_tokens=9_000,
         )
     )
+
     def payload_action() -> dict[str, Any]:
         return dashboard_payload(
             db_path=db_path,
@@ -333,9 +336,7 @@ def benchmark_size(
     }
     context_metrics: dict[str, Any] = {}
     if source_bundle:
-        timings["dashboard_payload_with_source_logs_seconds"] = (
-            dashboard_payload_active_seconds
-        )
+        timings["dashboard_payload_with_source_logs_seconds"] = dashboard_payload_active_seconds
         context_metrics = _benchmark_context_loads(
             db_path=db_path,
             row_count=row_count,
@@ -495,7 +496,9 @@ def _benchmark_context_loads(
         )
         timing_name = f"context_load_{label}_line_seconds"
         timings[timing_name] = elapsed
-        diagnostics = payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else {}
+        diagnostics = (
+            payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else {}
+        )
         loads[label] = {
             "record_id": record_id,
             "seconds": elapsed,
@@ -534,10 +537,7 @@ def _evaluate_thresholds(
         if threshold is None:
             continue
         limit = round(
-            (
-                threshold["base_seconds"]
-                + threshold["per_10k_seconds"] * (row_count / 10_000)
-            )
+            (threshold["base_seconds"] + threshold["per_10k_seconds"] * (row_count / 10_000))
             * threshold_scale,
             6,
         )
@@ -818,9 +818,15 @@ def _synthetic_events(
             subagent_type="guardian" if is_review else "thread_spawn" if is_subagent else None,
             agent_role="reviewer" if is_review else "worker" if is_subagent else None,
             agent_nickname=None,
-            parent_session_id=f"session-{(index - 1) % 2500:04d}" if is_subagent or is_review else None,
-            parent_thread_name=_synthetic_thread_name(index - 1) if is_subagent or is_review else None,
-            parent_session_updated_at=f"2026-05-{day:02d}T22:00:00Z" if is_subagent or is_review else None,
+            parent_session_id=f"session-{(index - 1) % 2500:04d}"
+            if is_subagent or is_review
+            else None,
+            parent_thread_name=_synthetic_thread_name(index - 1)
+            if is_subagent or is_review
+            else None,
+            parent_session_updated_at=f"2026-05-{day:02d}T22:00:00Z"
+            if is_subagent or is_review
+            else None,
             model_context_window=200_000,
             input_tokens=metrics["input_tokens"],
             cached_input_tokens=metrics["cached_input_tokens"],

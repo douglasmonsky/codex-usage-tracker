@@ -328,9 +328,7 @@ def test_parser_collects_diagnostic_facts_between_token_counts(tmp_path: Path) -
                         {
                             "type": "message",
                             "role": "assistant",
-                            "content": [
-                                {"type": "output_text", "text": "SECRET COMPACTION TEXT"}
-                            ],
+                            "content": [{"type": "output_text", "text": "SECRET COMPACTION TEXT"}],
                         }
                     ],
                 },
@@ -596,8 +594,6 @@ def _subprocess_env() -> dict[str, str]:
     repo_root = Path(__file__).resolve().parents[2]
     src_path = str(repo_root / "src")
     env["PYTHONPATH"] = (
-        f"{src_path}{os.pathsep}{env['PYTHONPATH']}"
-        if env.get("PYTHONPATH")
-        else src_path
+        f"{src_path}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else src_path
     )
     return env

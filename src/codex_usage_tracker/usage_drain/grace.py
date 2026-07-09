@@ -22,6 +22,7 @@ REGIME_GRACE_THRESHOLD_GRID = (3, 5, 10, 25, 50, 100, 200)
 
 REGIME_GRACE_SPAN_GRID = (1, 2, 3)
 
+
 def one_percent_grace_calibration(
     spans: list[UsageDeltaSpan], scopes: dict[str, int]
 ) -> dict[str, Any]:
@@ -82,6 +83,7 @@ def one_percent_grace_calibration(
         "scopes": scope_results,
     }
 
+
 def one_percent_grace_calibration_row(
     values: list[float],
     *,
@@ -112,9 +114,7 @@ def one_percent_grace_calibration_row(
         "exact_match_share": rounded(
             sum(
                 1
-                for actual_value, predicted_value in zip(
-                    actual, predictions, strict=True
-                )
+                for actual_value, predicted_value in zip(actual, predictions, strict=True)
                 if round(actual_value, 6) == round(predicted_value, 6)
             )
             / len(actual)
@@ -123,14 +123,14 @@ def one_percent_grace_calibration_row(
         ),
     }
 
-def one_percent_grace_config(
-    streak_threshold: int, grace_spans: int
-) -> dict[str, Any]:
+
+def one_percent_grace_config(streak_threshold: int, grace_spans: int) -> dict[str, Any]:
     return {
         "streak_threshold": streak_threshold,
         "grace_spans": grace_spans,
         "max_break_delta_percent": REGIME_GRACE_MAX_BREAK_DELTA,
     }
+
 
 def one_percent_regime_grace_prediction(
     previous_deltas: list[float],
@@ -141,9 +141,7 @@ def one_percent_regime_grace_prediction(
 ) -> float:
     if not previous_deltas:
         return 0.0
-    one_percent_streak = tail_streak(
-        previous_deltas, predicate=is_one_percent_delta
-    )
+    one_percent_streak = tail_streak(previous_deltas, predicate=is_one_percent_delta)
     if one_percent_streak >= streak_threshold:
         return 1.0
     break_age = small_break_age_after_one_percent_run(
@@ -155,6 +153,7 @@ def one_percent_regime_grace_prediction(
         return 1.0
     return previous_deltas[-1]
 
+
 def small_break_age_after_one_percent_run(
     values: list[float], *, streak_threshold: int, max_break_delta: float
 ) -> int | None:
@@ -163,9 +162,7 @@ def small_break_age_after_one_percent_run(
     index = len(values) - 1
     break_age = 0
     while (
-        index >= 0
-        and not is_one_percent_delta(values[index])
-        and values[index] <= max_break_delta
+        index >= 0 and not is_one_percent_delta(values[index]) and values[index] <= max_break_delta
     ):
         break_age += 1
         index -= 1

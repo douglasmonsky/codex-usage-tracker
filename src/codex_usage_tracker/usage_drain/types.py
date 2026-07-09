@@ -40,6 +40,7 @@ TIMING_TOTAL_FIELDS = (
 
 EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "missing", "other")
 
+
 def _span_optional_round(value: float | int | None, digits: int = 6) -> float | None:
     if value is None:
         return None
@@ -86,9 +87,7 @@ class UsageDeltaSpan:
     candidate_standard_credits: dict[str, float]
     documented_fast_weighted_credits: dict[str, float]
     candidate_row_counts: dict[str, int]
-    documented_fast_weighted_token_totals: dict[str, dict[str, float]] = field(
-        default_factory=dict
-    )
+    documented_fast_weighted_token_totals: dict[str, dict[str, float]] = field(default_factory=dict)
     models: dict[str, int] = field(default_factory=dict)
     effort_counts: dict[str, int] = field(default_factory=dict)
     turn_count: int = 0

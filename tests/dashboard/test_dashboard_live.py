@@ -466,12 +466,7 @@ def test_dashboard_live_hydrates_empty_shell_after_refresh() -> None:
 def test_dashboard_bootstraps_direct_diagnostics_view() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     dashboard_js = (
-        repo_root
-        / "src"
-        / "codex_usage_tracker"
-        / "plugin_data"
-        / "dashboard"
-        / "dashboard.js"
+        repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "dashboard.js"
     ).read_text(encoding="utf-8")
 
     assert "allowDiagnosticsBootstrap: true" in dashboard_js

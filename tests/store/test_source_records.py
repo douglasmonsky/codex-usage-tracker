@@ -117,9 +117,7 @@ def test_source_file_metadata_refreshes_source_record_parser_details(
     assert rows[0]["parser_version"] == "codex-jsonl-v2"
 
 
-def test_source_file_metadata_uses_parser_final_line_number(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_source_file_metadata_uses_parser_final_line_number(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "usage.sqlite3"
     source_path = tmp_path / "sessions" / "fast-metadata.jsonl"
     source_path.parent.mkdir(parents=True)

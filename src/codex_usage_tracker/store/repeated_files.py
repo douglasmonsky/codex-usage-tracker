@@ -93,15 +93,18 @@ def query_repeated_file_rediscovery(
     sorted_rows = sorted(rows, key=_candidate_row_sort_key, reverse=True)
     sliced_rows = sorted_rows if normalized_limit is None else sorted_rows[:normalized_limit]
     candidates = [
-        _file_candidate(row, trace_handles=_trace_handles_for_path(
-            conn,
-            path_hash=str(row["path_hash"]),
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            limit=normalized_sample_limit,
-        ))
+        _file_candidate(
+            row,
+            trace_handles=_trace_handles_for_path(
+                conn,
+                path_hash=str(row["path_hash"]),
+                since=since,
+                until=until,
+                thread=thread,
+                include_archived=include_archived,
+                limit=normalized_sample_limit,
+            ),
+        )
         for row in sliced_rows
     ]
     return {
@@ -275,7 +278,9 @@ def _recommendation(
                 f"{adjacent_retouch_count} adjacent retouches and {operation_mix} suggest rediscovery."
             )
         return f"Use thread handoff notes for {file_label}; operation mix is {operation_mix}."
-    return f"Batch edits for {file_label} or inspect thread trace; operation mix is {operation_mix}."
+    return (
+        f"Batch edits for {file_label} or inspect thread trace; operation mix is {operation_mix}."
+    )
 
 
 def _normalize_limit(limit: int | None) -> int | None:

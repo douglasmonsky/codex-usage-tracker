@@ -51,7 +51,9 @@ def record_function_call(
         call_roots[call_id] = root
         if representative_record_id:
             call_record_ids[call_id] = representative_record_id
-    _set_representative_record_id(counters["function_record_ids"], function_name, representative_record_id)
+    _set_representative_record_id(
+        counters["function_record_ids"], function_name, representative_record_id
+    )
     _set_representative_record_id(counters["command_record_ids"], root, representative_record_id)
     _record_git_command_interaction(
         command,
@@ -96,7 +98,9 @@ def _record_missing_shell_command(
         meta["missing_command"] += 1
 
 
-def _set_representative_record_id(mapping: dict[object, str], key: object, record_id: str | None) -> None:
+def _set_representative_record_id(
+    mapping: dict[object, str], key: object, record_id: str | None
+) -> None:
     if record_id and key not in mapping:
         mapping[key] = record_id
 
@@ -133,7 +137,9 @@ def _record_git_command_interaction(
     counters["git_interactions_by_root"][interaction["root"]] += 1
     if call_id:
         call_git_interactions[call_id] = interaction_key
-    _set_representative_record_id(counters["git_interaction_record_ids"], interaction_key, representative_record_id)
+    _set_representative_record_id(
+        counters["git_interaction_record_ids"], interaction_key, representative_record_id
+    )
 
 
 def _record_read_command(
@@ -195,8 +201,12 @@ def record_read_refs(
         indexes.append(event_index)
         counters["read_events_by_reader"][reader] += 1
         counters["read_events_by_path"][path_key] += 1
-        _set_representative_record_id(counters["read_reader_record_ids"], reader, representative_record_id)
-        _set_representative_record_id(counters["read_path_record_ids"], path_key, representative_record_id)
+        _set_representative_record_id(
+            counters["read_reader_record_ids"], reader, representative_record_id
+        )
+        _set_representative_record_id(
+            counters["read_path_record_ids"], path_key, representative_record_id
+        )
     return indexes
 
 
@@ -256,8 +266,8 @@ def record_function_output(
             output,
             counters=counters,
             function_name=function_name,
-        root=call_roots.get(call_id or ""),
-        git_interaction=git_interaction,
+            root=call_roots.get(call_id or ""),
+            git_interaction=git_interaction,
             read_indexes=read_indexes,
             representative_record_id=output_record_id,
         )
@@ -288,7 +298,9 @@ def record_missing_output_count(
     counters["missing_reasons"][missing_reason] += 1
     if root:
         counters["command_missing_count"][root] += 1
-        _set_representative_record_id(counters["command_record_ids"], root, representative_record_id)
+        _set_representative_record_id(
+            counters["command_record_ids"], root, representative_record_id
+        )
     if git_interaction:
         counters["git_interaction_missing_count"][git_interaction] += 1
         _set_representative_record_id(
@@ -316,7 +328,9 @@ def record_output_count(
     if root:
         counters["command_with_count"][root] += 1
         counters["command_token_sum"][root] += count
-        _set_representative_record_id(counters["command_record_ids"], root, representative_record_id)
+        _set_representative_record_id(
+            counters["command_record_ids"], root, representative_record_id
+        )
     if git_interaction:
         counters["git_interaction_with_count"][git_interaction] += 1
         counters["git_interaction_token_sum"][git_interaction] += count

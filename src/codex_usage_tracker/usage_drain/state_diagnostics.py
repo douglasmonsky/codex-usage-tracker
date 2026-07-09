@@ -51,9 +51,8 @@ STATE_AMBIGUITY_SIGNATURES: dict[str, tuple[str, ...]] = {
     ),
 }
 
-def state_ambiguity_summary(
-    rows: list[dict[str, Any]], scopes: dict[str, int]
-) -> dict[str, Any]:
+
+def state_ambiguity_summary(rows: list[dict[str, Any]], scopes: dict[str, int]) -> dict[str, Any]:
     return {
         "target": "next_visible_usage_delta_percent",
         "definition": (
@@ -67,8 +66,7 @@ def state_ambiguity_summary(
             "Unique states can look perfect by construction, so repeated-state metrics are the stricter signal.",
         ],
         "signatures": {
-            name: list(signature)
-            for name, signature in STATE_AMBIGUITY_SIGNATURES.items()
+            name: list(signature) for name, signature in STATE_AMBIGUITY_SIGNATURES.items()
         },
         "scopes": {
             scope_name: state_ambiguity_scope(rows, start_index=start_index)
@@ -76,9 +74,8 @@ def state_ambiguity_summary(
         },
     }
 
-def state_ambiguity_scope(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> dict[str, Any]:
+
+def state_ambiguity_scope(rows: list[dict[str, Any]], *, start_index: int) -> dict[str, Any]:
     scope_rows = [row for row in rows if int(row["index"]) >= start_index]
     return {
         "start_index": start_index,
@@ -88,6 +85,7 @@ def state_ambiguity_scope(
             for name, signature in STATE_AMBIGUITY_SIGNATURES.items()
         },
     }
+
 
 def state_signature_ambiguity(
     rows: list[dict[str, Any]],
@@ -188,9 +186,7 @@ def _state_signature_ambiguity_result(
     }
 
 
-def _state_analysis_values(
-    analyses: list[dict[str, Any]], field: str
-) -> list[float]:
+def _state_analysis_values(analyses: list[dict[str, Any]], field: str) -> list[float]:
     values: list[float] = []
     for analysis in analyses:
         values.extend(analysis[field])
@@ -201,9 +197,7 @@ def _state_analysis_row_count(analyses: list[dict[str, Any]]) -> int:
     return sum(len(analysis["values"]) for analysis in analyses)
 
 
-def _state_ambiguous_records(
-    analyses: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def _state_ambiguous_records(analyses: list[dict[str, Any]]) -> list[dict[str, Any]]:
     records = [
         analysis["ambiguous_record"]
         for analysis in analyses
@@ -218,6 +212,7 @@ def _state_ambiguous_record_sort_key(row: dict[str, Any]) -> tuple[float, int, s
         -int(row.get("n") or 0),
         str(row.get("state") or ""),
     )
+
 
 def state_ambiguous_group_record(
     key: tuple[str, ...],
@@ -260,9 +255,7 @@ def _mode_errors(values: list[float], mode_value: float) -> list[float]:
 
 
 def _row_dates(rows: list[dict[str, Any]]) -> list[str]:
-    return [
-        str((row.get("metadata") or {}).get("date") or "missing") for row in rows
-    ]
+    return [str((row.get("metadata") or {}).get("date") or "missing") for row in rows]
 
 
 def _signature_state(key: tuple[str, ...], signature: tuple[str, ...]) -> dict[str, str]:
@@ -272,18 +265,14 @@ def _signature_state(key: tuple[str, ...], signature: tuple[str, ...]) -> dict[s
     }
 
 
-def _actual_value_rows(
-    value_counts: dict[float, int], *, row_count: int
-) -> list[dict[str, Any]]:
+def _actual_value_rows(value_counts: dict[float, int], *, row_count: int) -> list[dict[str, Any]]:
     return [
         {
             "delta_percent": value,
             "count": count,
             "share": rounded(count / row_count),
         }
-        for value, count in sorted(
-            value_counts.items(), key=lambda item: (-item[1], item[0])
-        )
+        for value, count in sorted(value_counts.items(), key=lambda item: (-item[1], item[0]))
     ]
 
 
@@ -297,6 +286,7 @@ def _mean_error(errors: list[float]) -> float | None:
     if not errors:
         return None
     return rounded(sum(errors) / len(errors))
+
 
 def state_signature(state: dict[str, Any], signature: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(str(state.get(field) or "missing") for field in signature)

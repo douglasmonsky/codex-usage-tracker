@@ -11,6 +11,7 @@ _API_MODULE = "codex_usage_tracker.cli.main"
 
 __all__ = ["main"]
 
+
 def __getattr__(name: str) -> Any:
     module = import_module(_API_MODULE)
     try:

@@ -139,9 +139,7 @@ def build_allowance_export_report(
         "privacy_mode": "strict",
         "include_archived": include_archived,
         "summary": diagnostics["summary"],
-        "windows": [
-            _export_window(window) for window in diagnostics.get("windows", [])
-        ],
+        "windows": [_export_window(window) for window in diagnostics.get("windows", [])],
         "change_candidates": diagnostics.get("change_candidates", []),
         "notes": [
             *_privacy_notes(),
@@ -197,9 +195,7 @@ def _history_row(row: dict[str, Any], *, privacy_mode: str) -> dict[str, Any]:
     return payload
 
 
-def _privacy_filtered_analysis(
-    analysis: dict[str, Any], *, privacy_mode: str
-) -> dict[str, Any]:
+def _privacy_filtered_analysis(analysis: dict[str, Any], *, privacy_mode: str) -> dict[str, Any]:
     return {
         "summary": analysis["summary"],
         "windows": [
@@ -207,17 +203,14 @@ def _privacy_filtered_analysis(
             for window in analysis["windows"]
         ],
         "spans": [
-            _privacy_filtered_span(span, privacy_mode=privacy_mode)
-            for span in analysis["spans"]
+            _privacy_filtered_span(span, privacy_mode=privacy_mode) for span in analysis["spans"]
         ],
         "change_candidates": analysis["change_candidates"],
         "notes": [*analysis["notes"], *_privacy_notes()],
     }
 
 
-def _privacy_filtered_window(
-    window: dict[str, Any], *, privacy_mode: str
-) -> dict[str, Any]:
+def _privacy_filtered_window(window: dict[str, Any], *, privacy_mode: str) -> dict[str, Any]:
     return {
         "window_kind": window.get("window_kind"),
         "plan_type": window.get("plan_type"),
@@ -234,9 +227,7 @@ def _privacy_filtered_window(
     }
 
 
-def _privacy_filtered_span(
-    span: dict[str, Any], *, privacy_mode: str
-) -> dict[str, Any]:
+def _privacy_filtered_span(span: dict[str, Any], *, privacy_mode: str) -> dict[str, Any]:
     payload = dict(span)
     payload["start_observed_date"] = _date_bucket(payload.get("start_observed_at"))
     payload["end_observed_date"] = _date_bucket(payload.get("end_observed_at"))

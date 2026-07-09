@@ -52,21 +52,17 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     dashboard_actions_js = (asset_dir / "dashboard_actions.js").read_text(encoding="utf-8")
     dashboard_live_js = (asset_dir / "dashboard_live.js").read_text(encoding="utf-8")
     dashboard_events_js = (asset_dir / "dashboard_events.js").read_text(encoding="utf-8")
-    dashboard_diagnostics_js = (asset_dir / "dashboard_diagnostics.js").read_text(
+    dashboard_diagnostics_js = (asset_dir / "dashboard_diagnostics.js").read_text(encoding="utf-8")
+    dashboard_diagnostics_facts_js = (asset_dir / "dashboard_diagnostics_facts.js").read_text(
         encoding="utf-8"
     )
-    dashboard_diagnostics_facts_js = (
-        asset_dir / "dashboard_diagnostics_facts.js"
-    ).read_text(encoding="utf-8")
     dashboard_diagnostics_snapshots_js = (
         asset_dir / "dashboard_diagnostics_snapshots.js"
     ).read_text(encoding="utf-8")
-    dashboard_call_diagnostics_js = (
-        asset_dir / "dashboard_call_diagnostics.js"
-    ).read_text(encoding="utf-8")
-    dashboard_call_js = (asset_dir / "dashboard_call_investigator.js").read_text(
+    dashboard_call_diagnostics_js = (asset_dir / "dashboard_call_diagnostics.js").read_text(
         encoding="utf-8"
     )
+    dashboard_call_js = (asset_dir / "dashboard_call_investigator.js").read_text(encoding="utf-8")
     dashboard_state_js = (asset_dir / "dashboard_state.js").read_text(encoding="utf-8")
     dashboard_stylesheets = [
         "dashboard.css",
@@ -78,36 +74,37 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         "dashboard_responsive.css",
     ]
     dashboard_css = "\n".join(
-        (asset_dir / stylesheet).read_text(encoding="utf-8")
-        for stylesheet in dashboard_stylesheets
+        (asset_dir / stylesheet).read_text(encoding="utf-8") for stylesheet in dashboard_stylesheets
     )
     render_calls_js = _extract_js_function(dashboard_tables_js, "renderCalls")
-    dashboard_surface = "\n".join([
-        dashboard,
-        dashboard_format_js,
-        dashboard_data_js,
-        dashboard_analysis_js,
-        dashboard_cells_js,
-        dashboard_details_js,
-        dashboard_insights_js,
-        dashboard_tables_js,
-        dashboard_filters_js,
-        dashboard_payload_cache_js,
-        dashboard_i18n_js,
-        dashboard_tooltips_js,
-        dashboard_status_js,
-        dashboard_actions_js,
-        dashboard_live_js,
-        dashboard_events_js,
-        dashboard_diagnostics_js,
-        dashboard_diagnostics_facts_js,
-        dashboard_diagnostics_snapshots_js,
-        dashboard_call_diagnostics_js,
-        dashboard_call_js,
-        dashboard_js,
-        dashboard_state_js,
-        dashboard_css,
-    ])
+    dashboard_surface = "\n".join(
+        [
+            dashboard,
+            dashboard_format_js,
+            dashboard_data_js,
+            dashboard_analysis_js,
+            dashboard_cells_js,
+            dashboard_details_js,
+            dashboard_insights_js,
+            dashboard_tables_js,
+            dashboard_filters_js,
+            dashboard_payload_cache_js,
+            dashboard_i18n_js,
+            dashboard_tooltips_js,
+            dashboard_status_js,
+            dashboard_actions_js,
+            dashboard_live_js,
+            dashboard_events_js,
+            dashboard_diagnostics_js,
+            dashboard_diagnostics_facts_js,
+            dashboard_diagnostics_snapshots_js,
+            dashboard_call_diagnostics_js,
+            dashboard_call_js,
+            dashboard_js,
+            dashboard_state_js,
+            dashboard_css,
+        ]
+    )
     csv_text = csv_path.read_text(encoding="utf-8")
     assert exported == 4
     assert exported_with_zero_limit == 4
@@ -229,6 +226,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "metric.session_cumulative" in dashboard_surface.lower()
 
     from codex_usage_tracker.core.i18n import translations_for
+
     en_trans = translations_for("en")
     assert "session cumulative" in en_trans["metric.session_cumulative"].lower()
     assert "Estimated Cost" in dashboard
@@ -397,8 +395,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Click a call row for deep diagnostics." in dashboard_surface
     assert "data-open-investigator-record" not in render_calls_js
     assert "rowInvestigatorLink(row" in render_calls_js
-    assert "target=\"_blank\"" in dashboard_actions_js
-    assert "rel=\"noopener\"" in dashboard_actions_js
+    assert 'target="_blank"' in dashboard_actions_js
+    assert 'rel="noopener"' in dashboard_actions_js
     assert "a.row-investigator-link" in dashboard_events_js
     assert "/api/open-investigator" in dashboard_actions_js
     assert "openInvestigatorUrl(rowLink.href)" in dashboard_events_js
@@ -496,6 +494,7 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "thread.spawned_threads" in dashboard_tables_js
 
     from codex_usage_tracker.core.i18n import translations_for
+
     en_trans = translations_for("en")
     assert en_trans["detail.why_flagged"] == "Why flagged"
     assert en_trans["detail.thread_lifecycle"] == "Thread lifecycle"
@@ -535,7 +534,10 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Aggregate only" not in dashboard
     assert "Call Details" in dashboard
     assert "Dashboard guide" in dashboard
-    assert "github.com/douglasmonsky/codex-usage-tracker/blob/main/docs/dashboard-guide.md" not in dashboard
+    assert (
+        "github.com/douglasmonsky/codex-usage-tracker/blob/main/docs/dashboard-guide.md"
+        not in dashboard
+    )
     assert "codex-usage-tracker-guide/dashboard-guide.html" in dashboard
     assert (tmp_path / "codex-usage-tracker-guide" / "dashboard-guide.html").exists()
     dashboard_guide = (tmp_path / "codex-usage-tracker-guide" / "dashboard-guide.html").read_text(
@@ -569,14 +571,17 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
         assert (asset_dir / stylesheet).exists()
     assert "detail-section" in dashboard
     assert "detailToggle" in dashboard
-    assert "body[data-detail-panel=\"expanded\"] .grid" in dashboard_css
+    assert 'body[data-detail-panel="expanded"] .grid' in dashboard_css
     assert "applyDetailPanelState()" in dashboard_js
     assert "time-cell" in dashboard_surface
     assert "formatTimestamp" in dashboard_js
     assert "formatDuration" in dashboard_js
     assert 'data-sort-key="duration"' in dashboard
     assert 'data-sort-key="gap"' in dashboard
-    assert '<option value="duration" data-i18n="option.longest_duration">Longest duration</option>' in dashboard
+    assert (
+        '<option value="duration" data-i18n="option.longest_duration">Longest duration</option>'
+        in dashboard
+    )
     assert '<option value="gap" data-i18n="option.longest_gap">Longest gap</option>' in dashboard
     assert "scrollbar-gutter: stable" in dashboard_css
     assert "overflow-y: scroll" in dashboard_css
@@ -616,9 +621,15 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert 'data-sort-key="reasoning"' in dashboard
     assert 'data-sort-header="signals"' not in dashboard
     assert '<option value="signals"' not in dashboard
-    assert '<option value="time" selected data-i18n="option.newest_calls">Newest calls</option>' in dashboard
+    assert (
+        '<option value="time" selected data-i18n="option.newest_calls">Newest calls</option>'
+        in dashboard
+    )
     assert '<option value="initiator" data-i18n="table.initiated">Initiated</option>' in dashboard
-    assert '<option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option>' in dashboard
+    assert (
+        '<option value="usage" data-i18n="option.highest_codex_credits">Highest Codex credits</option>'
+        in dashboard
+    )
     assert 'id="insightsView" type="button" aria-pressed="false"' in dashboard
     assert 'id="callsView" type="button" aria-pressed="true"' in dashboard
     assert 'id="diagnosticsView" type="button" aria-pressed="false"' in dashboard

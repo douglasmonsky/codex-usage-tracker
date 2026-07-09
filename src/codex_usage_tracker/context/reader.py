@@ -88,8 +88,7 @@ def _normalize_context_mode(mode: str) -> str:
     normalized = str(mode or CONTEXT_MODE_QUICK).strip().lower()
     if normalized not in CONTEXT_MODES:
         raise ValueError(
-            f"Unsupported context mode: {mode}. Expected one of: "
-            f"{', '.join(sorted(CONTEXT_MODES))}"
+            f"Unsupported context mode: {mode}. Expected one of: {', '.join(sorted(CONTEXT_MODES))}"
         )
     return normalized
 
@@ -208,13 +207,19 @@ def _scan_context_line(
     if _pending_summary_handled(state, line_number, timestamp, entry_type, summarized):
         return False
     if summarized is not None:
-        state.candidates.append(_summarized_context_entry(line_number, timestamp, entry_type, summarized))
+        state.candidates.append(
+            _summarized_context_entry(line_number, timestamp, entry_type, summarized)
+        )
     return _is_token_count_boundary(line_number, token_line, entry_type, payload)
 
 
 def _context_envelope_parts(envelope: dict[str, Any]) -> tuple[str, dict[str, Any], str | None]:
     payload = envelope.get("payload") if isinstance(envelope.get("payload"), dict) else {}
-    return optional_str(envelope.get("type")) or "unknown", payload, optional_str(envelope.get("timestamp"))
+    return (
+        optional_str(envelope.get("type")) or "unknown",
+        payload,
+        optional_str(envelope.get("timestamp")),
+    )
 
 
 def _is_token_count_boundary(
@@ -223,7 +228,11 @@ def _is_token_count_boundary(
     entry_type: str,
     payload: dict[str, Any],
 ) -> bool:
-    return line_number >= token_line and entry_type == "event_msg" and payload.get("type") == "token_count"
+    return (
+        line_number >= token_line
+        and entry_type == "event_msg"
+        and payload.get("type") == "token_count"
+    )
 
 
 def _start_turn_context(
@@ -371,7 +380,6 @@ def _summarized_context_entry(
         else None,
         action_duration_ms=nonnegative_float(summarized.get("action_duration_ms")),
     )
-
 
 
 def _context_entry(

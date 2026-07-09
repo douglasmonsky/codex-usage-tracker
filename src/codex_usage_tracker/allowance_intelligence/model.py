@@ -179,9 +179,7 @@ def _change_candidate(window_kind: str, spans: list[dict[str, Any]]) -> dict[str
         return None
 
     best: dict[str, Any] | None = None
-    for split in range(
-        _MIN_BASELINE_CHANGE_SPANS, len(spans) - _MIN_RECENT_CHANGE_SPANS + 1
-    ):
+    for split in range(_MIN_BASELINE_CHANGE_SPANS, len(spans) - _MIN_RECENT_CHANGE_SPANS + 1):
         previous = spans[:split]
         recent = spans[split:]
         previous_median = _median_credits_per_percent(previous)

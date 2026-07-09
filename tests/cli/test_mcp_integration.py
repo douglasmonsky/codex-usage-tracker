@@ -577,9 +577,7 @@ def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
                     "codex-usage-tracker": {
                         "command": sys.executable,
                         "args": ["-m", "codex_usage_tracker.mcp_server"],
-                        "env": {
-                            "PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src")
-                        },
+                        "env": {"PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src")},
                     }
                 }
             }

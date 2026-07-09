@@ -448,9 +448,7 @@ def _filter_fact_group(
         return rows
     if fact_group == "tools":
         return [
-            row
-            for row in rows
-            if str(row.get("fact_type") or "") in DIAGNOSTIC_TOOL_FACT_TYPES
+            row for row in rows if str(row.get("fact_type") or "") in DIAGNOSTIC_TOOL_FACT_TYPES
         ]
     raise ValueError(f"unknown diagnostic fact group: {fact_group}")
 

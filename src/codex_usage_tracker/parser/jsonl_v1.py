@@ -55,9 +55,11 @@ KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset(
     }
 )
 
+
 @dataclass(frozen=True)
 class ParsedUsageFile:
     """Parsed aggregate usage events plus the final parser cursor."""
+
     events: list[UsageEvent]
     diagnostic_facts: list[DiagnosticFact]
     state: ParserState
@@ -183,16 +185,14 @@ def _handle_jsonl_line(
         return
 
     payload_type = payload.get("type")
-    skipped, state.call_origin_segment, state.diagnostic_facts_segment = (
-        _handle_non_token_event(
-            envelope=envelope,
-            entry_type=entry_type,
-            payload_type=payload_type,
-            line_number=line_number,
-            call_origin_segment=state.call_origin_segment,
-            diagnostic_facts_segment=state.diagnostic_facts_segment,
-            stats=stats,
-        )
+    skipped, state.call_origin_segment, state.diagnostic_facts_segment = _handle_non_token_event(
+        envelope=envelope,
+        entry_type=entry_type,
+        payload_type=payload_type,
+        line_number=line_number,
+        call_origin_segment=state.call_origin_segment,
+        diagnostic_facts_segment=state.diagnostic_facts_segment,
+        stats=stats,
     )
     if skipped:
         return

@@ -69,6 +69,7 @@ DEFAULT_DASHBOARD_SCRIPT_SRCS = {
     for key, _placeholder, filename in DASHBOARD_SCRIPT_ASSETS
 }
 
+
 def dashboard_guide_href(output_path: Path) -> str | None:
     override = os.environ.get("CODEX_USAGE_TRACKER_DOCS_URL")
     if override:
@@ -83,6 +84,7 @@ def dashboard_guide_href(output_path: Path) -> str | None:
         return None
     return "codex-usage-tracker-guide/dashboard-guide.html"
 
+
 def dashboard_assets_href(output_path: Path) -> str:
     assets_source = resources.files("codex_usage_tracker.plugin_data").joinpath("dashboard")
     assets_target = output_path.parent / "codex-usage-tracker-assets"
@@ -90,6 +92,7 @@ def dashboard_assets_href(output_path: Path) -> str:
         shutil.rmtree(assets_target)
     _copy_dashboard_resource_tree(assets_source, assets_target)
     return "codex-usage-tracker-assets"
+
 
 def versioned_asset_href(output_path: Path, asset_base: str, filename: str) -> str:
     asset_path = output_path.parent / asset_base / filename
@@ -99,11 +102,13 @@ def versioned_asset_href(output_path: Path, asset_base: str, filename: str) -> s
         return f"{asset_base}/{filename}"
     return f"{asset_base}/{filename}?v={digest}"
 
+
 def dashboard_script_srcs(output_path: Path, asset_base: str) -> dict[str, str]:
     return {
         key: versioned_asset_href(output_path, asset_base, filename)
         for key, _placeholder, filename in DASHBOARD_SCRIPT_ASSETS
     }
+
 
 def _copy_dashboard_resource_tree(source: Any, target: Path) -> None:
     target.mkdir(parents=True, exist_ok=True)
@@ -113,6 +118,7 @@ def _copy_dashboard_resource_tree(source: Any, target: Path) -> None:
             _copy_dashboard_resource_tree(child, destination)
         else:
             destination.write_bytes(child.read_bytes())
+
 
 def render_dashboard_template(
     payload: str,
@@ -154,6 +160,7 @@ def render_dashboard_template(
         )
     return rendered
 
+
 def format_body_attrs(attrs: dict[str, str] | None) -> str:
     if not attrs:
         return ""
@@ -163,6 +170,7 @@ def format_body_attrs(attrs: dict[str, str] | None) -> str:
             continue
         rendered.append(f'{html.escape(key, quote=True)}="{html.escape(str(value), quote=True)}"')
     return " " + " ".join(rendered) if rendered else ""
+
 
 def _read_dashboard_asset(name: str) -> str:
     asset = resources.files("codex_usage_tracker.plugin_data").joinpath("dashboard", name)

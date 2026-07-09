@@ -99,9 +99,7 @@ ORIGINAL_OUTPUT_RE = re.compile(
 def shell_command_from_payload(payload: dict[str, Any], *, function_name: str) -> str | None:
     if not is_shell_tool(function_name):
         return None
-    return _shell_command_from_arguments(payload.get("arguments")) or _command_from_mapping(
-        payload
-    )
+    return _shell_command_from_arguments(payload.get("arguments")) or _command_from_mapping(payload)
 
 
 def _shell_command_from_arguments(arguments: object) -> str | None:

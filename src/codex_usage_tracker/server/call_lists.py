@@ -125,7 +125,9 @@ def thread_calls_payload(
 ) -> dict[str, object]:
     """Build the thread-scoped calls API payload."""
     params = parse_qs(query)
-    thread_key = first_query_value(params.get("thread_key")) or first_query_value(params.get("thread"))
+    thread_key = first_query_value(params.get("thread_key")) or first_query_value(
+        params.get("thread")
+    )
     if not thread_key:
         raise MissingThreadKeyError("thread_key required")
     query_params = live_query_params(params, thread_key=thread_key)

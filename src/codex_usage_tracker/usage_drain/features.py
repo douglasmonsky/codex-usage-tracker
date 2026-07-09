@@ -127,9 +127,7 @@ def _span_credit_features(span: UsageDeltaSpan, *, proxy: str) -> dict[str, Any]
     }
 
 
-def _span_turn_features(
-    span: UsageDeltaSpan, credit_features: dict[str, Any]
-) -> dict[str, Any]:
+def _span_turn_features(span: UsageDeltaSpan, credit_features: dict[str, Any]) -> dict[str, Any]:
     standard = float(credit_features["standard_usage_credits"])
     total_tokens = float(credit_features["total_tokens"])
     input_tokens = float(credit_features["input_tokens"])
@@ -171,9 +169,7 @@ def _span_effort_features(span: UsageDeltaSpan) -> dict[str, Any]:
     dominant_effort_count = span.effort_counts.get(dominant_effort, 0)
     effort_purity = dominant_effort_count / effort_total if effort_total else 0.0
     effort_shares = {
-        effort: span.effort_counts.get(effort, 0) / effort_total
-        if effort_total
-        else 0.0
+        effort: span.effort_counts.get(effort, 0) / effort_total if effort_total else 0.0
         for effort in EFFORT_LEVELS
     }
     return {
@@ -245,14 +241,10 @@ def _span_timing_features(
     return {
         "call_duration_seconds": duration,
         "mean_call_duration_seconds": _safe_div(duration, span.row_count),
-        "previous_call_delta_seconds": span.timing_totals.get(
-            "previous_call_delta_seconds", 0.0
-        ),
+        "previous_call_delta_seconds": span.timing_totals.get("previous_call_delta_seconds", 0.0),
         "span_wall_time_seconds": wall_time_seconds,
         "span_wall_time_minutes": wall_time_seconds / 60.0,
-        "mean_span_wall_time_seconds_per_call": _safe_div(
-            wall_time_seconds, span.row_count
-        ),
+        "mean_span_wall_time_seconds_per_call": _safe_div(wall_time_seconds, span.row_count),
         "row_count_bucket": row_count_bucket,
         "call_duration_bucket": call_duration_bucket,
         "span_wall_time_bucket": span_wall_time_bucket,
@@ -266,8 +258,6 @@ def _span_timing_features(
     }
 
 
-
-
 def add_days_since_first_span(rows: list[dict[str, Any]]) -> None:
     first_date: datetime | None = None
     for row in rows:
@@ -279,6 +269,4 @@ def add_days_since_first_span(rows: list[dict[str, Any]]) -> None:
         if parsed is None or first_date is None:
             row["days_since_first_span"] = 0.0
         else:
-            row["days_since_first_span"] = max(
-                (parsed.date() - first_date.date()).days, 0
-            )
+            row["days_since_first_span"] = max((parsed.date() - first_date.date()).days, 0)

@@ -205,15 +205,13 @@ def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
     }
     walk_forward = summary["walk_forward_prediction"]["scopes"]["all_after_first"]
     assert walk_forward["models"]["hybrid_streak_regime"]["mae"] < 0.5
-    assert "error_by_one_percent_streak" in walk_forward["error_diagnostics"][
-        "hybrid_streak_regime"
-    ]
+    assert (
+        "error_by_one_percent_streak" in walk_forward["error_diagnostics"]["hybrid_streak_regime"]
+    )
     assert "one_percent_regime_grace" in walk_forward["models"]
     assert summary["span_correlations"]["delta_usage_percent"]["n"] == 6
     assert (
-        summary["span_correlations"]["one_percent_span_capacity"][
-            "standard_usage_credits"
-        ]["n"]
+        summary["span_correlations"]["one_percent_span_capacity"]["standard_usage_credits"]["n"]
         == 5
     )
     calibration = summary["walk_forward_prediction"]["one_percent_grace_calibration"]
@@ -238,9 +236,7 @@ def test_regime_streaks_expose_one_percent_runs_and_breaks() -> None:
         "sixth_plus_span",
     ]
     assert adaptation["all_segments"]["first_span"]["prediction_rows"] == 2
-    assert adaptation["by_label"]["stable_one_percent"]["first_span"][
-        "prediction_rows"
-    ] == 1
+    assert adaptation["by_label"]["stable_one_percent"]["first_span"]["prediction_rows"] == 1
     boundaries = segments["boundary_diagnostics"]
     assert boundaries["n"] == 5
     assert boundaries["boundary_count"] == 2
@@ -333,9 +329,7 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
 
     summary = summarize_usage_drain_model(rows)
 
-    risk = summary["piecewise_regime_segments"]["boundary_diagnostics"][
-        "walk_forward_risk"
-    ]
+    risk = summary["piecewise_regime_segments"]["boundary_diagnostics"]["walk_forward_risk"]
     scope = risk["scopes"]["all_after_10"]
     assert scope["boundary_count"] > 0
     prior = scope["models"]["overall_prior_rate"]
@@ -356,18 +350,10 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     delta_scope = delta_prediction["scopes"]["all_after_10"]
     previous_delta = delta_scope["models"]["previous_delta"]
     label_segment_age_mode = delta_scope["models"]["label_segment_age_mode"]
-    boundary_conditioned = delta_scope["models"][
-        "boundary_conditioned_label_segment_age_mode"
-    ]
-    adaptive_mae_gate = delta_scope["models"][
-        "adaptive_mae_gate_label_segment_age_mode"
-    ]
-    adaptive_rmse_gate = delta_scope["models"][
-        "adaptive_rmse_gate_label_segment_age_mode"
-    ]
-    boundary_conditioned_weighted = delta_scope["models"][
-        "risk_weighted_boundary_conditioned_mode"
-    ]
+    boundary_conditioned = delta_scope["models"]["boundary_conditioned_label_segment_age_mode"]
+    adaptive_mae_gate = delta_scope["models"]["adaptive_mae_gate_label_segment_age_mode"]
+    adaptive_rmse_gate = delta_scope["models"]["adaptive_rmse_gate_label_segment_age_mode"]
+    boundary_conditioned_weighted = delta_scope["models"]["risk_weighted_boundary_conditioned_mode"]
     assert label_segment_age_mode["mae"] == 0.0
     assert label_segment_age_mode["rmse"] == 0.0
     assert label_segment_age_mode["mae"] < previous_delta["mae"]
@@ -376,9 +362,7 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
     assert boundary_conditioned["mae"] >= boundary_conditioned_weighted["mae"]
     assert adaptive_mae_gate["mae"] == 0.0
     assert adaptive_rmse_gate["rmse"] == 0.0
-    delta_diagnostics = delta_scope["prediction_detail_diagnostics"][
-        "label_segment_age_mode"
-    ]
+    delta_diagnostics = delta_scope["prediction_detail_diagnostics"]["label_segment_age_mode"]
     assert delta_diagnostics["matched_state_share"] == 1.0
     assert delta_diagnostics["top_signatures"][0]["signature"] == (
         "previous_label,previous_segment_position_bucket"
@@ -387,9 +371,9 @@ def test_boundary_walk_forward_risk_learns_segment_age_pattern() -> None:
         "boundary_conditioned_label_segment_age_mode"
     ]
     assert boundary_conditioned_diagnostics["matched_state_share"] > 0.0
-    ambiguity = summary["walk_forward_prediction"]["state_ambiguity"]["scopes"][
-        "all_after_10"
-    ]["signatures"]
+    ambiguity = summary["walk_forward_prediction"]["state_ambiguity"]["scopes"]["all_after_10"][
+        "signatures"
+    ]
     assert ambiguity["previous_delta"]["ambiguous_group_count"] == 1
     assert ambiguity["previous_delta"]["ambiguous_row_share"] > 0.0
     assert ambiguity["history_state"]["ambiguous_group_count"] == 0
@@ -430,26 +414,19 @@ def test_boundary_delta_risk_gate_keeps_previous_delta_for_stable_regime() -> No
     label_segment_age_mode = delta_scope["models"]["label_segment_age_mode"]
     gated = delta_scope["models"]["risk_gated_label_segment_age_mode"]
     weighted = delta_scope["models"]["risk_weighted_label_segment_age_mode"]
-    adaptive_mae_gate = delta_scope["models"][
-        "adaptive_mae_gate_label_segment_age_mode"
-    ]
+    adaptive_mae_gate = delta_scope["models"]["adaptive_mae_gate_label_segment_age_mode"]
     assert gated["mae"] == previous_delta["mae"]
     assert gated["mae"] < label_segment_age_mode["mae"]
     assert weighted["mae"] <= label_segment_age_mode["mae"]
     assert adaptive_mae_gate["mae"] == previous_delta["mae"]
-    gate_diagnostics = delta_scope["risk_gate_diagnostics"][
-        "risk_gated_label_segment_age_mode"
-    ]
+    gate_diagnostics = delta_scope["risk_gate_diagnostics"]["risk_gated_label_segment_age_mode"]
     assert gate_diagnostics["override_share"] == 0.0
     assert gate_diagnostics["source_counts"][0]["source"] == "risk_gate_previous_delta"
     adaptive_diagnostics = delta_scope["risk_gate_diagnostics"][
         "adaptive_mae_gate_label_segment_age_mode"
     ]
     assert adaptive_diagnostics["override_share"] == 0.0
-    assert (
-        adaptive_diagnostics["source_counts"][0]["source"]
-        == "adaptive_risk_gate_previous_delta"
-    )
+    assert adaptive_diagnostics["source_counts"][0]["source"] == "adaptive_risk_gate_previous_delta"
     previous_delta_residuals = delta_scope["residual_diagnostics"]["previous_delta"]
     boundary_errors = previous_delta_residuals["top_error_groups"]["boundary_state"]
     assert boundary_errors[0]["boundary_state"] == "same_label"
@@ -477,9 +454,7 @@ def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
     walk_forward = summary["walk_forward_prediction"]["scopes"]["all_after_10"]
     previous = walk_forward["models"]["previous_delta"]
     empirical = walk_forward["models"]["empirical_history_state_mode"]
-    adaptive_gate = walk_forward["models"][
-        "adaptive_mae_transition_gate_history_state_mode"
-    ]
+    adaptive_gate = walk_forward["models"]["adaptive_mae_transition_gate_history_state_mode"]
     assert empirical["mae"] < previous["mae"]
     assert adaptive_gate["mae"] == empirical["mae"]
     assert adaptive_gate["r2"] == empirical["r2"]
@@ -490,9 +465,9 @@ def test_empirical_state_bucket_predictor_learns_prior_transitions() -> None:
         > 0.0
     )
     assert "empirical_calendar_state_mode" in walk_forward["models"]
-    transition = summary["walk_forward_prediction"]["transition_risk"]["scopes"][
-        "all_after_10"
-    ]["non_one_percent_delta"]
+    transition = summary["walk_forward_prediction"]["transition_risk"]["scopes"]["all_after_10"][
+        "non_one_percent_delta"
+    ]
     assert transition["positive_rate"] > 0.0
     assert (
         transition["models"]["history_state_risk"]["brier"]
@@ -549,23 +524,11 @@ def test_allowance_breakpoint_analysis_detects_capacity_denominator_change() -> 
         piecewise["global_no_intercept_credit_slope"]["metrics"]["r2"]
         == analysis["global_credit_to_delta_fit"]["metrics"]["r2"]
     )
-    assert (
-        piecewise["piecewise_mean_capacity_denominator"]["metrics"]["r2"]
-        == 1.0
-    )
-    assert (
-        piecewise["piecewise_ceiling_mean_capacity_denominator"]["metrics"]["r2"]
-        == 1.0
-    )
-    assert (
-        piecewise["piecewise_leave_one_out_capacity_denominator"]["metrics"]["r2"]
-        == 1.0
-    )
+    assert piecewise["piecewise_mean_capacity_denominator"]["metrics"]["r2"] == 1.0
+    assert piecewise["piecewise_ceiling_mean_capacity_denominator"]["metrics"]["r2"] == 1.0
+    assert piecewise["piecewise_leave_one_out_capacity_denominator"]["metrics"]["r2"] == 1.0
     assert piecewise["piecewise_no_intercept_credit_slope"]["metrics"]["r2"] == 1.0
-    assert (
-        piecewise["piecewise_ceiling_no_intercept_credit_slope"]["metrics"]["r2"]
-        == 1.0
-    )
+    assert piecewise["piecewise_ceiling_no_intercept_credit_slope"]["metrics"]["r2"] == 1.0
     online = analysis["online_capacity_credit_to_delta_fit"]
     assert online["prediction_rows"] == 59
     previous = online["models"]["previous_capacity_denominator"]
@@ -625,9 +588,7 @@ def test_token_component_regression_recovers_rate_card_and_fast_weighting() -> N
     summary = summarize_usage_drain_model(rows, fast_proxy_annotations=proxies)
 
     regression = summary["token_component_regression"]
-    unweighted = regression["variants"]["unweighted"]["credit_accounting"][
-        "no_intercept"
-    ]["all"]
+    unweighted = regression["variants"]["unweighted"]["credit_accounting"]["no_intercept"]["all"]
     weighted = regression["variants"]["high_medium_fast_weighted"]["credit_accounting"][
         "no_intercept"
     ]["all"]
@@ -651,9 +612,7 @@ def _component_credits(
     nonreasoning: int,
 ) -> float:
     return (
-        (uncached * 125.0)
-        + (cached * 12.5)
-        + ((reasoning + nonreasoning) * 750.0)
+        (uncached * 125.0) + (cached * 12.5) + ((reasoning + nonreasoning) * 750.0)
     ) / 1_000_000.0
 
 
@@ -771,16 +730,13 @@ def test_predictive_models_compare_control_families_on_holdout() -> None:
     assert by_name["time_controls__interleaved_every_5th"]["holdout"]["mae"] < 0.2
 
     summary = summarize_usage_drain_model(raw_rows)
-    attribution = summary["predictive_modeling"]["feature_family_attribution"][
-        "sequences"
-    ]
+    attribution = summary["predictive_modeling"]["feature_family_attribution"]["sequences"]
     rows = attribution["cost_and_time_controls"]["interleaved_every_5th"]
     by_family = {row["family"]: row for row in rows}
     assert "cyclic time" in by_family
     assert by_family["cyclic time"]["mae_improvement_vs_previous"] > 0.0
     assert "history/regime" in {
-        row["family"]
-        for row in attribution["history_regime_controls"]["interleaved_every_5th"]
+        row["family"] for row in attribution["history_regime_controls"]["interleaved_every_5th"]
     }
 
 
@@ -812,9 +768,7 @@ def test_causal_baselines_capture_low_delta_regime_shift() -> None:
     persistence = by_name["persistence_previous_delta__time_ordered_80_20"]["holdout"]
     rolling_mode = by_name["rolling10_mode_delta__time_ordered_80_20"]["holdout"]
     hybrid = by_name["hybrid_streak_regime__time_ordered_80_20"]["holdout"]
-    same_bucket_mode = by_name[
-        "same_bucket_rolling10_mode_delta__time_ordered_80_20"
-    ]["holdout"]
+    same_bucket_mode = by_name["same_bucket_rolling10_mode_delta__time_ordered_80_20"]["holdout"]
     train_mean = by_name["baseline_train_mean__time_ordered_80_20"]["holdout"]
     assert persistence["mae"] == 0.0
     assert rolling_mode["mae"] == 0.0

@@ -67,7 +67,9 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
                 "port": args.port,
                 "dashboard_path": path_payload(args.output),
                 "dashboard_url": _served_dashboard_url(args.host, args.port),
-                "legacy_dashboard_url": _served_legacy_dashboard_url(args.host, args.port, args.output.name),
+                "legacy_dashboard_url": _served_legacy_dashboard_url(
+                    args.host, args.port, args.output.name
+                ),
                 "limit": _limit_value(args),
                 "since": args.since,
                 "context_api": _context_api(args),

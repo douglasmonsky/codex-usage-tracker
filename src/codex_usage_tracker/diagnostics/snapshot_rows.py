@@ -17,7 +17,9 @@ def function_rows(
     output_missing_count: Counter[str],
     output_token_sum: Counter[str],
 ) -> list[dict[str, Any]]:
-    names = set(function_calls) | set(function_outputs) | set(output_with_count) | set(output_token_sum)
+    names = (
+        set(function_calls) | set(function_outputs) | set(output_with_count) | set(output_token_sum)
+    )
     rows = [
         {
             "function": name,
@@ -30,7 +32,9 @@ def function_rows(
         }
         for name in names
     ]
-    return sorted(rows, key=lambda row: (-int(row["original_token_sum"]), -int(row["calls"]), row["function"]))
+    return sorted(
+        rows, key=lambda row: (-int(row["original_token_sum"]), -int(row["calls"]), row["function"])
+    )
 
 
 def command_output_rows(
@@ -52,7 +56,9 @@ def command_output_rows(
         }
         for root in set(command_calls) | set(command_token_sum)
     ]
-    return sorted(rows, key=lambda row: (-int(row["original_token_sum"]), -int(row["calls"]), row["root"]))
+    return sorted(
+        rows, key=lambda row: (-int(row["original_token_sum"]), -int(row["calls"]), row["root"])
+    )
 
 
 def command_rows(
@@ -137,7 +143,11 @@ def read_reader_rows(
     ]
     return sorted(
         rows,
-        key=lambda row: (-int(row["allocated_output_token_sum"]), -int(row["read_events"]), row["reader"]),
+        key=lambda row: (
+            -int(row["allocated_output_token_sum"]),
+            -int(row["read_events"]),
+            row["reader"],
+        ),
     )
 
 

@@ -28,32 +28,44 @@ def test_call_origin_classifies_metadata_segments_without_raw_text() -> None:
 
 
 def test_call_origin_reads_only_event_shape_metadata() -> None:
-    assert event_flags_from_envelope(
-        _entry(
-            "response_item",
-            {
-                "type": "message",
-                "role": "user",
-                "content": [{"type": "input_text", "text": "SECRET RAW PROMPT"}],
-            },
-        )
-    ).user_message is True
-    assert event_flags_from_envelope(
-        _entry("response_item", {"type": "function_call_output", "output": "SECRET"})
-    ).tool_result is True
-    assert event_flags_from_envelope(
-        _entry("event_msg", {"type": "context_compacted", "replacement_history": ["SECRET"]})
-    ).compaction is True
-    assert event_flags_from_envelope(
-        _entry(
-            "response_item",
-            {
-                "type": "message",
-                "role": "assistant",
-                "content": [{"type": "output_text", "text": "SECRET RAW ANSWER"}],
-            },
-        )
-    ).codex_activity is True
+    assert (
+        event_flags_from_envelope(
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "SECRET RAW PROMPT"}],
+                },
+            )
+        ).user_message
+        is True
+    )
+    assert (
+        event_flags_from_envelope(
+            _entry("response_item", {"type": "function_call_output", "output": "SECRET"})
+        ).tool_result
+        is True
+    )
+    assert (
+        event_flags_from_envelope(
+            _entry("event_msg", {"type": "context_compacted", "replacement_history": ["SECRET"]})
+        ).compaction
+        is True
+    )
+    assert (
+        event_flags_from_envelope(
+            _entry(
+                "response_item",
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": "SECRET RAW ANSWER"}],
+                },
+            )
+        ).codex_activity
+        is True
+    )
 
 
 def test_call_origin_falls_back_to_subagent_metadata_for_migrated_rows() -> None:
@@ -75,9 +87,7 @@ def test_call_origin_falls_back_to_subagent_metadata_for_migrated_rows() -> None
 
 
 def test_event_flags_from_envelope_detects_event_message_user_shape() -> None:
-    flags = event_flags_from_envelope(
-        {"type": "event_msg", "payload": {"type": "user_message"}}
-    )
+    flags = event_flags_from_envelope({"type": "event_msg", "payload": {"type": "user_message"}})
 
     assert flags.user_message
 
@@ -91,9 +101,7 @@ def test_event_flags_from_envelope_detects_mcp_tool_result_shape() -> None:
 
 
 def test_event_flags_from_envelope_detects_agent_event_activity_shape() -> None:
-    flags = event_flags_from_envelope(
-        {"type": "event_msg", "payload": {"type": "agent_message"}}
-    )
+    flags = event_flags_from_envelope({"type": "event_msg", "payload": {"type": "agent_message"}})
 
     assert flags.codex_activity
 

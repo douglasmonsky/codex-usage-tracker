@@ -194,7 +194,9 @@ def _merge_command_run_row(existing: dict[str, object], row: dict[str, object]) 
         existing["command_root"] = row["command_root"]
         existing["command_label"] = row["command_label"]
     existing["status"] = _merged_status(existing.get("status"), row.get("status"))
-    existing["exit_code"] = row.get("exit_code") if row.get("exit_code") is not None else existing.get("exit_code")
+    existing["exit_code"] = (
+        row.get("exit_code") if row.get("exit_code") is not None else existing.get("exit_code")
+    )
     existing["output_size_bytes"] = max(
         _int_value(existing.get("output_size_bytes")),
         _int_value(row.get("output_size_bytes")),
@@ -309,7 +311,9 @@ def _upsert_file_event_rows(conn: sqlite3.Connection, rows: list[dict[str, objec
 
 def _upsert_sql(table_name: str, columns: tuple[str, ...], primary_key: str) -> str:
     placeholders = ", ".join("?" for _column in columns)
-    update_clause = ", ".join(f"{column}=excluded.{column}" for column in columns if column != primary_key)
+    update_clause = ", ".join(
+        f"{column}=excluded.{column}" for column in columns if column != primary_key
+    )
     return (
         f"INSERT INTO {table_name} ({', '.join(columns)}) "
         f"VALUES ({placeholders}) "

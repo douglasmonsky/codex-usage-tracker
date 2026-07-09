@@ -49,6 +49,7 @@ BOUNDARY_CONTEXT_FIELDS = (
     "rate_limit_limit_id",
 )
 
+
 def piecewise_boundary_diagnostics(
     spans: list[UsageDeltaSpan],
     prediction_rows: dict[int, dict[str, Any]],
@@ -58,8 +59,7 @@ def piecewise_boundary_diagnostics(
         row
         for row in rows
         if row["previous_label"] == "stable_one_percent"
-        and int(row.get("one_percent_streak_count") or 0)
-        >= REGIME_GRACE_STREAK_THRESHOLD
+        and int(row.get("one_percent_streak_count") or 0) >= REGIME_GRACE_STREAK_THRESHOLD
     ]
     return {
         "target": "next_span_regime_label_changes",
@@ -114,21 +114,15 @@ def _piecewise_boundary_rows(
             "previous_segment_position_bucket": regime_labels.segment_position_bucket(
                 previous_segment_position
             ),
-            "previous_segment_wall_time_seconds": _rounded(
-                previous_segment_wall_time_seconds
-            ),
-            "previous_segment_wall_time_bucket": _second_bucket(
-                previous_segment_wall_time_seconds
-            ),
+            "previous_segment_wall_time_seconds": _rounded(previous_segment_wall_time_seconds),
+            "previous_segment_wall_time_bucket": _second_bucket(previous_segment_wall_time_seconds),
             "timestamp": span.start_event_timestamp,
         }
         for field_name in BOUNDARY_CONTEXT_FIELDS:
             if field_name in row:
                 continue
             row[field_name] = metadata.get(field_name, "missing")
-        row["one_percent_streak_count"] = int(
-            metadata.get("one_percent_streak_count") or 0
-        )
+        row["one_percent_streak_count"] = int(metadata.get("one_percent_streak_count") or 0)
         rows.append(row)
         if current_label != previous_label:
             segment_start_index = index
@@ -159,9 +153,7 @@ def _piecewise_boundary_transition_counts(rows: list[dict[str, Any]]) -> list[di
             "count": count,
             "share": _rounded(count / total if total else None),
         }
-        for transition, count in sorted(
-            counts.items(), key=lambda item: (-item[1], item[0])
-        )[:10]
+        for transition, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:10]
     ]
 
 
@@ -202,9 +194,7 @@ def _latest_piecewise_boundaries(rows: list[dict[str, Any]]) -> list[dict[str, A
             "window_elapsed_bucket": row.get("window_elapsed_bucket"),
             "previous_delta_percent": row.get("previous_delta_percent"),
             "previous_segment_position": row.get("previous_segment_position"),
-            "previous_segment_position_bucket": row.get(
-                "previous_segment_position_bucket"
-            ),
+            "previous_segment_position_bucket": row.get("previous_segment_position_bucket"),
             "delta_percent": row.get("delta_percent"),
             "one_percent_streak_count": row.get("one_percent_streak_count"),
         }
@@ -240,8 +230,6 @@ def _boundary_walk_forward_risk_summary(rows: list[dict[str, Any]]) -> dict[str,
     }
 
 
-
-
 def _boundary_walk_forward_risk_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     previous_rows: list[dict[str, Any]] = []
@@ -275,12 +263,7 @@ def _boundary_walk_forward_risk_rows(rows: list[dict[str, Any]]) -> list[dict[st
     return output
 
 
-
-
-
-def _boundary_risk_scope(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> dict[str, Any]:
+def _boundary_risk_scope(rows: list[dict[str, Any]], *, start_index: int) -> dict[str, Any]:
     scope_rows = _boundary_scope_rows(rows, start_index=start_index)
     actual = _boundary_actuals(scope_rows)
     model_names = _boundary_risk_model_names(scope_rows)
@@ -290,15 +273,11 @@ def _boundary_risk_scope(
         "boundary_count": sum(actual),
         "boundary_rate": _boundary_rate(actual),
         "models": _boundary_risk_model_metrics(scope_rows, actual, model_names),
-        "risk_detail_diagnostics": _boundary_risk_scope_detail_diagnostics(
-            scope_rows, model_names
-        ),
+        "risk_detail_diagnostics": _boundary_risk_scope_detail_diagnostics(scope_rows, model_names),
     }
 
 
-def _boundary_scope_rows(
-    rows: list[dict[str, Any]], *, start_index: int
-) -> list[dict[str, Any]]:
+def _boundary_scope_rows(rows: list[dict[str, Any]], *, start_index: int) -> list[dict[str, Any]]:
     return [row for row in rows if int(row["index"]) >= start_index]
 
 
@@ -326,13 +305,8 @@ def _boundary_risk_model_metrics(
     }
 
 
-def _boundary_risk_scores(
-    rows: list[dict[str, Any]], model_name: str
-) -> list[float]:
-    return [
-        _number((row.get("boundary_risks") or {}).get(model_name))
-        for row in rows
-    ]
+def _boundary_risk_scores(rows: list[dict[str, Any]], model_name: str) -> list[float]:
+    return [_number((row.get("boundary_risks") or {}).get(model_name)) for row in rows]
 
 
 def _boundary_risk_scope_detail_diagnostics(
@@ -378,20 +352,13 @@ def _boundary_risk_detail_diagnostics(
 def _boundary_risk_details_for_model(
     rows: list[dict[str, Any]], model_name: str
 ) -> list[dict[str, Any]]:
-    return [
-        (row.get("boundary_risk_details") or {}).get(model_name) or {}
-        for row in rows
-    ]
+    return [(row.get("boundary_risk_details") or {}).get(model_name) or {} for row in rows]
 
 
 def _matched_boundary_risk_details(
     details: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    return [
-        detail
-        for detail in details
-        if detail.get("source") == "matched_boundary_state"
-    ]
+    return [detail for detail in details if detail.get("source") == "matched_boundary_state"]
 
 
 def _mean_boundary_risk_support(details: list[dict[str, Any]]) -> float | None:

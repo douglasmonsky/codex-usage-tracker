@@ -254,9 +254,7 @@ def _source_record_payload(row: sqlite3.Row) -> dict[str, object]:
 def _source_record_upsert_sql() -> str:
     placeholders = ", ".join("?" for _column in SOURCE_RECORD_COLUMNS)
     update_clause = ", ".join(
-        f"{column}=excluded.{column}"
-        for column in SOURCE_RECORD_COLUMNS
-        if column != "record_id"
+        f"{column}=excluded.{column}" for column in SOURCE_RECORD_COLUMNS if column != "record_id"
     )
     return (
         f"INSERT INTO source_records ({', '.join(SOURCE_RECORD_COLUMNS)}) "

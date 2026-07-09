@@ -14,9 +14,7 @@ from codex_usage_tracker.usage_drain.utils import number as _number
 from codex_usage_tracker.usage_drain.utils import rounded as _rounded
 
 BOUNDARY_RISK_MODEL_SIGNATURES: dict[str, tuple[tuple[str, ...], ...]] = {
-    "previous_label_risk": (
-        ("previous_label",),
-    ),
+    "previous_label_risk": (("previous_label",),),
     "segment_age_risk": (
         ("previous_segment_position_bucket",),
         ("previous_segment_wall_time_bucket",),

@@ -132,19 +132,13 @@ def _report_summary(
         "censored_or_reset_pending_segments": _int_from_mapping(
             span_stats, "censored_or_reset_pending_segments"
         ),
-        "rows_without_usage_snapshot": _int_from_mapping(
-            span_stats, "rows_without_usage_snapshot"
-        ),
+        "rows_without_usage_snapshot": _int_from_mapping(span_stats, "rows_without_usage_snapshot"),
         "estimated_cost_usd": round(estimated_cost, 6),
         "usage_credits": round(usage_credits, 6),
         "top_thread_cost_share": curves.get("top_thread_share"),
         "best_predictive_model": best.get("name") if isinstance(best, dict) else None,
         "raw_context_included": False,
     }
-
-
-
-
 
 
 def _model_highlights(rows: list[dict[str, Any]], spans: list[UsageDeltaSpan]) -> dict[str, Any]:
@@ -227,10 +221,7 @@ def _prediction_model_record(
 
 
 def _absolute_errors(actual: list[float], predicted: list[float]) -> list[float]:
-    return [
-        abs(left - right)
-        for left, right in zip(actual, predicted, strict=False)
-    ]
+    return [abs(left - right) for left, right in zip(actual, predicted, strict=False)]
 
 
 def _mean_absolute_error(errors: list[float]) -> float | None:
@@ -242,9 +233,7 @@ def _mean_absolute_error(errors: list[float]) -> float | None:
 def _root_mean_square_error(actual: list[float], predicted: list[float]) -> float | None:
     if not actual:
         return None
-    squared_error = sum(
-        (left - right) ** 2 for left, right in zip(actual, predicted, strict=False)
-    )
+    squared_error = sum((left - right) ** 2 for left, right in zip(actual, predicted, strict=False))
     return (squared_error / len(actual)) ** 0.5
 
 
@@ -272,9 +261,7 @@ def _token_accounting_highlights(
 
 def _token_accounting_totals(rows: list[dict[str, Any]]) -> dict[str, float | None]:
     return {
-        field_name: _rounded(
-            sum(_number(row.get(field_name)) for row in rows)
-        )
+        field_name: _rounded(sum(_number(row.get(field_name)) for row in rows))
         for field_name in TOKEN_ACCOUNTING_TOTAL_FIELDS
     }
 
@@ -347,7 +334,10 @@ def _allowance_breakpoint_highlights(spans: list[UsageDeltaSpan]) -> dict[str, A
             _r2([_number(row["delta_usage_percent"]) for row in rows], piecewise_predictions)
         ),
         "best_single_break": best_break,
-        "segments": [_allowance_segment_record(rows, start, end, index) for index, (start, end) in enumerate(segments, start=1)],
+        "segments": [
+            _allowance_segment_record(rows, start, end, index)
+            for index, (start, end) in enumerate(segments, start=1)
+        ],
         "notes": [
             "Compact dashboard breakpoints use one efficient single-break scan.",
             "Segments are chronological diagnostics over closed positive usage-delta spans, not proof of an official allowance change.",
@@ -425,9 +415,7 @@ def _piecewise_mean_capacity_predictions(
     predictions = [0.0 for _row in rows]
     for start, end in segments:
         segment = rows[start:end]
-        mean_capacity = _mean(
-            [_number(row["credits_per_visible_percent"]) for row in segment]
-        )
+        mean_capacity = _mean([_number(row["credits_per_visible_percent"]) for row in segment])
         if mean_capacity <= 0:
             continue
         for index in range(start, end):
@@ -467,14 +455,6 @@ def _range_sse(
     total = prefix_sum[end] - prefix_sum[start]
     square_total = prefix_square[end] - prefix_square[start]
     return square_total - (total * total / n)
-
-
-
-
-
-
-
-
 
 
 def _count_values(rows: list[dict[str, Any]], field: str) -> dict[str, int]:
@@ -544,9 +524,7 @@ def _r2(actual: list[float], predicted: list[float]) -> float | None:
     total = sum((value - mean_actual) ** 2 for value in actual)
     if total <= 0:
         return None
-    residual = sum(
-        (left - right) ** 2 for left, right in zip(actual, predicted, strict=False)
-    )
+    residual = sum((left - right) ** 2 for left, right in zip(actual, predicted, strict=False))
     return 1.0 - (residual / total)
 
 

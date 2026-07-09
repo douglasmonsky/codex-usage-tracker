@@ -109,7 +109,6 @@ def compute_concentration(
     }
 
 
-
 def _add_concentration_row(
     groups: dict[str, dict[str, Any]],
     *,
@@ -148,7 +147,10 @@ def _concentration_dimension(
     *,
     total_tokens: int,
 ) -> dict[str, Any]:
-    rows = [_concentration_group_row(dimension, group, total_tokens=total_tokens) for group in groups.values()]
+    rows = [
+        _concentration_group_row(dimension, group, total_tokens=total_tokens)
+        for group in groups.values()
+    ]
     rows = sorted(
         rows,
         key=lambda row: (-int(row["total_tokens"]), -int(row["usage_rows"]), row["label"]),
@@ -209,7 +211,12 @@ def _largest_impact_rows(dimensions: list[dict[str, Any]]) -> list[dict[str, Any
             rows.append(dict(row))
     return sorted(
         rows,
-        key=lambda row: (-float(row["share"]), -int(row["total_tokens"]), row["dimension"], row["label"]),
+        key=lambda row: (
+            -float(row["share"]),
+            -int(row["total_tokens"]),
+            row["dimension"],
+            row["label"],
+        ),
     )[:15]
 
 
@@ -264,8 +271,6 @@ def _day_label(value: object) -> str:
     return "unknown_day"
 
 
-
-
 def concentration_privacy_metadata() -> dict[str, str]:
     return {
         "source_log_label_policy": "session_id_prefix_or_source_hash",
@@ -291,7 +296,11 @@ def _path_ref_from_token(token: str) -> dict[str, str] | None:
 
 def _safe_path_label(token: str) -> str | None:
     normalized = token.rstrip("/")
-    label = normalized if normalized in {".", ".."} else normalized.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    label = (
+        normalized
+        if normalized in {".", ".."}
+        else normalized.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    )
     if not label:
         return None
     lowered = label.lower()

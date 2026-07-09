@@ -75,9 +75,7 @@ def empty_capacity_residual_diagnostics() -> dict[str, Any]:
 def capacity_residual_summary(errors: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "n": len(errors),
-        "mean_error": rounded(
-            sum(item["error"] for item in errors) / len(errors)
-        ),
+        "mean_error": rounded(sum(item["error"] for item in errors) / len(errors)),
         "within_5_credits_share": capacity_error_share(errors, max_error=5.0),
         "within_10_credits_share": capacity_error_share(errors, max_error=10.0),
         "large_error_share": capacity_error_share(errors, min_error=25.0),
@@ -105,7 +103,7 @@ def capacity_error_share(
 
 
 def capacity_residual_top_error_groups(
-    errors: list[dict[str, Any]]
+    errors: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
     return {
         field_name: capacity_top_error_groups(errors, field_name)
@@ -115,8 +113,7 @@ def capacity_residual_top_error_groups(
 
 def capacity_residual_metadata(row: dict[str, Any]) -> dict[str, Any]:
     return {
-        field_name: row.get(field_name, "missing")
-        for field_name in CAPACITY_RESIDUAL_GROUP_FIELDS
+        field_name: row.get(field_name, "missing") for field_name in CAPACITY_RESIDUAL_GROUP_FIELDS
     }
 
 
@@ -132,15 +129,11 @@ def capacity_top_error_groups(
         {
             field_name: key,
             "count": len(items),
-            "mean_abs_error": rounded(
-                sum(item["abs_error"] for item in items) / len(items)
-            ),
+            "mean_abs_error": rounded(sum(item["abs_error"] for item in items) / len(items)),
             "mean_error": rounded(sum(item["error"] for item in items) / len(items)),
             "max_abs_error": rounded(max(item["abs_error"] for item in items)),
             "mean_actual": rounded(sum(item["actual"] for item in items) / len(items)),
-            "meanpredicted": rounded(
-                sum(item["predicted"] for item in items) / len(items)
-            ),
+            "meanpredicted": rounded(sum(item["predicted"] for item in items) / len(items)),
         }
         for key, items in grouped.items()
     ]
@@ -153,9 +146,7 @@ def capacity_top_error_groups(
     return rows[:10]
 
 
-def largest_capacity_residual_errors(
-    errors: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def largest_capacity_residual_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = sorted(errors, key=lambda item: item["abs_error"], reverse=True)[:10]
     return [
         {
@@ -258,9 +249,7 @@ def fit_causal_baseline_models(
     for name, feature_field, constant in baselines:
         train_y = [number(row.get("target")) for row in train_rows]
         holdout_y = [number(row.get("target")) for row in holdout_rows]
-        train_predictions = baseline_predictions(
-            train_rows, field=feature_field, constant=constant
-        )
+        train_predictions = baseline_predictions(train_rows, field=feature_field, constant=constant)
         holdout_predictions = baseline_predictions(
             holdout_rows, field=feature_field, constant=constant
         )

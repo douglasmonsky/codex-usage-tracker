@@ -52,10 +52,8 @@ def load_fast_proxy_annotations(path: Path | None) -> dict[str, FastProxyAnnotat
                 continue
             annotations[record_id] = FastProxyAnnotation(
                 label=str(row.get("fast_proxy_label") or "not_fast_proxy").strip(),
-                timing_confidence=str(row.get("timing_confidence") or "unknown")
-                .strip()
-                .lower(),
-            score=_span_optional_number(row.get("fast_proxy_score")),
+                timing_confidence=str(row.get("timing_confidence") or "unknown").strip().lower(),
+                score=_span_optional_number(row.get("fast_proxy_score")),
             )
     return annotations
 
@@ -254,10 +252,7 @@ def _span_proxy_count_totals() -> dict[str, int]:
 
 
 def _span_weighted_token_totals() -> dict[str, dict[str, float]]:
-    return {
-        proxy: dict.fromkeys(TOKEN_COMPONENT_FIELDS, 0.0)
-        for proxy in DEFAULT_PROXY_NAMES
-    }
+    return {proxy: dict.fromkeys(TOKEN_COMPONENT_FIELDS, 0.0) for proxy in DEFAULT_PROXY_NAMES}
 
 
 def _add_span_row_dimensions(
@@ -313,9 +308,7 @@ def _add_span_proxy_totals(
     for proxy_name, is_candidate in _span_proxy_flags(annotation).items():
         token_multiplier = multiplier if is_candidate else 1.0
         for field_name, value in token_components.items():
-            documented_weighted_token_totals[proxy_name][
-                field_name
-            ] += value * token_multiplier
+            documented_weighted_token_totals[proxy_name][field_name] += value * token_multiplier
         if is_candidate:
             candidate[proxy_name] += credits
             documented_weighted[proxy_name] += credits * multiplier
@@ -429,19 +422,13 @@ def _preferred_span_usage_observation(row: dict[str, Any]) -> dict[str, Any]:
         {
             "source": "primary",
             "used_percent": _span_optional_number(row.get("rate_limit_primary_used_percent")),
-            "window_minutes": _span_optional_number(
-                row.get("rate_limit_primary_window_minutes")
-            ),
+            "window_minutes": _span_optional_number(row.get("rate_limit_primary_window_minutes")),
             "resets_at": _span_optional_number(row.get("rate_limit_primary_resets_at")),
         },
         {
             "source": "secondary",
-            "used_percent": _span_optional_number(
-                row.get("rate_limit_secondary_used_percent")
-            ),
-            "window_minutes": _span_optional_number(
-                row.get("rate_limit_secondary_window_minutes")
-            ),
+            "used_percent": _span_optional_number(row.get("rate_limit_secondary_used_percent")),
+            "window_minutes": _span_optional_number(row.get("rate_limit_secondary_window_minutes")),
             "resets_at": _span_optional_number(row.get("rate_limit_secondary_resets_at")),
         },
     ]

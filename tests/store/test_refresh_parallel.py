@@ -50,9 +50,7 @@ class BrokenProcessPoolExecutor:
         return future
 
 
-def test_refresh_parses_multiple_sources_with_worker_pool(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_refresh_parses_multiple_sources_with_worker_pool(tmp_path: Path, monkeypatch) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     RecordingProcessPoolExecutor.instances.clear()
@@ -119,9 +117,7 @@ def test_refresh_reports_phase_progress(tmp_path: Path, monkeypatch) -> None:
     assert phases[-1] == "finalizing"
     assert events[-1]["status"] == "completed"
     assert events[-1]["result"]["parsed_events"] == result.parsed_events
-    content_events = [
-        event for event in events if event["phase"] == "indexing_content"
-    ]
+    content_events = [event for event in events if event["phase"] == "indexing_content"]
     assert content_events
     assert content_events[-1]["status"] == "completed"
     assert content_events[-1]["percent"] == 100.0

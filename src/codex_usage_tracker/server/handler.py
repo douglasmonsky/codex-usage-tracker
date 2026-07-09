@@ -92,9 +92,12 @@ _DASHBOARD_ASSET_MIME_TYPES = {
 }
 _REACT_DASHBOARD_PATH = "/react-dashboard.html"
 _REACT_DASHBOARD_INDEX_PATH = "/codex-usage-tracker-assets/react/index.html"
+
+
 def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
     value = _first(params.get(key))
     return None if value is None else _safe_int(value)
+
 
 class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
     def __init__(
@@ -228,7 +231,9 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
         usage_data = json.dumps(payload, ensure_ascii=True).replace("</", "<\\/")
         usage_script = f'<script id="usage-data" type="application/json">{usage_data}</script>'
         if '<div id="root"></div>' in html:
-            html = html.replace('<div id="root"></div>', f'<div id="root"></div>\n    {usage_script}', 1)
+            html = html.replace(
+                '<div id="root"></div>', f'<div id="root"></div>\n    {usage_script}', 1
+            )
         elif "</head>" in html:
             html = html.replace("</head>", f"  {usage_script}\n</head>", 1)
         else:
@@ -311,11 +316,11 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
                 privacy_mode=self._privacy_mode,
                 since=self._since,
                 api_token=self._api_token,
-            context_api_enabled=self._context_api_state.enabled,
-            include_archived_default=self._include_archived,
-            language_default=self._language,
-            limit_default=self._limit,
-        )
+                context_api_enabled=self._context_api_state.enabled,
+                include_archived_default=self._include_archived,
+                language_default=self._language,
+                limit_default=self._limit,
+            )
         except sqlite3.Error as exc:
             self._send_exception("Database error while preparing dashboard shell", exc)
             return None
@@ -350,6 +355,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
             return
         payload = context_settings_payload(query, context_api_state=self._context_api_state)
         self._send_json(HTTPStatus.OK, payload)
+
     def _handle_open_investigator(self, query: str) -> None:
         params = parse_qs(query)
         if not self._has_valid_api_token(params):
@@ -367,6 +373,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
             self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
         self._send_json(HTTPStatus.OK, payload)
+
     def _handle_status(self, query: str) -> None:
         handle_status_request(
             query,
@@ -577,6 +584,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
             send_exception=self._send_exception,
             send_json=self._send_json,
         )
+
     def _request_origin_allowed(self) -> bool:
         return request_origin_allowed(self.headers, self.server.server_port)
 

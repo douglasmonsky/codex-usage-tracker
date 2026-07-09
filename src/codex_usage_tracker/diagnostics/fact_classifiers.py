@@ -54,6 +54,7 @@ SEARCH_READ_COMMANDS = frozenset(
     }
 )
 
+
 def structured_tool_and_skill_facts(
     *,
     entry_type: object,
@@ -247,8 +248,6 @@ def _command_activity_facts(
             )
         )
     return tuple(facts)
-
-
 
 
 def _skill_label(payload: dict[str, Any]) -> str | None:
