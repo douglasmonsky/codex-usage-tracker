@@ -24,10 +24,12 @@ from codex_usage_tracker.pricing.estimates import (
     OPENAI_GPT_53_CODEX_MODEL_URL,
 )
 from codex_usage_tracker.pricing.openai import (
+    OPENAI_LATEST_MODEL_MD_URL,
     OPENAI_PRICING_MD_URL,
     VALID_PRICING_TIERS,
     PricingParseError,
     PricingUpdateResult,
+    parse_openai_latest_model_id,
     parse_openai_pricing_markdown,
     update_pricing_from_openai_docs,
 )
@@ -37,6 +39,7 @@ __all__ = [
     "OPENAI_CODEX_LAUNCH_URL",
     "OPENAI_CODEX_RATE_CARD_URL",
     "OPENAI_GPT_53_CODEX_MODEL_URL",
+    "OPENAI_LATEST_MODEL_MD_URL",
     "OPENAI_PRICING_MD_URL",
     "PRICING_SCHEMA",
     "PRICING_TEMPLATE",
@@ -49,6 +52,7 @@ __all__ = [
     "estimate_cache_savings_usd",
     "estimate_cost_usd",
     "load_pricing_config",
+    "parse_openai_latest_model_id",
     "parse_openai_pricing_markdown",
     "pin_pricing_snapshot",
     "summarize_pricing_coverage",

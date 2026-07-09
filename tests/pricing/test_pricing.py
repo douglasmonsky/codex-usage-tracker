@@ -5,12 +5,14 @@ from pathlib import Path
 
 from codex_usage_tracker.pricing.api import (
     ESTIMATED_MODEL_PRICES,
+    OPENAI_LATEST_MODEL_MD_URL,
     OPENAI_PRICING_MD_URL,
     PRICING_SCHEMA,
     PricingParseError,
     annotate_rows_with_efficiency,
     efficiency_flags,
     load_pricing_config,
+    parse_openai_latest_model_id,
     parse_openai_pricing_markdown,
     summarize_pricing_coverage,
     update_pricing_from_openai_docs,
@@ -21,6 +23,9 @@ OPENAI_PRICING_FIXTURE = """
   client:load
   tier="standard"
   rows={[
+    ["gpt-5.6-sol", 5, 0.5, 6.25, 30],
+    ["gpt-5.6-terra", 2.5, 0.25, 3.125, 15],
+    ["gpt-5.6-luna", 1, 0.1, 1.25, 6],
     ["gpt-5.5 (<272K context length)", 5, 0.5, 30],
     ["gpt-5.4-mini", 0.75, 0.075, 4.5],
     ["gpt-5-pro", 15, null, 120],
@@ -35,10 +40,24 @@ OPENAI_PRICING_FIXTURE = """
 />
 """
 
+OPENAI_LATEST_MODEL_FIXTURE = """---
+latestModelInfo:
+  model: gpt-5.6-sol
+  migrationGuide: /api/docs/guides/upgrading-to-gpt-5p6-sol.md
+---
+"""
+
 
 def test_parse_openai_pricing_markdown_for_selected_tier() -> None:
     models = parse_openai_pricing_markdown(OPENAI_PRICING_FIXTURE, tier="standard")
 
+    assert models["gpt-5.6-sol"] == {
+        "input_per_million": 5.0,
+        "cached_input_per_million": 0.5,
+        "output_per_million": 30.0,
+    }
+    assert models["gpt-5.6-terra"]["output_per_million"] == 15
+    assert models["gpt-5.6-luna"]["output_per_million"] == 6
     assert models["gpt-5.5"]["input_per_million"] == 5
     assert models["gpt-5.5"]["cached_input_per_million"] == 0.5
     assert models["gpt-5.5"]["output_per_million"] == 30
@@ -56,6 +75,20 @@ def test_parse_openai_pricing_markdown_uses_requested_tier() -> None:
             "output_per_million": 15.0,
         }
     }
+
+
+def test_parse_openai_latest_model_id_reads_front_matter() -> None:
+    assert parse_openai_latest_model_id(OPENAI_LATEST_MODEL_FIXTURE) == "gpt-5.6-sol"
+    assert OPENAI_LATEST_MODEL_MD_URL.endswith("/latest-model.md")
+
+
+def test_parse_openai_latest_model_id_reports_schema_changes() -> None:
+    try:
+        parse_openai_latest_model_id("# Latest model\n")
+    except PricingParseError as exc:
+        assert "latestModelInfo.model" in str(exc)
+    else:
+        raise AssertionError("expected PricingParseError")
 
 
 def test_parse_openai_pricing_markdown_reports_schema_changes() -> None:
@@ -93,18 +126,21 @@ def test_update_pricing_from_openai_docs_writes_source_metadata(tmp_path: Path) 
     raw = json.loads(pricing_path.read_text(encoding="utf-8"))
     config = load_pricing_config(pricing_path)
 
-    assert result.model_count == 5
+    assert result.model_count == 8
     assert result.estimated_model_count == 2
     assert result.source_url == OPENAI_PRICING_MD_URL
     assert raw["_schema"] == PRICING_SCHEMA
     assert raw["_source"]["url"] == OPENAI_PRICING_MD_URL
     assert raw["_source"]["tier"] == "standard"
     assert raw["_source"]["estimated_model_count"] == 2
+    assert raw["aliases"]["gpt-5.6"] == "gpt-5.6-sol"
     assert raw["models"]["codex-auto-review"] == ESTIMATED_MODEL_PRICES["codex-auto-review"]
     assert raw["models"]["gpt-5.3-codex-spark"] == ESTIMATED_MODEL_PRICES["gpt-5.3-codex-spark"]
     assert config.loaded
     assert config.source and config.source["name"] == "OpenAI Developers pricing docs"
     assert config.models["gpt-5.5"]["output_per_million"] == 30
+    assert config.rates_for("gpt-5.6") == config.models["gpt-5.6-sol"]
+    assert config.priced_as("gpt-5.6") == "gpt-5.6-sol"
     assert config.models["codex-auto-review"]["input_per_million"] == 1.5
     assert config.is_estimated_model("codex-auto-review")
     assert config.models["gpt-5.3-codex-spark"]["input_per_million"] == 1.75
@@ -121,7 +157,7 @@ def test_update_pricing_from_openai_docs_can_skip_estimates(tmp_path: Path) -> N
     )
     raw = json.loads(pricing_path.read_text(encoding="utf-8"))
 
-    assert result.model_count == 3
+    assert result.model_count == 6
     assert result.estimated_model_count == 0
     assert "codex-auto-review" not in raw["models"]
     assert "gpt-5.3-codex-spark" not in raw["models"]

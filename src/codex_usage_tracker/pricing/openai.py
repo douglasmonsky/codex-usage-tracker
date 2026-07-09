@@ -19,7 +19,12 @@ from codex_usage_tracker.pricing.config import PRICING_SCHEMA, load_existing_ali
 from codex_usage_tracker.pricing.estimates import ESTIMATED_MODEL_PRICES, estimated_model_prices
 
 OPENAI_PRICING_MD_URL = "https://developers.openai.com/api/docs/pricing.md"
+OPENAI_LATEST_MODEL_MD_URL = "https://developers.openai.com/api/docs/guides/latest-model.md"
 VALID_PRICING_TIERS = ("standard", "batch", "flex", "priority")
+
+_OFFICIAL_PRICING_ALIASES = {
+    "gpt-5.6": "gpt-5.6-sol",
+}
 
 
 class PricingParseError(ValueError):
@@ -64,7 +69,12 @@ def update_pricing_from_openai_docs(
     models: dict[str, dict[str, Any]] = {
         model: dict(rates) for model, rates in parsed_models.items()
     }
-    aliases = load_existing_aliases(path)
+    aliases = {
+        **{
+            alias: target for alias, target in _OFFICIAL_PRICING_ALIASES.items() if target in models
+        },
+        **load_existing_aliases(path),
+    }
     estimated_model_count = 0
     if include_estimates:
         models.update(estimated_model_prices())
@@ -135,14 +145,31 @@ def parse_openai_pricing_markdown(
     return models
 
 
+def parse_openai_latest_model_id(markdown: str) -> str:
+    """Return the canonical latest model ID from OpenAI's model guide front matter."""
+
+    match = _OPENAI_LATEST_MODEL_RE.search(markdown)
+    if match is None:
+        raise PricingParseError(
+            "latest-model source schema changed: could not find latestModelInfo.model"
+        )
+    return match.group("model")
+
+
 _OPENAI_PRICE_ROW_RE = re.compile(
     r"""\[
         \s*"(?P<model>[^"]+)"\s*,
         \s*(?P<input>[^,\]\n]+)\s*,
         \s*(?P<cached>[^,\]\n]+)\s*,
+        (?:\s*(?P<cache_write>[^,\]\n]+)\s*,)?
         \s*(?P<output>[^,\]\n]+)\s*
     \]""",
     re.VERBOSE,
+)
+
+_OPENAI_LATEST_MODEL_RE = re.compile(
+    r"^latestModelInfo:\s*$.*?^[ \t]+model:\s*(?P<model>[A-Za-z0-9._-]+)\s*$",
+    re.MULTILINE | re.DOTALL,
 )
 
 

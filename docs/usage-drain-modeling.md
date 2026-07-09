@@ -23,7 +23,7 @@ Sources:
 
 - [Codex Speed](https://developers.openai.com/codex/speed)
 - [Codex Pricing](https://developers.openai.com/codex/pricing)
-- [Codex rate card](https://help.openai.com/en/articles/20001106-codex-rate-card)
+- [Codex pricing and rate card](https://developers.openai.com/codex/pricing)
 - [Codex app-server](https://developers.openai.com/codex/app-server)
 - [Codex configuration reference](https://developers.openai.com/codex/config-reference)
 
