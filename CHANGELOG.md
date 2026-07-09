@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add GPT-5.6 Sol, Terra, and Luna API pricing and Codex credit-rate support, including the official `gpt-5.6` alias and compatibility with OpenAI's new cache-write pricing column.
+
 ## 0.17.1 - 2026-07-09
 
 - Stabilize async dogfood cache fingerprints so repeated unchanged MCP dogfood runs can reuse cached reports even when SQLite file metadata changes during read/report activity.

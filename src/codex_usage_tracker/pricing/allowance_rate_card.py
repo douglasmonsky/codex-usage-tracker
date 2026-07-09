@@ -14,15 +14,14 @@ from codex_usage_tracker.core.paths import DEFAULT_RATE_CARD_PATH
 
 RATE_CARD_SCHEMA = "codex-usage-tracker-codex-rate-card-v1"
 
-CODEX_RATE_CARD_URL = "https://help.openai.com/en/articles/20001106-codex-rate-card"
-
 CODEX_PRICING_URL = "https://developers.openai.com/codex/pricing"
+CODEX_RATE_CARD_URL = CODEX_PRICING_URL
 
 DEFAULT_SOURCE = {
     "name": "OpenAI Codex rate card",
     "url": CODEX_RATE_CARD_URL,
     "pricing_url": CODEX_PRICING_URL,
-    "fetched_at": "2026-06-03",
+    "fetched_at": "2026-07-09",
     "basis": "credits per 1M input, cached input, and output tokens",
     "tier": "standard",
 }

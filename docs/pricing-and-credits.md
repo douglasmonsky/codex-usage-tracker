@@ -16,6 +16,8 @@ codex-usage-tracker update-pricing
 
 This fetches OpenAI text-token pricing from `https://developers.openai.com/api/docs/pricing.md`, parses the selected tier, and writes a source-stamped local cache to `~/.codex-usage-tracker/pricing.json`. The default tier is `standard`; other supported tiers are `batch`, `flex`, and `priority`.
 
+The updater supports both the older four-value pricing rows and the newer five-value rows used by GPT-5.6 for input, cached input, cache writes, and output. GPT-5.6 Sol, Terra, and Luna are loaded from the published table, and the documented `gpt-5.6` alias resolves to `gpt-5.6-sol`. Current Codex logs do not expose a separate cache-write token counter, so cost estimates use the logged uncached input, cached input, and output counters without adding an explicit cache-write charge.
+
 If a pricing file already exists, the updater leaves a timestamped `.bak` copy next to it before replacing the active cache.
 
 The updater also includes marked best-guess estimates for Codex labels that are not finalized in the public pricing table. `codex-auto-review` uses OpenAI's published `codex-mini-latest` Codex pricing from `https://openai.com/index/introducing-codex/`: `$1.50` per 1M input tokens, a 75% prompt-cache discount (`$0.375` per 1M cached input tokens), and `$6.00` per 1M output tokens. `gpt-5.3-codex-spark` is listed by OpenAI as a research preview with non-final Codex rates, so the tracker estimates it as `gpt-5.3-codex` at `$1.75` per 1M input tokens, `$0.175` per 1M cached input tokens, and `$14.00` per 1M output tokens.
@@ -40,6 +42,8 @@ Edit `~/.codex-usage-tracker/pricing.json` with USD-per-million-token rates for 
 ## Codex Credits
 
 `Codex Credits` is a calculated usage number, not a dashboard-only unit. The tracker uses Codex's logged aggregate token counters and the bundled OpenAI Codex rate-card snapshot to estimate credits consumed by local Codex calls.
+
+The bundled rate card includes the published GPT-5.6 Sol, Terra, and Luna credit rates from the current Codex pricing documentation.
 
 The estimate uses:
 

@@ -25,19 +25,30 @@ jobs:
           from urllib.request import Request, urlopen
 
           from codex_usage_tracker.pricing import (
+              OPENAI_LATEST_MODEL_MD_URL,
               OPENAI_PRICING_MD_URL,
               VALID_PRICING_TIERS,
+              parse_openai_latest_model_id,
               parse_openai_pricing_markdown,
           )
 
-          request = Request(
-              OPENAI_PRICING_MD_URL,
-              headers={"User-Agent": "codex-usage-tracker-pricing-compat"},
-          )
-          with urlopen(request, timeout=20) as response:
-              markdown = response.read().decode("utf-8")
+          def fetch(url: str) -> str:
+              request = Request(
+                  url,
+                  headers={"User-Agent": "codex-usage-tracker-pricing-compat"},
+              )
+              with urlopen(request, timeout=20) as response:
+                  return response.read().decode("utf-8")
+
+          markdown = fetch(OPENAI_PRICING_MD_URL)
+          latest_model = parse_openai_latest_model_id(fetch(OPENAI_LATEST_MODEL_MD_URL))
 
           for tier in VALID_PRICING_TIERS:
               models = parse_openai_pricing_markdown(markdown, tier=tier)
               print(f"{tier}: parsed {len(models)} models")
+              if tier == "standard" and latest_model not in models:
+                  raise RuntimeError(
+                      f"latest model {latest_model!r} missing from parsed standard pricing"
+                  )
+          print(f"latest model: {latest_model}")
           PY

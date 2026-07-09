@@ -29,13 +29,33 @@ def test_allowance_estimates_exact_codex_credit_usage() -> None:
 
     assert rows[0]["usage_credit_model"] == "gpt-5.5"
     assert rows[0]["usage_credit_confidence"] == "exact"
-    assert (
-        rows[0]["usage_credit_source_url"]
-        == "https://help.openai.com/en/articles/20001106-codex-rate-card"
-    )
-    assert rows[0]["usage_credit_fetched_at"] == "2026-06-03"
+    assert rows[0]["usage_credit_source_url"] == "https://developers.openai.com/codex/pricing"
+    assert rows[0]["usage_credit_fetched_at"] == "2026-07-09"
     assert rows[0]["usage_credit_tier"] == "standard"
     assert rows[0]["usage_credits"] == 0.1775
+
+
+def test_allowance_estimates_gpt_5_6_direct_and_alias_credit_usage() -> None:
+    rows = annotate_rows_with_allowance(
+        [
+            {
+                "model": model,
+                "input_tokens": 1000,
+                "cached_input_tokens": 200,
+                "uncached_input_tokens": 800,
+                "output_tokens": 100,
+                "total_tokens": 1100,
+            }
+            for model in ("gpt-5.6-sol", "gpt-5.6")
+        ]
+    )
+
+    assert [row["usage_credit_model"] for row in rows] == [
+        "gpt-5.6-sol",
+        "gpt-5.6-sol",
+    ]
+    assert [row["usage_credit_confidence"] for row in rows] == ["exact", "exact"]
+    assert [row["usage_credits"] for row in rows] == [0.355, 0.355]
 
 
 def test_allowance_marks_inferred_auto_review_mapping() -> None:
@@ -196,11 +216,14 @@ def test_update_rate_card_writes_bundled_snapshot(tmp_path: Path) -> None:
     raw = json.loads(path.read_text(encoding="utf-8"))
     config = load_allowance_config(tmp_path / "missing-allowance.json", rate_card_path=path)
 
-    assert result.model_count == 5
-    assert result.alias_count == 1
+    assert result.model_count == 8
+    assert result.alias_count == 2
     assert raw["schema"] == "codex-usage-tracker-codex-rate-card-v1"
     assert config.rate_card_loaded is True
-    assert config.source["fetched_at"] == "2026-06-03"
+    assert config.source["fetched_at"] == "2026-07-09"
+    assert config.credit_rates["gpt-5.6-sol"]["output_per_million"] == 1500.0
+    assert config.credit_rates["gpt-5.6-terra"]["output_per_million"] == 125.0
+    assert config.credit_rates["gpt-5.6-luna"]["output_per_million"] == 300.0
 
 
 def test_write_allowance_template_refuses_to_overwrite(tmp_path: Path) -> None:
