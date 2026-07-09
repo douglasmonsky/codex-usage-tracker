@@ -141,6 +141,7 @@ xenon_max_average = "A"
 ruff_max_complexity = 10
 pyright_type_checking_mode = "standard"
 enable_pip_audit = false
+enable_secret_scanning = true
 enable_wemake = false
 enable_interrogate = false
 

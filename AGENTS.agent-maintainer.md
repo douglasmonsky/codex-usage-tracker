@@ -45,6 +45,9 @@ Do not read it during normal coding unless changing guidance.
 - Complexity: Ruff `10`, Xenon `B`
 - Source-only changes without test-file changes: `blocked`
 
+## Active Gates
+
+- Secret scanning: gitleaks
 
 ## Failure Loop
 
