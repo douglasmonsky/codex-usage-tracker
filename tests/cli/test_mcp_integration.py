@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -525,6 +526,17 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert cached["stages"][-1]["stage"] == "result_cache"
     cached_result = mcp_server.usage_dogfood_result(cached["job_id"])
     assert cached_result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
+
+    bumped_mtime = time.time() + 60
+    os.utime(db_path, (bumped_mtime, bumped_mtime))
+    mtime_cached = mcp_server.usage_dogfood_start(
+        evidence_limit=1,
+        privacy_mode="strict",
+        refresh=False,
+        write_markdown=False,
+    )
+    assert mtime_cached["status"] == "completed"
+    assert mtime_cached["result_cache"]["hit"] is True
 
     with mcp_server._DOGFOOD_JOB_LOCK:
         mcp_server._DOGFOOD_RESULT_CACHE.clear()
