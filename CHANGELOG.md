@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.17.1 - 2026-07-09
+
+- Stabilize async dogfood cache fingerprints so repeated unchanged MCP dogfood runs can reuse cached reports even when SQLite file metadata changes during read/report activity.
+
 ## 0.17.0 - 2026-07-08
 
 - Add agentic MCP investigation tools for hypothesis-driven usage diagnostics, compact evidence briefs, and actionable recommendation reports.
