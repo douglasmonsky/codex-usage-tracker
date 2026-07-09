@@ -15,6 +15,7 @@
     "smoke:dashboard:diagnostics": "playwright test tests/playwright/dashboard-diagnostics.spec.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.0"
+    "@playwright/test": "1.61.0",
+    "markdownlint-cli2": "0.22.1"
   }
 }

@@ -18,6 +18,10 @@ checks without mixing in broad Python refactors or large documentation cleanup.
 - Enable repo-configured `yamllint`.
 - Add a repo-specific Markdown lint config and enable the gate with historical
   prose/layout rules disabled.
+- Add CI hardening job for `actionlint`, `gitleaks`, `markdownlint`,
+  `yamllint`, Taplo, and GitHub workflow schema validation.
+- Fix pytest verifier imports by including the repository root in pytest's
+  Python path.
 
 ## Finish On This Branch
 
