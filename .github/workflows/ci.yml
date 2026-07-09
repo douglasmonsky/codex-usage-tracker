@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
           npm ci
-          go install github.com/gitleaks/gitleaks/v8@v8.30.1
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
           cargo install taplo-cli --version 0.9.0 --locked
       - name: GitHub Actions lint
         run: actionlint .github/workflows/*.yml
