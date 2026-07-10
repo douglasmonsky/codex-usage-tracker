@@ -46,7 +46,7 @@ Changelog = "https://github.com/douglasmonsky/codex-usage-tracker/blob/main/CHAN
 
 [project.optional-dependencies]
 dev = [
-  "agent-maintainer[core]>=0.1.0b1; python_version >= '3.11'",
+  "agent-maintainer[core]>=0.1.0b5; python_version >= '3.11'",
   "build>=1.2",
   "check-jsonschema>=0.37.4; python_version >= '3.11'",
   "git-agent-ratchet>=1.3.0; python_version >= '3.11'",
@@ -154,6 +154,27 @@ enable_yamllint = true
 enable_taplo = true
 enable_markdownlint = true
 enable_check_jsonschema = true
+enable_typescript = true
+typescript_lint_command = [
+  "npm",
+  "--workspace",
+  "frontend/dashboard",
+  "run",
+  "lint",
+  "--",
+  "--format",
+  "json",
+]
+typescript_typecheck_command = ["npm", "run", "dashboard:typecheck"]
+typescript_test_command = [
+  "npm",
+  "--workspace",
+  "frontend/dashboard",
+  "run",
+  "test",
+  "--",
+  "--reporter=json",
+]
 check_jsonschema_args = [
   "--builtin-schema",
   "vendor.github-workflows",
@@ -163,6 +184,46 @@ check_jsonschema_args = [
 ]
 enable_wemake = false
 enable_interrogate = false
+
+[tool.agent_maintainer.file_baselines]
+enabled = true
+mode = "advisory"
+
+[tool.agent_maintainer.file_baselines.groups.dashboard-source]
+include = ["frontend/dashboard/src/**/*.ts", "frontend/dashboard/src/**/*.tsx"]
+exclude = [
+  "frontend/dashboard/src/**/*.test.ts",
+  "frontend/dashboard/src/**/*.test.tsx",
+  "frontend/dashboard/src/vite-env.d.ts",
+]
+role = "source"
+max_physical_lines = 500
+max_nonblank_lines = 400
+changed_file_warn = 10
+changed_line_warn = 800
+
+[tool.agent_maintainer.file_baselines.groups.dashboard-tests]
+include = [
+  "frontend/dashboard/src/**/*.test.ts",
+  "frontend/dashboard/src/**/*.test.tsx",
+  "tests/playwright/**/*.mjs",
+]
+role = "test"
+max_physical_lines = 600
+max_nonblank_lines = 500
+changed_file_warn = 12
+changed_line_warn = 1000
+
+[tool.agent_maintainer.file_baselines.groups.dashboard-styles]
+include = [
+  "frontend/dashboard/src/**/*.css",
+  "frontend/dashboard/src/**/*.scss",
+]
+role = "source"
+max_physical_lines = 600
+max_nonblank_lines = 500
+changed_file_warn = 8
+changed_line_warn = 700
 
 [tool.deptry]
 known_first_party = ["codex_usage_tracker"]
