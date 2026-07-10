@@ -1,0 +1,215 @@
+@layer components {
+  .button,
+  .iconButton,
+  .segment {
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    display: inline-flex;
+    font: 600 var(--text-control) / 1.25 var(--font-interface);
+    justify-content: center;
+    min-height: 36px;
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+
+  .button {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .primary {
+    background: var(--signal-selection);
+    color: var(--ink-on-signal);
+  }
+
+  .primary:hover:not(:disabled) {
+    background: var(--signal-selection-hover);
+  }
+
+  .secondary,
+  .ghost,
+  .iconButton,
+  .segment {
+    color: var(--ink-strong);
+  }
+
+  .secondary {
+    background: var(--surface-panel);
+    border-color: var(--line-subtle);
+  }
+
+  .ghost,
+  .iconButton {
+    background: transparent;
+  }
+
+  .secondary:hover:not(:disabled),
+  .ghost:hover:not(:disabled),
+  .iconButton:hover:not(:disabled),
+  .segment:hover:not(:disabled) {
+    background: var(--surface-subtle);
+    border-color: var(--line-strong);
+  }
+
+  .danger {
+    background: var(--signal-risk);
+    color: var(--ink-on-signal);
+  }
+
+  .button:disabled,
+  .iconButton:disabled,
+  .segment:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .button:focus-visible,
+  .iconButton:focus-visible,
+  .segment:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .iconButton {
+    height: 36px;
+    padding: var(--space-2);
+    width: 36px;
+  }
+
+  .iconButton > svg,
+  .button > svg {
+    flex: none;
+    height: 16px;
+    width: 16px;
+  }
+
+  .badge {
+    align-items: center;
+    border: 1px solid currentcolor;
+    border-radius: 999px;
+    display: inline-flex;
+    font: 600 var(--text-metadata) / 1.25 var(--font-interface);
+    gap: var(--space-1);
+    padding: 2px var(--space-2);
+  }
+
+  .neutral {
+    background: var(--surface-subtle);
+    color: var(--ink-muted);
+  }
+
+  .positive {
+    background: var(--signal-positive-subtle);
+    color: var(--signal-positive);
+  }
+
+  .caution {
+    background: var(--signal-caution-subtle);
+    color: var(--signal-caution);
+  }
+
+  .risk {
+    background: var(--signal-risk-subtle);
+    color: var(--signal-risk);
+  }
+
+  .context {
+    background: var(--signal-context-subtle);
+    color: var(--signal-context);
+  }
+
+  .surface {
+    background: var(--surface-panel);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--radius-panel);
+    color: var(--ink-strong);
+    padding: var(--space-4);
+  }
+
+  .surfaceSubtle {
+    background: var(--surface-subtle);
+  }
+
+  .metric {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .metricLabel,
+  .metricDetail {
+    color: var(--ink-muted);
+    font: var(--text-metadata) / 1.35 var(--font-interface);
+  }
+
+  .metricValue {
+    color: var(--ink-strong);
+    font: 600 var(--text-panel-title) / 1.2 var(--font-numeric);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .segments {
+    background: var(--surface-subtle);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--radius-control);
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+  }
+
+  .segment {
+    background: transparent;
+    min-height: 30px;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .segmentActive {
+    background: var(--surface-panel);
+    border-color: var(--line-subtle);
+  }
+
+  .progress {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .progressHeader {
+    color: var(--ink-muted);
+    display: flex;
+    font: var(--text-metadata) / 1.35 var(--font-interface);
+    justify-content: space-between;
+  }
+
+  .progressTrack {
+    background: var(--surface-subtle);
+    border-radius: 999px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .progressFill {
+    background: var(--signal-selection);
+    height: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .button,
+    .iconButton,
+    .segment {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 820px) {
+    .button,
+    .iconButton,
+    .segment {
+      min-height: 44px;
+    }
+
+    .iconButton {
+      height: 44px;
+      width: 44px;
+    }
+  }
+}
