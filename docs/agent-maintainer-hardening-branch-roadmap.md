@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/report-agentic-family`
+Current chunk: `refactor/report-action-brief`
 
 ## Goal
 
@@ -123,6 +123,8 @@ module boundary and keep behavior covered by focused tests.
     evidence compaction into independently sized modules.
   - [x] Extract investigation suggestions and goal-led agentic findings into a
     dedicated report family below both line thresholds.
+  - [x] Extract action-brief construction and split goal/finding strategy from
+    agentic report assembly so both modules remain under threshold.
   - [ ] Extract investigation, hypothesis, walk/export, and query/recommendation
     families until the facade is below the configured thresholds.
 - Split `src/codex_usage_tracker/store/content_index.py` by ingestion, FTS,
