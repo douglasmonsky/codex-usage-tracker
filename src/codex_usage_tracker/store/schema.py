@@ -710,11 +710,6 @@ def _record_migration(conn: sqlite3.Connection, version: int) -> None:
     )
 
 
-def _record_migration_if_missing(conn: sqlite3.Connection, version: int) -> None:
-    if not _migration_record_exists(conn, version):
-        _record_migration(conn, version)
-
-
 def _migration_record_exists(conn: sqlite3.Connection, version: int) -> bool:
     return (
         conn.execute(

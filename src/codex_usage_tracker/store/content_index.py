@@ -1388,20 +1388,6 @@ def _pending_fragment(
     )
 
 
-def _flush_pending_fragments(
-    conn: sqlite3.Connection,
-    *,
-    pending: list[_PendingFragment],
-    usage_row: UsageContentRow,
-) -> None:
-    turn_rows, fragment_rows = _pending_fragment_rows(
-        pending=pending,
-        usage_row=usage_row,
-    )
-    _upsert_turn_rows(conn, turn_rows)
-    _upsert_fragment_rows(conn, fragment_rows)
-
-
 def _empty_pending_content_rows() -> _PendingContentRows:
     return _PendingContentRows(
         turn_rows=[],

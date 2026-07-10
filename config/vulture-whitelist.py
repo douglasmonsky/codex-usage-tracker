@@ -1,0 +1,84 @@
+# ruff: noqa: B018, F821
+"""Reviewed Vulture references for dynamic and public compatibility surfaces."""
+
+# Package lazy exports are invoked by Python's module attribute protocol.
+__getattr__
+
+# MCP registers decorated tools dynamically.
+usage_refresh_start
+usage_refresh_status
+usage_action_brief
+
+# Public library helpers remain available to direct consumers and scripts.
+parse_usage_events
+refresh_usage_event_links
+refresh_thread_summaries
+index_content_for_source_files
+flush_pending_event_rows
+write_usage_drain_spans_csv
+
+# Dataclass fields are consumed through serialization and attribute access.
+session_updated_at
+current_date
+cumulative_input_tokens
+cumulative_cached_input_tokens
+cumulative_output_tokens
+cumulative_reasoning_output_tokens
+evidence_scope
+total_credits
+remaining_credits
+candidate_span_share
+coef_non_candidate_usage_pct_per_credit
+coef_candidate_usage_pct_per_credit
+two_feature_r2
+corr_candidate_credit_share_vs_drain_per_standard_credit
+spans_with_candidates
+spans_without_candidates
+with_vs_without_median_drain_ratio
+
+# HTTP handlers are selected by BaseHTTPRequestHandler or route dispatch maps.
+_.do_POST
+_._handle_diagnostics_summary
+_._handle_diagnostics_fact_calls
+_._handle_diagnostics_overview
+_._handle_diagnostics_refresh
+_._handle_diagnostics_overview_refresh
+_._handle_diagnostics_tool_output
+_._handle_diagnostics_tool_output_refresh
+_._handle_diagnostics_commands
+_._handle_diagnostics_commands_refresh
+_._handle_diagnostics_git_interactions
+_._handle_diagnostics_git_interactions_refresh
+_._handle_diagnostics_file_reads
+_._handle_diagnostics_file_reads_refresh
+_._handle_diagnostics_file_modifications
+_._handle_diagnostics_file_modifications_refresh
+_._handle_diagnostics_read_productivity
+_._handle_diagnostics_read_productivity_refresh
+_._handle_diagnostics_concentration
+_._handle_diagnostics_concentration_refresh
+_._handle_diagnostics_guided_summary
+_._handle_diagnostics_guided_summary_refresh
+_._handle_diagnostics_usage_drain
+_._handle_diagnostics_usage_drain_refresh
+_._handle_context
+_._handle_context_settings
+_._handle_open_investigator
+_._handle_status
+_._handle_calls
+_._handle_call
+_._handle_threads
+_._handle_thread_calls
+_._handle_summary
+_._handle_recommendations
+_._handle_allowance_history
+_._handle_allowance_diagnostics
+_._handle_allowance_export
+_._handle_reports_pack
+_._handle_refresh_start
+_._handle_refresh_status
+_._handle_usage
+
+# sqlite3 protocols and test doubles consume these assigned attributes.
+_.row_factory
+_.closed

@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/tach-domain-boundaries`
+Current chunk: `chore/dependency-dead-code-gates`
 
 ## Goal
 
@@ -38,6 +38,9 @@ mixing in broad Python refactors or unrelated documentation cleanup.
 - Replace the placeholder leaf-level Tach inventory with enforceable package
   domain contracts, record the reviewed reports-to-allowance edge, and move
   shared command parsing into `core` to remove a store-to-diagnostics cycle.
+- Configure Deptry with the package's first-party and development dependency
+  model, remove five verified dead private helpers, and keep Vulture at 60%
+  confidence with a reviewed whitelist for dynamic and public surfaces.
 
 ## Branch Exit
 
@@ -60,12 +63,12 @@ maintained Agent Maintainer profile.
 After tests and mechanical formatting are stable, make structural gates produce
 useful review feedback.
 
-- Keep the now-green Tach domain contract in maintained validation and audit
+- [x] Keep the now-green Tach domain contract in maintained validation and audit
   circular dependencies separately before enabling cycle blocking.
-- Triage `deptry` into three buckets: real unused dependencies, intentionally
+- [x] Triage `deptry` into three buckets: real unused dependencies, intentionally
   optional/runtime dependencies, and packaging/test-only dependencies. Commit
   configuration only with a short explanation.
-- Triage `vulture` similarly: delete true dead code, preserve public/CLI/MCP
+- [x] Triage `vulture` similarly: delete true dead code, preserve public/CLI/MCP
   entry points with explicit allowlists, and avoid broad suppressions.
 
 ### 3. Security Hardening Pass
