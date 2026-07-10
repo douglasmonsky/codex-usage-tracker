@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/content-index-persistence`
+Current chunk: `refactor/allowance-statistics`
 
 ## Goal
 
@@ -137,6 +137,11 @@ module boundary and keep behavior covered by focused tests.
 - Then address medium oversized modules surfaced by the latest file-length log:
   `allowance_intelligence/model.py`, `server/handler.py`, diagnostics modules,
   and CLI parser/main files.
+  - [x] Extract the nonparametric detector and numeric evidence helpers from
+    `allowance_intelligence/model.py`.
+  - [ ] Split server route dispatch from response/static-file handling.
+  - [ ] Split oversized diagnostic snapshot and summary families.
+  - [ ] Split CLI parser construction and command dispatch by command family.
 - Keep each refactor PR below the normal change budget unless a cohesive change
   plan is created first.
 
