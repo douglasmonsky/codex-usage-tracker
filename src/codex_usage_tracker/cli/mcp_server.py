@@ -20,9 +20,6 @@ from codex_usage_tracker.cli.mcp_allowance import (
     usage_allowance_history as usage_allowance_history,
 )
 from codex_usage_tracker.cli.mcp_discovery import (
-    _pattern_scan_payload,
-)
-from codex_usage_tracker.cli.mcp_discovery import (
     usage_command_loop_scan as usage_command_loop_scan,
 )
 from codex_usage_tracker.cli.mcp_discovery import (
@@ -82,6 +79,27 @@ from codex_usage_tracker.cli.mcp_dogfood import (
 from codex_usage_tracker.cli.mcp_dogfood import (
     utc_now as _utc_now,
 )
+from codex_usage_tracker.cli.mcp_investigations import (
+    usage_action_brief as usage_action_brief,
+)
+from codex_usage_tracker.cli.mcp_investigations import (
+    usage_context_bloat_scan as usage_context_bloat_scan,
+)
+from codex_usage_tracker.cli.mcp_investigations import (
+    usage_investigate as usage_investigate,
+)
+from codex_usage_tracker.cli.mcp_investigations import (
+    usage_investigation_walk as usage_investigation_walk,
+)
+from codex_usage_tracker.cli.mcp_investigations import (
+    usage_local_evidence_export as usage_local_evidence_export,
+)
+from codex_usage_tracker.cli.mcp_investigations import (
+    usage_suggest_investigations as usage_suggest_investigations,
+)
+from codex_usage_tracker.cli.mcp_investigations import (
+    usage_test_hypotheses as usage_test_hypotheses,
+)
 from codex_usage_tracker.cli.mcp_runtime import mcp
 from codex_usage_tracker.context.api import (
     DEFAULT_CONTEXT_CHARS,
@@ -115,13 +133,7 @@ from codex_usage_tracker.reports.agentic_dogfood import (
     DEFAULT_AGENTIC_DOGFOOD_DIR,
 )
 from codex_usage_tracker.reports.api import (
-    build_action_brief_report,
-    build_agentic_investigation_report,
     build_expensive_calls_report,
-    build_hypothesis_test_report,
-    build_investigation_suggestions_report,
-    build_investigation_walk_report,
-    build_local_evidence_export_report,
     build_summary_report,
 )
 from codex_usage_tracker.server.call_detail import call_detail_payload
@@ -364,85 +376,6 @@ def most_expensive_usage_calls(
 
 
 @mcp.tool()
-def usage_suggest_investigations(
-    goal: str | None = None,
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    limit: int | None = 10,
-    privacy_mode: str = "normal",
-) -> dict[str, Any]:
-    """Suggest goal-led usage investigations and next MCP tools."""
-
-    return build_investigation_suggestions_report(
-        goal=goal,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        limit=limit,
-        privacy_mode=privacy_mode,
-    ).payload
-
-
-@mcp.tool()
-def usage_investigate(
-    goal: str = "token_waste",
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    evidence_limit: int = 5,
-    detail_mode: str = "compact",
-    privacy_mode: str = "normal",
-) -> dict[str, Any]:
-    """Run a goal-led aggregate usage investigation."""
-
-    return build_agentic_investigation_report(
-        db_path=DEFAULT_DB_PATH,
-        pricing_path=DEFAULT_PRICING_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        projects_path=DEFAULT_PROJECTS_PATH,
-        goal=goal,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        evidence_limit=evidence_limit,
-        detail_mode=detail_mode,
-        privacy_mode=privacy_mode,
-    ).payload
-
-
-@mcp.tool()
-def usage_action_brief(
-    goal: str = "token_waste",
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    evidence_limit: int = 5,
-    privacy_mode: str = "normal",
-) -> dict[str, Any]:
-    """Return compact aggregate remediation brief with concrete next actions."""
-
-    return build_action_brief_report(
-        db_path=DEFAULT_DB_PATH,
-        pricing_path=DEFAULT_PRICING_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        projects_path=DEFAULT_PROJECTS_PATH,
-        goal=goal,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        evidence_limit=evidence_limit,
-        privacy_mode=privacy_mode,
-    ).payload
-
-
-@mcp.tool()
 def usage_dogfood_start(
     since: str | None = None,
     until: str | None = None,
@@ -598,108 +531,6 @@ def usage_dogfood_result(job_id: str) -> dict[str, Any]:
         return status
     result = status.get("result")
     return result if isinstance(result, dict) else status
-
-
-@mcp.tool()
-def usage_test_hypotheses(
-    question: str,
-    hypotheses: list[str] | None = None,
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    evidence_limit: int = 5,
-    privacy_mode: str = "normal",
-) -> dict[str, Any]:
-    """Test usage hypotheses against aggregate/local-index diagnostics."""
-    return build_hypothesis_test_report(
-        db_path=DEFAULT_DB_PATH,
-        pricing_path=DEFAULT_PRICING_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        projects_path=DEFAULT_PROJECTS_PATH,
-        question=question,
-        hypotheses=hypotheses,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        evidence_limit=evidence_limit,
-        privacy_mode=privacy_mode,
-    ).payload
-
-
-@mcp.tool()
-def usage_context_bloat_scan(
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    min_occurrences: int = 2,
-    limit: int | None = 20,
-    privacy_mode: str = "normal",
-) -> dict[str, Any]:
-    """Find high-token threads with local content/event density."""
-
-    return _pattern_scan_payload(
-        scan_type="context_bloat",
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        min_occurrences=min_occurrences,
-        limit=limit,
-        privacy_mode=privacy_mode,
-    )
-
-
-@mcp.tool()
-def usage_investigation_walk(
-    question: str,
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    min_occurrences: int = 2,
-    evidence_limit: int = 5,
-    privacy_mode: str = "normal",
-) -> dict[str, Any]:
-    """Run a bounded local hypothesis walk over normalized usage evidence."""
-
-    return build_investigation_walk_report(
-        db_path=DEFAULT_DB_PATH,
-        question=question,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        min_occurrences=min_occurrences,
-        evidence_limit=evidence_limit,
-        privacy_mode=privacy_mode,
-    ).payload
-
-
-@mcp.tool()
-def usage_local_evidence_export(
-    question: str,
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    min_occurrences: int = 2,
-    evidence_limit: int = 5,
-) -> dict[str, Any]:
-    """Return a strict shareable local evidence summary without raw content."""
-
-    return build_local_evidence_export_report(
-        db_path=DEFAULT_DB_PATH,
-        question=question,
-        since=since,
-        until=until,
-        thread=thread,
-        include_archived=include_archived,
-        min_occurrences=min_occurrences,
-        evidence_limit=evidence_limit,
-    ).payload
 
 
 @mcp.tool()
