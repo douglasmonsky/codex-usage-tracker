@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/content-index-parser`
+Current chunk: `refactor/content-index-persistence`
 
 ## Goal
 
@@ -132,7 +132,8 @@ module boundary and keep behavior covered by focused tests.
   - [x] Extract content search, thread trace, and shared paging/snippet helpers
     while preserving the original facade exports.
   - [x] Extract parser/provenance row construction from refresh orchestration.
-  - [ ] Extract persistence and FTS synchronization behind focused helpers.
+  - [x] Extract persistence and FTS synchronization behind focused helpers;
+    the content-index facade is now below both configured line thresholds.
 - Then address medium oversized modules surfaced by the latest file-length log:
   `allowance_intelligence/model.py`, `server/handler.py`, diagnostics modules,
   and CLI parser/main files.
