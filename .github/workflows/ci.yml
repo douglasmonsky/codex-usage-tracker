@@ -46,6 +46,10 @@ jobs:
         run: npm run dashboard:test
       - name: Dashboard build
         run: npm run dashboard:build
+      - name: Dashboard governance
+        run: npm run dashboard:governance
+      - name: Dashboard bundle budget
+        run: node scripts/check-dashboard-bundles.mjs
       - name: Whole-source Pyright
         run: python -m pyright --pythonpath "$(command -v python)" src
       - name: Dependency hygiene

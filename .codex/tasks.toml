@@ -1,0 +1,30 @@
+version = 1
+
+[tasks.dashboard-governance]
+argv = ["npm", "run", "dashboard:governance"]
+timeout_seconds = 600
+tail_lines = 80
+max_tail_bytes = 8192
+pass_exit_codes = [0]
+
+[tasks.dashboard-verify]
+argv = ["npm", "run", "dashboard:verify"]
+timeout_seconds = 1200
+tail_lines = 100
+max_tail_bytes = 12288
+pass_exit_codes = [0]
+
+[tasks.dashboard-source-budget]
+argv = ["python3", "scripts/check_dashboard_source_budgets.py"]
+timeout_seconds = 120
+tail_lines = 80
+max_tail_bytes = 8192
+pass_exit_codes = [0]
+
+[tasks.pr-checks]
+argv = ["gh", "pr", "checks", "--watch"]
+timeout_seconds = 1800
+tail_lines = 60
+max_tail_bytes = 8192
+pass_exit_codes = [0]
+allow_extra_args = true
