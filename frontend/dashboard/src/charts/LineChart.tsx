@@ -93,6 +93,7 @@ export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, h
         <div
           className="chart-scroll"
           ref={scrollRef}
+          role="region"
           tabIndex={hasScrollableHistory ? 0 : undefined}
           aria-label={`${yLabel} history. Recent dates are shown first; scroll left for earlier dates.`}
         >

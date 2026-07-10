@@ -1,0 +1,40 @@
+.announcement {
+  position: fixed;
+  z-index: 70;
+  right: 22px;
+  bottom: 22px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--signal-selection-line);
+  border-radius: 5px;
+  color: var(--ink-strong);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-overlay);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.refreshing svg {
+  animation: refresh-spin 900ms linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 820px) {
+  .announcement {
+    right: 12px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    left: 12px;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refreshing svg {
+    animation: none;
+  }
+}

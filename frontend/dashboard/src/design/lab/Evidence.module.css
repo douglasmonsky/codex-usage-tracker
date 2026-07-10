@@ -1,0 +1,303 @@
+.tableShell {
+  position: relative;
+  overflow: auto;
+  max-height: 470px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 5px;
+  background: var(--surface-panel);
+}
+
+.mobileList {
+  display: none;
+}
+
+.scrollCue {
+  border-color: var(--line-strong);
+  background: var(--surface-panel);
+}
+
+.scrollFooter {
+  position: sticky;
+  z-index: 8;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+  padding: 4px 8px;
+  border-top: 1px solid var(--line-subtle);
+  background: var(--surface-subtle);
+}
+
+.table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.table th,
+.table td {
+  height: 42px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-subtle);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  color: var(--ink-muted);
+  background: var(--surface-subtle);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.table th:first-child,
+.table td:first-child {
+  position: sticky;
+  z-index: 3;
+  left: 0;
+  min-width: 236px;
+  background: var(--surface-panel);
+}
+
+.table th:first-child {
+  z-index: 5;
+  background: var(--surface-subtle);
+}
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+.table tbody tr:hover td,
+.table tbody tr[data-selected='true'] td {
+  background: var(--signal-selection-surface);
+}
+
+.rowButton {
+  display: grid;
+  width: 100%;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.rowButton:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rowButton strong {
+  overflow: hidden;
+  max-width: 280px;
+  text-overflow: ellipsis;
+}
+
+.rowButton span {
+  color: var(--ink-muted);
+  font-size: 10px;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cacheGood {
+  color: var(--signal-positive-ink);
+  font-weight: 700;
+}
+
+.cacheRisk {
+  color: var(--signal-risk-ink);
+  font-weight: 700;
+}
+
+.splitWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 12px;
+  align-items: start;
+}
+
+.inspector {
+  position: sticky;
+  top: 100px;
+  display: grid;
+  gap: 14px;
+}
+
+.inspectorHero {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.inspectorHero strong {
+  font-size: 16px;
+}
+
+.inspectorHero span {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.inspectorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tokenRows,
+.timeline {
+  display: grid;
+  gap: 7px;
+}
+
+.tokenRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 11px;
+}
+
+.tokenRow span {
+  color: var(--ink-muted);
+}
+
+.tokenRow strong {
+  font-size: 12px;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 54px 8px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: 10px;
+}
+
+.timelineDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.timelineDot[data-tone='positive'] {
+  background: var(--signal-positive);
+}
+
+.timelineDot[data-tone='warning'] {
+  background: var(--signal-caution);
+}
+
+.timelineDot[data-tone='context'] {
+  background: var(--signal-context);
+}
+
+@media (max-width: 1080px) {
+  .splitWorkspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inspector {
+    position: static;
+  }
+}
+
+@media (max-width: 620px) {
+  .tableShell {
+    display: none;
+  }
+
+  .mobileList {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--line-subtle);
+    border-radius: 5px;
+    background: var(--surface-panel);
+  }
+
+  .mobileList > button {
+    display: grid;
+    min-width: 0;
+    min-height: 76px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border: 0;
+    border-bottom: 1px solid var(--line-subtle);
+    color: var(--ink-strong);
+    background: var(--surface-panel);
+    text-align: left;
+  }
+
+  .mobileList > button:last-child {
+    border-bottom: 0;
+  }
+
+  .mobileList > button[data-selected='true'] {
+    background: var(--signal-selection-surface);
+    box-shadow: inset 3px 0 var(--signal-selection);
+  }
+
+  .mobileIdentity,
+  .mobileIdentity strong,
+  .mobileIdentity span {
+    display: block;
+    min-width: 0;
+  }
+
+  .mobileIdentity strong {
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileIdentity span {
+    margin-top: 4px;
+    color: var(--ink-muted);
+    font-size: 10px;
+  }
+
+  .mobileMetrics {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 4px 10px;
+    text-align: right;
+  }
+
+  .mobileMetrics > span {
+    display: grid;
+  }
+
+  .mobileMetrics strong {
+    font-size: 12px;
+  }
+
+  .mobileMetrics small {
+    color: var(--ink-muted);
+    font-size: 9px;
+  }
+
+  .mobileMetrics > :last-child {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}

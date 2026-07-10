@@ -1,0 +1,105 @@
+.stateBanner {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+}
+
+.stateBanner[data-tone='caution'] {
+  border-color: var(--signal-caution-line);
+  background: var(--signal-caution-surface);
+}
+
+.stateBanner svg {
+  width: 18px;
+  height: 18px;
+  color: var(--signal-caution);
+}
+
+.stateBanner strong,
+.stateBanner span {
+  display: block;
+}
+
+.stateBanner strong {
+  font-size: 13px;
+}
+
+.stateBanner span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.statePanel {
+  display: grid;
+  max-width: 680px;
+  min-height: 320px;
+  place-content: center;
+  gap: 18px;
+  margin: 36px auto;
+  text-align: center;
+}
+
+.statePanel > svg {
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
+  color: var(--signal-selection);
+}
+
+.statePanel[data-tone='loading'] > svg {
+  animation: state-spin 1s linear infinite;
+}
+
+.statePanel[data-tone='error'] > svg {
+  color: var(--signal-risk);
+}
+
+.statePanel h1 {
+  margin: 10px 0 0;
+  font-size: 22px;
+}
+
+.statePanel p {
+  max-width: 520px;
+  margin: 7px auto 0;
+  color: var(--ink-muted);
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+@keyframes state-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 620px) {
+  .stateBanner {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
+  .stateBanner > :last-child {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .statePanel {
+    min-height: 360px;
+    margin-block: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statePanel[data-tone='loading'] > svg {
+    animation: none;
+  }
+}
