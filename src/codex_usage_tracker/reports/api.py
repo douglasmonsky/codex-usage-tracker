@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -80,6 +79,12 @@ from codex_usage_tracker.reports.discovery import (
     build_thread_trace_report as build_thread_trace_report,
 )
 from codex_usage_tracker.reports.filters import query_row_matches
+from codex_usage_tracker.reports.hypothesis_classification import (
+    classify_hypothesis_family as _classify_hypothesis_family,
+)
+from codex_usage_tracker.reports.hypothesis_classification import (
+    normalize_hypothesis_inputs as _normalize_hypothesis_inputs,
+)
 from codex_usage_tracker.reports.project_summary import project_summary_rows
 from codex_usage_tracker.reports.recommendation_builder import (
     recommendation_sort_key,
@@ -1054,110 +1059,6 @@ def build_hypothesis_test_report(
         ],
     }
     return HypothesisTestReport(payload)
-
-
-def _normalize_hypothesis_inputs(hypotheses: list[str] | str | None) -> list[str]:
-    if hypotheses is None:
-        return []
-    if isinstance(hypotheses, str):
-        return [hypotheses.strip()] if hypotheses.strip() else []
-    return [str(hypothesis).strip() for hypothesis in hypotheses if str(hypothesis).strip()]
-
-
-def _classify_hypothesis_family(hypothesis: str, question: str) -> str:
-    hypothesis_family = _classify_hypothesis_text(hypothesis.lower())
-    if hypothesis_family is not None:
-        return hypothesis_family
-    question_family = _classify_hypothesis_text(question.lower())
-    if question_family is not None:
-        return question_family
-    return "token_waste"
-
-
-def _classify_hypothesis_text(text: str) -> str | None:
-    if _has_any_phrase(
-        text,
-        (
-            "allowance",
-            "usage allowance",
-            "allowance change",
-            "limit change",
-            "limit changed",
-            "codex limit",
-            "usage limit",
-            "weekly allowance",
-            "weekly limit",
-            "5-hour",
-            "5 hour",
-            "throttle",
-            "throttled",
-        ),
-    ):
-        return "allowance_change"
-    if _has_any_phrase(text, ("cache", "cold resume", "cold resumes", "cold", "resume")):
-        return "cache_failure"
-    if _has_any_phrase(
-        text,
-        (
-            "file",
-            "rediscover",
-            "rediscovery",
-            "reread",
-            "rereads",
-            "re-read",
-            "re-reads",
-            "repeated read",
-            "repeated reads",
-            "path",
-            "content-index",
-            "content index",
-            "thread-trace",
-            "thread trace",
-        ),
-    ):
-        return "repeated_file_rediscovery"
-    if _has_shell_hypothesis_signal(text):
-        return "shell_churn"
-    if _has_any_word(text, ("effort", "model", "xhigh", "high", "medium", "gpt")):
-        return "effort_model_choice"
-    if _has_any_phrase(
-        text,
-        (
-            "token waste",
-            "wasting tokens",
-            "waste",
-            "expensive",
-            "cost",
-            "large low-output",
-            "large low output",
-            "low-output",
-            "low output",
-            "output length",
-            "context pressure",
-            "large call",
-            "large calls",
-            "cleanup target",
-        ),
-    ):
-        return "token_waste"
-    return None
-
-
-def _has_any_phrase(text: str, phrases: tuple[str, ...]) -> bool:
-    return any(phrase in text for phrase in phrases)
-
-
-def _has_any_word(text: str, words: tuple[str, ...]) -> bool:
-    return any(
-        re.search(rf"(?<![a-z0-9_-]){re.escape(word)}(?![a-z0-9_-])", text) for word in words
-    )
-
-
-def _has_shell_hypothesis_signal(text: str) -> bool:
-    if "shell" in text or "command" in text:
-        return True
-    tokens = {token for token in re.split(r"[^a-z0-9]+", text) if token}
-    return bool(tokens & {"sed", "rg", "git", "nl", "npm", "python", "pytest"})
 
 
 def _evaluate_hypothesis_spec(

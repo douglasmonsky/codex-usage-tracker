@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/report-discovery-families`
+Current chunk: `refactor/report-hypothesis-classification`
 
 ## Goal
 
@@ -115,6 +115,8 @@ module boundary and keep behavior covered by focused tests.
   behavior; it is the largest source file in the raw baseline.
   - [x] Extract coverage, indexed-content discovery, pattern scans, and focused
     token-waste candidate reports behind compatibility re-exports.
+  - [x] Extract hypothesis input normalization and family classification before
+    splitting the larger evaluator engine.
   - [ ] Extract investigation, hypothesis, walk/export, and query/recommendation
     families until the facade is below the configured thresholds.
 - Split `src/codex_usage_tracker/store/content_index.py` by ingestion, FTS,
