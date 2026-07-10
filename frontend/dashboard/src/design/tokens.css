@@ -41,16 +41,16 @@
     --shadow-overlay: 0 16px 36px rgb(24 32 42 / 18%);
     --font-interface: system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", sans-serif;
     --font-numeric: ui-monospace, "SFMono-Regular", consolas, monospace;
-    --text-metadata: 0.75rem;
-    --text-control: 0.875rem;
-    --text-panel-title: 1.125rem;
-    --space-1: 0.25rem;
-    --space-2: 0.5rem;
-    --space-3: 0.75rem;
-    --space-4: 1rem;
-    --space-6: 1.5rem;
-    --space-8: 2rem;
-    --radius-control: 0.25rem;
-    --radius-panel: 0.375rem;
+    --text-metadata: 12px;
+    --text-control: 14px;
+    --text-panel-title: 18px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --radius-control: 4px;
+    --radius-panel: 6px;
   }
 }

@@ -9,7 +9,7 @@
     display: inline-flex;
     font: 600 var(--text-control) / 1.25 var(--font-interface);
     justify-content: center;
-    min-height: 2.25rem;
+    min-height: 36px;
     transition: background-color 120ms ease, border-color 120ms ease;
   }
 
@@ -72,16 +72,16 @@
   }
 
   .iconButton {
-    height: 2.25rem;
+    height: 36px;
     padding: var(--space-2);
-    width: 2.25rem;
+    width: 36px;
   }
 
   .iconButton > svg,
   .button > svg {
     flex: none;
-    height: 1rem;
-    width: 1rem;
+    height: 16px;
+    width: 16px;
   }
 
   .badge {
@@ -91,7 +91,7 @@
     display: inline-flex;
     font: 600 var(--text-metadata) / 1.25 var(--font-interface);
     gap: var(--space-1);
-    padding: 0.125rem var(--space-2);
+    padding: 2px var(--space-2);
   }
 
   .neutral {
@@ -159,7 +159,7 @@
 
   .segment {
     background: transparent;
-    min-height: 1.875rem;
+    min-height: 30px;
     padding: var(--space-1) var(--space-2);
   }
 
@@ -183,7 +183,7 @@
   .progressTrack {
     background: var(--surface-subtle);
     border-radius: 999px;
-    height: 0.375rem;
+    height: 6px;
     overflow: hidden;
   }
 
@@ -204,12 +204,12 @@
     .button,
     .iconButton,
     .segment {
-      min-height: 2.75rem;
+      min-height: 44px;
     }
 
     .iconButton {
-      height: 2.75rem;
-      width: 2.75rem;
+      height: 44px;
+      width: 44px;
     }
   }
 }
