@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/report-hypothesis-evaluators`
+Current chunk: `refactor/report-agentic-family`
 
 ## Goal
 
@@ -121,6 +121,8 @@ module boundary and keep behavior covered by focused tests.
     evaluators can depend on a concrete module instead of the facade.
   - [x] Extract hypothesis evaluators, result metrics, and shared agentic
     evidence compaction into independently sized modules.
+  - [x] Extract investigation suggestions and goal-led agentic findings into a
+    dedicated report family below both line thresholds.
   - [ ] Extract investigation, hypothesis, walk/export, and query/recommendation
     families until the facade is below the configured thresholds.
 - Split `src/codex_usage_tracker/store/content_index.py` by ingestion, FTS,
