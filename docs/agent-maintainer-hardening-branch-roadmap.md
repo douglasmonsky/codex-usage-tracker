@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/report-walk-export`
+Current chunk: `refactor/content-index-queries`
 
 ## Goal
 
@@ -129,6 +129,10 @@ module boundary and keep behavior covered by focused tests.
     report facade is now below both configured line thresholds.
 - Split `src/codex_usage_tracker/store/content_index.py` by ingestion, FTS,
   provenance, and query responsibilities.
+  - [x] Extract content search, thread trace, and shared paging/snippet helpers
+    while preserving the original facade exports.
+  - [ ] Extract parser/provenance row construction from refresh orchestration.
+  - [ ] Extract persistence and FTS synchronization behind focused helpers.
 - Then address medium oversized modules surfaced by the latest file-length log:
   `allowance_intelligence/model.py`, `server/handler.py`, diagnostics modules,
   and CLI parser/main files.
