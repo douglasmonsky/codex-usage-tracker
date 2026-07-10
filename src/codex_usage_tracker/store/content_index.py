@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from codex_usage_tracker.parser.state import optional_str
@@ -14,6 +14,7 @@ from codex_usage_tracker.store.content_extract import (
     MAX_FRAGMENT_CHARS as MAX_FRAGMENT_CHARS,
 )
 from codex_usage_tracker.store.content_extract import (
+    _decode_content_envelope,
     _extract_content_rows_for_source_file,
     _extract_pending_fragments,
     _is_token_count,
@@ -30,6 +31,7 @@ from codex_usage_tracker.store.content_index_models import (
 )
 from codex_usage_tracker.store.content_index_models import (
     ContentIndexProgressCallback,
+    UsageContentRow,
     _ExtractedContentRows,
     _PendingContentRows,
     _PendingFragment,
@@ -349,6 +351,78 @@ def _configured_parallel_content_index_workers() -> int | None:
         return None
 
 
+@dataclass
+class _StreamingContentAccumulator:
+    pending: list[_PendingFragment] = field(default_factory=list)
+    tool_calls: list[PendingToolCall] = field(default_factory=list)
+    command_runs: list[PendingCommandRun] = field(default_factory=list)
+    file_events: list[PendingFileEvent] = field(default_factory=list)
+    rows: _PendingContentRows = field(default_factory=_empty_pending_content_rows)
+    turn_id: str | None = None
+    turn_index: int = 0
+    parse_warnings: int = 0
+
+    def consume(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        envelope: dict[str, object],
+        payload: dict[str, object],
+        line_number: int,
+        usage_row: UsageContentRow | None,
+    ) -> None:
+        entry_type = envelope.get("type")
+        timestamp = optional_str(envelope.get("timestamp"))
+        if entry_type == "turn_context":
+            self.turn_id = optional_str(payload.get("turn_id"))
+            self.turn_index += 1
+            return
+        if _is_token_count(entry_type, payload):
+            self._link_usage_row(conn, usage_row)
+            return
+        self.pending.extend(
+            _extract_pending_fragments(
+                envelope=envelope,
+                payload=payload,
+                line_number=line_number,
+                timestamp=timestamp,
+                turn_id=self.turn_id,
+                turn_index=self.turn_index,
+            )
+        )
+        events = extract_pending_local_events(
+            envelope=envelope,
+            payload=payload,
+            line_number=line_number,
+            timestamp=timestamp,
+        )
+        self.tool_calls.extend(events.tool_calls)
+        self.command_runs.extend(events.command_runs)
+        self.file_events.extend(events.file_events)
+
+    def _link_usage_row(
+        self,
+        conn: sqlite3.Connection,
+        usage_row: UsageContentRow | None,
+    ) -> None:
+        if usage_row is None:
+            return
+        _append_pending_content_rows(
+            self.rows,
+            pending=self.pending,
+            tool_calls=self.tool_calls,
+            command_runs=self.command_runs,
+            file_events=self.file_events,
+            usage_row=usage_row,
+        )
+        if self.rows.linked_records >= _CONTENT_WRITE_BATCH_RECORDS:
+            _flush_pending_content_rows(conn, self.rows)
+        self.pending.clear()
+        self.tool_calls.clear()
+        self.command_runs.clear()
+        self.file_events.clear()
+
+
 def _index_content_for_source_file(
     conn: sqlite3.Connection,
     *,
@@ -375,78 +449,28 @@ def _index_content_for_source_file(
             source_files_to_replace=[str(source_path)],
             sync_fts=sync_fts,
         )
-    pending: list[_PendingFragment] = []
-    pending_tool_calls: list[PendingToolCall] = []
-    pending_command_runs: list[PendingCommandRun] = []
-    pending_file_events: list[PendingFileEvent] = []
-    pending_rows = _empty_pending_content_rows()
-    turn_id: str | None = None
-    turn_index = 0
-    parse_warnings = 0
+    accumulator = _StreamingContentAccumulator()
     try:
         with source_path.open("rb") as handle:
             if start_byte > 0:
                 handle.seek(start_byte)
             for line_number, raw_line in enumerate(handle, start_line + 1):
-                try:
-                    envelope = json.loads(raw_line.decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError):
-                    parse_warnings += 1
+                decoded = _decode_content_envelope(raw_line)
+                if decoded is None:
+                    accumulator.parse_warnings += 1
                     continue
-                if not isinstance(envelope, dict):
-                    parse_warnings += 1
-                    continue
-                payload = envelope.get("payload")
-                if not isinstance(payload, dict):
-                    parse_warnings += 1
-                    continue
-                entry_type = envelope.get("type")
-                timestamp = optional_str(envelope.get("timestamp"))
-                if entry_type == "turn_context":
-                    turn_id = optional_str(payload.get("turn_id"))
-                    turn_index += 1
-                    continue
-                if _is_token_count(entry_type, payload):
-                    usage_row = usage_rows.get(line_number)
-                    if usage_row is not None:
-                        _append_pending_content_rows(
-                            pending_rows,
-                            pending=pending,
-                            tool_calls=pending_tool_calls,
-                            command_runs=pending_command_runs,
-                            file_events=pending_file_events,
-                            usage_row=usage_row,
-                        )
-                        if pending_rows.linked_records >= _CONTENT_WRITE_BATCH_RECORDS:
-                            _flush_pending_content_rows(conn, pending_rows)
-                        pending = []
-                        pending_tool_calls = []
-                        pending_command_runs = []
-                        pending_file_events = []
-                    continue
-                pending.extend(
-                    _extract_pending_fragments(
-                        envelope=envelope,
-                        payload=payload,
-                        line_number=line_number,
-                        timestamp=timestamp,
-                        turn_id=turn_id,
-                        turn_index=turn_index,
-                    )
-                )
-                events = extract_pending_local_events(
+                envelope, payload = decoded
+                accumulator.consume(
+                    conn,
                     envelope=envelope,
                     payload=payload,
                     line_number=line_number,
-                    timestamp=timestamp,
+                    usage_row=usage_rows.get(line_number),
                 )
-                pending_tool_calls.extend(events.tool_calls)
-                pending_command_runs.extend(events.command_runs)
-                pending_file_events.extend(events.file_events)
     except OSError:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
 
-    _flush_pending_content_rows(conn, pending_rows)
+    _flush_pending_content_rows(conn, accumulator.rows)
 
     if sync_fts:
         if replace_existing:
@@ -462,7 +486,7 @@ def _index_content_for_source_file(
         source_files=1,
         conversation_turns=counts["conversation_turns"],
         content_fragments=counts["content_fragments"],
-        parse_warnings=parse_warnings,
+        parse_warnings=accumulator.parse_warnings,
     )
 
 
