@@ -1,5 +1,3 @@
-"""MCP server exposing Codex usage, diagnostics, and local investigation tools."""
-
 from __future__ import annotations
 
 import json
