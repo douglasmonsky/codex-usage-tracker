@@ -43,6 +43,223 @@ class AgenticInvestigationReport:
     payload: dict[str, Any]
 
 
+def _append_report_finding(
+    *,
+    report: dict[str, Any],
+    findings: list[dict[str, Any]],
+    source_reports: list[str],
+    evidence_limit: int,
+    detail_mode: str,
+    finding: str,
+    why_it_matters: str,
+    recommended_action: str,
+    verify_with: list[str],
+    privacy_notes: str,
+    missing_access: str,
+    confidence: str | None = None,
+) -> None:
+    """Record a source schema and append its finding when evidence exists."""
+
+    source_reports.append(str(report["schema"]))
+    if not report["rows"]:
+        return
+    findings.append(
+        _agentic_finding(
+            finding=finding,
+            evidence=report["rows"][:evidence_limit],
+            detail_mode=detail_mode,
+            confidence=confidence or _count_confidence(int(report["total_candidates"])),
+            why_it_matters=why_it_matters,
+            recommended_action=recommended_action,
+            verify_with=verify_with,
+            privacy_notes=privacy_notes,
+            missing_access=missing_access,
+        )
+    )
+
+
+def _append_large_low_output_finding(
+    *,
+    db_path: Path,
+    findings: list[dict[str, Any]],
+    source_reports: list[str],
+    evidence_limit: int,
+    detail_mode: str,
+    privacy_mode: str,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+) -> None:
+    report = build_large_low_output_report(
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+    _append_report_finding(
+        report=report,
+        findings=findings,
+        source_reports=source_reports,
+        evidence_limit=evidence_limit,
+        detail_mode=detail_mode,
+        finding="Large calls produced little output",
+        why_it_matters=(
+            "Large input/context usage with low output is a strong candidate for "
+            "cold resumes, stale thread continuation, or low-value continuation."
+        ),
+        recommended_action=(
+            "Open the top calls, check whether a smaller fresh thread or preserved handoff "
+            "would avoid resending large context."
+        ),
+        verify_with=["usage_large_low_output_calls", "usage_call_detail", "usage_thread_trace"],
+        privacy_notes="Aggregate token/activity counts only; no raw fragments or command output.",
+        missing_access=(
+            "The aggregate report cannot prove why output was low without a thread trace "
+            "or explicit raw-context inspection."
+        ),
+    )
+
+
+def _append_shell_churn_finding(
+    *,
+    db_path: Path,
+    findings: list[dict[str, Any]],
+    source_reports: list[str],
+    evidence_limit: int,
+    detail_mode: str,
+    privacy_mode: str,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+) -> None:
+    report = build_shell_churn_report(
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+    _append_report_finding(
+        report=report,
+        findings=findings,
+        source_reports=source_reports,
+        evidence_limit=evidence_limit,
+        detail_mode=detail_mode,
+        finding="Repeated shell command churn",
+        why_it_matters=(
+            "Repeated shell roots, failures, or adjacent retries can waste turns and "
+            "inflate tool-output/context pressure."
+        ),
+        recommended_action="Turn repeated probes into a small script, narrower command, or targeted test command.",
+        verify_with=["usage_shell_churn", "usage_thread_trace"],
+        privacy_notes="Command roots and bounded labels only; raw command output is omitted.",
+        missing_access=(
+            "Strict aggregate evidence cannot always recover the exact shell intent "
+            "or full command arguments."
+        ),
+    )
+
+
+def _append_repeated_file_finding(
+    *,
+    db_path: Path,
+    findings: list[dict[str, Any]],
+    source_reports: list[str],
+    evidence_limit: int,
+    detail_mode: str,
+    privacy_mode: str,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+) -> None:
+    report = build_repeated_file_rediscovery_report(
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+    _append_report_finding(
+        report=report,
+        findings=findings,
+        source_reports=source_reports,
+        evidence_limit=evidence_limit,
+        detail_mode=detail_mode,
+        finding="Repeated file rediscovery",
+        why_it_matters=(
+            "Repeated safe file identities can indicate the agent keeps rediscovering "
+            "the same context instead of using a durable summary or targeted helper."
+        ),
+        recommended_action=(
+            "Summarize stable facts into project docs or build a small helper command for recurring lookups."
+        ),
+        verify_with=["usage_repeated_file_rediscovery", "usage_thread_trace"],
+        privacy_notes="Safe path hashes, basenames, and aggregates only; full paths are omitted.",
+        missing_access=(
+            "The report can rank repeated safe file identities, but cannot tell whether "
+            "each reread was necessary without task intent."
+        ),
+    )
+
+
+def _append_recommendations_finding(
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path,
+    findings: list[dict[str, Any]],
+    source_reports: list[str],
+    evidence_limit: int,
+    detail_mode: str,
+    privacy_mode: str,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+) -> None:
+    report = build_recommendations_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    ).payload
+    _append_report_finding(
+        report=report,
+        findings=findings,
+        source_reports=source_reports,
+        evidence_limit=evidence_limit,
+        detail_mode=detail_mode,
+        finding="Ranked aggregate usage recommendations",
+        confidence="medium",
+        why_it_matters=(
+            "Existing recommendation scoring combines aggregate cost, cache, context, and pricing signals."
+        ),
+        recommended_action=(
+            "Start with the highest recommendation score, then verify with the specific diagnostic tool."
+        ),
+        verify_with=["usage_recommendations", "usage_calls", "usage_call_detail"],
+        privacy_notes="Aggregate recommendations only; no prompt or tool-output text.",
+        missing_access="Recommendation scores do not know whether an expensive call produced high-value work.",
+    )
+
+
 def build_investigation_suggestions_report(
     *,
     goal: str | None = None,
@@ -116,141 +333,61 @@ def build_agentic_investigation_report(
     ]
 
     if normalized_goal in {"token_waste", "cache_failure", "workflow_churn"}:
-        large_low_output = build_large_low_output_report(
+        _append_large_low_output_finding(
             db_path=db_path,
+            findings=findings,
+            source_reports=source_reports,
+            evidence_limit=normalized_limit,
+            detail_mode=normalized_detail_mode,
+            privacy_mode=privacy_mode,
             since=since,
             until=until,
             thread=thread,
             include_archived=include_archived,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
-        source_reports.append(str(large_low_output["schema"]))
-        if large_low_output["rows"]:
-            findings.append(
-                _agentic_finding(
-                    finding="Large calls produced little output",
-                    evidence=large_low_output["rows"][:normalized_limit],
-                    detail_mode=normalized_detail_mode,
-                    confidence=_count_confidence(int(large_low_output["total_candidates"])),
-                    why_it_matters=(
-                        "Large input/context usage with low output is a strong candidate for "
-                        "cold resumes, stale thread continuation, or low-value continuation."
-                    ),
-                    recommended_action=(
-                        "Open the top calls, check whether a smaller fresh thread or preserved handoff "
-                        "would avoid resending large context."
-                    ),
-                    verify_with=[
-                        "usage_large_low_output_calls",
-                        "usage_call_detail",
-                        "usage_thread_trace",
-                    ],
-                    privacy_notes="Aggregate token/activity counts only; no raw fragments or command output.",
-                    missing_access=(
-                        "The aggregate report cannot prove why output was low without a thread trace "
-                        "or explicit raw-context inspection."
-                    ),
-                )
-            )
+        )
 
     if normalized_goal in {"token_waste", "workflow_churn"}:
-        shell_churn = build_shell_churn_report(
+        _append_shell_churn_finding(
             db_path=db_path,
+            findings=findings,
+            source_reports=source_reports,
+            evidence_limit=normalized_limit,
+            detail_mode=normalized_detail_mode,
+            privacy_mode=privacy_mode,
             since=since,
             until=until,
             thread=thread,
             include_archived=include_archived,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
-        source_reports.append(str(shell_churn["schema"]))
-        if shell_churn["rows"]:
-            findings.append(
-                _agentic_finding(
-                    finding="Repeated shell command churn",
-                    evidence=shell_churn["rows"][:normalized_limit],
-                    detail_mode=normalized_detail_mode,
-                    confidence=_count_confidence(int(shell_churn["total_candidates"])),
-                    why_it_matters=(
-                        "Repeated shell roots, failures, or adjacent retries can waste turns and "
-                        "inflate tool-output/context pressure."
-                    ),
-                    recommended_action=(
-                        "Turn repeated probes into a small script, narrower command, or targeted test command."
-                    ),
-                    verify_with=["usage_shell_churn", "usage_thread_trace"],
-                    privacy_notes="Command roots and bounded labels only; raw command output is omitted.",
-                    missing_access=(
-                        "Strict aggregate evidence cannot always recover the exact shell intent "
-                        "or full command arguments."
-                    ),
-                )
-            )
-
-        repeated_files = build_repeated_file_rediscovery_report(
+        )
+        _append_repeated_file_finding(
             db_path=db_path,
+            findings=findings,
+            source_reports=source_reports,
+            evidence_limit=normalized_limit,
+            detail_mode=normalized_detail_mode,
+            privacy_mode=privacy_mode,
             since=since,
             until=until,
             thread=thread,
             include_archived=include_archived,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
-        source_reports.append(str(repeated_files["schema"]))
-        if repeated_files["rows"]:
-            findings.append(
-                _agentic_finding(
-                    finding="Repeated file rediscovery",
-                    evidence=repeated_files["rows"][:normalized_limit],
-                    detail_mode=normalized_detail_mode,
-                    confidence=_count_confidence(int(repeated_files["total_candidates"])),
-                    why_it_matters=(
-                        "Repeated safe file identities can indicate the agent keeps rediscovering "
-                        "the same context instead of using a durable summary or targeted helper."
-                    ),
-                    recommended_action=(
-                        "Summarize stable facts into project docs or build a small helper command for recurring lookups."
-                    ),
-                    verify_with=["usage_repeated_file_rediscovery", "usage_thread_trace"],
-                    privacy_notes="Safe path hashes, basenames, and aggregates only; full paths are omitted.",
-                    missing_access=(
-                        "The report can rank repeated safe file identities, but cannot tell whether "
-                        "each reread was necessary without task intent."
-                    ),
-                )
-            )
+        )
 
     if normalized_goal in {"overview", "token_waste", "cache_failure"}:
-        recommendations = build_recommendations_report(
+        _append_recommendations_finding(
             db_path=db_path,
             pricing_path=pricing_path,
             allowance_path=allowance_path,
             projects_path=projects_path,
+            findings=findings,
+            source_reports=source_reports,
+            evidence_limit=normalized_limit,
+            detail_mode=normalized_detail_mode,
+            privacy_mode=privacy_mode,
             since=since,
             until=until,
             thread=thread,
             include_archived=include_archived,
-            limit=normalized_limit,
-            privacy_mode=privacy_mode,
-        ).payload
-        source_reports.append(str(recommendations["schema"]))
-        if recommendations["rows"]:
-            findings.append(
-                _agentic_finding(
-                    finding="Ranked aggregate usage recommendations",
-                    evidence=recommendations["rows"][:normalized_limit],
-                    detail_mode=normalized_detail_mode,
-                    confidence="medium",
-                    why_it_matters="Existing recommendation scoring combines aggregate cost, cache, context, and pricing signals.",
-                    recommended_action="Start with the highest recommendation score, then verify with the specific diagnostic tool.",
-                    verify_with=["usage_recommendations", "usage_calls", "usage_call_detail"],
-                    privacy_notes="Aggregate recommendations only; no prompt or tool-output text.",
-                    missing_access=(
-                        "Recommendation scores do not know whether an expensive call produced high-value work."
-                    ),
-                )
-            )
+        )
 
     if normalized_goal == "allowance_change":
         recommended_next_tools.extend(

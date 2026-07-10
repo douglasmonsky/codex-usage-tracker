@@ -342,24 +342,37 @@ def _export_branch(branch: dict[str, Any]) -> dict[str, Any]:
 
 def _export_aggregate_evidence(evidence_rows: list[dict[str, Any]]) -> dict[str, Any]:
     row_count = len(evidence_rows)
-    occurrences = sum(int(row.get("occurrences") or 0) for row in evidence_rows)
-    call_count = sum(int(row.get("call_count") or 0) for row in evidence_rows)
-    thread_count = sum(int(row.get("thread_count") or 0) for row in evidence_rows)
-    record_ids = {str(row.get("record_id")) for row in evidence_rows if row.get("record_id")}
-    thread_keys = {
-        str(row.get("thread_key") or row.get("thread_name"))
-        for row in evidence_rows
-        if row.get("thread_key") or row.get("thread_name")
-    }
+    occurrences = _sum_int_field(evidence_rows, "occurrences")
+    call_count = _sum_int_field(evidence_rows, "call_count")
+    thread_count = _sum_int_field(evidence_rows, "thread_count")
+    record_count = len(_unique_first_value(evidence_rows, "record_id"))
+    unique_thread_count = len(_unique_first_value(evidence_rows, "thread_key", "thread_name"))
     return {
         "evidence_row_count": row_count,
-        "total_tokens": sum(int(row.get("total_tokens") or 0) for row in evidence_rows),
-        "occurrences": occurrences or row_count,
-        "call_count": call_count or len(record_ids) or row_count,
-        "thread_count": thread_count or len(thread_keys),
+        "total_tokens": _sum_int_field(evidence_rows, "total_tokens"),
+        "occurrences": _first_nonzero(occurrences, row_count),
+        "call_count": _first_nonzero(call_count, record_count, row_count),
+        "thread_count": _first_nonzero(thread_count, unique_thread_count),
         "first_seen_date": _date_bucket(_first_seen(evidence_rows)),
         "last_seen_date": _date_bucket(_last_seen(evidence_rows)),
     }
+
+
+def _sum_int_field(rows: list[dict[str, Any]], field: str) -> int:
+    return sum(int(row.get(field) or 0) for row in rows)
+
+
+def _unique_first_value(rows: list[dict[str, Any]], *fields: str) -> set[str]:
+    values: set[str] = set()
+    for row in rows:
+        value = next((row.get(field) for field in fields if row.get(field)), None)
+        if value is not None:
+            values.add(str(value))
+    return values
+
+
+def _first_nonzero(*values: int) -> int:
+    return next((value for value in values if value), 0)
 
 
 def _score_bucket(score: int) -> str:

@@ -31,9 +31,9 @@ full-tree cleanup.
 
 ### 2. Agentic Report Assembly
 
-- [ ] Reduce `build_agentic_investigation_report` and
+- [x] Reduce `build_agentic_investigation_report` and
   `build_action_brief_report` through focused finding/section builders.
-- [ ] Reduce investigation export, shell-churn hypothesis, and dogfood payload
+- [x] Reduce investigation export, shell-churn hypothesis, and dogfood payload
   compaction through typed/declarative helpers.
 - Exit: all report-family functions rank B or better with report and MCP tests
   green.

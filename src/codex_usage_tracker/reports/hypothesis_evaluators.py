@@ -313,35 +313,21 @@ def _evaluate_shell_churn_hypothesis(
     evidence_limit: int,
     privacy_mode: str,
 ) -> dict[str, Any]:
-    report = context.get("shell_churn")
-    if report is None:
-        report = build_shell_churn_report(
-            db_path=db_path,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            min_occurrences=2,
-            limit=evidence_limit,
-            sample_limit=3,
-            privacy_mode=privacy_mode,
-        ).payload
-        context["shell_churn"] = report
+    report = _shell_churn_report(
+        context,
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=evidence_limit,
+        privacy_mode=privacy_mode,
+    )
     rows = report.get("rows", [])
     total = int(report["total_candidates"])
-    unknown_count = sum(
-        1 for row in rows if str(row.get("command_root") or "").startswith("unknown")
-    )
-    status = "true" if total >= 3 else "partially_true" if total else "false"
-    counter_evidence = []
-    if unknown_count:
-        counter_evidence.append(
-            "Some shell rows still have cloudy command labels; normalization needs more hardening."
-        )
-    if not total:
-        counter_evidence.append("No repeated shell churn candidates crossed the threshold.")
+    unknown_count = sum(1 for row in rows if _has_unknown_command_root(row))
     return _hypothesis_result(
-        status=status,
+        status=_candidate_status(total),
         confidence=_count_confidence(total) if total else "low",
         i_would_like_to_be_able_to="Detect repeated command probing without storing raw command output.",
         i_will_accomplish_this_using="Rank command roots, bounded labels, occurrence counts, failures, and associated token totals.",
@@ -351,10 +337,62 @@ def _evaluate_shell_churn_hypothesis(
             {"unknown_command_row_count": unknown_count},
         ),
         evidence=[_compact_agentic_evidence_row(row) for row in rows[:evidence_limit]],
-        counter_evidence=counter_evidence,
+        counter_evidence=_shell_churn_counter_evidence(total, unknown_count),
         next_action="If the same command family repeats, replace exploratory loops with a helper command, test selector, or saved project note.",
         recommended_next_tools=[
             _next_tool("usage_shell_churn", "Inspect repeated shell command families."),
             _next_tool("usage_thread_trace", "Trace whether command churn clusters in one thread."),
         ],
     )
+
+
+def _shell_churn_report(
+    context: dict[str, Any],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    evidence_limit: int,
+    privacy_mode: str,
+) -> dict[str, Any]:
+    report = context.get("shell_churn")
+    if report is not None:
+        return report
+    report = build_shell_churn_report(
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        min_occurrences=2,
+        limit=evidence_limit,
+        sample_limit=3,
+        privacy_mode=privacy_mode,
+    ).payload
+    context["shell_churn"] = report
+    return report
+
+
+def _candidate_status(total: int) -> str:
+    if total >= 3:
+        return "true"
+    if total:
+        return "partially_true"
+    return "false"
+
+
+def _has_unknown_command_root(row: dict[str, Any]) -> bool:
+    return str(row.get("command_root") or "").startswith("unknown")
+
+
+def _shell_churn_counter_evidence(total: int, unknown_count: int) -> list[str]:
+    counter_evidence: list[str] = []
+    if unknown_count:
+        counter_evidence.append(
+            "Some shell rows still have cloudy command labels; normalization needs more hardening."
+        )
+    if not total:
+        counter_evidence.append("No repeated shell churn candidates crossed the threshold.")
+    return counter_evidence

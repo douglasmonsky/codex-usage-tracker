@@ -408,25 +408,16 @@ def _compact_dogfood_payload(
             "hypotheses": run_hypotheses,
             "deep_investigations": run_deep_investigations,
         },
-        "summary": {
-            "old_hypothesis_count": len(old_summary),
-            "new_hypothesis_count": len(new_summary),
-            "large_low_output_candidates": large_low_output.get("total_candidates"),
-            "shell_churn_candidates": shell_churn.get("total_candidates"),
-            "repeated_file_candidates": repeated_files.get("total_candidates"),
-            "action_brief_actions": len(action_brief.get("actions") or []),
-            "allowance_primary_evidence_grade": (allowance.get("summary") or {}).get(
-                "primary_evidence_grade"
-            ),
-        },
-        "family_checks": {
-            "old_expected": EXPECTED_OLD_FAMILIES,
-            "old_actual": [row["family"] for row in old_summary],
-            "old_passed": [row["family"] for row in old_summary] == EXPECTED_OLD_FAMILIES,
-            "new_expected": EXPECTED_NEW_FAMILIES,
-            "new_actual": [row["family"] for row in new_summary],
-            "new_passed": [row["family"] for row in new_summary] == EXPECTED_NEW_FAMILIES,
-        },
+        "summary": _dogfood_summary(
+            old_summary=old_summary,
+            new_summary=new_summary,
+            large_low_output=large_low_output,
+            shell_churn=shell_churn,
+            repeated_files=repeated_files,
+            action_brief=action_brief,
+            allowance=allowance,
+        ),
+        "family_checks": _family_checks(old_summary, new_summary),
         "old_hypotheses": old_summary,
         "new_hypotheses": new_summary,
         "direct_reports": {
@@ -436,14 +427,10 @@ def _compact_dogfood_payload(
             "action_brief": _compact_action_brief(action_brief),
             "allowance": _compact_allowance(allowance),
         },
-        "suggestion_goals": [
-            row.get("goal") for row in suggestions.get("suggestions", []) if row.get("goal")
-        ],
+        "suggestion_goals": _non_null_values(suggestions.get("suggestions", []), "goal"),
         "investigation_findings": {
-            "token_waste": [finding.get("finding") for finding in token_waste.get("findings", [])],
-            "workflow_churn": [
-                finding.get("finding") for finding in workflow_churn.get("findings", [])
-            ],
+            "token_waste": _values(token_waste.get("findings", []), "finding"),
+            "workflow_churn": _values(workflow_churn.get("findings", []), "finding"),
         },
         "privacy_checks": _privacy_checks(
             [
@@ -471,6 +458,52 @@ def _compact_dogfood_payload(
         ],
     }
     return payload
+
+
+def _dogfood_summary(
+    *,
+    old_summary: list[dict[str, Any]],
+    new_summary: list[dict[str, Any]],
+    large_low_output: dict[str, Any],
+    shell_churn: dict[str, Any],
+    repeated_files: dict[str, Any],
+    action_brief: dict[str, Any],
+    allowance: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "old_hypothesis_count": len(old_summary),
+        "new_hypothesis_count": len(new_summary),
+        "large_low_output_candidates": large_low_output.get("total_candidates"),
+        "shell_churn_candidates": shell_churn.get("total_candidates"),
+        "repeated_file_candidates": repeated_files.get("total_candidates"),
+        "action_brief_actions": len(action_brief.get("actions") or []),
+        "allowance_primary_evidence_grade": (allowance.get("summary") or {}).get(
+            "primary_evidence_grade"
+        ),
+    }
+
+
+def _family_checks(
+    old_summary: list[dict[str, Any]], new_summary: list[dict[str, Any]]
+) -> dict[str, Any]:
+    old_actual = [row["family"] for row in old_summary]
+    new_actual = [row["family"] for row in new_summary]
+    return {
+        "old_expected": EXPECTED_OLD_FAMILIES,
+        "old_actual": old_actual,
+        "old_passed": old_actual == EXPECTED_OLD_FAMILIES,
+        "new_expected": EXPECTED_NEW_FAMILIES,
+        "new_actual": new_actual,
+        "new_passed": new_actual == EXPECTED_NEW_FAMILIES,
+    }
+
+
+def _non_null_values(rows: list[dict[str, Any]], field: str) -> list[Any]:
+    return [row[field] for row in rows if row.get(field) is not None]
+
+
+def _values(rows: list[dict[str, Any]], field: str) -> list[Any]:
+    return [row.get(field) for row in rows]
 
 
 def _dogfood_stage(
