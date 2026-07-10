@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `fix/pyright-maintained-surface`
+Current chunk: `chore/refresh-file-length-baseline`
 
 ## Goal
 
@@ -32,6 +32,9 @@ mixing in broad Python refactors or unrelated documentation cleanup.
   dependency violations instead of missing configuration.
 - Add CI-maintained Agent Maintainer guidance drift and narrow Pyright gates for
   the source surface already cleaned on this branch.
+- Refresh the file-length baseline against post-`0.17.2` `main` so existing
+  oversized modules are tracked at their actual paths and counts. Keep the
+  thresholds unchanged at 600 physical and 450 source lines.
 
 ## Branch Exit
 

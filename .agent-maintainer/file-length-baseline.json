@@ -1,84 +1,140 @@
 {
   "files": {
     "scripts/benchmark_synthetic_history.py": {
-      "physical": 843,
-      "source": 782
+      "physical": 849,
+      "source": 787
     },
     "scripts/check_release.py": {
-      "physical": 658,
-      "source": 603
+      "physical": 736,
+      "source": 677
     },
     "scripts/model_usage_drain.py": {
-      "physical": 656,
-      "source": 637
+      "physical": 569,
+      "source": 550
     },
-    "src/codex_usage_tracker/cli/main.py": {
-      "physical": 530,
-      "source": 484
+    "scripts/smoke_installed_package.py": {
+      "physical": 684,
+      "source": 620
     },
-    "src/codex_usage_tracker/cli/parser.py": {
-      "physical": 550,
-      "source": 490
-    },
-    "src/codex_usage_tracker/dashboard/api.py": {
-      "physical": 565,
+    "src/codex_usage_tracker/allowance_intelligence/model.py": {
+      "physical": 588,
       "source": 512
     },
+    "src/codex_usage_tracker/cli/main.py": {
+      "physical": 685,
+      "source": 625
+    },
+    "src/codex_usage_tracker/cli/mcp_server.py": {
+      "physical": 1699,
+      "source": 1516
+    },
+    "src/codex_usage_tracker/cli/parser.py": {
+      "physical": 706,
+      "source": 636
+    },
+    "src/codex_usage_tracker/core/json_contract_cli.py": {
+      "physical": 586,
+      "source": 581
+    },
+    "src/codex_usage_tracker/dashboard/api.py": {
+      "physical": 548,
+      "source": 511
+    },
+    "src/codex_usage_tracker/diagnostics/api.py": {
+      "physical": 562,
+      "source": 499
+    },
+    "src/codex_usage_tracker/diagnostics/guided_summary.py": {
+      "physical": 544,
+      "source": 500
+    },
+    "src/codex_usage_tracker/diagnostics/snapshot_analysis.py": {
+      "physical": 533,
+      "source": 485
+    },
+    "src/codex_usage_tracker/diagnostics/snapshot_events.py": {
+      "physical": 588,
+      "source": 503
+    },
     "src/codex_usage_tracker/diagnostics/snapshots.py": {
-      "physical": 539,
-      "source": 491
+      "physical": 573,
+      "source": 521
+    },
+    "src/codex_usage_tracker/reports/agentic_dogfood.py": {
+      "physical": 810,
+      "source": 764
+    },
+    "src/codex_usage_tracker/reports/api.py": {
+      "physical": 3104,
+      "source": 2856
+    },
+    "src/codex_usage_tracker/server/handler.py": {
+      "physical": 606,
+      "source": 557
     },
     "src/codex_usage_tracker/store/api.py": {
-      "physical": 558,
-      "source": 493
+      "physical": 890,
+      "source": 794
     },
-    "src/codex_usage_tracker/usage_drain/model.py": {
-      "physical": 497,
-      "source": 457
+    "src/codex_usage_tracker/store/content_index.py": {
+      "physical": 1724,
+      "source": 1567
+    },
+    "src/codex_usage_tracker/store/content_index_events.py": {
+      "physical": 570,
+      "source": 486
+    },
+    "src/codex_usage_tracker/store/schema.py": {
+      "physical": 761,
+      "source": 660
     },
     "src/codex_usage_tracker/usage_drain/reports.py": {
-      "physical": 602,
-      "source": 515
+      "physical": 580,
+      "source": 505
     },
     "tests/cli/test_cli_lifecycle.py": {
-      "physical": 796,
-      "source": 751
+      "physical": 876,
+      "source": 827
     },
     "tests/cli/test_cli_release.py": {
-      "physical": 537,
-      "source": 461
+      "physical": 606,
+      "source": 526
+    },
+    "tests/cli/test_mcp_integration.py": {
+      "physical": 606,
+      "source": 574
     },
     "tests/dashboard/test_dashboard_diagnostics_snapshots.py": {
       "physical": 910,
       "source": 873
     },
-    "tests/dashboard/test_dashboard_live.py": {
-      "physical": 477,
-      "source": 455
-    },
     "tests/dashboard/test_dashboard_payload.py": {
-      "physical": 800,
-      "source": 767
+      "physical": 811,
+      "source": 776
     },
     "tests/dashboard/test_dashboard_server.py": {
-      "physical": 1150,
-      "source": 1087
+      "physical": 1274,
+      "source": 1205
     },
     "tests/diagnostics/test_diagnostic_snapshots.py": {
-      "physical": 713,
-      "source": 652
+      "physical": 802,
+      "source": 736
     },
     "tests/parser/test_parser.py": {
-      "physical": 603,
-      "source": 544
+      "physical": 599,
+      "source": 540
+    },
+    "tests/store/test_content_index.py": {
+      "physical": 836,
+      "source": 751
     },
     "tests/store/test_store_dashboard_mcp.py": {
-      "physical": 1186,
-      "source": 1092
+      "physical": 1255,
+      "source": 1158
     },
     "tests/usage_drain/test_usage_drain_model.py": {
-      "physical": 823,
-      "source": 756
+      "physical": 777,
+      "source": 710
     }
   },
   "limits": {
