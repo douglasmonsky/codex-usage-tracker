@@ -1,5 +1,8 @@
 # Explicit Tach Module Inventory
 
+Status: Superseded by
+[`0003-domain-level-tach-boundaries.md`](0003-domain-level-tach-boundaries.md).
+
 Tach is part of the Agent Maintainer hardening profile, but the root
 `tach.toml` previously did not enumerate source modules. That made the
 architecture check too vague: Tach could run, but the verifier could not trust

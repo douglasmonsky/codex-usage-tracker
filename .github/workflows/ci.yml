@@ -9,7 +9,7 @@ jobs:
     name: Hardening gates
     runs-on: ubuntu-latest
     env:
-      AGENT_MAINTAINER_REV: 3267894ce8cb5259b16ebfb06f6a6edc0f3ea9c1
+      AGENT_MAINTAINER_REV: 0d2951b205fc2914d77fdf8abfbf794743376778
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -52,10 +52,6 @@
       "physical": 533,
       "source": 485
     },
-    "src/codex_usage_tracker/diagnostics/snapshot_events.py": {
-      "physical": 588,
-      "source": 503
-    },
     "src/codex_usage_tracker/diagnostics/snapshots.py": {
       "physical": 573,
       "source": 521

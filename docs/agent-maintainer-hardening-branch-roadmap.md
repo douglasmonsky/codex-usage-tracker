@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `chore/refresh-file-length-baseline`
+Current chunk: `refactor/tach-domain-boundaries`
 
 ## Goal
 
@@ -35,6 +35,9 @@ mixing in broad Python refactors or unrelated documentation cleanup.
 - Refresh the file-length baseline against post-`0.17.2` `main` so existing
   oversized modules are tracked at their actual paths and counts. Keep the
   thresholds unchanged at 600 physical and 450 source lines.
+- Replace the placeholder leaf-level Tach inventory with enforceable package
+  domain contracts, record the reviewed reports-to-allowance edge, and move
+  shared command parsing into `core` to remove a store-to-diagnostics cycle.
 
 ## Branch Exit
 
@@ -57,7 +60,8 @@ maintained Agent Maintainer profile.
 After tests and mechanical formatting are stable, make structural gates produce
 useful review feedback.
 
-- Fix actual `tach` boundary violations only after config is explicit.
+- Keep the now-green Tach domain contract in maintained validation and audit
+  circular dependencies separately before enabling cycle blocking.
 - Triage `deptry` into three buckets: real unused dependencies, intentionally
   optional/runtime dependencies, and packaging/test-only dependencies. Commit
   configuration only with a short explanation.

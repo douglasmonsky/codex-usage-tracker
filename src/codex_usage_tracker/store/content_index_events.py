@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker.diagnostics.snapshot_events import command_root_and_child
+from codex_usage_tracker.core.command_parsing import command_root_and_child
 
 _SHELL_TOOL_NAMES = {
     "bash",

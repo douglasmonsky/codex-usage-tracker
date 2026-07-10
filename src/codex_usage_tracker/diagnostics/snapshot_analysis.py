@@ -9,13 +9,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.core.command_parsing import safe_label
 from codex_usage_tracker.diagnostics.snapshot_events import (
     READ_PRODUCTIVITY_NOTE,
     int_value,
     modified_path_refs,
     path_privacy_metadata,
     ratio,
-    safe_label,
     simple_rows,
 )
 from codex_usage_tracker.diagnostics.snapshot_rows import (
