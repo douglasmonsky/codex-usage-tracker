@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/diagnostic-families`
+Current chunk: `refactor/cli-command-families`
 
 ## Goal
 
@@ -143,7 +143,8 @@ module boundary and keep behavior covered by focused tests.
     extracting a typed dashboard page/static-response mixin.
   - [x] Split oversized diagnostic snapshot and summary families into payload,
     overview, guided-signal, and doctor-check modules.
-  - [ ] Split CLI parser construction and command dispatch by command family.
+  - [x] Split CLI parser construction and command dispatch into lifecycle,
+    report/context, and data/config command families.
 - Keep each refactor PR below the normal change budget unless a cohesive change
   plan is created first.
 
