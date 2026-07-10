@@ -519,18 +519,14 @@ def _label(value: object, fallback: str) -> str:
     return text or fallback
 
 
-def _int(value: object) -> int:
-    if not isinstance(value, str | bytes | bytearray | int | float):
-        return 0
+def _int(value: Any) -> int:
     try:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
 
 
-def _float(value: object) -> float:
-    if not isinstance(value, str | bytes | bytearray | int | float):
-        return 0.0
+def _float(value: Any) -> float:
     try:
         return float(value or 0)
     except (TypeError, ValueError):
