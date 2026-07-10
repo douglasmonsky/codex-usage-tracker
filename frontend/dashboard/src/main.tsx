@@ -23,8 +23,20 @@ if (!root) {
   throw new Error('Dashboard root element was not found.');
 }
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+const reactRoot = createRoot(root);
+
+async function mountDashboard() {
+  const isVisualContractLab =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).get('lab') === 'visual-contract';
+  const Dashboard = isVisualContractLab
+    ? (await import('./design/lab/VisualContractLab')).VisualContractLab
+    : App;
+
+  reactRoot.render(
+    <StrictMode>
+      <Dashboard />
+    </StrictMode>,
+  );
+}
+
+void mountDashboard();

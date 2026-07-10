@@ -101,7 +101,7 @@
 
   .positive {
     background: var(--signal-positive-subtle);
-    color: var(--signal-positive);
+    color: var(--signal-positive-ink);
   }
 
   .caution {
@@ -111,7 +111,7 @@
 
   .risk {
     background: var(--signal-risk-subtle);
-    color: var(--signal-risk);
+    color: var(--signal-risk-ink);
   }
 
   .context {
