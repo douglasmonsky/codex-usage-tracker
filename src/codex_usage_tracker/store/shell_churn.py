@@ -6,6 +6,8 @@ import re
 import sqlite3
 from typing import Any
 
+from codex_usage_tracker.store.row_values import row_int
+
 SHELL_CHURN_ROOTS = {
     "sed",
     "rg",
@@ -159,35 +161,35 @@ def _shell_churn_candidate(
 ) -> dict[str, Any]:
     raw_command_root = str(row["command_root"] or "unknown")
     sample_command_label = str(row["sample_command_label"] or "")
-    distinct_label_count = int(row["distinct_label_count"] or 0)
+    distinct_label_count = row_int(row, "distinct_label_count")
     command_root = _display_command_root(
         raw_command_root,
         sample_command_label,
         distinct_label_count=distinct_label_count,
     )
-    occurrences = int(row["occurrences"] or 0)
-    failure_count = int(row["failure_count"] or 0)
-    adjacent_root_count = int(row["adjacent_root_repeat_count"] or 0)
-    adjacent_label_count = int(row["adjacent_label_repeat_count"] or 0)
-    total_tokens = int(row["total_tokens"] or 0)
-    output_size_bytes = int(row["output_size_bytes"] or 0)
+    occurrences = row_int(row, "occurrences")
+    failure_count = row_int(row, "failure_count")
+    adjacent_root_count = row_int(row, "adjacent_root_repeat_count")
+    adjacent_label_count = row_int(row, "adjacent_label_repeat_count")
+    total_tokens = row_int(row, "total_tokens")
+    output_size_bytes = row_int(row, "output_size_bytes")
     return {
         "command_root": command_root,
         "command_label": _display_command_label(command_root, sample_command_label),
         "command_family": _command_family(command_root),
         "churn_kind": _churn_kind(failure_count, adjacent_root_count),
         "occurrences": occurrences,
-        "call_count": int(row["call_count"] or 0),
-        "thread_count": int(row["thread_count"] or 0),
-        "session_count": int(row["session_count"] or 0),
+        "call_count": row_int(row, "call_count"),
+        "thread_count": row_int(row, "thread_count"),
+        "session_count": row_int(row, "session_count"),
         "total_tokens": total_tokens,
         "output_size_bytes": output_size_bytes,
-        "success_count": int(row["success_count"] or 0),
+        "success_count": row_int(row, "success_count"),
         "failure_count": failure_count,
         "distinct_label_count": distinct_label_count,
         "adjacent_root_repeat_count": adjacent_root_count,
         "adjacent_label_repeat_count": adjacent_label_count,
-        "retry_group_count": int(row["retry_group_count"] or 0),
+        "retry_group_count": row_int(row, "retry_group_count"),
         "first_seen_at": row["first_seen_at"],
         "last_seen_at": row["last_seen_at"],
         "top_labels": top_labels,

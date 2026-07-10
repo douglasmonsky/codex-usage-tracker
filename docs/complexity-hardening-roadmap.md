@@ -50,7 +50,7 @@ full-tree cleanup.
 
 ### 4. Waste Candidate Diagnostics
 
-- [ ] Reduce repeated-file, shell-churn, and large-low-output candidate builders
+- [x] Reduce repeated-file, shell-churn, and large-low-output candidate builders
   through shared metric and explanation helpers.
 - Exit: all candidate functions rank B or better and diagnostic payload schemas
   remain unchanged.
