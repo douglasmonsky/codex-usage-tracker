@@ -517,7 +517,7 @@ export const threadColumnChoices: ColumnChoice[] = [
   { id: 'investigate', label: 'Investigate', locked: true },
 ];
 
-export const weeklyWindowColumns: Array<ColumnDef<WeeklyWindow>> = [
+export const weeklyColumns: Array<ColumnDef<WeeklyWindow>> = [
   { accessorKey: 'week', header: 'Week' },
   { accessorKey: 'plan', header: 'Plan' },
   {
@@ -537,8 +537,6 @@ export const weeklyWindowColumns: Array<ColumnDef<WeeklyWindow>> = [
   },
   { accessorKey: 'note', header: 'Note' },
 ];
-
-export const weeklyColumns = weeklyWindowColumns;
 
 function riskTone(value: string): 'green' | 'orange' | 'red' | 'neutral' {
   if (value === 'High') {

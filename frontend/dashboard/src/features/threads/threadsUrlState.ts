@@ -40,7 +40,7 @@ const threadCallSortValues = new Set<string>([
 ]);
 const threadSortKeyValues = new Set(threadColumnChoices.map(choice => choice.id).filter(id => id !== 'investigate'));
 
-export function readSelectedThreadParam(href = window.location.href): string | null {
+function readSelectedThreadParam(href = window.location.href): string | null {
   return new URL(href).searchParams.get('thread')?.trim() || null;
 }
 

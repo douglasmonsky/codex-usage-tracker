@@ -64,7 +64,7 @@ export const diagnosticFactSourceDefinitions = [
   },
 ] as const;
 
-export type DiagnosticFactSourceDefinition = (typeof diagnosticFactSourceDefinitions)[number];
+type DiagnosticFactSourceDefinition = (typeof diagnosticFactSourceDefinitions)[number];
 export type DiagnosticFactSourceKey = DiagnosticFactSourceDefinition['key'];
 
 export type DiagnosticFactRow = {
@@ -97,7 +97,7 @@ export type DiagnosticFactsPayload = {
   notes?: string[];
 };
 
-export type DiagnosticFactCallsPayload = {
+type DiagnosticFactCallsPayload = {
   schema?: string;
   view?: string;
   row_count?: number;
@@ -113,7 +113,7 @@ export type DiagnosticFactCallsResult = {
   rawPayload: DiagnosticFactCallsPayload;
 };
 
-export type DiagnosticFactSortKey =
+type DiagnosticFactSortKey =
   | 'uncached'
   | 'total'
   | 'tokens'
@@ -126,7 +126,7 @@ export type DiagnosticFactSortKey =
   | 'cached'
   | 'output'
   | 'largest';
-export type DiagnosticFactCallSortKey =
+type DiagnosticFactCallSortKey =
   | 'tokens'
   | 'input'
   | 'cached'
@@ -138,7 +138,7 @@ export type DiagnosticFactCallSortKey =
   | 'thread'
   | 'model'
   | 'effort';
-export type DiagnosticSortDirection = 'asc' | 'desc';
+type DiagnosticSortDirection = 'asc' | 'desc';
 
 export type DiagnosticFactsOptions = {
   limit?: number;
@@ -268,10 +268,6 @@ export async function loadDiagnosticFactSource(
     });
     return (await readJsonResponse(response, definition.title)) as DiagnosticFactsPayload;
   });
-}
-
-export async function loadDiagnosticFacts(runtime: ContextRuntime): Promise<DiagnosticFactsPayload> {
-  return loadDiagnosticFactSource('facts', runtime);
 }
 
 export function cachedDiagnosticFactCalls(

@@ -2,7 +2,7 @@ import { isViewId, navItems, secondaryNavItems, type ViewId } from './navigation
 
 export type HistoryScope = 'active' | 'all';
 
-export function isCallReturnViewId(value: string | null): value is ViewId {
+function isCallReturnViewId(value: string | null): value is ViewId {
   return isViewId(value) && value !== 'call';
 }
 

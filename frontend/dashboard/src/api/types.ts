@@ -119,7 +119,7 @@ export type DashboardLanguage = {
   dir?: string;
 };
 
-export type ProjectMetadataPrivacy = {
+type ProjectMetadataPrivacy = {
   mode?: string;
   cwd_redacted?: boolean;
   project_names_redacted?: boolean;
@@ -130,7 +130,7 @@ export type ProjectMetadataPrivacy = {
   aliases_preserved?: boolean;
 };
 
-export type ObservedUsage = {
+type ObservedUsage = {
   available?: boolean;
   source?: string;
   observed_at?: string;
@@ -140,7 +140,7 @@ export type ObservedUsage = {
   reconciliation?: Record<string, unknown>;
 };
 
-export type ObservedUsageWindow = {
+type ObservedUsageWindow = {
   key?: string;
   label?: string;
   used_percent?: number | null;
@@ -148,7 +148,7 @@ export type ObservedUsageWindow = {
   resets_at?: number | string | null;
 };
 
-export type AllowanceWindow = {
+type AllowanceWindow = {
   key?: string;
   label?: string;
   total_credits?: number | null;
@@ -191,7 +191,7 @@ export type CallContextEntry = {
   };
 };
 
-export type TokenUsageSummary = {
+type TokenUsageSummary = {
   input_tokens?: number;
   cached_input_tokens?: number;
   uncached_input_tokens?: number;
@@ -250,7 +250,7 @@ export type MetricCard = {
   breakdown?: Array<{ label: string; value: string }>;
 };
 
-export type ChartPoint = {
+type ChartPoint = {
   label: string;
   value: number;
   secondary?: number;
