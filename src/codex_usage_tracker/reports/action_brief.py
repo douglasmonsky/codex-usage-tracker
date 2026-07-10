@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,106 @@ class ActionBriefReport:
     payload: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class _ActionBriefContext:
+    db_path: Path
+    pricing_path: Path
+    allowance_path: Path
+    projects_path: Path
+    since: str | None
+    until: str | None
+    thread: str | None
+    include_archived: bool
+    evidence_limit: int
+    privacy_mode: str
+    report_cache: dict[str, dict[str, Any]]
+
+    def large_low_output(self) -> dict[str, Any]:
+        return self._cached(
+            "large_low_output",
+            lambda: (
+                build_large_low_output_report(
+                    db_path=self.db_path,
+                    since=self.since,
+                    until=self.until,
+                    thread=self.thread,
+                    include_archived=self.include_archived,
+                    limit=self.evidence_limit,
+                    privacy_mode=self.privacy_mode,
+                ).payload
+            ),
+        )
+
+    def recommendations(self) -> dict[str, Any]:
+        return self._cached(
+            "recommendations",
+            lambda: (
+                build_recommendations_report(
+                    db_path=self.db_path,
+                    pricing_path=self.pricing_path,
+                    allowance_path=self.allowance_path,
+                    projects_path=self.projects_path,
+                    since=self.since,
+                    until=self.until,
+                    thread=self.thread,
+                    include_archived=self.include_archived,
+                    limit=self.evidence_limit,
+                    privacy_mode=self.privacy_mode,
+                ).payload
+            ),
+        )
+
+    def repeated_files(self) -> dict[str, Any]:
+        return self._cached(
+            "repeated_files",
+            lambda: (
+                build_repeated_file_rediscovery_report(
+                    db_path=self.db_path,
+                    since=self.since,
+                    until=self.until,
+                    thread=self.thread,
+                    include_archived=self.include_archived,
+                    limit=self.evidence_limit,
+                    privacy_mode=self.privacy_mode,
+                ).payload
+            ),
+        )
+
+    def shell_churn(self) -> dict[str, Any]:
+        return self._cached(
+            "shell_churn",
+            lambda: (
+                build_shell_churn_report(
+                    db_path=self.db_path,
+                    since=self.since,
+                    until=self.until,
+                    thread=self.thread,
+                    include_archived=self.include_archived,
+                    min_occurrences=2,
+                    limit=self.evidence_limit,
+                    privacy_mode=self.privacy_mode,
+                ).payload
+            ),
+        )
+
+    def _cached(self, key: str, builder: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+        existing = self.report_cache.get(key)
+        if existing is not None:
+            return existing
+        built = builder()
+        self.report_cache[key] = built
+        return built
+
+
+def _append_action_if_rows(
+    actions: list[dict[str, Any]],
+    report: dict[str, Any],
+    action_builder: Callable[[], dict[str, Any]],
+) -> None:
+    if report["rows"]:
+        actions.append(action_builder())
+
+
 def build_action_brief_report(
     *,
     db_path: Path,
@@ -49,6 +150,19 @@ def build_action_brief_report(
     normalized_goal = _normalize_agentic_goal(goal) or "token_waste"
     normalized_limit = max(1, evidence_limit)
     report_cache = precomputed_reports if precomputed_reports is not None else {}
+    context = _ActionBriefContext(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        evidence_limit=normalized_limit,
+        privacy_mode=privacy_mode,
+        report_cache=report_cache,
+    )
     actions: list[dict[str, Any]] = []
     source_reports: list[str] = []
     caveats = [
@@ -58,160 +172,115 @@ def build_action_brief_report(
     ]
 
     if normalized_goal in {"overview", "token_waste", "cache_failure"}:
-        large_low_output = report_cache.get("large_low_output")
-        if large_low_output is None:
-            large_low_output = build_large_low_output_report(
-                db_path=db_path,
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                limit=normalized_limit,
-                privacy_mode=privacy_mode,
-            ).payload
-            report_cache["large_low_output"] = large_low_output
+        large_low_output = context.large_low_output()
         source_reports.append(str(large_low_output["schema"]))
-        if large_low_output["rows"]:
-            actions.append(
-                _action_brief_action(
-                    family="large_low_output_context_pressure",
-                    finding="Large calls produced little output",
-                    confidence=_count_confidence(int(large_low_output["total_candidates"])),
-                    evidence=large_low_output["rows"][:normalized_limit],
-                    likely_waste_pattern=(
-                        "Large input or context payloads with little output can indicate cold resumes, "
-                        "stale thread continuation, or context copied forward after the useful work ended."
-                    ),
-                    recommended_workflow_change=(
-                        "Create a short handoff, start a fresh thread for the next task, and keep only the "
-                        "specific files or facts needed for the follow-up."
-                    ),
-                    recommended_existing_tool={
-                        "tool": "Headroom",
-                        "reason": "Use when available to estimate context pressure before continuing a long thread.",
-                    },
-                    recommended_custom_solution=(
-                        "Add a repo-local handoff/checkpoint command or template that summarizes stable facts "
-                        "without rereading broad context."
-                    ),
-                    how_to_verify=(
-                        "Re-run `usage_large_low_output_calls` and inspect whether future high-token calls have "
-                        "higher output, lower context pressure, or clearer task boundaries."
-                    ),
-                    recommended_next_tools=[
-                        "usage_large_low_output_calls",
-                        "usage_call_detail",
-                        "usage_threads",
-                    ],
-                    missing_access="The aggregate report cannot know whether a low-output call produced valuable reasoning.",
-                )
-            )
+        _append_action_if_rows(
+            actions,
+            large_low_output,
+            lambda: _action_brief_action(
+                family="large_low_output_context_pressure",
+                finding="Large calls produced little output",
+                confidence=_count_confidence(int(large_low_output["total_candidates"])),
+                evidence=large_low_output["rows"][:normalized_limit],
+                likely_waste_pattern=(
+                    "Large input or context payloads with little output can indicate cold resumes, "
+                    "stale thread continuation, or context copied forward after the useful work ended."
+                ),
+                recommended_workflow_change=(
+                    "Create a short handoff, start a fresh thread for the next task, and keep only the "
+                    "specific files or facts needed for the follow-up."
+                ),
+                recommended_existing_tool={
+                    "tool": "Headroom",
+                    "reason": "Use when available to estimate context pressure before continuing a long thread.",
+                },
+                recommended_custom_solution=(
+                    "Add a repo-local handoff/checkpoint command or template that summarizes stable facts "
+                    "without rereading broad context."
+                ),
+                how_to_verify=(
+                    "Re-run `usage_large_low_output_calls` and inspect whether future high-token calls have "
+                    "higher output, lower context pressure, or clearer task boundaries."
+                ),
+                recommended_next_tools=[
+                    "usage_large_low_output_calls",
+                    "usage_call_detail",
+                    "usage_threads",
+                ],
+                missing_access="The aggregate report cannot know whether a low-output call produced valuable reasoning.",
+            ),
+        )
 
-        recommendations = report_cache.get("recommendations")
-        if recommendations is None:
-            recommendations = build_recommendations_report(
-                db_path=db_path,
-                pricing_path=pricing_path,
-                allowance_path=allowance_path,
-                projects_path=projects_path,
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                limit=normalized_limit,
-                privacy_mode=privacy_mode,
-            ).payload
-            report_cache["recommendations"] = recommendations
+        recommendations = context.recommendations()
         source_reports.append(str(recommendations["schema"]))
 
     if normalized_goal in {"overview", "token_waste", "cache_failure", "workflow_churn"}:
-        repeated_files = report_cache.get("repeated_files")
-        if repeated_files is None:
-            repeated_files = build_repeated_file_rediscovery_report(
-                db_path=db_path,
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                limit=normalized_limit,
-                privacy_mode=privacy_mode,
-            ).payload
-            report_cache["repeated_files"] = repeated_files
+        repeated_files = context.repeated_files()
         source_reports.append(str(repeated_files["schema"]))
-        if repeated_files["rows"]:
-            actions.append(
-                _action_brief_action(
-                    family="repeated_file_rediscovery",
-                    finding="Repeated file rediscovery",
-                    confidence=_count_confidence(int(repeated_files["total_candidates"])),
-                    evidence=repeated_files["rows"][:normalized_limit],
-                    likely_waste_pattern=(
-                        "The same safe file identities keep being rediscovered, which can mean the agent is "
-                        "spending turns rebuilding local context instead of using a durable note or helper."
-                    ),
-                    recommended_workflow_change=(
-                        "Write stable file roles or investigation findings into a project note, then ask Codex "
-                        "to use that note before opening the same files again."
-                    ),
-                    recommended_existing_tool=None,
-                    recommended_custom_solution=(
-                        "Create a small repo command or skill section that returns the exact file map, owner, "
-                        "or test selector the agent keeps rediscovering."
-                    ),
-                    how_to_verify=(
-                        "Re-run `usage_repeated_file_rediscovery` and confirm repeated safe file identities "
-                        "drop or move to intentional focused reads."
-                    ),
-                    recommended_next_tools=[
-                        "usage_repeated_file_rediscovery",
-                        "usage_thread_trace",
-                    ],
-                    missing_access="Safe hashes prove recurrence, not whether each reread was necessary.",
-                )
-            )
+        _append_action_if_rows(
+            actions,
+            repeated_files,
+            lambda: _action_brief_action(
+                family="repeated_file_rediscovery",
+                finding="Repeated file rediscovery",
+                confidence=_count_confidence(int(repeated_files["total_candidates"])),
+                evidence=repeated_files["rows"][:normalized_limit],
+                likely_waste_pattern=(
+                    "The same safe file identities keep being rediscovered, which can mean the agent is "
+                    "spending turns rebuilding local context instead of using a durable note or helper."
+                ),
+                recommended_workflow_change=(
+                    "Write stable file roles or investigation findings into a project note, then ask Codex "
+                    "to use that note before opening the same files again."
+                ),
+                recommended_existing_tool=None,
+                recommended_custom_solution=(
+                    "Create a small repo command or skill section that returns the exact file map, owner, "
+                    "or test selector the agent keeps rediscovering."
+                ),
+                how_to_verify=(
+                    "Re-run `usage_repeated_file_rediscovery` and confirm repeated safe file identities "
+                    "drop or move to intentional focused reads."
+                ),
+                recommended_next_tools=[
+                    "usage_repeated_file_rediscovery",
+                    "usage_thread_trace",
+                ],
+                missing_access="Safe hashes prove recurrence, not whether each reread was necessary.",
+            ),
+        )
 
-        shell_churn = report_cache.get("shell_churn")
-        if shell_churn is None:
-            shell_churn = build_shell_churn_report(
-                db_path=db_path,
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                min_occurrences=2,
-                limit=normalized_limit,
-                privacy_mode=privacy_mode,
-            ).payload
-            report_cache["shell_churn"] = shell_churn
+        shell_churn = context.shell_churn()
         source_reports.append(str(shell_churn["schema"]))
-        if shell_churn["rows"]:
-            actions.append(
-                _action_brief_action(
-                    family="shell_churn",
-                    finding="Repeated shell probing",
-                    confidence=_count_confidence(int(shell_churn["total_candidates"])),
-                    evidence=shell_churn["rows"][:normalized_limit],
-                    likely_waste_pattern=(
-                        "Repeated command families can indicate trial-and-error probing, especially when reads, "
-                        "searches, or failed checks repeat without converging on an edit."
-                    ),
-                    recommended_workflow_change=(
-                        "After two similar failed probes, summarize what was learned and switch to a narrower "
-                        "query, helper script, or test selector."
-                    ),
-                    recommended_existing_tool=None,
-                    recommended_custom_solution=(
-                        "Add a project command for the repeated search/test sequence, or encode the sequence "
-                        "in a repo skill so it is executed once intentionally."
-                    ),
-                    how_to_verify=(
-                        "Re-run `usage_shell_churn` and compare repeated sed/rg/git/nl families before and "
-                        "after the workflow change."
-                    ),
-                    recommended_next_tools=["usage_shell_churn", "usage_investigation_walk"],
-                    missing_access="Aggregate command families omit raw command arguments in strict/shareable modes.",
-                )
-            )
+        _append_action_if_rows(
+            actions,
+            shell_churn,
+            lambda: _action_brief_action(
+                family="shell_churn",
+                finding="Repeated shell probing",
+                confidence=_count_confidence(int(shell_churn["total_candidates"])),
+                evidence=shell_churn["rows"][:normalized_limit],
+                likely_waste_pattern=(
+                    "Repeated command families can indicate trial-and-error probing, especially when reads, "
+                    "searches, or failed checks repeat without converging on an edit."
+                ),
+                recommended_workflow_change=(
+                    "After two similar failed probes, summarize what was learned and switch to a narrower "
+                    "query, helper script, or test selector."
+                ),
+                recommended_existing_tool=None,
+                recommended_custom_solution=(
+                    "Add a project command for the repeated search/test sequence, or encode the sequence "
+                    "in a repo skill so it is executed once intentionally."
+                ),
+                how_to_verify=(
+                    "Re-run `usage_shell_churn` and compare repeated sed/rg/git/nl families before and "
+                    "after the workflow change."
+                ),
+                recommended_next_tools=["usage_shell_churn", "usage_investigation_walk"],
+                missing_access="Aggregate command families omit raw command arguments in strict/shareable modes.",
+            ),
+        )
 
     if normalized_goal in {"overview", "allowance_change"}:
         actions.append(
