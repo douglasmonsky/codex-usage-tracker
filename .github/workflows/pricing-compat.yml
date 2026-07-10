@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: "17 13 * * 1"
 
+permissions:
+  contents: read
+
 jobs:
   parse-live-pricing:
     name: Parse live OpenAI pricing source
@@ -12,6 +15,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"

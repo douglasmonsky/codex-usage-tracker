@@ -47,6 +47,7 @@ Do not read it during normal coding unless changing guidance.
 
 ## Active Gates
 
+- pip-audit
 - Secret scanning: gitleaks
 - Markdown linting
 - YAML linting

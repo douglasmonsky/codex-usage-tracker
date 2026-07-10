@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `chore/dependency-dead-code-gates`
+Current chunk: `chore/security-hardening-gates`
 
 ## Goal
 
@@ -41,6 +41,9 @@ mixing in broad Python refactors or unrelated documentation cleanup.
 - Configure Deptry with the package's first-party and development dependency
   model, remove five verified dead private helpers, and keep Vulture at 60%
   confidence with a reviewed whitelist for dynamic and public surfaces.
+- Fix Zizmor's upstream workflow input, apply least-privilege workflow defaults,
+  retain reviewed action tag pins with Dependabot updates, and enable pip-audit
+  against a universal pinned runtime requirements file.
 
 ## Branch Exit
 
@@ -81,11 +84,10 @@ findings.
 - Keep `gitleaks` enabled as the current-tree secret gate. Consider a separate
   history-scan PR only after confirming no real credentials are present and
   deciding how to handle historical false positives.
-- Keep `pip-audit` disabled until the project has pinned dependency input.
-  Decide between a constraints file, lock export, or dedicated audit
-  requirements file before enabling it.
-- Triage `zizmor` repo-specific config/invocation. Do not enable it as blocking
-  until it audits local workflows without remote-fetch failures.
+- [x] Enable `pip-audit` against the dedicated universal pinned runtime input
+  in `requirements/audit.txt`.
+- [x] Triage `zizmor` repo-specific config/invocation and enable the clean
+  offline workflow audit in hardening CI.
 
 ### 4. Ratchet Large Python Files Down
 

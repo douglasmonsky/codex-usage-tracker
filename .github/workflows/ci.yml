@@ -4,14 +4,19 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   hardening:
     name: Hardening gates
     runs-on: ubuntu-latest
     env:
-      AGENT_MAINTAINER_REV: 0d2951b205fc2914d77fdf8abfbf794743376778
+      AGENT_MAINTAINER_REV: baabf0a6c5ac071302202f4736248b3b2ee90b1d
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -43,6 +48,10 @@ jobs:
         run: deptry .
       - name: Dead code
         run: vulture src tests config/vulture-whitelist.py
+      - name: Dependency vulnerabilities
+        run: pip-audit -r requirements/audit.txt
+      - name: Workflow security
+        run: zizmor --offline --no-progress .github/workflows
       - name: GitHub Actions lint
         run: actionlint .github/workflows/*.yml
       - name: Secret scan
@@ -60,6 +69,9 @@ jobs:
             .github/workflows/ci.yml \
             .github/workflows/pricing-compat.yml \
             .github/workflows/publish.yml
+          check-jsonschema \
+            --builtin-schema vendor.dependabot \
+            .github/dependabot.yml
 
   test:
     name: Test Python ${{ matrix.python-version }}
@@ -70,6 +82,8 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -110,6 +124,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"

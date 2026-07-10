@@ -21,4 +21,37 @@ def test_dependency_and_dead_code_scans_use_reviewed_project_policy() -> None:
 
     maintainer = config["tool"]["agent_maintainer"]
     assert "config/vulture-whitelist.py" in maintainer["vulture_paths"]
+    assert maintainer["enable_pip_audit"] is True
+    assert maintainer["pip_audit_args"] == ["-r", "requirements/audit.txt"]
     assert config["tool"]["vulture"]["min_confidence"] == 60
+
+
+def test_runtime_audit_input_is_fully_pinned() -> None:
+    requirements = (ROOT / "requirements" / "audit.txt").read_text(encoding="utf-8")
+    requirement_lines = [
+        line for line in requirements.splitlines() if line and not line.startswith((" ", "#"))
+    ]
+
+    assert any(line.startswith("mcp==") for line in requirement_lines)
+    assert any(line.startswith("tiktoken==") for line in requirement_lines)
+    assert all("==" in line for line in requirement_lines)
+
+
+def test_workflow_security_policy_is_explicit() -> None:
+    workflows = list((ROOT / ".github" / "workflows").glob("*.yml"))
+    workflow_text = "\n".join(path.read_text(encoding="utf-8") for path in workflows)
+
+    assert workflow_text.count("uses: actions/checkout@") == workflow_text.count(
+        "persist-credentials: false"
+    )
+    assert all(
+        "permissions:\n  contents: read" in path.read_text(encoding="utf-8") for path in workflows
+    )
+
+    dependabot = (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
+    assert 'package-ecosystem: "github-actions"' in dependabot
+    assert 'interval: "weekly"' in dependabot
+
+    zizmor = (ROOT / "zizmor.yml").read_text(encoding="utf-8")
+    assert "actions/*: ref-pin" in zizmor
+    assert "pypa/*: ref-pin" in zizmor
