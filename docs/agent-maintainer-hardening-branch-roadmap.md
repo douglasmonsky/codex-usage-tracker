@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/cli-command-families`
+Status: complete
 
 ## Goal
 
@@ -52,8 +52,13 @@ mixing in broad Python refactors or unrelated documentation cleanup.
 
 ## Branch Exit
 
-The branch is ready for PR once the latest commit is pushed and CI confirms the
-same hardening gates remotely.
+All required hardening and refactor chunks are merged. The closure PR refreshes
+the file-length baseline, reruns the maintained local gates, and requires the
+same remote CI matrix before merge.
+
+The refreshed baseline drops from 33 to 22 legacy oversized files and from 18
+to 7 under `src`; every source module targeted by this roadmap is removed from
+the baseline without changing the 600 physical / 450 source-line thresholds.
 
 ## Follow-Up PRs
 
@@ -152,6 +157,13 @@ module boundary and keep behavior covered by focused tests.
 
 These checks are useful, but should wait until the gates above stop producing
 basic noise.
+
+- The closure audit records 21 Xenon C/E-ranked functions and several B-ranked
+  modules. Keep Xenon out of CI until a focused complexity roadmap can reduce
+  that backlog without lowering the configured B/A/A targets.
+- The closure Pylint audit scores the source tree at 9.12/10, with broad legacy
+  convention and design findings. Keep it advisory until those categories can
+  be ratcheted without broad suppressions.
 
 - Tighten Markdown linting by re-enabling historical spacing/inline-HTML rules
   only in dedicated docs cleanup PRs.

@@ -16,22 +16,6 @@
       "physical": 684,
       "source": 620
     },
-    "src/codex_usage_tracker/allowance_intelligence/model.py": {
-      "physical": 588,
-      "source": 512
-    },
-    "src/codex_usage_tracker/cli/main.py": {
-      "physical": 685,
-      "source": 625
-    },
-    "src/codex_usage_tracker/cli/mcp_server.py": {
-      "physical": 1699,
-      "source": 1516
-    },
-    "src/codex_usage_tracker/cli/parser.py": {
-      "physical": 706,
-      "source": 636
-    },
     "src/codex_usage_tracker/core/json_contract_cli.py": {
       "physical": 586,
       "source": 581
@@ -40,49 +24,21 @@
       "physical": 548,
       "source": 511
     },
-    "src/codex_usage_tracker/diagnostics/api.py": {
-      "physical": 562,
-      "source": 499
-    },
-    "src/codex_usage_tracker/diagnostics/guided_summary.py": {
-      "physical": 544,
-      "source": 500
-    },
-    "src/codex_usage_tracker/diagnostics/snapshot_analysis.py": {
-      "physical": 533,
-      "source": 485
-    },
-    "src/codex_usage_tracker/diagnostics/snapshots.py": {
-      "physical": 573,
-      "source": 521
-    },
     "src/codex_usage_tracker/reports/agentic_dogfood.py": {
       "physical": 810,
       "source": 764
-    },
-    "src/codex_usage_tracker/reports/api.py": {
-      "physical": 3104,
-      "source": 2856
-    },
-    "src/codex_usage_tracker/server/handler.py": {
-      "physical": 606,
-      "source": 557
     },
     "src/codex_usage_tracker/store/api.py": {
       "physical": 890,
       "source": 794
     },
-    "src/codex_usage_tracker/store/content_index.py": {
-      "physical": 1724,
-      "source": 1567
-    },
     "src/codex_usage_tracker/store/content_index_events.py": {
-      "physical": 570,
-      "source": 486
+      "physical": 555,
+      "source": 475
     },
     "src/codex_usage_tracker/store/schema.py": {
-      "physical": 761,
-      "source": 660
+      "physical": 756,
+      "source": 657
     },
     "src/codex_usage_tracker/usage_drain/reports.py": {
       "physical": 580,
@@ -97,8 +53,8 @@
       "source": 526
     },
     "tests/cli/test_mcp_integration.py": {
-      "physical": 606,
-      "source": 574
+      "physical": 605,
+      "source": 573
     },
     "tests/dashboard/test_dashboard_diagnostics_snapshots.py": {
       "physical": 910,
