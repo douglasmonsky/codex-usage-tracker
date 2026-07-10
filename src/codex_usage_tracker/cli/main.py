@@ -28,6 +28,7 @@ from codex_usage_tracker.cli.dashboard import (
     run_serve_dashboard,
 )
 from codex_usage_tracker.cli.diagnostics import run_diagnostics
+from codex_usage_tracker.cli.inspect_log_output import print_inspect_log_summary
 from codex_usage_tracker.cli.output import print_json
 from codex_usage_tracker.cli.parser import build_parser
 from codex_usage_tracker.cli.plugin_installer import install_plugin, uninstall_plugin
@@ -279,22 +280,7 @@ def _run_inspect_log(args: argparse.Namespace) -> int:
     if args.as_json:
         print(json.dumps(payload, indent=2))
         return 0
-    print(f"Log: {payload['path']}")
-    print(f"Adapter: {payload['adapter']}")
-    print(f"File session id: {payload['file_session_id'] or 'unknown'}")
-    print(f"Parsed events: {payload['event_count']}")
-    if payload["session_ids"]:
-        print("Sessions: " + ", ".join(str(value) for value in payload["session_ids"]))
-    if payload["models"]:
-        print("Models: " + ", ".join(str(value) for value in payload["models"]))
-    diagnostics = payload["diagnostics"]
-    if diagnostics:
-        print(
-            "Diagnostics: "
-            + ", ".join(f"{key}={value}" for key, value in dict(diagnostics).items())
-        )
-    else:
-        print("Diagnostics: none")
+    print_inspect_log_summary(payload)
     return 0
 
 
