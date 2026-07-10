@@ -32,7 +32,7 @@ from tests.store_dashboard_helpers import (
 
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker import mcp_server
-    from codex_usage_tracker.cli import mcp_discovery, mcp_investigations
+    from codex_usage_tracker.cli import mcp_dashboard, mcp_discovery, mcp_investigations
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -43,15 +43,15 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     rate_card_path = tmp_path / "rate-card.json"
     thresholds_path = tmp_path / "thresholds.json"
     monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
-    for module in (mcp_server, mcp_discovery, mcp_investigations):
+    for module in (mcp_server, mcp_dashboard, mcp_discovery, mcp_investigations):
         monkeypatch.setattr(module, "DEFAULT_DB_PATH", db_path)
         monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
         monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_DASHBOARD_PATH", dashboard_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_RATE_CARD_PATH", rate_card_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_THRESHOLDS_PATH", thresholds_path)
-    monkeypatch.setattr(mcp_server, "update_pricing_from_openai_docs", _fake_pricing_update)
+    monkeypatch.setattr(mcp_dashboard, "DEFAULT_DASHBOARD_PATH", dashboard_path)
+    monkeypatch.setattr(mcp_dashboard, "DEFAULT_RATE_CARD_PATH", rate_card_path)
+    monkeypatch.setattr(mcp_dashboard, "DEFAULT_THRESHOLDS_PATH", thresholds_path)
+    monkeypatch.setattr(mcp_dashboard, "update_pricing_from_openai_docs", _fake_pricing_update)
 
     refresh = mcp_server.refresh_usage_index()
     summary = mcp_server.usage_summary(group_by="thread")
@@ -215,8 +215,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert source_coverage_json["includes_raw_fragments"] is False
     assert content_search_json["schema"] == "codex-usage-tracker-content-search-v1"
     assert content_search_json["content_mode"] == "local_content_index"
-    assert content_search_json["includes_indexed_content"] is True
-    assert content_search_json["row_count"] == 1
+    assert content_search_json["includes_indexed_content"] and content_search_json["row_count"] == 1
     assert "SECRET" in content_search_json["rows"][0]["snippet"]
     assert thread_trace_json["schema"] == "codex-usage-tracker-thread-trace-v1"
     assert thread_trace_json["content_mode"] == "local_content_index"
