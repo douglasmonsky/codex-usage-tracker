@@ -51,3 +51,21 @@ tach map -o /tmp/codex-usage-tracker-tach-map.json
 
 Use `tach report` and `tach map` for diagnosis. Use `tach check` as the local
 blocking gate.
+
+## React Dashboard Boundaries
+
+Tach does not inspect TypeScript. The React dashboard uses
+`dependency-cruiser.config.cjs` as its import-graph contract and
+`scripts/check_dashboard_source_budgets.py` as its file-size ratchet. The target
+dependency direction and migration rules are recorded in
+[`0004-dashboard-typescript-boundaries.md`](architecture/decisions/0004-dashboard-typescript-boundaries.md).
+
+Run the complete frontend governance surface with:
+
+```bash
+npm run dashboard:governance
+```
+
+Backend and frontend checks are complementary: a clean Tach graph does not prove
+the React graph is clean, and a clean dependency-cruiser report does not permit a
+new Python dependency edge.
