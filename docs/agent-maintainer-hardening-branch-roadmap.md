@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/mcp-runtime-allowance`
+Current chunk: `refactor/mcp-discovery-tools`
 
 ## Goal
 
@@ -104,6 +104,8 @@ module boundary and keep behavior covered by focused tests.
     execution into a focused module without changing MCP tool contracts.
   - [x] Introduce a shared registration runtime and move allowance intelligence
     tools into their own module while preserving compatibility exports.
+  - [x] Move filtered usage discovery, coverage, indexed-content search, and
+    token-waste candidate tools into a focused registration module.
   - [ ] Split the remaining MCP tool families until the registration module is
     below the configured file-length threshold.
 - Split `src/codex_usage_tracker/reports/api.py` by report family before editing
