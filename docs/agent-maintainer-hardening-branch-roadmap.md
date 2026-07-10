@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/mcp-server-dogfood`
+Current chunk: `refactor/mcp-runtime-allowance`
 
 ## Goal
 
@@ -102,6 +102,8 @@ module boundary and keep behavior covered by focused tests.
   threshold.
   - [x] Extract asynchronous dogfood job state, cache fingerprints, and worker
     execution into a focused module without changing MCP tool contracts.
+  - [x] Introduce a shared registration runtime and move allowance intelligence
+    tools into their own module while preserving compatibility exports.
   - [ ] Split the remaining MCP tool families until the registration module is
     below the configured file-length threshold.
 - Split `src/codex_usage_tracker/reports/api.py` by report family before editing

@@ -10,12 +10,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from mcp.server.fastmcp import FastMCP
-
-from codex_usage_tracker.allowance_intelligence import (
-    build_allowance_diagnostics_report,
-    build_allowance_export_report,
-    build_allowance_history_report,
+from codex_usage_tracker.cli.mcp_allowance import (
+    usage_allowance_diagnostics as usage_allowance_diagnostics,
+)
+from codex_usage_tracker.cli.mcp_allowance import (
+    usage_allowance_export as usage_allowance_export,
+)
+from codex_usage_tracker.cli.mcp_allowance import (
+    usage_allowance_history as usage_allowance_history,
 )
 from codex_usage_tracker.cli.mcp_dogfood import (
     DOGFOOD_JOB_LOCK as _DOGFOOD_JOB_LOCK,
@@ -41,6 +43,7 @@ from codex_usage_tracker.cli.mcp_dogfood import (
 from codex_usage_tracker.cli.mcp_dogfood import (
     utc_now as _utc_now,
 )
+from codex_usage_tracker.cli.mcp_runtime import mcp
 from codex_usage_tracker.context.api import (
     DEFAULT_CONTEXT_CHARS,
     DEFAULT_CONTEXT_ENTRIES,
@@ -110,8 +113,6 @@ from codex_usage_tracker.store.api import (
 from codex_usage_tracker.store.api import (
     refresh_usage_index as refresh_index,
 )
-
-mcp = FastMCP("codex-usage-tracker")
 
 _REFRESH_JOB_REGISTRY = RefreshJobRegistry()
 _REFRESH_JOB_LOCK = threading.Lock()
@@ -1209,70 +1210,6 @@ def usage_report_pack(
             privacy_mode=privacy_mode,
         ),
     )
-
-
-@mcp.tool()
-def usage_allowance_history(
-    window_kind: str | None = None,
-    limit: int = 1000,
-    include_archived: bool = False,
-    privacy_mode: str = "strict",
-) -> dict[str, Any]:
-    """Return normalized observed allowance history aggregate JSON."""
-
-    return build_allowance_history_report(
-        db_path=DEFAULT_DB_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        rate_card_path=DEFAULT_RATE_CARD_PATH,
-        include_archived=include_archived,
-        window_kind=window_kind,
-        limit=_allowance_report_limit(limit),
-        privacy_mode=privacy_mode,
-    ).payload
-
-
-@mcp.tool()
-def usage_allowance_diagnostics(
-    window_kind: str | None = None,
-    limit: int = 10000,
-    include_archived: bool = False,
-    privacy_mode: str = "strict",
-) -> dict[str, Any]:
-    """Diagnose allowance movement against local credit estimates."""
-
-    return build_allowance_diagnostics_report(
-        db_path=DEFAULT_DB_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        rate_card_path=DEFAULT_RATE_CARD_PATH,
-        include_archived=include_archived,
-        window_kind=window_kind,
-        limit=_allowance_report_limit(limit),
-        privacy_mode=privacy_mode,
-    ).payload
-
-
-@mcp.tool()
-def usage_allowance_export(
-    window_kind: str | None = None,
-    limit: int = 10000,
-    include_archived: bool = False,
-) -> dict[str, Any]:
-    """Return strict-privacy allowance evidence bundle for manual sharing."""
-
-    return build_allowance_export_report(
-        db_path=DEFAULT_DB_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        rate_card_path=DEFAULT_RATE_CARD_PATH,
-        include_archived=include_archived,
-        window_kind=window_kind,
-        limit=_allowance_report_limit(limit),
-    ).payload
-
-
-def _allowance_report_limit(limit: int | None) -> int | None:
-    if limit is None or limit <= 0:
-        return None
-    return limit
 
 
 @mcp.tool()
