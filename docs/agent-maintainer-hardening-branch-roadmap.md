@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Branch: `refactor/secret-scan-hardening`
+Current chunk: `fix/pyright-maintained-surface`
 
 ## Goal
 
