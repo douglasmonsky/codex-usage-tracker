@@ -23,6 +23,7 @@ dist/
 *.db
 *.csv
 *.html
+!frontend/dashboard/index.html
 !src/codex_usage_tracker/plugin_data/docs/dashboard-guide.html
 !src/codex_usage_tracker/plugin_data/dashboard/dashboard_template.html
 

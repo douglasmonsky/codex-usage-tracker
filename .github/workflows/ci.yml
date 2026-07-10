@@ -38,6 +38,14 @@ jobs:
           cargo install taplo-cli --version 0.9.0 --locked
       - name: Agent Maintainer guidance drift
         run: python -m agent_maintainer guidance --check
+      - name: Dashboard lint
+        run: npm run dashboard:lint
+      - name: Dashboard type check
+        run: npm run dashboard:typecheck
+      - name: Dashboard tests
+        run: npm run dashboard:test
+      - name: Dashboard build
+        run: npm run dashboard:build
       - name: Whole-source Pyright
         run: python -m pyright --pythonpath "$(command -v python)" src
       - name: Dependency hygiene
