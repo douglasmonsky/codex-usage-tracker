@@ -3,7 +3,8 @@ import { readFile, readdir } from 'node:fs/promises';
 
 const outputDir = new URL('../src/codex_usage_tracker/plugin_data/dashboard/react/', import.meta.url);
 const budgets = {
-  currentInitialJs: 168 * 1024,
+  // Equivalent bundles vary slightly across zlib builds; retain bounded platform headroom.
+  currentInitialJs: 170 * 1024,
   currentInitialCss: 10 * 1024,
   targetInitialJs: 85 * 1024,
   targetInitialCss: 12 * 1024,
