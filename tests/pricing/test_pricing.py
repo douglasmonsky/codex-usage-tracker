@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from codex_usage_tracker.pricing import openai as pricing_openai
 from codex_usage_tracker.pricing.api import (
     ESTIMATED_MODEL_PRICES,
     OPENAI_LATEST_MODEL_MD_URL,
@@ -39,6 +42,12 @@ OPENAI_PRICING_FIXTURE = """
   ]}
 />
 """
+
+
+def test_pricing_fetch_rejects_non_https_sources() -> None:
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        pricing_openai._fetch_text("file:///tmp/pricing.md")
+
 
 OPENAI_LATEST_MODEL_FIXTURE = """---
 latestModelInfo:

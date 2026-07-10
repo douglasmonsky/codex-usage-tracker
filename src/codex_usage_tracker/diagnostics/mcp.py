@@ -11,6 +11,8 @@ from pathlib import Path
 
 from codex_usage_tracker.diagnostics.types import DoctorCheck
 
+# The doctor executes a selected local interpreter with a fixed import check and no shell.
+
 PLUGIN_NAME = "codex-usage-tracker"
 
 
@@ -216,6 +218,7 @@ def _run_mcp_import_check(
     env = _mcp_runtime_env(server)
     cwd = _resolve_mcp_cwd(server.get("cwd"), repo_root)
     check = "import codex_usage_tracker.cli.mcp_server; import mcp.server.fastmcp"
+    # The argument vector is fixed apart from the interpreter path selected by the user.
     return subprocess.run(
         [command, "-c", check],
         cwd=cwd,

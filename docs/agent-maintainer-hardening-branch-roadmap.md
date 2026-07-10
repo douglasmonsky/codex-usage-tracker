@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `chore/security-hardening-gates`
+Current chunk: `chore/bandit-findings`
 
 ## Goal
 
@@ -44,6 +44,9 @@ mixing in broad Python refactors or unrelated documentation cleanup.
 - Fix Zizmor's upstream workflow input, apply least-privilege workflow defaults,
   retain reviewed action tag pins with Dependabot updates, and enable pip-audit
   against a universal pinned runtime requirements file.
+- Fix actionable Bandit URL, assertion, fallback, and subprocess findings; keep
+  reviewed B105/B608 heuristics in a compact baseline so new findings still
+  fail in hardening CI.
 
 ## Branch Exit
 
@@ -79,11 +82,11 @@ useful review feedback.
 Once codebase imports and architecture checks are stable, move to security
 findings.
 
-- Triage `bandit` findings. Start with medium SQL-construction warnings and URL
+- [x] Triage `bandit` findings. Start with medium SQL-construction warnings and URL
   handling; classify string-literal test fixtures separately from real issues.
-- Keep `gitleaks` enabled as the current-tree secret gate. Consider a separate
-  history-scan PR only after confirming no real credentials are present and
-  deciding how to handle historical false positives.
+- [x] Keep `gitleaks` enabled for the current tree and security-profile history
+  scan, with the deleted synthetic Slack-token fixture path explicitly
+  allowlisted after confirming the finding was not a real credential.
 - [x] Enable `pip-audit` against the dedicated universal pinned runtime input
   in `requirements/audit.txt`.
 - [x] Triage `zizmor` repo-specific config/invocation and enable the clean

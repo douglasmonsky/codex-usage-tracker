@@ -12,7 +12,7 @@ jobs:
     name: Hardening gates
     runs-on: ubuntu-latest
     env:
-      AGENT_MAINTAINER_REV: baabf0a6c5ac071302202f4736248b3b2ee90b1d
+      AGENT_MAINTAINER_REV: 90a860e6a6b2e3918d7fcd5333bc5415f5ace77a
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,6 +50,8 @@ jobs:
         run: vulture src tests config/vulture-whitelist.py
       - name: Dependency vulnerabilities
         run: pip-audit -r requirements/audit.txt
+      - name: Python security
+        run: python -m agent_maintainer.runners.bandit
       - name: Workflow security
         run: zizmor --offline --no-progress .github/workflows
       - name: GitHub Actions lint

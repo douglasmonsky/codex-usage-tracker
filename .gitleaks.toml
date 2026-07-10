@@ -9,5 +9,6 @@ paths = [
   '''(^|/)__pycache__/''',
   '''^tmp/''',
   '''^test-results/''',
+  '''^tests/test_store_dashboard_mcp\.py$''',
   '''^tests/store_dashboard_helpers\.py$''',
 ]
