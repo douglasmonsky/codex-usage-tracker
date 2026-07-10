@@ -121,6 +121,7 @@ python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 deptry .
 vulture src tests config/vulture-whitelist.py
 pip-audit -r requirements/audit.txt
+python -m agent_maintainer.runners.bandit
 zizmor --offline --no-progress .github/workflows
 python -m compileall src
 for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
@@ -139,6 +140,19 @@ dependencies:
 
 ```bash
 uv pip compile pyproject.toml --universal --output-file requirements/audit.txt
+```
+
+Bandit uses `.bandit` to ratchet the reviewed findings in
+`config/bandit-baseline.json`. The baseline contains B105 false positives for
+non-secret labels/sentinels, B608 findings where SQL structure comes from fixed
+internal builders while values remain parameter-bound, the HTTPS-validated
+pricing fetch, and the shell-free local interpreter health check. New findings
+still fail. After reviewing an intentional change, regenerate and compact the
+baseline:
+
+```bash
+bandit -q -f json -o /tmp/codex-bandit.json -r src || test $? -eq 1
+jq -c . /tmp/codex-bandit.json > config/bandit-baseline.json
 ```
 
 ## Installed Package Smoke

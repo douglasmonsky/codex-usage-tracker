@@ -1,0 +1,2 @@
+[bandit]
+baseline = config/bandit-baseline.json

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from codex_usage_tracker import __version__
@@ -174,6 +175,8 @@ _OPENAI_LATEST_MODEL_RE = re.compile(
 
 
 def _fetch_text(url: str) -> str:
+    if urlsplit(url).scheme != "https":
+        raise ValueError("pricing sources must use HTTPS")
     request = Request(
         url,
         headers={
@@ -182,6 +185,7 @@ def _fetch_text(url: str) -> str:
         },
     )
     try:
+        # The source scheme is restricted to HTTPS above.
         with urlopen(request, timeout=20) as response:
             return response.read().decode("utf-8")
     except URLError as exc:

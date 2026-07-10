@@ -536,11 +536,13 @@ def _trace_calls(
         call = calls_by_id.setdefault(record_id, _trace_call_row(row))
         if row["fragment_id"] is not None:
             fragments = call["fragments"]
-            assert isinstance(fragments, list)
+            if not isinstance(fragments, list):
+                raise TypeError("trace fragments must be a list")
             fragments.append(_trace_fragment_row(row, max_snippet_chars=max_snippet_chars))
     for call in calls_by_id.values():
         fragments = call["fragments"]
-        assert isinstance(fragments, list)
+        if not isinstance(fragments, list):
+            raise TypeError("trace fragments must be a list")
         call["fragment_count"] = len(fragments)
     return list(calls_by_id.values())
 

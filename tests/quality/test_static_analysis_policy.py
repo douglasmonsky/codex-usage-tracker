@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import configparser
+import json
+from collections import Counter
 from pathlib import Path
 
 try:
@@ -55,3 +58,20 @@ def test_workflow_security_policy_is_explicit() -> None:
     zizmor = (ROOT / "zizmor.yml").read_text(encoding="utf-8")
     assert "actions/*: ref-pin" in zizmor
     assert "pypa/*: ref-pin" in zizmor
+
+
+def test_bandit_baseline_contains_only_reviewed_heuristics() -> None:
+    bandit_config = configparser.ConfigParser()
+    bandit_config.read(ROOT / ".bandit", encoding="utf-8")
+    assert bandit_config["bandit"]["baseline"] == "config/bandit-baseline.json"
+
+    baseline = json.loads((ROOT / "config" / "bandit-baseline.json").read_text(encoding="utf-8"))
+    findings = baseline["results"]
+    assert Counter(finding["test_id"] for finding in findings) == {
+        "B105": 15,
+        "B310": 1,
+        "B404": 1,
+        "B603": 1,
+        "B608": 66,
+    }
+    assert all(finding["issue_severity"] in {"LOW", "MEDIUM"} for finding in findings)

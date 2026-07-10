@@ -40,7 +40,7 @@ def token_estimate(text: str, encoding: Any | None) -> int:
         try:
             return len(encoding.encode(text))
         except Exception:
-            pass
+            return max(1, ceil(len(text) / 4))
     return max(1, ceil(len(text) / 4))
 
 
@@ -75,8 +75,14 @@ def _encoding_for_model(tiktoken: Any, model: str) -> Any | None:
 
 def _fallback_encoding(tiktoken: Any) -> Any | None:
     for name in ("o200k_base", "cl100k_base"):
-        try:
-            return tiktoken.get_encoding(name)
-        except Exception:
-            continue
+        encoding = _named_encoding(tiktoken, name)
+        if encoding is not None:
+            return encoding
     return None
+
+
+def _named_encoding(tiktoken: Any, name: str) -> Any | None:
+    try:
+        return tiktoken.get_encoding(name)
+    except Exception:
+        return None

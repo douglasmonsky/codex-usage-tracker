@@ -17,6 +17,13 @@ class _BrokenEncoding:
         raise RuntimeError("encoding unavailable")
 
 
+class _FallbackEncodings:
+    def get_encoding(self, name: str) -> _FakeEncoding:
+        if name == "o200k_base":
+            raise ValueError("encoding unavailable")
+        return _FakeEncoding()
+
+
 def test_token_estimate_uses_encoding_when_available() -> None:
     assert context_token_estimates.token_estimate("one two three", _FakeEncoding()) == 3
 
@@ -24,6 +31,13 @@ def test_token_estimate_uses_encoding_when_available() -> None:
 def test_token_estimate_falls_back_to_chars_per_four() -> None:
     assert context_token_estimates.token_estimate("abcdefgh", _BrokenEncoding()) == 2
     assert context_token_estimates.token_estimate("", None) == 0
+
+
+def test_fallback_encoding_uses_next_available_encoding() -> None:
+    assert isinstance(
+        context_token_estimates._fallback_encoding(_FallbackEncodings()),
+        _FakeEncoding,
+    )
 
 
 def test_estimate_visible_tokens_uses_joined_entry_text(monkeypatch: Any) -> None:
