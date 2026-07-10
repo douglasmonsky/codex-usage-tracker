@@ -118,6 +118,10 @@ python -m ruff check .
 python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
+deptry .
+vulture src tests config/vulture-whitelist.py
+pip-audit -r requirements/audit.txt
+zizmor --offline --no-progress .github/workflows
 python -m compileall src
 for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
   node --check "$file"
@@ -128,6 +132,13 @@ rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-
 python -m build
 python -m twine check dist/*
 python scripts/check_release.py --dist
+```
+
+Regenerate the universal runtime audit input after changing production
+dependencies:
+
+```bash
+uv pip compile pyproject.toml --universal --output-file requirements/audit.txt
 ```
 
 ## Installed Package Smoke
