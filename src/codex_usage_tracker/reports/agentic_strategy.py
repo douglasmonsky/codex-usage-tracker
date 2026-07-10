@@ -24,7 +24,7 @@ def _normalize_agentic_goal(goal: str | None) -> str | None:
     normalized = goal.strip().lower().replace("-", "_").replace(" ", "_")
     aliases = {
         "waste": "token_waste",
-        "token": "token_waste",
+        "token": "token_waste",  # nosec B105 - diagnostic goal alias, not a secret
         "tokens": "token_waste",
         "usage_waste": "token_waste",
         "limits": "allowance_change",
