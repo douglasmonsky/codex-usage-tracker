@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/mcp-dashboard-tools`
+Current chunk: `refactor/report-discovery-families`
 
 ## Goal
 
@@ -113,6 +113,10 @@ module boundary and keep behavior covered by focused tests.
     below the configured file-length threshold.
 - Split `src/codex_usage_tracker/reports/api.py` by report family before editing
   behavior; it is the largest source file in the raw baseline.
+  - [x] Extract coverage, indexed-content discovery, pattern scans, and focused
+    token-waste candidate reports behind compatibility re-exports.
+  - [ ] Extract investigation, hypothesis, walk/export, and query/recommendation
+    families until the facade is below the configured thresholds.
 - Split `src/codex_usage_tracker/store/content_index.py` by ingestion, FTS,
   provenance, and query responsibilities.
 - Then address medium oversized modules surfaced by the latest file-length log:
