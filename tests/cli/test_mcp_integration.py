@@ -32,7 +32,7 @@ from tests.store_dashboard_helpers import (
 
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker import mcp_server
-    from codex_usage_tracker.cli import mcp_discovery
+    from codex_usage_tracker.cli import mcp_discovery, mcp_investigations
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -43,7 +43,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     rate_card_path = tmp_path / "rate-card.json"
     thresholds_path = tmp_path / "thresholds.json"
     monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
-    for module in (mcp_server, mcp_discovery):
+    for module in (mcp_server, mcp_discovery, mcp_investigations):
         monkeypatch.setattr(module, "DEFAULT_DB_PATH", db_path)
         monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
@@ -355,7 +355,7 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    from codex_usage_tracker.cli import mcp_discovery, mcp_server
+    from codex_usage_tracker.cli import mcp_discovery, mcp_investigations, mcp_server
 
     codex_home = _make_codex_home(tmp_path)
     archived_log_path = (
@@ -402,7 +402,7 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     allowance_path = tmp_path / "allowance.json"
     projects_path = tmp_path / "projects.json"
-    for module in (mcp_server, mcp_discovery):
+    for module in (mcp_server, mcp_discovery, mcp_investigations):
         monkeypatch.setattr(module, "DEFAULT_DB_PATH", db_path)
         monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
