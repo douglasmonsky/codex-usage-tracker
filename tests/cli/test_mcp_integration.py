@@ -32,6 +32,7 @@ from tests.store_dashboard_helpers import (
 
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker import mcp_server
+    from codex_usage_tracker.cli import mcp_discovery
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -42,11 +43,12 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     rate_card_path = tmp_path / "rate-card.json"
     thresholds_path = tmp_path / "thresholds.json"
     monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
-    monkeypatch.setattr(mcp_server, "DEFAULT_DB_PATH", db_path)
+    for module in (mcp_server, mcp_discovery):
+        monkeypatch.setattr(module, "DEFAULT_DB_PATH", db_path)
+        monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
+        monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
+        monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_DASHBOARD_PATH", dashboard_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_PRICING_PATH", pricing_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_ALLOWANCE_PATH", allowance_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_PROJECTS_PATH", projects_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_RATE_CARD_PATH", rate_card_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_THRESHOLDS_PATH", thresholds_path)
     monkeypatch.setattr(mcp_server, "update_pricing_from_openai_docs", _fake_pricing_update)
@@ -187,8 +189,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     ):
         _assert_contract(payload)
 
-    assert refresh["parsed_events"] == 4
-    assert refresh["skipped_events"] == 0
+    assert refresh["parsed_events"] == 4 and refresh["skipped_events"] == 0
     assert "Add Codex token tracking" in summary
     assert summary_json["schema"] == "codex-usage-tracker-summary-v1"
     assert summary_json["rows"][0]["group_key"] == "gpt-5.5"
@@ -203,9 +204,8 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert query_json["rows"][0]["cwd"].startswith("[redacted cwd:")
     assert query_json["rows"][0]["project_relative_cwd"] is None
     assert recommendations_json["schema"] == "codex-usage-tracker-recommendations-v1"
-    assert recommendations_json["row_count"] >= 1
+    assert recommendations_json["row_count"] >= 1 and recommendations_json["threads"]
     assert recommendations_json["rows"][0]["recommendation_score"] > 0
-    assert recommendations_json["threads"]
     assert "Codex pricing coverage" in pricing_coverage
     assert pricing_coverage_json["schema"] == "codex-usage-tracker-pricing-coverage-v1"
     assert "Codex source coverage" in source_coverage
@@ -355,7 +355,7 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    from codex_usage_tracker.cli import mcp_server
+    from codex_usage_tracker.cli import mcp_discovery, mcp_server
 
     codex_home = _make_codex_home(tmp_path)
     archived_log_path = (
@@ -402,10 +402,11 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     allowance_path = tmp_path / "allowance.json"
     projects_path = tmp_path / "projects.json"
-    monkeypatch.setattr(mcp_server, "DEFAULT_DB_PATH", db_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_PRICING_PATH", pricing_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_ALLOWANCE_PATH", allowance_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_PROJECTS_PATH", projects_path)
+    for module in (mcp_server, mcp_discovery):
+        monkeypatch.setattr(module, "DEFAULT_DB_PATH", db_path)
+        monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
+        monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
+        monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
 
     refresh_usage_index(codex_home=codex_home, db_path=db_path, include_archived=True)
 
@@ -444,9 +445,8 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
         evidence_limit=10,
     )
 
-    assert ARCHIVED_SESSION_ID in json.dumps(all_large)
-    assert ARCHIVED_SESSION_ID in json.dumps(all_shell)
-    assert "archived-only.py" in json.dumps(all_files)
+    archived = json.dumps((all_large, all_shell, all_files))
+    assert archived.count(ARCHIVED_SESSION_ID) >= 2 and "archived-only.py" in archived
     for payload in (
         active_large,
         active_shell,
