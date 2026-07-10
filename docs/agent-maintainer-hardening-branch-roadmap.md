@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/report-hypothesis-classification`
+Current chunk: `refactor/report-query-family`
 
 ## Goal
 
@@ -117,6 +117,8 @@ module boundary and keep behavior covered by focused tests.
     token-waste candidate reports behind compatibility re-exports.
   - [x] Extract hypothesis input normalization and family classification before
     splitting the larger evaluator engine.
+  - [x] Extract filtered query and recommendation reports so hypothesis
+    evaluators can depend on a concrete module instead of the facade.
   - [ ] Extract investigation, hypothesis, walk/export, and query/recommendation
     families until the facade is below the configured thresholds.
 - Split `src/codex_usage_tracker/store/content_index.py` by ingestion, FTS,
