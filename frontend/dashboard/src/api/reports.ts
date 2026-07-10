@@ -1,9 +1,9 @@
 import { usageRowToCall } from './client';
 import type { CallRow, ContextRuntime, ReportSummary, UsageRow } from './types';
 
-export type ReportPackReport = ReportSummary & { key: string };
+type ReportPackReport = ReportSummary & { key: string };
 
-export type ReportsPackPayload = {
+type ReportsPackPayload = {
   schema?: string;
   reports?: ReportPackReport[];
   evidence?: Record<string, { rows?: UsageRow[]; row_count?: number; limit?: number }>;

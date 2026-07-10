@@ -1,12 +1,12 @@
 import type { DiagnosticSnapshotDefinition, DiagnosticSnapshotPayload } from '../../api/diagnostics';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
 
-export type SnapshotMetric = {
+type SnapshotMetric = {
   label: string;
   value: string;
 };
 
-export type SnapshotChildRow = {
+type SnapshotChildRow = {
   label: string;
   value: string;
 };

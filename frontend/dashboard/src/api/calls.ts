@@ -1,7 +1,7 @@
 import { usageRowToCall } from './client';
 import type { CallRow, ContextRuntime, UsageRow } from './types';
 
-export type CallDetailPayload = {
+type CallDetailPayload = {
   schema?: string;
   record?: UsageRow;
   previous_record?: UsageRow | null;
