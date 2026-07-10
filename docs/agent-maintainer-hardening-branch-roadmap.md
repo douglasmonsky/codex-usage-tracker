@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/server-dashboard-pages`
+Current chunk: `refactor/diagnostic-families`
 
 ## Goal
 
@@ -141,7 +141,8 @@ module boundary and keep behavior covered by focused tests.
     `allowance_intelligence/model.py`.
   - [x] Split server route dispatch from response/static-file handling by
     extracting a typed dashboard page/static-response mixin.
-  - [ ] Split oversized diagnostic snapshot and summary families.
+  - [x] Split oversized diagnostic snapshot and summary families into payload,
+    overview, guided-signal, and doctor-check modules.
   - [ ] Split CLI parser construction and command dispatch by command family.
 - Keep each refactor PR below the normal change budget unless a cohesive change
   plan is created first.

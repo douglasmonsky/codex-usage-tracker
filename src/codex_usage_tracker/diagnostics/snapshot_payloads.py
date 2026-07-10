@@ -6,7 +6,6 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from codex_usage_tracker.diagnostics.snapshot_analysis import path_privacy_metadata
 from codex_usage_tracker.diagnostics.snapshot_concentration import (
     concentration_privacy_metadata,
 )
@@ -26,6 +25,7 @@ from codex_usage_tracker.diagnostics.snapshot_constants import (
     DIAGNOSTIC_TOOL_OUTPUT_SECTION,
     DIAGNOSTIC_USAGE_DRAIN_SECTION,
 )
+from codex_usage_tracker.diagnostics.snapshot_events import path_privacy_metadata
 
 MissingFieldValue = object | Callable[[], object]
 
