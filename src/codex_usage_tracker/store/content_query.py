@@ -15,9 +15,9 @@ def _snippet(
 ) -> tuple[str, bool]:
     if _snippet_is_unbounded(text, max_chars):
         return text, False
-    assert max_chars is not None
+    snippet_chars = max_chars or len(text)
     center = _first_match_position(text, _search_terms(query))
-    start, end = _snippet_bounds(len(text), center=center, max_chars=max_chars)
+    start, end = _snippet_bounds(len(text), center=center, max_chars=snippet_chars)
     excerpt = text[start:end].strip()
     prefix, suffix = _snippet_markers(start=start, end=end, text_length=len(text))
     return f"{prefix}{excerpt}{suffix}", True
