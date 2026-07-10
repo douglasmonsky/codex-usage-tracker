@@ -39,6 +39,10 @@ jobs:
             src/codex_usage_tracker/cli/main.py \
             src/codex_usage_tracker/cli/inspect_log_output.py \
             src/codex_usage_tracker/context/reader.py
+      - name: Dependency hygiene
+        run: deptry .
+      - name: Dead code
+        run: vulture src tests config/vulture-whitelist.py
       - name: GitHub Actions lint
         run: actionlint .github/workflows/*.yml
       - name: Secret scan

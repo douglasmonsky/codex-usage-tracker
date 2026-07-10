@@ -127,7 +127,7 @@ structure_ignore_paths = [
   "venv/**",
   "**/__pycache__/**",
 ]
-vulture_paths = ["src", "tests"]
+vulture_paths = ["src", "tests", "config/vulture-whitelist.py"]
 require_tests = true
 coverage_fail_under = 80
 diff_cover_fail_under = 90
@@ -161,6 +161,14 @@ check_jsonschema_args = [
 ]
 enable_wemake = false
 enable_interrogate = false
+
+[tool.deptry]
+known_first_party = ["codex_usage_tracker"]
+optional_dependencies_dev_groups = ["dev"]
+extend_exclude = ["scripts"]
+
+[tool.vulture]
+min_confidence = 60
 
 [tool.agent_maintainer.diagnostics]
 enabled = true

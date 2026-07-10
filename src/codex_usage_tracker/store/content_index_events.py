@@ -329,21 +329,6 @@ def _command_tokens(command: str) -> list[str]:
         return command.split()
 
 
-def _strip_assignment_prefixes(tokens: list[str]) -> list[str]:
-    index = 0
-    while (
-        index < len(tokens)
-        and "=" in tokens[index]
-        and not tokens[index].startswith(("-", "./", "/"))
-    ):
-        index += 1
-    return tokens[index:]
-
-
-def _is_python_root(root: str) -> bool:
-    return bool(re.fullmatch(r"python(?:\d+(?:\.\d+)?)?", root))
-
-
 def _file_events_from_command(
     command: str,
     *,

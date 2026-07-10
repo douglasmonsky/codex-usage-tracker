@@ -94,11 +94,6 @@ _REACT_DASHBOARD_PATH = "/react-dashboard.html"
 _REACT_DASHBOARD_INDEX_PATH = "/codex-usage-tracker-assets/react/index.html"
 
 
-def _optional_int_query(params: dict[str, list[str]], key: str) -> int | None:
-    value = _first(params.get(key))
-    return None if value is None else _safe_int(value)
-
-
 class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
     def __init__(
         self,
