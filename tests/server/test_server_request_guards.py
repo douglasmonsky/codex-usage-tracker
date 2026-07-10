@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from email.message import Message
+
 from codex_usage_tracker.server.request_guards import (
     has_valid_api_token,
     request_origin_allowed,
@@ -8,6 +10,13 @@ from codex_usage_tracker.server.request_guards import (
 
 def test_request_origin_allowed_accepts_loopback_host_without_origin() -> None:
     headers = {"Host": "127.0.0.1:8898"}
+
+    assert request_origin_allowed(headers, server_port=8898) is True
+
+
+def test_request_origin_allowed_accepts_stdlib_message_headers() -> None:
+    headers = Message()
+    headers["Host"] = "127.0.0.1:8898"
 
     assert request_origin_allowed(headers, server_port=8898) is True
 

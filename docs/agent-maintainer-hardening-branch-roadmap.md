@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `chore/bandit-findings`
+Current chunk: `chore/whole-repo-pyright`
 
 ## Goal
 
@@ -47,6 +47,8 @@ mixing in broad Python refactors or unrelated documentation cleanup.
 - Fix actionable Bandit URL, assertion, fallback, and subprocess findings; keep
   reviewed B105/B608 heuristics in a compact baseline so new findings still
   fail in hardening CI.
+- Clear the remaining whole-source Pyright backlog and replace the narrow CI
+  type-check surface with all of `src`.
 
 ## Branch Exit
 
@@ -57,12 +59,10 @@ same hardening gates remotely.
 
 ### 1. Stabilize Existing Full Profile
 
-The pytest collection/import blocker, mechanical formatting blocker, and first
-narrow source Pyright errors are cleared. The cleaned Pyright surface is now
-protected in CI. Remaining type backlog is broader and should be handled in
-focused typing PRs, not as a blanket strictness migration. Once the profile is
-fast and consistently green, replace the narrow CI Pyright command with the
-maintained Agent Maintainer profile.
+The pytest collection/import blocker, mechanical formatting blocker, and
+whole-source Pyright backlog are cleared. All of `src` is now protected by the
+CI Pyright command. Complexity and broad style debt remain separate refactor
+work so the type gate stays fast and actionable.
 
 ### 2. Make Architecture And Dependency Checks Actionable
 

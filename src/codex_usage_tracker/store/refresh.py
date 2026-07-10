@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codex_usage_tracker import store as store_facade
 from codex_usage_tracker.core.models import DiagnosticFact, RefreshResult, UsageEvent
@@ -43,9 +43,9 @@ _PARALLEL_PARSE_WORKERS_ENV = "CODEX_USAGE_TRACKER_REFRESH_WORKERS"
 _PARALLEL_PARSE_MIN_FILES = 4
 _PARALLEL_PARSE_MAX_WORKERS = 8
 
-vars(store_facade)["parse_usage_events_from_file_with_state"] = (
-    _parse_usage_events_from_file_with_state
-)
+cast(
+    Any, store_facade
+).parse_usage_events_from_file_with_state = _parse_usage_events_from_file_with_state
 
 
 def _parse_usage_events_from_file(*args: Any, **kwargs: Any) -> Any:

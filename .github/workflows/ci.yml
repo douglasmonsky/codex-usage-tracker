@@ -38,12 +38,8 @@ jobs:
           cargo install taplo-cli --version 0.9.0 --locked
       - name: Agent Maintainer guidance drift
         run: python -m agent_maintainer guidance --check
-      - name: Maintained Pyright surface
-        run: |
-          python -m pyright \
-            src/codex_usage_tracker/cli/main.py \
-            src/codex_usage_tracker/cli/inspect_log_output.py \
-            src/codex_usage_tracker/context/reader.py
+      - name: Whole-source Pyright
+        run: python -m pyright --pythonpath "$(command -v python)" src
       - name: Dependency hygiene
         run: deptry .
       - name: Dead code

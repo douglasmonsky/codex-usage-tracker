@@ -365,9 +365,10 @@ def usage_payload(
     payload["refresh_result"] = refresh_result
 
     if diagnostics_enabled:
+        payload_rows = payload.get("rows")
         diagnostic_payload: dict[str, object] = {
             "dashboard_payload_ms": dashboard_payload_ms,
-            "rows_returned": len(payload.get("rows") or []),
+            "rows_returned": len(payload_rows) if isinstance(payload_rows, list) else 0,
             "include_archived": include_archived,
             "limit": limit,
             "offset": offset,

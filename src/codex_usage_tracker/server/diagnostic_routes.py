@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import threading
 from http import HTTPStatus
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from codex_usage_tracker.diagnostics.snapshots import (
@@ -57,6 +59,33 @@ _DIAGNOSTIC_SNAPSHOT_REPORTS: dict[str, tuple[Any, str]] = {
 
 class DiagnosticRouteMixin:
     """Diagnostic route adapters for ``_UsageDashboardHandler``."""
+
+    if TYPE_CHECKING:
+        path: str
+        _db_path: Path
+        _pricing_path: Path
+        _allowance_path: Path
+        _rate_card_path: Path
+        _include_archived: bool
+        _privacy_mode: str
+        _refresh_lock: threading.Lock
+
+        def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool: ...
+
+        def _send_error(
+            self,
+            status: HTTPStatus,
+            message: str,
+            **extra: object,
+        ) -> None: ...
+
+        def _send_exception(self, prefix: str, exc: BaseException) -> None: ...
+
+        def _send_json(
+            self,
+            status: HTTPStatus,
+            payload: dict[str, object],
+        ) -> None: ...
 
     def _handle_diagnostics_summary(self, query: str) -> None:
         handle_diagnostics_summary_request(

@@ -131,7 +131,7 @@ def build_guided_summary(
 
 
 def _aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    totals = {
+    totals: dict[str, int | float] = {
         "usage_rows": len(rows),
         "total_tokens": 0,
         "input_tokens": 0,
@@ -519,14 +519,14 @@ def _label(value: object, fallback: str) -> str:
     return text or fallback
 
 
-def _int(value: object) -> int:
+def _int(value: Any) -> int:
     try:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
 
 
-def _float(value: object) -> float:
+def _float(value: Any) -> float:
     try:
         return float(value or 0)
     except (TypeError, ValueError):
