@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 import webbrowser
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker.core.i18n import normalize_language
@@ -49,6 +50,7 @@ from codex_usage_tracker.server.open_investigator import (
 from codex_usage_tracker.server.recommendations import handle_recommendations_request
 from codex_usage_tracker.server.reports import handle_reports_pack_request
 from codex_usage_tracker.server.request_guards import (
+    HeaderLookup,
     has_valid_api_token,
     request_origin_allowed,
 )
@@ -97,7 +99,7 @@ _REACT_DASHBOARD_INDEX_PATH = "/codex-usage-tracker-assets/react/index.html"
 class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
     def __init__(
         self,
-        *args: object,
+        *args: Any,
         db_path: Path,
         pricing_path: Path,
         allowance_path: Path,
@@ -199,7 +201,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
         )
         super().end_headers()
 
-    def guess_type(self, path: str) -> str:
+    def guess_type(self, path: str | os.PathLike[str]) -> str:
         forced_type = _DASHBOARD_ASSET_MIME_TYPES.get(Path(path).suffix.lower())
         if forced_type is not None:
             return forced_type
@@ -360,7 +362,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
             payload = open_investigator_payload(
                 query,
                 request_host=self.headers.get("Host"),
-                server_port=self.server.server_port,
+                server_port=cast(HTTPServer, self.server).server_port,
                 dashboard_name=self._dashboard_name,
                 open_new_tab=webbrowser.open_new_tab,
             )
@@ -581,10 +583,11 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, SimpleHTTPRequestHandler):
         )
 
     def _request_origin_allowed(self) -> bool:
-        return request_origin_allowed(self.headers, self.server.server_port)
+        server = cast(HTTPServer, self.server)
+        return request_origin_allowed(cast(HeaderLookup, self.headers), server.server_port)
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool:
-        return has_valid_api_token(self.headers, params, self._api_token)
+        return has_valid_api_token(cast(HeaderLookup, self.headers), params, self._api_token)
 
     def _send_error(
         self,

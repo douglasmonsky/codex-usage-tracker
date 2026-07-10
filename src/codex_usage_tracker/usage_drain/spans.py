@@ -334,8 +334,8 @@ def _span_from_rows(
     model_counts: dict[str, int] = {}
     effort_counts: dict[str, int] = {}
     turn_counts: dict[tuple[str, str], int] = {}
-    token_totals = dict.fromkeys(TOKEN_TOTAL_FIELDS, 0.0)
-    timing_totals = dict.fromkeys(TIMING_TOTAL_FIELDS, 0.0)
+    token_totals: dict[str, float] = dict.fromkeys(TOKEN_TOTAL_FIELDS, 0.0)
+    timing_totals: dict[str, float] = dict.fromkeys(TIMING_TOTAL_FIELDS, 0.0)
     for row in rows:
         credits = max(_span_number(row.get("usage_credits")), 0.0)
         standard += credits

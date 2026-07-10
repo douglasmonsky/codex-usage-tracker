@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codex_usage_tracker.core.call_origin import ensure_call_origin
 from codex_usage_tracker.core.i18n import dashboard_i18n_payload, language_direction
@@ -105,7 +105,7 @@ def dashboard_payload(
         allowance=allowance,
     )
     allowance_summary = summarize_allowance_usage(
-        token_summary["priced_model_rows"],
+        cast(list[dict[str, Any]], token_summary["priced_model_rows"]),
         allowance,
     )
     observed_usage = query_latest_observed_usage(
@@ -310,7 +310,7 @@ def generate_dashboard(
             output_path=output_path,
             guide_href=guide_href,
             stylesheet_hrefs=stylesheet_hrefs,
-            **script_srcs,
+            **cast(Any, script_srcs),
         ),
         encoding="utf-8",
     )

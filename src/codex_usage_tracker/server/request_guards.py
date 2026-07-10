@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hmac
-from typing import Protocol
+from typing import Protocol, TypeVar, overload
 from urllib.parse import urlparse
 
 from codex_usage_tracker.server.utils import (
@@ -12,12 +12,17 @@ from codex_usage_tracker.server.utils import (
     host_header_name,
 )
 
+_T = TypeVar("_T")
+
 
 class HeaderLookup(Protocol):
     """Minimal header lookup protocol used by SimpleHTTPRequestHandler."""
 
-    def get(self, name: str, default: str | None = None) -> str | None:
-        """Return a header value when present."""
+    @overload
+    def get(self, name: str) -> str | None: ...
+
+    @overload
+    def get(self, name: str, default: _T) -> str | _T: ...
 
 
 def request_origin_allowed(headers: HeaderLookup, server_port: int) -> bool:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from codex_usage_tracker.context.values import (
     content_text,
@@ -306,7 +306,8 @@ def _summarize_token_count(
 ) -> dict[str, Any] | None:
     if event_type != "token_count":
         return None
-    info = payload.get("info") if isinstance(payload.get("info"), dict) else {}
+    raw_info = payload.get("info")
+    info = cast(dict[str, Any], raw_info) if isinstance(raw_info, dict) else {}
     token_usage = _token_count_summary(info)
     return {
         "label": "Token count",

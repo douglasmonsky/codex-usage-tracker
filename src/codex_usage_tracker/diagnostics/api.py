@@ -7,6 +7,7 @@ import json
 import os
 import platform
 import sys
+from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
@@ -369,14 +370,14 @@ def _check_parser_diagnostics(db_path: Path) -> DoctorCheck:
     return _parser_diagnostic_pass(metadata)
 
 
-def _parser_diagnostic_drift_parts(metadata: dict[str, object]) -> list[str]:
+def _parser_diagnostic_drift_parts(metadata: Mapping[str, object]) -> list[str]:
     diagnostics = _parser_diagnostic_counts(metadata)
     parts = _skipped_event_parts(metadata)
     parts.extend(f"{key}={diagnostics[key]}" for key in _parser_diagnostic_drift_keys(diagnostics))
     return parts
 
 
-def _parser_diagnostic_counts(metadata: dict[str, object]) -> dict[str, int]:
+def _parser_diagnostic_counts(metadata: Mapping[str, object]) -> dict[str, int]:
     return {
         key.removeprefix("parser_"): _safe_int(value)
         for key, value in metadata.items()
@@ -384,7 +385,7 @@ def _parser_diagnostic_counts(metadata: dict[str, object]) -> dict[str, int]:
     }
 
 
-def _skipped_event_parts(metadata: dict[str, object]) -> list[str]:
+def _skipped_event_parts(metadata: Mapping[str, object]) -> list[str]:
     skipped = _safe_int(metadata.get("skipped_events"))
     return [f"skipped_events={skipped}"] if skipped else []
 
@@ -413,7 +414,7 @@ def _parser_diagnostic_warning(parts: list[str]) -> DoctorCheck:
     )
 
 
-def _parser_diagnostic_pass(metadata: dict[str, object]) -> DoctorCheck:
+def _parser_diagnostic_pass(metadata: Mapping[str, object]) -> DoctorCheck:
     parsed = metadata.get("parsed_events", "0")
     scanned = metadata.get("scanned_files", "0")
     return DoctorCheck(

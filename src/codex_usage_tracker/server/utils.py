@@ -152,6 +152,8 @@ def elapsed_ms(started_at: float) -> float:
 
 
 def safe_int(value: object) -> int:
+    if not isinstance(value, str | bytes | bytearray | int | float):
+        return 0
     try:
         return int(value)
     except (TypeError, ValueError):
