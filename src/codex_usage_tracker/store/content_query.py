@@ -13,21 +13,36 @@ def _snippet(
     query: str,
     max_chars: int | None,
 ) -> tuple[str, bool]:
-    if max_chars is None or max_chars <= 0 or len(text) <= max_chars:
+    if _snippet_is_unbounded(text, max_chars):
         return text, False
-    terms = _search_terms(query)
-    lower_text = text.lower()
-    positions = [lower_text.find(term.lower()) for term in terms]
-    match_positions = [position for position in positions if position >= 0]
-    center = min(match_positions) if match_positions else 0
-    start = max(0, center - max_chars // 3)
-    end = min(len(text), start + max_chars)
-    if end - start < max_chars:
-        start = max(0, end - max_chars)
+    snippet_chars = max_chars or len(text)
+    center = _first_match_position(text, _search_terms(query))
+    start, end = _snippet_bounds(len(text), center=center, max_chars=snippet_chars)
     excerpt = text[start:end].strip()
-    prefix = "... " if start > 0 else ""
-    suffix = " ..." if end < len(text) else ""
+    prefix, suffix = _snippet_markers(start=start, end=end, text_length=len(text))
     return f"{prefix}{excerpt}{suffix}", True
+
+
+def _snippet_is_unbounded(text: str, max_chars: int | None) -> bool:
+    return max_chars is None or max_chars <= 0 or len(text) <= max_chars
+
+
+def _first_match_position(text: str, terms: list[str]) -> int:
+    positions = [text.lower().find(term.lower()) for term in terms]
+    matches = [position for position in positions if position >= 0]
+    return min(matches) if matches else 0
+
+
+def _snippet_bounds(text_length: int, *, center: int, max_chars: int) -> tuple[int, int]:
+    start = max(0, center - max_chars // 3)
+    end = min(text_length, start + max_chars)
+    return max(0, end - max_chars), end
+
+
+def _snippet_markers(*, start: int, end: int, text_length: int) -> tuple[str, str]:
+    prefix = "... " if start > 0 else ""
+    suffix = " ..." if end < text_length else ""
+    return prefix, suffix
 
 
 def _search_terms(query: str) -> list[str]:

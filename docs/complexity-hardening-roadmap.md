@@ -40,10 +40,10 @@ full-tree cleanup.
 
 ### 3. Content Indexing
 
-- [ ] Reduce content snippets and source-file extraction with explicit parsing
+- [x] Reduce content snippets and source-file extraction with explicit parsing
   and clipping helpers.
-- [ ] Split serial source indexing into read, accumulate, flush, and FTS phases.
-- [ ] Simplify shell/path token classification without changing privacy-safe
+- [x] Split serial source indexing into read, accumulate, flush, and FTS phases.
+- [x] Simplify shell/path token classification without changing privacy-safe
   path identities.
 - Exit: content query/extract/index/event functions rank B or better with
   incremental, parallel, FTS, and MCP content tests green.

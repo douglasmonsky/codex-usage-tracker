@@ -346,17 +346,9 @@ def _file_events_from_command(
 
 
 def _read_path_tokens(command: str, *, root: str) -> list[str]:
-    tokens = _command_tokens(command)
-    if not tokens:
+    if root not in _READ_COMMAND_ROOTS:
         return []
-    args = tokens[1:]
-    if root in {"cat", "head", "tail", "nl", "wc", "strings"}:
-        return [token for token in args if _looks_like_path_argument(token)]
-    if root in {"rg", "grep", "find"}:
-        return [token for token in args if _looks_like_path_argument(token)]
-    if root == "sed":
-        return [token for token in args if _looks_like_path_argument(token)]
-    return []
+    return [token for token in _command_tokens(command)[1:] if _looks_like_path_argument(token)]
 
 
 def _looks_like_path_argument(token: str) -> bool:

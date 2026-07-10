@@ -49,18 +49,11 @@ def _extract_content_rows_for_source_file(
             if start_byte > 0:
                 handle.seek(start_byte)
             for line_number, raw_line in enumerate(handle, start_line + 1):
-                try:
-                    envelope = json.loads(raw_line.decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError):
+                decoded = _decode_content_envelope(raw_line)
+                if decoded is None:
                     parse_warnings += 1
                     continue
-                if not isinstance(envelope, dict):
-                    parse_warnings += 1
-                    continue
-                payload = envelope.get("payload")
-                if not isinstance(payload, dict):
-                    parse_warnings += 1
-                    continue
+                envelope, payload = decoded
                 entry_type = envelope.get("type")
                 timestamp = optional_str(envelope.get("timestamp"))
                 if entry_type == "turn_context":
@@ -113,6 +106,19 @@ def _extract_content_rows_for_source_file(
         event_rows=pending_rows.event_rows,
         parse_warnings=parse_warnings,
     )
+
+
+def _decode_content_envelope(raw_line: bytes) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    try:
+        envelope = json.loads(raw_line.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(envelope, dict):
+        return None
+    payload = envelope.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    return envelope, payload
 
 
 def _empty_extracted_content_rows(
