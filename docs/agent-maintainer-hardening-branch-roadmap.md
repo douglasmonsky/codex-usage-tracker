@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/mcp-investigation-tools`
+Current chunk: `refactor/mcp-dashboard-tools`
 
 ## Goal
 
@@ -108,7 +108,8 @@ module boundary and keep behavior covered by focused tests.
     token-waste candidate tools into a focused registration module.
   - [x] Move goal-led investigation, hypothesis testing, action briefs, and
     strict evidence export into a focused orchestration module.
-  - [ ] Split the remaining MCP tool families until the registration module is
+  - [x] Move dashboard/API, export, and local config tools into a focused module;
+    the registration module is now
     below the configured file-length threshold.
 - Split `src/codex_usage_tracker/reports/api.py` by report family before editing
   behavior; it is the largest source file in the raw baseline.
