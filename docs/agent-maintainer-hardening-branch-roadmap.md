@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `chore/whole-repo-pyright`
+Current chunk: `refactor/mcp-server-dogfood`
 
 ## Goal
 
@@ -100,6 +100,10 @@ module boundary and keep behavior covered by focused tests.
 - Start with `src/codex_usage_tracker/cli/mcp_server.py`, because it directly
   contributed to context/tool-output confusion and is far over the file-length
   threshold.
+  - [x] Extract asynchronous dogfood job state, cache fingerprints, and worker
+    execution into a focused module without changing MCP tool contracts.
+  - [ ] Split the remaining MCP tool families until the registration module is
+    below the configured file-length threshold.
 - Split `src/codex_usage_tracker/reports/api.py` by report family before editing
   behavior; it is the largest source file in the raw baseline.
 - Split `src/codex_usage_tracker/store/content_index.py` by ingestion, FTS,

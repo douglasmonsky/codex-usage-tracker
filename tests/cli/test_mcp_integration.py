@@ -462,7 +462,7 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
 
 
 def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> None:
-    from codex_usage_tracker.cli import mcp_server
+    from codex_usage_tracker.cli import mcp_dogfood, mcp_server
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -481,7 +481,7 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     monkeypatch.setattr(mcp_server, "DEFAULT_AGENTIC_DOGFOOD_DIR", output_dir)
     with mcp_server._DOGFOOD_JOB_LOCK:
         mcp_server._DOGFOOD_JOBS.clear()
-        mcp_server._DOGFOOD_RESULT_CACHE.clear()
+        mcp_dogfood.DOGFOOD_RESULT_CACHE.clear()
 
     started = mcp_server.usage_dogfood_start(
         evidence_limit=1,
@@ -539,7 +539,7 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert mtime_cached["result_cache"]["hit"] is True
 
     with mcp_server._DOGFOOD_JOB_LOCK:
-        mcp_server._DOGFOOD_RESULT_CACHE.clear()
+        mcp_dogfood.DOGFOOD_RESULT_CACHE.clear()
     disk_cached = mcp_server.usage_dogfood_start(
         evidence_limit=1,
         privacy_mode="strict",
