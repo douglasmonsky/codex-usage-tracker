@@ -1,0 +1,56 @@
+@layer reset, tokens, base, components, utilities, overrides;
+
+@layer tokens {
+  :root {
+    color-scheme: light;
+    --surface-canvas: #f6f7f9;
+    --surface-panel: #ffffff;
+    --surface-rail: #171a20;
+    --surface-rail-raised: #222731;
+    --surface-rail-hover: #272d38;
+    --surface-rail-selected: #29364f;
+    --surface-rail-line: #303642;
+    --surface-rail-line-strong: #465163;
+    --surface-rail-ink: #c9d1dc;
+    --surface-rail-ink-strong: #ffffff;
+    --surface-rail-ink-muted: #8f99a8;
+    --surface-subtle: #eef1f5;
+    --ink-strong: #18202a;
+    --ink-muted: #5c6675;
+    --ink-on-signal: #ffffff;
+    --line-subtle: #d9dee7;
+    --line-strong: #aeb7c5;
+    --signal-selection: #2f6fed;
+    --signal-selection-hover: #245bc4;
+    --signal-selection-line: #9db9f6;
+    --signal-selection-surface: #e9f0ff;
+    --signal-positive: #16866b;
+    --signal-positive-ink: #0a6a53;
+    --signal-positive-subtle: #e5f5f0;
+    --signal-caution: #9a5900;
+    --signal-caution-ink: #6b3d00;
+    --signal-caution-line: #e8b45e;
+    --signal-caution-surface: #fff4dd;
+    --signal-caution-subtle: #fff1d6;
+    --signal-risk: #c84652;
+    --signal-risk-ink: #a72e3b;
+    --signal-risk-subtle: #fce9eb;
+    --signal-context: #7651c9;
+    --signal-context-subtle: #f0ebfb;
+    --focus-ring: #2f6fed;
+    --shadow-overlay: 0 16px 36px rgb(24 32 42 / 18%);
+    --font-interface: system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", sans-serif;
+    --font-numeric: ui-monospace, "SFMono-Regular", consolas, monospace;
+    --text-metadata: 0.75rem;
+    --text-control: 0.875rem;
+    --text-panel-title: 1.125rem;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --radius-control: 0.25rem;
+    --radius-panel: 0.375rem;
+  }
+}
