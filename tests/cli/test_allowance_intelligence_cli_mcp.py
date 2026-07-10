@@ -24,7 +24,7 @@ def test_allowance_intelligence_cli_commands_parse() -> None:
 
 
 def test_usage_allowance_mcp_tools_return_contracts(tmp_path: Path, monkeypatch) -> None:
-    from codex_usage_tracker.cli import mcp_server
+    from codex_usage_tracker.cli import mcp_allowance, mcp_server
 
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events(
@@ -56,9 +56,9 @@ def test_usage_allowance_mcp_tools_return_contracts(tmp_path: Path, monkeypatch)
         ],
         db_path=db_path,
     )
-    monkeypatch.setattr(mcp_server, "DEFAULT_DB_PATH", db_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_ALLOWANCE_PATH", tmp_path / "allowance.json")
-    monkeypatch.setattr(mcp_server, "DEFAULT_RATE_CARD_PATH", tmp_path / "rate-card.json")
+    monkeypatch.setattr(mcp_allowance, "DEFAULT_DB_PATH", db_path)
+    monkeypatch.setattr(mcp_allowance, "DEFAULT_ALLOWANCE_PATH", tmp_path / "allowance.json")
+    monkeypatch.setattr(mcp_allowance, "DEFAULT_RATE_CARD_PATH", tmp_path / "rate-card.json")
 
     history = mcp_server.usage_allowance_history(window_kind="weekly")
     diagnostics = mcp_server.usage_allowance_diagnostics(window_kind="weekly")

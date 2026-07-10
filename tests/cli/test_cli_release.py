@@ -575,7 +575,7 @@ def _documented_cli_commands(path: Path) -> tuple[set[str], list[str]]:
 
 
 def _mcp_tool_names(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    tree = ast.parse("\n".join(candidate.read_text() for candidate in path.parent.glob("mcp_*.py")))
     tools: set[str] = set()
     for node in tree.body:
         if not isinstance(node, ast.FunctionDef):
