@@ -1,5 +1,11 @@
 # Experimental Frontend Rewrite Roadmap
 
+> Historical roadmap: this document records the React transition that produced
+> the current dashboard. The final pre-1.0 dashboard redesign is governed by
+> [Dashboard Final Redesign Roadmap](dashboard-final-redesign-roadmap.md), with
+> its measured [audit](dashboard-final-redesign-audit.md) and
+> [design specification](dashboard-final-redesign-spec.md).
+
 0.14.0 release hardening update: React dashboard transition release gates now live in `docs/react-dashboard-0.14-release-roadmap.md`; new rewrite work should clear that checklist before the minor release branch.
 
 React live shell boot update: `/react-dashboard.html` now injects the same aggregate-only `usage-data` API token shell payload as the dashboard route, with zero embedded rows and the finite server default limit. This keeps the preferred React route live-enabled while preventing accidental no-cap startup loads on large histories; real-data QA covered finite startup, typed finite load, Load more, and explicit No row cap requests on a 75k-row dataset.
