@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/allowance-statistics`
+Current chunk: `refactor/server-dashboard-pages`
 
 ## Goal
 
@@ -139,7 +139,8 @@ module boundary and keep behavior covered by focused tests.
   and CLI parser/main files.
   - [x] Extract the nonparametric detector and numeric evidence helpers from
     `allowance_intelligence/model.py`.
-  - [ ] Split server route dispatch from response/static-file handling.
+  - [x] Split server route dispatch from response/static-file handling by
+    extracting a typed dashboard page/static-response mixin.
   - [ ] Split oversized diagnostic snapshot and summary families.
   - [ ] Split CLI parser construction and command dispatch by command family.
 - Keep each refactor PR below the normal change budget unless a cohesive change
