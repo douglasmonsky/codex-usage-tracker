@@ -23,9 +23,9 @@ full-tree cleanup.
 
 ### 1. Agentic Evidence
 
-- [ ] Lock compact evidence row and summary behavior with direct tests.
-- [ ] Split `_compact_agentic_evidence_row` into field-family helpers.
-- [ ] Replace `_agentic_evidence_summary` branch accumulation with declarative
+- [x] Lock compact evidence row and summary behavior with direct tests.
+- [x] Split `_compact_agentic_evidence_row` into field-family helpers.
+- [x] Replace `_agentic_evidence_summary` branch accumulation with declarative
   metric specifications and bounded reducers.
 - Exit: both functions rank B or better and report/MCP contracts are unchanged.
 
