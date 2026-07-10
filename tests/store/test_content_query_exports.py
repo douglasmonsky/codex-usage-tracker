@@ -1,4 +1,5 @@
 from codex_usage_tracker.store import content_index
+from codex_usage_tracker.store.content_index_models import ContentIndexPlan, ContentIndexResult
 from codex_usage_tracker.store.content_search import (
     ContentSearchResult,
     search_content_fragments,
@@ -7,6 +8,8 @@ from codex_usage_tracker.store.content_trace import ContentTraceResult, trace_th
 
 
 def test_content_index_preserves_query_exports() -> None:
+    assert content_index.ContentIndexPlan is ContentIndexPlan
+    assert content_index.ContentIndexResult is ContentIndexResult
     assert content_index.ContentSearchResult is ContentSearchResult
     assert content_index.ContentTraceResult is ContentTraceResult
     assert content_index.search_content_fragments is search_content_fragments

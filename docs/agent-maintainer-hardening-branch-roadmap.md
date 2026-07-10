@@ -1,6 +1,6 @@
 # Agent Maintainer Hardening Branch Roadmap
 
-Current chunk: `refactor/content-index-queries`
+Current chunk: `refactor/content-index-parser`
 
 ## Goal
 
@@ -131,7 +131,7 @@ module boundary and keep behavior covered by focused tests.
   provenance, and query responsibilities.
   - [x] Extract content search, thread trace, and shared paging/snippet helpers
     while preserving the original facade exports.
-  - [ ] Extract parser/provenance row construction from refresh orchestration.
+  - [x] Extract parser/provenance row construction from refresh orchestration.
   - [ ] Extract persistence and FTS synchronization behind focused helpers.
 - Then address medium oversized modules surfaced by the latest file-length log:
   `allowance_intelligence/model.py`, `server/handler.py`, diagnostics modules,
