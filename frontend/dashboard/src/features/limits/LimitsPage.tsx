@@ -9,7 +9,7 @@ import {
   type AllowanceWindowKind,
 } from '../../api/allowance';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
-import { Button, MetricReadout, SegmentedControl, StatusBadge, Surface } from '../../design';
+import { Button, MetricReadout, PageLoadProgress, SegmentedControl, StatusBadge, Surface } from '../../design';
 import { Visualization } from '../../visualization';
 import { csvDateStamp } from '../shared/exportCsv';
 import { AllowanceEvidenceLedger } from './AllowanceEvidenceLedger';
@@ -81,6 +81,7 @@ export function LimitsPage({
     : null;
   const loading = historyQuery.isFetching || diagnosticsQuery.isFetching;
   const error = historyQuery.error ?? diagnosticsQuery.error;
+  const completedModules = Number(Boolean(historyQuery.data)) + Number(Boolean(diagnosticsQuery.data));
 
   function selectWindow(next: AllowanceWindowKind) {
     setWindowKind(next);
@@ -138,6 +139,15 @@ export function LimitsPage({
           </Button>
         </div>
       </header>
+
+      <PageLoadProgress
+        active={canUseLive && loading}
+        completed={completedModules}
+        total={2}
+        label="Loading allowance history and detector"
+        error={canUseLive && error ? errorMessage(error) : null}
+        updating={completedModules > 0}
+      />
 
       <div className={styles.statusRow} role="status" aria-live="polite">
         <StatusBadge tone={workspace.live ? 'positive' : 'neutral'}>{workspace.live ? 'Live detector payload' : 'Loaded aggregate fallback'}</StatusBadge>

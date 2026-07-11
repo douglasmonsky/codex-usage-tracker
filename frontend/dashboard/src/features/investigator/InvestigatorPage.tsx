@@ -22,7 +22,7 @@ import {
   type InvestigationWalkBranch,
 } from '../../api/investigations';
 import type { CallRow, ContextRuntime, DashboardModel } from '../../api/types';
-import { Button, MetricReadout, StatusBadge, Surface } from '../../design';
+import { Button, MetricReadout, PageLoadProgress, StatusBadge, Surface } from '../../design';
 import type { DashboardViewId } from '../../routes/dashboardSearch';
 import { Visualization } from '../../visualization';
 import { fallbackDiagnosticSnapshots } from '../diagnostics/diagnosticSnapshotFallbacks';
@@ -116,6 +116,10 @@ export function InvestigatorPage({
   );
   const loadedSnapshotCount = snapshotQueries.filter(query => query.data).length;
   const loadingSnapshots = snapshotQueries.some(query => query.isFetching);
+  const completedModules = loadedSnapshotCount + Number(Boolean(agenticQuery.data));
+  const progressError = agenticQuery.error
+    ?? snapshotQueries.find(query => query.error)?.error
+    ?? null;
 
   useEffect(() => {
     if (!selected && workspace.findings[0]) setSelectedId(workspace.findings[0].id);
@@ -196,6 +200,15 @@ export function InvestigatorPage({
           </Button>
         </div>
       </header>
+
+      <PageLoadProgress
+        active={canUseLive && (agenticQuery.isFetching || loadingSnapshots)}
+        completed={completedModules}
+        total={diagnosticSnapshotDefinitions.length + 1}
+        label="Loading investigation evidence"
+        error={canUseLive && progressError ? errorMessage(progressError) : null}
+        updating={completedModules > 0}
+      />
 
       <div className={styles.statusRow} role="status" aria-live="polite">
         <StatusBadge tone={workspace.live ? 'positive' : 'neutral'}>{workspace.live ? 'Live report services' : 'Loaded aggregate fallback'}</StatusBadge>

@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDashboardQueryClient } from '../../data/queryRuntime';
@@ -69,10 +69,12 @@ describe('Cache and Context focused evidence', () => {
       </QueryClientProvider>,
     );
 
+    expect(screen.getByRole('progressbar', { name: 'Loading cache and context evidence' })).toBeInTheDocument();
     expect((await screen.findAllByText('scope-thread')).length).toBeGreaterThan(0);
     expect(screen.getByText('1,200')).toBeInTheDocument();
     expect(screen.getAllByText('80.0%').length).toBeGreaterThan(0);
     expect(await screen.findByText('1 loaded')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('progressbar', { name: 'Loading cache and context evidence' })).not.toBeInTheDocument());
   });
 });
 

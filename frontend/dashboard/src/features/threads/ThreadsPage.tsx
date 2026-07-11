@@ -362,11 +362,13 @@ setVisibleThreadCallCount(threadCallPageSize);
         isFetchingNextPage: focusedThreadsQuery.isFetchingNextPage,
         usingFocused: usingFocusedThreads,
         fallbackReason: endpointState.reason,
+        error: focusedThreadsQuery.error ? queryErrorMessage(focusedThreadsQuery.error) : null,
       }}
       selectedCallsState={{
         isFetching: selectedThreadCallsQuery.isFetching,
         count: selectedCalls.length,
         hydrated: Boolean(selectedThreadCallsQuery.data),
+        error: selectedThreadCallsQuery.error ? queryErrorMessage(selectedThreadCallsQuery.error) : null,
       }}
       displayedThreads={displayedThreads}
       totalMatchedThreads={totalMatchedThreads}
@@ -402,4 +404,8 @@ setVisibleThreadCallCount(threadCallPageSize);
       onCopyCallLink={onCopyCallLink}
     />
   );
+}
+
+function queryErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

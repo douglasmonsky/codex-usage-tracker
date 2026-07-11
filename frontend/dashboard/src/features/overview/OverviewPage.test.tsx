@@ -102,7 +102,9 @@ describe('Overview focused evidence flow', () => {
       </QueryClientProvider>,
     );
 
+    expect(screen.getByRole('progressbar', { name: 'Loading overview evidence' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Focused endpoints')).toBeInTheDocument());
+    expect(screen.queryByRole('progressbar', { name: 'Loading overview evidence' })).not.toBeInTheDocument();
     expect(screen.getByText('Total Calls')).toBeInTheDocument();
     expect(screen.getByText('1,250')).toBeInTheDocument();
     expect(screen.getByText('8 detailed rows available')).toBeInTheDocument();

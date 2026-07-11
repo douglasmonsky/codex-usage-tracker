@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 
 import type { ContextRuntime, DashboardModel } from '../../api/types';
 import type { LoadWindow } from '../../data/dataScope';
-import { Button, StatusBadge } from '../../design';
+import { Button, PageLoadProgress, StatusBadge } from '../../design';
 import { overviewQueryOptions, type OverviewEndpointBundle } from '../../data/overviewQueries';
 import { Visualization } from '../../visualization';
 import { OverviewMetrics } from './OverviewMetrics';
@@ -58,6 +58,11 @@ export function OverviewPage(props: OverviewPageProps) {
     () => buildOverviewViewModel(props.model, focusedQuery.data, props.runtime.historyScope),
     [focusedQuery.data, props.model, props.runtime.historyScope],
   );
+  const completedModules = Number(Boolean(focusedQuery.data?.summary.data))
+    + Number(Boolean(focusedQuery.data?.recommendations.data));
+  const endpointError = focusedQuery.error
+    ? queryErrorMessage(focusedQuery.error)
+    : focusedQuery.data?.summary.error || focusedQuery.data?.recommendations.error || null;
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
@@ -67,6 +72,15 @@ export function OverviewPage(props: OverviewPageProps) {
           <Button variant="primary" onClick={props.onRefresh} disabled={props.refreshing}><RefreshCw /> {props.refreshing ? 'Refreshing...' : 'Refresh data'}</Button>
         </div>
       </header>
+
+      <PageLoadProgress
+        active={canUseFocusedEndpoints && focusedQuery.isFetching}
+        completed={completedModules}
+        total={2}
+        label="Loading overview evidence"
+        error={canUseFocusedEndpoints ? endpointError : null}
+        updating={completedModules > 0}
+      />
 
       <OverviewMetrics
         metrics={viewModel.metrics}
@@ -94,6 +108,10 @@ export function OverviewPage(props: OverviewPageProps) {
       />
     </div>
   );
+}
+
+function queryErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function endpointLabel(isFetching: boolean, data: OverviewEndpointBundle | undefined, error: Error | null, enabled: boolean): string {

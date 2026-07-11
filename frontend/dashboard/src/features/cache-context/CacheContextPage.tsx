@@ -7,6 +7,7 @@ import { DataTable } from '../../components/DataTable';
 import { MetricCard } from '../../components/MetricCard';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { PageLoadProgress } from '../../design';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
 import { threadActionColumn, threadColumns, threadInvestigatorRowLabel } from '../shared/tables';
 import { stopRowActionKeyDown } from '../shared/rowActionEvents';
@@ -71,6 +72,15 @@ return (
           <StatusBadge label="Context safe" tone="blue" />
         </div>
       </div>
+
+      <PageLoadProgress
+        active={evidence.progress.active}
+        completed={evidence.progress.completed}
+        total={evidence.progress.total}
+        label="Loading cache and context evidence"
+        error={evidence.progress.error}
+        updating={evidence.progress.updating}
+      />
 
       <div className="metric-grid span-all">
         {evidence.cards.map(card => (

@@ -50,7 +50,9 @@ describe('Limits live evidence flow', () => {
       </QueryClientProvider>,
     );
 
+    expect(screen.getByRole('progressbar', { name: 'Loading allowance history and detector' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Live detector payload')).toBeInTheDocument());
+    expect(screen.queryByRole('progressbar', { name: 'Loading allowance history and detector' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No weekly regime change detected' })).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Allowance evidence windows and linked calls' })).toBeInTheDocument();
 
