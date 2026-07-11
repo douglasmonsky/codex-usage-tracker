@@ -47,7 +47,7 @@
   width: 34px;
   height: 34px;
   margin: 0 auto;
-  color: var(--signal-selection);
+  color: var(--signal-selection-ink);
 }
 
 .statePanel[data-tone='loading'] > svg {

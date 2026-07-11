@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const workspaces = [
   ['Overview', '/?view=overview&qa=r11-accessibility'],
@@ -28,6 +29,7 @@ test.describe('R11 dashboard release candidate', () => {
 
   test('passes the workspace accessibility and viewport matrix', async ({ page }) => {
     const browserIssues = collectBrowserIssues(page);
+    const axeIssues = [];
 
     for (const [viewportName, viewport] of viewports) {
       await page.setViewportSize(viewport);
@@ -36,6 +38,7 @@ test.describe('R11 dashboard release candidate', () => {
         browserIssues.length = 0;
         await openWorkspace(page, workspaceName, path);
         const audit = await accessibilityAudit(page);
+        const axeViolations = await seriousAxeViolations(page);
 
         expect(audit, `${viewportName} ${workspaceName} accessibility audit`).toEqual({
           documentOverflow: expect.any(Number),
@@ -45,9 +48,12 @@ test.describe('R11 dashboard release candidate', () => {
           unnamedControls: [],
         });
         expect(audit.documentOverflow, `${viewportName} ${workspaceName} document overflow`).toBeLessThanOrEqual(2);
+        if (axeViolations.length > 0) axeIssues.push({ viewportName, workspaceName, violations: axeViolations });
         expect(browserIssues, `${viewportName} ${workspaceName} console/page errors`).toEqual([]);
       }
     }
+
+    expect(axeIssues, 'serious or critical Axe violations').toEqual([]);
   });
 
   test('reflows every workspace at a 200 percent desktop zoom equivalent', async ({ page }) => {
@@ -214,6 +220,20 @@ async function accessibilityAudit(page) {
       unnamedControls,
     };
   });
+}
+
+async function seriousAxeViolations(page) {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  return results.violations
+    .filter(violation => violation.impact === 'serious' || violation.impact === 'critical')
+    .map(violation => ({
+      help: violation.help,
+      id: violation.id,
+      impact: violation.impact,
+      targets: violation.nodes.slice(0, 5).map(node => node.target),
+    }));
 }
 
 function durationMilliseconds(value) {
