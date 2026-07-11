@@ -123,7 +123,7 @@ export function FileEvidenceExplorer({
         <StatusBadge label={fileStatus(canLoad, fetching, loaded, error)} tone={loaded ? 'green' : 'blue'} />
       </div>
       <div className={styles.splitWorkspace}>
-        <main className={styles.evidenceSurface}>
+        <section className={styles.evidenceSurface} aria-label="File evidence results">
           <EvidenceGrid
             ariaLabel="File evidence"
             columns={columns}
@@ -151,7 +151,7 @@ export function FileEvidenceExplorer({
             emptyLabel={canLoad ? 'No file evidence is available in the stored diagnostic snapshots.' : 'File evidence requires the localhost dashboard server.'}
           />
           <div className={styles.gridFooter}><span>{filteredRows.length.toLocaleString()} ranked files</span></div>
-        </main>
+        </section>
         <FileInspector row={selected} onCopyCallLink={onCopyCallLink} onOpenInvestigator={onOpenInvestigator} />
       </div>
     </div>

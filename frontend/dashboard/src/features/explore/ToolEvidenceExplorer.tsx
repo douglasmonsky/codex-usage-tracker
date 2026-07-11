@@ -161,7 +161,7 @@ export function ToolEvidenceExplorer({
         <StatusBadge label={toolStatus(canLoad, query.isFetching, Boolean(query.data), query.error)} tone={query.data ? 'green' : 'blue'} />
       </div>
       <div className={styles.splitWorkspace}>
-        <main className={styles.evidenceSurface}>
+        <section className={styles.evidenceSurface} aria-label="Tool evidence results">
           <EvidenceGrid
             ariaLabel="Tool evidence"
             columns={columns}
@@ -197,7 +197,7 @@ export function ToolEvidenceExplorer({
               </button>
             ) : null}
           </div>
-        </main>
+        </section>
         <ToolInspector
           row={selected}
           calls={callsQuery.data?.calls ?? []}

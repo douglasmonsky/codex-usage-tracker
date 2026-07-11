@@ -183,7 +183,7 @@ export function ThreadsExplorerView({
         </div>
       </div>
       <div className={styles.splitWorkspace}>
-        <main className={styles.evidenceSurface}>
+        <section className={styles.evidenceSurface} aria-label="Thread evidence">
           {viewMode === 'table' ? (
             <>
               <EvidenceGrid
@@ -238,7 +238,7 @@ export function ThreadsExplorerView({
           {viewMode === 'lifecycle' ? (
             <Visualization spec={lifecycleSpec} height={520} onSelectionChange={onOpenInvestigator} />
           ) : null}
-        </main>
+        </section>
         <ThreadInspector
           {...inspector}
           onCallSortChange={onCallSortChange}

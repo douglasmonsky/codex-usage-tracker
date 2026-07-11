@@ -160,7 +160,7 @@ export function ReportsPage({
       </div>
 
       <div className={styles.workspace}>
-        <main className={styles.main}>
+        <section className={styles.main} aria-label="Report evidence">
           <Visualization spec={visualizationSpec} height={320} />
           <Panel
             title="Report Evidence Calls"
@@ -173,7 +173,7 @@ export function ReportsPage({
               onCopyCallLink={onCopyCallLink}
             />
           </Panel>
-        </main>
+        </section>
 
         <aside className={styles.research}>
           <Panel title="Research Notes" subtitle="Interpretation boundary">

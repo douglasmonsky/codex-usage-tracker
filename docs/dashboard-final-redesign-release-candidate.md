@@ -86,19 +86,17 @@ The release-candidate policy is to retain the current transition behavior:
 | `serve-dashboard --open` | Opens `/react-dashboard.html` | Keep as the preferred live launch |
 | `/react-dashboard.html` | Serves the React redesign | Candidate default live UI |
 | `/dashboard.html` | Serves the legacy dashboard shell | Keep as the rollback route |
-| `/` | Serves the legacy dashboard shell | Keep unchanged unless the open decision below is approved |
+| `/` | Serves the legacy dashboard shell | Keep unchanged as the transition rollback entry |
 | `open-dashboard` | Opens a generated static legacy file | Keep unchanged for static snapshots |
 
 Do not delete the legacy assets, redirect `/dashboard.html`, or redefine the
 static command during R11. Those changes would remove the same-server rollback
 surface and require a separate reviewed decision.
 
-**Open decision:** should `/` remain a legacy entry point for the transition
-release, or redirect to `/react-dashboard.html`? Current code serves the legacy
-shell at `/`. R11 can ship without changing it because the CLI already opens
-the React route explicitly. Record the maintainer decision before R12; do not
-describe a root-route switch as complete unless code, tests, and this guide are
-updated together.
+**Maintainer decision:** `/` remains the legacy entry point for the transition
+release. The CLI continues to open the React route explicitly, while `/` and
+`/dashboard.html` preserve a same-server recovery path. A later root-route
+switch requires a separate reviewed change to code, tests, and this guide.
 
 ## Migration Expectations
 
@@ -150,7 +148,7 @@ the example URL.
 2. Reinstall the maintainer-designated last-known-good version:
 
    ```bash
-   pipx install --force "codex-usage-tracking==<last-known-good-version>"
+   pipx install --force "codex-usage-tracking==0.17.1"
    codex-usage-tracker setup
    codex-usage-tracker doctor
    codex-usage-tracker serve-dashboard --open
@@ -161,9 +159,9 @@ the example URL.
 4. Record the exact package version and result without publishing local paths
    or private usage data.
 
-**Open decision:** replace `<last-known-good-version>` with an approved released
-version before publishing release notes. The R11 base does not identify that
-release, so this guide does not invent one.
+`0.17.1` is the last tagged release before this redesign candidate and is the
+designated installed-package rollback version. Rehearse the command in a clean
+environment before publishing release notes.
 
 ### Roll back a source-checkout candidate
 
@@ -229,9 +227,9 @@ Do not paste raw logs or real user data into this document.
 - [ ] `/react-dashboard.html`, `/dashboard.html`, and compatibility query links
   were exercised from the packaged candidate.
 - [ ] Same-server rollback was rehearsed without changing or losing local data.
-- [ ] The last-known-good package version was selected and package rollback was
-  rehearsed in a clean environment.
-- [ ] The `/` route decision is recorded and matches code, tests, and docs.
+- [x] The last-known-good package version was selected as `0.17.1`.
+- [ ] Package rollback was rehearsed in a clean environment.
+- [x] The `/` route decision is recorded and matches code, tests, and docs.
 - [ ] Known limits are acceptable for the transition release and appear in the
   final release notes.
 - [ ] Accessibility, performance, security, and package results contain no
