@@ -111,24 +111,24 @@ export const fixtureModel: DashboardModel = {
     },
   ],
   calls: [
-    ['Jun 1, 10:24 AM', 'thread-9f3a1c', 'codex-1', 'high', 128_542, 45_231, 62, 0.42, '18.4s', false, ['review']],
-    ['Jun 1, 10:18 AM', 'thread-7b2e91', 'o4-mini', 'medium', 98_731, 32_104, 41, 0.31, '12.7s', true, ['analysis']],
-    ['Jun 1, 10:12 AM', 'thread-3c8d4e', 'o3', 'high', 64_221, 18_903, 28, 0.12, '9.3s', true, ['uncached']],
-    ['Jun 1, 10:06 AM', 'thread-1a2b3c', 'codex-1', 'high', 245_123, 98_112, 71, 0.87, '27.6s', false, ['large']],
-    ['Jun 1, 10:01 AM', 'thread-8d7c6b', 'gpt-4.1', 'low', 12_543, 4_231, 12, 0.03, '3.6s', true, ['quick']],
-    ['Jun 1, 09:55 AM', 'thread-2f9e7d', 'o4-mini', 'medium', 76_881, 28_442, 39, 0.24, '11.2s', false, ['subagent']],
-    ['Jun 1, 09:50 AM', 'thread-6a5b4c', 'codex-1', 'high', 312_654, 112_991, 67, 1.12, '31.8s', false, ['file-heavy']],
-    ['Jun 1, 09:47 AM', 'thread-0f1e2d', 'o3', 'low', 8_221, 2_903, 15, 0.02, '2.8s', true, ['fast']],
-  ].map(([time, thread, model, effort, input, output, cachedPct, cost, duration, fast, tags], index) => {
+    ['2026-06-01T10:24:00Z', 'Jun 1, 10:24 AM', 'thread-9f3a1c', 'codex-1', 'high', 128_542, 45_231, 62, 0.42, '18.4s', false, ['review']],
+    ['2026-06-01T10:18:00Z', 'Jun 1, 10:18 AM', 'thread-7b2e91', 'o4-mini', 'medium', 98_731, 32_104, 41, 0.31, '12.7s', true, ['analysis']],
+    ['2026-06-01T10:12:00Z', 'Jun 1, 10:12 AM', 'thread-3c8d4e', 'o3', 'high', 64_221, 18_903, 28, 0.12, '9.3s', true, ['uncached']],
+    ['2026-06-01T10:06:00Z', 'Jun 1, 10:06 AM', 'thread-1a2b3c', 'codex-1', 'high', 245_123, 98_112, 71, 0.87, '27.6s', false, ['large']],
+    ['2026-06-01T10:01:00Z', 'Jun 1, 10:01 AM', 'thread-8d7c6b', 'gpt-4.1', 'low', 12_543, 4_231, 12, 0.03, '3.6s', true, ['quick']],
+    ['2026-06-01T09:55:00Z', 'Jun 1, 09:55 AM', 'thread-2f9e7d', 'o4-mini', 'medium', 76_881, 28_442, 39, 0.24, '11.2s', false, ['subagent']],
+    ['2026-06-01T09:50:00Z', 'Jun 1, 09:50 AM', 'thread-6a5b4c', 'codex-1', 'high', 312_654, 112_991, 67, 1.12, '31.8s', false, ['file-heavy']],
+    ['2026-06-01T09:47:00Z', 'Jun 1, 09:47 AM', 'thread-0f1e2d', 'o3', 'low', 8_221, 2_903, 15, 0.02, '2.8s', true, ['fast']],
+  ].map(([eventTimestamp, time, thread, model, effort, input, output, cachedPct, cost, duration, fast, tags], index) => {
     const inputTokens = Number(input);
     const outputTokens = Number(output);
     const cachedPercent = Number(cachedPct);
     const uncachedInput = Math.round(inputTokens * Math.max(100 - cachedPercent, 0) / 100);
     return {
       id: `fixture-call-${index}`,
-      rawTime: String(time),
-      eventTimestamp: String(time),
-      callStartedAt: String(time),
+      rawTime: String(eventTimestamp),
+      eventTimestamp: String(eventTimestamp),
+      callStartedAt: String(eventTimestamp),
       time: String(time),
       thread: String(thread),
       model: String(model),

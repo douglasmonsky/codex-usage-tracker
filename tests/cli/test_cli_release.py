@@ -218,6 +218,16 @@ def test_release_check_rejects_raw_context_in_react_dashboard_artifacts(tmp_path
     assert not any("safeFixture.ts" in failure for failure in failures)
 
 
+def test_release_secret_scan_ignores_tracked_files_deleted_in_worktree(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = _load_release_check_module()
+    monkeypatch.setattr(module, "_tracked_files", lambda: [tmp_path / "deleted-bundle.js"])
+
+    assert module._check_tracked_files_for_secrets() == []
+
+
 def test_readme_codex_usage_tracker_commands_reference_known_subcommands() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     readme = repo_root / "README.md"

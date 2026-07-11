@@ -7,7 +7,7 @@ from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.store.connection import connect
-from codex_usage_tracker.store.query_sql import usage_where_clause
+from codex_usage_tracker.store.query_sql import normalize_limit, usage_where_clause
 from codex_usage_tracker.store.rows import usage_row_to_dict
 from codex_usage_tracker.store.schema import init_db
 from codex_usage_tracker.store.usage_timing import (
@@ -81,12 +81,22 @@ def query_usage_record(
 
 def query_most_expensive_calls(
     db_path: Path = DEFAULT_DB_PATH,
-    limit: int = 20,
+    limit: int | None = 20,
     since: str | None = None,
+    include_archived: bool = True,
 ) -> list[dict[str, Any]]:
     """Return calls with largest last-call token count."""
 
-    where_clause, params = usage_where_clause(since=since, table_alias="usage_events")
+    where_clause, params = usage_where_clause(
+        since=since,
+        table_alias="usage_events",
+        include_archived=include_archived,
+    )
+    normalized_limit = normalize_limit(limit)
+    limit_clause = "LIMIT ?" if normalized_limit is not None else ""
+    query_params = [*params]
+    if normalized_limit is not None:
+        query_params.append(normalized_limit)
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(
@@ -98,8 +108,8 @@ def query_most_expensive_calls(
             {USAGE_TIMING_JOIN_SQL}
             {where_clause}
             ORDER BY usage_events.total_tokens DESC, usage_events.event_timestamp DESC
-            LIMIT ?
+            {limit_clause}
             """,
-            (*params, limit),
+            query_params,
         ).fetchall()
     return [usage_row_to_dict(row) for row in rows]

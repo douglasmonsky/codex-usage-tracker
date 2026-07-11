@@ -103,7 +103,7 @@ def test_summary_payload_normalizes_query_filters(
     monkeypatch.setattr(server_summary, "build_summary_report", build_report)
 
     payload = server_summary.summary_payload(
-        "group_by=model&limit=9&preset=by-subagent-role&since=2026-06-01",
+        "group_by=model&limit=9&preset=by-subagent-role&since=2026-06-01&include_archived=true",
         db_path=tmp_path / "usage.sqlite3",
         pricing_path=tmp_path / "pricing.json",
         projects_path=tmp_path / "projects.json",
@@ -116,6 +116,7 @@ def test_summary_payload_normalizes_query_filters(
     assert calls["limit"] == 9
     assert calls["preset"] == "by-subagent-role"
     assert calls["since"] == "2026-06-01"
+    assert calls["include_archived"] is True
     assert calls["privacy_mode"] == "strict"
 
 
@@ -143,3 +144,27 @@ def test_summary_payload_uses_defaults(
     assert calls["group_by"] == "thread"
     assert calls["limit"] == 20
     assert calls["preset"] is None
+    assert calls["include_archived"] is False
+
+
+def test_summary_payload_accepts_an_unbounded_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, Any] = {}
+
+    def build_report(**kwargs: Any) -> _Report:
+        calls.update(kwargs)
+        return _Report({})
+
+    monkeypatch.setattr(server_summary, "build_summary_report", build_report)
+
+    server_summary.summary_payload(
+        "limit=0",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        projects_path=tmp_path / "projects.json",
+        privacy_mode="normal",
+    )
+
+    assert calls["limit"] is None

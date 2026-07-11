@@ -1,4 +1,4 @@
-import{r as m,j as n}from"./dashboard-react.js";import{J as k}from"./App.js";/**
+import{r as m,j as n}from"./dashboard-react.js";import{n as k}from"./App.js";/**
  * @license lucide-react v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.
