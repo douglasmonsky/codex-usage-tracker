@@ -5,3 +5,19 @@ export type DashboardDataScope = {
   default_load_window?: 'day' | 'week' | 'rows' | 'all';
   since?: string | null;
 };
+
+export type DashboardScopeSummary = {
+  visibleCalls: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  uncachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  usageCredits: number;
+};
+
+export type DashboardModelScope = {
+  scopeSummary?: DashboardScopeSummary;
+};

@@ -7,6 +7,7 @@ import {
 } from '../data/httpTransportSupport';
 import { buildFindings, buildModelCosts, buildReports } from './modelInsights';
 import { buildOverviewSeriesFromDailyValues } from './overviewSeries';
+import { scopeSummaryFromBootPayload, summaryNumber } from './dashboardScopeSummary';
 import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, Series, ThreadRow, UsageRow, WeeklyWindow } from './types';
 import {
   loadAllUsagePayloadPaged,
@@ -211,6 +212,7 @@ const cards = buildCards({
  return {
  ...emptyDashboardModel(payload),
 contextRuntime: contextRuntimeFromBootPayload(payload),
+scopeSummary: scopeSummaryFromBootPayload(payload),
 cards,
 ...overviewSeries,
 ...usageDrainSeries,
@@ -373,11 +375,6 @@ function weeklyWindowKey(row: UsageRow, timestamp: number): string {
 
 function formatChartDate(timestamp: number): string {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(timestamp));
-}
-
-function summaryNumber(payload: DashboardBootPayload, key: string): number {
-  const value = Number(payload.summary?.[key] ?? 0);
-  return Number.isFinite(value) ? value : 0;
 }
 
 function contextRuntimeFromBootPayload(payload: DashboardBootPayload | null): ContextRuntime {

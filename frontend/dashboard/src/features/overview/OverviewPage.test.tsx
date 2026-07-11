@@ -21,6 +21,20 @@ afterEach(() => vi.unstubAllGlobals());
 describe('Overview focused evidence flow', () => {
   it('renders endpoint-ranked evidence and opens its supporting call', async () => {
     const openCall = vi.fn();
+    const model = {
+      ...fixtureModel,
+      scopeSummary: {
+        visibleCalls: 1_250,
+        inputTokens: 1_000_000,
+        cachedInputTokens: 800_000,
+        uncachedInputTokens: 200_000,
+        outputTokens: 100_000,
+        reasoningOutputTokens: 50_000,
+        totalTokens: 1_100_000,
+        estimatedCostUsd: 890,
+        usageCredits: 456.7,
+      },
+    };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const payload = String(input).startsWith('/api/summary')
         ? {
@@ -65,7 +79,7 @@ describe('Overview focused evidence flow', () => {
     render(
       <QueryClientProvider client={createDashboardQueryClient()}>
         <OverviewPage
-          model={fixtureModel}
+          model={model}
           contextRuntime={{ apiToken: 'local-token', contextApiEnabled: false, fileMode: false }}
           sourceRevision="revision-1"
           onRefresh={vi.fn()}
@@ -93,6 +107,9 @@ describe('Overview focused evidence flow', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'High context pressure is the clearest current signal' })).toBeInTheDocument());
     expect(screen.getByText('Focused endpoints')).toBeInTheDocument();
+    expect(screen.getByText('Calls in scope')).toBeInTheDocument();
+    expect(screen.getByText('1,250')).toBeInTheDocument();
+    expect(screen.getByText('8 evidence rows loaded')).toBeInTheDocument();
     expect(screen.getByText('1 call')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Usage constellation' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Usage constellation evidence' })).toBeInTheDocument();

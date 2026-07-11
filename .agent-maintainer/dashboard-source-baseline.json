@@ -12,8 +12,8 @@
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
-      "nonblank": 767,
-      "physical": 829
+      "nonblank": 765,
+      "physical": 826
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",

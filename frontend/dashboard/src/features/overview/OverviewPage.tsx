@@ -97,7 +97,11 @@ export function OverviewPage(props: OverviewPageProps) {
         </div>
       </section>
 
-      <OverviewMetrics metrics={viewModel.metrics} availableCalls={props.runtime.totalAvailableRows} />
+      <OverviewMetrics
+        metrics={viewModel.metrics}
+        loadedCalls={props.runtime.loadedRowCount}
+        availableCalls={props.runtime.totalAvailableRows}
+      />
 
       <div className={styles.analysisGrid}>
         <Visualization spec={viewModel.pulseSpec} height={280} />
