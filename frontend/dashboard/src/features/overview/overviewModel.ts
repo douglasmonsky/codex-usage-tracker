@@ -1,3 +1,4 @@
+import type { DashboardScopeSummary } from '../../api/dashboardDataScope';
 import type { CallRow, DashboardModel } from '../../api/types';
 import type {
   OverviewRecommendationRow,
@@ -28,6 +29,7 @@ export type OverviewFindingView = {
 };
 
 export type OverviewLoadedMetrics = {
+  basis: 'scope' | 'loaded';
   calls: number;
   totalTokens: number;
   cachedInputTokens: number;
@@ -56,7 +58,7 @@ export function buildOverviewViewModel(
   endpoints: OverviewEndpointBundle | undefined,
   historyScope: 'active' | 'all',
 ): OverviewViewModel {
-  const metrics = loadedMetrics(model.calls);
+  const metrics = scopeMetrics(model.scopeSummary) ?? loadedMetrics(model.calls);
   const findings = endpointFindings(endpoints?.recommendations.data) ?? fallbackFindings(model);
   const topFinding = findings[0];
   return {
@@ -148,9 +150,25 @@ function loadedMetrics(calls: CallRow[]): OverviewLoadedMetrics {
   );
   const inputTokens = totals.cachedInputTokens + totals.uncachedInputTokens;
   return {
+    basis: 'loaded',
     calls: calls.length,
     ...totals,
     cachePercent: inputTokens > 0 ? (totals.cachedInputTokens / inputTokens) * 100 : 0,
+  };
+}
+
+function scopeMetrics(summary: DashboardScopeSummary | undefined): OverviewLoadedMetrics | null {
+  if (!summary) return null;
+  return {
+    basis: 'scope',
+    calls: summary.visibleCalls,
+    totalTokens: summary.totalTokens,
+    cachedInputTokens: summary.cachedInputTokens,
+    uncachedInputTokens: summary.uncachedInputTokens,
+    outputTokens: summary.outputTokens,
+    reasoningOutputTokens: summary.reasoningOutputTokens,
+    cachePercent: summary.inputTokens > 0 ? (summary.cachedInputTokens / summary.inputTokens) * 100 : 0,
+    estimatedCredits: summary.usageCredits,
   };
 }
 
@@ -220,6 +238,9 @@ function tokenAccountingSpec(
   metrics: OverviewLoadedMetrics,
   historyScope: 'active' | 'all',
 ): FlowVisualizationSpecV1 {
+  const scopeMetricsAvailable = metrics.basis === 'scope';
+  const accountingLabel = scopeMetricsAvailable ? 'Scope accounting' : 'Loaded accounting';
+  const callsLabel = scopeMetricsAvailable ? 'calls in selected scope' : 'loaded calls';
   const generated = metrics.outputTokens + metrics.reasoningOutputTokens;
   const input = metrics.cachedInputTokens + metrics.uncachedInputTokens;
   const links = [
@@ -233,15 +254,17 @@ function tokenAccountingSpec(
   return {
     schema: visualizationSpecSchema,
     id: 'overview-token-accounting',
-    title: 'Loaded token accounting',
-    description: 'The four reported token categories across calls currently loaded in the dashboard.',
-    state: links.length ? { kind: 'ready' } : { kind: 'empty', message: 'No loaded token accounting is available.' },
-    scope: { label: `${calls.length.toLocaleString()} loaded calls`, rowCount: calls.length, historyScope },
+    title: scopeMetricsAvailable ? 'Token accounting in scope' : 'Loaded token accounting',
+    description: scopeMetricsAvailable
+      ? 'The four reported token categories across the complete selected data scope.'
+      : 'The four reported token categories across calls currently loaded in the dashboard.',
+    state: links.length ? { kind: 'ready' } : { kind: 'empty', message: 'No token accounting is available in this scope.' },
+    scope: { label: `${metrics.calls.toLocaleString()} ${callsLabel}`, rowCount: metrics.calls, historyScope },
     freshness: { generatedAt: latestTimestamp(calls.map(call => call.eventTimestamp)) || new Date().toISOString() },
     caveats: ['Categories mirror reported fields and may overlap; flow widths are accounting, not causality or billed cost.'],
     accessibility: { summary: tokenAccountingSummary(metrics) },
     table: {
-      caption: 'Loaded token accounting categories',
+      caption: `${accountingLabel} categories`,
       columns: [
         { field: 'source', label: 'From', type: 'text' },
         { field: 'target', label: 'To', type: 'text' },
@@ -255,7 +278,7 @@ function tokenAccountingSpec(
     encoding: { sourceLabel: 'Category', targetLabel: 'Reported type', valueLabel: 'Tokens', valueUnit: 'tokens' },
     data: {
       nodes: [
-        { id: 'account', label: 'Loaded accounting', color: '#2f6fed' },
+        { id: 'account', label: accountingLabel, color: '#2f6fed' },
         { id: 'input', label: 'Input accounting', color: '#2f6fed' },
         { id: 'generated', label: 'Generated accounting', color: '#7651c9' },
         { id: 'cached', label: 'Cached input', color: '#16866b' },
@@ -292,8 +315,9 @@ function usagePulseSummary(rows: VisualizationRecord[]): string {
 }
 
 function tokenAccountingSummary(metrics: OverviewLoadedMetrics): string {
-  if (!metrics.calls) return 'No loaded calls are available for token accounting.';
-  return `${metrics.calls} loaded calls include ${Math.round(metrics.cachePercent)} percent cached input reuse.`;
+  if (!metrics.calls) return 'No calls are available for token accounting.';
+  const callsLabel = metrics.basis === 'scope' ? 'calls in the selected scope' : 'loaded calls';
+  return `${metrics.calls} ${callsLabel} include ${Math.round(metrics.cachePercent)} percent cached input reuse.`;
 }
 
 function supportLabel(count: number): string {

@@ -105,8 +105,9 @@ describe('dashboard API model builder', () => {
     );
   });
 
-  it('uses loaded calls and call-level token fields for overview cards', () => {
+  it('keeps loaded-row cards while preserving the complete scope summary', () => {
     const payload: DashboardBootPayload = {
+      load_window: 'all',
       loaded_row_count: 2,
       total_available_rows: 500,
       summary: {
@@ -142,6 +143,12 @@ describe('dashboard API model builder', () => {
     };
 
     const model = modelFromBootPayload(payload);
+    expect(model.scopeSummary).toEqual(
+      expect.objectContaining({
+        visibleCalls: 500,
+        totalTokens: 999_999,
+      }),
+    );
     expect(model.cards.find(card => card.label === 'Total Calls')).toEqual(
       expect.objectContaining({
         value: '2',
@@ -159,6 +166,7 @@ describe('dashboard API model builder', () => {
         ],
       }),
     );
+    expect(modelFromBootPayload({ ...payload, load_window: 'rows' }).scopeSummary).toBeUndefined();
   });
 
   it('builds usage drain series from loaded rows', () => {

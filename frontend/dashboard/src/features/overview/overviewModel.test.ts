@@ -59,4 +59,34 @@ describe('Overview view model', () => {
     expect(result.tokenFlowSpec.caveats?.[0]).toContain('not causality');
     expect(result.tokenFlowSpec.data.links.length).toBeGreaterThan(0);
   });
+
+  it('uses complete scope totals instead of the bounded evidence rows', () => {
+    const result = buildOverviewViewModel({
+      ...fixtureModel,
+      scopeSummary: {
+        visibleCalls: 12_500,
+        inputTokens: 1_000_000,
+        cachedInputTokens: 800_000,
+        uncachedInputTokens: 200_000,
+        outputTokens: 100_000,
+        reasoningOutputTokens: 50_000,
+        totalTokens: 1_100_000,
+        estimatedCostUsd: 890,
+        usageCredits: 456.7,
+      },
+    }, undefined, 'active');
+
+    expect(result.metrics).toMatchObject({
+      basis: 'scope',
+      calls: 12_500,
+      totalTokens: 1_100_000,
+      cachePercent: 80,
+      estimatedCredits: 456.7,
+    });
+    expect(result.tokenFlowSpec.title).toBe('Token accounting in scope');
+    expect(result.tokenFlowSpec.scope).toMatchObject({
+      label: '12,500 calls in selected scope',
+      rowCount: 12_500,
+    });
+  });
 });

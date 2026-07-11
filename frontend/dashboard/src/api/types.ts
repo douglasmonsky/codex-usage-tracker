@@ -1,4 +1,4 @@
-import type { DashboardDataScope } from './dashboardDataScope';
+import type { DashboardDataScope, DashboardModelScope } from './dashboardDataScope';
 
 export type UsageRow = {
   id?: string;
@@ -414,7 +414,7 @@ export type ReportSummary = {
   owner: string;
 };
 
-export type DashboardModel = {
+export type DashboardModel = DashboardModelScope & {
   contextRuntime: ContextRuntime;
   cards: MetricCard[];
   tokenSeries: Series[];
