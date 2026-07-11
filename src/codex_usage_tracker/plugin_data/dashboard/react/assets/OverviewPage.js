@@ -1,4 +1,4 @@
-import{j as t,r as j}from"./dashboard-react.js";import{u as G}from"./useQuery.js";import{b as k,a as I,B as v,M as _,I as S}from"./Primitives.js";import{q as K,r as U}from"./filtering.js";import{v as F,V as O}from"./Visualization.js";import{A as L,a as Q}from"./arrow-up-right.js";import{k as z,a as y,f as b,p as E,u as V,D as q,b as J,h as W,r as X,i as Y,j as Z,R as ee}from"./App.js";import{G as ne}from"./gauge.js";import{u as te}from"./index3.js";import"./triangle-alert.js";import"./dashboardRouter.js";import"./router.js";/**
+import{j as t,r as j}from"./dashboard-react.js";import{u as G}from"./useQuery.js";import{b as k,a as I,B as v,M as _,I as S}from"./Primitives.js";import{q as K,r as U}from"./filtering.js";import{v as F,V as O}from"./Visualization.js";import{A as L,a as Q}from"./arrow-up-right.js";import{c as z,a as y,f as b,p as E,u as V,D as q,b as J,i as W,r as X,j as Y,k as Z,R as ee}from"./App.js";import{G as ne}from"./gauge.js";import{u as te}from"./index3.js";import"./triangle-alert.js";import"./dashboardRouter.js";import"./router.js";/**
  * @license lucide-react v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.

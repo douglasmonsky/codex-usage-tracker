@@ -123,7 +123,7 @@ describe('React dashboard threads workspace', () => {
 
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', { name: /Export calls/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Export thread calls/i }));
   expect(clickSpy).toHaveBeenCalledTimes(1);
   expect(screen.getAllByText(/Exported \d+ calls/).length).toBeGreaterThan(0);
 });
@@ -535,7 +535,7 @@ it('clears thread filters and selected thread URL state', () => {
   expect(params.get('thread_q')).toBe('thread-0e16');
   expect(params.get('risk')).toBe('Low');
 
-  fireEvent.click(screen.getByRole('button', { name: /Clear thread filters/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Reset thread view/i }));
 
   expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveValue('');
   expect(screen.getByDisplayValue('All risks')).toBeInTheDocument();

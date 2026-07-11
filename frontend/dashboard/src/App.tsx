@@ -7,6 +7,7 @@ import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } fro
 import { ShellI18nProvider } from './app/i18nContext';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
 import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
+import { RowLimitControl } from './app/RowLimitControl';
 import { ShellGlobalFilters } from './app/ShellGlobalFilters';
 import {
   finiteRowLimitFallback,
@@ -14,12 +15,9 @@ import {
   nextRowLoadLimit,
   normalizeRowLimit,
   readDataScopePreference,
-  rowLimitMin,
   rowLimitNoCap,
   rowLimitSliderMaxValue,
-  rowLimitStep,
   rowLimitSummaryLabel,
-  rowLimitValueLabel,
   rowLoadStatusLabel,
   storeDataScopePreference,
 } from './app/rowLimit';
@@ -615,6 +613,7 @@ placeholder={shellI18n.t('filter.search_placeholder', 'Search calls, threads, mo
 />
 </label>
 <div className="topbar-actions">
+<div className="topbar-scope-controls">
 {shellI18n.languages.length > 1 ? (
 <label className="topbar-select">
 <span>{shellI18n.t('language.label', 'Language')}</span>
@@ -640,106 +639,34 @@ aria-label="History scope"
 </select>
 <small>{historyScopeDetail}</small>
           </label>
-            <div className="row-limit-control" aria-label="Row limit control">
-              <div className="row-limit-heading">
-<span>Rows loaded</span>
-<strong>{rowLimitValueLabel(pendingLoadLimit)}</strong>
-</div>
-<div className={`row-limit-status${refreshing ? ' is-loading' : ''}`} role="status" aria-live="polite">
-{refreshing ? (
-                <>
-                  <span className="row-loading-dot" aria-hidden="true" />
-                  <span>{refreshProgressText}</span>
-                </>
-) : (
-<>
-<span>{rowLoadModeLabel}</span>
-<span>{rowLoadStatus}</span>
-</>
-)}
-</div>
-<div className="row-limit-range-meta">
-                <span>Quick range</span>
-              <span>{pendingLoadLimitUncapped ? 'No cap enabled' : 'No fixed max'}</span>
-              </div>
-              <input
-                aria-label="Rows to load slider"
-                aria-valuetext={
-                  pendingLoadLimitUncapped
-                ? 'No row cap; move slider or type a count to restore a finite limit'
-                : `${finitePendingLoadLimit.toLocaleString()} rows; slider expands as needed, or type any count`
-                }
-                type="range"
-                min={rowLimitMin}
-                max={rowLimitSliderMax}
-                step={rowLimitStep}
-                value={rowLimitSliderValue}
-onChange={event => handleLoadLimitSliderChange(event.target.value)}
-disabled={refreshing || !canUseLiveApi}
-/>
-              <div className="row-limit-entry">
-                <input
-                  aria-label="Rows to load"
-                type="number"
-                min={rowLimitNoCap}
-                step={rowLimitStep}
-                value={pendingLoadLimit}
-                onChange={event => handleLoadLimitDraftChange(event.target.value)}
-                aria-describedby="row-limit-entry-help"
-                disabled={refreshing || !canUseLiveApi}
-              />
-                <label className="row-limit-no-cap">
-                  <input
-                    aria-label="No row cap"
-                    type="checkbox"
-                    checked={pendingLoadLimitUncapped}
-                    onChange={event => handleLoadLimitNoCapChange(event.target.checked)}
-                    disabled={refreshing || !canUseLiveApi}
-                  />
-                <span>No cap</span>
-              </label>
-            <button type="button" onClick={applyLoadLimitChange} disabled={refreshing || !canUseLiveApi || !rowLimitChanged}>
-              {pendingLoadLimitUncapped ? 'Load all' : shellI18n.t('nav.load', 'Load')}
-            </button>
           </div>
-          {refreshing ? (
-            <div className="row-load-progress" aria-label="Row loading progress">
-              <div
-                className="row-load-progress-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={refreshProgressPercent ?? undefined}
-              >
-                <span style={{ width: `${refreshProgressPercent ?? 8}%` }} />
-              </div>
-              <span>
-                {refreshProgressPercent === null ? 'Preparing...' : `${Math.round(refreshProgressPercent)}% loaded`}
-                <button
-                  className="icon-button"
-                  type="button"
-                  onClick={() => void cancelDashboardRefresh()}
-                  aria-label="Cancel refresh"
-                  title="Cancel refresh"
-                >
-                  <X size={13} />
-                </button>
-              </span>
-            </div>
-          ) : null}
-          <button className="row-limit-load-all" type="button" onClick={loadAllRows} disabled={!canLoadAllRows}>
-            Load all rows
-          </button>
-<p id="row-limit-entry-help" className="row-limit-hint">
-Use Load all rows for the full history, or type any finite row count.
-</p>
-              <div className="row-limit-load-more">
-                <span>{rowLoadStatus}</span>
-<button type="button" onClick={loadMoreRows} disabled={refreshing || !canUseLiveApi || !hasMoreRows}>
-              {shellI18n.t('button.load_more', 'Load more')}
-                </button>
-              </div>
-            </div>
+          <RowLimitControl
+            canLoadAllRows={canLoadAllRows}
+            canUseLiveApi={canUseLiveApi}
+            finitePendingLoadLimit={finitePendingLoadLimit}
+            hasMoreRows={hasMoreRows}
+            loadLabel={shellI18n.t('nav.load', 'Load')}
+            loadMoreLabel={shellI18n.t('button.load_more', 'Load more')}
+            pendingLoadLimit={pendingLoadLimit}
+            pendingLoadLimitUncapped={pendingLoadLimitUncapped}
+            refreshProgressPercent={refreshProgressPercent}
+            refreshProgressText={refreshProgressText}
+            refreshing={refreshing}
+            rowLimitChanged={rowLimitChanged}
+            rowLimitSliderMax={rowLimitSliderMax}
+            rowLimitSliderValue={rowLimitSliderValue}
+            rowLoadModeLabel={rowLoadModeLabel}
+            rowLoadStatus={rowLoadStatus}
+            onApply={applyLoadLimitChange}
+            onCancel={cancelDashboardRefresh}
+            onDraftChange={handleLoadLimitDraftChange}
+            onLoadAll={loadAllRows}
+            onLoadMore={loadMoreRows}
+            onNoCapChange={handleLoadLimitNoCapChange}
+            onSliderChange={handleLoadLimitSliderChange}
+          />
+        <div className="topbar-meta">
+          <div className="topbar-statuses">
         {activePreset ? (
           <button className="toolbar-button" type="button" onClick={clearInvestigationPreset}>
             <X size={15} />
@@ -761,6 +688,8 @@ Use Load all rows for the full history, or type any finite row count.
 />
 <span>{shellI18n.t('nav.live', 'Live')}</span>
 </label>
+          </div>
+          <div className="topbar-icon-actions">
 <button className="icon-button" type="button" onClick={copyCurrentViewLink} aria-label={shellI18n.t('button.copy_link', 'Copy link')}>
 <Copy size={17} />
 </button>
@@ -771,6 +700,8 @@ Use Load all rows for the full history, or type any finite row count.
 <RefreshCw size={17} />
 </button>
           </div>
+        </div>
+      </div>
       </header>
       <DashboardRouteView
         key={navigationRevision}

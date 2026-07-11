@@ -1,4 +1,4 @@
-import{r as D,j as e}from"./dashboard-react.js";import{u as X,f as h,g as Y,a as Z}from"./index2.js";import{k as w,L as _}from"./App.js";/**
+import{r as D,j as e}from"./dashboard-react.js";import{u as X,f as h,g as Y,a as Z}from"./index2.js";import{c as w,L as _}from"./App.js";/**
  * @license lucide-react v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.
