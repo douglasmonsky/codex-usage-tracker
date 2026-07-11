@@ -19,6 +19,9 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_RATE_CARD_PATH,
 )
 from codex_usage_tracker.core.projects import validate_privacy_mode
+from codex_usage_tracker.reports.agentic_dogfood_markdown import (
+    render_agentic_dogfood_markdown,
+)
 from codex_usage_tracker.reports.api import (
     build_action_brief_report,
     build_agentic_investigation_report,
@@ -794,50 +797,3 @@ def _tool_names(value: Any) -> list[str]:
             if isinstance(tool, str):
                 names.append(tool)
     return names
-
-
-def render_agentic_dogfood_markdown(payload: dict[str, Any]) -> str:
-    """Render a compact Markdown artifact from a dogfood payload."""
-
-    lines = [
-        "# Agentic Dogfood Summary",
-        "",
-        f"Generated: {payload.get('generated_at')}",
-        f"Privacy mode: `{payload.get('privacy_mode')}`",
-        f"Include archived: `{payload.get('filters', {}).get('include_archived')}`",
-        "",
-        "## Family Checks",
-        "",
-        f"- Old hypotheses: `{payload['family_checks']['old_passed']}`",
-        f"- New hypotheses: `{payload['family_checks']['new_passed']}`",
-        "",
-        "## Old Hypotheses",
-        "",
-        *_hypothesis_lines(payload.get("old_hypotheses", [])),
-        "",
-        "## New Hypotheses",
-        "",
-        *_hypothesis_lines(payload.get("new_hypotheses", [])),
-        "",
-        "## Direct Evidence",
-        "",
-        f"- Large low-output candidates: {payload['summary'].get('large_low_output_candidates')}",
-        f"- Shell churn candidates: {payload['summary'].get('shell_churn_candidates')}",
-        f"- Repeated file candidates: {payload['summary'].get('repeated_file_candidates')}",
-        (
-            "- Allowance evidence grade: "
-            f"{payload['summary'].get('allowance_primary_evidence_grade')}"
-        ),
-        "",
-        "## Privacy Checks",
-        "",
-        f"- Passed: `{payload['privacy_checks'].get('passed')}`",
-        f"- Forbidden marker hits: {payload['privacy_checks'].get('forbidden_marker_hits')}",
-    ]
-    return "\n".join(lines) + "\n"
-
-
-def _hypothesis_lines(rows: list[dict[str, Any]]) -> list[str]:
-    return [
-        f"- **{row.get('family')}**: {row.get('status')} ({row.get('confidence')})" for row in rows
-    ]
