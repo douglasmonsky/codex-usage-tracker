@@ -131,7 +131,17 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         />
       );
     case 'investigator':
-      return <InvestigatorPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
+      return (
+        <InvestigatorPage
+          model={model}
+          contextRuntime={contextRuntime}
+          includeArchived={historyScope === 'all'}
+          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          onOpenInvestigator={openCallInvestigator}
+          onCopyCallLink={copyCallInvestigatorLink}
+          onNavigateView={navigateView}
+        />
+      );
     case 'calls':
       return (
         <ExploreRoutePage

@@ -185,12 +185,10 @@ it('syncs investigator selected finding to the URL', () => {
 
   render(<App />);
 
-  const findingCard = screen.getByText('Cache Misses (Large Inputs)').closest('article');
-  expect(findingCard).not.toBeNull();
-  fireEvent.click(within(findingCard as HTMLElement).getByRole('button', { name: /Inspect/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Cache Misses \(Large Inputs\)/i }));
 
-  expect(new URLSearchParams(window.location.search).get('finding')).toBe('2');
-  expect(screen.getByText('Selected Cache Misses (Large Inputs)')).toBeInTheDocument();
+  expect(new URLSearchParams(window.location.search).get('finding')).toBe('cache-misses-large-inputs-2');
+  expect(screen.getByRole('heading', { name: 'Cache Misses (Large Inputs)' })).toBeInTheDocument();
 });
 
 it('reports empty Calls shell exports without duplicated row wording', async () => {

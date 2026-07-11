@@ -123,7 +123,7 @@ function fallbackFindings(model: DashboardModel): OverviewFindingView[] {
     id: `legacy-${finding.rank}`,
     title: finding.title,
     why: finding.summary,
-    nextAction: 'Open the Investigator to review the loaded aggregate evidence.',
+    nextAction: 'Review the loaded aggregate evidence in Investigate.',
     severity: finding.severity === 'High' ? 'high' : finding.severity === 'Medium' ? 'medium' : 'review',
     evidenceGrade: 'Limited',
     supportCount: 1,

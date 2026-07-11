@@ -23,10 +23,10 @@ totals and row-level navigation.
 | Load more / load all | Both controls remain adjacent to the evidence list and preserve shell loading state | `App.overview.test.tsx` |
 | CSV export | Shell export compatibility and a scoped Recent Calls export remain | `currentViewExport.ts` and Overview component |
 | Refresh | Shell refresh remains available; desktop Overview also exposes a direct refresh action | Overview component |
-| Investigation routes | Direct actions reach Investigator, Limits, Threads, and Call Investigator | Overview Playwright and component tests |
+| Investigation routes | Direct actions reach Investigate, Limits, Threads, and Call Investigator | Overview Playwright and component tests |
 | Static/live behavior | Static snapshots render immediately; live focused endpoints show loading, partial, and fallback states without hiding loaded evidence | Overview Playwright and query tests |
 
 The old Overview-only estimated-cost chart is intentionally not duplicated.
-Cost remains available in Calls, Threads, Investigator, Reports, and exports;
+Cost remains available in Calls, Threads, Investigate, Reports, and exports;
 the Overview now reserves chart space for usage movement and decision-changing
 evidence.

@@ -35,7 +35,7 @@ export function OverviewFindingRail({ findings, onOpenFinding, onNavigateView }:
         </div>
       ) : <p className={styles.empty}>No ranked recommendation is present in the current scope.</p>}
       <div className={styles.railActions}>
-        <Button onClick={() => onNavigateView('investigator')}><ListTree /> Open Investigator</Button>
+        <Button onClick={() => onNavigateView('investigator')}><ListTree /> Investigate usage</Button>
         <Button onClick={() => onNavigateView('usage-drain')}><Gauge /> Review limits</Button>
         <Button variant="ghost" onClick={() => onNavigateView('threads')}>Review threads <ArrowRight /></Button>
       </div>

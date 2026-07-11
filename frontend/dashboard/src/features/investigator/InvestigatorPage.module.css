@@ -1,0 +1,316 @@
+.page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pageHeader,
+.panelHeader,
+.statusRow,
+.headerActions {
+  align-items: center;
+  display: flex;
+}
+
+.pageHeader {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.pageHeader h1,
+.panelHeader h2 {
+  color: var(--ink-strong, var(--dashboard-text));
+  margin: 0;
+}
+
+.pageHeader h1 {
+  font-size: 28px;
+  line-height: 1.12;
+}
+
+.pageHeader p:not(.eyebrow),
+.panelHeader p {
+  color: var(--ink-muted, var(--dashboard-muted));
+  margin: 5px 0 0;
+}
+
+.eyebrow {
+  color: var(--signal-context, var(--dashboard-accent-strong));
+  font-size: 11px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.headerActions {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.statusRow {
+  background: var(--surface-subtle);
+  border-block: 1px solid var(--line-subtle);
+  color: var(--ink-muted);
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 10px;
+}
+
+.statusRow > span:last-child {
+  margin-left: auto;
+  min-width: 180px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.analysisGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.75fr);
+  min-width: 0;
+}
+
+.findingsPanel,
+.recommendationPanel,
+.fingerprintPanel {
+  min-width: 0;
+}
+
+.panelHeader {
+  align-items: flex-start;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.panelHeader h2 {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.panelHeader p {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.findingList {
+  border-block: 1px solid var(--line-subtle);
+  display: grid;
+  max-height: 440px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.findingButton {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line-subtle);
+  color: var(--ink-strong);
+  cursor: pointer;
+  display: grid;
+  gap: 11px;
+  grid-template-columns: 4px minmax(0, 1fr) auto 18px;
+  min-height: 62px;
+  padding: 9px 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.findingButton:last-child {
+  border-bottom: 0;
+}
+
+.findingButton:hover,
+.findingButton[data-selected='true'] {
+  background: var(--surface-subtle);
+}
+
+.findingButton[data-selected='true'] {
+  box-shadow: inset 2px 0 var(--signal-selection);
+}
+
+.findingButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.findingButton > svg {
+  color: var(--ink-muted);
+  height: 16px;
+  width: 16px;
+}
+
+.findingSignal {
+  align-self: stretch;
+  background: var(--line-strong);
+  border-radius: 2px;
+  display: block;
+  min-height: 32px;
+}
+
+.findingSignal[data-tone='risk'] {
+  background: var(--signal-risk);
+}
+
+.findingSignal[data-tone='caution'] {
+  background: var(--signal-caution);
+}
+
+.findingSignal[data-tone='positive'] {
+  background: var(--signal-positive);
+}
+
+.findingSignal[data-tone='context'] {
+  background: var(--signal-context);
+}
+
+.findingCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.findingCopy strong,
+.findingCopy span,
+.findingEvidence {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.findingCopy strong {
+  font-size: 13px;
+}
+
+.findingCopy span,
+.findingEvidence {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.findingEvidence {
+  font-variant-numeric: tabular-nums;
+}
+
+.recommendationPanel {
+  align-content: start;
+  display: grid;
+}
+
+.recommendation {
+  color: var(--ink-strong);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 4px 0 18px;
+}
+
+.methodList {
+  display: grid;
+  gap: 0;
+  margin: 0 0 18px;
+}
+
+.methodList > div {
+  border-top: 1px solid var(--line-subtle);
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+.methodList dt {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.methodList dd {
+  color: var(--ink-strong);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.recommendationPanel > button {
+  justify-self: start;
+  margin-top: auto;
+}
+
+.fingerprintPanel {
+  padding: 10px 12px 12px;
+}
+
+.ledgerSection {
+  min-width: 0;
+}
+
+.ledgerSection > .panelHeader {
+  margin-bottom: 8px;
+  padding-inline: 2px;
+}
+
+@media (max-width: 1180px) {
+  .analysisGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .findingList {
+    max-height: 360px;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    gap: 12px;
+  }
+
+  .pageHeader,
+  .panelHeader {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .pageHeader {
+    gap: 12px;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+  }
+
+  .headerActions > button {
+    flex: 1;
+  }
+
+  .statusRow {
+    align-items: flex-start;
+  }
+
+  .statusRow > span:last-child {
+    flex-basis: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .findingButton {
+    grid-template-columns: 4px minmax(0, 1fr) 16px;
+  }
+
+  .findingEvidence {
+    display: none;
+  }
+
+}
+
+@media (max-width: 430px) {
+  .headerActions > button {
+    width: 100%;
+  }
+}

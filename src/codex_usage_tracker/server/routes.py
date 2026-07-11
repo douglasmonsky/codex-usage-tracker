@@ -21,6 +21,13 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
         "/api/allowance/diagnostics": "_handle_allowance_diagnostics",
         "/api/allowance/export": "_handle_allowance_export",
         "/api/reports/pack": "_handle_reports_pack",
+        "/api/investigations/agentic": "_handle_investigation_agentic",
+        "/api/investigations/repeated-files": (
+            "_handle_investigation_repeated_file_rediscovery"
+        ),
+        "/api/investigations/shell-churn": "_handle_investigation_shell_churn",
+        "/api/investigations/large-low-output": "_handle_investigation_large_low_output",
+        "/api/investigations/walk": "_handle_investigation_walk",
         "/api/diagnostics/summary": "_handle_diagnostics_summary",
         "/api/diagnostics/facts": "_handle_diagnostics_facts",
         "/api/diagnostics/fact-calls": "_handle_diagnostics_fact_calls",

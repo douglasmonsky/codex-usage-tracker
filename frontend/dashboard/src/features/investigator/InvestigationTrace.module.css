@@ -1,0 +1,134 @@
+.hypothesisPanel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hypothesisControls {
+  align-items: stretch;
+  display: flex;
+  gap: 8px;
+}
+
+.hypothesisControls label {
+  align-items: center;
+  background: var(--surface-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-height: 38px;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.hypothesisControls label:focus-within {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
+}
+
+.hypothesisControls label svg {
+  color: var(--signal-context);
+  flex: none;
+  height: 17px;
+  width: 17px;
+}
+
+.hypothesisControls input {
+  background: transparent;
+  border: 0;
+  color: var(--ink-strong);
+  font: inherit;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.traceResults {
+  border-top: 1px solid var(--line-subtle);
+  display: grid;
+  margin-top: 4px;
+}
+
+.traceResults article {
+  align-items: center;
+  border-bottom: 1px solid var(--line-subtle);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 46px;
+  padding: 7px 2px;
+}
+
+.traceResults strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.traceResults article > span:last-child {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.errorState,
+.emptyState {
+  color: var(--ink-muted);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.errorState {
+  color: var(--signal-risk-ink);
+}
+
+.caveats {
+  border-block: 1px solid var(--line-subtle);
+  color: var(--ink-muted);
+  font-size: 12px;
+  padding: 10px 2px;
+}
+
+.caveats summary {
+  align-items: center;
+  color: var(--ink-strong);
+  cursor: pointer;
+  display: flex;
+  font-weight: 700;
+  gap: 7px;
+}
+
+.caveats summary svg {
+  height: 16px;
+  width: 16px;
+}
+
+.caveats ul {
+  line-height: 1.5;
+  margin: 10px 0 0;
+  padding-left: 22px;
+}
+
+@media (max-width: 760px) {
+  .hypothesisControls {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .traceResults article {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .traceResults article > span:first-child {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 430px) {
+  .hypothesisControls > button {
+    width: 100%;
+  }
+}

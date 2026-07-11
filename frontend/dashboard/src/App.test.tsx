@@ -23,7 +23,7 @@ expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocu
 it('opens the investigator workbench from overview findings', () => {
 render(<App />);
 fireEvent.click(screen.getByRole('button', { name: 'Inspect evidence' }));
-expect(screen.getByRole('heading', { name: 'Investigator Workbench' })).toBeInTheDocument();
+expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=investigator');
 expect(window.location.search).toContain('finding=1');
 });

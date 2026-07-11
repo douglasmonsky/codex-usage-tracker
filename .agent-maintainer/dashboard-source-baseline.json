@@ -40,11 +40,6 @@
       "nonblank": 413,
       "physical": 445
     },
-    "frontend/dashboard/src/features/investigator/InvestigatorPage.tsx": {
-      "group": "source",
-      "nonblank": 410,
-      "physical": 444
-    },
     "frontend/dashboard/src/features/reports/ReportsPage.tsx": {
       "group": "source",
       "nonblank": 572,
