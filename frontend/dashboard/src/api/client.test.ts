@@ -232,22 +232,28 @@ describe('dashboard API model builder', () => {
 });
 
 describe('dashboard live usage client', () => {
-  it('loads time windows as bounded evidence instead of materializing every matching row', async () => {
+  it('loads uncapped time windows in pages so every matching row is available', async () => {
     const progress = vi.fn();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      expect(url).toContain('limit=500');
+      expect(url).toContain('limit=10000');
       expect(url).toContain('load_window=week');
       expect(url).toContain('since=2026-07-04T10%3A15%3A00.000Z');
+      const offset = Number(new URL(url, 'http://localhost').searchParams.get('offset') ?? 0);
       return jsonResponse({
         api_token: 'token',
         load_window: 'week',
         since: '2026-07-04T10:15:00.000Z',
-        loaded_row_count: 500,
-        total_available_rows: 86_166,
-        limit: 500,
-        has_more: true,
-        rows: [{ record_id: 'recent-week-row', total_tokens: 2 }],
+        loaded_row_count: offset ? 1 : 2,
+        total_available_rows: 3,
+        limit: 10_000,
+        has_more: offset === 0,
+        rows: offset
+          ? [{ record_id: 'recent-week-row-3', total_tokens: 3 }]
+          : [
+              { record_id: 'recent-week-row-1', total_tokens: 1 },
+              { record_id: 'recent-week-row-2', total_tokens: 2 },
+            ],
       });
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -256,7 +262,7 @@ describe('dashboard live usage client', () => {
       { api_token: 'token', loaded_row_count: 500, rows: [] },
       {
         refresh: false,
-        limit: 500,
+        limit: 0,
         loadWindow: 'week',
         since: '2026-07-04T10:15:00.000Z',
         onProgress: progress,
@@ -264,9 +270,11 @@ describe('dashboard live usage client', () => {
     );
 
     expect(payload.load_window).toBe('week');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(payload.rows).toHaveLength(3);
+    expect(payload.limit).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(progress).toHaveBeenCalledWith(
-      expect.objectContaining({ phase: 'loading_rows', completed: 500, total: 86_166, percent: 100 }),
+      expect.objectContaining({ phase: 'loading_rows', completed: 3, total: 3, percent: 100 }),
     );
   });
 

@@ -236,8 +236,7 @@ scrollbar-gutter: auto;
     white-space: nowrap;
   }
 
-  .secondary-block,
-  .status-card {
+  .secondary-block {
     display: none;
   }
 

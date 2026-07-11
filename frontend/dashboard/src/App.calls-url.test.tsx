@@ -179,13 +179,12 @@ expect(screen.getByRole('button', { name: /Convocatoria anterior/i })).toBeInThe
     expect(screen.getByText('Sin límite de caracteres')).toBeInTheDocument();
   });
 
-it('opens overview findings and recent calls without homepage presets', () => {
+it('opens Investigate and detailed overview calls without homepage presets', () => {
   render(<App />);
   expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Inspect evidence' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Investigate' }));
   expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
   expect(window.location.search).toContain('view=investigator');
-  expect(window.location.search).toContain('finding=1');
   fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
   fireEvent.click(screen.getByRole('button', { name: 'Open investigator for thread-1a2b3c codex-1' }));
   expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();

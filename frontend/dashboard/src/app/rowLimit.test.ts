@@ -50,6 +50,12 @@ describe('row limit helpers', () => {
       limit: null,
       since: null,
     });
+    expect(dataScopeFromCompatibilityLimit(500, 'active', null, 'all')).toEqual({
+      historyScope: 'active',
+      loadWindow: 'all',
+      limit: null,
+      since: null,
+    });
     expect(requestLimitForDataScope({ historyScope: 'active', loadWindow: 'all', limit: null, since: null })).toBe(rowLimitNoCap);
     expect(requestLimitForDataScope({ historyScope: 'active', loadWindow: 'rows', limit: 37, since: null })).toBe(37);
 

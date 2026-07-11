@@ -14,7 +14,7 @@ import {
   type VisualizationRecord,
 } from '../../visualization';
 
-export type OverviewFindingView = {
+type OverviewFindingView = {
   id: string;
   title: string;
   why: string;

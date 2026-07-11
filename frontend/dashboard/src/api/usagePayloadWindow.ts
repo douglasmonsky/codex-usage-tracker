@@ -38,6 +38,9 @@ export async function requestScopedWindowPayload(
   options: UsagePayloadRequest,
   requestPage: UsagePageRequester,
 ): Promise<DashboardBootPayload> {
+  if (options.limit === 0) {
+    return loadAllUsagePayloadPaged(currentPayload, options, requestPage);
+  }
   const payload = await requestPage(currentPayload, { ...options, limit: scopedWindowEvidenceLimit });
   options.onProgress?.({
     status: 'completed',

@@ -93,6 +93,60 @@ export function ThreadInspector({
   return (
     <aside className="side-panel">
       <Panel title="Selected Thread" subtitle={selected.name}>
+        <div className="thread-call-list">
+          <div className="section-heading compact">
+            <h3>Thread Calls</h3>
+            <span>
+              {sortedCalls.length
+                ? `${visibleCalls.length} of ${sortedCalls.length} loaded`
+                : 'No loaded calls'}
+            </span>
+          </div>
+          {sortedCalls.length ? (
+            <>
+              <ThreadCallControls
+                callSort={callSort}
+                callSortDirection={callSortDirection}
+                onCallSortChange={onCallSortChange}
+                onCallSortDirectionChange={onCallSortDirectionChange}
+              />
+              <ol className="thread-mini-timeline">
+                {visibleCalls.map(call => (
+                  <ThreadCallRow
+                    key={call.id}
+                    call={call}
+                    onOpenInvestigator={onOpenInvestigator}
+                    onCopyCallLink={onCopyCallLink}
+                  />
+                ))}
+              </ol>
+              <div className="thread-call-pager">
+                <button
+                  className="toolbar-button"
+                  type="button"
+                  onClick={() => onVisibleCallCountChange(
+                    current => Math.min(current + threadCallPageSize, sortedCalls.length),
+                  )}
+                  disabled={!hiddenCallCount}
+                >
+                  Show {formatNumber(nextThreadCallBatchCount || threadCallPageSize)} more calls
+                </button>
+                {visibleCallCount > threadCallPageSize ? (
+                  <button
+                    className="toolbar-button"
+                    type="button"
+                    onClick={() => onVisibleCallCountChange(threadCallPageSize)}
+                  >
+                    Show first {threadCallPageSize}
+                  </button>
+                ) : null}
+                <span>{hiddenCallCount ? `${hiddenCallCount} more available` : 'All loaded calls visible'}</span>
+              </div>
+            </>
+          ) : (
+            <p className="empty-state">No loaded aggregate call rows belong to this thread.</p>
+          )}
+        </div>
         <div className="detail-stat-grid vertical">
           <span><strong>{selected.turns}</strong>Turns visible</span>
           <span><strong>{money(selected.cost)}</strong>Estimated cost</span>
@@ -212,60 +266,6 @@ export function ThreadInspector({
             <span><strong>{selected.modelSummary}</strong>Model mix</span>
             <span><strong>{selected.effortSummary}</strong>Effort mix</span>
           </div>
-        </div>
-        <div className="thread-call-list">
-          <div className="section-heading compact">
-            <h3>Thread Calls</h3>
-            <span>
-              {sortedCalls.length
-                ? `${visibleCalls.length} of ${sortedCalls.length} loaded`
-                : 'No loaded calls'}
-            </span>
-          </div>
-          {sortedCalls.length ? (
-            <>
-              <ThreadCallControls
-                callSort={callSort}
-                callSortDirection={callSortDirection}
-                onCallSortChange={onCallSortChange}
-                onCallSortDirectionChange={onCallSortDirectionChange}
-              />
-              <ol className="thread-mini-timeline">
-                {visibleCalls.map(call => (
-                  <ThreadCallRow
-                    key={call.id}
-                    call={call}
-                    onOpenInvestigator={onOpenInvestigator}
-                    onCopyCallLink={onCopyCallLink}
-                  />
-                ))}
-              </ol>
-              <div className="thread-call-pager">
-                <button
-                  className="toolbar-button"
-                  type="button"
-                  onClick={() => onVisibleCallCountChange(
-                    current => Math.min(current + threadCallPageSize, sortedCalls.length),
-                  )}
-                  disabled={!hiddenCallCount}
-                >
-                  Show {formatNumber(nextThreadCallBatchCount || threadCallPageSize)} more calls
-                </button>
-                {visibleCallCount > threadCallPageSize ? (
-                  <button
-                    className="toolbar-button"
-                    type="button"
-                    onClick={() => onVisibleCallCountChange(threadCallPageSize)}
-                  >
-                    Show first {threadCallPageSize}
-                  </button>
-                ) : null}
-                <span>{hiddenCallCount ? `${hiddenCallCount} more available` : 'All loaded calls visible'}</span>
-              </div>
-            </>
-          ) : (
-            <p className="empty-state">No loaded aggregate call rows belong to this thread.</p>
-          )}
         </div>
       </Panel>
     </aside>

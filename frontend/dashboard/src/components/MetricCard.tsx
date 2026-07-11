@@ -4,7 +4,9 @@ import type { MetricCard as MetricCardModel } from '../api/types';
 
 const iconByLabel: Record<string, LucideIcon> = {
   'Cache Hit Rate': Database,
+  'Cache Reuse': Database,
   'Estimated Cost': CircleDollarSign,
+  'Estimated Credits': CircleDollarSign,
   'Total Calls': PhoneCall,
   'Total Tokens': Activity,
   'Usage Remaining': Gauge,

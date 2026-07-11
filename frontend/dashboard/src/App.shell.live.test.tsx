@@ -65,7 +65,7 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   expect(await screen.findByText('real-live-thread')).toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=10000');
   expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
 });
@@ -132,7 +132,7 @@ it('hydrates legacy history scope from the URL and exposes granular row controls
     render(<App />);
 
   expect(screen.getByLabelText('History scope')).toHaveValue('all');
-  expect(screen.getAllByText('All sessions - Most recent 500').length).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Recent rows' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('All history includes 49,378 archived calls')).toBeInTheDocument();
   expect(screen.getByLabelText('Rows to load')).toHaveValue(500);
   const rowLimitSlider = screen.getByLabelText('Rows to load slider');

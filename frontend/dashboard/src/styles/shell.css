@@ -35,8 +35,7 @@
 }
 
 .brand span,
-.secondary-block span,
-.status-card small {
+.secondary-block span {
   color: var(--dashboard-sidebar-muted);
   font-size: 12px;
 }
@@ -162,41 +161,8 @@ gap: 6px;
 }
 
 .secondary-block {
-  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid #193252;
-}
-
-.status-card {
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--dashboard-sidebar-border);
-  border-radius: 8px;
-  background: var(--dashboard-sidebar-bg-raised);
-}
-
-.status-card span {
-  color: #93a9c5;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0;
-}
-
-.status-card strong {
-  color: var(--dashboard-surface);
-}
-
-.status-card button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 36px;
-  color: var(--dashboard-surface);
-  background: #14345c;
-  border: 1px solid #2f5687;
-  border-radius: 8px;
 }
 
 .workspace {

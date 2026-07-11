@@ -387,7 +387,7 @@ render(<App />);
 
   expect(await screen.findByText('row-limit-after-thread-a')).toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=10000');
   expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
   expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
@@ -467,7 +467,7 @@ it('refreshes usage rows when history scope changes', async () => {
 
     expect(await screen.findByText('all-history-thread')).toBeInTheDocument();
   expect(screen.queryByText('active-history-thread')).not.toBeInTheDocument();
-  expect(screen.getAllByText('All sessions - Most recent 500').length).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Recent rows' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('All history includes 6 archived calls')).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/usage?');

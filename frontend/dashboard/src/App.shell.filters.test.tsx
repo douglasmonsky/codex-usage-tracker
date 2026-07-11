@@ -14,7 +14,7 @@ describe('React dashboard shell global filters', () => {
     expect(params.get('model')).toBe('o4-mini');
     expect(params.get('effort')).toBe('medium');
     expect(params.get('confidence')).toBe('cost-estimated');
-    const recentCalls = screen.getByRole('table', { name: 'Recent calls' });
+    const recentCalls = screen.getByRole('table', { name: 'Overview calls' });
     expect(within(recentCalls).getByText('thread-7b2e91')).toBeInTheDocument();
     expect(within(recentCalls).queryByText('thread-9f3a1c')).not.toBeInTheDocument();
 

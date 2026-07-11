@@ -243,18 +243,6 @@ url.searchParams.set('return', returnView);
 pushShellUrl(url);
 }
 
-function openFindingInvestigator(rank: number) {
-setActiveView('investigator');
-setActivePreset('');
-setActiveRecordId('');
-const url = new URL(window.location.href);
-url.searchParams.set('view', 'investigator');
-url.searchParams.set('finding', String(rank));
-url.searchParams.delete('preset');
-clearInactiveViewSearchParams(url, 'investigator');
-pushShellUrl(url);
-}
-
 function backFromCallInvestigator() {
 setView(callReturnView);
 }
@@ -584,18 +572,6 @@ return (
             );
           })}
         </div>
-        <div className="status-card">
-          <span>Data Snapshot</span>
-          <strong>Current</strong>
-          <small>
-            {historyScope === 'all' ? 'All sessions' : 'Active sessions'} - {loadWindowLabel(loadWindow, loadLimit)}
-          </small>
-          <small>{refreshState}</small>
-          <button type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh all dashboard data">
-            <RefreshCw size={15} />
-            {refreshing ? `${shellI18n.t('button.refresh', 'Refresh')}...` : shellI18n.t('button.refresh', 'Refresh')}
-          </button>
-        </div>
       </aside>
       <main className="workspace">
         <div className="unofficial-banner" role="note" aria-label="Unofficial project notice">
@@ -703,6 +679,7 @@ aria-label="History scope"
         </div>
       </div>
       </header>
+      <p className="sr-only" role="status" aria-live="polite">{refreshState}</p>
       <DashboardRouteView
         key={navigationRevision}
         activeView={activeView}
@@ -716,7 +693,6 @@ aria-label="History scope"
         setContextApiEnabled={setContextApiEnabled}
         openCallInvestigator={openCallInvestigator}
         copyCallInvestigatorLink={copyCallInvestigatorLink}
-        openFindingInvestigator={openFindingInvestigator}
         callBackLabel={
           callReturnViewExplicit
             ? `Back to ${callReturnViewLabel(callReturnView)}`

@@ -322,7 +322,7 @@
 
 .diagnostic-fact-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 5px 10px;
   align-items: center;
   width: 100%;
@@ -344,7 +344,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px 10px;
   align-items: center;
-  width: 100%;
+  min-width: 0;
   padding: 0;
   border: 0;
   color: inherit;
@@ -367,6 +367,7 @@
 .diagnostic-fact-select span:first-child {
   color: var(--diagnostics-text-strong);
   font-weight: 800;
+  overflow-wrap: break-word;
 }
 
 .diagnostic-fact-select strong {
@@ -407,8 +408,7 @@
 }
 
 .diagnostic-fact-card .table-action-group {
-  grid-column: 2;
-  grid-row: 2;
+  justify-self: start;
 }
 
 .diagnostic-fact-call-scroll {

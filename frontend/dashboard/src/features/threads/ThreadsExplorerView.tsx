@@ -209,8 +209,6 @@ export function ThreadsExplorerView({
                 selectedRowId={selected?.name}
                 onRowSelect={thread => onSelectThread(thread.name)}
                 onRowActivate={onActivateThread}
-                activateOnClick
-                selectOnHover
                 viewportHeight={560}
               />
               <div className={styles.gridFooter} aria-live="polite">
