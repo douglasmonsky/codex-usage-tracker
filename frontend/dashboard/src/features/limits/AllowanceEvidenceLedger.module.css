@@ -35,6 +35,11 @@
   border-radius: var(--radius-panel);
 }
 
+.tableFrame:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .tableFrame table {
   width: 100%;
   min-width: 820px;
@@ -121,7 +126,7 @@
 
 .actions button:hover,
 .actions button:focus-visible {
-  color: var(--signal-selection);
+  color: var(--signal-selection-ink);
   background: var(--surface-panel);
   border-color: var(--signal-selection-line);
   outline: 0;

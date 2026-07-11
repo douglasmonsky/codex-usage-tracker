@@ -359,7 +359,7 @@ function ThreadCallRow({
         <span>{formatCredits(call.credits)}</span>
       </div>
       {call.recommendation ? <p className="thread-call-recommendation">{call.recommendation}</p> : null}
-      <div className="thread-context-bar" aria-label={`Context use ${formatCallContextUse(call)}`}>
+      <div className="thread-context-bar" role="img" aria-label={`Context use ${formatCallContextUse(call)}`}>
         <span
           className={timelineSeverityClass(call.contextWindowPct)}
           style={{ width: timelineWidth(call.contextWindowPct) }}

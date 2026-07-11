@@ -36,7 +36,7 @@ export function AllowanceEvidenceLedger({
           {visibleRows.length} of {rows.length}
         </StatusBadge>
       </div>
-      <div className={styles.tableFrame}>
+      <div className={styles.tableFrame} tabIndex={0} aria-label="Scrollable allowance evidence table">
         <table>
           <caption className="sr-only">Allowance evidence windows and linked calls</caption>
           <thead>

@@ -94,7 +94,7 @@
 }
 
 .viewModes button[aria-pressed="true"] {
-  color: var(--signal-selection);
+  color: var(--signal-selection-ink);
   background: var(--surface-panel);
   border-color: var(--signal-selection-line);
 }

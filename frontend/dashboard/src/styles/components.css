@@ -149,11 +149,11 @@ margin-bottom: 14px;
 }
 
 .trend.positive {
-  color: #059669;
+  color: var(--signal-positive-ink);
 }
 
 .trend.negative {
-  color: #dc2626;
+  color: var(--signal-risk-ink);
 }
 
 .toolbar-button,
@@ -325,7 +325,7 @@ margin-bottom: 14px;
 }
 
 .status-badge.orange {
-  color: #b45309;
+  color: var(--signal-caution-ink);
   background: #fff1d6;
 }
 

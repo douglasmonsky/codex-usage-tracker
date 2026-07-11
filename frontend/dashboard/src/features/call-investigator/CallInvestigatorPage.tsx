@@ -790,7 +790,7 @@ function TokenComposition({ call }: { call: CallRow }) {
         <strong>Token composition</strong>
         <span>{formatCompact(total)} visible tokens</span>
       </div>
-      <div className="composition-bar" aria-label="Token composition">
+      <div className="composition-bar" role="img" aria-label="Token composition">
         {segments.map(segment => (
           <i key={segment.label} style={{ width: `${Math.max(segment.value / total * 100, 3)}%`, background: segment.color }} />
         ))}
