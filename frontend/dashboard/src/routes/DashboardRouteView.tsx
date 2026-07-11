@@ -186,7 +186,16 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         />
       );
     case 'usage-drain':
-      return <UsageDrainPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
+      return (
+        <UsageDrainPage
+          model={model}
+          contextRuntime={contextRuntime}
+          includeArchived={historyScope === 'all'}
+          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          onOpenInvestigator={openCallInvestigator}
+          onCopyCallLink={copyCallInvestigatorLink}
+        />
+      );
     case 'cache-context':
       return <CacheContextPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
     case 'diagnostics':

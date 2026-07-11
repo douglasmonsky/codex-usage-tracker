@@ -184,6 +184,34 @@ usage may be coming from.
   optional local trace to a local JSON bundle marked
   `includes_raw_fragments: false`.
 
+## Limits View
+
+Use `Limits` when the question is whether observed allowance behavior changed,
+rather than which calls consumed the most tokens.
+
+- The workspace reads `/api/allowance/history` and
+  `/api/allowance/diagnostics`, the same report contracts exposed by MCP
+  `usage_allowance_history(...)` and `usage_allowance_diagnostics(...)`.
+- Weekly evidence is always the primary analysis. The 5-hour segmented view is
+  labeled as noisy rolling-window context and is not promoted into an allowance
+  claim.
+- The weekly chart uses a local capacity proxy: estimated credits per 100
+  percentage points of observed movement. Candidate splits, resets, observation
+  gaps, and exact median intervals appear only when present in or derivable from
+  the shared evidence payloads.
+- The hypothesis check evaluates "allowance decreased" or "behavior stayed
+  stable" against the server's evidence grade and research-readiness result. It
+  does not run a second detector in the browser.
+- Supporting windows open linked calls in Call Investigator when the localhost
+  normal-privacy payload includes a record id. Static dashboards keep aggregate
+  evidence visible without fabricating call links.
+- `Export evidence` calls `/api/allowance/export`, which always returns the
+  strict local sharing contract. Static fallback exports omit local identifiers.
+
+The tracker cannot read OpenAI's internal allowance ledger. Outside ChatGPT or
+Codex usage, sparse observations, and rolling-window resets remain explicit
+caveats.
+
 ## Diagnostics View
 
 ![Diagnostics Notebook view showing diagnostic snapshot modules and usage-drain reporting.](assets/dashboard-diagnostics.png)

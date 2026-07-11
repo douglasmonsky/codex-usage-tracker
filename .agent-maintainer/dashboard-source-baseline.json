@@ -50,11 +50,6 @@
       "nonblank": 507,
       "physical": 530
     },
-    "frontend/dashboard/src/features/usage-drain/UsageDrainPage.tsx": {
-      "group": "source",
-      "nonblank": 416,
-      "physical": 443
-    },
     "frontend/dashboard/src/styles/context-evidence.css": {
       "group": "styles",
       "nonblank": 352,

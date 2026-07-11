@@ -62,24 +62,16 @@ it('copies call investigator links from cache context row actions', async () => 
   expect(timelineUrl.searchParams.get('record')).toBe('fixture-call-0');
 });
 
-it('copies call investigator links from workspace side evidence lists', async () => {
+it('copies call investigator links from report and investigation evidence lists', async () => {
   const writeText = mockClipboardWrite();
 
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-  fireEvent.click(screen.getByRole('button', { name: /Copy link for usage drain evidence call thread-6a5b4c codex-1/i }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-  const usageDrainUrl = new URL(writeText.mock.calls[0][0]);
-  expect(usageDrainUrl.searchParams.get('view')).toBe('call');
-  expect(usageDrainUrl.searchParams.get('record')).toBe('fixture-call-6');
-  expect(usageDrainUrl.searchParams.get('return')).toBe('usage-drain');
-
 fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
 window.history.replaceState(null, '', '/?view=reports&report=weekly-credits&mode=full&max_entries=50&include_tool_output=1');
 fireEvent.click(screen.getByRole('button', { name: /Copy link for report side evidence call thread-6a5b4c codex-1/i }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
-  const reportUrl = new URL(writeText.mock.calls[1][0]);
+  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+  const reportUrl = new URL(writeText.mock.calls[0][0]);
 expect(reportUrl.searchParams.get('view')).toBe('call');
 expect(reportUrl.searchParams.get('record')).toBe('fixture-call-6');
 expect(reportUrl.searchParams.get('return')).toBe('reports');
@@ -93,8 +85,8 @@ fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
     name: /thread-6a5b4c cache-risk 1 425\.65K medium/i,
   });
   fireEvent.click(within(investigatorEvidenceRow).getByRole('button', { name: /Copy call link for cache-risk/i }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(3));
-  const investigatorUrl = new URL(writeText.mock.calls[2][0]);
+  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+  const investigatorUrl = new URL(writeText.mock.calls[1][0]);
   expect(investigatorUrl.searchParams.get('view')).toBe('call');
   expect(investigatorUrl.searchParams.get('record')).toBe('fixture-call-6');
   expect(investigatorUrl.searchParams.get('return')).toBe('investigator');
@@ -150,24 +142,18 @@ it('opens full-page call investigator from cache context thread table rows', () 
 });
 
 
-it('opens full-page call investigator from usage drain evidence calls', () => {
+it('opens the weekly-first Limits workspace and evaluates URL-backed hypotheses', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-    expect(screen.getByRole('heading', { name: 'Usage Drain Lab' })).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'Usage drain evidence calls' })).toBeInTheDocument();
-    expect(screen.getByText('Drain Evidence Profile')).toBeInTheDocument();
-    expect(screen.getByText('Evidence Basis')).toBeInTheDocument();
-    expect(screen.getByText('Selection: all efforts, including subagents')).toBeInTheDocument();
-    expect(screen.getByText('Order: estimated Codex credits descending, then total tokens')).toBeInTheDocument();
-    expect(screen.getByText('Limit: active sample top 20 calls; table shows first 8')).toBeInTheDocument();
-    expect(screen.getByText('Top Evidence Calls')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
+    expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Weekly local capacity evidence' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Allowance evidence windows and linked calls' })).toBeInTheDocument();
+    expect(screen.getByText('Supporting windows')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Open investigator for usage drain call thread-6a5b4c codex-1/i }));
-
-    expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-    expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
-    expect(window.location.search).toContain('view=call');
-    expect(window.location.search).toContain('record=fixture-call-6');
+    fireEvent.click(screen.getByRole('button', { name: 'Behavior stayed stable' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Test weekly claim' }));
+    expect(screen.getByText('The loaded weekly history cannot test this claim yet')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('limit_hypothesis')).toBe('stable');
   });
 
 

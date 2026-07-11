@@ -300,6 +300,34 @@ Gate:
 - chart/table accessibility and export checks;
 - copy review preventing unsupported allowance claims.
 
+Implementation checkpoint (2026-07-11):
+
+- `Limits` replaces the legacy Usage Drain Lab while retaining the
+  `usage-drain` route id for link and export compatibility;
+- the dashboard now consumes `/api/allowance/history`,
+  `/api/allowance/diagnostics`, and `/api/allowance/export` through typed clients
+  using the same report schemas as CLI and MCP;
+- weekly capacity evidence is the primary timeline, with recent-first zoom,
+  candidate shifts, reset and observation-gap annotations, synchronized exact
+  tables, and linked Call Investigator records. The 5-hour view is explicitly
+  secondary rolling-window context;
+- `nonparametric-v1` candidate evidence now includes reproducible,
+  distribution-free 95% median intervals when the exact order-statistic method
+  can attain that coverage. Smaller samples report the interval as unavailable
+  instead of receiving a browser-side approximation;
+- the deterministic hypothesis check evaluates decreased-versus-stable claims
+  against the server evidence grade and research-readiness result, including
+  outside-usage caveats, without creating a second detector in React;
+- strict export uses the shared server contract; static fallback exports omit
+  local identifiers and are clearly labeled descriptive rather than diagnostic;
+- the shell sidebar remains sticky on long workspaces and scrolls internally at
+  desktop/tablet heights without reintroducing document overflow;
+- stable, noisy, regime-shift, missing-observation, outside-usage, strict-export,
+  linked-call, URL, and shell integration tests pass. Browser checks at
+  1280x720, 1024x768, 390x844, and a 640px 200%-layout equivalent found no
+  document overflow, visible interactive overlap, table containment failures,
+  or console warnings/errors.
+
 ### R9. Reports, Settings, And Remaining Parity
 
 Target PR: `redesign/09-reports-settings` -> experiment

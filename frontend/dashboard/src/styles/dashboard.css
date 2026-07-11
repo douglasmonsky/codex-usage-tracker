@@ -211,6 +211,8 @@ scrollbar-gutter: auto;
     height: auto;
     gap: 12px;
     padding: 14px 12px;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
   }
 
   .primary-nav {

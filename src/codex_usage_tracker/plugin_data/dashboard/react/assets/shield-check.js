@@ -1,4 +1,4 @@
-import{n as e}from"./App.js";/**
+import{k as e}from"./App.js";/**
  * @license lucide-react v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.
