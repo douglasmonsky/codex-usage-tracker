@@ -47,7 +47,11 @@ def paths(tmp_path: Path) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("kind", "builder_name", "schema"),
     [
-        ("agentic", "build_agentic_investigation_report", "codex-usage-tracker-agentic-investigation-v1"),
+        (
+            "agentic",
+            "build_agentic_investigation_report",
+            "codex-usage-tracker-agentic-investigation-v1",
+        ),
         (
             "repeated-file-rediscovery",
             "build_repeated_file_rediscovery_report",
@@ -119,7 +123,9 @@ def test_unlimited_filter_preserves_zero_as_none(
     assert calls["limit"] is None
 
 
-def test_bounded_integer_filters_are_capped(paths: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_bounded_integer_filters_are_capped(
+    paths: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
     calls: dict[str, Any] = {}
 
     def build_report(**kwargs: Any) -> _Report:

@@ -32,27 +32,13 @@ def _evaluate_effort_model_hypothesis(
         thread=thread,
         include_archived=include_archived,
     )
-    total_tokens = sum(_number(row.get("total_tokens")) for row in rows)
-    effort_totals = _token_totals_by(rows, "effort")
+    total_tokens, high_effort_ratio, effort_totals = _effort_token_share(rows)
     model_totals = _token_totals_by(rows, "model")
-    high_effort_tokens = sum(
-        value
-        for effort, value in effort_totals.items()
-        if effort.lower() in {"high", "xhigh", "maximum"}
+    status, confidence = _effort_hypothesis_outcome(
+        row_count=len(rows),
+        total_tokens=total_tokens,
+        high_effort_ratio=high_effort_ratio,
     )
-    high_effort_ratio = high_effort_tokens / total_tokens if total_tokens else 0.0
-    if not rows or not total_tokens:
-        status = "insufficient_evidence"
-        confidence = "insufficient_local_evidence"
-    elif high_effort_ratio >= 0.5:
-        status = "true"
-        confidence = "medium"
-    elif high_effort_ratio >= 0.2:
-        status = "partially_true"
-        confidence = "low"
-    else:
-        status = "false"
-        confidence = "low"
     return _hypothesis_result(
         status=status,
         confidence=confidence,
@@ -67,9 +53,7 @@ def _evaluate_effort_model_hypothesis(
             "top_models": _top_token_totals(model_totals),
         },
         evidence=[],
-        counter_evidence=[]
-        if high_effort_ratio
-        else ["No high-effort token share found in the selected scope."],
+        counter_evidence=_effort_counter_evidence(high_effort_ratio),
         next_action="Compare high-effort calls against task type, then use lower effort for routine edits and reserve higher effort for uncertain design work.",
         recommended_next_tools=[
             _next_tool("usage_summary", "Summarize usage by model or effort."),
@@ -79,6 +63,41 @@ def _evaluate_effort_model_hypothesis(
             ),
         ],
     )
+
+
+def _effort_token_share(
+    rows: list[dict[str, Any]],
+) -> tuple[float, float, dict[str, float]]:
+    total_tokens = sum(_number(row.get("total_tokens")) for row in rows)
+    effort_totals = _token_totals_by(rows, "effort")
+    high_effort_tokens = sum(
+        value
+        for effort, value in effort_totals.items()
+        if effort.lower() in {"high", "xhigh", "maximum"}
+    )
+    ratio = high_effort_tokens / total_tokens if total_tokens else 0.0
+    return total_tokens, ratio, effort_totals
+
+
+def _effort_hypothesis_outcome(
+    *,
+    row_count: int,
+    total_tokens: float,
+    high_effort_ratio: float,
+) -> tuple[str, str]:
+    if not row_count or not total_tokens:
+        return "insufficient_evidence", "insufficient_local_evidence"
+    if high_effort_ratio >= 0.5:
+        return "true", "medium"
+    if high_effort_ratio >= 0.2:
+        return "partially_true", "low"
+    return "false", "low"
+
+
+def _effort_counter_evidence(high_effort_ratio: float) -> list[str]:
+    if high_effort_ratio:
+        return []
+    return ["No high-effort token share found in the selected scope."]
 
 
 def _evaluate_allowance_hypothesis(

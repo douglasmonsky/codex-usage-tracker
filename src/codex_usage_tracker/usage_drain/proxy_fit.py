@@ -119,24 +119,46 @@ def _candidate_drain_comparison(
     candidate_values: list[float],
 ) -> tuple[dict[str, float | int | None], dict[str, float | int | None], float | None]:
     with_candidates = _drain_stats(
-        [
-            span
-            for span, candidate in zip(spans, candidate_values, strict=True)
-            if candidate > 0 and span.standard_usage_credits > 0
-        ]
+        _spans_by_candidate_presence(
+            spans,
+            candidate_values,
+            require_candidate=True,
+        )
     )
     without_candidates = _drain_stats(
-        [
-            span
-            for span, candidate in zip(spans, candidate_values, strict=True)
-            if candidate <= 0 and span.standard_usage_credits > 0
-        ]
+        _spans_by_candidate_presence(
+            spans,
+            candidate_values,
+            require_candidate=False,
+        )
     )
-    median_ratio = (
-        float(with_candidates["median_drain_per_standard_credit"])
-        / float(without_candidates["median_drain_per_standard_credit"])
-        if with_candidates["median_drain_per_standard_credit"]
-        and without_candidates["median_drain_per_standard_credit"]
-        else None
+    return (
+        with_candidates,
+        without_candidates,
+        _median_drain_ratio(with_candidates, without_candidates),
     )
-    return with_candidates, without_candidates, median_ratio
+
+
+def _spans_by_candidate_presence(
+    spans: list[UsageDeltaSpan],
+    candidate_values: list[float],
+    *,
+    require_candidate: bool,
+) -> list[UsageDeltaSpan]:
+    selected: list[UsageDeltaSpan] = []
+    for span, candidate in zip(spans, candidate_values, strict=True):
+        has_candidate = candidate > 0
+        if has_candidate == require_candidate and span.standard_usage_credits > 0:
+            selected.append(span)
+    return selected
+
+
+def _median_drain_ratio(
+    with_candidates: dict[str, float | int | None],
+    without_candidates: dict[str, float | int | None],
+) -> float | None:
+    with_median = with_candidates["median_drain_per_standard_credit"]
+    without_median = without_candidates["median_drain_per_standard_credit"]
+    if not with_median or not without_median:
+        return None
+    return float(with_median) / float(without_median)

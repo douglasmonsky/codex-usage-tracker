@@ -313,18 +313,27 @@ def append_diagnostic_fact_filters(
     fact_category: str | None,
     table_alias: str,
 ) -> tuple[str, list[Any]]:
-    clauses = [where_clause.removeprefix("WHERE ")] if where_clause else []
+    clauses = _existing_fact_filter_clauses(where_clause)
     updated_params = list(params)
     prefix = f"{table_alias}."
-    if fact_type:
-        clauses.append(f"{prefix}fact_type = ?")
-        updated_params.append(fact_type)
-    if fact_name:
-        clauses.append(f"{prefix}fact_name = ?")
-        updated_params.append(fact_name)
-    if fact_category:
-        clauses.append(f"{prefix}fact_category = ?")
-        updated_params.append(fact_category)
+    for field, value in (
+        ("fact_type", fact_type),
+        ("fact_name", fact_name),
+        ("fact_category", fact_category),
+    ):
+        if value:
+            clauses.append(f"{prefix}{field} = ?")
+            updated_params.append(value)
+    return _diagnostic_where_clause(clauses), updated_params
+
+
+def _existing_fact_filter_clauses(where_clause: str) -> list[str]:
+    if not where_clause:
+        return []
+    return [where_clause.removeprefix("WHERE ")]
+
+
+def _diagnostic_where_clause(clauses: list[str]) -> str:
     if not clauses:
-        return "", updated_params
-    return "WHERE " + " AND ".join(f"({clause})" for clause in clauses), updated_params
+        return ""
+    return "WHERE " + " AND ".join(f"({clause})" for clause in clauses)

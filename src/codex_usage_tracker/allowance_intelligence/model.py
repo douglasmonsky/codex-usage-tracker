@@ -34,41 +34,19 @@ _MIN_CHANGE_SPANS = _MIN_BASELINE_CHANGE_SPANS + _MIN_RECENT_CHANGE_SPANS
 def build_allowance_analysis(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Build aggregate allowance-change evidence from normalized observations."""
 
-    observation_rows = [
-        row
-        for row in sorted(rows, key=_observation_sort_key)
-        if _number(row.get("used_percent")) is not None
-    ]
-    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
-    for row in observation_rows:
-        grouped.setdefault(_analysis_key(row), []).append(row)
-
-    window_reports = [
-        _window_report(key, group_rows) for key, group_rows in sorted(grouped.items())
-    ]
-    spans = [span for report in window_reports for span in report["spans"]]
-    candidates = [
-        candidate for report in window_reports for candidate in report.get("change_candidates", [])
-    ]
+    observation_rows = _normalized_observations(rows)
+    window_reports = _grouped_window_reports(observation_rows)
+    spans = _flatten_window_rows(window_reports, "spans")
+    candidates = _flatten_window_rows(window_reports, "change_candidates")
     primary = _primary_window_report(window_reports)
     return {
-        "summary": {
-            "observation_count": len(observation_rows),
-            "window_report_count": len(window_reports),
-            "positive_span_count": len(spans),
-            "candidate_change_count": len(candidates),
-            "primary_window_kind": primary.get("window_kind") if primary else None,
-            "primary_evidence_grade": primary.get("evidence_grade")
-            if primary
-            else "insufficient_data",
-            "weekly_observation_count": sum(
-                1 for row in observation_rows if row.get("window_kind") == "weekly"
-            ),
-            "five_hour_observation_count": sum(
-                1 for row in observation_rows if row.get("window_kind") == "five_hour"
-            ),
-            "research_readiness": _research_readiness(window_reports, candidates),
-        },
+        "summary": _allowance_analysis_summary(
+            observation_rows=observation_rows,
+            window_reports=window_reports,
+            spans=spans,
+            candidates=candidates,
+            primary=primary,
+        ),
         "windows": window_reports,
         "spans": spans,
         "change_candidates": candidates,
@@ -78,6 +56,68 @@ def build_allowance_analysis(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "Unexplained movement can mean allowance behavior changed, but it can also mean usage outside these local Codex logs.",
         ],
     }
+
+
+def _normalized_observations(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in sorted(rows, key=_observation_sort_key)
+        if _number(row.get("used_percent")) is not None
+    ]
+
+
+def _grouped_window_reports(
+    observation_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in observation_rows:
+        grouped.setdefault(_analysis_key(row), []).append(row)
+    return [_window_report(key, group_rows) for key, group_rows in sorted(grouped.items())]
+
+
+def _flatten_window_rows(
+    window_reports: list[dict[str, Any]],
+    field: str,
+) -> list[dict[str, Any]]:
+    return [
+        row for report in window_reports for row in report.get(field, []) if isinstance(row, dict)
+    ]
+
+
+def _allowance_analysis_summary(
+    *,
+    observation_rows: list[dict[str, Any]],
+    window_reports: list[dict[str, Any]],
+    spans: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+    primary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "observation_count": len(observation_rows),
+        "window_report_count": len(window_reports),
+        "positive_span_count": len(spans),
+        "candidate_change_count": len(candidates),
+        "primary_window_kind": primary.get("window_kind") if primary else None,
+        "primary_evidence_grade": (
+            primary.get("evidence_grade") if primary else "insufficient_data"
+        ),
+        "weekly_observation_count": _window_observation_count(
+            observation_rows,
+            "weekly",
+        ),
+        "five_hour_observation_count": _window_observation_count(
+            observation_rows,
+            "five_hour",
+        ),
+        "research_readiness": _research_readiness(window_reports, candidates),
+    }
+
+
+def _window_observation_count(
+    observation_rows: list[dict[str, Any]],
+    window_kind: str,
+) -> int:
+    return sum(1 for row in observation_rows if row.get("window_kind") == window_kind)
 
 
 def _window_report(key: tuple[str, str, str], rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -360,20 +400,28 @@ def _research_readiness_reasons(
             "Public allowance-change claims need repeated weekly spans before and after a candidate split.",
         ]
     evidence = best_candidate.get("statistical_evidence") or {}
-    reasons: list[str] = []
     before_count = int(evidence.get("sample_size_before") or 0)
     after_count = int(evidence.get("sample_size_after") or 0)
     p_value = _number(evidence.get("p_value_one_sided"))
-    if before_count < _PUBLIC_CLAIM_MIN_SPLIT_SPANS:
-        reasons.append("Too few weekly spans before the candidate split.")
-    if after_count < _PUBLIC_CLAIM_MIN_SPLIT_SPANS:
-        reasons.append("Too few weekly spans after the candidate split.")
-    if p_value is None or p_value > _PUBLIC_CLAIM_P_VALUE_THRESHOLD:
-        reasons.append("Nonparametric p-value is not yet strong enough for a public claim.")
-    if best_candidate.get("outside_usage_possible"):
-        reasons.append(
-            "Observed movement could still reflect usage outside these local logs; disclose this caveat."
-        )
+    rules = (
+        (
+            before_count < _PUBLIC_CLAIM_MIN_SPLIT_SPANS,
+            "Too few weekly spans before the candidate split.",
+        ),
+        (
+            after_count < _PUBLIC_CLAIM_MIN_SPLIT_SPANS,
+            "Too few weekly spans after the candidate split.",
+        ),
+        (
+            _p_value_not_ready(p_value),
+            "Nonparametric p-value is not yet strong enough for a public claim.",
+        ),
+        (
+            bool(best_candidate.get("outside_usage_possible")),
+            "Observed movement could still reflect usage outside these local logs; disclose this caveat.",
+        ),
+    )
+    reasons = [message for failed, message in rules if failed]
     if ready:
         reasons.insert(
             0,
@@ -382,6 +430,10 @@ def _research_readiness_reasons(
     if weekly_span_count < _PUBLIC_CLAIM_MIN_SPLIT_SPANS * 2:
         reasons.append("More weekly spans would improve stability of change-point estimates.")
     return reasons
+
+
+def _p_value_not_ready(p_value: float | None) -> bool:
+    return p_value is None or p_value > _PUBLIC_CLAIM_P_VALUE_THRESHOLD
 
 
 def _primary_window_report(windows: list[dict[str, Any]]) -> dict[str, Any] | None:

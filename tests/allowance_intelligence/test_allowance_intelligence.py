@@ -94,12 +94,8 @@ def test_weekly_capacity_drop_flags_strong_local_evidence_after_baseline() -> No
     assert candidate["statistical_evidence"]["method"] == "exact_permutation_mean_shift"
     assert candidate["statistical_evidence"]["effect_size_cliffs_delta"] == -1.0
     assert candidate["statistical_evidence"]["signal"] == "directionally_consistent_small_sample"
-    assert candidate["statistical_evidence"][
-        "median_confidence_interval_before_95"
-    ]["available"]
-    assert not candidate["statistical_evidence"][
-        "median_confidence_interval_after_95"
-    ]["available"]
+    assert candidate["statistical_evidence"]["median_confidence_interval_before_95"]["available"]
+    assert not candidate["statistical_evidence"]["median_confidence_interval_after_95"]["available"]
     assert not analysis["summary"]["research_readiness"]["ready_for_public_claim"]
 
 

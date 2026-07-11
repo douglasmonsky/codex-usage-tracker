@@ -90,6 +90,15 @@ def fit_ridge(
 ) -> list[float] | None:
     if not x_rows or not y_values:
         return None
+    lhs, rhs = _ridge_normal_equations(x_rows, y_values)
+    _regularize_ridge(lhs, alpha)
+    return solve_linear_system(lhs, rhs)
+
+
+def _ridge_normal_equations(
+    x_rows: list[list[float]],
+    y_values: list[float],
+) -> tuple[list[list[float]], list[float]]:
     width = len(x_rows[0]) + 1
     lhs = [[0.0 for _ in range(width)] for _ in range(width)]
     rhs = [0.0 for _ in range(width)]
@@ -99,32 +108,50 @@ def fit_ridge(
             rhs[i] += x_i * y_value
             for j, x_j in enumerate(expanded):
                 lhs[i][j] += x_i * x_j
-    for index in range(1, width):
+    return lhs, rhs
+
+
+def _regularize_ridge(lhs: list[list[float]], alpha: float) -> None:
+    for index in range(1, len(lhs)):
         lhs[index][index] += alpha
-    return solve_linear_system(lhs, rhs)
 
 
 def solve_linear_system(lhs: list[list[float]], rhs: list[float]) -> list[float] | None:
     size = len(rhs)
     matrix = [row[:] + [rhs_value] for row, rhs_value in zip(lhs, rhs, strict=True)]
     for column in range(size):
-        pivot = max(range(column, size), key=lambda row: abs(matrix[row][column]))
-        if abs(matrix[pivot][column]) < 1e-12:
+        if not _eliminate_linear_column(matrix, column=column, size=size):
             return None
-        matrix[column], matrix[pivot] = matrix[pivot], matrix[column]
-        pivot_value = matrix[column][column]
-        matrix[column] = [value / pivot_value for value in matrix[column]]
-        for row_index in range(size):
-            if row_index == column:
-                continue
-            factor = matrix[row_index][column]
-            if factor == 0:
-                continue
-            matrix[row_index] = [
-                value - factor * pivot_component
-                for value, pivot_component in zip(matrix[row_index], matrix[column], strict=True)
-            ]
     return [matrix[row][size] for row in range(size)]
+
+
+def _eliminate_linear_column(
+    matrix: list[list[float]],
+    *,
+    column: int,
+    size: int,
+) -> bool:
+    pivot = max(range(column, size), key=lambda row: abs(matrix[row][column]))
+    if abs(matrix[pivot][column]) < 1e-12:
+        return False
+    matrix[column], matrix[pivot] = matrix[pivot], matrix[column]
+    pivot_value = matrix[column][column]
+    matrix[column] = [value / pivot_value for value in matrix[column]]
+    for row_index in range(size):
+        if row_index == column:
+            continue
+        factor = matrix[row_index][column]
+        if factor == 0:
+            continue
+        matrix[row_index] = [
+            value - factor * pivot_component
+            for value, pivot_component in zip(
+                matrix[row_index],
+                matrix[column],
+                strict=True,
+            )
+        ]
+    return True
 
 
 def predict(x_rows: list[list[float]], coefficients: list[float]) -> list[float]:

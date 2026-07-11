@@ -28,12 +28,8 @@ def _statistical_evidence(
         "sample_size_before": len(previous_values),
         "sample_size_after": len(recent_values),
         "median_shift_credits_per_percent": _rounded(shift),
-        "median_confidence_interval_before_95": _median_confidence_interval(
-            previous_values
-        ),
-        "median_confidence_interval_after_95": _median_confidence_interval(
-            recent_values
-        ),
+        "median_confidence_interval_before_95": _median_confidence_interval(previous_values),
+        "median_confidence_interval_after_95": _median_confidence_interval(recent_values),
         "effect_size_cliffs_delta": _rounded(effect_size),
         "p_value_one_sided": _rounded(p_value),
         "combinations_evaluated": combinations_evaluated,
@@ -72,9 +68,7 @@ def _median_confidence_interval(values: list[float]) -> dict[str, Any]:
             break
         selected_rank = rank
         achieved_coverage = 1.0 - (2.0 * lower_tail_numerator / denominator)
-        binomial_coefficient = (
-            binomial_coefficient * (sample_size - rank + 1) // rank
-        )
+        binomial_coefficient = binomial_coefficient * (sample_size - rank + 1) // rank
 
     if selected_rank is None:
         return {
@@ -139,18 +133,38 @@ def _exact_permutation_p_value(
     if observed is None:
         return None, "insufficient_metric_values", None
 
-    values = previous + recent
+    extreme_count = _permutation_extreme_count(
+        previous + recent,
+        before_size=before_size,
+        observed=observed,
+    )
+    return extreme_count / combination_count, "exact_permutation_mean_shift", combination_count
+
+
+def _permutation_extreme_count(
+    values: list[float],
+    *,
+    before_size: int,
+    observed: float,
+) -> int:
     extreme_count = 0
-    for before_indices in combinations(range(total_size), before_size):
-        before_index_set = set(before_indices)
-        permuted_previous = [values[index] for index in before_indices]
-        permuted_recent = [
-            values[index] for index in range(total_size) if index not in before_index_set
-        ]
-        permuted_shift = _mean_shift(permuted_previous, permuted_recent)
+    for before_indices in combinations(range(len(values)), before_size):
+        permuted_shift = _permuted_mean_shift(values, before_indices)
         if permuted_shift is not None and permuted_shift <= observed + 1e-12:
             extreme_count += 1
-    return extreme_count / combination_count, "exact_permutation_mean_shift", combination_count
+    return extreme_count
+
+
+def _permuted_mean_shift(
+    values: list[float],
+    before_indices: tuple[int, ...],
+) -> float | None:
+    before_index_set = set(before_indices)
+    permuted_previous = [values[index] for index in before_indices]
+    permuted_recent = [
+        values[index] for index in range(len(values)) if index not in before_index_set
+    ]
+    return _mean_shift(permuted_previous, permuted_recent)
 
 
 def _cliffs_delta(previous: list[float], recent: list[float]) -> float | None:
@@ -186,19 +200,47 @@ def _statistical_signal(
 ) -> str:
     if before_count < 2 or after_count < 2 or effect_size is None:
         return "insufficient_metric_values"
-    if (
-        before_count >= _PUBLIC_CLAIM_MIN_SPLIT_SPANS
-        and after_count >= _PUBLIC_CLAIM_MIN_SPLIT_SPANS
-        and effect_size <= -0.8
-        and p_value is not None
-        and p_value <= _PUBLIC_CLAIM_P_VALUE_THRESHOLD
+    if _is_strong_nonparametric_shift(
+        effect_size=effect_size,
+        p_value=p_value,
+        before_count=before_count,
+        after_count=after_count,
     ):
         return "strong_nonparametric_shift"
-    if effect_size <= -0.8 and p_value is not None and p_value <= 0.2:
+    if _is_directionally_consistent(effect_size=effect_size, p_value=p_value):
         return "directionally_consistent_small_sample"
     if effect_size <= -0.5:
         return "directional_effect_limited"
     return "weak_or_mixed"
+
+
+def _is_strong_nonparametric_shift(
+    *,
+    effect_size: float,
+    p_value: float | None,
+    before_count: int,
+    after_count: int,
+) -> bool:
+    if p_value is None:
+        return False
+    return all(
+        (
+            before_count >= _PUBLIC_CLAIM_MIN_SPLIT_SPANS,
+            after_count >= _PUBLIC_CLAIM_MIN_SPLIT_SPANS,
+            effect_size <= -0.8,
+            p_value <= _PUBLIC_CLAIM_P_VALUE_THRESHOLD,
+        )
+    )
+
+
+def _is_directionally_consistent(
+    *,
+    effect_size: float,
+    p_value: float | None,
+) -> bool:
+    if p_value is None:
+        return False
+    return effect_size <= -0.8 and p_value <= 0.2
 
 
 def _statistical_public_claim_ready(
