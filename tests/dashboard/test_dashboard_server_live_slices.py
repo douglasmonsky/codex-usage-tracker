@@ -9,6 +9,7 @@ from datetime import datetime
 from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from typing import Any, cast
 
 from codex_usage_tracker.store.api import refresh_usage_index
 from tests.store_dashboard_helpers import (
@@ -18,6 +19,12 @@ from tests.store_dashboard_helpers import (
     _read_json,
     _write_pricing,
 )
+
+JsonObject = dict[str, Any]
+
+
+def _as_json_object(payload: dict[str, object]) -> JsonObject:
+    return cast(JsonObject, payload)
 
 
 def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path) -> None:
@@ -51,39 +58,55 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     try:
         base_url = f"http://127.0.0.1:{server.server_port}"
 
-        status_payload = _read_json(f"{base_url}/api/status")
-        calls_payload = _read_json(
-            f"{base_url}/api/calls?limit=2&sort=tokens&direction=desc&q=Codex"
+        status_payload = _as_json_object(_read_json(f"{base_url}/api/status"))
+        calls_payload = _as_json_object(
+            _read_json(f"{base_url}/api/calls?limit=2&sort=tokens&direction=desc&q=Codex")
         )
-        offset_payload = _read_json(
-            f"{base_url}/api/calls?limit=1&offset=1&sort=tokens&direction=desc&q=Codex"
+        offset_payload = _as_json_object(
+            _read_json(f"{base_url}/api/calls?limit=1&offset=1&sort=tokens&direction=desc&q=Codex")
         )
         record_id = calls_payload["rows"][0]["record_id"]
-        call_payload = _read_json(f"{base_url}/api/call?record_id={record_id}")
-        threads_payload = _read_json(f"{base_url}/api/threads?limit=2&sort=tokens")
+        call_payload = _as_json_object(_read_json(f"{base_url}/api/call?record_id={record_id}"))
+        threads_payload = _as_json_object(_read_json(f"{base_url}/api/threads?limit=2&sort=tokens"))
         thread_key = threads_payload["rows"][0]["thread_key"]
-        thread_calls_payload = _read_json(
-            f"{base_url}/api/thread-calls?thread_key={urllib.parse.quote(thread_key)}&limit=2"
+        thread_calls_payload = _as_json_object(
+            _read_json(
+                f"{base_url}/api/thread-calls?thread_key={urllib.parse.quote(thread_key)}&limit=2"
+            )
         )
-        summary_payload = _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
-        recommendations_payload = _read_json(f"{base_url}/api/recommendations?limit=5")
-        reports_pack_payload = _read_json(f"{base_url}/api/reports/pack?limit=5&evidence_limit=2")
-        diagnostics_summary_payload = _read_json(f"{base_url}/api/diagnostics/summary?limit=5")
-        diagnostics_facts_payload = _read_json(f"{base_url}/api/diagnostics/facts?limit=5")
-        diagnostics_sorted_facts_payload = _read_json(
-            f"{base_url}/api/diagnostics/facts?limit=5&sort=cached&direction=desc"
+        summary_payload = _as_json_object(
+            _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
         )
-        diagnostics_compactions_payload = _read_json(
-            f"{base_url}/api/diagnostics/compactions?limit=5"
+        recommendations_payload = _as_json_object(
+            _read_json(f"{base_url}/api/recommendations?limit=5")
         )
-        diagnostics_tools_payload = _read_json(f"{base_url}/api/diagnostics/tools?limit=5")
-        diagnostics_fact_calls_payload = _read_json(
-            f"{base_url}/api/diagnostics/fact-calls"
-            "?fact_type=compaction&fact_name=post_compaction&limit=5"
+        reports_pack_payload = _as_json_object(
+            _read_json(f"{base_url}/api/reports/pack?limit=5&evidence_limit=2")
+        )
+        diagnostics_summary_payload = _as_json_object(
+            _read_json(f"{base_url}/api/diagnostics/summary?limit=5")
+        )
+        diagnostics_facts_payload = _as_json_object(
+            _read_json(f"{base_url}/api/diagnostics/facts?limit=5")
+        )
+        diagnostics_sorted_facts_payload = _as_json_object(
+            _read_json(f"{base_url}/api/diagnostics/facts?limit=5&sort=cached&direction=desc")
+        )
+        diagnostics_compactions_payload = _as_json_object(
+            _read_json(f"{base_url}/api/diagnostics/compactions?limit=5")
+        )
+        diagnostics_tools_payload = _as_json_object(
+            _read_json(f"{base_url}/api/diagnostics/tools?limit=5")
+        )
+        diagnostics_fact_calls_payload = _as_json_object(
+            _read_json(
+                f"{base_url}/api/diagnostics/fact-calls"
+                "?fact_type=compaction&fact_name=post_compaction&limit=5"
+            )
         )
         invalid_diagnostics = _http_error_json(f"{base_url}/api/diagnostics/facts?sort=bad")
         missing_fact_calls = _http_error_json(f"{base_url}/api/diagnostics/fact-calls")
-        invalid_sort = _http_error_json(f"{base_url}/api/calls?sort=not-a-sort")
+        invalid_sort = _as_json_object(_http_error_json(f"{base_url}/api/calls?sort=not-a-sort"))
     finally:
         server.shutdown()
         server.server_close()
