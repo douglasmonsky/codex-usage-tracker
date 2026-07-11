@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import './design/tokens.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
@@ -25,13 +26,22 @@ if (!root) {
 const reactRoot = createRoot(root);
 
 async function mountDashboard() {
-  const isVisualContractLab =
-    import.meta.env.DEV && new URLSearchParams(window.location.search).get('lab') === 'visual-contract';
+  const lab = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('lab') : null;
+  const isVisualContractLab = lab === 'visual-contract';
   if (isVisualContractLab) {
     const { VisualContractLab } = await import('./design/lab/VisualContractLab');
     reactRoot.render(
       <StrictMode>
         <VisualContractLab />
+      </StrictMode>,
+    );
+    return;
+  }
+  if (lab === 'visualization-contract') {
+    const { VisualizationContractLab } = await import('./visualization/lab/VisualizationContractLab');
+    reactRoot.render(
+      <StrictMode>
+        <VisualizationContractLab />
       </StrictMode>,
     );
     return;

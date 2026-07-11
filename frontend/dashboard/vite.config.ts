@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: '/codex-usage-tracker-assets/react/',
   plugins: [react()],
+  optimizeDeps: {
+    exclude: ['echarts'],
+  },
   build: {
     outDir: '../../src/codex_usage_tracker/plugin_data/dashboard/react',
     emptyOutDir: true,
