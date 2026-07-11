@@ -617,7 +617,12 @@ def _component_credits(
 
 
 def _coefficients_by_feature(rows: list[dict[str, object]]) -> dict[str, float | None]:
-    return {str(row["feature"]): row["coefficient"] for row in rows}
+    coefficients: dict[str, float | None] = {}
+    for row in rows:
+        coefficient = row["coefficient"]
+        assert coefficient is None or isinstance(coefficient, (int, float))
+        coefficients[str(row["feature"])] = None if coefficient is None else float(coefficient)
+    return coefficients
 
 
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:

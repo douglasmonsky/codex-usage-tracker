@@ -7,7 +7,7 @@ from codex_usage_tracker.context.action_timing import (
 
 
 def test_annotate_action_timing_adds_elapsed_and_gap_metadata() -> None:
-    entries = [
+    entries: list[dict[str, object]] = [
         {"timestamp": "2026-06-01T10:00:00Z", "text": "start"},
         {"timestamp": "2026-06-01T10:00:01Z", "text": "middle"},
         {"timestamp": "2026-06-01T10:00:01.500Z", "text": "end"},
@@ -27,9 +27,13 @@ def test_annotate_action_timing_adds_elapsed_and_gap_metadata() -> None:
         "since_turn_start_ms": 0,
         "timestamp_source": "entry.timestamp",
     }
-    assert entries[1]["action_timing"]["since_turn_start_ms"] == 1000
-    assert entries[1]["action_timing"]["since_previous_entry_ms"] == 1000
-    assert entries[2]["action_timing"]["since_previous_entry_ms"] == 500
+    middle_timing = entries[1]["action_timing"]
+    end_timing = entries[2]["action_timing"]
+    assert isinstance(middle_timing, dict)
+    assert isinstance(end_timing, dict)
+    assert middle_timing["since_turn_start_ms"] == 1000
+    assert middle_timing["since_previous_entry_ms"] == 1000
+    assert end_timing["since_previous_entry_ms"] == 500
 
 
 def test_annotate_action_timing_ignores_invalid_timestamps() -> None:

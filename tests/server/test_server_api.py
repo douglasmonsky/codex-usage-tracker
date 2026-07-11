@@ -25,7 +25,7 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
             self.closed = True
 
     def generate_dashboard(**kwargs: object) -> Path:
-        return Path(kwargs["output_path"])
+        return Path(str(kwargs["output_path"]))
 
     monkeypatch.setattr(server_api, "generate_dashboard", generate_dashboard)
     monkeypatch.setattr(server_api, "ThreadingHTTPServer", FakeServer)

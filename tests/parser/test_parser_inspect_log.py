@@ -18,7 +18,10 @@ def test_inspect_log_reports_aggregate_event_rows(tmp_path: Path) -> None:
     )
 
     payload = inspect_log(log_path)
-    event_row = payload["events"][0]
+    events = payload["events"]
+    assert isinstance(events, list)
+    event_row = events[0]
+    assert isinstance(event_row, dict)
 
     assert payload["event_count"] == 1
     assert {

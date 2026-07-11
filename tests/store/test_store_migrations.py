@@ -232,10 +232,10 @@ def test_doctor_reports_malformed_legacy_schema_without_traceback(tmp_path: Path
 
     assert report["status"] == "fail"
     assert schema_check["status"] == "fail"
-    assert "source_file" in schema_check["detail"]
+    assert "source_file" in str(schema_check["detail"])
     assert "rebuild-index" in str(schema_check["remediation"])
     assert parser_check["status"] == "fail"
-    assert "database migration failed" in parser_check["detail"]
+    assert "database migration failed" in str(parser_check["detail"])
 
 
 def _write_legacy_usage_database(db_path: Path, *, omit_source_file: bool = False) -> None:

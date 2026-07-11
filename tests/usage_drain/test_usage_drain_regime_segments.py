@@ -14,7 +14,7 @@ def _span(index: int, delta: float) -> UsageDeltaSpan:
         delta_usage_percent=delta,
         row_count=1,
         standard_usage_credits=100.0 * delta,
-        non_candidate_standard_credits=0.0,
+        non_candidate_standard_credits={},
         candidate_standard_credits={},
         documented_fast_weighted_credits={},
         candidate_row_counts={},
