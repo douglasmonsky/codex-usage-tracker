@@ -235,6 +235,44 @@ Use `Diagnostics` view when you want to see what structured event patterns are h
 
 The same model, reasoning, confidence, time range, history scope, cards, and load controls apply in `Overview`, `Threads`, `Diagnostics`, and the other secondary workspaces. `Calls` keeps a fuller table-specific filter row for local search, source coverage, sorting, density, and selected-row state.
 
+## Reports View
+
+Use `Reports` when you want a compact answer, method, caveat, visualization, and
+supporting calls for one report at a time. The selected report is always the
+first narrative in the workspace, and `report=<key>` keeps that selection in
+the URL.
+
+- The report switcher changes the selected narrative without stacking every
+  report into one long page.
+- Live localhost mode loads the token-gated `/api/reports/pack` contract and
+  caches it for five minutes. The workspace shows its server generation time,
+  source schema, and stale or refresh-error state.
+- Static dashboards use the aggregates already loaded into the page. They label
+  that source explicitly and disable live report refresh instead of implying
+  that a packaged snapshot can contact the server.
+- `Export selected` writes only the selected aggregate report, method, caveats,
+  visualization spec, and linked evidence metadata.
+- Evidence rows open the same Call Investigator used by Calls, Threads, Limits,
+  and Diagnostics.
+
+## Settings View
+
+`Settings` is a read-only explanation of the authoritative local configuration,
+grouped into `Data`, `Estimates`, `Content Access`, `Application`, and `Source
+Health`. The selected group is kept as a local browser preference.
+
+- `Data` describes history scope, row loading, and source coverage.
+- `Estimates` exposes pricing, credit, and allowance inputs without inventing a
+  second configuration store in React.
+- `Content Access` explains the active privacy and localhost context posture.
+- `Application` reflects the shell's current language, direction, and refresh
+  behavior.
+- `Source Health` reports parser coverage, warnings, and local runtime health.
+
+Writable configuration remains in the existing CLI and local configuration
+files. Settings deliberately reports that state instead of presenting controls
+that cannot persist it safely.
+
 ## Call Investigator
 
 ![Call investigator showing exact token accounting, cache/accounting deltas, context estimates, and evidence controls.](assets/dashboard-call-investigator.png)

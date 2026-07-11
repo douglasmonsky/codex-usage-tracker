@@ -1,10 +1,13 @@
 import { usageRowToCall } from './client';
 import type { CallRow, ContextRuntime, ReportSummary, UsageRow } from './types';
 
+const reportsPackSchema = 'codex-usage-tracker-reports-pack-v1';
+
 type ReportPackReport = ReportSummary & { key: string };
 
 type ReportsPackPayload = {
   schema?: string;
+  generated_at?: string;
   reports?: ReportPackReport[];
   evidence?: Record<string, { rows?: UsageRow[]; row_count?: number; limit?: number }>;
   row_count?: number;
@@ -17,6 +20,9 @@ export type ReportsPackModel = {
   evidence: Record<string, CallRow[]>;
   rowCount: number;
   totalMatchedRows: number;
+  schema: string;
+  generatedAt: string;
+  rawContextIncluded: boolean;
   rawPayload: ReportsPackPayload;
 };
 
@@ -54,11 +60,17 @@ export async function loadReportsPack(
     cache: 'no-store',
   });
   const payload = (await readJsonResponse(response, 'Reports pack')) as ReportsPackPayload;
+  if (payload.schema !== reportsPackSchema) {
+    throw new Error('Reports pack returned an unsupported schema.');
+  }
   return {
     reports: payload.reports ?? [],
     evidence: evidenceRowsToCalls(payload.evidence ?? {}),
     rowCount: Number(payload.row_count ?? 0),
     totalMatchedRows: Number(payload.total_matched_rows ?? payload.row_count ?? 0),
+    schema: payload.schema,
+    generatedAt: payload.generated_at ?? '',
+    rawContextIncluded: payload.raw_context_included === true,
     rawPayload: payload,
   };
 }

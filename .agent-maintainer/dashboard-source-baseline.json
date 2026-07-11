@@ -40,15 +40,10 @@
       "nonblank": 413,
       "physical": 445
     },
-    "frontend/dashboard/src/features/reports/ReportsPage.tsx": {
-      "group": "source",
-      "nonblank": 572,
-      "physical": 615
-    },
     "frontend/dashboard/src/features/shared/tables.tsx": {
       "group": "source",
-      "nonblank": 507,
-      "physical": 530
+      "nonblank": 487,
+      "physical": 509
     },
     "frontend/dashboard/src/styles/context-evidence.css": {
       "group": "styles",

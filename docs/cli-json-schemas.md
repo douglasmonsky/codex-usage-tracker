@@ -53,6 +53,7 @@ Tracked schema ids:
 | `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
 | `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
 | `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response, MCP `usage_report_pack(...)` |
+| | Includes the UTC `generated_at` timestamp, aggregate report definitions, aggregate linked-call evidence, and `raw_context_included: false`. |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |

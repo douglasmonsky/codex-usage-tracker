@@ -6,6 +6,7 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -865,6 +866,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert recommendations_payload["schema"] == "codex-usage-tracker-recommendations-v1"
     _assert_contract(recommendations_payload)
     assert reports_pack_payload["schema"] == "codex-usage-tracker-reports-pack-v1"
+    assert datetime.fromisoformat(reports_pack_payload["generated_at"]).tzinfo is not None
     _assert_contract(reports_pack_payload)
     report_titles = {report["title"] for report in reports_pack_payload["reports"]}
     assert report_titles >= {"Cost Curves", "Usage Drain Model"}
