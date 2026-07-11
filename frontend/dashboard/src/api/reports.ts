@@ -5,6 +5,7 @@ type ReportPackReport = ReportSummary & { key: string };
 
 type ReportsPackPayload = {
   schema?: string;
+  generated_at?: string;
   reports?: ReportPackReport[];
   evidence?: Record<string, { rows?: UsageRow[]; row_count?: number; limit?: number }>;
   row_count?: number;
@@ -17,6 +18,9 @@ export type ReportsPackModel = {
   evidence: Record<string, CallRow[]>;
   rowCount: number;
   totalMatchedRows: number;
+  schema: string;
+  generatedAt: string;
+  rawContextIncluded: boolean;
   rawPayload: ReportsPackPayload;
 };
 
@@ -59,6 +63,9 @@ export async function loadReportsPack(
     evidence: evidenceRowsToCalls(payload.evidence ?? {}),
     rowCount: Number(payload.row_count ?? 0),
     totalMatchedRows: Number(payload.total_matched_rows ?? payload.row_count ?? 0),
+    schema: payload.schema ?? '',
+    generatedAt: payload.generated_at ?? '',
+    rawContextIncluded: payload.raw_context_included === true,
     rawPayload: payload,
   };
 }
