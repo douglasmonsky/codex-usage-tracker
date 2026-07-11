@@ -177,16 +177,20 @@ def _best_allowance_capacity_split(
         right_sse = _allowance_capacity_sse(rows, split_index, end)
         combined_sse = left_sse + right_sse
         reduction = parent_sse - combined_sse
-        if best_split is None or reduction > _number(best_split["sse_reduction"]):
-            best_split = {
-                "start": start,
-                "end": end,
-                "split_index": split_index,
-                "parent_sse": parent_sse,
-                "piecewise_sse": combined_sse,
-                "sse_reduction": reduction,
-                "sse_reduction_share": reduction / parent_sse,
-            }
+        previous_reduction = (
+            float("-inf") if best_split is None else _number(best_split["sse_reduction"])
+        )
+        if reduction <= previous_reduction:
+            continue
+        best_split = {
+            "start": start,
+            "end": end,
+            "split_index": split_index,
+            "parent_sse": parent_sse,
+            "piecewise_sse": combined_sse,
+            "sse_reduction": reduction,
+            "sse_reduction_share": reduction / parent_sse,
+        }
     return best_split
 
 

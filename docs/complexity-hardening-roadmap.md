@@ -50,26 +50,41 @@ full-tree cleanup.
 
 ### 4. Waste Candidate Diagnostics
 
-- [ ] Reduce repeated-file, shell-churn, and large-low-output candidate builders
+- [x] Reduce repeated-file, shell-churn, and large-low-output candidate builders
   through shared metric and explanation helpers.
 - Exit: all candidate functions rank B or better and diagnostic payload schemas
   remain unchanged.
 
 ### 5. Allowance And Isolated Utilities
 
-- [ ] Reduce allowance analysis/readiness and nonparametric statistical branch
+- [x] Reduce allowance analysis/readiness and nonparametric statistical branch
   complexity while preserving evidence grades and exact test results.
-- [ ] Reduce doctor formatting and command-wrapper classification.
+- [x] Reduce doctor formatting and command-wrapper classification.
 - Exit: every remaining C/E function ranks B or better.
 
 ### 6. Maintained Gates
 
-- [ ] Add Xenon B/A/A to hardening CI only after the full source tree passes.
-- [ ] Audit Pylint messages into correctness, maintainability, and convention
+- [x] Add Xenon B/A/A to hardening CI only after the full source tree passes.
+- [x] Audit Pylint messages into correctness, maintainability, and convention
   groups.
-- [ ] Enable a reviewed low-noise Pylint selection or changed-code ratchet; do
+- [x] Enable a reviewed low-noise Pylint selection or changed-code ratchet; do
   not add broad suppressions to manufacture a green full-tree score.
 - [ ] Run the full CI, security, package, and release validation matrix.
+
+The 2026-07-11 Pylint audit counted 1,448 default findings. Most were legacy
+convention or broad design signals already owned by Ruff, file-length, Xenon,
+Tach, or focused refactors: 342 missing function docstrings, 270 duplicate-code
+reports, 229 too-many-argument reports, 184 line-length reports, and 120
+useless-import-alias reports. The maintained Pylint gate now selects fatal and
+error messages plus a reviewed set of high-signal control-flow, exception,
+subprocess, finite-number, and comparison checks. The eight findings exposed by
+that selection were fixed in code. This is repository-level configuration, not
+inline suppression, and the historical audit remains available for future
+advisory cleanup.
+
+The complete source tree also passes the configured Xenon B/A/A gate. That
+result closes the original 21-function C/E backlog and makes complexity drift a
+maintained hardening failure instead of a periodic advisory scan.
 
 ## Validation Pattern
 
