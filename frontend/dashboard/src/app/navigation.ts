@@ -6,8 +6,8 @@ import {
   BrainCircuit,
   Database,
   FileText,
+  FlaskConical,
   Home,
-  Search,
   Settings,
   Table2,
   Workflow,
@@ -26,7 +26,7 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { id: 'overview', label: 'Overview', description: 'High-level telemetry', icon: Home },
-  { id: 'investigator', label: 'Investigator', description: 'Usage drivers', icon: Search },
+  { id: 'investigator', label: 'Investigate', description: 'Root-cause evidence', icon: FlaskConical },
   { id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2 },
   { id: 'threads', label: 'Threads', description: 'Thread efficiency', icon: Workflow },
   { id: 'usage-drain', label: 'Usage Drain Lab', description: 'Allowance and weekly credits', icon: BrainCircuit },

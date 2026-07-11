@@ -255,6 +255,31 @@ Gate:
 - privacy tests proving default aggregate surfaces omit indexed/raw content;
 - evidence-to-call/thread browser flows.
 
+Implementation checkpoint (2026-07-11):
+
+- the new Investigate workspace ranks aggregate and live agentic findings across
+  cache/context, tool output, shell churn, repeated file discovery, file reads
+  and modifications, concentration, read productivity, and guided summaries;
+- five localhost investigation routes call the same report builders used by MCP
+  for the agentic report, repeated files, shell churn, large low-output calls,
+  and bounded investigation walks, with tested filter and privacy parity;
+- progressive diagnostic queries retain the loaded aggregate fallback while
+  live evidence refreshes, and stored snapshots remain usable without a local
+  API;
+- a shared `VisualizationSpecV1` waste fingerprint matrix provides synchronized
+  chart/table views, deterministic freshness, caveats, and accessible summaries;
+- the virtualized evidence ledger freezes identity on desktop, becomes a ranked
+  list on mobile, and opens or copies the exact supporting Call Investigator
+  record while preserving return and selected-finding URL state;
+- local hypothesis traces remain explicitly gated by content-access settings,
+  and default evidence exports declare that they omit indexed/raw fragments;
+- desktop, tablet, mobile, and 200% layout-equivalent Browser checks found no
+  document overflow, visible control overlap, clipped panels, or console/page
+  warnings; chart/table switching and call/back navigation passed manually;
+- all 320 dashboard tests, governance, type, style, source-budget, dependency,
+  dead-code, and production-build gates pass, along with 45 focused Python
+  integration tests, release readiness, and `git diff --check`.
+
 ### R8. Limits And Allowance Intelligence
 
 Target PR: `redesign/08-limits` -> experiment

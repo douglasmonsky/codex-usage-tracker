@@ -38,6 +38,10 @@ from codex_usage_tracker.server.dashboard_pages import (
     DashboardPageMixin,
 )
 from codex_usage_tracker.server.diagnostic_routes import DiagnosticRouteMixin
+from codex_usage_tracker.server.investigations import (
+    InvestigationKind,
+    handle_investigation_request,
+)
 from codex_usage_tracker.server.live_queries import live_query_params
 from codex_usage_tracker.server.live_rows import annotate_live_rows, query_live_call_rows
 from codex_usage_tracker.server.open_investigator import (
@@ -334,6 +338,36 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
             query,
             live_query_params=self._live_query_params,
             live_call_rows=self._live_call_rows,
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
+
+    def _handle_investigation_agentic(self, query: str) -> None:
+        self._handle_investigation("agentic", query)
+
+    def _handle_investigation_repeated_file_rediscovery(self, query: str) -> None:
+        self._handle_investigation("repeated-file-rediscovery", query)
+
+    def _handle_investigation_shell_churn(self, query: str) -> None:
+        self._handle_investigation("shell-churn", query)
+
+    def _handle_investigation_large_low_output(self, query: str) -> None:
+        self._handle_investigation("large-low-output", query)
+
+    def _handle_investigation_walk(self, query: str) -> None:
+        self._handle_investigation("walk", query)
+
+    def _handle_investigation(self, kind: InvestigationKind, query: str) -> None:
+        handle_investigation_request(
+            kind,
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            projects_path=self._projects_path,
+            include_archived_default=self._include_archived,
+            privacy_mode=self._privacy_mode,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,

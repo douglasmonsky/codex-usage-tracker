@@ -89,7 +89,10 @@ expect(reportUrl.searchParams.has('max_entries')).toBe(false);
 expect(reportUrl.searchParams.has('include_tool_output')).toBe(false);
 
 fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
-  fireEvent.click(screen.getByRole('button', { name: /Copy link for workbench evidence call thread-6a5b4c codex-1/i }));
+  const investigatorEvidenceRow = screen.getByRole('row', {
+    name: /thread-6a5b4c cache-risk 1 425\.65K medium/i,
+  });
+  fireEvent.click(within(investigatorEvidenceRow).getByRole('button', { name: /Copy call link for cache-risk/i }));
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(3));
   const investigatorUrl = new URL(writeText.mock.calls[2][0]);
   expect(investigatorUrl.searchParams.get('view')).toBe('call');

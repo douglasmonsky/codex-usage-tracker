@@ -71,7 +71,7 @@ Open `Overview` when you want a quick read on current aggregate usage before sor
 - Metric cards summarize loaded aggregate rows without exposing prompts, assistant text, or raw tool output.
 - Time-series charts open on the most recent dates first and can scroll left for earlier history while keeping the value axis visible.
 - `Recent Calls` keeps the homepage modular: it shows the latest matching calls and lets any row open Call Investigator directly.
-- Use `Investigator` or `Calls` when you need deeper ranking, filtering, or preset-style investigation workflows.
+- Use `Investigate` or `Calls` when you need deeper ranking, filtering, or evidence review.
 
 ## Calls View
 
@@ -157,6 +157,32 @@ view.
 - Both views expose explicit live, stored, unavailable, empty, and error states,
   preserve direct Call Investigator actions, and export the currently loaded
   evidence rows.
+
+## Investigate View
+
+Use `Investigate` when you want an evidence-backed answer to where avoidable
+usage may be coming from.
+
+- The selected finding, confidence, evidence count, and deterministic next action
+  stay visible while you compare ranked signals.
+- The localhost dashboard reads `/api/investigations/agentic`, which returns the
+  same `codex-usage-tracker-agentic-investigation-v1` report as MCP
+  `usage_investigate(...)`. Repeated-file, shell-churn, and large-low-output
+  routes expose the corresponding MCP report contracts without a dashboard-only
+  interpretation layer.
+- Stored tool-output, file-read, file-modification, read-productivity,
+  concentration, and guided-summary diagnostics progressively join the ranked
+  findings. Static dashboards render loaded aggregate fallbacks instead of a
+  blank workspace.
+- The waste fingerprint matrix compares diagnostic families across linked
+  threads. Its synchronized table and the evidence ledger preserve exact values,
+  keyboard access, and direct Call Investigator or Threads navigation.
+- Local hypothesis traces call `/api/investigations/walk` only after local
+  content access is enabled. The response may use indexed event signals but does
+  not include raw fragments.
+- `Export evidence` writes the current findings, linked evidence, caveats, and
+  optional local trace to a local JSON bundle marked
+  `includes_raw_fragments: false`.
 
 ## Diagnostics View
 

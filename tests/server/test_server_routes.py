@@ -14,6 +14,17 @@ def test_server_route_tables_cover_dashboard_api_paths() -> None:
     assert GET_ROUTE_METHODS["/api/allowance/history"] == "_handle_allowance_history"
     assert GET_ROUTE_METHODS["/api/allowance/diagnostics"] == ("_handle_allowance_diagnostics")
     assert GET_ROUTE_METHODS["/api/allowance/export"] == "_handle_allowance_export"
+    assert GET_ROUTE_METHODS["/api/investigations/agentic"] == "_handle_investigation_agentic"
+    assert GET_ROUTE_METHODS["/api/investigations/repeated-files"] == (
+        "_handle_investigation_repeated_file_rediscovery"
+    )
+    assert GET_ROUTE_METHODS["/api/investigations/shell-churn"] == (
+        "_handle_investigation_shell_churn"
+    )
+    assert GET_ROUTE_METHODS["/api/investigations/large-low-output"] == (
+        "_handle_investigation_large_low_output"
+    )
+    assert GET_ROUTE_METHODS["/api/investigations/walk"] == "_handle_investigation_walk"
     assert GET_ROUTE_METHODS["/api/usage"] == "_handle_usage"
     assert GET_DIAGNOSTIC_FACT_ROUTES == {
         "/api/diagnostics/compactions": {"fact_type": "compaction"},

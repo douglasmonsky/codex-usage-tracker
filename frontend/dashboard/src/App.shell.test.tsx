@@ -335,9 +335,9 @@ expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     expect(screen.getByText('Context API gated')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
-    expect(screen.getByRole('heading', { name: 'Investigator Workbench' })).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: /^Inspect/i })[0]);
-    expect(screen.getByText(/Selected Long Thread/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Cache Misses \(Large Inputs\)/i }));
+    expect(screen.getByRole('heading', { name: 'Cache Misses (Large Inputs)' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
     fireEvent.click(screen.getByRole('button', { name: /Cost Curves/i }));

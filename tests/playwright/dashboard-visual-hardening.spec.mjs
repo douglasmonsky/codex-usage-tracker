@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const routes = [
   ['Overview', 'Overview', '/?view=overview&qa=visual-hardening'],
-  ['Investigator', 'Investigator Workbench', '/?view=investigator&qa=visual-hardening'],
+  ['Investigate', 'Investigate', '/?view=investigator&qa=visual-hardening'],
   ['Calls', 'Calls', '/?view=calls&qa=visual-hardening'],
   ['Call Investigator', 'Call Investigator', '/?view=call&record=fixture-call-2&qa=visual-hardening'],
   ['Threads', 'Threads', '/?view=threads&thread=thread-9f3a1c&qa=visual-hardening'],

@@ -183,7 +183,7 @@ it('opens overview findings and recent calls without homepage presets', () => {
   render(<App />);
   expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Inspect evidence' }));
-  expect(screen.getByRole('heading', { name: 'Investigator Workbench' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
   expect(window.location.search).toContain('view=investigator');
   expect(window.location.search).toContain('finding=1');
   fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
