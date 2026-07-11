@@ -8,11 +8,15 @@ from codex_usage_tracker.core.json_contract_server import SERVER_JSON_PAYLOAD_CO
 from codex_usage_tracker.core.json_contract_validation import (
     validate_json_payload_contract as _validate_json_payload_contract,
 )
+from codex_usage_tracker.core.json_contract_visualization import (
+    VISUALIZATION_JSON_PAYLOAD_CONTRACTS,
+)
 
 JSON_PAYLOAD_CONTRACTS = {
     **CLI_JSON_PAYLOAD_CONTRACTS,
     **DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS,
     **SERVER_JSON_PAYLOAD_CONTRACTS,
+    **VISUALIZATION_JSON_PAYLOAD_CONTRACTS,
 }
 
 

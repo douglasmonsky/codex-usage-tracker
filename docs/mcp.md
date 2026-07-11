@@ -41,6 +41,7 @@ Check whether my weekly allowance changed.
 Explain why the 5-hour counter looks noisy.
 Compare usage by model and effort, then suggest safer defaults.
 Show me what is estimated or unpriced before I trust cost numbers.
+Suggest the clearest chart for finding token waste, then render its spec.
 ```
 
 The API skill should refresh the local index, use MCP JSON tools, state scope and caveats, and recommend practical next actions. If MCP tools are unavailable, use the CLI JSON commands documented in [CLI And MCP JSON Schemas](cli-json-schemas.md).
@@ -66,6 +67,43 @@ Use lower-level diagnostics when the investigation report recommends them:
 - `usage_local_evidence_export(question=...)`: strict shareable summary from the local investigation walk, omitting raw/private records.
 
 Waste-discovery answers should not stop at "interesting." Tie recommendations to evidence and suggest verification in Calls, Threads, Call Investigator, Diagnostics Notebook, or Allowance Intelligence. Mention Headroom only when context pressure or handoff timing is relevant and the tool is available. Suggest custom local commands, scripts, repo notes, or skill updates when the same waste pattern keeps recurring.
+
+## Visualization Tools
+
+Use `usage_visualization_suggest(question=..., scope=...)` when the user asks
+what chart would clarify a usage question. It deterministically ranks four
+supported intents: token waste, weekly allowance change, cache failure, and
+thread lifecycle.
+
+Use `usage_visualization_render(kind=..., format="spec")` after choosing an
+intent. It reuses the existing aggregate report, allowance, Calls, and Threads
+tools and returns:
+
+- a renderer-independent `VisualizationSpecV1`;
+- the same compact rows used by the visualization table;
+- a short narrative, next action, and caveats;
+- explicit aggregate/raw-content flags and source schema metadata.
+
+`source_limit=0` or `source_limit=None` scans all matching aggregate source
+rows; `evidence_limit` remains intentionally bounded from 1 through 50. The
+default privacy mode is `strict`. SVG and PNG are deliberately unsupported in
+this experiment so the base Python package does not acquire a Node or browser
+runtime dependency. Codex clients can render the semantic spec when supported,
+or use its synchronized table and narrative directly.
+
+Compact examples:
+
+```text
+usage_visualization_render(kind="token_waste", source_limit=500, evidence_limit=12)
+usage_visualization_render(kind="allowance_change", source_limit=0, evidence_limit=20)
+usage_visualization_render(kind="cache_failure", model="gpt-5.5", evidence_limit=10)
+usage_visualization_render(kind="thread_lifecycle", thread="thread:example", source_limit=None)
+```
+
+The first and third examples use aggregate report-pack evidence, allowance
+change uses the weekly detector payload, and a selected thread uses
+chronological Calls data. Omitting `thread` produces a bounded comparison of
+the highest-token thread summaries instead.
 
 ## Tools
 
@@ -108,6 +146,8 @@ Waste-discovery answers should not stop at "interesting." Tie recommendations to
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
 - `usage_local_evidence_export`
+- `usage_visualization_suggest`
+- `usage_visualization_render`
 - `generate_usage_dashboard`
 - `export_usage_csv`
 - `init_usage_pricing_config`

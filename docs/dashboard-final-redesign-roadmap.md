@@ -397,6 +397,25 @@ Stop condition:
   payloads, document the experiment and defer image artifacts without blocking
   the dashboard release.
 
+Implementation checkpoint (2026-07-11):
+
+- `usage_visualization_suggest` now ranks four bounded, evidence-backed intents:
+  token waste, weekly allowance change, cache failure, and thread lifecycle;
+- `usage_visualization_render(format="spec")` reuses report-pack, allowance,
+  Calls, and Threads payloads and returns the shared
+  `codex-usage-visualization/v1` semantic contract plus compact table-equivalent
+  evidence, narrative, next action, caveats, and provenance;
+- source scans support finite limits plus `source_limit=0` and `None` for all
+  matching aggregate rows, while returned evidence remains an explicit 1-50
+  row control;
+- Python contract tests, MCP routing tests, a synthetic SQLite integration test,
+  and a shared Python/React JSON fixture verify semantic-spec equivalence;
+- the companion skill routes chart/plot/show requests through the new tools and
+  continues to use aggregate evidence by default;
+- the experiment is useful enough to retain the spec tools. SVG/PNG artifacts
+  are deferred because they would add a browser, Node, or second chart runtime
+  to the base package without improving the semantic evidence contract.
+
 ### R11. Hardening, Migration, And Release Candidate
 
 Target PR: `redesign/11-release-candidate` -> experiment
@@ -477,7 +496,8 @@ Every redesign PR answers these questions in its description:
 
 ## Immediate Next Unit
 
-After this roadmap commit is pushed, begin R1. Do not start page redesign work
-until dependency boundaries, visual contract ownership, and bundle reporting are
-in place. That order lets future agents move quickly without recreating the same
-large modules and global styles the redesign is intended to remove.
+R0 through R10 are complete on the experiment branch. Begin R11 with the full
+route/viewport accessibility matrix, cache and large-row benchmarks, packaged
+asset/install verification, documentation screenshots, migration notes, default
+switch, and rollback rehearsal. Do not open the final `main` PR until that
+release-candidate evidence is recorded and all R11 blockers are closed.
