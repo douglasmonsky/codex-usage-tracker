@@ -75,6 +75,11 @@ _._handle_allowance_history
 _._handle_allowance_diagnostics
 _._handle_allowance_export
 _._handle_reports_pack
+_._handle_investigation_agentic
+_._handle_investigation_repeated_file_rediscovery
+_._handle_investigation_shell_churn
+_._handle_investigation_large_low_output
+_._handle_investigation_walk
 _._handle_refresh_start
 _._handle_refresh_status
 _._handle_usage
