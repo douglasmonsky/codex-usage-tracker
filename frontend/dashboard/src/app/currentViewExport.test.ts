@@ -11,7 +11,9 @@ const runtime: RuntimeExportState = {
     fileMode: false,
   },
   historyScope: 'all',
+  loadWindow: 'all',
   loadLimit: rowLimitNoCap,
+  scopeSince: null,
   loadedRowCount: 8,
   totalAvailableRows: 25,
   canUseLiveApi: true,
@@ -25,6 +27,8 @@ describe('current view export helpers', () => {
       { field: 'live_api', value: 'available' },
       { field: 'context_api', value: 'enabled' },
       { field: 'history_scope', value: 'all' },
+      { field: 'data_window', value: 'All time' },
+      { field: 'scope_since', value: 'none' },
       { field: 'row_request', value: 'no cap' },
       { field: 'loaded_rows', value: '8' },
       { field: 'total_available_rows', value: '25' },
@@ -40,9 +44,10 @@ describe('current view export helpers', () => {
 
     expect(exportSpec.filename).toMatch(/^codex-dashboard-settings-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(exportSpec.label).toBe('settings rows');
-    expect(exportSpec.rowCount).toBe(10);
+    expect(exportSpec.rowCount).toBe(12);
     expect(exportSpec.csv).toContain('Field,Value');
     expect(exportSpec.csv).toContain('row_request,no cap');
+    expect(exportSpec.csv).toContain('data_window,All time');
     expect(exportSpec.csv).toContain('history_scope,all');
   });
 

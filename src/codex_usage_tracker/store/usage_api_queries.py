@@ -13,13 +13,13 @@ from codex_usage_tracker.store.query_sql import (
     normalize_sort_direction,
     usage_api_sort_expression,
     usage_api_where_clause,
-    usage_where_clause,
 )
 from codex_usage_tracker.store.rows import usage_row_to_dict
 from codex_usage_tracker.store.schema import init_db
 from codex_usage_tracker.store.usage_timing import (
     USAGE_TIMING_JOIN_SQL,
     USAGE_TIMING_SELECT_SQL,
+    usage_parent_select_sql,
 )
 
 
@@ -68,12 +68,6 @@ def query_usage_api_events(
         limit_clause = "LIMIT -1 OFFSET ?"
         query_params.append(normalized_offset)
 
-    parent_where_clause, parent_params = usage_where_clause(include_archived=include_archived)
-    parent_thread_filter = (
-        f"{parent_where_clause} AND thread_name IS NOT NULL"
-        if parent_where_clause
-        else "WHERE thread_name IS NOT NULL"
-    )
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(
@@ -81,33 +75,16 @@ def query_usage_api_events(
             SELECT
                 usage_events.*,
                 {USAGE_TIMING_SELECT_SQL},
-                coalesce(
-                    usage_events.parent_thread_name,
-                    parent_threads.thread_name
-                ) AS resolved_parent_thread_name,
-                coalesce(
-                    usage_events.parent_session_updated_at,
-                    parent_threads.session_updated_at
-                ) AS resolved_parent_session_updated_at
+                {usage_parent_select_sql(include_archived=include_archived)}
             FROM usage_events
             {USAGE_TIMING_JOIN_SQL}
-            LEFT JOIN (
-                SELECT
-                    session_id,
-                    max(thread_name) AS thread_name,
-                    max(session_updated_at) AS session_updated_at
-                FROM usage_events
-                {parent_thread_filter}
-                GROUP BY session_id
-            ) AS parent_threads
-            ON usage_events.parent_session_id = parent_threads.session_id
             {where_clause}
             ORDER BY {order_expr} {direction_sql},
                 usage_events.event_timestamp DESC,
                 usage_events.cumulative_total_tokens DESC
             {limit_clause}
             """,
-            [*parent_params, *query_params],
+            query_params,
         ).fetchall()
     return [usage_row_to_dict(row) for row in rows]
 

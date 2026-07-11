@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   finiteRowLimitFallback,
+  currentLoadWindowFromPayload,
   dataScopeFromCompatibilityLimit,
+  initialLoadWindowFromPayload,
+  loadWindowLabel,
   loadLimitFromPayload,
   nextRowLoadLimit,
   normalizeRowLimit,
@@ -13,6 +16,7 @@ import {
   rowLimitSummaryLabel,
   rowLimitValueLabel,
   rowLoadStatusLabel,
+  sinceForLoadWindow,
   storeDataScopePreference,
 } from './rowLimit';
 
@@ -40,13 +44,30 @@ describe('row limit helpers', () => {
   });
 
   it('uses null internally for no-cap requests and restores session preferences', () => {
-    expect(dataScopeFromCompatibilityLimit(rowLimitNoCap, 'all')).toEqual({ historyScope: 'all', limit: null });
-    expect(requestLimitForDataScope({ historyScope: 'active', limit: null })).toBe(rowLimitNoCap);
-    expect(requestLimitForDataScope({ historyScope: 'active', limit: 37 })).toBe(37);
+    expect(dataScopeFromCompatibilityLimit(rowLimitNoCap, 'all')).toEqual({
+      historyScope: 'all',
+      loadWindow: 'rows',
+      limit: null,
+      since: null,
+    });
+    expect(requestLimitForDataScope({ historyScope: 'active', loadWindow: 'all', limit: null, since: null })).toBe(rowLimitNoCap);
+    expect(requestLimitForDataScope({ historyScope: 'active', loadWindow: 'rows', limit: 37, since: null })).toBe(37);
 
     window.sessionStorage.clear();
-    storeDataScopePreference(37, 'all');
-    expect(readDataScopePreference()).toEqual({ historyScope: 'all', loadLimit: 37 });
+    storeDataScopePreference(37, 'all', 'day');
+    expect(readDataScopePreference()).toEqual({ historyScope: 'all', loadLimit: 37, loadWindow: 'day' });
+  });
+
+  it('defaults live dashboards to all time and keeps explicit window labels', () => {
+    expect(initialLoadWindowFromPayload({ rows: [], limit: 500, default_load_window: 'all' })).toBe('all');
+    expect(currentLoadWindowFromPayload({ rows: [], limit: 500, load_window: 'rows' })).toBe('rows');
+    expect(currentLoadWindowFromPayload({ rows: [], limit: null, limit_label: 'All', load_window: 'all' })).toBe('all');
+    expect(loadWindowLabel('day')).toBe('Last 24 hours');
+    expect(loadWindowLabel('week')).toBe('Last 7 days');
+    expect(loadWindowLabel('rows', 1250)).toBe('Most recent 1,250');
+    expect(loadWindowLabel('all')).toBe('All time');
+    expect(sinceForLoadWindow('week', new Date('2026-07-11T10:15:42Z'))).toBe('2026-07-04T10:15:00.000Z');
+    expect(sinceForLoadWindow('all')).toBeNull();
   });
 
   it('increments finite load-more requests without switching to no cap', () => {

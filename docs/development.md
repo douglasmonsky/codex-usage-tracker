@@ -221,6 +221,13 @@ DASHBOARD_BASE_URL=http://127.0.0.1:8898 npm run smoke:dashboard:diagnostics
 
 Dashboard screenshots in `docs/assets/` and `src/codex_usage_tracker/plugin_data/docs/assets/` must be generated from synthetic aggregate fixture data only. Capture the React dashboard from the Vite fixture route, then mirror the refreshed files into the packaged docs asset directory.
 
+With the dashboard Vite server running on port 4181, refresh both tracked copies
+with:
+
+```bash
+npm run dashboard:screenshots
+```
+
 The tracked dashboard screenshot set is:
 
 - `dashboard-insights.png`

@@ -258,6 +258,9 @@ def handle_usage_request(
     except UsageRefreshAuthError as exc:
         send_error(HTTPStatus.FORBIDDEN, str(exc))
         return
+    except ValueError as exc:
+        send_error(HTTPStatus.BAD_REQUEST, str(exc))
+        return
     except sqlite3.Error as exc:
         send_exception("Database error while reading usage data", exc)
         return
@@ -329,6 +332,11 @@ def usage_payload(
         first_query_value(params.get("diagnostics")), False
     )
     shell_only = parse_bool_query_value(first_query_value(params.get("shell")), False)
+    requested_since = first_query_value(params.get("since"))
+    effective_since = requested_since or since
+    requested_load_window = first_query_value(params.get("load_window"))
+    if requested_load_window and requested_load_window not in {"day", "week", "rows", "all"}:
+        raise ValueError("load_window must be one of: day, week, rows, all")
     refresh_result = None
     refresh_ms: float | None = None
 
@@ -353,12 +361,13 @@ def usage_payload(
         thresholds_path=thresholds_path,
         projects_path=projects_path,
         privacy_mode=privacy_mode,
-        since=since,
+        since=effective_since,
         api_token=api_token,
         context_api_enabled=context_api_enabled,
         include_archived=include_archived,
         language=language,
         include_rows=not shell_only,
+        load_window=requested_load_window,
     )
     dashboard_payload_ms = elapsed_ms(payload_started)
     payload["refreshed_at"] = utc_now()
@@ -372,6 +381,8 @@ def usage_payload(
             "include_archived": include_archived,
             "limit": limit,
             "offset": offset,
+            "since": effective_since,
+            "load_window": payload.get("load_window"),
         }
         if refresh_ms is not None:
             diagnostic_payload["refresh_ms"] = refresh_ms

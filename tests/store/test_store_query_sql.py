@@ -40,7 +40,7 @@ def test_usage_where_clause_excludes_archived_sources_when_requested() -> None:
     where, params = _usage_where_clause(include_archived=False)
 
     assert where == (
-        "WHERE (coalesce(is_archived, 0) = 0 "
+        "WHERE (is_archived = 0 "
         "AND NOT (source_file LIKE ? OR source_file LIKE ? "
         "OR source_file LIKE ? OR source_file LIKE ?))"
     )

@@ -39,6 +39,7 @@ export type CallsPageProps = {
   onCopyCallLink: (recordId: string) => void;
   includeArchived?: boolean;
   sourceRevision?: string;
+  scopeSince?: string | null;
   focusedEndpointsEnabled?: boolean;
   workspaceSwitcher?: ReactNode;
 };
@@ -96,6 +97,7 @@ export function CallsPage({
   onCopyCallLink,
   includeArchived = false,
   sourceRevision = '',
+  scopeSince = null,
   focusedEndpointsEnabled = import.meta.env.MODE !== 'test',
   workspaceSwitcher,
 }: CallsPageProps) {
@@ -121,6 +123,7 @@ export function CallsPage({
       activePreset,
       sourceFilter,
       sortKey,
+      scopeSince,
       timeFilter,
       dateStart,
       dateEnd,
@@ -143,6 +146,7 @@ export function CallsPage({
       modelFilter,
       sortKey,
       sourceFilter,
+      scopeSince,
       timeFilter,
     ],
   );

@@ -1,3 +1,5 @@
+import type { DashboardDataScope } from './dashboardDataScope';
+
 export type UsageRow = {
   id?: string;
   record_id?: string;
@@ -74,7 +76,7 @@ export type UsageRow = {
  efficiency_flags?: string[] | null;
 };
 
-export type DashboardBootPayload = {
+export type DashboardBootPayload = DashboardDataScope & {
   api_token?: string;
   context_api_enabled?: boolean;
   refresh_jobs_available?: boolean;
@@ -86,8 +88,6 @@ translation_catalog?: Record<string, Record<string, string>>;
 rows?: UsageRow[];
   summary?: Record<string, unknown>;
   observed_usage?: ObservedUsage;
-  history_scope?: string;
-  include_archived?: boolean;
   limit?: number | null;
   limit_label?: string;
   has_more?: boolean;

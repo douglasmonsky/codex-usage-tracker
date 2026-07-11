@@ -210,6 +210,41 @@ def test_handle_usage_request_sends_refresh_auth_error(tmp_path: Path) -> None:
     assert senders.json_payloads == []
 
 
+def test_usage_payload_forwards_request_window_without_refreshing(
+    tmp_path: Path,
+    monkeypatch: _MonkeyPatch,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def dashboard_payload(**kwargs: Any) -> dict[str, object]:
+        seen.update(kwargs)
+        return {"rows": [], "load_window": kwargs["load_window"]}
+
+    monkeypatch.setattr(server_usage_refresh, "dashboard_payload", dashboard_payload)
+
+    payload = server_usage_refresh.usage_payload(
+        "limit=0&since=2026-07-04T10%3A15%3A00.000Z&load_window=week",
+        **_usage_kwargs(tmp_path),
+    )
+
+    assert seen["limit"] is None
+    assert seen["since"] == "2026-07-04T10:15:00.000Z"
+    assert seen["load_window"] == "week"
+    assert payload["load_window"] == "week"
+
+
+def test_usage_payload_rejects_unknown_load_window(tmp_path: Path) -> None:
+    try:
+        server_usage_refresh.usage_payload(
+            "load_window=forever",
+            **_usage_kwargs(tmp_path),
+        )
+    except ValueError as exc:
+        assert str(exc) == "load_window must be one of: day, week, rows, all"
+    else:
+        raise AssertionError("unknown load window should fail")
+
+
 def test_handle_usage_request_sends_os_error(
     tmp_path: Path,
     monkeypatch: _MonkeyPatch,

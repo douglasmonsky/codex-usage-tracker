@@ -71,12 +71,17 @@ describe('Overview focused evidence flow', () => {
           onRefresh={vi.fn()}
           refreshState="Stored snapshot loaded"
           globalQuery=""
-          runtime={{ historyScope: 'active', loadLimit: 500, loadedRowCount: 8, totalAvailableRows: 8 }}
+          runtime={{
+            historyScope: 'active',
+            loadLimit: 500,
+            loadWindow: 'rows',
+            loadedRowCount: 8,
+            scopeSince: null,
+            totalAvailableRows: 8,
+          }}
           refreshing={false}
           canLoadMoreRows={false}
-          canLoadAllRows={false}
           onLoadMoreRows={vi.fn()}
-          onLoadAllRows={vi.fn()}
           onOpenInvestigator={openCall}
           onCopyCallLink={vi.fn()}
           onOpenFinding={vi.fn()}
@@ -89,6 +94,8 @@ describe('Overview focused evidence flow', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'High context pressure is the clearest current signal' })).toBeInTheDocument());
     expect(screen.getByText('Focused endpoints')).toBeInTheDocument();
     expect(screen.getByText('1 call')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Usage constellation' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Usage constellation evidence' })).toBeInTheDocument();
     expect(fetchMock.mock.calls.every(([url]) => String(url).includes('include_archived=false'))).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Inspect evidence' }));

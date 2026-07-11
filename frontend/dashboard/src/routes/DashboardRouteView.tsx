@@ -2,7 +2,7 @@ import { lazyRouteComponent } from '@tanstack/react-router';
 import { Suspense, type ReactNode } from 'react';
 
 import type { ContextRuntime, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
-import type { HistoryScope } from '../data/dataScope';
+import type { HistoryScope, LoadWindow } from '../data/dataScope';
 import type { DashboardViewId } from './dashboardSearch';
 
 const OverviewPage = lazyRouteComponent(() => import('../features/overview/OverviewPage'), 'OverviewPage');
@@ -53,10 +53,12 @@ type DashboardRouteViewProps = {
   globalQuery: string;
   hasMoreRows: boolean;
   historyScope: HistoryScope;
+  loadWindow: LoadWindow;
   loadAllRows: () => void;
   loadedRowCount: number;
   loadLimit: number;
   loadMoreRows: () => void;
+  scopeSince: string | null;
   model: DashboardModel;
   navigateView: (view: DashboardViewId) => void;
   onRefresh: () => void;
@@ -94,10 +96,12 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     globalQuery,
     hasMoreRows,
     historyScope,
+    loadWindow,
     loadAllRows,
     loadedRowCount,
     loadLimit,
     loadMoreRows,
+    scopeSince,
     model,
     navigateView,
     onRefresh,
@@ -119,12 +123,10 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onRefresh={onRefresh}
           refreshState={refreshState}
           globalQuery={globalQuery}
-          runtime={{ historyScope, loadLimit, loadedRowCount, totalAvailableRows }}
+          runtime={{ historyScope, loadLimit, loadWindow, loadedRowCount, scopeSince, totalAvailableRows }}
           refreshing={refreshing}
           canLoadMoreRows={canUseLiveApi && hasMoreRows}
-          canLoadAllRows={canLoadAllRows}
           onLoadMoreRows={loadMoreRows}
-          onLoadAllRows={loadAllRows}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
           onOpenFinding={openFindingInvestigator}
@@ -153,6 +155,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onRefresh={onRefresh}
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
+          scopeSince={scopeSince}
           sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
           onContextApiEnabledChange={setContextApiEnabled}
           onOpenInvestigator={openCallInvestigator}
@@ -236,7 +239,9 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           model={model}
           payload={dashboardPayload}
           historyScope={historyScope}
+          loadWindow={loadWindow}
           loadLimit={loadLimit}
+          scopeSince={scopeSince}
           loadedRowCount={loadedRowCount}
           totalAvailableRows={totalAvailableRows}
           canUseLiveApi={canUseLiveApi}

@@ -329,7 +329,7 @@ expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     fireEvent.click(within(screen.getByRole('group', { name: 'Quick Links' })).getByRole('button', { name: 'Files' }));
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     expect(screen.getByText('Loaded Data')).toBeInTheDocument();
- expect(screen.getAllByText('Rows loaded').length).toBeGreaterThan(0);
+ expect(screen.getAllByText('Evidence rows').length).toBeGreaterThan(0);
     expect(screen.getByText('8 of 8')).toBeInTheDocument();
     expect(screen.getByText('Static snapshot')).toBeInTheDocument();
     expect(screen.getByText('Content access gated')).toBeInTheDocument();

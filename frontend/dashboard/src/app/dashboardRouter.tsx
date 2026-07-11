@@ -46,9 +46,9 @@ declare module '@tanstack/react-router' {
   }
 }
 
-function dashboardBasepath(): string {
-  const configured = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return configured || '/';
+export function dashboardBasepath(): string {
+  // Vite's base locates assets; dashboard routes stay on the served document URL.
+  return '/';
 }
 
 function DashboardRoutePending() {

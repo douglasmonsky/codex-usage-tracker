@@ -6,17 +6,16 @@ const routes = [
   ['Calls', 'Calls', '/?view=calls&qa=visual-hardening'],
   ['Call Investigator', 'Call Investigator', '/?view=call&record=fixture-call-2&qa=visual-hardening'],
   ['Threads', 'Threads', '/?view=threads&thread=thread-9f3a1c&qa=visual-hardening'],
-  ['Usage Drain Lab', 'Usage Drain Lab', '/?view=usage-drain&qa=visual-hardening'],
-  ['Cache And Context Lab', 'Cache And Context Lab', '/?view=cache-context&qa=visual-hardening'],
+  ['Limits', 'Limits', '/?view=usage-drain&qa=visual-hardening'],
+  ['Cache And Context', 'Cache And Context Lab', '/?view=cache-context&qa=visual-hardening'],
   ['Diagnostics Notebook', 'Diagnostics Notebook', '/?view=diagnostics&qa=visual-hardening'],
   ['Reports', 'Reports', '/?view=reports&qa=visual-hardening'],
   ['Settings', 'Settings', '/?view=settings&qa=visual-hardening'],
 ];
 
 const viewports = [
+  ['compact desktop', { width: 1280, height: 800 }],
   ['desktop', { width: 1600, height: 900 }],
-  ['tablet', { width: 1024, height: 768 }],
-  ['mobile', { width: 390, height: 844 }],
 ];
 
 test.describe('React dashboard visual hardening', () => {

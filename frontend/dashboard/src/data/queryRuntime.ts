@@ -8,12 +8,19 @@ import {
 import type { DashboardBootPayload } from '../api/types';
 import {
   dataScopeFromCompatibilityLimit,
+  currentLoadWindowFromPayload,
   loadLimitFromPayload,
   requestLimitForDataScope,
   type DataScope,
   type HistoryScope,
+  type LoadWindow,
 } from './dataScope';
 import { isAbortError } from './httpTransportSupport';
+import {
+  persistentUsageSnapshotStore,
+  type UsageSnapshotIdentity,
+  type UsageSnapshotStore,
+} from './usageSnapshotCache';
 
 export type UsageTransport = {
   kind: 'production' | 'synthetic';
@@ -43,11 +50,14 @@ export type DashboardRuntimeMetadata = {
 type UsageQueryRequest = {
   currentPayload: DashboardBootPayload | null;
   historyScope: HistoryScope;
+  loadWindow?: LoadWindow;
   loadLimit: number;
+  since?: string | null;
   onProgress?: (progress: RefreshProgressPayload) => void;
   queryClient?: QueryClient;
   refresh?: boolean;
   transport?: UsageTransport;
+  snapshotStore?: UsageSnapshotStore;
 };
 
 const metadataStorageKey = 'codexUsageDashboardRuntimeMetadata';
@@ -56,8 +66,8 @@ const usageStaleTimeMs = 30_000;
 
 const usageQueryKeys = {
   all: ['usage'] as const,
-  snapshot: (sourceKey: string, scope: DataScope) =>
-    [...usageQueryKeys.all, 'snapshot', sourceKey, scope.historyScope, scope.limit] as const,
+  snapshot: (sourceKey: string, sourceRevision: string, scope: DataScope) =>
+    [...usageQueryKeys.all, 'snapshot', sourceKey, sourceRevision, scope.historyScope, scope.loadWindow, scope.limit, scope.since] as const,
 };
 
 export function createDashboardQueryClient(): QueryClient {
@@ -79,15 +89,18 @@ export const dashboardQueryClient = createDashboardQueryClient();
 export async function queryUsageSnapshot({
   currentPayload,
   historyScope,
+  loadWindow,
   loadLimit,
+  since = null,
   onProgress,
   queryClient = dashboardQueryClient,
   refresh = false,
+  snapshotStore = persistentUsageSnapshotStore,
   transport = productionUsageTransport,
 }: UsageQueryRequest): Promise<DashboardBootPayload> {
-  const scope = dataScopeFromCompatibilityLimit(loadLimit, historyScope);
+  const scope = dataScopeFromCompatibilityLimit(loadLimit, historyScope, since, loadWindow);
   const sourceKey = payloadSourceKey(currentPayload);
-  const queryKey = usageQueryKeys.snapshot(sourceKey, scope);
+  const queryKey = usageQueryKeys.snapshot(sourceKey, payloadSourceRevision(currentPayload), scope);
 
   if (!queryClient.getQueryData(queryKey) && payloadMatchesScope(currentPayload, scope)) {
     queryClient.setQueryData(queryKey, currentPayload);
@@ -96,20 +109,56 @@ export async function queryUsageSnapshot({
     await queryClient.invalidateQueries({ queryKey, exact: true });
   }
 
+  const cacheIdentity = usageSnapshotIdentity(currentPayload, scope);
   const payload = await queryClient.fetchQuery({
     queryKey,
-    queryFn: ({ signal }) =>
-      transport.load(currentPayload, {
+    queryFn: async ({ signal }) => {
+      const cachedPayload = !refresh && cacheIdentity
+        ? await snapshotStore.read(cacheIdentity)
+        : null;
+      if (cachedPayload) {
+        onProgress?.({
+          status: 'completed',
+          phase: 'loading_rows',
+          message: 'Loaded cached dashboard snapshot',
+          completed: Number(cachedPayload.loaded_row_count ?? cachedPayload.rows?.length ?? 0),
+          total: Number(cachedPayload.total_available_rows ?? cachedPayload.loaded_row_count ?? 0),
+          percent: 100,
+        });
+        return cachedPayload;
+      }
+      const loadedPayload = await transport.load(currentPayload, {
         refresh,
         limit: requestLimitForDataScope(scope),
         includeArchived: scope.historyScope === 'all',
+        loadWindow,
+        since: scope.since,
         onProgress,
         signal,
-      }),
+      });
+      const loadedIdentity = cacheIdentity
+        ? {
+            ...cacheIdentity,
+            sourceRevision: String(loadedPayload.latest_refresh_at ?? cacheIdentity.sourceRevision),
+          }
+        : usageSnapshotIdentity(loadedPayload, scope);
+      if (loadedIdentity) await snapshotStore.write(loadedIdentity, loadedPayload);
+      return loadedPayload;
+    },
     staleTime: refresh ? 0 : usageStaleTimeMs,
   });
   writeDashboardRuntimeMetadata(metadataFromPayload(payload, scope));
   return payload;
+}
+
+function usageSnapshotIdentity(
+  payload: DashboardBootPayload | null,
+  scope: DataScope,
+): UsageSnapshotIdentity | null {
+  if (!payload?.api_token) return null;
+  const sourceRevision = String(payload.latest_refresh_at ?? '');
+  if (!sourceRevision) return null;
+  return { sourceKey: payloadSourceKey(payload), sourceRevision, scope };
 }
 
 export async function cancelUsageQueries(queryClient = dashboardQueryClient): Promise<void> {
@@ -168,8 +217,10 @@ function payloadMatchesScope(payload: DashboardBootPayload | null, scope: DataSc
   if (!payload || !(payload.rows?.length ?? 0)) return false;
   const payloadLimit = loadLimitFromPayload(payload);
   const limitMatches = scope.limit === null ? payloadLimit === 0 : payloadLimit === scope.limit;
+  const sinceMatches = (payload.since ?? null) === scope.since;
+  const loadWindowMatches = currentLoadWindowFromPayload(payload) === scope.loadWindow;
   const payloadHistory = payload.include_archived || payload.history_scope === 'all-history' ? 'all' : 'active';
-  return limitMatches && payloadHistory === scope.historyScope;
+  return limitMatches && sinceMatches && loadWindowMatches && payloadHistory === scope.historyScope;
 }
 
 function payloadSourceKey(payload: DashboardBootPayload | null): string {
@@ -182,11 +233,17 @@ function payloadSourceKey(payload: DashboardBootPayload | null): string {
   return `${version}:${key}`;
 }
 
+function payloadSourceRevision(payload: DashboardBootPayload | null): string {
+  return String(payload?.latest_refresh_at ?? 'unversioned');
+}
+
 function isDataScope(value: unknown): value is DataScope {
   if (!value || typeof value !== 'object') return false;
   const scope = value as Partial<DataScope>;
   const limitValid = scope.limit === null || (typeof scope.limit === 'number' && Number.isFinite(scope.limit) && scope.limit > 0);
-  return limitValid && (scope.historyScope === 'active' || scope.historyScope === 'all');
+  const sinceValid = scope.since === null || typeof scope.since === 'string';
+  const loadWindowValid = scope.loadWindow === 'day' || scope.loadWindow === 'week' || scope.loadWindow === 'rows' || scope.loadWindow === 'all';
+  return limitValid && sinceValid && loadWindowValid && (scope.historyScope === 'active' || scope.historyScope === 'all');
 }
 
 function sessionStorageOrNull(): Storage | null {

@@ -2,6 +2,7 @@ import { callInvestigatorCallForCurrentUrl } from '../features/call-investigator
 import { rowsToCsv, csvDateStamp, type CsvColumn } from '../features/shared/exportCsv';
 import { callCsvColumns } from '../features/shared/tables';
 import type { ContextRuntime, DashboardModel } from '../api/types';
+import { loadWindowLabel, type LoadWindow } from '../data/dataScope';
 import type { ViewId } from './navigation';
 import { rowLimitNoCap } from './rowLimit';
 import type { HistoryScope } from './shellUrl';
@@ -9,7 +10,9 @@ import type { HistoryScope } from './shellUrl';
 export type RuntimeExportState = {
   contextRuntime: ContextRuntime;
   historyScope: HistoryScope;
+  loadWindow: LoadWindow;
   loadLimit: number;
+  scopeSince: string | null;
   loadedRowCount: number;
   totalAvailableRows: number;
   canUseLiveApi: boolean;
@@ -93,6 +96,8 @@ export function settingsExportRows(model: DashboardModel, runtime: RuntimeExport
     { field: 'live_api', value: runtime.canUseLiveApi ? 'available' : 'static snapshot' },
     { field: 'context_api', value: runtime.contextRuntime.contextApiEnabled ? 'enabled' : 'gated' },
     { field: 'history_scope', value: runtime.historyScope },
+    { field: 'data_window', value: loadWindowLabel(runtime.loadWindow, runtime.loadLimit) },
+    { field: 'scope_since', value: runtime.scopeSince ?? 'none' },
     { field: 'row_request', value: runtime.loadLimit === rowLimitNoCap ? 'no cap' : String(runtime.loadLimit) },
     { field: 'loaded_rows', value: String(runtime.loadedRowCount) },
     { field: 'total_available_rows', value: String(runtime.totalAvailableRows) },

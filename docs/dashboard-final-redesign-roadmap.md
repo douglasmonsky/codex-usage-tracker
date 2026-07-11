@@ -120,6 +120,11 @@ Deliverables:
 - route-level lazy loading and error boundaries;
 - source revision/cache-validator support where API changes are warranted.
 
+R11 hardening update: the live shell now defaults to an All time server-aggregate
+window with 500 bounded evidence rows, offers 24-hour, 7-day, and typed recent-row
+scopes, and restores revision-matched snapshots from IndexedDB on reload. Scope
+changes read the existing SQLite index; explicit refresh alone rescans sources.
+
 Compatibility requirements:
 
 - arbitrary finite limit, `limit=0`, `limit=None`, No cap, Load more, active/all
@@ -420,12 +425,16 @@ Implementation checkpoint (2026-07-11):
 
 Target PR: `redesign/11-release-candidate` -> experiment
 
+Final review additions are delivered as isolated R11 PRs before the release
+evidence checkpoint: compact shell/filter density and the ADR 0008 Overview usage
+constellation with responsive WebGL, pixel, interaction, and table-fallback gates.
+
 Deliverables:
 
-- route/viewport Playwright matrix for every workspace;
+- compact- and standard-desktop Playwright matrix for every workspace;
 - axe, keyboard, focus, zoom, reduced motion, contrast, containment, and chart
   table-equivalence gates;
-- performance traces for startup, 5k rows, No cap, 100k synthetic rows, reload,
+- performance traces for startup, 5k rows, All time, 100k synthetic rows, reload,
   cache hit, and single appended record;
 - production bundle and package-asset verification;
 - synthetic docs screenshots and dashboard guide updates;
@@ -449,7 +458,7 @@ Open one PR from `experiment/dashboard-final-redesign` to `main` only after R11.
 
 The PR must include:
 
-- before/after workflow evidence at desktop and mobile;
+- before/after workflow evidence at compact and standard desktop;
 - signed feature-parity and route-compatibility ledger;
 - architecture graph and debt/bundle deltas;
 - API/MCP contract changes and migration notes;
@@ -496,8 +505,7 @@ Every redesign PR answers these questions in its description:
 
 ## Immediate Next Unit
 
-R0 through R10 are complete on the experiment branch. Begin R11 with the full
-route/viewport accessibility matrix, cache and large-row benchmarks, packaged
-asset/install verification, documentation screenshots, migration notes, default
-switch, and rollback rehearsal. Do not open the final `main` PR until that
-release-candidate evidence is recorded and all R11 blockers are closed.
+R0 through R11 are complete on the experiment branch. Proceed to the R12 audit,
+commit the release-candidate branch, integrate it into
+`experiment/dashboard-final-redesign`, and open the final PR to `main` only
+after confirming the branch diff and GitHub checks remain non-destructive.

@@ -3,22 +3,26 @@ import { ArrowRight, RefreshCw } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 
 import type { ContextRuntime, DashboardModel } from '../../api/types';
+import type { LoadWindow } from '../../data/dataScope';
 import { Button, StatusBadge } from '../../design';
 import { overviewQueryOptions, type OverviewEndpointBundle } from '../../data/overviewQueries';
-import { Visualization } from '../../visualization';
+import { UsageConstellation, Visualization } from '../../visualization';
 import { OverviewFindingRail } from './OverviewFindingRail';
 import { OverviewMetrics } from './OverviewMetrics';
 import styles from './OverviewPage.module.css';
 import { OverviewRecentCalls } from './OverviewRecentCalls';
 import { buildOverviewViewModel, type OverviewFindingView } from './overviewModel';
 import type { OverviewNavigationTarget } from './overviewNavigation';
+import { buildUsageConstellationModel } from './usageConstellationModel';
 
 export { overviewCallsForQuery } from './overviewCalls';
 
 type OverviewRuntime = {
   historyScope: 'active' | 'all';
   loadLimit: number;
+  loadWindow: LoadWindow;
   loadedRowCount: number;
+  scopeSince: string | null;
   totalAvailableRows: number;
 };
 
@@ -32,9 +36,7 @@ type OverviewPageProps = {
   runtime: OverviewRuntime;
   refreshing: boolean;
   canLoadMoreRows: boolean;
-  canLoadAllRows: boolean;
   onLoadMoreRows: () => void;
-  onLoadAllRows: () => void;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
   onOpenFinding: (rank: number) => void;
@@ -46,12 +48,11 @@ type OverviewPageProps = {
 export function OverviewPage(props: OverviewPageProps) {
   const focusedEndpointsEnabled = props.focusedEndpointsEnabled ?? import.meta.env.MODE !== 'test';
   const canUseFocusedEndpoints = focusedEndpointsEnabled && !props.contextRuntime.fileMode && Boolean(props.contextRuntime.apiToken);
-  const since = earliestLoadedDate(props.model);
   const focusedQuery = useQuery({
     ...overviewQueryOptions({
       runtime: props.contextRuntime,
       includeArchived: props.runtime.historyScope === 'all',
-      since,
+      since: props.runtime.scopeSince ?? undefined,
       sourceRevision: props.sourceRevision,
     }),
     enabled: canUseFocusedEndpoints,
@@ -60,6 +61,10 @@ export function OverviewPage(props: OverviewPageProps) {
   const viewModel = useMemo(
     () => buildOverviewViewModel(props.model, focusedQuery.data, props.runtime.historyScope),
     [focusedQuery.data, props.model, props.runtime.historyScope],
+  );
+  const constellationModel = useMemo(
+    () => buildUsageConstellationModel(props.model.calls),
+    [props.model.calls],
   );
   const topFinding = viewModel.findings[0];
 
@@ -101,6 +106,8 @@ export function OverviewPage(props: OverviewPageProps) {
 
       <Visualization spec={viewModel.tokenFlowSpec} height={290} />
 
+      <UsageConstellation model={constellationModel} onOpenCall={props.onOpenInvestigator} />
+
       <OverviewRecentCalls
         calls={props.model.calls}
         globalFilters={props.globalFilters}
@@ -109,20 +116,13 @@ export function OverviewPage(props: OverviewPageProps) {
         totalAvailableRows={props.runtime.totalAvailableRows}
         refreshing={props.refreshing}
         canLoadMoreRows={props.canLoadMoreRows}
-        canLoadAllRows={props.canLoadAllRows}
         onLoadMoreRows={props.onLoadMoreRows}
-        onLoadAllRows={props.onLoadAllRows}
+        onBrowseCalls={() => props.onNavigateView('calls')}
         onOpenCall={props.onOpenInvestigator}
         onCopyCallLink={props.onCopyCallLink}
       />
     </div>
   );
-}
-
-function earliestLoadedDate(model: DashboardModel): string | undefined {
-  const timestamps = model.calls.map(call => Date.parse(call.eventTimestamp)).filter(Number.isFinite);
-  if (!timestamps.length) return undefined;
-  return new Date(Math.min(...timestamps)).toISOString().slice(0, 10);
 }
 
 function endpointLabel(isFetching: boolean, data: OverviewEndpointBundle | undefined, error: Error | null, enabled: boolean): string {

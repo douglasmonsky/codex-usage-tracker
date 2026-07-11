@@ -11,6 +11,8 @@ const budgets = {
   routeJs: 65 * 1024,
   // ADR 0006 keeps 110 kB as the target and permits 114 kB of measured headroom.
   visualizationRouteJs: 114 * 1024,
+  // ADR 0008 isolates the optional Three.js constellation behind a 140 kB hard ceiling.
+  constellationRouteJs: 140 * 1024,
   routeCss: 20 * 1024
 };
 
@@ -29,7 +31,8 @@ for (const file of assets) {
     file: outputPath,
     gzipBytes: gzipSync(content, { level: 9, mtime: 0 }).byteLength,
     kind: initialFiles.has(outputPath) ? 'initial' : 'route',
-    visualizationCore: content.includes('ZRender, a high performance 2d drawing library')
+    visualizationCore: content.includes('ZRender, a high performance 2d drawing library'),
+    constellationRenderer: file === 'UsageConstellationCanvas.js'
   });
 }
 
@@ -58,9 +61,11 @@ if (initialCssBytes > budgets.currentInitialCss) {
   failures.push(`initial css ${kib(initialCssBytes)} exceeds ${kib(budgets.currentInitialCss)}`);
 }
 for (const row of rows.filter((item) => item.kind === 'route' && item.file.endsWith('.js'))) {
-  const limit = row.visualizationCore || /visualization|chart/i.test(row.file)
-    ? budgets.visualizationRouteJs
-    : budgets.routeJs;
+  const limit = row.constellationRenderer
+    ? budgets.constellationRouteJs
+    : row.visualizationCore || /visualization|chart/i.test(row.file)
+      ? budgets.visualizationRouteJs
+      : budgets.routeJs;
   if (row.gzipBytes > limit) failures.push(`${row.file} ${kib(row.gzipBytes)} exceeds ${kib(limit)}`);
 }
 for (const row of rows.filter((item) => item.kind === 'route' && item.file.endsWith('.css'))) {

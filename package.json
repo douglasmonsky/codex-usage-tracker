@@ -21,6 +21,7 @@
     "dashboard:verify": "npm run dashboard:lint && npm run dashboard:typecheck && npm run dashboard:test && npm run dashboard:governance && npm run dashboard:bundle-report",
     "dashboard:smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test tests/playwright/dashboard-react.spec.mjs",
     "dashboard:visualization-smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173/codex-usage-tracker-assets/react/ playwright test tests/playwright/dashboard-visualization.spec.mjs --project=chromium-desktop",
+    "dashboard:screenshots": "node scripts/capture_dashboard_screenshots.mjs",
     "smoke:dashboard:diagnostics": "playwright test tests/playwright/dashboard-diagnostics.spec.mjs"
   },
   "devDependencies": {
@@ -30,6 +31,7 @@
     "esbuild": "^0.28.1",
     "knip": "6.26.0",
     "markdownlint-cli2": "0.23.0",
+    "pngjs": "^7.0.0",
     "stylelint": "17.14.0"
   }
 }
