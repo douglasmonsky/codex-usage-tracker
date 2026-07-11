@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 
 from codex_usage_tracker.core.paths import DEFAULT_PRICING_PATH
 
@@ -136,55 +136,90 @@ def pin_pricing_snapshot(
 
 
 def parse_models(raw: object) -> dict[str, dict[str, float]]:
+    model_payload = _required_model_payload(raw)
+    models: dict[str, dict[str, float]] = {}
+    for model, rates in model_payload.items():
+        if not _valid_model_name(model):
+            continue
+        parsed_rates = _parsed_model_rates(model, rates)
+        if parsed_rates is not None:
+            models[model] = parsed_rates
+    return models
+
+
+def _required_model_payload(raw: object) -> dict[object, object]:
     if not isinstance(raw, dict):
         raise ValueError("pricing config must be a JSON object")
     model_payload = raw.get("models", raw)
     if not isinstance(model_payload, dict):
         raise ValueError("pricing config 'models' must be an object")
+    return model_payload
 
-    models: dict[str, dict[str, float]] = {}
-    for model, rates in model_payload.items():
-        if not isinstance(model, str) or model.startswith("_"):
-            continue
-        if not isinstance(rates, dict):
-            continue
-        input_rate = _required_rate(rates, "input_per_million", model)
-        cached_rate = _optional_rate(rates, "cached_input_per_million")
-        output_rate = _required_rate(rates, "output_per_million", model)
-        models[model] = {
-            "input_per_million": float(input_rate),
-            "cached_input_per_million": float(
-                cached_rate if cached_rate is not None else input_rate
-            ),
-            "output_per_million": float(output_rate),
-        }
-    return models
+
+def _optional_model_payload(raw: object) -> dict[object, object]:
+    if not isinstance(raw, dict):
+        return {}
+    model_payload = raw.get("models", raw)
+    if not isinstance(model_payload, dict):
+        return {}
+    return model_payload
+
+
+def _parsed_model_rates(model: str, rates: object) -> dict[str, float] | None:
+    if not isinstance(rates, dict):
+        return None
+    input_rate = _required_rate(rates, "input_per_million", model)
+    cached_rate = _optional_rate(rates, "cached_input_per_million")
+    output_rate = _required_rate(rates, "output_per_million", model)
+    return {
+        "input_per_million": float(input_rate),
+        "cached_input_per_million": float(cached_rate if cached_rate is not None else input_rate),
+        "output_per_million": float(output_rate),
+    }
+
+
+def _valid_model_name(model: object) -> TypeGuard[str]:
+    return isinstance(model, str) and not model.startswith("_")
 
 
 def parse_aliases(raw: object) -> dict[str, str]:
-    if not isinstance(raw, dict):
-        return {}
-    aliases = raw.get("aliases")
-    if not isinstance(aliases, dict):
-        return {}
+    aliases = _optional_named_mapping(raw, "aliases")
     parsed: dict[str, str] = {}
-    for source, target in aliases.items():
-        if isinstance(source, str) and isinstance(target, str) and source and target:
+    for alias in aliases.items():
+        if _valid_alias(alias):
+            source, target = alias
             parsed[source] = target
     return parsed
 
 
-def parse_estimated_models(raw: object) -> set[str]:
+def _optional_named_mapping(raw: object, field: str) -> dict[object, object]:
     if not isinstance(raw, dict):
-        return set()
-    model_payload = raw.get("models", raw)
-    if not isinstance(model_payload, dict):
-        return set()
-    return {
-        model
-        for model, rates in model_payload.items()
-        if isinstance(model, str) and isinstance(rates, dict) and rates.get("estimated") is True
-    }
+        return {}
+    value = raw.get(field)
+    if not isinstance(value, dict):
+        return {}
+    return value
+
+
+def _valid_alias(alias: tuple[object, object]) -> TypeGuard[tuple[str, str]]:
+    source, target = alias
+    return all(
+        (
+            isinstance(source, str),
+            isinstance(target, str),
+            bool(source),
+            bool(target),
+        )
+    )
+
+
+def parse_estimated_models(raw: object) -> set[str]:
+    model_payload = _optional_model_payload(raw)
+    return {model for model, rates in model_payload.items() if _estimated_model_entry(model, rates)}
+
+
+def _estimated_model_entry(model: object, rates: object) -> TypeGuard[str]:
+    return isinstance(model, str) and isinstance(rates, dict) and rates.get("estimated") is True
 
 
 def load_existing_aliases(path: Path) -> dict[str, str]:

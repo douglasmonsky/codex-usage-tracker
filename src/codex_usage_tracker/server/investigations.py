@@ -91,77 +91,195 @@ def investigation_payload(
         first_query_value(params.get("include_archived")),
         include_archived_default,
     )
-    selected_privacy_mode = first_query_value(params.get("privacy_mode")) or privacy_mode
+    selected_privacy_mode = _selected_privacy_mode(params, privacy_mode)
 
     if kind == "agentic":
-        return dict(
-            build_agentic_investigation_report(
-                db_path=db_path,
-                pricing_path=pricing_path,
-                allowance_path=allowance_path,
-                projects_path=projects_path,
-                goal=first_query_value(params.get("goal")) or "token_waste",
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                evidence_limit=_bounded_int(params, "evidence_limit", 5),
-                detail_mode=first_query_value(params.get("detail_mode")) or "compact",
-                privacy_mode=selected_privacy_mode,
-            ).payload
+        return _agentic_investigation_payload(
+            params,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            privacy_mode=selected_privacy_mode,
         )
     if kind == "repeated-file-rediscovery":
-        return dict(
-            build_repeated_file_rediscovery_report(
-                db_path=db_path,
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                min_occurrences=_bounded_int(params, "min_occurrences", 2),
-                limit=parse_api_limit(first_query_value(params.get("limit")), 20),
-                sample_limit=_bounded_int(params, "sample_limit", 3),
-                privacy_mode=selected_privacy_mode,
-            ).payload
+        return _repeated_file_investigation_payload(
+            params,
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            privacy_mode=selected_privacy_mode,
         )
     if kind == "shell-churn":
-        return dict(
-            build_shell_churn_report(
-                db_path=db_path,
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                min_occurrences=_bounded_int(params, "min_occurrences", 3),
-                limit=parse_api_limit(first_query_value(params.get("limit")), 20),
-                sample_limit=_bounded_int(params, "sample_limit", 3),
-                privacy_mode=selected_privacy_mode,
-            ).payload
+        return _shell_churn_investigation_payload(
+            params,
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            privacy_mode=selected_privacy_mode,
         )
     if kind == "large-low-output":
-        return dict(
-            build_large_low_output_report(
-                db_path=db_path,
-                since=since,
-                until=until,
-                thread=thread,
-                include_archived=include_archived,
-                min_total_tokens=_bounded_int(
-                    params,
-                    "min_total_tokens",
-                    20_000,
-                    maximum=1_000_000_000,
-                ),
-                max_output_tokens=_bounded_int(
-                    params,
-                    "max_output_tokens",
-                    1_000,
-                    maximum=1_000_000_000,
-                ),
-                limit=parse_api_limit(first_query_value(params.get("limit")), 20),
-                privacy_mode=selected_privacy_mode,
-            ).payload
+        return _large_low_output_investigation_payload(
+            params,
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            privacy_mode=selected_privacy_mode,
         )
+    return _walk_investigation_payload(
+        params,
+        db_path=db_path,
+        since=since,
+        until=until,
+        thread=thread,
+        include_archived=include_archived,
+        privacy_mode=selected_privacy_mode,
+    )
+
+
+def _selected_privacy_mode(
+    params: dict[str, list[str]],
+    privacy_mode: str,
+) -> str:
+    return first_query_value(params.get("privacy_mode")) or privacy_mode
+
+
+def _agentic_investigation_payload(
+    params: dict[str, list[str]],
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    privacy_mode: str,
+) -> dict[str, object]:
+    return dict(
+        build_agentic_investigation_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            goal=first_query_value(params.get("goal")) or "token_waste",
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=_bounded_int(params, "evidence_limit", 5),
+            detail_mode=first_query_value(params.get("detail_mode")) or "compact",
+            privacy_mode=privacy_mode,
+        ).payload
+    )
+
+
+def _repeated_file_investigation_payload(
+    params: dict[str, list[str]],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    privacy_mode: str,
+) -> dict[str, object]:
+    return dict(
+        build_repeated_file_rediscovery_report(
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_occurrences=_bounded_int(params, "min_occurrences", 2),
+            limit=parse_api_limit(first_query_value(params.get("limit")), 20),
+            sample_limit=_bounded_int(params, "sample_limit", 3),
+            privacy_mode=privacy_mode,
+        ).payload
+    )
+
+
+def _shell_churn_investigation_payload(
+    params: dict[str, list[str]],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    privacy_mode: str,
+) -> dict[str, object]:
+    return dict(
+        build_shell_churn_report(
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_occurrences=_bounded_int(params, "min_occurrences", 3),
+            limit=parse_api_limit(first_query_value(params.get("limit")), 20),
+            sample_limit=_bounded_int(params, "sample_limit", 3),
+            privacy_mode=privacy_mode,
+        ).payload
+    )
+
+
+def _large_low_output_investigation_payload(
+    params: dict[str, list[str]],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    privacy_mode: str,
+) -> dict[str, object]:
+    return dict(
+        build_large_low_output_report(
+            db_path=db_path,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            min_total_tokens=_bounded_int(
+                params,
+                "min_total_tokens",
+                20_000,
+                maximum=1_000_000_000,
+            ),
+            max_output_tokens=_bounded_int(
+                params,
+                "max_output_tokens",
+                1_000,
+                maximum=1_000_000_000,
+            ),
+            limit=parse_api_limit(first_query_value(params.get("limit")), 20),
+            privacy_mode=privacy_mode,
+        ).payload
+    )
+
+
+def _walk_investigation_payload(
+    params: dict[str, list[str]],
+    *,
+    db_path: Path,
+    since: str | None,
+    until: str | None,
+    thread: str | None,
+    include_archived: bool,
+    privacy_mode: str,
+) -> dict[str, object]:
     question = first_query_value(params.get("question"))
     if not question:
         raise ValueError("question is required")
@@ -175,7 +293,7 @@ def investigation_payload(
             include_archived=include_archived,
             min_occurrences=_bounded_int(params, "min_occurrences", 2),
             evidence_limit=_bounded_int(params, "evidence_limit", 5),
-            privacy_mode=selected_privacy_mode,
+            privacy_mode=privacy_mode,
         ).payload
     )
 

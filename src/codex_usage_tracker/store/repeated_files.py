@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
+from codex_usage_tracker.store.query_values import row_int
+
 
 def query_repeated_file_rediscovery(
     conn: sqlite3.Connection,
@@ -118,18 +120,14 @@ def _file_candidate(
     *,
     trace_handles: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    read_count = int(row["read_count"] or 0)
-    write_count = int(row["write_count"] or 0)
-    other_count = int(row["other_operation_count"] or 0)
-    occurrences = int(row["occurrences"] or 0)
-    call_count = int(row["call_count"] or 0)
-    adjacent_count = int(row["adjacent_retouch_count"] or 0)
-    total_tokens = int(row["total_tokens"] or 0)
-    candidate_kind = (
-        "repeated_read_rediscovery"
-        if read_count >= max(write_count + other_count, 1)
-        else "edit_or_write_churn"
-    )
+    read_count = row_int(row, "read_count")
+    write_count = row_int(row, "write_count")
+    other_count = row_int(row, "other_operation_count")
+    occurrences = row_int(row, "occurrences")
+    call_count = row_int(row, "call_count")
+    adjacent_count = row_int(row, "adjacent_retouch_count")
+    total_tokens = row_int(row, "total_tokens")
+    candidate_kind = _file_candidate_kind(read_count, write_count, other_count)
     return {
         "path_hash": row["path_hash"],
         "path_identity": row["path_identity"],
@@ -138,10 +136,10 @@ def _file_candidate(
         "candidate_kind": candidate_kind,
         "occurrences": occurrences,
         "call_count": call_count,
-        "thread_count": int(row["thread_count"] or 0),
-        "session_count": int(row["session_count"] or 0),
+        "thread_count": row_int(row, "thread_count"),
+        "session_count": row_int(row, "session_count"),
         "total_tokens": total_tokens,
-        "avg_tokens_per_call": round(total_tokens / call_count, 2) if call_count else 0.0,
+        "avg_tokens_per_call": _average_per_call(total_tokens, call_count),
         "adjacent_retouch_count": adjacent_count,
         "operation_mix": {
             "read": read_count,
@@ -161,6 +159,18 @@ def _file_candidate(
         ),
         "trace_handles": trace_handles,
     }
+
+
+def _file_candidate_kind(read_count: int, write_count: int, other_count: int) -> str:
+    if read_count >= max(write_count + other_count, 1):
+        return "repeated_read_rediscovery"
+    return "edit_or_write_churn"
+
+
+def _average_per_call(total_tokens: int, call_count: int) -> float:
+    if not call_count:
+        return 0.0
+    return round(total_tokens / call_count, 2)
 
 
 def _trace_handles_for_path(

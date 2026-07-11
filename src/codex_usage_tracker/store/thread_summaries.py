@@ -72,32 +72,17 @@ def query_thread_summaries(
         search=search,
         include_archived=include_archived,
     )
-    sort_map = {
-        "tokens": "total_tokens",
-        "time": "latest_event_timestamp",
-        "calls": "call_count",
-        "cache": "avg_cache_ratio",
-        "thread": "thread_label",
-    }
-    if sort not in sort_map:
-        allowed = ", ".join(sorted(sort_map))
-        raise ValueError(f"sort must be one of: {allowed}")
+    sort_column = _thread_summary_sort_column(sort)
     direction_sql = normalize_sort_direction(direction)
     normalized_limit = normalize_limit(limit)
     normalized_offset = normalize_offset(offset)
+    limit_clause, query_params = _thread_summary_limit_clause(
+        normalized_limit,
+        normalized_offset,
+        params,
+    )
     usage_thread_key = thread_key_expression("u.")
-    active_usage_filter = "" if include_archived else "AND coalesce(u.is_archived, 0) = 0"
-    limit_clause = ""
-    query_params = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
+    active_usage_filter = _active_usage_filter(include_archived)
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(
@@ -117,12 +102,50 @@ def query_thread_summaries(
                 ) AS latest_record_id
             FROM thread_summaries AS t
             {where_clause}
-            ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
+            ORDER BY {sort_column} {direction_sql}, latest_event_timestamp DESC
             {limit_clause}
             """,
             query_params,
         ).fetchall()
     return [row_to_dict(row) for row in rows]
+
+
+def _thread_summary_sort_column(sort: str) -> str:
+    sort_map = {
+        "tokens": "total_tokens",
+        "time": "latest_event_timestamp",
+        "calls": "call_count",
+        "cache": "avg_cache_ratio",
+        "thread": "thread_label",
+    }
+    if sort not in sort_map:
+        allowed = ", ".join(sorted(sort_map))
+        raise ValueError(f"sort must be one of: {allowed}")
+    return sort_map[sort]
+
+
+def _thread_summary_limit_clause(
+    limit: int | None,
+    offset: int,
+    params: list[Any],
+) -> tuple[str, list[Any]]:
+    query_params = list(params)
+    if limit is not None:
+        query_params.append(limit)
+        if offset:
+            query_params.append(offset)
+            return "LIMIT ? OFFSET ?", query_params
+        return "LIMIT ?", query_params
+    if offset:
+        query_params.append(offset)
+        return "LIMIT -1 OFFSET ?", query_params
+    return "", query_params
+
+
+def _active_usage_filter(include_archived: bool) -> str:
+    if include_archived:
+        return ""
+    return "AND coalesce(u.is_archived, 0) = 0"
 
 
 def query_thread_summary_count(

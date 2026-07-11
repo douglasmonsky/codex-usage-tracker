@@ -333,27 +333,34 @@ def _command_tokens(command: str) -> list[str]:
 def _strip_command_wrappers(tokens: list[str]) -> list[str]:
     remaining = list(tokens)
     while remaining:
-        while remaining and _looks_like_assignment(remaining[0]):
-            remaining.pop(0)
-        if not remaining:
+        remaining = _strip_leading_assignments(remaining)
+        unwrapped = _unwrap_command_once(remaining)
+        if unwrapped is None:
             break
-        base = _command_basename(remaining[0])
-        if base in {"command", "env", "sudo"}:
-            remaining.pop(0)
-            continue
-        if base in SHELL_EXEC_WRAPPERS:
-            nested = _shell_exec_nested_tokens(remaining)
-            if nested:
-                remaining = nested
-                continue
-        if base in RUN_WRAPPERS and len(remaining) > 2 and remaining[1] == "run":
-            remaining = remaining[2:]
-            continue
-        if base == "npx" and len(remaining) > 1:
-            remaining = remaining[1:]
-            continue
-        break
+        remaining = unwrapped
     return remaining
+
+
+def _strip_leading_assignments(tokens: list[str]) -> list[str]:
+    index = 0
+    while index < len(tokens) and _looks_like_assignment(tokens[index]):
+        index += 1
+    return tokens[index:]
+
+
+def _unwrap_command_once(tokens: list[str]) -> list[str] | None:
+    if not tokens:
+        return None
+    base = _command_basename(tokens[0])
+    if base in {"command", "env", "sudo"}:
+        return tokens[1:]
+    if base in SHELL_EXEC_WRAPPERS:
+        return _shell_exec_nested_tokens(tokens) or None
+    if base in RUN_WRAPPERS and len(tokens) > 2 and tokens[1] == "run":
+        return tokens[2:]
+    if base == "npx" and len(tokens) > 1:
+        return tokens[1:]
+    return None
 
 
 def _looks_like_assignment(token: str) -> bool:
