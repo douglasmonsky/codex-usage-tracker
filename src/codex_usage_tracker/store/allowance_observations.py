@@ -40,16 +40,6 @@ ALLOWANCE_OBSERVATION_COLUMNS = (
 ALLOWANCE_SYNC_BATCH_SIZE = 500
 
 
-def sync_allowance_observations(conn: sqlite3.Connection) -> int:
-    """Refresh normalized allowance observations from aggregate usage events."""
-
-    conn.execute("DELETE FROM allowance_observations")
-    inserted = 0
-    for window_key in ("primary", "secondary"):
-        inserted += conn.execute(_insert_observation_sql(window_key)).rowcount
-    return inserted
-
-
 def sync_allowance_observations_for_record_ids(
     conn: sqlite3.Connection,
     record_ids: list[str],
