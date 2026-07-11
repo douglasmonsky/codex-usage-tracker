@@ -55,7 +55,7 @@ describe('Reports selected-report workspace', () => {
     expect(screen.getByText('Live localhost report pack')).toBeInTheDocument();
     expect(screen.getByText('2026-07-11T10:00:00Z')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/reports/pack?'),
+      expect.stringMatching(/\/api\/reports\/pack\?.*limit=0/),
       expect.objectContaining({ headers: expect.objectContaining({ 'X-Codex-Usage-Token': 'local-token' }) }),
     );
 
@@ -76,6 +76,7 @@ function renderReports(overrides: {
         model={overrides.model ?? fixtureModel}
         refreshState="Loaded snapshot ready"
         includeArchived={false}
+        loadWindow="all"
         loadLimit={500}
         onOpenInvestigator={overrides.onOpenInvestigator ?? vi.fn()}
         onCopyCallLink={overrides.onCopyCallLink ?? vi.fn()}

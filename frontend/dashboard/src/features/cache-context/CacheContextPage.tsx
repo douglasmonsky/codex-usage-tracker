@@ -1,7 +1,7 @@
 import { Copy, Search } from 'lucide-react';
 import { useMemo, useState, type CSSProperties } from 'react';
 
-import type { CallRow, DashboardModel, HeatmapRow, ThreadRow } from '../../api/types';
+import type { CallRow, ContextRuntime, DashboardModel, HeatmapRow, ThreadRow } from '../../api/types';
 import { LineChart } from '../../charts/LineChart';
 import { DataTable } from '../../components/DataTable';
 import { MetricCard } from '../../components/MetricCard';
@@ -10,9 +10,15 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
 import { threadActionColumn, threadColumns, threadInvestigatorRowLabel } from '../shared/tables';
 import { stopRowActionKeyDown } from '../shared/rowActionEvents';
+import { useCacheContextEvidence } from './cacheContextEvidence';
 
 type CacheContextPageProps = {
   model: DashboardModel;
+  contextRuntime: ContextRuntime;
+  includeArchived?: boolean;
+  scopeSince?: string | null;
+  sourceRevision?: string;
+  focusedEndpointsEnabled?: boolean;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 };
@@ -22,21 +28,36 @@ export function cacheContextCallsForCurrentUrl(model: DashboardModel): CallRow[]
   return cacheThreadCalls(model.calls, selectedThread);
 }
 
-export function CacheContextPage({ model, onOpenInvestigator, onCopyCallLink }: CacheContextPageProps) {
-  const [selectedThreadName, setSelectedThreadName] = useState<string | null>(() => cacheThreadNameFromUrl(model.threads));
-  const selectedThread = model.threads.find(thread => thread.name === selectedThreadName) ?? model.threads[0] ?? null;
+export function CacheContextPage({
+  model,
+  contextRuntime,
+  includeArchived = false,
+  scopeSince = null,
+  sourceRevision = '',
+  focusedEndpointsEnabled = import.meta.env.MODE !== 'test',
+  onOpenInvestigator,
+  onCopyCallLink,
+}: CacheContextPageProps) {
+  const [selectedThreadName, setSelectedThreadName] = useState<string | null>(cacheThreadParam);
+  const evidence = useCacheContextEvidence({
+    model,
+    runtime: contextRuntime,
+    includeArchived,
+    scopeSince,
+    selectedThreadName,
+    sourceRevision,
+    enabled: focusedEndpointsEnabled,
+  });
+  const selectedThread = evidence.selectedThread;
   const threadTableColumns = useMemo(
     () => [...threadColumns, threadActionColumn({ onOpenInvestigator, onCopyCallLink })],
     [onCopyCallLink, onOpenInvestigator],
   );
-  const selectedCalls = useMemo(
-    () => cacheThreadCalls(model.calls, selectedThread),
-    [model.calls, selectedThread],
-  );
+  const selectedCalls = evidence.selectedCalls;
 const selectedHeatmap = selectedThread
-? model.cacheHeatmap.find(row => threadLabelsMatch(row.thread, selectedThread.name))
+? evidence.heatmap.find(row => threadLabelsMatch(row.thread, selectedThread.name))
 : null;
-const heatmapWindowLabels = useMemo(() => cacheHeatmapWindowLabels(model.cacheHeatmap), [model.cacheHeatmap]);
+const heatmapWindowLabels = useMemo(() => cacheHeatmapWindowLabels(evidence.heatmap), [evidence.heatmap]);
 
 return (
     <div className="cache-layout">
@@ -46,20 +67,20 @@ return (
           <p>Cache behavior, cold resumes, context pressure, optimization recommendations.</p>
         </div>
         <div className="toolbar">
-          <StatusBadge label="Snapshot current" tone="green" />
+          <StatusBadge label={evidence.usingFocusedEndpoints ? 'Full-scope endpoints' : 'Snapshot fallback'} tone={evidence.usingFocusedEndpoints ? 'green' : 'orange'} />
           <StatusBadge label="Context safe" tone="blue" />
         </div>
       </div>
 
       <div className="metric-grid span-all">
-        {model.cards.slice(2, 5).map(card => (
+        {evidence.cards.map(card => (
           <MetricCard key={card.label} card={card} />
         ))}
       </div>
 
       <Panel title="Cache Hit Rate & Context Window Over Time" subtitle="Cache reuse and context pressure">
         <LineChart
-          series={[...model.cacheSeries, model.usageRemainingSeries[0]].filter(Boolean)}
+          series={[...evidence.cacheSeries, model.usageRemainingSeries[0]].filter(Boolean)}
           yLabel="Percent"
           valueFormatter={value => `${value}%`}
         />
@@ -75,7 +96,7 @@ return (
                   <span key={label} role="columnheader">{label}</span>
                 ))}
               </div>
-              {model.cacheHeatmap.map(row => (
+              {evidence.heatmap.map(row => (
                 <div className="heatmap-row" role="row" key={row.thread}>
                   <strong className="sticky-column" role="rowheader">{row.thread}</strong>
                   {heatmapWindowLabels.map((label, index) => {
@@ -107,7 +128,7 @@ return (
       >
         <DataTable
           columns={threadTableColumns}
-          data={model.threads}
+          data={evidence.threads}
           compact
 getRowId={thread => thread.name}
 getRowActionLabel={threadInvestigatorRowLabel}
@@ -125,6 +146,7 @@ activateOnClick
 selectOnHover
 ariaLabel="Cache context threads overview"
 />
+        <p className="table-caption">Showing {formatNumber(evidence.threads.length)} of {formatNumber(evidence.totalThreads)} full-scope thread summaries.</p>
       </Panel>
 
 <SelectedCacheThreadPanel
@@ -320,9 +342,13 @@ function cacheThreadCalls(calls: CallRow[], thread: ThreadRow | null): CallRow[]
 }
 
 function cacheThreadNameFromUrl(threads: ThreadRow[]): string | null {
-  const threadName = new URLSearchParams(window.location.search).get('cache_thread')?.trim();
+  const threadName = cacheThreadParam();
   if (!threadName) return null;
   return threads.some(thread => thread.name === threadName) ? threadName : null;
+}
+
+function cacheThreadParam(): string | null {
+  return new URLSearchParams(window.location.search).get('cache_thread')?.trim() || null;
 }
 
 function cacheThreadFromUrl(threads: ThreadRow[]): ThreadRow | null {

@@ -121,7 +121,7 @@ const canAutoRefreshUsageRows = shouldAutoRefreshUsageView(activeView);
     pendingLimit: pendingLoadLimit,
   });
   const rowLimitSliderValue = Math.min(finitePendingLoadLimit, rowLimitSliderMax);
-const hasMoreRows = loadWindow === 'rows' && (Boolean(dashboardPayload?.has_more) || (totalAvailableRows > 0 && loadedRowCount < totalAvailableRows));
+const hasMoreRows = Boolean(dashboardPayload?.has_more) || (totalAvailableRows > 0 && loadedRowCount < totalAvailableRows);
   const nextLoadMoreLimit = nextRowLoadLimit({
     currentLimit: loadLimit,
     loadedRows: loadedRowCount,
@@ -418,7 +418,7 @@ void refreshDashboard({ refresh: false, loadWindow: 'all' });
 
 function loadMoreRows() {
 setPendingLoadLimit(nextLoadMoreLimit);
-void refreshDashboard({ refresh: false, loadLimit: nextLoadMoreLimit, loadWindow: 'rows' });
+void refreshDashboard({ refresh: false, loadLimit: nextLoadMoreLimit, loadWindow });
 }
 
 function handleLoadWindowChange(nextLoadWindow: LoadWindow) {

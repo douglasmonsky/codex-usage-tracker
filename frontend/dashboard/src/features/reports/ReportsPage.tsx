@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { loadReportsPack } from '../../api/reports';
 import type { CallRow, DashboardModel } from '../../api/types';
+import type { LoadWindow } from '../../data/dataScope';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Visualization } from '../../visualization';
@@ -24,6 +25,7 @@ type ReportsPageProps = {
   model: DashboardModel;
   refreshState: string;
   includeArchived: boolean;
+  loadWindow: LoadWindow;
   loadLimit: number;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
@@ -37,6 +39,7 @@ export function ReportsPage({
   model,
   refreshState,
   includeArchived,
+  loadWindow,
   loadLimit,
   onOpenInvestigator,
   onCopyCallLink,
@@ -44,10 +47,11 @@ export function ReportsPage({
   const [selectedKey, setSelectedKey] = useState(() => reportKey(reportFromUrl(model.reports) ?? model.reports[0]));
   const [actionStatus, setActionStatus] = useState('');
   const canUseLive = Boolean(model.contextRuntime.apiToken) && !model.contextRuntime.fileMode;
+  const reportLimit = loadWindow === 'rows' ? loadLimit : 0;
   const reportQuery = useQuery({
-    queryKey: ['reports', 'pack', canUseLive, includeArchived, loadLimit],
+    queryKey: ['reports', 'pack', canUseLive, includeArchived, reportLimit],
     queryFn: () => loadReportsPack(model.contextRuntime, {
-      limit: loadLimit,
+      limit: reportLimit,
       evidenceLimit: 8,
       includeArchived,
     }),
