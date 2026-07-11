@@ -38,7 +38,7 @@ class MonkeyPatch(Protocol):
         target: object,
         name: str,
         value: object,
-        raising: bool = True,
+        _raising: bool = True,
     ) -> None: ...
 
 
