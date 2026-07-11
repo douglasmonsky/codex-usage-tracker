@@ -54,8 +54,7 @@ export function dataScopeFromCompatibilityLimit(
   loadWindow: LoadWindow = 'rows',
 ): DataScope {
   const normalized = normalizeRowLimit(limit);
-  const scopedLimit = loadWindow === 'rows' && normalized !== rowLimitNoCap ? normalized : null;
-  return { historyScope, loadWindow, limit: scopedLimit, since };
+  return { historyScope, loadWindow, limit: normalized === rowLimitNoCap ? null : normalized, since };
 }
 
 export function requestLimitForDataScope(scope: DataScope): number {

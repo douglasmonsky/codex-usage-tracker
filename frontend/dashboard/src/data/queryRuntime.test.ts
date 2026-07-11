@@ -76,7 +76,7 @@ describe('dashboard query runtime', () => {
     expect(load.mock.calls[1]?.[1]).toMatchObject({ includeArchived: false, limit: 37, refresh: true });
   });
 
-  it('requests every row for time-window scopes even when the recent-row preference is finite', async () => {
+  it('keeps time-window shell evidence bounded while endpoints cover the full scope', async () => {
     const load = vi.fn<UsageTransport['load']>(async () => ({
       ...shellPayload,
       load_window: 'all',
@@ -95,7 +95,7 @@ describe('dashboard query runtime', () => {
 
     expect(load).toHaveBeenCalledWith(
       shellPayload,
-      expect.objectContaining({ limit: 0, loadWindow: 'all' }),
+      expect.objectContaining({ limit: 500, loadWindow: 'all' }),
     );
   });
 

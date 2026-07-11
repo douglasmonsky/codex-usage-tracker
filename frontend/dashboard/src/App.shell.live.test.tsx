@@ -65,7 +65,7 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   expect(await screen.findByText('real-live-thread')).toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=10000');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
   expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
 });
