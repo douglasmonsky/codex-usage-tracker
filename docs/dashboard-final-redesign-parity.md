@@ -7,8 +7,6 @@ deferred work so the final switch does not rely on an informal visual review.
 Status meanings:
 
 - **Complete**: implemented and covered by focused tests or browser evidence.
-- **R10 optional**: useful MCP visualization experiment, not a dashboard-release
-  blocker unless it changes a public contract.
 - **R11 gate**: behavior exists, but release-candidate accessibility,
   performance, package, or viewport evidence is still required.
 - **Deferred**: deliberately outside the redesign release, with the current
@@ -74,14 +72,14 @@ Overview instead of producing a broken route.
 | Diagnostics snapshots and facts APIs | Complete | Cached notebook data and linked evidence retained. |
 | Reports pack API | Complete | Existing schema remains compatible; the UI adds presentation metadata without changing server semantics. |
 | CSV/JSON exports | Complete | Aggregate exports retain compatibility headers; strict allowance export omits local identifiers. |
-| MCP structured payloads | R10 optional | Existing structured MCP tools remain unchanged; visualization-spec usefulness is evaluated separately. |
+| MCP structured payloads | Complete | Existing structured tools remain compatible; suggestion and spec-first rendering tools add the shared visualization contract without raw fragments. |
 
 ## Explicit Non-Blockers And R11 Evidence
 
 The following items are not silent omissions:
 
-- R10 may stop after a documented negative result if MCP visualization specs are
-  not materially more useful than current structured tool payloads.
+- R10 retained semantic visualization specs and explicitly deferred SVG/PNG
+  artifacts so the base Python runtime remains browser- and Node-free.
 - Raw prompts, assistant text, file content, and command output remain absent
   from aggregate dashboard payloads. Explicit Call Investigator content access
   stays local and gated.

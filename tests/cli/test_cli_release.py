@@ -97,7 +97,7 @@ MCP_TOOL_NAMES = {
     "init_usage_pricing_config",
     "update_usage_pricing_config",
     "init_usage_allowance_config",
-}
+} | {"usage_visualization_suggest", "usage_visualization_render"}
 
 
 def test_module_cli_version() -> None:

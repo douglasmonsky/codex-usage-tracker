@@ -38,8 +38,9 @@ For maintainer dogfood or plugin-quality checks, prefer the MCP polling flow whe
 5. If the user asks about cache misses, cold resumes, context bloat, or low-output expensive calls, call `usage_investigate(goal="cache_failure")`, then inspect `usage_large_low_output_calls(...)`, `usage_calls(...)`, `usage_report_pack(...)`, or `usage_context_bloat_scan(...)`.
 6. If the user asks about repeated shell probing, repeated file rediscovery, or workflow churn, call `usage_investigate(goal="workflow_churn")`, then inspect `usage_shell_churn(...)`, `usage_repeated_file_rediscovery(...)`, or `usage_investigation_walk(question=...)`.
 7. If the user asks a precise dashboard/API question, use the direct tool: `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_summary`, `usage_query`, `session_usage`, `usage_report_pack`, `usage_dashboard_recommendations`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`.
-8. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
-9. Use `usage_call_context(...)` only when the user explicitly asks for raw local context and the MCP server has raw context enabled.
+8. If the user asks to visualize, chart, plot, or show a usage pattern, call `usage_visualization_suggest(question=...)` when the intent is unclear, then `usage_visualization_render(kind=..., format="spec")`. Use the returned narrative and synchronized evidence table even when the client cannot render the spec.
+9. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
+10. Use `usage_call_context(...)` only when the user explicitly asks for raw local context and the MCP server has raw context enabled.
 
 ## Tool Stance
 
@@ -49,6 +50,7 @@ For maintainer dogfood or plugin-quality checks, prefer the MCP polling flow whe
 - `usage_allowance_diagnostics` is the main allowance-change evidence tool. Treat weekly windows as the primary signal and 5-hour windows as noisy rolling-window context.
 - `usage_large_low_output_calls`, `usage_shell_churn`, and `usage_repeated_file_rediscovery` are the most actionable token-waste probes. Use them to turn broad findings into concrete next steps.
 - `usage_investigation_walk` can use local content/event-index signals for deeper pattern scans, but it is not the default shareable report.
+- `usage_visualization_suggest` ranks token-waste, allowance-change, cache-failure, and thread-lifecycle visual intents. `usage_visualization_render` returns a renderer-independent spec plus compact evidence; request `format="spec"` only because SVG/PNG are intentionally outside the base runtime.
 - If MCP tools are unavailable, use CLI JSON equivalents documented in `docs/cli-json-schemas.md`.
 
 ## Remediation Guidance

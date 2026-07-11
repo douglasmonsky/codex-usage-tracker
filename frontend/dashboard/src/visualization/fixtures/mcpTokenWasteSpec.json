@@ -1,0 +1,146 @@
+{
+  "schema": "codex-usage-visualization/v1",
+  "id": "mcp-token-waste",
+  "title": "Large-input, low-output candidates",
+  "description": "Uncached input and output tokens for the strongest loaded aggregate candidates.",
+  "state": {
+    "kind": "ready"
+  },
+  "scope": {
+    "label": "1 aggregate evidence rows",
+    "rowCount": 1,
+    "historyScope": "active"
+  },
+  "freshness": {
+    "generatedAt": "2026-07-01T12:00:00Z",
+    "sourceRevision": "codex-usage-tracker-reports-pack-v1"
+  },
+  "caveats": [
+    "Large uncached input with little output is a candidate signal, not proof that the context was unnecessary.",
+    "Only aggregate call fields are included; inspect a linked call explicitly for local context."
+  ],
+  "accessibility": {
+    "summary": "Large-input, low-output candidates contains 1 aggregate evidence rows.",
+    "details": [
+      "Large uncached input with little output is a candidate signal, not proof that the context was unnecessary.",
+      "Only aggregate call fields are included; inspect a linked call explicitly for local context."
+    ],
+    "keyboardInstructions": "Use left and right arrow keys to inspect values, or switch to the table for exact data."
+  },
+  "table": {
+    "caption": "Large-input, low-output candidates evidence",
+    "columns": [
+      {
+        "field": "label",
+        "label": "Call",
+        "type": "category",
+        "align": "left"
+      },
+      {
+        "field": "uncached_input_tokens",
+        "label": "Uncached input",
+        "type": "number",
+        "align": "right",
+        "unit": "tokens"
+      },
+      {
+        "field": "output_tokens",
+        "label": "Output",
+        "type": "number",
+        "align": "right",
+        "unit": "tokens"
+      },
+      {
+        "field": "total_tokens",
+        "label": "Total tokens",
+        "type": "number",
+        "align": "right",
+        "unit": "tokens"
+      },
+      {
+        "field": "cached_percent",
+        "label": "Cached",
+        "type": "number",
+        "align": "right",
+        "unit": "percent"
+      },
+      {
+        "field": "estimated_cost_usd",
+        "label": "Estimated cost",
+        "type": "number",
+        "align": "right",
+        "unit": "usd"
+      },
+      {
+        "field": "usage_credits",
+        "label": "Credits",
+        "type": "number",
+        "align": "right",
+        "unit": "credits"
+      },
+      {
+        "field": "record_id",
+        "label": "Record",
+        "type": "text",
+        "align": "left",
+        "hiddenByDefault": true
+      }
+    ]
+  },
+  "interactions": {
+    "selection": {
+      "keyField": "id",
+      "labelField": "label"
+    }
+  },
+  "annotations": [],
+  "kind": "cartesian",
+  "data": {
+    "rows": [
+      {
+        "id": "call-large",
+        "label": "large-thread - 2",
+        "record_id": "call-large",
+        "uncached_input_tokens": 9500,
+        "output_tokens": 25,
+        "total_tokens": 10025,
+        "cached_percent": 5,
+        "estimated_cost_usd": 0.75,
+        "usage_credits": 18.75
+      }
+    ]
+  },
+  "axes": {
+    "x": {
+      "field": "label",
+      "label": "Call",
+      "type": "category"
+    },
+    "y": {
+      "field": "uncached_input_tokens",
+      "label": "Tokens",
+      "type": "number",
+      "unit": "tokens"
+    }
+  },
+  "series": [
+    {
+      "id": "uncached-input",
+      "label": "Uncached input",
+      "mark": "bar",
+      "xField": "label",
+      "yField": "uncached_input_tokens",
+      "color": "#2f6fed",
+      "smooth": false
+    },
+    {
+      "id": "output",
+      "label": "Output",
+      "mark": "bar",
+      "xField": "label",
+      "yField": "output_tokens",
+      "color": "#16866b",
+      "smooth": false
+    }
+  ]
+}
