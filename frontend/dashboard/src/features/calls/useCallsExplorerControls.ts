@@ -36,6 +36,7 @@ import {
 export const callsTablePageSize = 250;
 
 export function useCallsExplorerControls(model: DashboardModel, globalQuery: string) {
+  const densityParam = readCallsSearchParam('density');
   const [localQuery, setLocalQuery] = useState(() => readCallsSearchParam('call_q'));
   const [modelFilter, setModelFilter] = useState(() => readCallsSearchParam('model') || 'all');
   const [effortFilter, setEffortFilter] = useState(() => readCallsSearchParam('effort') || 'all');
@@ -51,7 +52,7 @@ export function useCallsExplorerControls(model: DashboardModel, globalQuery: str
   const gridPreferences = useEvidenceGridPreferences('codexUsageCallsEvidenceGrid', {
     density: readDensityParam() === 'dense' ? 'compact' : 'comfortable',
     columnVisibility: {},
-  });
+  }, densityParam === 'roomy' ? 'comfortable' : densityParam === 'dense' ? 'compact' : undefined);
   const density: Density = gridPreferences.density === 'compact' ? 'dense' : 'roomy';
   const initialSelectedCallId = useMemo(() => readInitialSelectedCallId(), []);
   const [selectedCallId, setSelectedCallId] = useState<string | null>(initialSelectedCallId);

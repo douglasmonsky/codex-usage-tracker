@@ -59,13 +59,14 @@ function mockViewport(matches: boolean) {
 type HarnessProps = {
   data?: Evidence[];
   storageKey?: string;
+  initialDensity?: EvidenceGridDensity;
   onSelect?: (row: Evidence) => void;
   onActivate?: (row: Evidence) => void;
 };
 
-function GridHarness({ data = rows, storageKey = 'test-evidence-grid', onSelect, onActivate }: HarnessProps) {
+function GridHarness({ data = rows, storageKey = 'test-evidence-grid', initialDensity, onSelect, onActivate }: HarnessProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const preferences = useEvidenceGridPreferences(storageKey, defaults);
+  const preferences = useEvidenceGridPreferences(storageKey, defaults, initialDensity);
   return (
     <EvidenceGrid
       ariaLabel="Calls evidence"
@@ -191,6 +192,18 @@ describe('EvidenceGrid', () => {
 });
 
 describe('useEvidenceGridPreferences', () => {
+  it('lets an explicit initial density override a stored density without discarding columns', () => {
+    mockViewport(false);
+    globalThis.localStorage.setItem('shared-grid', JSON.stringify({
+      density: 'compact',
+      columnVisibility: { tokens: false },
+    }));
+    render(<GridHarness storageKey="shared-grid" initialDensity="comfortable" />);
+    expect(screen.getByRole('button', { name: 'Roomy' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByText('Columns'));
+    expect(screen.getByLabelText('Tokens')).not.toBeChecked();
+  });
+
   it('ignores malformed stored values', () => {
     mockViewport(false);
     globalThis.localStorage.setItem('malformed-grid', JSON.stringify({

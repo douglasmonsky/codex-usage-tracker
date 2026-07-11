@@ -26,17 +26,22 @@ function getLocalStorage(): Storage | undefined {
   }
 }
 
-function readPreferences(storageKey: string, defaults: EvidenceGridPreferenceDefaults): EvidenceGridPreferenceDefaults {
+function readPreferences(
+  storageKey: string,
+  defaults: EvidenceGridPreferenceDefaults,
+  initialDensity?: EvidenceGridDensity,
+): EvidenceGridPreferenceDefaults {
   const storage = getLocalStorage();
   if (!storage) {
-    return defaults;
+    return { ...defaults, density: initialDensity ?? defaults.density };
   }
 
   try {
     const stored = JSON.parse(storage.getItem(storageKey) ?? '{}') as StoredEvidenceGridPreferences;
-    const density = stored.density === 'compact' || stored.density === 'comfortable'
+    const storedDensity = stored.density === 'compact' || stored.density === 'comfortable'
       ? stored.density
       : defaults.density;
+    const density = initialDensity ?? storedDensity;
     const columnVisibility = stored.columnVisibility && typeof stored.columnVisibility === 'object'
       ? Object.fromEntries(
           Object.entries(stored.columnVisibility).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'),
@@ -51,8 +56,9 @@ function readPreferences(storageKey: string, defaults: EvidenceGridPreferenceDef
 export function useEvidenceGridPreferences(
   storageKey: string,
   defaults: EvidenceGridPreferenceDefaults,
+  initialDensity?: EvidenceGridDensity,
 ): EvidenceGridPreferences {
-  const [preferences, setPreferences] = useState(() => readPreferences(storageKey, defaults));
+  const [preferences, setPreferences] = useState(() => readPreferences(storageKey, defaults, initialDensity));
 
   useEffect(() => {
     getLocalStorage()?.setItem(storageKey, JSON.stringify(preferences));
