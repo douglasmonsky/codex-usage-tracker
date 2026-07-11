@@ -7,33 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import TypedDict, cast
-
-
-class _ContextLoad(TypedDict):
-    context_payload_json_bytes: int
-    source_scan_ms: float
-
-
-class _BenchmarkResult(TypedDict):
-    rows: int
-    filtered_rows: int
-    query_plan: list[str]
-    threshold_status: str
-    threshold_failures: list[str]
-    timings: dict[str, float]
-    source_logs_generated: int
-    source_log_bytes: int
-    context_load_seconds: float | None
-    context_payload_json_bytes: int
-    source_scan_ms: float
-    serialized_estimate_ms: float
-    context_loads: dict[str, _ContextLoad]
-
-
-class _BenchmarkPayload(TypedDict):
-    threshold_scale: float
-    benchmarks: list[_BenchmarkResult]
+from typing import Any
 
 
 def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
@@ -113,7 +87,7 @@ def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> N
     assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
 
 
-def _run_benchmark_json(args: list[str]) -> _BenchmarkPayload:
+def _run_benchmark_json(args: list[str]) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
         [sys.executable, *args],
@@ -124,7 +98,7 @@ def _run_benchmark_json(args: list[str]) -> _BenchmarkPayload:
         env=_subprocess_env(),
     )
     try:
-        payload = cast(_BenchmarkPayload, json.loads(result.stdout))
+        payload: dict[str, Any] = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise AssertionError(
             "benchmark did not emit JSON\n"

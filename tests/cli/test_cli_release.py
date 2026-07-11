@@ -6,8 +6,9 @@ import os
 import shlex
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Protocol, cast
+from typing import Protocol, cast
 
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
