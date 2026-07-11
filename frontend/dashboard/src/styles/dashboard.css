@@ -45,6 +45,11 @@
  overflow: auto;
 }
 
+.heatmap-scroll:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .heatmap {
  min-width: 720px;
  overflow: hidden;

@@ -73,7 +73,7 @@
 }
 
 .rangeLabel > span > span {
-  color: var(--signal-selection);
+  color: var(--signal-selection-ink);
   font-weight: 700;
 }
 

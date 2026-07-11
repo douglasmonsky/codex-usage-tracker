@@ -399,7 +399,7 @@
 .diagnostic-fact-meta b {
   display: block;
   margin-bottom: 1px;
-  color: var(--diagnostics-text-muted);
+  color: var(--diagnostics-text-strong);
   font-size: 9px;
   font-weight: 850;
   line-height: 1.1;

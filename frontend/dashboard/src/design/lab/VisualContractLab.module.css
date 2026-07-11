@@ -230,7 +230,7 @@
 .scopeButton svg {
   width: 15px;
   height: 15px;
-  color: var(--signal-selection);
+  color: var(--signal-selection-ink);
 }
 
 .scopeCopy {
@@ -331,7 +331,7 @@
   }
 
   .mobileNav button[data-active='true'] {
-    color: var(--signal-selection);
+    color: var(--signal-selection-ink);
     background: var(--signal-selection-surface);
   }
 
