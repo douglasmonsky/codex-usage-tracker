@@ -28,7 +28,7 @@
     "dependency-cruiser": "18.0.0",
     "esbuild": "^0.28.1",
     "knip": "6.26.0",
-    "markdownlint-cli2": "0.22.1",
+    "markdownlint-cli2": "0.23.0",
     "stylelint": "17.14.0"
   }
 }
