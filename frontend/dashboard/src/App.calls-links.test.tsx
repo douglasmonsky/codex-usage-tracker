@@ -191,7 +191,7 @@ describe('React dashboard call investigator link URL state', () => {
   it('opens the full-page call investigator from a single overview recent-call row click', () => {
       render(<App />);
 
-    fireEvent.click(screen.getByRole('row', { name: 'Open Call Investigator for thread-9f3a1c' }));
+    fireEvent.click(screen.getByText('thread-9f3a1c'));
 
     expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
     expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();

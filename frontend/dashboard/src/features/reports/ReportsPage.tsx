@@ -4,8 +4,10 @@ import { useMemo, useState } from 'react';
 
 import { loadReportsPack } from '../../api/reports';
 import type { CallRow, DashboardModel } from '../../api/types';
+import type { LoadWindow } from '../../data/dataScope';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { PageLoadProgress } from '../../design';
 import { Visualization } from '../../visualization';
 import { csvDateStamp } from '../shared/exportCsv';
 import { ReportEvidenceTable } from './ReportEvidenceTable';
@@ -24,6 +26,7 @@ type ReportsPageProps = {
   model: DashboardModel;
   refreshState: string;
   includeArchived: boolean;
+  loadWindow: LoadWindow;
   loadLimit: number;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
@@ -37,6 +40,7 @@ export function ReportsPage({
   model,
   refreshState,
   includeArchived,
+  loadWindow,
   loadLimit,
   onOpenInvestigator,
   onCopyCallLink,
@@ -44,10 +48,11 @@ export function ReportsPage({
   const [selectedKey, setSelectedKey] = useState(() => reportKey(reportFromUrl(model.reports) ?? model.reports[0]));
   const [actionStatus, setActionStatus] = useState('');
   const canUseLive = Boolean(model.contextRuntime.apiToken) && !model.contextRuntime.fileMode;
+  const reportLimit = loadWindow === 'rows' ? loadLimit : 0;
   const reportQuery = useQuery({
-    queryKey: ['reports', 'pack', canUseLive, includeArchived, loadLimit],
+    queryKey: ['reports', 'pack', canUseLive, includeArchived, reportLimit],
     queryFn: () => loadReportsPack(model.contextRuntime, {
-      limit: loadLimit,
+      limit: reportLimit,
       evidenceLimit: 8,
       includeArchived,
     }),
@@ -127,6 +132,13 @@ export function ReportsPage({
           </button>
         </div>
       </header>
+
+      <PageLoadProgress
+        active={canUseLive && reportQuery.isFetching}
+        label="Loading full-scope report pack"
+        error={canUseLive && reportQuery.error && !reportQuery.data ? errorMessage(reportQuery.error) : null}
+        updating={Boolean(reportQuery.data)}
+      />
 
       <div className={styles.status} role="status" aria-live="polite">
         <StatusBadge label={pack ? 'Live report pack' : 'Aggregate fallback'} tone={pack ? 'green' : 'orange'} />

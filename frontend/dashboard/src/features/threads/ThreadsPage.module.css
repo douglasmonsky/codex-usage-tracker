@@ -88,7 +88,7 @@
 
 .splitWorkspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: start;
   min-width: 0;
@@ -99,12 +99,9 @@
 }
 
 .splitWorkspace > :global(.side-panel) {
-  position: sticky;
-  top: 18px;
-  max-height: calc(100dvh - 36px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  position: static;
+  max-height: none;
+  overflow: visible;
 }
 
 .gridFooter {

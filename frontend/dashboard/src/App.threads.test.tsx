@@ -165,7 +165,7 @@ it('opens full-page call investigator from thread leaderboard rows', () => {
   expect(window.location.search).not.toContain('return=');
 });
 
-it('opens full-page call investigator from thread leaderboard row click', () => {
+it('expands thread evidence without leaving the thread leaderboard', () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
 
@@ -174,12 +174,10 @@ it('opens full-page call investigator from thread leaderboard row click', () => 
   expect(row).not.toBeNull();
 fireEvent.click(row as HTMLTableRowElement);
 
-  expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-  expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
-  expect(window.location.search).toContain('view=call');
-  expect(window.location.search).toContain('record=fixture-call-0');
-  expect(window.location.search).toContain('return=threads');
-  expect(screen.getByRole('button', { name: /Back to Threads/i })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
+  expect(screen.getByText('Thread Calls')).toBeInTheDocument();
+  expect(window.location.search).toContain('view=threads');
+  expect(window.location.search).not.toContain('record=');
 });
 
 it('copies call investigator links from thread row actions', async () => {
@@ -453,7 +451,7 @@ it('hydrates and syncs selected thread URL state', () => {
 
 const row = within(screen.getByRole('table', { name: 'Thread leaderboard' })).getByText('thread-9f3a').closest('tr');
 expect(row).not.toBeNull();
-fireEvent.mouseEnter(row as HTMLTableRowElement);
+    fireEvent.click(row as HTMLTableRowElement);
 
 expect(window.location.search).toContain('view=threads');
     expect(window.location.search).toContain('thread=thread-9f3a');

@@ -729,6 +729,22 @@ def test_connect_sets_sqlite_concurrency_pragmas(tmp_path: Path) -> None:
     assert user_version == 14
 
 
+def test_current_schema_reads_succeed_while_writer_is_active(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    with connect(db_path) as conn:
+        init_db(conn)
+
+    writer = sqlite3.connect(db_path, timeout=0.1)
+    try:
+        writer.execute("BEGIN IMMEDIATE")
+        with connect(db_path) as reader:
+            init_db(reader)
+            assert reader.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0] == 0
+    finally:
+        writer.rollback()
+        writer.close()
+
+
 def test_init_db_repairs_version_zero_schema(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     raw = sqlite3.connect(db_path)

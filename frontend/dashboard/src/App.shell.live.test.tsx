@@ -68,6 +68,72 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
   expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByText('2 calls analyzed · 1 detail row cached')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Analysis scope' })).toBeInTheDocument();
+});
+
+it('loads more all-time evidence without switching to recent rows', async () => {
+  window.__CODEX_USAGE_BOOT__ = {
+    api_token: 'all-time-more-token',
+    shell_boot: true,
+    loaded_row_count: 0,
+    total_available_rows: 1500,
+    default_load_window: 'all',
+    load_window: 'rows',
+    limit: 500,
+    rows: [],
+  };
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const requestedLimit = Number(new URL(url, 'http://localhost').searchParams.get('limit'));
+    return {
+      ok: true,
+      json: async () => ({
+        api_token: 'all-time-more-token',
+        default_load_window: 'all',
+        load_window: 'all',
+        limit: requestedLimit,
+        loaded_row_count: requestedLimit,
+        total_available_rows: 1500,
+        has_more: requestedLimit < 1500,
+        rows: [
+          {
+            record_id: 'all-time-row-a',
+            call_started_at: '2026-07-02T10:00:00Z',
+            thread_name: 'all-time-thread-a',
+            model: 'codex-1',
+            input_tokens: 100,
+            cached_input_tokens: 50,
+            output_tokens: 10,
+            total_tokens: 110,
+          },
+          ...(requestedLimit > 500 ? [{
+            record_id: 'all-time-row-b',
+            call_started_at: '2026-07-02T11:00:00Z',
+            thread_name: 'all-time-thread-b',
+            model: 'codex-1',
+            input_tokens: 200,
+            cached_input_tokens: 100,
+            output_tokens: 20,
+            total_tokens: 220,
+          }] : []),
+        ],
+      }),
+    } as Response;
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  render(<App />);
+
+  expect(await screen.findByText('all-time-thread-a')).toBeInTheDocument();
+  const loadMore = screen.getByRole('button', { name: 'Load more recent calls' });
+  expect(loadMore).toBeEnabled();
+  fireEvent.click(loadMore);
+
+  expect(await screen.findByText('all-time-thread-b')).toBeInTheDocument();
+  expect(String(fetchMock.mock.calls[1]?.[0])).toContain('limit=1500');
+  expect(String(fetchMock.mock.calls[1]?.[0])).toContain('load_window=all');
+  expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('renders Reports live boot payloads without embedded report summaries', () => {
@@ -132,7 +198,7 @@ it('hydrates legacy history scope from the URL and exposes granular row controls
     render(<App />);
 
   expect(screen.getByLabelText('History scope')).toHaveValue('all');
-  expect(screen.getAllByText('All sessions - Most recent 500').length).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Recent rows' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('All history includes 49,378 archived calls')).toBeInTheDocument();
   expect(screen.getByLabelText('Rows to load')).toHaveValue(500);
   const rowLimitSlider = screen.getByLabelText('Rows to load slider');

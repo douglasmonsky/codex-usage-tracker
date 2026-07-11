@@ -142,8 +142,10 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
 
+    expect(screen.getByRole('progressbar', { name: 'Loading diagnostic fact sources' })).toBeInTheDocument();
     await screen.findByText('Live snapshots: 10');
     await screen.findByText('Live facts: 1');
+    expect(screen.queryByRole('progressbar', { name: 'Loading diagnostic fact sources' })).not.toBeInTheDocument();
     expect((await screen.findAllByText('diag-cache-thread')).length).toBeGreaterThan(0);
     const firstLoadCount = fetchMock.mock.calls.filter(([input]) => String(input).includes('/api/diagnostics/')).length;
     expect(firstLoadCount).toBe(14);

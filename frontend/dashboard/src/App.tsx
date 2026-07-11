@@ -121,7 +121,7 @@ const canAutoRefreshUsageRows = shouldAutoRefreshUsageView(activeView);
     pendingLimit: pendingLoadLimit,
   });
   const rowLimitSliderValue = Math.min(finitePendingLoadLimit, rowLimitSliderMax);
-const hasMoreRows = loadWindow === 'rows' && (Boolean(dashboardPayload?.has_more) || (totalAvailableRows > 0 && loadedRowCount < totalAvailableRows));
+const hasMoreRows = Boolean(dashboardPayload?.has_more) || (totalAvailableRows > 0 && loadedRowCount < totalAvailableRows);
   const nextLoadMoreLimit = nextRowLoadLimit({
     currentLimit: loadLimit,
     loadedRows: loadedRowCount,
@@ -243,18 +243,6 @@ url.searchParams.set('return', returnView);
 pushShellUrl(url);
 }
 
-function openFindingInvestigator(rank: number) {
-setActiveView('investigator');
-setActivePreset('');
-setActiveRecordId('');
-const url = new URL(window.location.href);
-url.searchParams.set('view', 'investigator');
-url.searchParams.set('finding', String(rank));
-url.searchParams.delete('preset');
-clearInactiveViewSearchParams(url, 'investigator');
-pushShellUrl(url);
-}
-
 function backFromCallInvestigator() {
 setView(callReturnView);
 }
@@ -324,9 +312,9 @@ async function refreshDashboard(options: RefreshOptions = {}) {
     storeDataScopePreference(appliedLoadLimit, appliedHistoryScope, nextLoadWindow);
     const loaded = payload.loaded_row_count ?? payload.rows?.length ?? 0;
     const total = payload.total_available_rows ?? loaded;
-    setRefreshState(
-      `${loadedFromCache ? 'Cache hit; l' : shouldRefreshIndex ? 'Refreshed index; l' : 'L'}oaded ${loaded.toLocaleString()} of ${total.toLocaleString()} calls from ${loadWindowLabel(nextLoadWindow, appliedLoadLimit)}`,
-    );
+    setRefreshState(nextLoadWindow === 'rows'
+      ? `${loadedFromCache ? 'Cache hit; l' : shouldRefreshIndex ? 'Refreshed index; l' : 'L'}oaded ${loaded.toLocaleString()} of ${total.toLocaleString()} calls from ${loadWindowLabel(nextLoadWindow, appliedLoadLimit)}`
+      : `${loadedFromCache ? 'Cache hit; ' : shouldRefreshIndex ? 'Refreshed index; ' : ''}${loadWindowLabel(nextLoadWindow, appliedLoadLimit)} analysis ready across ${total.toLocaleString()} calls; ${loaded.toLocaleString()} detail rows cached`);
   } catch (error) {
     setRefreshProgress(null);
     if (isUsageQueryCancelled(error)) {
@@ -430,7 +418,7 @@ void refreshDashboard({ refresh: false, loadWindow: 'all' });
 
 function loadMoreRows() {
 setPendingLoadLimit(nextLoadMoreLimit);
-void refreshDashboard({ refresh: false, loadLimit: nextLoadMoreLimit, loadWindow: 'rows' });
+void refreshDashboard({ refresh: false, loadLimit: nextLoadMoreLimit, loadWindow });
 }
 
 function handleLoadWindowChange(nextLoadWindow: LoadWindow) {
@@ -584,18 +572,6 @@ return (
             );
           })}
         </div>
-        <div className="status-card">
-          <span>Data Snapshot</span>
-          <strong>Current</strong>
-          <small>
-            {historyScope === 'all' ? 'All sessions' : 'Active sessions'} - {loadWindowLabel(loadWindow, loadLimit)}
-          </small>
-          <small>{refreshState}</small>
-          <button type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh all dashboard data">
-            <RefreshCw size={15} />
-            {refreshing ? `${shellI18n.t('button.refresh', 'Refresh')}...` : shellI18n.t('button.refresh', 'Refresh')}
-          </button>
-        </div>
       </aside>
       <main className="workspace">
         <div className="unofficial-banner" role="note" aria-label="Unofficial project notice">
@@ -703,6 +679,7 @@ aria-label="History scope"
         </div>
       </div>
       </header>
+      <p className="sr-only" role="status" aria-live="polite">{refreshState}</p>
       <DashboardRouteView
         key={navigationRevision}
         activeView={activeView}
@@ -716,7 +693,6 @@ aria-label="History scope"
         setContextApiEnabled={setContextApiEnabled}
         openCallInvestigator={openCallInvestigator}
         copyCallInvestigatorLink={copyCallInvestigatorLink}
-        openFindingInvestigator={openFindingInvestigator}
         callBackLabel={
           callReturnViewExplicit
             ? `Back to ${callReturnViewLabel(callReturnView)}`

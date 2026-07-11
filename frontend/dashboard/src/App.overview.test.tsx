@@ -14,33 +14,6 @@ vi.mock('./visualization/renderer/echartsRenderer', () => ({
 describe('React dashboard overview workspace', () => {
   installAppTestHooks();
 
-it('direct finding review clears stale call investigator URL state', () => {
-window.history.replaceState(
-null,
-'',
-'/?view=overview&record=fixture-call-0&return=calls&mode=full&max_entries=50&max_chars=0&include_tool_output=1&include_compaction_history=true&report=weekly-credits',
-);
-
-render(<App />);
-fireEvent.click(screen.getByRole('button', { name: /Inspect evidence/i }));
-
-const params = new URLSearchParams(window.location.search);
-expect(params.get('view')).toBe('investigator');
-expect(params.get('finding')).toBe('1');
-for (const name of [
-'record',
-'return',
-'mode',
-'max_entries',
-'max_chars',
-'include_tool_output',
-'include_compaction_history',
-'report',
-]) {
-expect(params.get(name)).toBeNull();
-}
-});
-
   it('uses loaded totals, focused visualization contracts, and no homepage presets', async () => {
     window.__CODEX_USAGE_BOOT__ = {
       loaded_row_count: 1,
@@ -75,13 +48,22 @@ expect(params.get(name)).toBeNull();
 
     const metrics = screen.getByLabelText('Loaded usage metrics');
     expect(within(metrics).getByText('1.25K')).toBeInTheDocument();
-    expect(within(metrics).getByText(/cached 400.*uncached 600.*output 250.*reasoning 0/i)).toBeInTheDocument();
+    expect(within(metrics).getByText('Cached')).toBeInTheDocument();
+    expect(within(metrics).getByText('400')).toBeInTheDocument();
+    expect(within(metrics).getByText('Uncached')).toBeInTheDocument();
+    expect(within(metrics).getByText('600')).toBeInTheDocument();
+    expect(within(metrics).getByText('Output')).toBeInTheDocument();
+    expect(within(metrics).getByText('250')).toBeInTheDocument();
+    expect(within(metrics).getByText('Reasoning')).toBeInTheDocument();
     expect(within(metrics).getByText('40.0%')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Recent token movement' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Loaded token accounting' })).toBeInTheDocument();
-    const recentCallsTable = screen.getByRole('table', { name: 'Recent calls' });
-    const recentCallsSection = screen.getByRole('region', { name: 'Recent calls' });
+    const recentCallsTable = screen.getByRole('table', { name: 'Overview calls' });
+    const recentCallsSection = screen.getByRole('region', { name: 'Calls' });
     expect(within(recentCallsTable).getByRole('columnheader', { name: /Thread/i })).toBeInTheDocument();
+    expect(within(recentCallsTable).getByRole('button', { name: 'Sort by Input Tokens' })).toBeInTheDocument();
+    expect(within(recentCallsTable).getByRole('button', { name: 'Sort by Total Tokens' })).toBeInTheDocument();
+    expect(within(recentCallsTable).getByRole('button', { name: 'Sort by Codex Credits' })).toBeInTheDocument();
     await waitFor(() => expect(within(recentCallsTable).getByText('live-overview-thread')).toBeInTheDocument());
     expect(screen.getByText('Loaded 1 of 1 available calls')).toBeInTheDocument();
     expect(within(recentCallsSection).getByRole('button', { name: 'Load more recent calls' })).toBeDisabled();
@@ -115,8 +97,8 @@ expect(params.get(name)).toBeNull();
 
     render(<App />);
 
-    const recentCallsTable = screen.getByRole('table', { name: 'Recent calls' });
-    const recentCallsSection = screen.getByRole('region', { name: 'Recent calls' });
+    const recentCallsTable = screen.getByRole('table', { name: 'Overview calls' });
+    const recentCallsSection = screen.getByRole('region', { name: 'Calls' });
     expect(recentCallsTable).toHaveAttribute('aria-rowcount', '9');
     await waitFor(() => expect(within(recentCallsTable).getByText('overview-load-thread-0')).toBeInTheDocument());
     expect(screen.getByText('Loaded 8 of 20 available calls')).toBeInTheDocument();

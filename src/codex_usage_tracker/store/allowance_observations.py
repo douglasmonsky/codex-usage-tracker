@@ -37,15 +37,32 @@ ALLOWANCE_OBSERVATION_COLUMNS = (
     "total_tokens",
     "cumulative_total_tokens",
 )
+ALLOWANCE_SYNC_BATCH_SIZE = 500
 
 
-def sync_allowance_observations(conn: sqlite3.Connection) -> int:
-    """Refresh normalized allowance observations from aggregate usage events."""
+def sync_allowance_observations_for_record_ids(
+    conn: sqlite3.Connection,
+    record_ids: list[str],
+) -> int:
+    """Refresh normalized allowance rows for newly upserted usage records."""
 
-    conn.execute("DELETE FROM allowance_observations")
+    unique_record_ids = list(dict.fromkeys(record_ids))
+    if not unique_record_ids:
+        return 0
     inserted = 0
-    for window_key in ("primary", "secondary"):
-        inserted += conn.execute(_insert_observation_sql(window_key)).rowcount
+    for start in range(0, len(unique_record_ids), ALLOWANCE_SYNC_BATCH_SIZE):
+        chunk = unique_record_ids[start : start + ALLOWANCE_SYNC_BATCH_SIZE]
+        placeholders = ", ".join("?" for _record_id in chunk)
+        conn.execute(
+            f"DELETE FROM allowance_observations WHERE record_id IN ({placeholders})",
+            chunk,
+        )
+        record_filter = f"AND record_id IN ({placeholders})"
+        for window_key in ("primary", "secondary"):
+            inserted += conn.execute(
+                _insert_observation_sql(window_key, record_filter=record_filter),
+                chunk,
+            ).rowcount
     return inserted
 
 
@@ -60,7 +77,6 @@ def query_allowance_observations(
 
     with connect(db_path) as conn:
         init_db(conn)
-        sync_allowance_observations(conn)
         where: list[str] = []
         params: list[Any] = []
         if not include_archived:
@@ -86,7 +102,7 @@ def query_allowance_observations(
     return [row_to_dict(row) for row in rows]
 
 
-def _insert_observation_sql(window_key: str) -> str:
+def _insert_observation_sql(window_key: str, *, record_filter: str = "") -> str:
     used_col = f"rate_limit_{window_key}_used_percent"
     minutes_col = f"rate_limit_{window_key}_window_minutes"
     resets_col = f"rate_limit_{window_key}_resets_at"
@@ -122,9 +138,12 @@ def _insert_observation_sql(window_key: str) -> str:
             total_tokens,
             cumulative_total_tokens
         FROM usage_events
-        WHERE {used_col} IS NOT NULL
+        WHERE (
+            {used_col} IS NOT NULL
             OR {minutes_col} IS NOT NULL
             OR {resets_col} IS NOT NULL
+        )
+        {record_filter}
     """
 
 

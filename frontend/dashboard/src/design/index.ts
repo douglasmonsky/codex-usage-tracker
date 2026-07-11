@@ -1,5 +1,7 @@
 import './tokens.css';
 
+export { PageLoadProgress } from './PageLoadProgress';
+
 export {
   Button,
   IconButton,

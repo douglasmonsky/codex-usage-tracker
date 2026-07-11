@@ -76,6 +76,29 @@ describe('dashboard query runtime', () => {
     expect(load.mock.calls[1]?.[1]).toMatchObject({ includeArchived: false, limit: 37, refresh: true });
   });
 
+  it('keeps time-window shell evidence bounded while endpoints cover the full scope', async () => {
+    const load = vi.fn<UsageTransport['load']>(async () => ({
+      ...shellPayload,
+      load_window: 'all',
+      limit: null,
+    }));
+
+    await queryUsageSnapshot({
+      currentPayload: shellPayload,
+      historyScope: 'active',
+      loadLimit: 500,
+      loadWindow: 'all',
+      queryClient: createDashboardQueryClient(),
+      snapshotStore: { read: vi.fn(async () => null), write: vi.fn(async () => undefined) },
+      transport: { kind: 'production', load },
+    });
+
+    expect(load).toHaveBeenCalledWith(
+      shellPayload,
+      expect.objectContaining({ limit: 500, loadWindow: 'all' }),
+    );
+  });
+
   it('does not reuse an in-memory snapshot after the source revision changes', async () => {
     const queryClient = createDashboardQueryClient();
     const load = vi.fn<UsageTransport['load']>(async currentPayload => ({

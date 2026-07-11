@@ -51,17 +51,29 @@ describe('Reports selected-report workspace', () => {
       model: { ...fixtureModel, contextRuntime: { ...fixtureModel.contextRuntime, apiToken: 'local-token', fileMode: false } },
     });
 
+    expect(screen.getByRole('progressbar', { name: 'Loading full-scope report pack' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Server Cost Review' })).toBeInTheDocument());
+    expect(screen.queryByRole('progressbar', { name: 'Loading full-scope report pack' })).not.toBeInTheDocument();
     expect(screen.getByText('Live localhost report pack')).toBeInTheDocument();
     expect(screen.getByText('2026-07-11T10:00:00Z')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/reports/pack?'),
+      expect.stringMatching(/\/api\/reports\/pack\?.*limit=0/),
       expect.objectContaining({ headers: expect.objectContaining({ 'X-Codex-Usage-Token': 'local-token' }) }),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh report' }));
     await waitFor(() => expect(screen.getByText(/Refresh failed: report service unavailable/)).toBeInTheDocument());
     expect(screen.getByText('Live localhost report pack')).toBeInTheDocument();
+  });
+
+  it('keeps an incomplete-evidence warning visible when the initial report query fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'report service unavailable' }, 503)));
+
+    renderReports({
+      model: { ...fixtureModel, contextRuntime: { ...fixtureModel.contextRuntime, apiToken: 'local-token', fileMode: false } },
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incomplete page evidence: report service unavailable');
   });
 });
 
@@ -76,6 +88,7 @@ function renderReports(overrides: {
         model={overrides.model ?? fixtureModel}
         refreshState="Loaded snapshot ready"
         includeArchived={false}
+        loadWindow="all"
         loadLimit={500}
         onOpenInvestigator={overrides.onOpenInvestigator ?? vi.fn()}
         onCopyCallLink={overrides.onCopyCallLink ?? vi.fn()}

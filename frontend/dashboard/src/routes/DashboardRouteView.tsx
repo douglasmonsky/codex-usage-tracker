@@ -63,7 +63,6 @@ type DashboardRouteViewProps = {
   navigateView: (view: DashboardViewId) => void;
   onRefresh: () => void;
   openCallInvestigator: (recordId: string) => void;
-  openFindingInvestigator: (rank: number) => void;
   refreshing: boolean;
   refreshState: string;
   setContextApiEnabled: (enabled: boolean) => void;
@@ -106,7 +105,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     navigateView,
     onRefresh,
     openCallInvestigator,
-    openFindingInvestigator,
     refreshing,
     refreshState,
     setContextApiEnabled,
@@ -121,7 +119,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           contextRuntime={contextRuntime}
           sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
           onRefresh={onRefresh}
-          refreshState={refreshState}
           globalQuery={globalQuery}
           runtime={{ historyScope, loadLimit, loadWindow, loadedRowCount, scopeSince, totalAvailableRows }}
           refreshing={refreshing}
@@ -129,7 +126,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onLoadMoreRows={loadMoreRows}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
-          onOpenFinding={openFindingInvestigator}
           onNavigateView={navigateView}
           globalFilters={globalFilters}
         />
@@ -202,7 +198,17 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         />
       );
     case 'cache-context':
-      return <CacheContextPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
+      return (
+        <CacheContextPage
+          model={model}
+          contextRuntime={contextRuntime}
+          includeArchived={historyScope === 'all'}
+          scopeSince={scopeSince}
+          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          onOpenInvestigator={openCallInvestigator}
+          onCopyCallLink={copyCallInvestigatorLink}
+        />
+      );
     case 'diagnostics':
       return (
         <DiagnosticsPage
@@ -228,6 +234,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           model={model}
           refreshState={refreshState}
           includeArchived={historyScope === 'all'}
+          loadWindow={loadWindow}
           loadLimit={loadLimit}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}

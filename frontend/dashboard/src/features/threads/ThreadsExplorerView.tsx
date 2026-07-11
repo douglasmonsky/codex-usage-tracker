@@ -3,7 +3,7 @@ import { Download, RotateCcw, Search } from 'lucide-react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type { CallRow, ThreadRow } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
-import { SegmentedControl } from '../../design';
+import { PageLoadProgress, SegmentedControl } from '../../design';
 import { Visualization, type VisualizationSpecV1 } from '../../visualization';
 import { EvidenceGrid } from '../explore/EvidenceGrid';
 import { ExploreWorkspaceSwitcher } from '../explore/ExploreWorkspaceSwitcher';
@@ -33,8 +33,9 @@ type ThreadsExplorerViewProps = {
     isFetchingNextPage: boolean;
     usingFocused: boolean;
     fallbackReason: string;
+    error: string | null;
   };
-  selectedCallsState: { isFetching: boolean; count: number; hydrated: boolean };
+  selectedCallsState: { isFetching: boolean; count: number; hydrated: boolean; error: string | null };
   displayedThreads: ThreadRow[];
   totalMatchedThreads: number;
   canLoadMoreThreads: boolean;
@@ -129,6 +130,14 @@ export function ThreadsExplorerView({
           </button>
         </div>
       </header>
+      <PageLoadProgress
+        active={focusedState.isFetching || selectedCallsState.isFetching}
+        completed={Number(focusedState.usingFocused) + Number(selectedCallsState.hydrated)}
+        total={2}
+        label="Loading thread summaries and selected calls"
+        error={focusedState.error ?? selectedCallsState.error}
+        updating={focusedState.usingFocused || selectedCallsState.hydrated}
+      />
       {globalFilters}
       <section className={styles.queryBar} aria-label="Thread filters">
         <label className="search-box">
@@ -209,8 +218,6 @@ export function ThreadsExplorerView({
                 selectedRowId={selected?.name}
                 onRowSelect={thread => onSelectThread(thread.name)}
                 onRowActivate={onActivateThread}
-                activateOnClick
-                selectOnHover
                 viewportHeight={560}
               />
               <div className={styles.gridFooter} aria-live="polite">

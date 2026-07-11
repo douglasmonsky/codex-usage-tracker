@@ -232,7 +232,7 @@ describe('dashboard API model builder', () => {
 });
 
 describe('dashboard live usage client', () => {
-  it('loads time windows as bounded evidence instead of materializing every matching row', async () => {
+  it('loads a bounded evidence sample for time windows', async () => {
     const progress = vi.fn();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -243,11 +243,14 @@ describe('dashboard live usage client', () => {
         api_token: 'token',
         load_window: 'week',
         since: '2026-07-04T10:15:00.000Z',
-        loaded_row_count: 500,
-        total_available_rows: 86_166,
+        loaded_row_count: 2,
+        total_available_rows: 3,
         limit: 500,
         has_more: true,
-        rows: [{ record_id: 'recent-week-row', total_tokens: 2 }],
+        rows: [
+          { record_id: 'recent-week-row-1', total_tokens: 1 },
+          { record_id: 'recent-week-row-2', total_tokens: 2 },
+        ],
       });
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -256,7 +259,7 @@ describe('dashboard live usage client', () => {
       { api_token: 'token', loaded_row_count: 500, rows: [] },
       {
         refresh: false,
-        limit: 500,
+        limit: 0,
         loadWindow: 'week',
         since: '2026-07-04T10:15:00.000Z',
         onProgress: progress,
@@ -264,9 +267,11 @@ describe('dashboard live usage client', () => {
     );
 
     expect(payload.load_window).toBe('week');
+    expect(payload.rows).toHaveLength(2);
+    expect(payload.limit).toBe(500);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(progress).toHaveBeenCalledWith(
-      expect.objectContaining({ phase: 'loading_rows', completed: 500, total: 86_166, percent: 100 }),
+      expect.objectContaining({ phase: 'loading_rows', completed: 2, total: 3, percent: 100 }),
     );
   });
 

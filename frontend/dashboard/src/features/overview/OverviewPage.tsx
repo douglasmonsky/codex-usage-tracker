@@ -1,19 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 
 import type { ContextRuntime, DashboardModel } from '../../api/types';
 import type { LoadWindow } from '../../data/dataScope';
-import { Button, StatusBadge } from '../../design';
+import { Button, PageLoadProgress, StatusBadge } from '../../design';
 import { overviewQueryOptions, type OverviewEndpointBundle } from '../../data/overviewQueries';
-import { UsageConstellation, Visualization } from '../../visualization';
-import { OverviewFindingRail } from './OverviewFindingRail';
+import { Visualization } from '../../visualization';
 import { OverviewMetrics } from './OverviewMetrics';
 import styles from './OverviewPage.module.css';
 import { OverviewRecentCalls } from './OverviewRecentCalls';
-import { buildOverviewViewModel, type OverviewFindingView } from './overviewModel';
+import { buildOverviewViewModel } from './overviewModel';
 import type { OverviewNavigationTarget } from './overviewNavigation';
-import { buildUsageConstellationModel } from './usageConstellationModel';
 
 export { overviewCallsForQuery } from './overviewCalls';
 
@@ -31,7 +29,6 @@ type OverviewPageProps = {
   contextRuntime: ContextRuntime;
   sourceRevision: string;
   onRefresh: () => void;
-  refreshState: string;
   globalQuery: string;
   runtime: OverviewRuntime;
   refreshing: boolean;
@@ -39,7 +36,6 @@ type OverviewPageProps = {
   onLoadMoreRows: () => void;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
-  onOpenFinding: (rank: number) => void;
   onNavigateView: (view: OverviewNavigationTarget) => void;
   focusedEndpointsEnabled?: boolean;
   globalFilters?: ReactNode;
@@ -62,18 +58,11 @@ export function OverviewPage(props: OverviewPageProps) {
     () => buildOverviewViewModel(props.model, focusedQuery.data, props.runtime.historyScope),
     [focusedQuery.data, props.model, props.runtime.historyScope],
   );
-  const constellationModel = useMemo(
-    () => buildUsageConstellationModel(props.model.calls),
-    [props.model.calls],
-  );
-  const topFinding = viewModel.findings[0];
-
-  function openFinding(finding: OverviewFindingView) {
-    if (finding.recordId) props.onOpenInvestigator(finding.recordId);
-    else if (finding.legacyRank) props.onOpenFinding(finding.legacyRank);
-    else props.onNavigateView('investigator');
-  }
-
+  const completedModules = Number(Boolean(focusedQuery.data?.summary.data))
+    + Number(Boolean(focusedQuery.data?.recommendations.data));
+  const endpointError = focusedQuery.error
+    ? queryErrorMessage(focusedQuery.error)
+    : focusedQuery.data?.summary.error || focusedQuery.data?.recommendations.error || null;
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
@@ -84,18 +73,14 @@ export function OverviewPage(props: OverviewPageProps) {
         </div>
       </header>
 
-      <section className={styles.answerBand} data-tone={viewModel.answer.tone} aria-labelledby="overview-answer-title">
-        <div>
-          <p className={styles.answerLabel}>Highest-priority answer</p>
-          <h2 id="overview-answer-title">{viewModel.answer.title}</h2>
-          <p>{viewModel.answer.detail}</p>
-          <strong className={styles.nextAction}>Next action: {viewModel.answer.action}</strong>
-        </div>
-        <div className={styles.answerActions}>
-          <span><strong>{topFinding?.evidenceGrade ?? 'Baseline'}</strong><small>{topFinding ? supportingCallsLabel(topFinding.supportCount) : props.refreshState}</small></span>
-          <Button variant="primary" onClick={() => topFinding ? openFinding(topFinding) : props.onNavigateView('investigator')}>Inspect evidence <ArrowRight /></Button>
-        </div>
-      </section>
+      <PageLoadProgress
+        active={canUseFocusedEndpoints && focusedQuery.isFetching}
+        completed={completedModules}
+        total={2}
+        label="Loading overview evidence"
+        error={canUseFocusedEndpoints ? endpointError : null}
+        updating={completedModules > 0}
+      />
 
       <OverviewMetrics
         metrics={viewModel.metrics}
@@ -105,12 +90,8 @@ export function OverviewPage(props: OverviewPageProps) {
 
       <div className={styles.analysisGrid}>
         <Visualization spec={viewModel.pulseSpec} height={280} />
-        <OverviewFindingRail findings={viewModel.findings} onOpenFinding={openFinding} onNavigateView={props.onNavigateView} />
+        <Visualization spec={viewModel.tokenFlowSpec} height={280} />
       </div>
-
-      <Visualization spec={viewModel.tokenFlowSpec} height={290} />
-
-      <UsageConstellation model={constellationModel} onOpenCall={props.onOpenInvestigator} />
 
       <OverviewRecentCalls
         calls={props.model.calls}
@@ -129,6 +110,10 @@ export function OverviewPage(props: OverviewPageProps) {
   );
 }
 
+function queryErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function endpointLabel(isFetching: boolean, data: OverviewEndpointBundle | undefined, error: Error | null, enabled: boolean): string {
   if (!enabled) return 'Stored snapshot';
   if (isFetching && data) return 'Updating evidence';
@@ -141,8 +126,4 @@ function endpointLabel(isFetching: boolean, data: OverviewEndpointBundle | undef
 function endpointTone(data: OverviewEndpointBundle | undefined, error: Error | null, enabled: boolean): 'positive' | 'caution' | 'neutral' {
   if (!enabled) return 'neutral';
   return error && !data || data?.summary.error || data?.recommendations.error ? 'caution' : 'positive';
-}
-
-function supportingCallsLabel(count: number): string {
-  return count === 1 ? '1 supporting call' : `${count} supporting calls`;
 }

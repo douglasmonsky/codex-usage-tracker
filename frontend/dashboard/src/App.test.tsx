@@ -7,25 +7,22 @@ describe('React dashboard shell overview', () => {
     render(<App />);
 
 expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
-expect(screen.getByText('Total tokens')).toBeInTheDocument();
-expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeInTheDocument();
-expect(screen.getByText('Long Thread: data-engine-refactor')).toBeInTheDocument();
-expect(screen.getByRole('table', { name: 'Recent calls' })).toBeInTheDocument();
+expect(screen.getAllByText('Total Tokens').length).toBeGreaterThan(0);
+expect(screen.queryByRole('heading', { name: 'Needs attention' })).not.toBeInTheDocument();
+expect(screen.getByRole('table', { name: 'Overview calls' })).toBeInTheDocument();
     expect(screen.getByText('Loaded 8 of 8 available calls')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Open investigator for thread-9f3a1c codex-1/i }),
     ).toBeInTheDocument();
-    const investigatorRow = screen.getByRole('row', { name: 'Open Call Investigator for thread-9f3a1c' });
-    fireEvent.click(investigatorRow);
+    fireEvent.click(screen.getByText('thread-9f3a1c'));
 expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
 });
 
-it('opens the investigator workbench from overview findings', () => {
+it('opens the investigator workbench from primary navigation', () => {
 render(<App />);
-fireEvent.click(screen.getByRole('button', { name: 'Inspect evidence' }));
+fireEvent.click(screen.getByRole('button', { name: 'Investigate' }));
 expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=investigator');
-expect(window.location.search).toContain('finding=1');
 });
 
 });

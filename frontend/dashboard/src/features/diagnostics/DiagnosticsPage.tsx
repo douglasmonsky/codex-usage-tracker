@@ -17,6 +17,7 @@ import type { CallRow, ContextRuntime, DashboardModel, DiagnosticSection } from 
 import { LineChart } from '../../charts/LineChart';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { PageLoadProgress } from '../../design';
 import { formatCompact, money, pct } from '../shared/format';
 import {
   FactCallsPanel,
@@ -29,6 +30,7 @@ import {
 } from './DiagnosticFactsPanels';
 import { DiagnosticSnapshotMatrix } from './DiagnosticSnapshotMatrix';
 import { FACT_CALL_PAGE_SIZE, diagnosticFactKey, factCallsHasMore, mergeFactCallResults } from './diagnosticFactCalls';
+import { factFromCalls, numericFactField } from './diagnosticFallbackFacts';
 import type { FactCallSortState, FactSortState } from './diagnosticFactSorting';
 import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 
@@ -105,6 +107,16 @@ export function DiagnosticsPage({
         : contextRuntime.apiToken
           ? factState.message
           : 'Static fallback facts';
+  const canUseLiveFacts = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
+  const completedFactModules = diagnosticFactSourceDefinitions.filter(
+    source => factStates[source.key]?.status === 'loaded',
+  ).length;
+  const loadingFactModules = diagnosticFactSourceDefinitions.some(
+    source => factStates[source.key]?.status === 'loading',
+  );
+  const factProgressError = diagnosticFactSourceDefinitions
+    .map(source => factStates[source.key])
+    .find((state): state is Extract<FactLoadState, { status: 'error' }> => state?.status === 'error');
 
   useEffect(() => {
     if (!facts.length) {
@@ -287,6 +299,15 @@ export function DiagnosticsPage({
           <StatusBadge label="Local Only" tone="green" />
         </div>
       </div>
+
+      <PageLoadProgress
+        active={canUseLiveFacts && loadingFactModules}
+        completed={completedFactModules}
+        total={diagnosticFactSourceDefinitions.length}
+        label="Loading diagnostic fact sources"
+        error={canUseLiveFacts ? factProgressError?.message : null}
+        updating={completedFactModules > 0}
+      />
 
       {globalFilters}
 
@@ -513,8 +534,8 @@ function fallbackDiagnosticFacts(calls: CallRow[]): DiagnosticFactRow[] {
     .map(spec => factFromCalls(spec.fact_type, spec.fact_name, spec.calls))
     .sort(
       (left, right) =>
-        numberField(right.associated_uncached_input_tokens) - numberField(left.associated_uncached_input_tokens) ||
-        numberField(right.associated_total_tokens) - numberField(left.associated_total_tokens),
+        numericFactField(right.associated_uncached_input_tokens) - numericFactField(left.associated_uncached_input_tokens) ||
+        numericFactField(right.associated_total_tokens) - numericFactField(left.associated_total_tokens),
     );
 }
 
@@ -583,35 +604,6 @@ function syncDiagnosticFactUrl(sourceKey: DiagnosticFactSourceKey, fact: Diagnos
     url.searchParams.delete('diagnostic_fact');
   }
   window.history.replaceState(null, '', url);
-}
-
-function factFromCalls(factType: string, factName: string, calls: CallRow[]): DiagnosticFactRow {
-  const largest = [...calls].sort((left, right) => right.totalTokens - left.totalTokens)[0];
-  const associatedInput = calls.reduce((sum, call) => sum + call.input, 0);
-  const associatedCached = calls.reduce((sum, call) => sum + Math.round(call.input * (call.cachedPct / 100)), 0);
-  return {
-    fact_type: factType,
-    fact_name: factName,
-    fact_category: 'react-fallback',
-    occurrences: calls.length,
-    associated_calls: calls.length,
-    associated_input_tokens: associatedInput,
-    associated_cached_input_tokens: associatedCached,
-    associated_uncached_input_tokens: calls.reduce((sum, call) => sum + call.uncachedInput, 0),
-    associated_output_tokens: calls.reduce((sum, call) => sum + call.output, 0),
-    associated_reasoning_output_tokens: calls.reduce((sum, call) => sum + call.reasoningOutput, 0),
-    associated_total_tokens: calls.reduce((sum, call) => sum + call.totalTokens, 0),
-    avg_cache_ratio: associatedInput ? associatedCached / associatedInput : 0,
-    largest_call_tokens: largest?.totalTokens ?? 0,
-    largest_record_id: largest?.id ?? null,
-    latest_event_timestamp: largest?.rawTime || largest?.time || null,
-    action_hint: 'Open associated aggregate calls in the full Call Investigator.',
-  };
-}
-
-function numberField(value: unknown): number {
-  const numeric = Number(value ?? 0);
-  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 function staticFactState(): FactLoadState {
