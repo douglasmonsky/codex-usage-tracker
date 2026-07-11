@@ -28,6 +28,12 @@ def _statistical_evidence(
         "sample_size_before": len(previous_values),
         "sample_size_after": len(recent_values),
         "median_shift_credits_per_percent": _rounded(shift),
+        "median_confidence_interval_before_95": _median_confidence_interval(
+            previous_values
+        ),
+        "median_confidence_interval_after_95": _median_confidence_interval(
+            recent_values
+        ),
         "effect_size_cliffs_delta": _rounded(effect_size),
         "p_value_one_sided": _rounded(p_value),
         "combinations_evaluated": combinations_evaluated,
@@ -45,6 +51,57 @@ def _statistical_evidence(
             after_count=len(recent_values),
         ),
     }
+
+
+def _median_confidence_interval(values: list[float]) -> dict[str, Any]:
+    """Return an exact distribution-free 95% interval for a population median."""
+
+    ordered = sorted(values)
+    sample_size = len(ordered)
+    target_coverage = 0.95
+    selected_rank: int | None = None
+    achieved_coverage = _widest_median_interval_coverage(sample_size)
+    denominator = 2**sample_size
+    binomial_coefficient = 1
+    lower_tail_numerator = 0
+
+    # Exact two-sided 95% coverage requires each binomial tail to be at most 1/40.
+    for rank in range(1, (sample_size // 2) + 1):
+        lower_tail_numerator += binomial_coefficient
+        if 40 * lower_tail_numerator > denominator:
+            break
+        selected_rank = rank
+        achieved_coverage = 1.0 - (2.0 * lower_tail_numerator / denominator)
+        binomial_coefficient = (
+            binomial_coefficient * (sample_size - rank + 1) // rank
+        )
+
+    if selected_rank is None:
+        return {
+            "method": "exact_binomial_order_statistic",
+            "confidence_level": target_coverage,
+            "sample_size": sample_size,
+            "available": False,
+            "low": None,
+            "high": None,
+            "achieved_coverage": _rounded(achieved_coverage),
+        }
+
+    return {
+        "method": "exact_binomial_order_statistic",
+        "confidence_level": target_coverage,
+        "sample_size": sample_size,
+        "available": True,
+        "low": _rounded(ordered[selected_rank - 1]),
+        "high": _rounded(ordered[sample_size - selected_rank]),
+        "achieved_coverage": _rounded(achieved_coverage),
+    }
+
+
+def _widest_median_interval_coverage(sample_size: int) -> float:
+    if sample_size <= 0:
+        return 0.0
+    return max(0.0, 1.0 - (2.0 / (2**sample_size)))
 
 
 def _credits_per_percent_values(spans: list[dict[str, Any]]) -> list[float]:

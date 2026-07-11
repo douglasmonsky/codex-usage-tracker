@@ -254,7 +254,7 @@ it('clears stale usage drain state leaving Usage Drain workspace', () => {
   window.history.replaceState(
     null,
     '',
-    '/?view=usage-drain&usage_plan=Weekly&usage_effort=high&usage_subagents=0&usage_sample=80&usage_confidence=0.55',
+    '/?view=usage-drain&usage_plan=Weekly&usage_effort=high&usage_subagents=0&usage_sample=80&usage_confidence=0.55&limit_window=five_hour&limit_hypothesis=stable',
   );
 
   render(<App />);
@@ -262,7 +262,7 @@ it('clears stale usage drain state leaving Usage Drain workspace', () => {
 
   const params = new URLSearchParams(window.location.search);
   expect(params.get('view')).toBe('overview');
-  for (const name of ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence']) {
+  for (const name of ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence', 'limit_window', 'limit_hypothesis']) {
     expect(params.get(name)).toBeNull();
   }
 });
@@ -306,9 +306,9 @@ it('clears stale Calls table state leaving Calls workspace but preserves global 
 
 it('switches between feature workspaces and preserves active navigation state', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-    expect(screen.getByRole('heading', { name: 'Usage Drain Lab' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Usage Drain Lab/i })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
+    expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Limits$/i })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
@@ -346,9 +346,10 @@ expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /Export Pack/i }));
     expect(screen.getByText(/Exported 6 report snapshots/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Refresh Diagnostics/i }));
-    expect(screen.getByText(/Diagnostics refreshed/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
+    fireEvent.click(screen.getByRole('button', { name: '5-hour' }));
+    expect(screen.getByRole('heading', { level: 2, name: '5-hour rolling context' })).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('limit_window')).toBe('five_hour');
 
     fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
     expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toBeVisible();

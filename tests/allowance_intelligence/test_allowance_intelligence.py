@@ -94,6 +94,12 @@ def test_weekly_capacity_drop_flags_strong_local_evidence_after_baseline() -> No
     assert candidate["statistical_evidence"]["method"] == "exact_permutation_mean_shift"
     assert candidate["statistical_evidence"]["effect_size_cliffs_delta"] == -1.0
     assert candidate["statistical_evidence"]["signal"] == "directionally_consistent_small_sample"
+    assert candidate["statistical_evidence"][
+        "median_confidence_interval_before_95"
+    ]["available"]
+    assert not candidate["statistical_evidence"][
+        "median_confidence_interval_after_95"
+    ]["available"]
     assert not analysis["summary"]["research_readiness"]["ready_for_public_claim"]
 
 
@@ -110,6 +116,24 @@ def test_larger_consistent_weekly_shift_is_public_claim_ready() -> None:
     assert candidate["recent_span_count"] == 6
     assert statistical_evidence["signal"] == "strong_nonparametric_shift"
     assert statistical_evidence["p_value_one_sided"] <= 0.05
+    assert statistical_evidence["median_confidence_interval_before_95"] == {
+        "method": "exact_binomial_order_statistic",
+        "confidence_level": 0.95,
+        "sample_size": 6,
+        "available": True,
+        "low": 100.0,
+        "high": 100.0,
+        "achieved_coverage": 0.96875,
+    }
+    assert statistical_evidence["median_confidence_interval_after_95"] == {
+        "method": "exact_binomial_order_statistic",
+        "confidence_level": 0.95,
+        "sample_size": 6,
+        "available": True,
+        "low": 50.0,
+        "high": 50.0,
+        "achieved_coverage": 0.96875,
+    }
     assert analysis["summary"]["research_readiness"]["ready_for_public_claim"]
 
 

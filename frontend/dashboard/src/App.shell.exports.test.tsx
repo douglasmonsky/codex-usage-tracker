@@ -131,42 +131,37 @@ it('exports reports evidence rows scoped by selected report URL state', async ()
     expect(await screen.findAllByText('Exported 4 call rows')).not.toHaveLength(0);
   });
 
-it('exports Usage Drain evidence rows scoped by URL-backed controls', async () => {
+it('exports Limits compatibility call rows while preserving URL-backed analysis state', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     window.history.replaceState(
       null,
       '',
-      '/?view=usage-drain&usage_plan=Prolite&usage_effort=low&usage_subagents=0&usage_sample=1&usage_confidence=0.55',
+      '/?view=usage-drain&limit_window=five_hour&limit_hypothesis=stable',
     );
 
     render(<App />);
 
-    expect(screen.getByLabelText('Plan')).toHaveValue('Prolite');
-    expect(screen.getByLabelText('Effort Filter')).toHaveValue('low');
-    expect(screen.getByLabelText('Include subagents')).not.toBeChecked();
-    expect(screen.getByLabelText('Min sample size')).toHaveValue(1);
-    expect(screen.getByLabelText('Confidence threshold')).toHaveValue('0.55');
+    expect(screen.getByRole('button', { name: '5-hour' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Behavior stayed stable' })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
 
     await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
-    expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
+    expect(await screen.findAllByText('Exported 8 call rows')).not.toHaveLength(0);
   });
 
-it('syncs Usage Drain controls to URL state', () => {
+it('syncs Limits window and hypothesis controls to URL state', () => {
     window.history.replaceState(null, '', '/?view=usage-drain');
 
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText('Effort Filter'), { target: { value: 'low' } });
-    fireEvent.click(screen.getByLabelText('Include subagents'));
-    fireEvent.change(screen.getByLabelText('Min sample size'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: '5-hour' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Behavior stayed stable' }));
 
     const params = new URLSearchParams(window.location.search);
     expect(params.get('view')).toBe('usage-drain');
-    expect(params.get('usage_effort')).toBe('low');
-    expect(params.get('usage_subagents')).toBe('0');
-    expect(params.get('usage_sample')).toBe('3');
+    expect(params.get('limit_window')).toBe('five_hour');
+    expect(params.get('limit_hypothesis')).toBe('stable');
   });
 
 it('exports call rows behind filtered Threads rows from shell topbar', async () => {
