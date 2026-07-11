@@ -17,6 +17,7 @@ import type { CallRow, ContextRuntime, DashboardModel, DiagnosticSection } from 
 import { LineChart } from '../../charts/LineChart';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { PageLoadProgress } from '../../design';
 import { formatCompact, money, pct } from '../shared/format';
 import {
   FactCallsPanel,
@@ -105,6 +106,16 @@ export function DiagnosticsPage({
         : contextRuntime.apiToken
           ? factState.message
           : 'Static fallback facts';
+  const canUseLiveFacts = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
+  const completedFactModules = diagnosticFactSourceDefinitions.filter(
+    source => factStates[source.key]?.status === 'loaded',
+  ).length;
+  const loadingFactModules = diagnosticFactSourceDefinitions.some(
+    source => factStates[source.key]?.status === 'loading',
+  );
+  const factProgressError = diagnosticFactSourceDefinitions
+    .map(source => factStates[source.key])
+    .find((state): state is Extract<FactLoadState, { status: 'error' }> => state?.status === 'error');
 
   useEffect(() => {
     if (!facts.length) {
@@ -287,6 +298,15 @@ export function DiagnosticsPage({
           <StatusBadge label="Local Only" tone="green" />
         </div>
       </div>
+
+      <PageLoadProgress
+        active={canUseLiveFacts && loadingFactModules}
+        completed={completedFactModules}
+        total={diagnosticFactSourceDefinitions.length}
+        label="Loading diagnostic fact sources"
+        error={canUseLiveFacts ? factProgressError?.message : null}
+        updating={completedFactModules > 0}
+      />
 
       {globalFilters}
 
