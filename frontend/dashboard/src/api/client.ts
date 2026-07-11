@@ -1,4 +1,10 @@
 import { fixtureModel } from '../test-fixtures/dashboardFixture';
+import {
+  abortableDelay,
+  assertLiveUsagePayloadAvailable,
+  isAbortError,
+  liveUsageHeaders,
+} from '../data/httpTransportSupport';
 import { buildFindings, buildModelCosts, buildReports } from './modelInsights';
 import { buildOverviewSeriesFromDailyValues } from './overviewSeries';
 import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, Series, ThreadRow, UsageRow, WeeklyWindow } from './types';
@@ -45,6 +51,7 @@ export type UsagePayloadRequest = {
   offset?: number;
   includeArchived?: boolean;
   onProgress?: (progress: RefreshProgressPayload) => void;
+  signal?: AbortSignal;
 };
 
 const uncappedUsagePageSize = 10_000;
@@ -73,6 +80,7 @@ async function tryRefreshUsageIndex(
     await refreshUsageIndex(currentPayload, options);
     return true;
   } catch (error) {
+    if (isAbortError(error)) throw error;
     if (error instanceof UsageRefreshJobFailedError) {
       throw error;
     }
@@ -102,6 +110,7 @@ async function requestUsagePayload(
   const response = await fetch(`/api/usage?${params.toString()}`, {
     headers: liveUsageHeaders(currentPayload),
     cache: 'no-store',
+    signal: options.signal,
   });
   const payload = await readJsonResponse(response, 'Usage refresh');
   return payload as DashboardBootPayload;
@@ -116,6 +125,7 @@ async function loadAllUsagePayloadPaged(
   let latestPayload: DashboardBootPayload | null = null;
   let totalRows = Number(currentPayload?.total_available_rows ?? 0);
   for (let pageIndex = 0; pageIndex < 1000; pageIndex += 1) {
+    options.signal?.throwIfAborted();
     const payload = await requestUsagePayload(currentPayload, {
       ...options,
       refresh: pageIndex === 0 ? options.refresh : false,
@@ -164,6 +174,7 @@ async function refreshUsageIndex(
   const startResponse = await fetch(`/api/refresh/start?${params.toString()}`, {
     headers: liveUsageHeaders(currentPayload),
     cache: 'no-store',
+    signal: options.signal,
   });
   const started = (await readJsonResponse(startResponse, 'Usage refresh start')) as RefreshProgressPayload;
   options.onProgress?.(started);
@@ -171,19 +182,22 @@ async function refreshUsageIndex(
   if (!jobId) {
     throw new Error('Usage refresh start did not return a job id.');
   }
-  return pollUsageRefreshJob(currentPayload, jobId, options.onProgress);
+  return pollUsageRefreshJob(currentPayload, jobId, options.onProgress, options.signal);
 }
 
 async function pollUsageRefreshJob(
   currentPayload: DashboardBootPayload,
   jobId: string,
   onProgress?: (progress: RefreshProgressPayload) => void,
+  signal?: AbortSignal,
 ): Promise<RefreshProgressPayload> {
   for (let attempt = 0; attempt < 600; attempt += 1) {
+    signal?.throwIfAborted();
     const params = new URLSearchParams({ job_id: jobId, _: String(Date.now()) });
     const response = await fetch(`/api/refresh/status?${params.toString()}`, {
       headers: liveUsageHeaders(currentPayload),
       cache: 'no-store',
+      signal,
     });
     const progress = (await readJsonResponse(response, 'Usage refresh status')) as RefreshProgressPayload;
     onProgress?.(progress);
@@ -193,29 +207,9 @@ async function pollUsageRefreshJob(
     if (progress.status === 'failed') {
       throw new UsageRefreshJobFailedError(progress.error || progress.message || 'Usage refresh failed.');
     }
-    await delay(Math.min(1000, 150 + attempt * 50));
+    await abortableDelay(Math.min(1000, 150 + attempt * 50), signal);
   }
   throw new Error('Usage refresh did not complete before the polling timeout.');
-}
-
-function assertLiveUsagePayloadAvailable(currentPayload: DashboardBootPayload | null): asserts currentPayload is DashboardBootPayload {
-  if (window.location.protocol === 'file:') {
-    throw new Error('Live refresh requires the localhost dashboard server.');
-  }
-  if (!currentPayload?.api_token) {
-    throw new Error('Live refresh requires localhost dashboard API token.');
-  }
-}
-
-function liveUsageHeaders(currentPayload: DashboardBootPayload): HeadersInit {
-  return {
-    Accept: 'application/json',
-    'X-Codex-Usage-Token': currentPayload.api_token || '',
-  };
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
 class UsageRefreshJobFailedError extends Error {}

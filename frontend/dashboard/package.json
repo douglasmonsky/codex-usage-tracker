@@ -11,6 +11,8 @@
     "smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test ../../tests/playwright/dashboard-react.spec.mjs"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-router": "^1.170.17",
     "@tanstack/react-table": "^8.21.3",
     "d3-array": "^3.2.4",
     "d3-scale": "^4.0.2",

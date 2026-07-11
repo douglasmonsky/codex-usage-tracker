@@ -1,48 +1,48 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, rowsToCsv, screen, vi, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, render, rowsToCsv, screen, vi, waitFor, within } from './test-utils/appTestHarness';
 import { callCsvColumns } from './features/shared/tables';
 import { fixtureModel } from './test-fixtures/dashboardFixture';
 
 describe('React dashboard shell exports', () => {
   installAppTestHooks();
 
-it('exports the current view from the shell topbar', () => {
+it('exports the current view from the shell topbar', async () => {
 const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
 
 render(<App />);
 
 fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-expect(clickSpy).toHaveBeenCalledTimes(1);
-expect(screen.getAllByText('Exported 8 call rows').length).toBeGreaterThan(0);
+await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+expect(await screen.findAllByText('Exported 8 call rows')).not.toHaveLength(0);
 
 fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-  expect(clickSpy).toHaveBeenCalledTimes(2);
-  expect(screen.getAllByText(/Exported \d+ call rows/).length).toBeGreaterThan(0);
+  await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(2));
+  expect(await screen.findAllByText(/Exported \d+ call rows/)).not.toHaveLength(0);
 });
 
-it('exports filtered Calls rows from shell topbar', () => {
+it('exports filtered Calls rows from shell topbar', async () => {
   const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=calls&call_q=thread-9f3a');
 
   render(<App />);
 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-  expect(clickSpy).toHaveBeenCalledTimes(1);
-  expect(screen.getAllByText('Exported 1 call rows').length).toBeGreaterThan(0);
+  await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+  expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
 });
 
-it('exports only the selected full-page Call Investigator row from shell topbar', () => {
+it('exports only the selected full-page Call Investigator row from shell topbar', async () => {
   const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=call&record=fixture-call-2');
 
   render(<App />);
 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-  expect(clickSpy).toHaveBeenCalledTimes(1);
-  expect(screen.getAllByText('Exported 1 call rows').length).toBeGreaterThan(0);
+  await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+  expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
 });
 
-it('does not export the wrong Call Investigator row for unloaded records', () => {
+it('does not export the wrong Call Investigator row for unloaded records', async () => {
   const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=call&record=not-loaded');
 
@@ -50,40 +50,40 @@ it('does not export the wrong Call Investigator row for unloaded records', () =>
 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
   expect(clickSpy).not.toHaveBeenCalled();
-  expect(screen.getAllByText('No call rows to export').length).toBeGreaterThan(0);
+  expect(await screen.findAllByText('No call rows to export')).not.toHaveLength(0);
 });
 
-it('exports overview rows filtered by global search from shell topbar', () => {
+it('exports overview rows filtered by global search from shell topbar', async () => {
   const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=overview&q=thread-9f3a');
 
   render(<App />);
 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-  expect(clickSpy).toHaveBeenCalledTimes(1);
-  expect(screen.getAllByText('Exported 1 call rows').length).toBeGreaterThan(0);
+  await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+  expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
 });
 
-it('exports investigator rows scoped by selected finding URL state', () => {
+it('exports investigator rows scoped by selected finding URL state', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     window.history.replaceState(null, '', '/?view=investigator&finding=2');
 
   render(<App />);
 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText('Exported 6 call rows').length).toBeGreaterThan(0);
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findAllByText('Exported 6 call rows')).not.toHaveLength(0);
   });
 
-it('exports Cache And Context evidence rows scoped by selected thread URL state', () => {
+it('exports Cache And Context evidence rows scoped by selected thread URL state', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     window.history.replaceState(null, '', '/?view=cache-context&cache_thread=thread-9f3a');
 
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
 
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText('Exported 1 call rows').length).toBeGreaterThan(0);
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
   });
 
 it('syncs Cache And Context selected thread to URL state', () => {
@@ -98,15 +98,15 @@ it('syncs Cache And Context selected thread to URL state', () => {
     expect(new URLSearchParams(window.location.search).get('cache_thread')).toBe('thread-3c5d');
   });
 
-it('exports Diagnostics fact calls scoped by selected fact URL state', () => {
+it('exports Diagnostics fact calls scoped by selected fact URL state', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     window.history.replaceState(null, '', '/?view=diagnostics&diagnostic_fact=model:high_effort');
 
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
 
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText('Exported 4 call rows').length).toBeGreaterThan(0);
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findAllByText('Exported 4 call rows')).not.toHaveLength(0);
   });
 
 it('syncs Diagnostics selected structured fact to URL state', () => {
@@ -120,18 +120,18 @@ it('syncs Diagnostics selected structured fact to URL state', () => {
     expect(params.get('diagnostic_fact')).toBe('model:high_effort');
   });
 
-it('exports reports evidence rows scoped by selected report URL state', () => {
+it('exports reports evidence rows scoped by selected report URL state', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     window.history.replaceState(null, '', '/?view=reports&report=fast-mode-proxy');
 
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
 
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText('Exported 4 call rows').length).toBeGreaterThan(0);
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findAllByText('Exported 4 call rows')).not.toHaveLength(0);
   });
 
-it('exports Usage Drain evidence rows scoped by URL-backed controls', () => {
+it('exports Usage Drain evidence rows scoped by URL-backed controls', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     window.history.replaceState(
       null,
@@ -149,8 +149,8 @@ it('exports Usage Drain evidence rows scoped by URL-backed controls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
 
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText('Exported 1 call rows').length).toBeGreaterThan(0);
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
   });
 
 it('syncs Usage Drain controls to URL state', () => {
@@ -169,15 +169,15 @@ it('syncs Usage Drain controls to URL state', () => {
     expect(params.get('usage_sample')).toBe('3');
   });
 
-it('exports call rows behind filtered Threads rows from shell topbar', () => {
+it('exports call rows behind filtered Threads rows from shell topbar', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=threads&thread_q=thread-0e16&risk=Low');
 
   render(<App />);
 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-  expect(clickSpy).toHaveBeenCalledTimes(1);
-  expect(screen.getAllByText('Exported 1 call rows').length).toBeGreaterThan(0);
+  await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+  expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
 });
 
 it('syncs investigator selected finding to the URL', () => {
@@ -193,7 +193,7 @@ it('syncs investigator selected finding to the URL', () => {
   expect(screen.getByText('Selected Cache Misses (Large Inputs)')).toBeInTheDocument();
 });
 
-it('reports empty Calls shell exports without duplicated row wording', () => {
+it('reports empty Calls shell exports without duplicated row wording', async () => {
   const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=calls&call_q=definitely-no-matching-call');
 
@@ -201,7 +201,7 @@ it('reports empty Calls shell exports without duplicated row wording', () => {
 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
   expect(clickSpy).not.toHaveBeenCalled();
-  expect(screen.getAllByText('No call rows to export').length).toBeGreaterThan(0);
+  expect(await screen.findAllByText('No call rows to export')).not.toHaveLength(0);
 });
 
 it('escapes CSV output for aggregate exports', () => {

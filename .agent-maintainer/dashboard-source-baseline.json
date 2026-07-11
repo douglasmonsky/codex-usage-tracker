@@ -7,13 +7,13 @@
     },
     "frontend/dashboard/src/App.tsx": {
       "group": "source",
-      "nonblank": 931,
-      "physical": 978
+      "nonblank": 801,
+      "physical": 849
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
-      "nonblank": 819,
-      "physical": 886
+      "nonblank": 816,
+      "physical": 880
     },
     "frontend/dashboard/src/api/diagnostics.ts": {
       "group": "source",

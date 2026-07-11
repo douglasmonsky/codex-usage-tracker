@@ -91,6 +91,22 @@ expect(screen.getByRole('heading', { name: 'Diagnostics Notebook' })).toBeInTheD
 expect(window.location.search).toContain('view=diagnostics');
 });
 
+it('creates navigation history entries and rehydrates shell state on popstate', () => {
+  const pushState = vi.spyOn(window.history, 'pushState');
+  render(<App />);
+
+  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  expect(pushState).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
+
+  window.history.replaceState(null, '', '/?view=overview&q=cache&preset=cache-heavy&history=all');
+  fireEvent.popState(window);
+
+  expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Search dashboard')).toHaveValue('cache');
+  expect(new URLSearchParams(window.location.search).get('history')).toBe('all');
+});
+
 it('shows legacy back-to-top control after scrolling', () => {
     const scrollTo = vi.fn();
     Object.defineProperty(window, 'scrollTo', {

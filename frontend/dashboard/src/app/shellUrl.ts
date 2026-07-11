@@ -1,6 +1,7 @@
 import { isViewId, navItems, secondaryNavItems, type ViewId } from './navigation';
+import type { HistoryScope } from '../data/dataScope';
 
-export type HistoryScope = 'active' | 'all';
+export type { HistoryScope } from '../data/dataScope';
 
 function isCallReturnViewId(value: string | null): value is ViewId {
   return isViewId(value) && value !== 'call';
