@@ -23,7 +23,9 @@ def test_refresh_job_registry_reports_progress_and_result(tmp_path: Path) -> Non
 
     job_id = str(started["job_id"])
     assert started["status"] in {"running", "completed"}
-    assert "phase" in started["progress"]
+    started_progress = started["progress"]
+    assert isinstance(started_progress, dict)
+    assert "phase" in started_progress
 
     deadline = time.monotonic() + 5
     status = registry.status(job_id)
@@ -32,9 +34,13 @@ def test_refresh_job_registry_reports_progress_and_result(tmp_path: Path) -> Non
         status = registry.status(job_id)
 
     assert status["status"] == "completed"
-    assert status["progress"]["phase"] == "finalizing"
-    assert status["progress"]["status"] == "completed"
-    assert status["result"]["parsed_events"] > 0
+    progress = status["progress"]
+    result = status["result"]
+    assert isinstance(progress, dict)
+    assert isinstance(result, dict)
+    assert progress["phase"] == "finalizing"
+    assert progress["status"] == "completed"
+    assert int(result["parsed_events"]) > 0
 
 
 def test_refresh_job_registry_reports_missing_job() -> None:

@@ -6,7 +6,9 @@ import os
 import shlex
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Protocol, cast
 
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
@@ -49,6 +51,19 @@ STABLE_CLI_COMMANDS = {
     "init-projects",
     "support-bundle",
 }
+
+
+class _ReleaseCheckModule(Protocol):
+    REPO_ROOT: Path
+    CLI_HELP_SUBCOMMANDS: Iterable[str]
+
+    def _check_package_naming_docs(self) -> list[str]: ...
+
+    def _check_public_release_doc_versions(self, version: str) -> list[str]: ...
+
+    def _check_react_dashboard_privacy_artifacts(self) -> list[str]: ...
+
+    def _check_tracked_files_for_secrets(self) -> list[str]: ...
 
 
 MCP_TOOL_NAMES = {
@@ -441,7 +456,7 @@ def _subprocess_env() -> dict[str, str]:
     return env
 
 
-def _load_release_check_module():
+def _load_release_check_module() -> _ReleaseCheckModule:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "check_release.py"
     spec = importlib.util.spec_from_file_location("check_release", script_path)
@@ -449,7 +464,7 @@ def _load_release_check_module():
         raise AssertionError("could not load check_release.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    return cast(_ReleaseCheckModule, module)
 
 
 def _documented_cli_commands(path: Path) -> tuple[set[str], list[str]]:

@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
 def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
@@ -86,7 +87,7 @@ def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> N
     assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
 
 
-def _run_benchmark_json(args: list[str]) -> dict[str, object]:
+def _run_benchmark_json(args: list[str]) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
         [sys.executable, *args],
@@ -97,7 +98,7 @@ def _run_benchmark_json(args: list[str]) -> dict[str, object]:
         env=_subprocess_env(),
     )
     try:
-        payload = json.loads(result.stdout)
+        payload: dict[str, Any] = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise AssertionError(
             "benchmark did not emit JSON\n"
