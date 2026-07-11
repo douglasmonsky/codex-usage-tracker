@@ -8,6 +8,7 @@ from codex_usage_tracker.reports.visualization import (
     build_visualization_result,
     suggest_visualizations,
 )
+from codex_usage_tracker.reports.visualization_support import _optional_number
 
 
 def test_visualization_suggestions_rank_question_cues() -> None:
@@ -59,6 +60,13 @@ def test_allowance_visualization_preserves_backend_grade_and_candidate() -> None
     assert spec["scope"]["historyScope"] == "all"
     assert spec["data"]["rows"][0]["capacity_proxy"] == 800.0
     assert spec["annotations"][0]["id"] == "candidate-regime-shift"
+
+
+def test_visualization_numbers_reject_non_finite_values() -> None:
+    assert _optional_number(float("nan")) is None
+    assert _optional_number(float("inf")) is None
+    assert _optional_number("not-a-number") is None
+    assert _optional_number("12.5") == 12.5
 
 
 def test_thread_call_visualization_uses_chronological_call_shape() -> None:

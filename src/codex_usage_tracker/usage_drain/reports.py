@@ -373,26 +373,26 @@ def _best_allowance_split(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         left_sse = _range_sse(prefix_sum, prefix_square, 0, split)
         right_sse = _range_sse(prefix_sum, prefix_square, split, len(values))
         reduction = parent_sse - left_sse - right_sse
-        if best is None or reduction > _number(best["sse_reduction"]):
-            left = rows[:split]
-            right = rows[split:]
-            best = {
-                "split_index": split,
-                "left_n": len(left),
-                "right_n": len(right),
-                "left_start_event_timestamp": left[0]["start_event_timestamp"],
-                "left_end_event_timestamp": left[-1]["end_event_timestamp"],
-                "right_start_event_timestamp": right[0]["start_event_timestamp"],
-                "right_end_event_timestamp": right[-1]["end_event_timestamp"],
-                "left_mean_credits_per_percent": _rounded(
-                    _mean([_number(row["credits_per_visible_percent"]) for row in left])
-                ),
-                "right_mean_credits_per_percent": _rounded(
-                    _mean([_number(row["credits_per_visible_percent"]) for row in right])
-                ),
-                "sse_reduction_share": _rounded(reduction / parent_sse),
-                "sse_reduction": reduction,
-            }
+        if reduction <= (_number(best["sse_reduction"]) if best else float("-inf")):
+            continue
+        left, right = rows[:split], rows[split:]
+        best = {
+            "split_index": split,
+            "left_n": len(left),
+            "right_n": len(right),
+            "left_start_event_timestamp": left[0]["start_event_timestamp"],
+            "left_end_event_timestamp": left[-1]["end_event_timestamp"],
+            "right_start_event_timestamp": right[0]["start_event_timestamp"],
+            "right_end_event_timestamp": right[-1]["end_event_timestamp"],
+            "left_mean_credits_per_percent": _rounded(
+                _mean([_number(row["credits_per_visible_percent"]) for row in left])
+            ),
+            "right_mean_credits_per_percent": _rounded(
+                _mean([_number(row["credits_per_visible_percent"]) for row in right])
+            ),
+            "sse_reduction_share": _rounded(reduction / parent_sse),
+            "sse_reduction": reduction,
+        }
     return best
 
 

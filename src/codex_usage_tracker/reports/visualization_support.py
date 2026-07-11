@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any
 
 VISUALIZATION_SPEC_SCHEMA = "codex-usage-visualization/v1"
@@ -235,4 +236,4 @@ def _optional_number(value: Any) -> float | None:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return number if number == number and abs(number) != float("inf") else None
+    return number if isfinite(number) else None

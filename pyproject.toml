@@ -111,6 +111,32 @@ target-version = "py310"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
 
+[tool.pylint."messages control"]
+disable = ["all"]
+enable = [
+  "F",
+  "E",
+  "W0101", # unreachable
+  "W0102", # dangerous-default-value
+  "W0120", # useless-else-on-loop
+  "W0123", # eval-used
+  "W0129", # assert-on-string-literal
+  "W0150", # lost-exception
+  "W0199", # assert-on-tuple
+  "W0702", # bare-except
+  "W0705", # duplicate-except
+  "W0707", # raise-missing-from
+  "W0711", # binary-op-exception
+  "W1404", # implicit-str-concat
+  "W1501", # bad-open-mode
+  "W1508", # invalid-envvar-default
+  "W1510", # subprocess-run-check
+  "R0124", # comparison-with-itself
+  "R1716", # chained-comparison
+  "R1730", # consider-using-min-builtin
+  "R1731", # consider-using-max-builtin
+]
+
 [tool.agent_maintainer]
 mode = "legacy-ratchet"
 architecture_tool = "tach"
