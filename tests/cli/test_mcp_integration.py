@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any, cast
 
 from codex_usage_tracker.dashboard.api import generate_dashboard
 from codex_usage_tracker.diagnostics.api import run_doctor
@@ -34,6 +35,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker import mcp_server
     from codex_usage_tracker.cli import mcp_dashboard, mcp_discovery, mcp_investigations
 
+    mcp_server = cast(Any, mcp_server)
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     dashboard_path = tmp_path / "dashboard.html"

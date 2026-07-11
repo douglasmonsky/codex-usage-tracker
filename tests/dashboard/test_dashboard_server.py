@@ -9,8 +9,7 @@ import urllib.request
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-
-import pytest
+from typing import Any, Protocol, cast
 
 from codex_usage_tracker.dashboard.api import dashboard_payload, generate_dashboard
 from codex_usage_tracker.store.api import (
@@ -30,10 +29,26 @@ from tests.store_dashboard_helpers import (
     _write_pricing,
 )
 
+JsonObject = dict[str, Any]
+
+
+class MonkeyPatch(Protocol):
+    def setattr(
+        self,
+        target: object,
+        name: str,
+        value: object,
+        _raising: bool = True,
+    ) -> None: ...
+
+
+def _as_json_object(payload: dict[str, object]) -> JsonObject:
+    return cast(JsonObject, payload)
+
 
 def test_dashboard_server_forces_dashboard_asset_mime_types(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     from codex_usage_tracker.server.api import _UsageDashboardHandler
 
@@ -249,17 +264,21 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             data=b"",
             method="POST",
         )
-        diagnostic_refresh_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview/refresh",
-            headers={"X-Codex-Usage-Token": "test-token"},
-            data=b"",
-            method="POST",
+        diagnostic_refresh_payload = _as_json_object(
+            _read_json(
+                f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview/refresh",
+                headers={"X-Codex-Usage-Token": "test-token"},
+                data=b"",
+                method="POST",
+            )
         )
-        diagnostic_batch_refresh_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/refresh",
-            headers={"X-Codex-Usage-Token": "test-token"},
-            data=b"",
-            method="POST",
+        diagnostic_batch_refresh_payload = _as_json_object(
+            _read_json(
+                f"http://127.0.0.1:{server.server_port}/api/diagnostics/refresh",
+                headers={"X-Codex-Usage-Token": "test-token"},
+                data=b"",
+                method="POST",
+            )
         )
         diagnostic_tool_output_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "toolOutput"
@@ -288,8 +307,8 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         diagnostic_usage_drain_refresh_payload = diagnostic_batch_refresh_payload["sections"][
             "usageDrain"
         ]
-        diagnostic_stored_payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview"
+        diagnostic_stored_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview")
         )
         diagnostic_tool_output_stored_payload = _read_json(
             f"http://127.0.0.1:{server.server_port}/api/diagnostics/tool-output"
@@ -327,8 +346,8 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             timeout=5,
         ) as response:
             second_usage_refresh_payload = json.loads(response.read().decode("utf-8"))
-        diagnostic_after_second_usage_refresh = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview"
+        diagnostic_after_second_usage_refresh = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview")
         )
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"http://127.0.0.1:{server.server_port}/api/usage?limit=all",
@@ -877,9 +896,11 @@ def test_dashboard_call_api_returns_adjacent_records_for_investigator(
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        payload = _read_json(
-            f"http://127.0.0.1:{server.server_port}/api/call?record_id=a2",
-            headers={"X-Codex-Usage-Token": "test-token"},
+        payload = _as_json_object(
+            _read_json(
+                f"http://127.0.0.1:{server.server_port}/api/call?record_id=a2",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            )
         )
     finally:
         server.shutdown()
@@ -1004,10 +1025,14 @@ def test_dashboard_server_returns_json_for_sqlite_errors(tmp_path: Path, monkeyp
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        usage_error = _http_error_json(f"http://127.0.0.1:{server.server_port}/api/usage")
-        context_error = _http_error_json(
-            f"http://127.0.0.1:{server.server_port}/api/context?record_id=abc",
-            headers={"X-Codex-Usage-Token": "test-token"},
+        usage_error = _as_json_object(
+            _http_error_json(f"http://127.0.0.1:{server.server_port}/api/usage")
+        )
+        context_error = _as_json_object(
+            _http_error_json(
+                f"http://127.0.0.1:{server.server_port}/api/context?record_id=abc",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            )
         )
     finally:
         server.shutdown()
@@ -1051,9 +1076,11 @@ def test_dashboard_server_can_enable_context_api_at_runtime(tmp_path: Path) -> N
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        disabled_error = _http_error_json(
-            f"http://127.0.0.1:{server.server_port}/api/context?record_id={record_id}",
-            headers={"X-Codex-Usage-Token": "test-token"},
+        disabled_error = _as_json_object(
+            _http_error_json(
+                f"http://127.0.0.1:{server.server_port}/api/context?record_id={record_id}",
+                headers={"X-Codex-Usage-Token": "test-token"},
+            )
         )
         enable_without_token = _http_error_json(
             f"http://127.0.0.1:{server.server_port}/api/context-settings?enabled=1"
