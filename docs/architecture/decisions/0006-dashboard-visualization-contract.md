@@ -33,6 +33,21 @@ benefit from requesting a chart without depending on dashboard DOM.
 - MCP experiments return `VisualizationSpecV1` plus compact evidence. Static
   artifact rendering must not make Node a requirement of the base Python package.
 
+## R4 Bundle Measurement
+
+The ECharts 6.1 modular SVG implementation was measured after separating
+Cartesian, heatmap, flow, interaction, annotation, legend, tooltip, and visual-map
+registration behind independent dynamic imports. Feature chunks range from 1.41
+to 25.03 kB gzip. The shared ECharts/ZRender SVG core is 112.00 kB gzip under the
+repository's deterministic esbuild measurement, 2.00 kB above the original 110
+kB target.
+
+The R4 hard limit is therefore 114 kB gzip for the largest individual renderer
+chunk, while 110 kB remains the target. This 3.6% ceiling provides narrow tooling
+and compression-version headroom without allowing feature modules to accumulate
+inside the core chunk. Any increase beyond 114 kB fails CI and requires a new
+measured decision; total or initial-dashboard bundle size is not exempted.
+
 ## Consequences
 
 - Dashboard and MCP can share one analytical graphic contract while retaining

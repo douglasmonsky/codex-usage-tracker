@@ -56,7 +56,19 @@ module.exports = {
       name: 'visualization-spec-is-renderer-and-react-free',
       severity: 'error',
       from: { path: '^src/visualization/spec/' },
-      to: { path: '(^react$|^react/|src/visualization/(renderer|react)/)' }
+      to: { path: '(^react$|^react/|^echarts($|/)|src/visualization/(renderer|react)/)' }
+    },
+    {
+      name: 'visualization-fixtures-are-ui-free',
+      severity: 'error',
+      from: { path: '^src/visualization/fixtures/' },
+      to: { path: '(^react$|^react/|^echarts($|/)|src/visualization/(renderer|react|lab)/)' }
+    },
+    {
+      name: 'echarts-is-confined-to-visualization-renderer',
+      severity: 'error',
+      from: { path: '^src/', pathNot: '^src/visualization/renderer/' },
+      to: { path: '^echarts($|/)' }
     },
     {
       name: 'data-contracts-are-react-and-fixture-free',

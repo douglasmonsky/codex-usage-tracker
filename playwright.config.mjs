@@ -17,6 +17,9 @@ export default defineConfig({
   },
   use: {
     baseURL,
+    launchOptions: {
+      args: ['--disable-gpu'],
+    },
     trace: 'retain-on-failure',
   },
   reporter: [['list']],
