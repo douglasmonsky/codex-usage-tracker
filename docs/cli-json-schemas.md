@@ -133,6 +133,7 @@ Schema: `codex-usage-tracker-summary-v1`
   "schema": "codex-usage-tracker-summary-v1",
   "group_by": "model",
   "is_expensive": false,
+  "include_archived": true,
   "privacy_mode": "normal",
   "row_count": 1,
   "rows": []
@@ -140,6 +141,10 @@ Schema: `codex-usage-tracker-summary-v1`
 ```
 
 `rows` contains aggregate summary rows for `summary` and aggregate per-call rows for `expensive`.
+`include_archived` records the resolved history scope. CLI and MCP summary calls retain their
+existing all-history default; the dashboard `/api/summary` endpoint defaults to active history and
+accepts `include_archived=true` when the user selects all history.
+Summary and expensive-call reports treat `limit=0` as no finite row cap.
 
 ## Query
 

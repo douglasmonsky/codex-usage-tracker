@@ -179,7 +179,8 @@ Gate:
 - summary/recommendation contract tests;
 - row-to-investigator browser test;
 - mobile first-answer placement and loading-state tests;
-- current Overview parity checklist signed off.
+- current Overview parity checklist signed off in
+  [`dashboard-overview-parity.md`](dashboard-overview-parity.md).
 
 ### R6. Explore: Calls, Threads, Tools, And Files
 

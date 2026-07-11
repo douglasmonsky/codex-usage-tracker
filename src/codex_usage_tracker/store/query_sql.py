@@ -72,8 +72,12 @@ def _group_expression(group_by: str) -> str:
         raise ValueError(f"group_by must be one of: {allowed}") from exc
 
 
-def _since_where_clause(since: str | None) -> tuple[str, list[Any]]:
-    return _usage_where_clause(since=since)
+def _since_where_clause(
+    since: str | None,
+    *,
+    include_archived: bool = True,
+) -> tuple[str, list[Any]]:
+    return _usage_where_clause(since=since, include_archived=include_archived)
 
 
 def _thread_key_expression(prefix: str = "") -> str:

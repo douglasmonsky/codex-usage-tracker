@@ -9,7 +9,8 @@ const budgets = {
   targetInitialJs: 85 * 1024,
   targetInitialCss: 12 * 1024,
   routeJs: 65 * 1024,
-  visualizationRouteJs: 110 * 1024,
+  // ADR 0006 keeps 110 kB as the target and permits 114 kB of measured headroom.
+  visualizationRouteJs: 114 * 1024,
   routeCss: 20 * 1024
 };
 
@@ -27,7 +28,8 @@ for (const file of assets) {
   rows.push({
     file: outputPath,
     gzipBytes: gzipSync(content, { level: 9, mtime: 0 }).byteLength,
-    kind: initialFiles.has(outputPath) ? 'initial' : 'route'
+    kind: initialFiles.has(outputPath) ? 'initial' : 'route',
+    visualizationCore: content.includes('ZRender, a high performance 2d drawing library')
   });
 }
 
@@ -56,7 +58,9 @@ if (initialCssBytes > budgets.currentInitialCss) {
   failures.push(`initial css ${kib(initialCssBytes)} exceeds ${kib(budgets.currentInitialCss)}`);
 }
 for (const row of rows.filter((item) => item.kind === 'route' && item.file.endsWith('.js'))) {
-  const limit = /visualization|chart/i.test(row.file) ? budgets.visualizationRouteJs : budgets.routeJs;
+  const limit = row.visualizationCore || /visualization|chart/i.test(row.file)
+    ? budgets.visualizationRouteJs
+    : budgets.routeJs;
   if (row.gzipBytes > limit) failures.push(`${row.file} ${kib(row.gzipBytes)} exceeds ${kib(limit)}`);
 }
 for (const row of rows.filter((item) => item.kind === 'route' && item.file.endsWith('.css'))) {

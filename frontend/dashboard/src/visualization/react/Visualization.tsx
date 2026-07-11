@@ -43,6 +43,10 @@ export function Visualization({ defaultView = 'chart', height = 360, onSelection
   useEffect(() => {
     const element = chartElementRef.current;
     if (view !== 'chart' || !canRenderData || !element) return;
+    if (element.clientWidth <= 0 || element.clientHeight <= 0) {
+      setRendererState('idle');
+      return;
+    }
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     const abortController = new AbortController();

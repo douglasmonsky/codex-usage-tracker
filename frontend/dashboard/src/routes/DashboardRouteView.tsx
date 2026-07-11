@@ -57,6 +57,7 @@ type DashboardRouteViewProps = {
   loadLimit: number;
   loadMoreRows: () => void;
   model: DashboardModel;
+  navigateView: (view: DashboardViewId) => void;
   onRefresh: () => void;
   openCallInvestigator: (recordId: string) => void;
   openFindingInvestigator: (rank: number) => void;
@@ -96,6 +97,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     loadLimit,
     loadMoreRows,
     model,
+    navigateView,
     onRefresh,
     openCallInvestigator,
     openFindingInvestigator,
@@ -110,6 +112,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
       return (
         <OverviewPage
           model={model}
+          contextRuntime={contextRuntime}
+          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
           onRefresh={onRefresh}
           refreshState={refreshState}
           globalQuery={globalQuery}
@@ -122,6 +126,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
           onOpenFinding={openFindingInvestigator}
+          onNavigateView={navigateView}
           globalFilters={globalFilters}
         />
       );

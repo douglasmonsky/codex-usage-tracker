@@ -126,6 +126,37 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert "SECRET RAW PROMPT" not in json.dumps(source_rows)
 
 
+def test_summary_can_exclude_archived_usage(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    _write_archived_log(codex_home)
+    db_path = tmp_path / "usage.sqlite3"
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path, include_archived=True)
+
+    active_rows = query_summary(
+        db_path=db_path,
+        group_by="model",
+        include_archived=False,
+    )
+    all_rows = query_summary(
+        db_path=db_path,
+        group_by="model",
+        limit=0,
+        include_archived=True,
+    )
+    all_expensive = query_most_expensive_calls(
+        db_path=db_path,
+        limit=0,
+        include_archived=True,
+    )
+
+    assert sum(int(row["model_calls"]) for row in active_rows) == 4
+    assert sum(int(row["model_calls"]) for row in all_rows) == 5
+    assert sum(int(row["total_tokens"]) for row in active_rows) == 400
+    assert sum(int(row["total_tokens"]) for row in all_rows) == 1_300
+    assert len(all_expensive) == 5
+
+
 def test_refresh_reports_skipped_corrupt_token_events(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"

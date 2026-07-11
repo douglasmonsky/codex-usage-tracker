@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { allowanceChangePointSpec } from '../fixtures';
 import { Visualization } from './Visualization';
@@ -19,7 +19,11 @@ vi.mock('../renderer/echartsRenderer', () => ({
 describe('Visualization', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(360);
   });
+
+  afterEach(() => vi.restoreAllMocks());
 
   it('keeps chart and table selection synchronized through keyboard controls', () => {
     const onSelectionChange = vi.fn();

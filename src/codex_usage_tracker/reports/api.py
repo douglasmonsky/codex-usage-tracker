@@ -183,6 +183,7 @@ class SummaryReport:
     group_by: str
     is_expensive: bool = False
     privacy_mode: str = "normal"
+    include_archived: bool = True
 
     def render(self) -> str:
         if self.is_expensive:
@@ -195,6 +196,7 @@ class SummaryReport:
             "group_by": self.group_by,
             "is_expensive": self.is_expensive,
             "privacy_mode": self.privacy_mode,
+            "include_archived": self.include_archived,
             "row_count": len(self.rows),
             "rows": self.rows,
         }
@@ -232,11 +234,12 @@ def build_summary_report(
     db_path: Path,
     pricing_path: Path,
     group_by: str = "thread",
-    limit: int = 20,
+    limit: int | None = 20,
     preset: str | None = None,
     since: str | None = None,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
+    include_archived: bool = True,
 ) -> SummaryReport:
     """Build a usage summary or expensive-call preset from aggregate rows."""
 
@@ -244,7 +247,12 @@ def build_summary_report(
     resolved_group_by, since_filter = resolve_summary_options(group_by, preset, since)
     pricing = load_pricing_config(pricing_path)
     if preset == "expensive":
-        rows = query_most_expensive_calls(db_path, limit=limit, since=since_filter)
+        rows = query_most_expensive_calls(
+            db_path,
+            limit=limit,
+            since=since_filter,
+            include_archived=include_archived,
+        )
         return SummaryReport(
             rows=apply_project_privacy_to_rows(
                 annotate_rows_with_recommendations(annotate_rows_with_efficiency(rows, pricing)),
@@ -253,6 +261,7 @@ def build_summary_report(
             group_by=resolved_group_by,
             is_expensive=True,
             privacy_mode=privacy_mode,
+            include_archived=include_archived,
         )
 
     if resolved_group_by in {"project", "project_tag"}:
@@ -264,21 +273,33 @@ def build_summary_report(
             since=since_filter,
             projects_path=projects_path,
             privacy_mode=privacy_mode,
+            include_archived=include_archived,
         )
-        return SummaryReport(rows=rows, group_by=resolved_group_by, privacy_mode=privacy_mode)
+        return SummaryReport(
+            rows=rows,
+            group_by=resolved_group_by,
+            privacy_mode=privacy_mode,
+            include_archived=include_archived,
+        )
 
     rows = query_summary(
         db_path,
         group_by=resolved_group_by,
         limit=limit,
         since=since_filter,
+        include_archived=include_archived,
     )
     if resolved_group_by == "model":
         rows = annotate_rows_with_efficiency(rows, pricing, model_field="group_key")
     rows = apply_project_privacy_to_summary_rows(
         rows, group_by=resolved_group_by, privacy_mode=privacy_mode
     )
-    return SummaryReport(rows=rows, group_by=resolved_group_by, privacy_mode=privacy_mode)
+    return SummaryReport(
+        rows=rows,
+        group_by=resolved_group_by,
+        privacy_mode=privacy_mode,
+        include_archived=include_archived,
+    )
 
 
 def build_expensive_calls_report(

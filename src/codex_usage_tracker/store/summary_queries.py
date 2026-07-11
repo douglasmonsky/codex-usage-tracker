@@ -7,7 +7,11 @@ from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.store.connection import connect
-from codex_usage_tracker.store.query_sql import group_expression, since_where_clause
+from codex_usage_tracker.store.query_sql import (
+    group_expression,
+    normalize_limit,
+    since_where_clause,
+)
 from codex_usage_tracker.store.rows import row_to_dict
 from codex_usage_tracker.store.schema import init_db
 
@@ -15,14 +19,20 @@ from codex_usage_tracker.store.schema import init_db
 def query_summary(
     db_path: Path = DEFAULT_DB_PATH,
     group_by: str = "thread",
-    limit: int = 20,
+    limit: int | None = 20,
     since: str | None = None,
+    include_archived: bool = True,
 ) -> list[dict[str, Any]]:
     """Return aggregate usage grouped by a supported summary dimension."""
 
     group_expr = group_expression(group_by)
-    where_clause, raw_params = since_where_clause(since)
+    where_clause, raw_params = since_where_clause(
+        since,
+        include_archived=include_archived,
+    )
     params: list[Any] = list(raw_params)
+    normalized_limit = normalize_limit(limit)
+    limit_clause = "LIMIT ?" if normalized_limit is not None else ""
     sql = f"""
         SELECT
             {group_expr} AS group_key,
@@ -43,9 +53,10 @@ def query_summary(
         {where_clause}
         GROUP BY group_key
         ORDER BY total_tokens DESC
-        LIMIT ?
+        {limit_clause}
     """
-    params.append(limit)
+    if normalized_limit is not None:
+        params.append(normalized_limit)
     with connect(db_path) as conn:
         init_db(conn)
         return [row_to_dict(row) for row in conn.execute(sql, params)]

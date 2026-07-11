@@ -775,7 +775,7 @@ Use Load all rows for the full history, or type any finite row count.
       <DashboardRouteView
         key={navigationRevision}
         activeView={activeView}
-        model={scopedModel}
+        model={scopedModel} navigateView={setView}
         onRefresh={onRefresh}
         refreshState={refreshState}
         globalQuery={globalQuery}

@@ -182,7 +182,7 @@ expect(screen.getByRole('button', { name: /Convocatoria anterior/i })).toBeInThe
 it('opens overview findings and recent calls without homepage presets', () => {
   render(<App />);
   expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Review finding 1: Long Thread: data-engine-refactor' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect evidence' }));
   expect(screen.getByRole('heading', { name: 'Investigator Workbench' })).toBeInTheDocument();
   expect(window.location.search).toContain('view=investigator');
   expect(window.location.search).toContain('finding=1');

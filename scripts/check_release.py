@@ -618,7 +618,7 @@ def _check_tracked_files_for_secrets() -> list[str]:
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (FileNotFoundError, UnicodeDecodeError):
             continue
         for label, pattern in SECRET_PATTERNS.items():
             if pattern.search(text):

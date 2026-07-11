@@ -1,4 +1,15 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, within } from './test-utils/appTestHarness';
+import { vi } from 'vitest';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, waitFor, within } from './test-utils/appTestHarness';
+
+vi.mock('./visualization/renderer/echartsRenderer', () => ({
+  createEChartsVisualizationRenderer: vi.fn(async () => ({
+    dispose: vi.fn(),
+    exportSvgDataUrl: vi.fn(() => ''),
+    resize: vi.fn(),
+    select: vi.fn(),
+    setSpec: vi.fn(),
+  })),
+}));
 
 describe('React dashboard overview workspace', () => {
   installAppTestHooks();
@@ -11,7 +22,7 @@ null,
 );
 
 render(<App />);
-fireEvent.click(screen.getByRole('button', { name: /Review finding 1/i }));
+fireEvent.click(screen.getByRole('button', { name: /Inspect evidence/i }));
 
 const params = new URLSearchParams(window.location.search);
 expect(params.get('view')).toBe('investigator');
@@ -30,7 +41,7 @@ expect(params.get(name)).toBeNull();
 }
 });
 
-  it('uses live aggregate totals cache composition trend charts without homepage presets', () => {
+  it('uses loaded totals, focused visualization contracts, and no homepage presets', async () => {
     window.__CODEX_USAGE_BOOT__ = {
       loaded_row_count: 1,
       total_available_rows: 1,
@@ -62,25 +73,24 @@ expect(params.get(name)).toBeNull();
 
     render(<App />);
 
-    expect(screen.getByRole('img', { name: '1.25K composition' })).toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: '24.83M composition' })).not.toBeInTheDocument();
-    expect(within(screen.getByRole('img', { name: 'Tokens line chart' })).getByText('Input')).toBeInTheDocument();
-    expect(within(screen.getByRole('img', { name: 'Tokens line chart' })).getByText('Jul 2')).toBeInTheDocument();
-    expect(within(screen.getByRole('img', { name: 'USD line chart' })).getByText('Estimated Cost')).toBeInTheDocument();
-    expect(screen.getByText('33%')).toBeInTheDocument();
-    expect(screen.getByText('Weekly observed usage')).toBeInTheDocument();
+    const metrics = screen.getByLabelText('Loaded usage metrics');
+    expect(within(metrics).getByText('1.25K')).toBeInTheDocument();
+    expect(within(metrics).getByText(/cached 400.*uncached 600.*output 250.*reasoning 0/i)).toBeInTheDocument();
+    expect(within(metrics).getByText('40.0%')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Recent token movement' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Loaded token accounting' })).toBeInTheDocument();
     const recentCallsTable = screen.getByRole('table', { name: 'Recent calls' });
-    expect(within(recentCallsTable).getByRole('columnheader', { name: /Thread/i })).toHaveClass('sticky-column');
-    expect(within(recentCallsTable).getByText('live-overview-thread').closest('td')).toHaveClass('sticky-column');
-    expect(screen.getByText('Showing 1 of 1 loaded calls')).toBeInTheDocument();
-    expect(screen.getByText('Dashboard rows: 1 of 1 loaded')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeDisabled();
+    const recentCallsSection = screen.getByRole('region', { name: 'Recent calls' });
+    expect(within(recentCallsTable).getByRole('columnheader', { name: /Thread/i })).toBeInTheDocument();
+    await waitFor(() => expect(within(recentCallsTable).getByText('live-overview-thread')).toBeInTheDocument());
+    expect(screen.getByText('Loaded 1 of 1 available calls')).toBeInTheDocument();
+    expect(within(recentCallsSection).getByRole('button', { name: 'Load more recent calls' })).toBeDisabled();
     expect(screen.getAllByRole('button', { name: /Load all rows/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText('32.4%')).not.toBeInTheDocument();
     expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();
   });
 
-  it('separates showing loaded recent calls from loading more dashboard rows', () => {
+  it('virtualizes loaded recent calls and opens a row in Call Investigator', async () => {
     window.__CODEX_USAGE_BOOT__ = {
       api_token: 'overview-load-token',
       context_api_enabled: true,
@@ -106,15 +116,16 @@ expect(params.get(name)).toBeNull();
     render(<App />);
 
     const recentCallsTable = screen.getByRole('table', { name: 'Recent calls' });
-    expect(within(recentCallsTable).getByRole('columnheader', { name: /Thread/i })).toHaveClass('sticky-column');
-    expect(within(recentCallsTable).getByText('overview-load-thread-0').closest('td')).toHaveClass('sticky-column');
-    expect(screen.getByText('Showing 6 of 8 loaded calls')).toBeInTheDocument();
-    expect(screen.getByText('Dashboard rows: 8 of 20 loaded')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeEnabled();
+    const recentCallsSection = screen.getByRole('region', { name: 'Recent calls' });
+    expect(recentCallsTable).toHaveAttribute('aria-rowcount', '9');
+    await waitFor(() => expect(within(recentCallsTable).getByText('overview-load-thread-0')).toBeInTheDocument());
+    expect(screen.getByText('Loaded 8 of 20 available calls')).toBeInTheDocument();
+    expect(within(recentCallsSection).getByRole('button', { name: 'Load more recent calls' })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show 2 more loaded calls' }));
+    fireEvent.click(within(recentCallsTable).getByText('overview-load-thread-0'));
 
-    expect(screen.getByText('overview-load-thread-7')).toBeInTheDocument();
-    expect(screen.getByText('Showing 8 of 8 loaded calls')).toBeInTheDocument();
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('view')).toBe('call');
+    expect(params.get('record')).toBe('overview-load-row-0');
   });
 });

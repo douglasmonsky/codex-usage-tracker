@@ -57,6 +57,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
         "required": {
             "group_by": str,
             "is_expensive": bool,
+            "include_archived": bool,
             "privacy_mode": str,
             "row_count": int,
             "rows": list,

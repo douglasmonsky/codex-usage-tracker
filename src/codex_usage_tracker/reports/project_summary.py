@@ -28,10 +28,11 @@ def project_summary_rows(
     db_path: Path,
     pricing: PricingConfig,
     group_by: str,
-    limit: int,
+    limit: int | None,
     since: str | None,
     projects_path: Path,
     privacy_mode: str,
+    include_archived: bool = True,
 ) -> list[dict[str, Any]]:
     """Build project or project-tag grouped usage summary rows."""
 
@@ -41,6 +42,7 @@ def project_summary_rows(
         since=since,
         projects_path=projects_path,
         privacy_mode=privacy_mode,
+        include_archived=include_archived,
     )
     buckets: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -48,7 +50,7 @@ def project_summary_rows(
             _add_project_summary_row(buckets, str(key), row)
     summaries = [_final_project_summary_bucket(bucket) for bucket in buckets.values()]
     summaries.sort(key=lambda row: (-int(row["total_tokens"]), str(row["group_key"])))
-    return summaries[:limit]
+    return summaries if limit is None or limit <= 0 else summaries[:limit]
 
 
 def _project_rows(
@@ -58,8 +60,14 @@ def _project_rows(
     since: str | None,
     projects_path: Path,
     privacy_mode: str,
+    include_archived: bool,
 ) -> list[dict[str, Any]]:
-    rows = query_dashboard_events(db_path, limit=0, since=since)
+    rows = query_dashboard_events(
+        db_path,
+        limit=0,
+        since=since,
+        include_archived=include_archived,
+    )
     rows = annotate_rows_with_efficiency(rows, pricing)
     rows = annotate_rows_with_project_identity(rows, load_project_config(projects_path))
     return apply_project_privacy_to_rows(rows, privacy_mode=privacy_mode)
