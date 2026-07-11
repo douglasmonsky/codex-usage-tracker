@@ -175,6 +175,13 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
             react_cache_control = response.headers.get("Cache-Control")
 
         with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"{base_url}/codex-usage-tracker-assets/react/assets/dashboard-react.js",
+            timeout=5,
+        ) as response:
+            react_asset = response.read().decode("utf-8")
+            react_asset_cache_control = response.headers.get("Cache-Control")
+
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"{base_url}/dashboard.html",
             timeout=5,
         ) as response:
@@ -188,7 +195,10 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
     assert react_content_type.split(";", 1)[0] == "text/html"
     assert react_cache_control == "no-store"
     assert "Codex Usage Tracker React Dashboard" in react_html
-    assert "/codex-usage-tracker-assets/react/assets/dashboard-react.js?v=" in react_html
+    assert 'src="/codex-usage-tracker-assets/react/assets/dashboard-react.js"' in react_html
+    assert "dashboard-react.js?v=" not in react_html
+    assert react_asset_cache_control == "no-cache"
+    assert "window.__reactDashboard = true" in react_asset
     assert '<script id="usage-data" type="application/json">' in react_html
     react_payload = json.loads(
         react_html.split('<script id="usage-data" type="application/json">', 1)[1].split(

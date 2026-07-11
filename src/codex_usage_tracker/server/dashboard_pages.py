@@ -53,6 +53,8 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
     def end_headers(self) -> None:
         if self._is_dashboard_html_request():
             self.send_header("Cache-Control", "no-store")
+        elif urlparse(self.path).path.startswith("/codex-usage-tracker-assets/react/assets/"):
+            self.send_header("Cache-Control", "no-cache")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header(
@@ -86,7 +88,6 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         except OSError as exc:
             self._send_exception("Could not read React dashboard shell", exc)
             return
-        html = self._cache_bust_react_asset_urls(html)
         usage_data = json.dumps(payload, ensure_ascii=True).replace("</", "<\\/")
         usage_script = f'<script id="usage-data" type="application/json">{usage_data}</script>'
         if '<div id="root"></div>' in html:
@@ -104,26 +105,6 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         finally:
             self.path = original_path
             self._serving_react_dashboard = False
-
-    def _cache_bust_react_asset_urls(self, html: str) -> str:
-        for asset_url in (
-            "/codex-usage-tracker-assets/react/assets/dashboard-react.js",
-            "/codex-usage-tracker-assets/react/assets/index.css",
-        ):
-            version = self._react_asset_version(asset_url)
-            if not version:
-                continue
-            html = html.replace(f'{asset_url}"', f'{asset_url}?v={version}"')
-            html = html.replace(f"{asset_url}'", f"{asset_url}?v={version}'")
-        return html
-
-    def _react_asset_version(self, asset_url: str) -> str:
-        asset_path = Path(self.translate_path(asset_url))
-        try:
-            stat = asset_path.stat()
-        except OSError:
-            return ""
-        return f"{stat.st_mtime_ns:x}-{stat.st_size:x}"
 
     def _is_investigator_dashboard_request(self, path: str, query: str) -> bool:
         if path != f"/{self._dashboard_name}":
