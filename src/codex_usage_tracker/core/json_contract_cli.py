@@ -9,6 +9,7 @@ from codex_usage_tracker.core.json_contract_common import (
     PLUGIN_INSTALL_FIELDS,
     REFRESH_RESULT_FIELDS,
 )
+from codex_usage_tracker.core.json_contract_summary import SUMMARY_JSON_PAYLOAD_CONTRACTS
 
 NoneType = type(None)
 Number = (int, float)
@@ -53,16 +54,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "deleted_usage_events": int,
         }
     },
-    "codex-usage-tracker-summary-v1": {
-        "required": {
-            "group_by": str,
-            "is_expensive": bool,
-            "include_archived": bool,
-            "privacy_mode": str,
-            "row_count": int,
-            "rows": list,
-        }
-    },
+    **SUMMARY_JSON_PAYLOAD_CONTRACTS,
     "codex-usage-tracker-query-v1": {
         "required": {
             "filters": dict,

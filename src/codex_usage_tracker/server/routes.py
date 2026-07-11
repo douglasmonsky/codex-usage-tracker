@@ -22,9 +22,7 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
         "/api/allowance/export": "_handle_allowance_export",
         "/api/reports/pack": "_handle_reports_pack",
         "/api/investigations/agentic": "_handle_investigation_agentic",
-        "/api/investigations/repeated-files": (
-            "_handle_investigation_repeated_file_rediscovery"
-        ),
+        "/api/investigations/repeated-files": ("_handle_investigation_repeated_file_rediscovery"),
         "/api/investigations/shell-churn": "_handle_investigation_shell_churn",
         "/api/investigations/large-low-output": "_handle_investigation_large_low_output",
         "/api/investigations/walk": "_handle_investigation_walk",

@@ -1,178 +1,364 @@
-import sqlite3
-from contextlib import suppress
-from typing import Any
+"""Dashboard query and materialized thread-summary store coverage."""
 
-from codex_usage_tracker.store.dashboard_queries import observed_usage_reconciliation
-from codex_usage_tracker.store.schema import init_db
+from __future__ import annotations
 
+from dataclasses import replace
+from pathlib import Path
 
-class _AutoClosingConnection:
-    def __init__(self, conn: sqlite3.Connection) -> None:
-        self._conn = conn
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._conn, name)
-
-    def close(self) -> None:
-        self._conn.close()
-
-    def __del__(self) -> None:
-        with suppress(Exception):
-            self.close()
-
-
-def _usage_db() -> _AutoClosingConnection:
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    init_db(conn)
-    return _AutoClosingConnection(conn)
+from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.store.api import (
+    connect,
+    init_db,
+    query_dashboard_event_count,
+    query_dashboard_events,
+    query_thread_summaries,
+    query_usage_api_events,
+    refresh_usage_index,
+    upsert_usage_events,
+)
+from codex_usage_tracker.store.thread_summaries import query_thread_summary_count
+from tests.store_dashboard_helpers import (
+    SECOND_SESSION_ID,
+    SESSION_ID,
+    _make_codex_home,
+    _usage_event,
+    _write_archived_log,
+)
 
 
-def _insert_observed_usage_row(
-    conn: sqlite3.Connection,
-    *,
-    record_id: str,
-    event_timestamp: str,
-    limit_id: str,
-    plan_type: str = "pro",
-    cumulative_total_tokens: int = 0,
-) -> None:
-    conn.execute(
-        """
-        INSERT INTO usage_events (
-            record_id,
-            session_id,
-            event_timestamp,
-            source_file,
-            line_number,
-            input_tokens,
-            cached_input_tokens,
-            output_tokens,
-            reasoning_output_tokens,
-            total_tokens,
-            cumulative_input_tokens,
-            cumulative_cached_input_tokens,
-            cumulative_output_tokens,
-            cumulative_reasoning_output_tokens,
-            cumulative_total_tokens,
-            uncached_input_tokens,
-            cache_ratio,
-            reasoning_output_ratio,
-            context_window_percent,
-            rate_limit_plan_type,
-            rate_limit_limit_id
+def test_dashboard_event_query_uses_sql_prefilters(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    model_rows = query_dashboard_events(db_path=db_path, limit=0, model="codex-auto-review")
+    effort_rows = query_dashboard_events(db_path=db_path, limit=0, effort="xhigh")
+    token_rows = query_dashboard_events(db_path=db_path, limit=0, min_tokens=100)
+    thread_rows = query_dashboard_events(
+        db_path=db_path,
+        limit=0,
+        thread="Add Codex token tracking",
+    )
+    offset_rows = query_dashboard_events(db_path=db_path, limit=2, offset=2)
+    session_rows = query_dashboard_events(db_path=db_path, limit=0, thread=SESSION_ID)
+    since_rows = query_dashboard_events(db_path=db_path, limit=0, since="2026-05-17")
+    future_rows = query_dashboard_events(db_path=db_path, limit=0, until="2000-01-01")
+
+    assert len(model_rows) == 1
+    assert model_rows[0]["model"] == "codex-auto-review"
+    assert {row["effort"] for row in effort_rows} == {"xhigh"}
+    assert {row["total_tokens"] for row in token_rows} == {100, 200}
+    assert {row["session_id"] for row in thread_rows} >= {SESSION_ID, SECOND_SESSION_ID}
+    assert len(offset_rows) == 2
+    assert {row["record_id"] for row in offset_rows}.isdisjoint(
+        {row["record_id"] for row in query_dashboard_events(db_path=db_path, limit=2)}
+    )
+    assert {row["session_id"] for row in session_rows} == {SESSION_ID}
+    assert len(since_rows) == 4
+    assert future_rows == []
+
+
+def test_large_history_query_prefilter_uses_sql_indexes(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        UsageEvent(
+            record_id=f"record-{index}",
+            session_id=f"session-{index % 100}",
+            thread_name=f"Thread {index % 25}",
+            session_updated_at="2026-05-17T18:58:27Z",
+            event_timestamp=f"2026-05-{(index % 28) + 1:02d}T12:00:00Z",
+            source_file=f"/tmp/synthetic/{index}.jsonl",
+            line_number=index + 1,
+            turn_id=f"turn-{index}",
+            turn_timestamp=f"2026-05-{(index % 28) + 1:02d}T12:00:00Z",
+            cwd=f"/tmp/project-{index % 10}",
+            model="gpt-5.5" if index % 2 == 0 else "codex-auto-review",
+            effort="high" if index % 3 == 0 else "low",
+            current_date="2026-05-17",
+            timezone="UTC",
+            call_initiator="user",
+            call_initiator_reason="user_message",
+            call_initiator_confidence="high",
+            is_archived=0,
+            thread_key=f"thread:Thread {index % 25}",
+            thread_call_index=None,
+            previous_record_id=None,
+            next_record_id=None,
+            thread_source="user",
+            subagent_type=None,
+            agent_role=None,
+            agent_nickname=None,
+            parent_session_id=None,
+            parent_thread_name=None,
+            parent_session_updated_at=None,
+            model_context_window=200000,
+            input_tokens=1000 + index,
+            cached_input_tokens=200,
+            output_tokens=100,
+            reasoning_output_tokens=10,
+            total_tokens=1100 + index,
+            cumulative_input_tokens=1000 + index,
+            cumulative_cached_input_tokens=200,
+            cumulative_output_tokens=100,
+            cumulative_reasoning_output_tokens=10,
+            cumulative_total_tokens=1100 + index,
         )
-        VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, 0, 0.0, 0.0, 0.0, ?, ?)
-        """,
-        (
-            record_id,
-            f"session-{record_id}",
-            event_timestamp,
-            "/tmp/session.jsonl",
-            1,
-            cumulative_total_tokens,
-            plan_type,
-            limit_id,
+        for index in range(10_000)
+    ]
+    upsert_usage_events(events, db_path=db_path)
+
+    rows = query_dashboard_events(
+        db_path=db_path,
+        limit=25,
+        model="gpt-5.5",
+        effort="high",
+        min_tokens=9000,
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        plan = " ".join(
+            str(row["detail"])
+            for row in conn.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT *
+                FROM usage_events
+                WHERE model = ? AND effort = ? AND total_tokens >= ?
+                """,
+                ("gpt-5.5", "high", 9000),
+            )
+        )
+
+    assert len(rows) == 25
+    assert all(row["model"] == "gpt-5.5" for row in rows)
+    assert all(row["effort"] == "high" for row in rows)
+    assert all(row["total_tokens"] >= 9000 for row in rows)
+    assert "idx_usage_model_effort" in plan
+
+
+def test_upsert_refreshes_thread_adjacency_fields(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="a1",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:00Z",
+            cumulative_total_tokens=100,
         ),
+        _usage_event(
+            record_id="b1",
+            session_id="session-b",
+            thread_key="thread:Beta",
+            event_timestamp="2026-05-17T12:00:01Z",
+            cumulative_total_tokens=50,
+        ),
+        _usage_event(
+            record_id="a2",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:02Z",
+            cumulative_total_tokens=200,
+        ),
+        _usage_event(
+            record_id="a3",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:03Z",
+            cumulative_total_tokens=300,
+        ),
+    ]
+
+    upsert_usage_events(events, db_path=db_path)
+    rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=True)
+    by_id = {row["record_id"]: row for row in rows}
+
+    assert by_id["a1"]["thread_call_index"] == 1
+    assert by_id["a1"]["previous_record_id"] is None
+    assert by_id["a1"]["next_record_id"] == "a2"
+    assert by_id["a2"]["thread_call_index"] == 2
+    assert by_id["a2"]["previous_record_id"] == "a1"
+    assert by_id["a2"]["next_record_id"] == "a3"
+    assert by_id["a3"]["thread_call_index"] == 3
+    assert by_id["a3"]["previous_record_id"] == "a2"
+    assert by_id["a3"]["next_record_id"] is None
+    assert by_id["b1"]["thread_call_index"] == 1
+    assert by_id["b1"]["previous_record_id"] is None
+    assert by_id["b1"]["next_record_id"] is None
+
+
+def test_dashboard_rows_include_call_timing_from_thread_adjacency(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        replace(
+            _usage_event(
+                record_id="a1",
+                session_id="session-a",
+                thread_key="thread:Alpha",
+                event_timestamp="2026-05-17T12:00:10Z",
+                cumulative_total_tokens=100,
+            ),
+            turn_id="turn-alpha",
+            turn_timestamp="2026-05-17T12:00:00Z",
+        ),
+        replace(
+            _usage_event(
+                record_id="a2",
+                session_id="session-a",
+                thread_key="thread:Alpha",
+                event_timestamp="2026-05-17T12:00:45Z",
+                cumulative_total_tokens=200,
+            ),
+            turn_id="turn-alpha",
+            turn_timestamp="2026-05-17T12:00:00Z",
+        ),
+        replace(
+            _usage_event(
+                record_id="a3",
+                session_id="session-a",
+                thread_key="thread:Alpha",
+                event_timestamp="2026-05-17T12:05:05Z",
+                cumulative_total_tokens=300,
+            ),
+            turn_id="turn-beta",
+            turn_timestamp="2026-05-17T12:05:00Z",
+        ),
+        replace(
+            _usage_event(
+                record_id="b1",
+                session_id="session-b",
+                thread_key="thread:Beta",
+                event_timestamp="2026-05-17T12:00:30Z",
+                cumulative_total_tokens=50,
+            ),
+            turn_id="turn-beta-thread",
+            turn_timestamp="2026-05-17T12:00:20Z",
+        ),
+    ]
+
+    upsert_usage_events(events, db_path=db_path)
+    rows = query_dashboard_events(db_path=db_path, limit=0, include_archived=True)
+    by_id = {row["record_id"]: row for row in rows}
+
+    assert by_id["a1"]["previous_call_event_timestamp"] is None
+    assert by_id["a1"]["call_started_at"] == "2026-05-17T12:00:00Z"
+    assert by_id["a1"]["call_duration_seconds"] == 10.0
+    assert by_id["a1"]["previous_call_delta_seconds"] is None
+
+    assert by_id["a2"]["previous_call_event_timestamp"] == "2026-05-17T12:00:10Z"
+    assert by_id["a2"]["call_started_at"] == "2026-05-17T12:00:10Z"
+    assert by_id["a2"]["call_duration_seconds"] == 35.0
+    assert by_id["a2"]["previous_call_delta_seconds"] == 35.0
+
+    assert by_id["a3"]["previous_call_event_timestamp"] == "2026-05-17T12:00:45Z"
+    assert by_id["a3"]["call_started_at"] == "2026-05-17T12:05:00Z"
+    assert by_id["a3"]["call_duration_seconds"] == 5.0
+    assert by_id["a3"]["previous_call_delta_seconds"] == 260.0
+
+    assert by_id["b1"]["call_started_at"] == "2026-05-17T12:00:20Z"
+    assert by_id["b1"]["call_duration_seconds"] == 10.0
+    assert by_id["b1"]["previous_call_delta_seconds"] is None
+
+    by_duration = query_usage_api_events(
+        db_path=db_path,
+        limit=1,
+        include_archived=True,
+        sort="duration",
+        direction="desc",
+    )
+    by_gap = query_usage_api_events(
+        db_path=db_path,
+        limit=1,
+        include_archived=True,
+        sort="gap",
+        direction="desc",
+    )
+    assert by_duration[0]["record_id"] == "a2"
+    assert by_gap[0]["record_id"] == "a3"
+
+
+def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="a1",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:00Z",
+            cumulative_total_tokens=100,
+        ),
+        _usage_event(
+            record_id="a2",
+            session_id="session-a",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-05-17T12:00:02Z",
+            cumulative_total_tokens=220,
+        ),
+        _usage_event(
+            record_id="b1",
+            session_id="session-b",
+            thread_key="thread:Beta",
+            event_timestamp="2026-05-17T12:00:01Z",
+            cumulative_total_tokens=90,
+        ),
+    ]
+
+    upsert_usage_events(events, db_path=db_path)
+    summaries = query_thread_summaries(db_path=db_path, limit=0, include_archived=False)
+    by_key = {row["thread_key"]: row for row in summaries}
+
+    assert set(by_key) == {"thread:Alpha", "thread:Beta"}
+    assert query_thread_summary_count(db_path=db_path) == 2
+    assert query_thread_summary_count(db_path=db_path, search="alpha") == 1
+    assert query_thread_summary_count(db_path=db_path, search="missing") == 0
+    assert by_key["thread:Alpha"]["call_count"] == 2
+    assert by_key["thread:Alpha"]["session_count"] == 1
+    assert by_key["thread:Alpha"]["total_tokens"] == 220
+    assert by_key["thread:Alpha"]["cached_input_tokens"] == 40
+    assert by_key["thread:Alpha"]["call_initiator_summary"] == "mostly_user"
+    assert by_key["thread:Alpha"]["is_archived_scope"] == "active"
+    assert by_key["thread:Alpha"]["estimated_cost_usd"] is None
+    assert by_key["thread:Alpha"]["usage_credits"] is None
+    assert by_key["thread:Alpha"]["latest_record_id"] == "a2"
+    assert by_key["thread:Beta"]["latest_record_id"] == "b1"
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        persisted = conn.execute("SELECT COUNT(*) AS count FROM thread_summaries").fetchone()
+    assert persisted is not None
+    assert persisted["count"] == 4
+
+
+def test_thread_summaries_keep_active_and_all_history_scopes_separate(
+    tmp_path: Path,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    _write_archived_log(codex_home)
+    db_path = tmp_path / "usage.sqlite3"
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path, include_archived=True)
+    active_summaries = query_thread_summaries(db_path=db_path, limit=0)
+    all_summaries = query_thread_summaries(
+        db_path=db_path,
+        limit=0,
+        include_archived=True,
     )
 
-
-def _selected_row(conn: sqlite3.Connection, record_id: str) -> sqlite3.Row:
-    row = conn.execute(
-        "SELECT * FROM usage_events WHERE record_id = ?",
-        (record_id,),
-    ).fetchone()
-    assert row is not None
-    return row
-
-
-def test_observed_usage_reconciliation_recommends_live_check_for_alternate_streak() -> None:
-    conn = _usage_db()
-    _insert_observed_usage_row(
-        conn,
-        record_id="selected-codex",
-        event_timestamp="2026-06-01T10:00:00Z",
-        limit_id="codex",
-    )
-    for index in range(3):
-        _insert_observed_usage_row(
-            conn,
-            record_id=f"alternate-{index}",
-            event_timestamp=f"2026-06-01T10:0{index + 1}:00Z",
-            limit_id="codex_spark",
-            cumulative_total_tokens=index,
-        )
-
-    result = observed_usage_reconciliation(
-        conn,
-        scoped_where="",
-        params=[],
-        selected_row=_selected_row(conn, "selected-codex"),
-    )
-
-    assert result["recommended"] is True
-    assert result["reason"] == "latest_alternate_codex_limit_rows"
-    assert result["suggested_action"] == "live_usage_check"
-    assert result["consecutive_alternate_rows"] == 3
-    assert result["latest_limit_id"] == "codex_spark"
-    assert result["latest_observed_at"] == "2026-06-01T10:03:00Z"
-    assert result["selected_limit_id"] == "codex"
+    assert {row["is_archived_scope"] for row in active_summaries} == {"active"}
+    assert {row["is_archived_scope"] for row in all_summaries} == {"all-history"}
+    assert sum(row["call_count"] for row in active_summaries) == 4
+    assert sum(row["call_count"] for row in all_summaries) == 5
+    assert sum(row["archived_call_count"] for row in active_summaries) == 0
+    assert sum(row["archived_call_count"] for row in all_summaries) == 1
+    assert all(row["latest_record_id"] for row in active_summaries)
+    assert all(row["latest_record_id"] for row in all_summaries)
 
 
-def test_observed_usage_reconciliation_ignores_short_or_interrupted_alternate_streak() -> None:
-    conn = _usage_db()
-    _insert_observed_usage_row(
-        conn,
-        record_id="selected-codex",
-        event_timestamp="2026-06-01T10:00:00Z",
-        limit_id="codex",
-    )
-    _insert_observed_usage_row(
-        conn,
-        record_id="latest-alternate",
-        event_timestamp="2026-06-01T10:02:00Z",
-        limit_id="codex_spark",
-    )
-    _insert_observed_usage_row(
-        conn,
-        record_id="latest-codex",
-        event_timestamp="2026-06-01T10:03:00Z",
-        limit_id="codex",
-    )
+def test_dashboard_query_limit_zero_loads_all_rows(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
 
-    result = observed_usage_reconciliation(
-        conn,
-        scoped_where="",
-        params=[],
-        selected_row=_selected_row(conn, "selected-codex"),
-    )
-
-    assert result["recommended"] is False
-    assert result["reason"] is None
-    assert result["suggested_action"] is None
-    assert result["consecutive_alternate_rows"] == 0
-    assert result["latest_limit_id"] is None
-
-
-def test_observed_usage_reconciliation_ignores_selected_latest_alternate() -> None:
-    conn = _usage_db()
-    for index in range(3):
-        _insert_observed_usage_row(
-            conn,
-            record_id=f"alternate-{index}",
-            event_timestamp=f"2026-06-01T10:0{index + 1}:00Z",
-            limit_id="codex_spark",
-            cumulative_total_tokens=index,
-        )
-
-    result = observed_usage_reconciliation(
-        conn,
-        scoped_where="",
-        params=[],
-        selected_row=_selected_row(conn, "alternate-2"),
-    )
-
-    assert result["recommended"] is False
-    assert result["consecutive_alternate_rows"] == 3
-    assert result["latest_limit_id"] == "codex_spark"
-    assert result["selected_limit_id"] == "codex_spark"
+    assert len(query_dashboard_events(db_path=db_path, limit=2)) == 2
+    assert len(query_dashboard_events(db_path=db_path, limit=0)) == 4
+    assert query_dashboard_event_count(db_path=db_path) == 4

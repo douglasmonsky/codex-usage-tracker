@@ -14,7 +14,7 @@ from codex_usage_tracker.reports.api import (
     build_shell_churn_report,
     build_thread_trace_report,
 )
-from codex_usage_tracker.store import content_index
+from codex_usage_tracker.store import content_index, content_index_stream
 from codex_usage_tracker.store.api import connect, init_db, refresh_usage_index
 from codex_usage_tracker.store.content_index_events import _command_root_and_label
 from codex_usage_tracker.store.shell_churn import (
@@ -156,14 +156,14 @@ def test_refresh_batches_content_index_row_writes(tmp_path: Path, monkeypatch) -
     _write_jsonl(log_path, rows)
     db_path = tmp_path / "usage.sqlite3"
     fragment_write_sizes: list[int] = []
-    original_upsert = content_index._upsert_fragment_rows
+    original_upsert = content_index_stream._upsert_fragment_rows
 
     def counting_upsert(conn, rows: list[dict[str, object]]) -> None:
         fragment_write_sizes.append(len(rows))
         original_upsert(conn, rows)
 
-    monkeypatch.setattr(content_index, "_CONTENT_WRITE_BATCH_RECORDS", 2)
-    monkeypatch.setattr(content_index, "_upsert_fragment_rows", counting_upsert)
+    monkeypatch.setattr(content_index_stream, "_CONTENT_WRITE_BATCH_RECORDS", 2)
+    monkeypatch.setattr(content_index_stream, "_upsert_fragment_rows", counting_upsert)
 
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
 
