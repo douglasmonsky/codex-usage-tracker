@@ -1,49 +1,10 @@
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
 from pathlib import Path
-from typing import Any
 
-import pytest
-
-
-def _run_dashboard_live_script(script: str) -> dict[str, Any]:
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for dashboard live helper tests")
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = (
-        repo_root
-        / "src"
-        / "codex_usage_tracker"
-        / "plugin_data"
-        / "dashboard"
-        / "dashboard_live.js"
-    )
-    wrapped = f"""
-const fs = require('fs');
-const vm = require('vm');
-const code = fs.readFileSync({json.dumps(str(script_path))}, 'utf8');
-const context = {{
-  window: {{ clearInterval, setInterval }},
-  URLSearchParams,
-  fetch: async (url, options) => globalThis.__fetch(url, options),
-  console,
-}};
-vm.createContext(context);
-vm.runInContext(code, context);
-const factory = context.window.CodexUsageDashboardLive;
-{script}
-"""
-    result = subprocess.run(
-        [node, "-e", wrapped],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return json.loads(result.stdout)
+from tests.dashboard.dashboard_node_test_helpers import (
+    run_dashboard_live_script as _run_dashboard_live_script,
+)
 
 
 def test_dashboard_live_reports_available_rows_for_shell_only_views() -> None:
