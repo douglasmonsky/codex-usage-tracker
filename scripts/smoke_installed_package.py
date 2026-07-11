@@ -522,6 +522,7 @@ def _smoke_served_dashboard(
     process_output = ""
     try:
         react_html = _read_url_when_ready(react_url, process)
+        root_html = _read_url(f"{root_url}/")
         legacy_html = _read_url(legacy_url)
         react_js = _read_url(
             f"{root_url}/codex-usage-tracker-assets/react/assets/dashboard-react.js"
@@ -542,6 +543,8 @@ def _smoke_served_dashboard(
         raise SystemExit("served React dashboard should not default to an uncapped row request")
     if "dashboard" not in legacy_html.lower():
         raise SystemExit("served legacy dashboard route did not return dashboard HTML")
+    if root_html != legacy_html:
+        raise SystemExit("served root route did not preserve the legacy dashboard rollback shell")
     if len(react_js) < 1000:
         raise SystemExit("served React JavaScript asset looked unexpectedly small")
     if "app-shell" not in react_css:
