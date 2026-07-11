@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 
 from codex_usage_tracker.allowance_intelligence import (
@@ -44,6 +45,58 @@ def test_allowance_observations_normalize_primary_and_secondary_windows(
     assert [row["window_kind"] for row in rows] == ["weekly", "five_hour"]
     assert rows[0]["remaining_percent"] == 65.0
     assert rows[1]["remaining_percent"] == 88.0
+
+
+def test_allowance_observation_reads_do_not_require_a_write_lock(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id="rec-read-only",
+                session_id="session-read-only",
+                thread_key="thread:allowance",
+                event_timestamp="2026-06-01T00:00:00Z",
+                cumulative_total_tokens=100,
+                rate_limit_primary_used_percent=35.0,
+                rate_limit_primary_window_minutes=10080,
+            )
+        ],
+        db_path=db_path,
+    )
+
+    writer = sqlite3.connect(db_path, timeout=0.1)
+    try:
+        writer.execute("BEGIN IMMEDIATE")
+        rows = query_allowance_observations(db_path=db_path, limit=None)
+    finally:
+        writer.rollback()
+        writer.close()
+
+    assert len(rows) == 1
+    assert rows[0]["record_id"] == "rec-read-only"
+
+
+def test_allowance_observation_sync_batches_large_upserts(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id=f"rec-{index}",
+                session_id="session-batch",
+                thread_key="thread:allowance",
+                event_timestamp=f"2026-06-01T00:{index % 60:02d}:00Z",
+                cumulative_total_tokens=index + 1,
+                rate_limit_primary_used_percent=float(index % 100),
+                rate_limit_primary_window_minutes=10080,
+            )
+            for index in range(501)
+        ],
+        db_path=db_path,
+    )
+
+    rows = query_allowance_observations(db_path=db_path, limit=None)
+
+    assert len(rows) == 501
 
 
 def test_weekly_stable_allowance_does_not_flag_regime_change() -> None:

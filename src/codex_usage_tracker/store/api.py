@@ -23,6 +23,9 @@ from codex_usage_tracker.parser.state import (
 from codex_usage_tracker.store.allowance_observations import (
     query_allowance_observations as query_allowance_observations,
 )
+from codex_usage_tracker.store.allowance_observations import (
+    sync_allowance_observations_for_record_ids,
+)
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import (
     clear_content_index_rows,
@@ -171,6 +174,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         clear_content_index_rows(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
+        conn.execute("DELETE FROM allowance_observations")
         conn.execute("DELETE FROM source_records")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
@@ -594,7 +598,9 @@ def upsert_usage_events(
         affected_thread_keys.update(_thread_keys_for_usage_rows(rows))
         _delete_diagnostic_facts_for_record_ids(conn, _usage_event_record_ids(rows))
         _insert_usage_event_rows(conn, rows)
-        sync_source_records(conn, record_ids=_usage_event_record_ids(rows))
+        record_ids = _usage_event_record_ids(rows)
+        sync_allowance_observations_for_record_ids(conn, record_ids)
+        sync_source_records(conn, record_ids=record_ids)
         _insert_diagnostic_facts(conn, fact_rows)
         _refresh_after_usage_event_upsert(
             conn,
@@ -629,6 +635,17 @@ def _delete_usage_events_for_source_files(
         conn,
         placeholders=placeholders,
         source_files_to_replace=source_files_to_replace,
+    )
+    conn.execute(
+        f"""
+        DELETE FROM allowance_observations
+        WHERE record_id IN (
+            SELECT record_id
+            FROM usage_events
+            WHERE source_file IN ({placeholders})
+        )
+        """,
+        source_files_to_replace,
     )
     conn.execute(
         f"""

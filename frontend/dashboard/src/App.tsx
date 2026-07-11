@@ -312,9 +312,9 @@ async function refreshDashboard(options: RefreshOptions = {}) {
     storeDataScopePreference(appliedLoadLimit, appliedHistoryScope, nextLoadWindow);
     const loaded = payload.loaded_row_count ?? payload.rows?.length ?? 0;
     const total = payload.total_available_rows ?? loaded;
-    setRefreshState(
-      `${loadedFromCache ? 'Cache hit; l' : shouldRefreshIndex ? 'Refreshed index; l' : 'L'}oaded ${loaded.toLocaleString()} of ${total.toLocaleString()} calls from ${loadWindowLabel(nextLoadWindow, appliedLoadLimit)}`,
-    );
+    setRefreshState(nextLoadWindow === 'rows'
+      ? `${loadedFromCache ? 'Cache hit; l' : shouldRefreshIndex ? 'Refreshed index; l' : 'L'}oaded ${loaded.toLocaleString()} of ${total.toLocaleString()} calls from ${loadWindowLabel(nextLoadWindow, appliedLoadLimit)}`
+      : `${loadedFromCache ? 'Cache hit; ' : shouldRefreshIndex ? 'Refreshed index; ' : ''}${loadWindowLabel(nextLoadWindow, appliedLoadLimit)} analysis ready across ${total.toLocaleString()} calls; ${loaded.toLocaleString()} detail rows cached`);
   } catch (error) {
     setRefreshProgress(null);
     if (isUsageQueryCancelled(error)) {

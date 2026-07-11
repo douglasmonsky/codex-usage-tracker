@@ -472,6 +472,7 @@ def rebuild_usage_index(
     with connect(db_path) as conn:
         init_db(conn)
         clear_content_index_rows(conn)
+        conn.execute("DELETE FROM allowance_observations")
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM source_records")

@@ -37,15 +37,22 @@ const windowOptions: Array<{ value: LoadWindow; label: string; ariaLabel: string
 
 export function RowLimitControl(props: RowLimitControlProps) {
   const disabled = props.refreshing || !props.canUseLiveApi;
-  const loadedSummary = `${props.loadedRowCount.toLocaleString()} loaded / ${props.totalAvailableRows.toLocaleString()} total`;
-  const loadedSummaryTitle = props.totalAvailableRows > props.loadedRowCount
+  const isRecentRows = props.loadWindow === 'rows';
+  const detailRowLabel = `${props.loadedRowCount.toLocaleString()} detail row${props.loadedRowCount === 1 ? '' : 's'} cached`;
+  const loadedSummary = isRecentRows
+    ? `${props.loadedRowCount.toLocaleString()} loaded / ${props.totalAvailableRows.toLocaleString()} total`
+    : `${props.totalAvailableRows.toLocaleString()} calls analyzed · ${detailRowLabel}`;
+  const loadedSummaryTitle = isRecentRows
     ? `${props.loadedRowCount.toLocaleString()} of ${props.totalAvailableRows.toLocaleString()} evidence rows loaded`
-    : `${props.loadedRowCount.toLocaleString()} evidence rows loaded`;
+    : `Focused pages analyze all ${props.totalAvailableRows.toLocaleString()} calls in scope; ${props.loadedRowCount.toLocaleString()} call rows are cached for immediate detail views.`;
+  const accessibleStatus = isRecentRows
+    ? props.rowLoadStatus
+    : `${props.rowLoadModeLabel} analysis uses ${props.totalAvailableRows.toLocaleString()} calls; ${detailRowLabel}`;
 
   return (
-    <section className="data-window-control" aria-label="Data window">
+    <section className="data-window-control" aria-label="Analysis scope">
       <div className="data-window-summary">
-        <span>Data window</span>
+        <span>Analysis scope</span>
         <strong>{props.rowLoadModeLabel}</strong>
         <small title={loadedSummaryTitle}>{loadedSummary}</small>
       </div>
@@ -118,7 +125,7 @@ export function RowLimitControl(props: RowLimitControlProps) {
           </span>
         </div>
       ) : null}
-      <span className="sr-only" role="status" aria-live="polite">{props.rowLoadStatus}</span>
+      <span className="sr-only" role="status" aria-live="polite">{accessibleStatus}</span>
     </section>
   );
 }

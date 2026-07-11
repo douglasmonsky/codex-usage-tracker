@@ -68,6 +68,8 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
   expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByText('2 calls analyzed · 1 detail row cached')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Analysis scope' })).toBeInTheDocument();
 });
 
 it('loads more all-time evidence without switching to recent rows', async () => {
