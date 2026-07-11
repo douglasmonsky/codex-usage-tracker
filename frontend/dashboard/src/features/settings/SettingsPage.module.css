@@ -1,0 +1,30 @@
+.page { display: grid; gap: 16px; min-width: 0; }
+.header { display: flex; gap: 24px; align-items: flex-start; justify-content: space-between; }
+.header h1 { margin: 0; color: var(--ink-strong); font-size: 28px; line-height: 1.12; }
+.header p:not(.eyebrow) { max-width: 76ch; margin: 5px 0 0; color: var(--ink-muted); font-size: 13px; line-height: 1.45; }
+.eyebrow { margin: 0 0 4px; color: var(--signal-context); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.navigator { display: flex; gap: 4px; padding: 4px; overflow-x: auto; background: var(--surface-subtle); border: 1px solid var(--line-subtle); border-radius: 8px; }
+.navigator button { flex: 0 0 auto; padding: 7px 11px; color: var(--ink-muted); font: inherit; font-size: 12px; font-weight: 700; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+.navigator button:hover { color: var(--ink-strong); background: var(--surface-raised); }
+.navigator button[aria-pressed='true'] { color: var(--signal-context); background: var(--surface-raised); border-color: var(--line-strong); }
+.navigator button:focus-visible { outline: 2px solid var(--signal-context); outline-offset: 2px; }
+.sectionHeading { margin: 0 2px 10px; }
+.sectionHeading h2 { margin: 0; color: var(--ink-strong); font-size: 18px; }
+.sectionHeading p { margin: 3px 0 0; color: var(--ink-muted); font-size: 12px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.grid > :only-child { grid-column: 1 / -1; }
+.facts { display: grid; gap: 0; margin: 0; }
+.facts > div { display: grid; grid-template-columns: minmax(150px, .55fr) minmax(0, 1fr); gap: 16px; align-items: center; min-height: 40px; padding: 7px 0; border-bottom: 1px solid var(--line-subtle); }
+.facts > div:last-child { border-bottom: 0; }
+.facts dt { display: flex; gap: 8px; align-items: center; color: var(--ink-muted); font-size: 12px; font-weight: 700; }
+.facts dt svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--signal-context); }
+.facts dd { margin: 0; color: var(--ink-strong); font-size: 12px; overflow-wrap: anywhere; text-align: right; }
+.rules { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 760px) {
+  .header { flex-direction: column; gap: 12px; }
+  .badges { justify-content: flex-start; }
+  .grid { grid-template-columns: 1fr; }
+  .facts > div { grid-template-columns: 1fr; gap: 3px; }
+  .facts dd { padding-left: 24px; text-align: left; }
+}
