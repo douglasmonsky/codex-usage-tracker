@@ -1,8 +1,9 @@
 import { isViewId, navItems, secondaryNavItems, type ViewId } from './navigation';
+import type { HistoryScope } from '../data/dataScope';
 
-export type HistoryScope = 'active' | 'all';
+export type { HistoryScope } from '../data/dataScope';
 
-export function isCallReturnViewId(value: string | null): value is ViewId {
+function isCallReturnViewId(value: string | null): value is ViewId {
   return isViewId(value) && value !== 'call';
 }
 
@@ -44,9 +45,17 @@ const inactiveViewSearchParams: Partial<Record<ViewId, string[]>> = {
   threads: ['thread', 'expand', 'threads', 'thread_q', 'risk', 'thread_call_sort', 'thread_call_page'],
   'cache-context': ['cache_thread'],
   reports: ['report'],
-  'usage-drain': ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence'],
+  'usage-drain': [
+    'usage_plan',
+    'usage_effort',
+    'usage_subagents',
+    'usage_sample',
+    'usage_confidence',
+    'limit_window',
+    'limit_hypothesis',
+  ],
   diagnostics: ['diagnostic_source', 'diagnostic_fact'],
-  calls: ['detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page'],
+  calls: ['explore', 'detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page'],
   call: ['record', 'return', 'mode', 'max_entries', 'max_chars', 'include_tool_output', 'include_compaction_history'],
 };
 

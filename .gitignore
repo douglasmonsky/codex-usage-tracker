@@ -31,4 +31,5 @@ dist/
 tmp/
 .cache/
 
-.codex/
+.codex/*
+!.codex/tasks.toml

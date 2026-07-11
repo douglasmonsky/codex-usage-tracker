@@ -11,11 +11,27 @@
     "dashboard:typecheck": "npm --workspace frontend/dashboard run typecheck",
     "dashboard:test": "npm --workspace frontend/dashboard run test",
     "dashboard:lint": "npm --workspace frontend/dashboard run lint",
+    "dashboard:boundaries": "cd frontend/dashboard && depcruise --config ../../dependency-cruiser.config.cjs src",
+    "dashboard:dead-code": "knip --config knip.json --workspace frontend/dashboard",
+    "dashboard:stylelint": "stylelint \"frontend/dashboard/src/**/*.css\"",
+    "dashboard:source-budget": "python3 scripts/check_dashboard_source_budgets.py",
+    "dashboard:governance": "npm run dashboard:boundaries && npm run dashboard:dead-code && npm run dashboard:stylelint && npm run dashboard:source-budget",
+    "dashboard:bundle-report": "npm run dashboard:build && node scripts/check-dashboard-bundles.mjs && npm run dashboard:visualization-bundle",
+    "dashboard:visualization-bundle": "node scripts/check-visualization-renderer-bundle.mjs",
+    "dashboard:verify": "npm run dashboard:lint && npm run dashboard:typecheck && npm run dashboard:test && npm run dashboard:governance && npm run dashboard:bundle-report",
     "dashboard:smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test tests/playwright/dashboard-react.spec.mjs",
+    "dashboard:visualization-smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173/codex-usage-tracker-assets/react/ playwright test tests/playwright/dashboard-visualization.spec.mjs --project=chromium-desktop",
+    "dashboard:screenshots": "node scripts/capture_dashboard_screenshots.mjs",
     "smoke:dashboard:diagnostics": "playwright test tests/playwright/dashboard-diagnostics.spec.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.61.0",
-    "markdownlint-cli2": "0.22.1"
+    "dependency-cruiser": "18.0.0",
+    "esbuild": "^0.28.1",
+    "knip": "6.26.0",
+    "markdownlint-cli2": "0.23.0",
+    "pngjs": "^7.0.0",
+    "stylelint": "17.14.0"
   }
 }

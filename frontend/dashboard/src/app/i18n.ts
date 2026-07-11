@@ -86,7 +86,7 @@ export function createShellI18n(payload: DashboardBootPayload | null, language: 
   };
 }
 
-export function dashboardLanguages(payload: DashboardBootPayload | null): DashboardLanguage[] {
+function dashboardLanguages(payload: DashboardBootPayload | null): DashboardLanguage[] {
   const languages = payload?.available_languages?.filter(language => language.code) ?? [];
   return languages.length ? languages : [{ code: 'en', english_name: 'English', native_name: 'English', dir: 'ltr' }];
 }

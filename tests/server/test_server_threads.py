@@ -86,6 +86,7 @@ def test_threads_payload_normalizes_query_filters(
         return [{"thread_key": "thread-1"}]
 
     monkeypatch.setattr(server_threads, "query_thread_summaries", query_threads)
+    monkeypatch.setattr(server_threads, "query_thread_summary_count", lambda **_kwargs: 11)
 
     payload = server_threads.threads_payload(
         "limit=7&offset=3&include_archived=true&q=preferred&search=ignored&sort=calls&direction=asc",
@@ -96,8 +97,11 @@ def test_threads_payload_normalizes_query_filters(
     assert payload["schema"] == "codex-usage-tracker-threads-v1"
     assert payload["rows"] == [{"thread_key": "thread-1"}]
     assert payload["row_count"] == 1
+    assert payload["total_matched_rows"] == 11
     assert payload["limit"] == 7
     assert payload["offset"] == 3
+    assert payload["has_more"] is True
+    assert payload["next_offset"] == 4
     assert payload["include_archived"] is True
     assert payload["raw_context_included"] is False
     assert calls["search"] == "preferred"
@@ -116,6 +120,7 @@ def test_threads_payload_uses_defaults_and_all_limit(
         return []
 
     monkeypatch.setattr(server_threads, "query_thread_summaries", query_threads)
+    monkeypatch.setattr(server_threads, "query_thread_summary_count", lambda **_kwargs: 0)
 
     payload = server_threads.threads_payload(
         "limit=all",
@@ -126,6 +131,9 @@ def test_threads_payload_uses_defaults_and_all_limit(
     assert payload["limit"] is None
     assert payload["offset"] == 0
     assert payload["include_archived"] is True
+    assert payload["total_matched_rows"] == 0
+    assert payload["has_more"] is False
+    assert payload["next_offset"] is None
     assert calls["limit"] is None
     assert calls["search"] is None
     assert calls["sort"] == "tokens"
@@ -145,6 +153,7 @@ def test_threads_payload_accepts_zero_and_none_as_all_limit(
         return []
 
     monkeypatch.setattr(server_threads, "query_thread_summaries", query_threads)
+    monkeypatch.setattr(server_threads, "query_thread_summary_count", lambda **_kwargs: 0)
 
     payload = server_threads.threads_payload(
         f"limit={limit_value}",
@@ -153,6 +162,8 @@ def test_threads_payload_accepts_zero_and_none_as_all_limit(
     )
 
     assert payload["limit"] is None
+    assert payload["has_more"] is False
+    assert payload["next_offset"] is None
     assert calls["limit"] is None
 
 

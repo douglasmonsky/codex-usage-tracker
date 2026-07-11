@@ -16,7 +16,7 @@ def test_span_error_metadata_reports_time_reset_and_usage_buckets() -> None:
         delta_usage_percent=1.0,
         row_count=1,
         standard_usage_credits=100.0,
-        non_candidate_standard_credits=0.0,
+        non_candidate_standard_credits={},
         candidate_standard_credits={},
         documented_fast_weighted_credits={},
         candidate_row_counts={},

@@ -1,25 +1,29 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ArrowUp, Copy, Download, RefreshCw, ShieldAlert, Terminal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { currentViewCsvExport } from './app/currentViewExport';
+import { errorMessage, refreshProgressLabel, type RefreshOptions } from './app/dashboardRefresh';
 import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyScope';
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
 import { ShellI18nProvider } from './app/i18nContext';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
 import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
+import { RowLimitControl } from './app/RowLimitControl';
 import { ShellGlobalFilters } from './app/ShellGlobalFilters';
 import {
   finiteRowLimitFallback,
+  currentLoadWindowFromPayload,
+  initialLoadWindowFromPayload,
+  loadWindowLabel,
   loadLimitFromPayload,
   nextRowLoadLimit,
   normalizeRowLimit,
-  rowLimitMin,
-  rowLimitNoCap,
+  readDataScopePreference,
   rowLimitSliderMaxValue,
-  rowLimitStep,
-  rowLimitSummaryLabel,
-  rowLimitValueLabel,
   rowLoadStatusLabel,
+  sinceForLoadWindow,
+  storeDataScopePreference,
+  type LoadWindow,
 } from './app/rowLimit';
 import {
   callReturnViewFromSearch,
@@ -32,33 +36,22 @@ import {
   type HistoryScope,
   viewFromUrlParam,
 } from './app/shellUrl';
-import { loadUsagePayload, modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
+import { modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
+import {
+  cancelUsageQueries,
+  dashboardQueryClient,
+  isUsageQueryCancelled,
+  queryUsageSnapshot,
+} from './data/queryRuntime';
 import { EnvironmentStatus } from './components/EnvironmentStatus';
-import { StatusBadge } from './components/StatusBadge';
-import { CallInvestigatorPage } from './features/call-investigator/CallInvestigatorPage';
-import { CacheContextPage } from './features/cache-context/CacheContextPage';
-import { CallsPage } from './features/calls/CallsPage';
-import { DiagnosticsPage } from './features/diagnostics/DiagnosticsPage';
-import { InvestigatorPage } from './features/investigator/InvestigatorPage';
-import { OverviewPage } from './features/overview/OverviewPage';
-import { ReportsPage } from './features/reports/ReportsPage';
-import { SettingsPage } from './features/settings/SettingsPage';
 import { copyText } from './features/shared/copyText';
 import { downloadCsv } from './features/shared/exportCsv';
-import { presetLabel, type InvestigationPresetAction } from './features/shared/investigationPresets';
-import { ThreadsPage } from './features/threads/ThreadsPage';
-import { UsageDrainPage } from './features/usage-drain/UsageDrainPage';
-
-type RefreshOptions = {
-  loadLimit?: number;
-  historyScope?: HistoryScope;
-  refresh?: boolean;
-};
+import { presetLabel } from './features/shared/investigationPresets';
+import { DashboardRouteView } from './routes/DashboardRouteView';
 
 const autoRefreshIntervalMs = 10_000;
-const usageLoadSessionKey = 'codexUsageDashboardLoadSettings';
 const keyboardShortcutViews: Record<string, ViewId> = {
   '1': 'overview',
   '2': 'calls',
@@ -74,35 +67,6 @@ export function shouldAutoRefreshUsageView(view: ViewId): boolean {
 function isKeyboardShortcutTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
   return Boolean(target.closest('input, select, textarea, button, [contenteditable="true"]'));
-}
-
-function readUsageLoadSessionSettings(): RefreshOptions | null {
-  try {
-    const rawValue = window.sessionStorage?.getItem(usageLoadSessionKey);
-    if (!rawValue) return null;
-    const parsed = JSON.parse(rawValue) as { loadLimit?: unknown; historyScope?: unknown };
-    const loadLimit =
-      typeof parsed.loadLimit === 'number' && Number.isFinite(parsed.loadLimit)
-        ? normalizeRowLimit(parsed.loadLimit)
-        : undefined;
-    const historyScope: HistoryScope | undefined =
-      parsed.historyScope === 'all' || parsed.historyScope === 'active' ? parsed.historyScope : undefined;
-    if (loadLimit === undefined && historyScope === undefined) return null;
-    return { loadLimit, historyScope };
-  } catch {
-    return null;
-  }
-}
-
-function storeUsageLoadSessionSettings(loadLimit: number, historyScope: HistoryScope) {
-  try {
-    window.sessionStorage?.setItem(
-      usageLoadSessionKey,
-      JSON.stringify({ loadLimit: normalizeRowLimit(loadLimit), historyScope }),
-    );
-  } catch {
-    // Storage can be disabled in private or embedded browser contexts.
-  }
 }
 
 export function App() {
@@ -129,10 +93,12 @@ const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
 const [showBackToTop, setShowBackToTop] = useState(false);
 const [language, setLanguage] = useState(() => initialDashboardLanguage(initialPayload));
 const initialLiveLoadAttempted = useRef(false);
- const [loadLimit, setLoadLimit] = useState(() => loadLimitFromPayload(initialPayload));
-  const [pendingLoadLimit, setPendingLoadLimit] = useState(() => loadLimitFromPayload(initialPayload));
+ const [loadLimit, setLoadLimit] = useState(() => finiteRowLimitFallback(loadLimitFromPayload(initialPayload), 500));
+  const [pendingLoadLimit, setPendingLoadLimit] = useState(() => finiteRowLimitFallback(loadLimitFromPayload(initialPayload), 500));
+  const [loadWindow, setLoadWindow] = useState<LoadWindow>(() => initialLoadWindowFromPayload(initialPayload));
   const [historyScope, setHistoryScope] = useState<HistoryScope>(() => historyScopeFromUrl(historyScopeFromPayload(initialPayload)));
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
+  const [navigationRevision, setNavigationRevision] = useState(0);
 const canUseLiveApi = Boolean(dashboardPayload?.api_token);
 const shellI18n = useMemo(() => createShellI18n(dashboardPayload, language), [dashboardPayload, language]);
 const contextRuntime = useMemo<ContextRuntime>(
@@ -145,10 +111,7 @@ const legacyShellFilteredModel = useMemo(
 );
 const scopedModel = activeView === 'calls' || activeView === 'call' ? model : legacyShellFilteredModel;
 const canAutoRefreshUsageRows = shouldAutoRefreshUsageView(activeView);
-const pendingLoadLimitUncapped = pendingLoadLimit === rowLimitNoCap;
-  const finitePendingLoadLimit = pendingLoadLimitUncapped
-    ? finiteRowLimitFallback(loadLimit, dashboardPayload?.loaded_row_count)
-    : pendingLoadLimit;
+  const finitePendingLoadLimit = finiteRowLimitFallback(pendingLoadLimit, loadLimit, 500);
   const loadedRowCount = Math.max(0, Number(dashboardPayload?.loaded_row_count ?? dashboardPayload?.rows?.length ?? model.calls.length ?? 0));
   const totalAvailableRows = Math.max(0, Number(dashboardPayload?.total_available_rows ?? loadedRowCount));
   const rowLimitChanged = pendingLoadLimit !== loadLimit;
@@ -157,10 +120,8 @@ const pendingLoadLimitUncapped = pendingLoadLimit === rowLimitNoCap;
     loadedRows: loadedRowCount,
     pendingLimit: pendingLoadLimit,
   });
-  const rowLimitSliderValue = pendingLoadLimitUncapped
-    ? rowLimitSliderMax
-    : Math.min(finitePendingLoadLimit, rowLimitSliderMax);
-const hasMoreRows = !pendingLoadLimitUncapped && (Boolean(dashboardPayload?.has_more) || (totalAvailableRows > 0 && loadedRowCount < totalAvailableRows));
+  const rowLimitSliderValue = Math.min(finitePendingLoadLimit, rowLimitSliderMax);
+const hasMoreRows = loadWindow === 'rows' && (Boolean(dashboardPayload?.has_more) || (totalAvailableRows > 0 && loadedRowCount < totalAvailableRows));
   const nextLoadMoreLimit = nextRowLoadLimit({
     currentLimit: loadLimit,
     loadedRows: loadedRowCount,
@@ -171,11 +132,8 @@ loadedRows: loadedRowCount,
 limit: loadLimit,
 totalRows: totalAvailableRows,
 });
-const rowLoadModeLabel = loadLimit === rowLimitNoCap ? 'All rows mode' : `Most recent ${loadLimit.toLocaleString()} calls`;
-  const rowLoadingLabel =
-    loadLimit === rowLimitNoCap || pendingLoadLimitUncapped
-      ? 'Loading all rows...'
-      : `Loading ${finitePendingLoadLimit.toLocaleString()} rows...`;
+const rowLoadModeLabel = loadWindowLabel(loadWindow, loadLimit);
+  const rowLoadingLabel = `Loading ${loadWindowLabel(loadWindow, finitePendingLoadLimit).toLowerCase()}...`;
   const refreshProgressPercent =
     refreshing && typeof refreshProgress?.percent === 'number'
       ? Math.max(0, Math.min(100, refreshProgress.percent))
@@ -183,7 +141,7 @@ const rowLoadModeLabel = loadLimit === rowLimitNoCap ? 'All rows mode' : `Most r
   const refreshProgressText = refreshProgress
     ? refreshProgressLabel(refreshProgress, historyScope)
     : rowLoadingLabel;
-  const canLoadAllRows = canUseLiveApi && !refreshing && loadLimit !== rowLimitNoCap;
+  const canLoadAllRows = canUseLiveApi && !refreshing && loadWindow !== 'all';
 const historyScopeDetail = historyScopeStatusLabel({
 historyScope,
 activeRows: dashboardPayload?.active_available_rows,
@@ -201,11 +159,16 @@ function setView(view: ViewId) {
   if (view !== 'call') {
     setActiveRecordId('');
   }
-  replaceShellUrl(url);
+  pushShellUrl(url);
 }
 
 function replaceShellUrl(url: URL) {
   window.history.replaceState(null, '', url);
+  setLocationSearch(url.search);
+}
+
+function pushShellUrl(url: URL) {
+  window.history.pushState(null, '', url);
   setLocationSearch(url.search);
 }
 
@@ -215,6 +178,25 @@ useEffect(() => {
     replaceShellUrl(url);
   }
 }, []);
+
+useEffect(() => {
+  function hydrateShellFromLocation() {
+    const search = window.location.search;
+    const params = new URLSearchParams(search);
+    setActiveView(viewFromUrlParam(params.get('view')));
+    setActiveRecordId(params.get('record') ?? '');
+    setCallReturnView(callReturnViewFromSearch(search));
+    setCallReturnViewExplicit(hasCallReturnViewParam(search));
+    setGlobalQuery(params.get('q') ?? '');
+    setActivePreset(params.get('preset') ?? '');
+    setHistoryScope(historyScopeFromUrl(historyScopeFromPayload(dashboardPayload), search));
+    setLocationSearch(search);
+    setNavigationRevision(revision => revision + 1);
+  }
+
+  window.addEventListener('popstate', hydrateShellFromLocation);
+  return () => window.removeEventListener('popstate', hydrateShellFromLocation);
+}, [dashboardPayload]);
 
   useEffect(() => {
     function handleKeyboardShortcut(event: KeyboardEvent) {
@@ -258,7 +240,7 @@ clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callRetur
 url.searchParams.set('view', 'call');
 url.searchParams.set('record', recordId);
 url.searchParams.set('return', returnView);
-replaceShellUrl(url);
+pushShellUrl(url);
 }
 
 function openFindingInvestigator(rank: number) {
@@ -270,7 +252,7 @@ url.searchParams.set('view', 'investigator');
 url.searchParams.set('finding', String(rank));
 url.searchParams.delete('preset');
 clearInactiveViewSearchParams(url, 'investigator');
-replaceShellUrl(url);
+pushShellUrl(url);
 }
 
 function backFromCallInvestigator() {
@@ -290,76 +272,80 @@ setView(callReturnView);
   replaceShellUrl(url);
 }
 
-  function applyInvestigationPreset(action: InvestigationPresetAction) {
-    setActiveView(action.view);
-    setActivePreset(action.presetKey);
-    setGlobalQuery(action.query ?? '');
-    setActiveRecordId('');
-const url = new URL(window.location.href);
-url.searchParams.set('view', action.view);
-url.searchParams.set('preset', action.presetKey);
-clearInactiveViewSearchParams(url, action.view);
-if (action.query) {
-url.searchParams.set('q', action.query);
-} else {
-url.searchParams.delete('q');
-}
-replaceShellUrl(url);
-}
-
 async function refreshDashboard(options: RefreshOptions = {}) {
   if (refreshing) return;
   initialLiveLoadAttempted.current = true;
   const nextLoadLimit = options.loadLimit ?? loadLimit;
+  const nextLoadWindow = options.loadWindow ?? loadWindow;
+  const nextSince = sinceForLoadWindow(nextLoadWindow);
   const nextHistoryScope = options.historyScope ?? historyScope;
   const shouldRefreshIndex = options.refresh ?? true;
-  const shouldShowProgress = nextLoadLimit === rowLimitNoCap || Boolean(dashboardPayload?.refresh_jobs_available);
+  const shouldShowProgress = Boolean(dashboardPayload?.refresh_jobs_available);
   setRefreshing(true);
   setRefreshProgress(
     shouldShowProgress
       ? {
           status: 'running',
           phase: shouldRefreshIndex ? 'refreshing_index' : 'loading_rows',
-          message: `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${
-            nextHistoryScope === 'all' ? 'all history' : 'active'
-          } aggregate rows`,
+          message: `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${loadWindowLabel(nextLoadWindow, nextLoadLimit)}`,
         }
       : null,
   );
   setRefreshState(
-    `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${nextHistoryScope === 'all' ? 'all history' : 'active'} aggregate rows...`,
+    `${shouldRefreshIndex ? 'Refreshing index for' : 'Loading'} ${loadWindowLabel(nextLoadWindow, nextLoadLimit)}...`,
   );
- try {
-      const payload = await loadUsagePayload(dashboardPayload, {
+  let loadedFromCache = false;
+  try {
+    const payload = await queryUsageSnapshot({
+      currentPayload: dashboardPayload,
       refresh: shouldRefreshIndex,
-      limit: nextLoadLimit,
-      includeArchived: nextHistoryScope === 'all',
+      loadLimit: nextLoadLimit,
+      loadWindow: nextLoadWindow,
+      since: nextSince,
+      historyScope: nextHistoryScope,
       onProgress: progress => {
+        loadedFromCache ||= progress.message === 'Loaded cached dashboard snapshot';
         setRefreshProgress(progress);
         setRefreshState(refreshProgressLabel(progress, nextHistoryScope));
       },
-      });
+    });
     clearDiagnosticApiCache();
     setDashboardPayload(payload);
       setModel(modelFromBootPayload(payload));
       setContextApiEnabled(Boolean(payload.context_api_enabled));
-    const appliedLoadLimit = loadLimitFromPayload(payload, nextLoadLimit);
+    const appliedLoadLimit = nextLoadWindow === 'rows'
+      ? finiteRowLimitFallback(loadLimitFromPayload(payload, nextLoadLimit), nextLoadLimit)
+      : nextLoadLimit;
     setLoadLimit(appliedLoadLimit);
     setPendingLoadLimit(appliedLoadLimit);
+    setLoadWindow(nextLoadWindow);
     const appliedHistoryScope = historyScopeFromPayload(payload, nextHistoryScope);
     setHistoryScope(appliedHistoryScope);
-    storeUsageLoadSessionSettings(appliedLoadLimit, appliedHistoryScope);
+    storeDataScopePreference(appliedLoadLimit, appliedHistoryScope, nextLoadWindow);
     const loaded = payload.loaded_row_count ?? payload.rows?.length ?? 0;
     const total = payload.total_available_rows ?? loaded;
-    setRefreshState(`Live refresh loaded ${loaded} of ${total} aggregate rows`);
+    setRefreshState(
+      `${loadedFromCache ? 'Cache hit; l' : shouldRefreshIndex ? 'Refreshed index; l' : 'L'}oaded ${loaded.toLocaleString()} of ${total.toLocaleString()} calls from ${loadWindowLabel(nextLoadWindow, appliedLoadLimit)}`,
+    );
   } catch (error) {
     setRefreshProgress(null);
+    if (isUsageQueryCancelled(error)) {
+      setRefreshState('Refresh cancelled; stored snapshot remains visible');
+      return;
+    }
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setRefreshState(`${errorMessage(error)} Stored snapshot kept at ${timestamp}`);
   } finally {
     setRefreshProgress(null);
     setRefreshing(false);
   }
+}
+
+async function cancelDashboardRefresh() {
+  await cancelUsageQueries();
+  setRefreshProgress(null);
+  setRefreshing(false);
+  setRefreshState('Refresh cancelled; stored snapshot remains visible');
 }
 
 useEffect(() => {
@@ -370,12 +356,15 @@ document.documentElement.dir = shellI18n.direction;
 useEffect(() => {
   const availableRows = Number(dashboardPayload?.total_available_rows ?? 0);
   const loadedRows = Number(dashboardPayload?.loaded_row_count ?? dashboardPayload?.rows?.length ?? 0);
-  const sessionSettings = readUsageLoadSessionSettings();
+  const sessionSettings = readDataScopePreference();
   const nextHistoryScope = sessionSettings?.historyScope ?? historyScope;
   const nextLoadLimit = sessionSettings?.loadLimit ?? loadLimit;
+  const nextLoadWindow = sessionSettings?.loadWindow ?? loadWindow;
+  const payloadLoadWindow = currentLoadWindowFromPayload(dashboardPayload);
   const needsSessionRestore =
-    Boolean(sessionSettings) &&
-    (nextHistoryScope !== historyScope || nextLoadLimit !== loadLimit || nextLoadLimit === rowLimitNoCap);
+    nextHistoryScope !== historyScope ||
+    nextLoadWindow !== payloadLoadWindow ||
+    (nextLoadWindow === 'rows' && nextLoadLimit !== loadLimitFromPayload(dashboardPayload));
   const hasLoadedRows = loadedRows > 0;
   if (
     !canUseLiveApi ||
@@ -391,10 +380,11 @@ useEffect(() => {
     setHistoryScope(nextHistoryScope);
     setLoadLimit(nextLoadLimit);
     setPendingLoadLimit(nextLoadLimit);
+    setLoadWindow(nextLoadWindow);
     replaceShellUrl(historyScopeUrl(nextHistoryScope));
   }
-  void refreshDashboard({ refresh: false, historyScope: nextHistoryScope, loadLimit: nextLoadLimit });
-}, [canUseLiveApi, dashboardPayload, historyScope, loadLimit, refreshing]);
+  void refreshDashboard({ refresh: false, historyScope: nextHistoryScope, loadLimit: nextLoadLimit, loadWindow: nextLoadWindow });
+}, [canUseLiveApi, dashboardPayload, historyScope, loadLimit, loadWindow, refreshing]);
 
  useEffect(() => {
  if (!canUseLiveApi && autoRefreshEnabled) {
@@ -408,7 +398,7 @@ const intervalId = window.setInterval(() => {
 void refreshDashboard();
 }, autoRefreshIntervalMs);
 return () => window.clearInterval(intervalId);
-}, [autoRefreshEnabled, canAutoRefreshUsageRows, canUseLiveApi, dashboardPayload, historyScope, loadLimit, refreshing]);
+}, [autoRefreshEnabled, canAutoRefreshUsageRows, canUseLiveApi, dashboardPayload, historyScope, loadLimit, loadWindow, refreshing]);
 
 useEffect(() => {
 if (!autoRefreshEnabled || !canUseLiveApi || !canAutoRefreshUsageRows) return undefined;
@@ -419,41 +409,40 @@ void refreshDashboard();
 }
 document.addEventListener('visibilitychange', handleVisibilityChange);
 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-}, [autoRefreshEnabled, canAutoRefreshUsageRows, canUseLiveApi, dashboardPayload, historyScope, loadLimit, refreshing]);
+}, [autoRefreshEnabled, canAutoRefreshUsageRows, canUseLiveApi, dashboardPayload, historyScope, loadLimit, loadWindow, refreshing]);
 
 function handleLoadLimitDraftChange(value: string) {
 const trimmedValue = value.trim();
-setPendingLoadLimit(normalizeRowLimit(trimmedValue === '' ? Number.NaN : Number(trimmedValue)));
+setPendingLoadLimit(Math.max(1, normalizeRowLimit(trimmedValue === '' ? Number.NaN : Number(trimmedValue))));
 }
 
 function handleLoadLimitSliderChange(value: string) {
 handleLoadLimitDraftChange(value);
 }
 
-function handleLoadLimitNoCapChange(enabled: boolean) {
-setPendingLoadLimit(enabled ? rowLimitNoCap : finiteRowLimitFallback(loadLimit, dashboardPayload?.loaded_row_count));
-}
-
 function applyLoadLimitChange() {
-void refreshDashboard({ loadLimit: pendingLoadLimit });
+void refreshDashboard({ refresh: false, loadLimit: pendingLoadLimit, loadWindow: 'rows' });
 }
 
 function loadAllRows() {
-setPendingLoadLimit(rowLimitNoCap);
-void refreshDashboard({ loadLimit: rowLimitNoCap });
+void refreshDashboard({ refresh: false, loadWindow: 'all' });
 }
 
 function loadMoreRows() {
-if (pendingLoadLimitUncapped) return;
 setPendingLoadLimit(nextLoadMoreLimit);
-void refreshDashboard({ loadLimit: nextLoadMoreLimit });
+void refreshDashboard({ refresh: false, loadLimit: nextLoadMoreLimit, loadWindow: 'rows' });
+}
+
+function handleLoadWindowChange(nextLoadWindow: LoadWindow) {
+  if (nextLoadWindow === loadWindow) return;
+  void refreshDashboard({ refresh: false, loadWindow: nextLoadWindow });
 }
 
 function handleHistoryScopeChange(value: string) {
   const nextHistoryScope: HistoryScope = value === 'all' ? 'all' : 'active';
   setHistoryScope(nextHistoryScope);
   replaceShellUrl(historyScopeUrl(nextHistoryScope));
-  void refreshDashboard({ historyScope: nextHistoryScope });
+  void refreshDashboard({ refresh: false, historyScope: nextHistoryScope });
 }
 
 function handleAutoRefreshChange(enabled: boolean) {
@@ -508,14 +497,16 @@ setRefreshState('Copy unavailable in browser');
 }
 }
 
-function exportCurrentViewCsv() {
-const exportSpec = currentViewCsvExport(
+async function exportCurrentViewCsv() {
+const exportSpec = await currentViewCsvExport(
 activeView,
 scopedModel,
       {
         contextRuntime,
         historyScope,
+        loadWindow,
         loadLimit,
+        scopeSince: dashboardPayload?.since ?? sinceForLoadWindow(loadWindow),
         loadedRowCount,
         totalAvailableRows,
         canUseLiveApi,
@@ -581,7 +572,7 @@ return (
 );
           })}
         </nav>
-        <div className="secondary-block">
+        <div className="secondary-block" role="group" aria-label="Quick Links">
           <span>Quick Links</span>
           {secondaryNavItems.map(item => {
             const Icon = item.icon;
@@ -597,7 +588,7 @@ return (
           <span>Data Snapshot</span>
           <strong>Current</strong>
           <small>
-            {historyScope === 'all' ? 'All history' : 'Active history'} - {rowLimitSummaryLabel(loadLimit)}
+            {historyScope === 'all' ? 'All sessions' : 'Active sessions'} - {loadWindowLabel(loadWindow, loadLimit)}
           </small>
           <small>{refreshState}</small>
           <button type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh all dashboard data">
@@ -614,7 +605,7 @@ return (
             supported by OpenAI.
           </span>
         </div>
-        <header className="topbar">
+        <header className="topbar" aria-label="Dashboard toolbar">
 <label className="global-search">
 <span className="sr-only">{shellI18n.t('filter.search', 'Search dashboard')}</span>
 <input
@@ -626,6 +617,7 @@ placeholder={shellI18n.t('filter.search_placeholder', 'Search calls, threads, mo
 />
 </label>
 <div className="topbar-actions">
+<div className="topbar-scope-controls">
 {shellI18n.languages.length > 1 ? (
 <label className="topbar-select">
 <span>{shellI18n.t('language.label', 'Language')}</span>
@@ -642,6 +634,7 @@ placeholder={shellI18n.t('filter.search_placeholder', 'Search calls, threads, mo
 <span>{shellI18n.t('nav.history', 'History')}</span>
 <select
 aria-label="History scope"
+              title={historyScopeDetail}
               value={historyScope}
               onChange={event => handleHistoryScopeChange(event.target.value)}
               disabled={refreshing || !canUseLiveApi}
@@ -649,108 +642,42 @@ aria-label="History scope"
 <option value="active">{shellI18n.t('option.active_sessions_only', 'Active')}</option>
 <option value="all">{shellI18n.t('option.all_history', 'All history')}</option>
 </select>
-<small>{historyScopeDetail}</small>
+<small className="sr-only">{historyScopeDetail}</small>
           </label>
-            <div className="row-limit-control" aria-label="Row limit control">
-              <div className="row-limit-heading">
-<span>Rows loaded</span>
-<strong>{rowLimitValueLabel(pendingLoadLimit)}</strong>
-</div>
-<div className={`row-limit-status${refreshing ? ' is-loading' : ''}`} role="status" aria-live="polite">
-{refreshing ? (
-                <>
-                  <span className="row-loading-dot" aria-hidden="true" />
-                  <span>{refreshProgressText}</span>
-                </>
-) : (
-<>
-<span>{rowLoadModeLabel}</span>
-<span>{rowLoadStatus}</span>
-</>
-)}
-</div>
-<div className="row-limit-range-meta">
-                <span>Quick range</span>
-              <span>{pendingLoadLimitUncapped ? 'No cap enabled' : 'No fixed max'}</span>
-              </div>
-              <input
-                aria-label="Rows to load slider"
-                aria-valuetext={
-                  pendingLoadLimitUncapped
-                ? 'No row cap; move slider or type a count to restore a finite limit'
-                : `${finitePendingLoadLimit.toLocaleString()} rows; slider expands as needed, or type any count`
-                }
-                type="range"
-                min={rowLimitMin}
-                max={rowLimitSliderMax}
-                step={rowLimitStep}
-                value={rowLimitSliderValue}
-onChange={event => handleLoadLimitSliderChange(event.target.value)}
-disabled={refreshing || !canUseLiveApi}
-/>
-              <div className="row-limit-entry">
-                <input
-                  aria-label="Rows to load"
-                type="number"
-                min={rowLimitNoCap}
-                step={rowLimitStep}
-                value={pendingLoadLimit}
-                onChange={event => handleLoadLimitDraftChange(event.target.value)}
-                aria-describedby="row-limit-entry-help"
-                disabled={refreshing || !canUseLiveApi}
-              />
-                <label className="row-limit-no-cap">
-                  <input
-                    aria-label="No row cap"
-                    type="checkbox"
-                    checked={pendingLoadLimitUncapped}
-                    onChange={event => handleLoadLimitNoCapChange(event.target.checked)}
-                    disabled={refreshing || !canUseLiveApi}
-                  />
-                <span>No cap</span>
-              </label>
-            <button type="button" onClick={applyLoadLimitChange} disabled={refreshing || !canUseLiveApi || !rowLimitChanged}>
-              {pendingLoadLimitUncapped ? 'Load all' : shellI18n.t('nav.load', 'Load')}
-            </button>
           </div>
-          {refreshing ? (
-            <div className="row-load-progress" aria-label="Row loading progress">
-              <div
-                className="row-load-progress-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={refreshProgressPercent ?? undefined}
-              >
-                <span style={{ width: `${refreshProgressPercent ?? 8}%` }} />
-              </div>
-              <span>{refreshProgressPercent === null ? 'Preparing...' : `${Math.round(refreshProgressPercent)}% loaded`}</span>
-            </div>
-          ) : null}
-          <button className="row-limit-load-all" type="button" onClick={loadAllRows} disabled={!canLoadAllRows}>
-            Load all rows
-          </button>
-<p id="row-limit-entry-help" className="row-limit-hint">
-Use Load all rows for the full history, or type any finite row count.
-</p>
-              <div className="row-limit-load-more">
-                <span>{rowLoadStatus}</span>
-<button type="button" onClick={loadMoreRows} disabled={refreshing || !canUseLiveApi || !hasMoreRows}>
-              {shellI18n.t('button.load_more', 'Load more')}
-                </button>
-              </div>
-            </div>
+          <RowLimitControl
+            canUseLiveApi={canUseLiveApi}
+            finitePendingLoadLimit={finitePendingLoadLimit}
+            hasMoreRows={hasMoreRows}
+            loadLabel={shellI18n.t('nav.load', 'Load')}
+            loadMoreLabel={shellI18n.t('button.load_more', 'Load more')}
+            loadWindow={loadWindow}
+            loadedRowCount={loadedRowCount}
+            pendingLoadLimit={pendingLoadLimit}
+            refreshProgressPercent={refreshProgressPercent}
+            refreshProgressText={refreshProgressText}
+            refreshing={refreshing}
+            rowLimitChanged={rowLimitChanged}
+            rowLimitSliderMax={rowLimitSliderMax}
+            rowLimitSliderValue={rowLimitSliderValue}
+            rowLoadModeLabel={rowLoadModeLabel}
+            rowLoadStatus={rowLoadStatus}
+            totalAvailableRows={totalAvailableRows}
+            onApply={applyLoadLimitChange}
+            onCancel={cancelDashboardRefresh}
+            onDraftChange={handleLoadLimitDraftChange}
+            onLoadMore={loadMoreRows}
+            onSliderChange={handleLoadLimitSliderChange}
+            onWindowChange={handleLoadWindowChange}
+          />
+        <div className="topbar-meta">
+          <div className="topbar-statuses">
         {activePreset ? (
           <button className="toolbar-button" type="button" onClick={clearInvestigationPreset}>
             <X size={15} />
             {shellI18n.t('button.clear', 'Clear')} {presetLabel(activePreset)}
           </button>
         ) : null}
-        <StatusBadge label="Stored Snapshot" tone="blue" />
-          <StatusBadge
-            label={dashboardPayload?.api_token ? `${shellI18n.t('badge.live', 'Live')} API` : shellI18n.t('status.static', 'Static')}
-            tone={dashboardPayload?.api_token ? 'green' : 'orange'}
-          />
 <label className="topbar-toggle">
           <input
             aria-label="Auto refresh"
@@ -759,51 +686,66 @@ Use Load all rows for the full history, or type any finite row count.
             onChange={event => handleAutoRefreshChange(event.target.checked)}
             disabled={refreshing || !canUseLiveApi}
 />
-<span>{shellI18n.t('nav.live', 'Live')}</span>
+<span>Auto</span>
 </label>
-<button className="icon-button" type="button" onClick={copyCurrentViewLink} aria-label={shellI18n.t('button.copy_link', 'Copy link')}>
+          </div>
+          <div className="topbar-icon-actions">
+<button className="icon-button" type="button" onClick={copyCurrentViewLink} aria-label={shellI18n.t('button.copy_link', 'Copy link')} title={shellI18n.t('button.copy_link', 'Copy link')}>
 <Copy size={17} />
 </button>
-<button className="icon-button" type="button" onClick={exportCurrentViewCsv} aria-label={shellI18n.t('button.export_csv', 'Export CSV')}>
+<button className="icon-button" type="button" onClick={exportCurrentViewCsv} aria-label={shellI18n.t('button.export_csv', 'Export CSV')} title={shellI18n.t('button.export_csv', 'Export CSV')}>
 <Download size={17} />
 </button>
-<button className="icon-button" type="button" onClick={onRefresh} aria-label={shellI18n.t('button.refresh', 'Refresh')} disabled={refreshing}>
+<button className="icon-button" type="button" onClick={onRefresh} aria-label={shellI18n.t('button.refresh', 'Refresh')} title={shellI18n.t('button.refresh', 'Refresh')} disabled={refreshing}>
 <RefreshCw size={17} />
 </button>
           </div>
+        </div>
+      </div>
       </header>
-      {renderView(
-        activeView,
-        scopedModel,
-          onRefresh,
-          refreshState,
-          globalQuery,
-          activePreset,
-          activeRecordId,
-          contextRuntime,
-          setContextApiEnabled,
-openCallInvestigator,
-copyCallInvestigatorLink,
-openFindingInvestigator,
-applyInvestigationPreset,
-callReturnViewExplicit
-  ? `Back to ${callReturnViewLabel(callReturnView)}`
-  : shellI18n.t('button.back_to_dashboard', 'Back to dashboard'),
-backFromCallInvestigator,
- dashboardPayload,
- historyScope,
- loadLimit,
- loadedRowCount,
- totalAvailableRows,
- canUseLiveApi,
- autoRefreshEnabled,
- refreshing,
- hasMoreRows,
- canLoadAllRows,
- loadMoreRows,
- loadAllRows,
- <ShellGlobalFilters activeView={activeView} locationSearch={locationSearch} model={model} onUrlChange={replaceShellUrl} />,
-)}
+      <DashboardRouteView
+        key={navigationRevision}
+        activeView={activeView}
+        model={scopedModel} navigateView={setView}
+        onRefresh={onRefresh}
+        refreshState={refreshState}
+        globalQuery={globalQuery}
+        activePreset={activePreset}
+        activeRecordId={activeRecordId}
+        contextRuntime={contextRuntime}
+        setContextApiEnabled={setContextApiEnabled}
+        openCallInvestigator={openCallInvestigator}
+        copyCallInvestigatorLink={copyCallInvestigatorLink}
+        openFindingInvestigator={openFindingInvestigator}
+        callBackLabel={
+          callReturnViewExplicit
+            ? `Back to ${callReturnViewLabel(callReturnView)}`
+            : shellI18n.t('button.back_to_dashboard', 'Back to dashboard')
+        }
+        backFromCallInvestigator={backFromCallInvestigator}
+        dashboardPayload={dashboardPayload}
+        historyScope={historyScope}
+        loadWindow={loadWindow}
+        scopeSince={dashboardPayload?.since ?? sinceForLoadWindow(loadWindow)}
+        loadLimit={loadLimit}
+        loadedRowCount={loadedRowCount}
+        totalAvailableRows={totalAvailableRows}
+        canUseLiveApi={canUseLiveApi}
+        autoRefreshEnabled={autoRefreshEnabled} applicationI18n={shellI18n}
+        refreshing={refreshing}
+        hasMoreRows={hasMoreRows}
+        canLoadAllRows={canLoadAllRows}
+        loadMoreRows={loadMoreRows}
+        loadAllRows={loadAllRows}
+        globalFilters={
+          <ShellGlobalFilters
+            activeView={activeView}
+            locationSearch={locationSearch}
+            model={model}
+            onUrlChange={replaceShellUrl}
+          />
+        }
+      />
       </main>
       {showBackToTop ? (
         <button className="to-top-button" type="button" onClick={scrollToTop} aria-label="Back to top">
@@ -820,159 +762,10 @@ backFromCallInvestigator,
   }
 }
 
-function renderView(
-  activeView: ViewId,
-  model: DashboardModel,
-  onRefresh: () => void,
-  refreshState: string,
-  globalQuery: string,
-  activePreset: string,
-  activeRecordId: string,
-  contextRuntime: ContextRuntime,
-  setContextApiEnabled: (enabled: boolean) => void,
-openCallInvestigator: (recordId: string) => void,
-copyCallInvestigatorLink: (recordId: string) => void,
-openFindingInvestigator: (rank: number) => void,
-_applyInvestigationPreset: (action: InvestigationPresetAction) => void,
-  callBackLabel: string,
-  backFromCallInvestigator: () => void,
-  dashboardPayload: DashboardBootPayload | null,
-  historyScope: HistoryScope,
-  loadLimit: number,
- loadedRowCount: number,
- totalAvailableRows: number,
- canUseLiveApi: boolean,
- autoRefreshEnabled: boolean,
- refreshing: boolean,
- hasMoreRows: boolean,
- canLoadAllRows: boolean,
- loadMoreRows: () => void,
- loadAllRows: () => void,
- globalFilters: ReactNode,
-) {
-  switch (activeView) {
-    case 'overview':
-      return (
-        <OverviewPage
-          model={model}
-          onRefresh={onRefresh}
-        refreshState={refreshState}
-        globalQuery={globalQuery}
-        runtime={{ historyScope, loadLimit, loadedRowCount, totalAvailableRows }}
-        refreshing={refreshing}
-        canLoadMoreRows={canUseLiveApi && hasMoreRows}
-        canLoadAllRows={canLoadAllRows}
-        onLoadMoreRows={loadMoreRows}
-        onLoadAllRows={loadAllRows}
-	onOpenInvestigator={openCallInvestigator}
-	onCopyCallLink={copyCallInvestigatorLink}
-	onOpenFinding={openFindingInvestigator}
-	globalFilters={globalFilters}
-/>
-      );
-    case 'investigator':
-      return <InvestigatorPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
-    case 'calls':
-      return (
-        <CallsPage
-          model={model}
-          globalQuery={globalQuery}
-          activePreset={activePreset}
-          onRefresh={onRefresh}
-          contextRuntime={contextRuntime}
-          onContextApiEnabledChange={setContextApiEnabled}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-    case 'call':
-      return (
-        <CallInvestigatorPage
-          model={model}
-          recordId={activeRecordId}
-          contextRuntime={contextRuntime}
-          onContextApiEnabledChange={setContextApiEnabled}
-          onNavigateRecord={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          onBackToCalls={backFromCallInvestigator}
-          backLabel={callBackLabel}
-        />
-      );
-    case 'threads':
-      return (
-        <ThreadsPage
-          model={model}
-          globalQuery={globalQuery}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          globalFilters={globalFilters}
-        />
-      );
-    case 'usage-drain':
-      return <UsageDrainPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
-    case 'cache-context':
-      return (
-        <CacheContextPage
-          model={model}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-    case 'diagnostics':
-      return (
-        <DiagnosticsPage
-          model={model}
-          contextRuntime={contextRuntime}
-          rowLoadControls={{
-            loadedRowCount,
-            totalAvailableRows,
-            canLoadMoreRows: canUseLiveApi && hasMoreRows,
-            canLoadAllRows,
-            refreshing,
-            onLoadMoreRows: loadMoreRows,
-            onLoadAllRows: loadAllRows,
-          }}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          globalFilters={globalFilters}
-        />
-      );
-    case 'reports':
-      return (
-        <ReportsPage
-          model={model}
-          onRefresh={onRefresh}
-          refreshState={refreshState}
-          includeArchived={historyScope === 'all'}
-          loadLimit={loadLimit}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-case 'settings':
-return (
-<SettingsPage
-          model={model}
-          payload={dashboardPayload}
-          historyScope={historyScope}
-          loadLimit={loadLimit}
-          loadedRowCount={loadedRowCount}
-          totalAvailableRows={totalAvailableRows}
-          canUseLiveApi={canUseLiveApi}
-          autoRefreshEnabled={autoRefreshEnabled}
-          refreshState={refreshState}
-        />
-);
-}
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function refreshProgressLabel(progress: RefreshProgressPayload, historyScope: HistoryScope): string {
-  const scope = historyScope === 'all' ? 'all history' : 'active history';
-  const message = progress.message || 'Refreshing usage index';
-  const percent = typeof progress.percent === 'number' ? ` ${Math.round(progress.percent)}%` : '';
-  return `${message}${percent} (${scope})`;
+export function RoutedApp() {
+  return (
+    <QueryClientProvider client={dashboardQueryClient}>
+      <App />
+    </QueryClientProvider>
+  );
 }

@@ -180,53 +180,92 @@ def format_doctor(report: dict[str, Any]) -> str:
         f"Failures: {report.get('failures', 0)} | warnings: {report.get('warnings', 0)}",
         "",
     ]
-    environment = report.get("environment")
-    if isinstance(environment, dict):
-        lines.extend(["Environment:"])
-        package = environment.get("package")
-        if isinstance(package, dict):
-            lines.append(
-                f"Package: {package.get('name', 'unknown')} {package.get('version', 'unknown')}"
-            )
-        python = environment.get("python")
-        if isinstance(python, dict):
-            lines.append(
-                "Python: "
-                f"{python.get('version', 'unknown')} "
-                f"({python.get('implementation', 'unknown')})"
-            )
-        paths = environment.get("paths")
-        if isinstance(paths, dict):
-            lines.append(f"Codex home: {paths.get('codex_home', 'unknown')}")
-            lines.append(f"Database: {paths.get('db_path', 'unknown')}")
-            lines.append(f"Dashboard: {paths.get('dashboard_path', 'unknown')}")
-        codex_logs = environment.get("codex_logs")
-        if isinstance(codex_logs, dict):
-            sessions_status = "found" if codex_logs.get("sessions_dir_exists") else "missing"
-            lines.append(
-                "Codex logs: "
-                f"{sessions_status}, "
-                f"{_fmt_int(codex_logs.get('jsonl_files'))} JSONL files"
-            )
-        assets = environment.get("dashboard_assets")
-        if isinstance(assets, dict):
-            asset_status = "available" if assets.get("available") else "missing"
-            missing = assets.get("missing")
-            suffix = f" ({len(missing)} missing)" if isinstance(missing, list) and missing else ""
-            lines.append(f"Dashboard assets: {asset_status}{suffix}")
-        lines.append("")
-    for check in report.get("checks", []):
+    lines.extend(_doctor_environment_lines(report.get("environment")))
+    lines.extend(_doctor_check_lines(report.get("checks", [])))
+    lines.extend(_doctor_suggestion_lines(report.get("repair_suggestions")))
+    return "\n".join(lines)
+
+
+def _doctor_environment_lines(value: Any) -> list[str]:
+    if not isinstance(value, dict):
+        return []
+    lines = ["Environment:"]
+    for formatter in (
+        _doctor_package_lines,
+        _doctor_python_lines,
+        _doctor_path_lines,
+        _doctor_log_lines,
+        _doctor_asset_lines,
+    ):
+        lines.extend(formatter(value))
+    lines.append("")
+    return lines
+
+
+def _doctor_package_lines(environment: dict[str, Any]) -> list[str]:
+    package = environment.get("package")
+    if not isinstance(package, dict):
+        return []
+    return [f"Package: {package.get('name', 'unknown')} {package.get('version', 'unknown')}"]
+
+
+def _doctor_python_lines(environment: dict[str, Any]) -> list[str]:
+    python = environment.get("python")
+    if not isinstance(python, dict):
+        return []
+    return [
+        f"Python: {python.get('version', 'unknown')} ({python.get('implementation', 'unknown')})"
+    ]
+
+
+def _doctor_path_lines(environment: dict[str, Any]) -> list[str]:
+    paths = environment.get("paths")
+    if not isinstance(paths, dict):
+        return []
+    return [
+        f"Codex home: {paths.get('codex_home', 'unknown')}",
+        f"Database: {paths.get('db_path', 'unknown')}",
+        f"Dashboard: {paths.get('dashboard_path', 'unknown')}",
+    ]
+
+
+def _doctor_log_lines(environment: dict[str, Any]) -> list[str]:
+    codex_logs = environment.get("codex_logs")
+    if not isinstance(codex_logs, dict):
+        return []
+    sessions_status = "found" if codex_logs.get("sessions_dir_exists") else "missing"
+    return [f"Codex logs: {sessions_status}, {_fmt_int(codex_logs.get('jsonl_files'))} JSONL files"]
+
+
+def _doctor_asset_lines(environment: dict[str, Any]) -> list[str]:
+    assets = environment.get("dashboard_assets")
+    if not isinstance(assets, dict):
+        return []
+    asset_status = "available" if assets.get("available") else "missing"
+    missing = assets.get("missing")
+    suffix = f" ({len(missing)} missing)" if isinstance(missing, list) and missing else ""
+    return [f"Dashboard assets: {asset_status}{suffix}"]
+
+
+def _doctor_check_lines(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    lines: list[str] = []
+    for check in value:
+        if not isinstance(check, dict):
+            continue
         status = str(check.get("status", "unknown")).upper()
         lines.append(f"- [{status}] {check.get('name')}: {check.get('detail')}")
         remediation = check.get("remediation")
         if remediation:
             lines.append(f"  Next: {remediation}")
-    suggestions = report.get("repair_suggestions")
-    if isinstance(suggestions, list) and suggestions:
-        lines.extend(["", "Repair suggestions:"])
-        for suggestion in suggestions:
-            lines.append(f"- {suggestion}")
-    return "\n".join(lines)
+    return lines
+
+
+def _doctor_suggestion_lines(value: Any) -> list[str]:
+    if not isinstance(value, list) or not value:
+        return []
+    return ["", "Repair suggestions:", *(f"- {suggestion}" for suggestion in value)]
 
 
 def format_pricing_coverage(report: dict[str, Any], limit: int = 20) -> str:

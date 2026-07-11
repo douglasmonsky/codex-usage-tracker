@@ -224,6 +224,44 @@ describe('dashboard API model builder', () => {
 });
 
 describe('dashboard live usage client', () => {
+  it('loads time windows as bounded evidence instead of materializing every matching row', async () => {
+    const progress = vi.fn();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      expect(url).toContain('limit=500');
+      expect(url).toContain('load_window=week');
+      expect(url).toContain('since=2026-07-04T10%3A15%3A00.000Z');
+      return jsonResponse({
+        api_token: 'token',
+        load_window: 'week',
+        since: '2026-07-04T10:15:00.000Z',
+        loaded_row_count: 500,
+        total_available_rows: 86_166,
+        limit: 500,
+        has_more: true,
+        rows: [{ record_id: 'recent-week-row', total_tokens: 2 }],
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const payload = await loadUsagePayload(
+      { api_token: 'token', loaded_row_count: 500, rows: [] },
+      {
+        refresh: false,
+        limit: 500,
+        loadWindow: 'week',
+        since: '2026-07-04T10:15:00.000Z',
+        onProgress: progress,
+      },
+    );
+
+    expect(payload.load_window).toBe('week');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(progress).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'loading_rows', completed: 500, total: 86_166, percent: 100 }),
+    );
+  });
+
   it('polls async refresh jobs before loading usage rows', async () => {
     const progress = vi.fn();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

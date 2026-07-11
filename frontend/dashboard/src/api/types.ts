@@ -1,3 +1,5 @@
+import type { DashboardDataScope } from './dashboardDataScope';
+
 export type UsageRow = {
   id?: string;
   record_id?: string;
@@ -11,6 +13,7 @@ export type UsageRow = {
   turn_timestamp?: string;
   time?: string;
   thread_name?: string | null;
+  thread_key?: string | null;
   thread?: string;
   resolved_parent_thread_name?: string | null;
   parent_thread_name?: string | null;
@@ -73,7 +76,7 @@ export type UsageRow = {
  efficiency_flags?: string[] | null;
 };
 
-export type DashboardBootPayload = {
+export type DashboardBootPayload = DashboardDataScope & {
   api_token?: string;
   context_api_enabled?: boolean;
   refresh_jobs_available?: boolean;
@@ -85,8 +88,6 @@ translation_catalog?: Record<string, Record<string, string>>;
 rows?: UsageRow[];
   summary?: Record<string, unknown>;
   observed_usage?: ObservedUsage;
-  history_scope?: string;
-  include_archived?: boolean;
   limit?: number | null;
   limit_label?: string;
   has_more?: boolean;
@@ -119,7 +120,7 @@ export type DashboardLanguage = {
   dir?: string;
 };
 
-export type ProjectMetadataPrivacy = {
+type ProjectMetadataPrivacy = {
   mode?: string;
   cwd_redacted?: boolean;
   project_names_redacted?: boolean;
@@ -130,7 +131,7 @@ export type ProjectMetadataPrivacy = {
   aliases_preserved?: boolean;
 };
 
-export type ObservedUsage = {
+type ObservedUsage = {
   available?: boolean;
   source?: string;
   observed_at?: string;
@@ -140,7 +141,7 @@ export type ObservedUsage = {
   reconciliation?: Record<string, unknown>;
 };
 
-export type ObservedUsageWindow = {
+type ObservedUsageWindow = {
   key?: string;
   label?: string;
   used_percent?: number | null;
@@ -148,7 +149,7 @@ export type ObservedUsageWindow = {
   resets_at?: number | string | null;
 };
 
-export type AllowanceWindow = {
+type AllowanceWindow = {
   key?: string;
   label?: string;
   total_credits?: number | null;
@@ -191,7 +192,7 @@ export type CallContextEntry = {
   };
 };
 
-export type TokenUsageSummary = {
+type TokenUsageSummary = {
   input_tokens?: number;
   cached_input_tokens?: number;
   uncached_input_tokens?: number;
@@ -250,7 +251,7 @@ export type MetricCard = {
   breakdown?: Array<{ label: string; value: string }>;
 };
 
-export type ChartPoint = {
+type ChartPoint = {
   label: string;
   value: number;
   secondary?: number;
@@ -277,6 +278,7 @@ export type Finding = {
 
 export type CallRow = {
   id: string;
+  threadKey?: string;
   rawTime: string;
   eventTimestamp: string;
   callStartedAt: string;

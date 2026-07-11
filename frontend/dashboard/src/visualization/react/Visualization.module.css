@@ -1,0 +1,230 @@
+.root {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  overflow: hidden;
+  color: var(--ink-strong);
+  background: var(--surface-panel);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-panel);
+}
+
+.header {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: var(--text-panel-title);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.header p {
+  max-width: 72ch;
+  margin: var(--space-1) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-control);
+  line-height: 1.45;
+}
+
+.toolbar,
+.segmented {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.segmented {
+  padding: 2px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-control);
+}
+
+.segmented button,
+.iconButton {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--ink-muted);
+  place-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+}
+
+.segmented button:hover,
+.iconButton:hover:not(:disabled) {
+  color: var(--ink-strong);
+  background: var(--surface-panel);
+  border-color: var(--line-subtle);
+}
+
+.segmented button[aria-pressed="true"] {
+  color: var(--signal-selection-ink);
+  background: var(--surface-panel);
+  border-color: var(--signal-selection-line);
+}
+
+.segmented button:focus-visible,
+.iconButton:focus-visible,
+.chartRegion:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.meta {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-metadata);
+  line-height: 1.3;
+}
+
+.meta span + span::before {
+  margin-right: var(--space-3);
+  color: var(--line-strong);
+  content: "/";
+}
+
+.chartRegion {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-panel);
+}
+
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+
+.chartStatus {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  padding: var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--text-control);
+  text-align: center;
+  background: rgb(255 255 255 / 88%);
+}
+
+.state {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  color: var(--ink-muted);
+  background: var(--surface-subtle);
+  border-left: 3px solid var(--line-strong);
+}
+
+.state[data-state="partial"],
+.state[data-state="stale"] {
+  color: var(--signal-caution-ink);
+  background: var(--signal-caution-surface);
+  border-left-color: var(--signal-caution);
+}
+
+.state[data-state="error"] {
+  color: var(--signal-risk-ink);
+  background: var(--signal-risk-subtle);
+  border-left-color: var(--signal-risk);
+}
+
+.state > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.state strong,
+.state span {
+  display: block;
+}
+
+.state span {
+  font-size: var(--text-control);
+}
+
+.spinning {
+  animation: visualization-spin 900ms linear infinite;
+}
+
+.summary {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-3);
+  color: var(--ink-muted);
+  font-size: var(--text-metadata);
+  line-height: 1.45;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.summary strong {
+  color: var(--ink-strong);
+  font-size: var(--text-control);
+}
+
+.screenReaderOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+@keyframes visualization-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .root {
+    padding: var(--space-3);
+  }
+
+  .header {
+    align-items: stretch;
+  }
+
+  .toolbar {
+    align-self: flex-start;
+  }
+
+  .meta {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .meta span + span::before {
+    margin-right: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+}

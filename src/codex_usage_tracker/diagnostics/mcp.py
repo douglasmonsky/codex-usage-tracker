@@ -226,6 +226,7 @@ def _run_mcp_import_check(
         capture_output=True,
         text=True,
         timeout=20,
+        check=False,
     )
 
 

@@ -24,7 +24,10 @@ def test_allowance_history_payload_returns_normalized_rows(tmp_path: Path) -> No
     assert payload["schema"] == "codex-usage-tracker-allowance-history-v1"
     assert payload["privacy_mode"] == "strict"
     assert payload["row_count"] == 2
-    assert "record_id" not in payload["rows"][0]
+    rows = payload["rows"]
+    assert isinstance(rows, list)
+    assert isinstance(rows[0], dict)
+    assert "record_id" not in rows[0]
 
 
 @pytest.mark.parametrize("limit_query", ["limit=0", "limit=None", "limit=none"])
@@ -56,8 +59,12 @@ def test_allowance_payloads_accept_zero_and_none_limits(
     )
 
     assert history["row_count"] == 2
-    assert diagnostics["summary"]["observation_count"] == 2
-    assert export["summary"]["observation_count"] == 2
+    diagnostics_summary = diagnostics["summary"]
+    export_summary = export["summary"]
+    assert isinstance(diagnostics_summary, dict)
+    assert isinstance(export_summary, dict)
+    assert diagnostics_summary["observation_count"] == 2
+    assert export_summary["observation_count"] == 2
 
 
 def test_allowance_diagnostics_payload_validates_window_kind(tmp_path: Path) -> None:

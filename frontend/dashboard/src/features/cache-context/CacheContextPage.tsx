@@ -67,7 +67,7 @@ return (
 
 <Panel title="Cache Reuse Heatmap" subtitle={heatmapWindowLabels.length ? `${heatmapWindowLabels.length} cache windows` : 'No cache heatmap rows'}>
         {heatmapWindowLabels.length ? (
-          <div className="heatmap-scroll">
+          <div className="heatmap-scroll" tabIndex={0} aria-label="Scrollable cache reuse heatmap">
             <div className="heatmap" role="table" aria-label="Cache reuse heatmap" style={{ '--heatmap-columns': heatmapWindowLabels.length } as CSSProperties}>
               <div className="heatmap-head" role="row">
                 <span className="sticky-column" role="columnheader">Thread</span>

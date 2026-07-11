@@ -37,17 +37,18 @@ test.describe('React dashboard rewrite smoke', () => {
 await page.getByRole('button', { name: /Call Details/i }).click();
 await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
 
+await page.getByText('More filters', { exact: true }).click();
 await page.getByLabel('Start date').fill('2026-07-04');
 await page.getByLabel('End date').fill('2026-07-03');
 await expect(page.getByText('Invalid date range')).toBeVisible();
 await page.getByRole('button', { name: /Clear filters/i }).click();
 await expect(page.getByText('Invalid date range')).toHaveCount(0);
 
-await page.getByRole('button', { name: /Columns/i }).click();
+await page.getByRole('button', { name: 'Columns', exact: true }).click();
     await expect(page.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
     await page.getByRole('checkbox', { name: 'Signal' }).uncheck();
     await expect(page.getByRole('columnheader', { name: /Signal/i })).toHaveCount(0);
-    await page.getByRole('button', { name: /Columns/i }).click();
+    await page.getByRole('button', { name: 'Columns', exact: true }).click();
 
     await page.getByRole('button', { name: 'Sort by Est. Cost' }).click();
     await expect(page.getByRole('columnheader', { name: /Est. Cost/i })).toHaveAttribute('aria-sort', 'descending');

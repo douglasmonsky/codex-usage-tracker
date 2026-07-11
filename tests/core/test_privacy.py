@@ -89,7 +89,10 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
         for output in shareable_outputs:
             assert sentinel not in output
 
-    strict_row = strict_payload["rows"][0]
+    strict_rows = strict_payload["rows"]
+    assert isinstance(strict_rows, list)
+    strict_row = strict_rows[0]
+    assert isinstance(strict_row, dict)
     with csv_path.open(encoding="utf-8", newline="") as handle:
         csv_rows = list(csv.DictReader(handle))
     assert strict_payload["privacy_mode"] == "strict"
@@ -291,8 +294,10 @@ def test_context_server_requires_loopback_origin_token_and_enablement(tmp_path: 
         server.server_close()
         thread.join(timeout=5)
 
+    disabled_payload = disabled_error["payload"]
+    assert isinstance(disabled_payload, dict)
     assert disabled_error["status"] == 403
-    assert disabled_error["payload"]["context_api_enabled"] is False
+    assert disabled_payload["context_api_enabled"] is False
     assert foreign_origin_error["status"] == 403
     assert missing_token_error["status"] == 403
     assert settings_payload["schema"] == "codex-usage-tracker-context-settings-v1"

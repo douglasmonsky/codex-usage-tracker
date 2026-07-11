@@ -74,31 +74,31 @@ Example conversation docs:
 
 Overview is the dashboard landing workspace: it shows recent aggregate usage, weekly remaining usage context, row loading controls, and charts that open on recent dates.
 
-![Overview view showing high-level metrics, row loading controls, time-series charts, and recent aggregate calls.](docs/assets/dashboard-insights.png?v=readme-smart-20260704)
+![Overview view showing high-level metrics, row loading controls, time-series charts, and recent aggregate calls.](docs/assets/dashboard-insights.png?v=readme-final-20260711)
 
 Calls is the high-density investigation surface: filter, sort, inspect details, and export the exact aggregate rows you are looking at.
 
-![Calls view showing the expanded model-call table with sticky thread rows and detail controls.](docs/assets/dashboard-calls.png?v=readme-smart-20260704)
+![Calls view showing the expanded model-call table with sticky thread rows and detail controls.](docs/assets/dashboard-calls.png?v=readme-final-20260711)
 
 The details rail stays beside the model-call table, so you can inspect aggregate call accounting before opening a full investigator route.
 
-![Calls view showing the expanded model-call table beside the Call Drill-Down detail rail.](docs/assets/dashboard-details.png?v=readme-smart-20260704)
+![Calls view showing the expanded model-call table beside the Call Drill-Down detail rail.](docs/assets/dashboard-details.png?v=readme-final-20260711)
 
 Click a call row to open the dedicated investigator for exact token accounting, cache/accounting deltas, local serialized evidence buckets, and runtime-only evidence controls.
 
-![Call investigator showing token accounting, cache diagnostics, serialized evidence groups, and evidence controls.](docs/assets/dashboard-call-investigator.png?v=readme-smart-20260704)
+![Call investigator showing token accounting, cache diagnostics, serialized evidence groups, and evidence controls.](docs/assets/dashboard-call-investigator.png?v=readme-final-20260711)
 
 The lower investigator view keeps local JSONL context gated behind explicit localhost actions; raw context is not embedded in generated dashboard HTML.
 
-![Lower call investigator view showing context estimates and the explicit raw-context evidence gate.](docs/assets/dashboard-call-investigator-evidence.png?v=readme-smart-20260704)
+![Lower call investigator view showing context estimates and the explicit raw-context evidence gate.](docs/assets/dashboard-call-investigator-evidence.png?v=readme-final-20260711)
 
 Threads view groups related calls so long chats, subagents, and auto-review passes are easier to reason about as one work session.
 
-![Threads view with one expanded thread and its calls.](docs/assets/dashboard-threads.png?v=readme-smart-20260704)
+![Threads view with one expanded thread and its calls.](docs/assets/dashboard-threads.png?v=readme-final-20260711)
 
 Diagnostics Notebook surfaces on-demand snapshot reports for usage drain, tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration without tying them to the normal live refresh loop.
 
-![Diagnostics Notebook view showing diagnostic snapshot modules and usage-drain reporting.](docs/assets/dashboard-diagnostics.png?v=readme-smart-20260704)
+![Diagnostics Notebook view showing diagnostic snapshot modules and usage-drain reporting.](docs/assets/dashboard-diagnostics.png?v=readme-final-20260711)
 
 Dashboard screenshots use synthetic aggregate fixture data, and companion prompt/chat previews are synthetic. They do not contain prompts, local logs, assistant responses, real tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the full walkthrough.
 
@@ -187,7 +187,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
-- `Overview`, `Calls`, `Threads`, and `Diagnostics` dashboard views, including on-demand usage-drain report runs with cumulative per-thread cost curves.
+- `Overview`, `Investigate`, `Calls`, `Threads`, `Limits`, and `Diagnostics` dashboard views, including evidence-graded weekly allowance analysis and on-demand usage-drain report runs.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.

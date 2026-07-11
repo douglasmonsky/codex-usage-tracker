@@ -214,7 +214,7 @@ it('sorts table columns through accessible header controls', () => {
   fireEvent.click(screen.getByRole('checkbox', { name: 'Reasoning Output' }));
   expect(screen.queryByRole('columnheader', { name: /Reasoning Output/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: /^Threads$/i }));
     const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
     expect(within(threadsTable).getByRole('button', { name: /Sort by Latest/i })).toBeInTheDocument();
     expect(within(threadsTable).getByRole('button', { name: /Sort by Avg Gap/i })).toBeInTheDocument();

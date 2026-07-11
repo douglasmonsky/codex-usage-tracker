@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "frontend/dashboard": {
+      "entry": ["src/**/*.test.{ts,tsx}", "src/visualization/index.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    }
+  }
+}

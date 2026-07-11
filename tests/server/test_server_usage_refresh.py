@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
-
-import pytest
+from typing import Any, Protocol, TypedDict
 
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
+
+
+class _MonkeyPatch(Protocol):
+    def setattr(self, target: object, name: str, value: object) -> None: ...
 
 
 @dataclass
@@ -51,7 +53,7 @@ class _RouteSenders:
 
 def test_refresh_usage_payload_returns_aggregate_refresh_metadata(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     calls: dict[str, Any] = {}
 
@@ -92,7 +94,36 @@ def test_refresh_usage_payload_returns_aggregate_refresh_metadata(
     assert isinstance(refresh_ms, float)
 
 
-def _usage_kwargs(tmp_path: Path) -> dict[str, object]:
+class _UsageBaseKwargs(TypedDict):
+    db_path: Path
+    pricing_path: Path
+    allowance_path: Path
+    rate_card_path: Path
+    thresholds_path: Path
+    projects_path: Path
+    privacy_mode: str
+    since: str | None
+    api_token: str
+    context_api_enabled: bool
+    include_archived_default: bool
+    language_default: str
+    limit_default: int
+    codex_home: Path
+    refresh_lock: _FakeLock
+
+
+class _UsageKwargs(_UsageBaseKwargs):
+    refresh_allowed: bool
+
+
+class _HandleUsageKwargs(_UsageBaseKwargs):
+    has_valid_api_token: server_usage_refresh.TokenValidator
+    send_error: server_usage_refresh.ErrorSender
+    send_exception: server_usage_refresh.ExceptionSender
+    send_json: server_usage_refresh.JsonSender
+
+
+def _usage_base_kwargs(tmp_path: Path) -> _UsageBaseKwargs:
     return {
         "db_path": tmp_path / "usage.sqlite3",
         "pricing_path": tmp_path / "pricing.json",
@@ -109,8 +140,11 @@ def _usage_kwargs(tmp_path: Path) -> dict[str, object]:
         "limit_default": 500,
         "codex_home": tmp_path / "codex-home",
         "refresh_lock": _FakeLock(),
-        "refresh_allowed": False,
     }
+
+
+def _usage_kwargs(tmp_path: Path) -> _UsageKwargs:
+    return {**_usage_base_kwargs(tmp_path), "refresh_allowed": False}
 
 
 def _handle_usage_kwargs(
@@ -118,23 +152,19 @@ def _handle_usage_kwargs(
     senders: _RouteSenders,
     *,
     has_valid_api_token: server_usage_refresh.TokenValidator = lambda _params: True,
-) -> dict[str, object]:
-    kwargs = _usage_kwargs(tmp_path)
-    kwargs.pop("refresh_allowed")
-    kwargs.update(
-        {
-            "has_valid_api_token": has_valid_api_token,
-            "send_error": senders.send_error,
-            "send_exception": senders.send_exception,
-            "send_json": senders.send_json,
-        },
-    )
-    return kwargs
+) -> _HandleUsageKwargs:
+    return {
+        **_usage_base_kwargs(tmp_path),
+        "has_valid_api_token": has_valid_api_token,
+        "send_error": senders.send_error,
+        "send_exception": senders.send_exception,
+        "send_json": senders.send_json,
+    }
 
 
 def test_handle_usage_request_sends_payload(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     senders = _RouteSenders()
     seen: dict[str, Any] = {}
@@ -180,9 +210,44 @@ def test_handle_usage_request_sends_refresh_auth_error(tmp_path: Path) -> None:
     assert senders.json_payloads == []
 
 
+def test_usage_payload_forwards_request_window_without_refreshing(
+    tmp_path: Path,
+    monkeypatch: _MonkeyPatch,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def dashboard_payload(**kwargs: Any) -> dict[str, object]:
+        seen.update(kwargs)
+        return {"rows": [], "load_window": kwargs["load_window"]}
+
+    monkeypatch.setattr(server_usage_refresh, "dashboard_payload", dashboard_payload)
+
+    payload = server_usage_refresh.usage_payload(
+        "limit=0&since=2026-07-04T10%3A15%3A00.000Z&load_window=week",
+        **_usage_kwargs(tmp_path),
+    )
+
+    assert seen["limit"] is None
+    assert seen["since"] == "2026-07-04T10:15:00.000Z"
+    assert seen["load_window"] == "week"
+    assert payload["load_window"] == "week"
+
+
+def test_usage_payload_rejects_unknown_load_window(tmp_path: Path) -> None:
+    try:
+        server_usage_refresh.usage_payload(
+            "load_window=forever",
+            **_usage_kwargs(tmp_path),
+        )
+    except ValueError as exc:
+        assert str(exc) == "load_window must be one of: day, week, rows, all"
+    else:
+        raise AssertionError("unknown load window should fail")
+
+
 def test_handle_usage_request_sends_os_error(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     senders = _RouteSenders()
 
@@ -203,7 +268,7 @@ def test_handle_usage_request_sends_os_error(
 
 def test_usage_payload_forwards_query_options_to_dashboard_payload(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     calls: dict[str, Any] = {}
 
@@ -229,16 +294,20 @@ def test_usage_payload_forwards_query_options_to_dashboard_payload(
 
 
 def test_usage_payload_rejects_refresh_without_valid_token(tmp_path: Path) -> None:
-    with pytest.raises(server_usage_refresh.UsageRefreshAuthError, match="Valid API token"):
+    try:
         server_usage_refresh.usage_payload(
             "refresh=1",
             **_usage_kwargs(tmp_path),
         )
+    except server_usage_refresh.UsageRefreshAuthError as exc:
+        assert "Valid API token" in str(exc)
+    else:
+        raise AssertionError("Expected refresh authentication to fail")
 
 
 def test_usage_payload_adds_refresh_diagnostics(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: _MonkeyPatch,
 ) -> None:
     def dashboard_payload(**_kwargs: Any) -> dict[str, object]:
         return {"rows": [{"record_id": "r1"}, {"record_id": "r2"}]}
@@ -258,7 +327,9 @@ def test_usage_payload_adds_refresh_diagnostics(
     )
 
     assert payload["refresh_result"] == {"parsed_events": 7}
-    assert payload["diagnostics"]["rows_returned"] == 2
-    assert payload["diagnostics"]["refresh_ms"] == 12.5
-    assert payload["diagnostics"]["limit"] == 25
-    assert payload["diagnostics"]["offset"] == 3
+    diagnostics = payload["diagnostics"]
+    assert isinstance(diagnostics, dict)
+    assert diagnostics["rows_returned"] == 2
+    assert diagnostics["refresh_ms"] == 12.5
+    assert diagnostics["limit"] == 25
+    assert diagnostics["offset"] == 3

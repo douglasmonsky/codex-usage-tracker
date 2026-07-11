@@ -48,7 +48,7 @@ it('maps legacy Insights route params to the renamed Overview workspace', () => 
 
   it('labels return views from primary and secondary shell navigation', () => {
     expect(callReturnViewLabel('calls')).toBe('Calls');
-    expect(callReturnViewLabel('investigator')).toBe('Investigator');
+    expect(callReturnViewLabel('investigator')).toBe('Investigate');
   });
 
 it('clears inactive workspace URL state while preserving shared shell filters', () => {

@@ -45,6 +45,11 @@
  overflow: auto;
 }
 
+.heatmap-scroll:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .heatmap {
  min-width: 720px;
  overflow: hidden;
@@ -194,6 +199,10 @@ grid-column: 1;
 
 .drilldown-panel {
 position: static;
+max-height: none;
+overflow: visible;
+overscroll-behavior: auto;
+scrollbar-gutter: auto;
 }
 }
 
@@ -207,6 +216,8 @@ position: static;
     height: auto;
     gap: 12px;
     padding: 14px 12px;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
   }
 
   .primary-nav {

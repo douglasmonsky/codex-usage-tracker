@@ -1,15 +1,8 @@
 import { callInvestigatorCallForCurrentUrl } from '../features/call-investigator/callInvestigatorState';
-import { cacheContextCallsForCurrentUrl } from '../features/cache-context/CacheContextPage';
-import { callsForCurrentUrl } from '../features/calls/CallsPage';
-import { diagnosticsCallsForCurrentUrl } from '../features/diagnostics/DiagnosticsPage';
-import { investigatorCallsForCurrentUrl } from '../features/investigator/InvestigatorPage';
-import { overviewCallsForQuery } from '../features/overview/OverviewPage';
-import { reportCallsForCurrentUrl } from '../features/reports/ReportsPage';
 import { rowsToCsv, csvDateStamp, type CsvColumn } from '../features/shared/exportCsv';
 import { callCsvColumns } from '../features/shared/tables';
-import { threadCallsForCurrentUrl } from '../features/threads/ThreadsPage';
-import { usageDrainCallsForCurrentUrl } from '../features/usage-drain/UsageDrainPage';
 import type { ContextRuntime, DashboardModel } from '../api/types';
+import { loadWindowLabel, type LoadWindow } from '../data/dataScope';
 import type { ViewId } from './navigation';
 import { rowLimitNoCap } from './rowLimit';
 import type { HistoryScope } from './shellUrl';
@@ -17,7 +10,9 @@ import type { HistoryScope } from './shellUrl';
 export type RuntimeExportState = {
   contextRuntime: ContextRuntime;
   historyScope: HistoryScope;
+  loadWindow: LoadWindow;
   loadLimit: number;
+  scopeSince: string | null;
   loadedRowCount: number;
   totalAvailableRows: number;
   canUseLiveApi: boolean;
@@ -32,33 +27,49 @@ export type CsvExportSpec = {
   label: string;
 };
 
-export function currentViewCsvExport(
+export async function currentViewCsvExport(
   activeView: ViewId,
   model: DashboardModel,
   runtime: RuntimeExportState,
   globalQuery = '',
   activePreset = '',
-): CsvExportSpec {
+): Promise<CsvExportSpec> {
   const stamp = csvDateStamp();
     switch (activeView) {
-      case 'threads':
+      case 'threads': {
+      const { threadCallsForCurrentUrl } = await import('../features/threads/ThreadsPage');
       return csvExport(`codex-thread-filtered-calls-${stamp}.csv`, threadCallsForCurrentUrl(model, globalQuery), callCsvColumns, 'call rows');
-    case 'cache-context':
+      }
+    case 'cache-context': {
+      const { cacheContextCallsForCurrentUrl } = await import('../features/cache-context/CacheContextPage');
       return csvExport(`codex-${activeView}-calls-${stamp}.csv`, cacheContextCallsForCurrentUrl(model), callCsvColumns, 'call rows');
-    case 'usage-drain':
+    }
+    case 'usage-drain': {
+      const { usageDrainCallsForCurrentUrl } = await import('../features/usage-drain/UsageDrainPage');
       return csvExport(`codex-usage-drain-calls-${stamp}.csv`, usageDrainCallsForCurrentUrl(model), callCsvColumns, 'call rows');
-    case 'diagnostics':
+    }
+    case 'diagnostics': {
+      const { diagnosticsCallsForCurrentUrl } = await import('../features/diagnostics/DiagnosticsPage');
       return csvExport(`codex-diagnostics-calls-${stamp}.csv`, diagnosticsCallsForCurrentUrl(model), callCsvColumns, 'call rows');
-    case 'reports':
+    }
+    case 'reports': {
+      const { reportCallsForCurrentUrl } = await import('../features/reports/ReportsPage');
       return csvExport(`codex-reports-evidence-${stamp}.csv`, reportCallsForCurrentUrl(model), callCsvColumns, 'call rows');
+    }
     case 'settings':
       return csvExport(`codex-dashboard-settings-${stamp}.csv`, settingsExportRows(model, runtime), settingsCsvColumns, 'settings rows');
-    case 'calls':
+    case 'calls': {
+      const { callsForCurrentUrl } = await import('../features/calls/CallsPage');
       return csvExport(`codex-calls-${stamp}.csv`, callsForCurrentUrl(model.calls, globalQuery, activePreset), callCsvColumns, 'call rows');
-    case 'overview':
+    }
+    case 'overview': {
+      const { overviewCallsForQuery } = await import('../features/overview/OverviewPage');
       return csvExport(`codex-overview-calls-${stamp}.csv`, overviewCallsForQuery(model.calls, globalQuery), callCsvColumns, 'call rows');
-    case 'investigator':
+    }
+    case 'investigator': {
+      const { investigatorCallsForCurrentUrl } = await import('../features/investigator/InvestigatorPage');
       return csvExport(`codex-investigator-calls-${stamp}.csv`, investigatorCallsForCurrentUrl(model), callCsvColumns, 'call rows');
+    }
     case 'call':
       return csvExport(`codex-call-calls-${stamp}.csv`, callInvestigatorCallForCurrentUrl(model), callCsvColumns, 'call rows');
   }
@@ -85,6 +96,8 @@ export function settingsExportRows(model: DashboardModel, runtime: RuntimeExport
     { field: 'live_api', value: runtime.canUseLiveApi ? 'available' : 'static snapshot' },
     { field: 'context_api', value: runtime.contextRuntime.contextApiEnabled ? 'enabled' : 'gated' },
     { field: 'history_scope', value: runtime.historyScope },
+    { field: 'data_window', value: loadWindowLabel(runtime.loadWindow, runtime.loadLimit) },
+    { field: 'scope_since', value: runtime.scopeSince ?? 'none' },
     { field: 'row_request', value: runtime.loadLimit === rowLimitNoCap ? 'no cap' : String(runtime.loadLimit) },
     { field: 'loaded_rows', value: String(runtime.loadedRowCount) },
     { field: 'total_available_rows', value: String(runtime.totalAvailableRows) },

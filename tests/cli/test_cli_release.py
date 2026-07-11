@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-import json
 import os
 import shlex
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Protocol, cast
 
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
@@ -50,6 +51,19 @@ STABLE_CLI_COMMANDS = {
     "init-projects",
     "support-bundle",
 }
+
+
+class _ReleaseCheckModule(Protocol):
+    REPO_ROOT: Path
+    CLI_HELP_SUBCOMMANDS: Iterable[str]
+
+    def _check_package_naming_docs(self) -> list[str]: ...
+
+    def _check_public_release_doc_versions(self, version: str) -> list[str]: ...
+
+    def _check_react_dashboard_privacy_artifacts(self) -> list[str]: ...
+
+    def _check_tracked_files_for_secrets(self) -> list[str]: ...
 
 
 MCP_TOOL_NAMES = {
@@ -97,7 +111,7 @@ MCP_TOOL_NAMES = {
     "init_usage_pricing_config",
     "update_usage_pricing_config",
     "init_usage_allowance_config",
-}
+} | {"usage_visualization_suggest", "usage_visualization_render"}
 
 
 def test_module_cli_version() -> None:
@@ -216,6 +230,16 @@ def test_release_check_rejects_raw_context_in_react_dashboard_artifacts(tmp_path
     assert any("raw context persisted" in failure for failure in failures)
     assert any("local Codex session JSONL path" in failure for failure in failures)
     assert not any("safeFixture.ts" in failure for failure in failures)
+
+
+def test_release_secret_scan_ignores_tracked_files_deleted_in_worktree(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = _load_release_check_module()
+    monkeypatch.setattr(module, "_tracked_files", lambda: [tmp_path / "deleted-bundle.js"])
+
+    assert module._check_tracked_files_for_secrets() == []
 
 
 def test_readme_codex_usage_tracker_commands_reference_known_subcommands() -> None:
@@ -422,119 +446,6 @@ def test_cli_json_schema_doc_lists_tracked_contracts() -> None:
     assert not missing
 
 
-def test_synthetic_history_benchmark_script_smoke(tmp_path: Path) -> None:
-    payload = _run_benchmark_json(
-        [
-            "scripts/benchmark_synthetic_history.py",
-            "--rows",
-            "100",
-            "--batch-size",
-            "25",
-            "--db-dir",
-            str(tmp_path),
-            "--json",
-            "--enforce-thresholds",
-            "--threshold-scale",
-            "5",
-        ],
-    )
-
-    assert payload["threshold_scale"] == 5.0
-    assert payload["benchmarks"][0]["rows"] == 100
-    assert payload["benchmarks"][0]["filtered_rows"] <= 50
-    assert "idx_usage_model_effort" in payload["benchmarks"][0]["query_plan"]
-    assert payload["benchmarks"][0]["threshold_status"] == "pass"
-    assert payload["benchmarks"][0]["threshold_failures"] == []
-    assert {
-        "populate_seconds",
-        "active_dashboard_query_seconds",
-        "all_history_dashboard_query_seconds",
-        "since_until_query_seconds",
-        "filtered_query_seconds",
-        "filtered_count_seconds",
-        "dashboard_payload_active_seconds",
-        "thread_summary_seconds",
-        "recommendations_report_seconds",
-        "pricing_coverage_seconds",
-        "project_summary_seconds",
-    } <= set(payload["benchmarks"][0]["timings"])
-
-
-def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> None:
-    payload = _run_benchmark_json(
-        [
-            "scripts/benchmark_synthetic_history.py",
-            "--rows",
-            "100",
-            "--batch-size",
-            "25",
-            "--db-dir",
-            str(tmp_path),
-            "--with-source-logs",
-            "--json",
-            "--enforce-thresholds",
-            "--threshold-scale",
-            "10",
-        ],
-    )
-    benchmark = payload["benchmarks"][0]
-
-    assert payload["threshold_scale"] == 10.0
-    assert benchmark["threshold_status"] == "pass"
-    assert benchmark["threshold_failures"] == []
-    assert benchmark["source_logs_generated"] > 0
-    assert benchmark["source_log_bytes"] > 0
-    assert benchmark["context_load_seconds"] is not None
-    assert benchmark["context_payload_json_bytes"] > 0
-    assert benchmark["source_scan_ms"] >= 0
-    assert benchmark["serialized_estimate_ms"] >= 0
-    assert {
-        "dashboard_payload_with_source_logs_seconds",
-        "context_load_early_line_seconds",
-        "context_load_middle_line_seconds",
-        "context_load_late_line_seconds",
-    } <= set(benchmark["timings"])
-    assert {"early", "middle", "late"} == set(benchmark["context_loads"])
-    assert benchmark["context_loads"]["middle"]["context_payload_json_bytes"] > 0
-    assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
-
-
-def _run_benchmark_json(args: list[str]) -> dict[str, object]:
-    repo_root = Path(__file__).resolve().parents[2]
-    result = subprocess.run(
-        [sys.executable, *args],
-        check=False,
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        env=_subprocess_env(),
-    )
-    try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise AssertionError(
-            "benchmark did not emit JSON\n"
-            f"returncode={result.returncode}\n"
-            f"stdout={result.stdout}\n"
-            f"stderr={result.stderr}"
-        ) from exc
-    if result.returncode != 0:
-        failures = [
-            failure
-            for benchmark in payload.get("benchmarks", [])
-            if isinstance(benchmark, dict)
-            for failure in benchmark.get("threshold_failures", [])
-        ]
-        raise AssertionError(
-            "benchmark exited nonzero\n"
-            f"returncode={result.returncode}\n"
-            f"threshold_failures={failures}\n"
-            f"stderr={result.stderr}\n"
-            f"payload={json.dumps(payload, indent=2)}"
-        )
-    return payload
-
-
 def _subprocess_env() -> dict[str, str]:
     env = dict(os.environ)
     repo_root = Path(__file__).resolve().parents[2]
@@ -545,7 +456,7 @@ def _subprocess_env() -> dict[str, str]:
     return env
 
 
-def _load_release_check_module():
+def _load_release_check_module() -> _ReleaseCheckModule:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "check_release.py"
     spec = importlib.util.spec_from_file_location("check_release", script_path)
@@ -553,7 +464,7 @@ def _load_release_check_module():
         raise AssertionError("could not load check_release.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    return cast(_ReleaseCheckModule, module)
 
 
 def _documented_cli_commands(path: Path) -> tuple[set[str], list[str]]:

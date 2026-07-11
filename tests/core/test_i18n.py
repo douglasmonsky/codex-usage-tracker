@@ -358,11 +358,16 @@ def test_dashboard_i18n_payload_shape_for_each_supported_language() -> None:
         payload = dashboard_i18n_payload(language)
         assert payload["language"] == normalize_language(language)
         assert payload["language_direction"] == language_direction(language)
-        assert {entry["code"] for entry in payload["available_languages"]} == set(
-            SUPPORTED_LANGUAGES
-        )  # type: ignore[index]
-        assert set(payload["translation_catalog"]) == set(SUPPORTED_LANGUAGES)  # type: ignore[arg-type]
-        assert payload["translations"]["dashboard.title"]  # type: ignore[index]
+        languages = payload["available_languages"]
+        catalog = payload["translation_catalog"]
+        translations = payload["translations"]
+        assert isinstance(languages, list)
+        assert all(isinstance(entry, dict) for entry in languages)
+        assert isinstance(catalog, dict)
+        assert isinstance(translations, dict)
+        assert {entry["code"] for entry in languages} == set(SUPPORTED_LANGUAGES)
+        assert set(catalog) == set(SUPPORTED_LANGUAGES)
+        assert translations["dashboard.title"]
 
 
 def test_dashboard_i18n_payload_unknown_language_falls_back_to_english() -> None:

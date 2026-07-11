@@ -1,4 +1,4 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, within } from './test-utils/appTestHarness';
 
 describe('React dashboard shell global filters', () => {
   installAppTestHooks();
@@ -14,19 +14,20 @@ describe('React dashboard shell global filters', () => {
     expect(params.get('model')).toBe('o4-mini');
     expect(params.get('effort')).toBe('medium');
     expect(params.get('confidence')).toBe('cost-estimated');
-    expect(screen.getByText('thread-7b2e91')).toBeInTheDocument();
-    expect(screen.queryByText('thread-9f3a1c')).not.toBeInTheDocument();
+    const recentCalls = screen.getByRole('table', { name: 'Recent calls' });
+    expect(within(recentCalls).getByText('thread-7b2e91')).toBeInTheDocument();
+    expect(within(recentCalls).queryByText('thread-9f3a1c')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Global start date'), { target: { value: '2026-06-01' } });
-    fireEvent.change(screen.getByLabelText('Global end date'), { target: { value: '2026-06-01' } });
+    fireEvent.change(screen.getByLabelText('Global start date'), { target: { value: '2026-05-01' } });
+    fireEvent.change(screen.getByLabelText('Global end date'), { target: { value: '2026-05-01' } });
 
     const dateParams = new URLSearchParams(window.location.search);
     expect(dateParams.get('date')).toBe('custom');
     expect(dateParams.get('time')).toBe('custom');
-    expect(dateParams.get('from')).toBe('2026-06-01');
-    expect(dateParams.get('to')).toBe('2026-06-01');
-    expect(screen.getByText('Custom: 2026-06-01 to 2026-06-01')).toHaveAttribute('data-state', 'active');
-    expect(screen.getByText('No rows match current filters.')).toBeInTheDocument();
+    expect(dateParams.get('from')).toBe('2026-05-01');
+    expect(dateParams.get('to')).toBe('2026-05-01');
+    expect(screen.getByText('Custom: 2026-05-01 to 2026-05-01')).toHaveAttribute('data-state', 'active');
+    expect(screen.getByText('No loaded calls match the current search.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Clear filters/i }));
 
@@ -38,8 +39,8 @@ describe('React dashboard shell global filters', () => {
     expect(clearedParams.get('time')).toBeNull();
     expect(clearedParams.get('from')).toBeNull();
     expect(clearedParams.get('to')).toBeNull();
-    expect(screen.queryByText('Custom: 2026-06-01 to 2026-06-01')).not.toBeInTheDocument();
-    expect(screen.getByText('thread-9f3a1c')).toBeInTheDocument();
+    expect(screen.queryByText('Custom: 2026-05-01 to 2026-05-01')).not.toBeInTheDocument();
+    expect(within(recentCalls).getByText('thread-9f3a1c')).toBeInTheDocument();
   });
 
   it('ports the legacy invalid custom date range status', () => {
@@ -49,7 +50,7 @@ describe('React dashboard shell global filters', () => {
     fireEvent.change(screen.getByLabelText('Global end date'), { target: { value: '2026-06-01' } });
 
     expect(screen.getByText('Invalid date range')).toHaveAttribute('data-state', 'error');
-    expect(screen.getByText('No rows match current filters.')).toBeInTheDocument();
+    expect(screen.getByText('No loaded calls match the current search.')).toBeInTheDocument();
   });
 
   it('ports legacy preset date range status labels', () => {

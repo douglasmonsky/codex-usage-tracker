@@ -115,7 +115,7 @@ export function readoutPositionDetail(positionLabel: string): string {
     : `Position: ${positionLabel}`;
 }
 
-export function formatI18nTemplate(template: string, values: Record<string, string>): string {
+function formatI18nTemplate(template: string, values: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match);
 }
 

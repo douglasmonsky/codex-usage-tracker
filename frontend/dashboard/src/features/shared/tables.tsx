@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { Copy, Search } from 'lucide-react';
 import { useShellI18n } from '../../app/i18nContext';
-import type { CallRow, ThreadRow, WeeklyWindow } from '../../api/types';
+import type { CallRow, ThreadRow } from '../../api/types';
 import type { ColumnChoice } from '../../components/ColumnChooser';
 import type { CsvColumn } from './exportCsv';
 import { formatCompact, formatNumber, money, pct } from './format';
@@ -141,28 +141,6 @@ export const callCsvColumns: Array<CsvColumn<CallRow>> = [
   { header: 'signal', value: row => row.signal },
   { header: 'tags', value: row => row.tags.join('|') },
   { header: 'efficiency_flags', value: row => row.efficiencyFlags.join('|') },
-];
-
-export const callColumnChoices: ColumnChoice[] = [
-  { id: 'time', label: 'Time', locked: true },
-  { id: 'thread', label: 'Thread', locked: true },
-  { id: 'model', label: 'Model' },
-  { id: 'effort', label: 'Effort' },
-  { id: 'input', label: 'Input Tokens' },
-  { id: 'totalTokens', label: 'Total Tokens' },
-  { id: 'cachedInput', label: 'Cached Input' },
-  { id: 'uncachedInput', label: 'Uncached Input' },
-  { id: 'output', label: 'Output Tokens' },
-  { id: 'reasoningOutput', label: 'Reasoning Output' },
-  { id: 'cachedPct', label: 'Cached %' },
-  { id: 'cost', label: 'Est. Cost' },
-  { id: 'credits', label: 'Codex Credits' },
-  { id: 'contextWindowPct', label: 'Context %' },
-  { id: 'duration', label: 'Duration' },
-  { id: 'previousCallGap', label: 'Prev Gap' },
-  { id: 'initiator', label: 'Initiated' },
-  { id: 'signal', label: 'Signals' },
-  { id: 'investigate', label: 'Investigate', locked: true },
 ];
 
 export type CallSignalPuck = {
@@ -516,29 +494,6 @@ export const threadColumnChoices: ColumnChoice[] = [
   { id: 'productivity', label: 'Productivity' },
   { id: 'investigate', label: 'Investigate', locked: true },
 ];
-
-export const weeklyWindowColumns: Array<ColumnDef<WeeklyWindow>> = [
-  { accessorKey: 'week', header: 'Week' },
-  { accessorKey: 'plan', header: 'Plan' },
-  {
-    accessorKey: 'credits',
-    header: 'Credits',
-    cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
-  },
-  {
-    accessorKey: 'projected',
-    header: 'Projected',
-    cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
-  },
-  {
-    accessorKey: 'confidence',
-    header: 'Confidence',
-    cell: info => <span className={`status-badge ${riskTone(String(info.getValue()))}`}>{String(info.getValue())}</span>,
-  },
-  { accessorKey: 'note', header: 'Note' },
-];
-
-export const weeklyColumns = weeklyWindowColumns;
 
 function riskTone(value: string): 'green' | 'orange' | 'red' | 'neutral' {
   if (value === 'High') {

@@ -1,7 +1,21 @@
 import { fixtureModel } from '../test-fixtures/dashboardFixture';
+import {
+  abortableDelay,
+  assertLiveUsagePayloadAvailable,
+  isAbortError,
+  liveUsageHeaders,
+} from '../data/httpTransportSupport';
 import { buildFindings, buildModelCosts, buildReports } from './modelInsights';
 import { buildOverviewSeriesFromDailyValues } from './overviewSeries';
 import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, Series, ThreadRow, UsageRow, WeeklyWindow } from './types';
+import {
+  loadAllUsagePayloadPaged,
+  requestScopedWindowPayload,
+  type RefreshProgressPayload,
+  type UsagePayloadRequest,
+} from './usagePayloadWindow';
+
+export type { RefreshProgressPayload, UsagePayloadRequest } from './usagePayloadWindow';
 
 declare global {
   interface Window {
@@ -26,29 +40,6 @@ export function readBootPayload(): DashboardBootPayload | null {
   }
 }
 
-export type RefreshProgressPayload = {
-  schema?: string;
-  job_id?: string;
-  status?: string;
-  phase?: string;
-  message?: string;
-  completed?: number;
-  total?: number;
-  percent?: number;
-  error?: string;
-  result?: Record<string, unknown>;
-};
-
-export type UsagePayloadRequest = {
-  refresh?: boolean;
-  limit?: number;
-  offset?: number;
-  includeArchived?: boolean;
-  onProgress?: (progress: RefreshProgressPayload) => void;
-};
-
-const uncappedUsagePageSize = 10_000;
-
 export async function loadUsagePayload(
   currentPayload: DashboardBootPayload | null,
   options: UsagePayloadRequest = {},
@@ -56,12 +47,18 @@ export async function loadUsagePayload(
   if (options.refresh && currentPayload?.refresh_jobs_available) {
     const refreshed = await tryRefreshUsageIndex(currentPayload, options);
     const nextOptions = { ...options, refresh: !refreshed };
+    if (nextOptions.loadWindow && nextOptions.loadWindow !== 'rows') {
+      return requestScopedWindowPayload(currentPayload, nextOptions, requestUsagePayload);
+    }
     return nextOptions.limit === 0
-      ? loadAllUsagePayloadPaged(currentPayload, nextOptions)
+      ? loadAllUsagePayloadPaged(currentPayload, nextOptions, requestUsagePayload)
       : requestUsagePayload(currentPayload, nextOptions);
   }
+  if (options.loadWindow && options.loadWindow !== 'rows') {
+    return requestScopedWindowPayload(currentPayload, options, requestUsagePayload);
+  }
   return options.limit === 0
-    ? loadAllUsagePayloadPaged(currentPayload, options)
+    ? loadAllUsagePayloadPaged(currentPayload, options, requestUsagePayload)
     : requestUsagePayload(currentPayload, options);
 }
 
@@ -73,6 +70,7 @@ async function tryRefreshUsageIndex(
     await refreshUsageIndex(currentPayload, options);
     return true;
   } catch (error) {
+    if (isAbortError(error)) throw error;
     if (error instanceof UsageRefreshJobFailedError) {
       throw error;
     }
@@ -91,6 +89,8 @@ async function requestUsagePayload(
     limit: String(options.limit ?? currentPayload?.limit ?? currentPayload?.loaded_row_count ?? 500),
     _: String(Date.now()),
   });
+  if (options.loadWindow) params.set('load_window', options.loadWindow);
+  if (options.since) params.set('since', options.since);
   if (options.offset && options.offset > 0) {
     params.set('offset', String(options.offset));
   }
@@ -102,54 +102,12 @@ async function requestUsagePayload(
   const response = await fetch(`/api/usage?${params.toString()}`, {
     headers: liveUsageHeaders(currentPayload),
     cache: 'no-store',
+    signal: options.signal,
   });
   const payload = await readJsonResponse(response, 'Usage refresh');
   return payload as DashboardBootPayload;
 }
 
-async function loadAllUsagePayloadPaged(
-  currentPayload: DashboardBootPayload | null,
-  options: UsagePayloadRequest = {},
-): Promise<DashboardBootPayload> {
-  const rows: UsageRow[] = [];
-  let offset = 0;
-  let latestPayload: DashboardBootPayload | null = null;
-  let totalRows = Number(currentPayload?.total_available_rows ?? 0);
-  for (let pageIndex = 0; pageIndex < 1000; pageIndex += 1) {
-    const payload = await requestUsagePayload(currentPayload, {
-      ...options,
-      refresh: pageIndex === 0 ? options.refresh : false,
-      limit: uncappedUsagePageSize,
-      offset,
-    });
-    const pageRows = payload.rows ?? [];
-    latestPayload = payload;
-    rows.push(...pageRows);
-    totalRows = Number(payload.total_available_rows ?? totalRows ?? rows.length);
-    const pageComplete = rows.length >= totalRows || !payload.has_more;
-    options.onProgress?.({
-      status: pageComplete ? 'completed' : 'running',
-      phase: 'loading_rows',
-      message: 'Loading all rows',
-      completed: rows.length,
-      total: totalRows,
-      percent: pageComplete ? 100 : totalRows > 0 ? Math.min(99, Math.floor((rows.length / totalRows) * 100)) : 0,
-    } as RefreshProgressPayload);
-    offset += pageRows.length;
-    if (!payload.has_more || pageRows.length === 0 || rows.length >= totalRows) {
-      break;
-    }
-  }
-  return {
-    ...(latestPayload ?? currentPayload ?? {}),
-    rows,
-    loaded_row_count: rows.length,
-    limit: null,
-    limit_label: 'All',
-    has_more: false,
-    total_available_rows: totalRows || rows.length,
-  } as DashboardBootPayload;
-}
 
 async function refreshUsageIndex(
   currentPayload: DashboardBootPayload | null,
@@ -164,6 +122,7 @@ async function refreshUsageIndex(
   const startResponse = await fetch(`/api/refresh/start?${params.toString()}`, {
     headers: liveUsageHeaders(currentPayload),
     cache: 'no-store',
+    signal: options.signal,
   });
   const started = (await readJsonResponse(startResponse, 'Usage refresh start')) as RefreshProgressPayload;
   options.onProgress?.(started);
@@ -171,19 +130,22 @@ async function refreshUsageIndex(
   if (!jobId) {
     throw new Error('Usage refresh start did not return a job id.');
   }
-  return pollUsageRefreshJob(currentPayload, jobId, options.onProgress);
+  return pollUsageRefreshJob(currentPayload, jobId, options.onProgress, options.signal);
 }
 
 async function pollUsageRefreshJob(
   currentPayload: DashboardBootPayload,
   jobId: string,
   onProgress?: (progress: RefreshProgressPayload) => void,
+  signal?: AbortSignal,
 ): Promise<RefreshProgressPayload> {
   for (let attempt = 0; attempt < 600; attempt += 1) {
+    signal?.throwIfAborted();
     const params = new URLSearchParams({ job_id: jobId, _: String(Date.now()) });
     const response = await fetch(`/api/refresh/status?${params.toString()}`, {
       headers: liveUsageHeaders(currentPayload),
       cache: 'no-store',
+      signal,
     });
     const progress = (await readJsonResponse(response, 'Usage refresh status')) as RefreshProgressPayload;
     onProgress?.(progress);
@@ -193,29 +155,9 @@ async function pollUsageRefreshJob(
     if (progress.status === 'failed') {
       throw new UsageRefreshJobFailedError(progress.error || progress.message || 'Usage refresh failed.');
     }
-    await delay(Math.min(1000, 150 + attempt * 50));
+    await abortableDelay(Math.min(1000, 150 + attempt * 50), signal);
   }
   throw new Error('Usage refresh did not complete before the polling timeout.');
-}
-
-function assertLiveUsagePayloadAvailable(currentPayload: DashboardBootPayload | null): asserts currentPayload is DashboardBootPayload {
-  if (window.location.protocol === 'file:') {
-    throw new Error('Live refresh requires the localhost dashboard server.');
-  }
-  if (!currentPayload?.api_token) {
-    throw new Error('Live refresh requires localhost dashboard API token.');
-  }
-}
-
-function liveUsageHeaders(currentPayload: DashboardBootPayload): HeadersInit {
-  return {
-    Accept: 'application/json',
-    'X-Codex-Usage-Token': currentPayload.api_token || '',
-  };
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
 class UsageRefreshJobFailedError extends Error {}
@@ -601,6 +543,7 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
 
   return {
     id,
+    threadKey: String(row.thread_key ?? ''),
     rawTime,
     eventTimestamp,
     callStartedAt,

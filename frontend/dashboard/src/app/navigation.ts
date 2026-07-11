@@ -3,28 +3,19 @@ import {
   BarChart3,
   BookOpen,
   Boxes,
-  BrainCircuit,
   Database,
   FileText,
+  FlaskConical,
   Home,
-  Search,
   Settings,
   Table2,
+  TimerReset,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
+import { isDashboardViewId, type DashboardViewId } from '../routes/dashboardSearch';
 
-export type ViewId =
-  | 'overview'
-  | 'investigator'
-  | 'calls'
-  | 'call'
-  | 'threads'
-  | 'usage-drain'
-  | 'cache-context'
-  | 'diagnostics'
-  | 'reports'
-  | 'settings';
+export type ViewId = DashboardViewId;
 
 export type NavItem = {
   id: ViewId;
@@ -35,10 +26,10 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { id: 'overview', label: 'Overview', description: 'High-level telemetry', icon: Home },
-  { id: 'investigator', label: 'Investigator', description: 'Usage drivers', icon: Search },
+  { id: 'investigator', label: 'Investigate', description: 'Root-cause evidence', icon: FlaskConical },
   { id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2 },
   { id: 'threads', label: 'Threads', description: 'Thread efficiency', icon: Workflow },
-  { id: 'usage-drain', label: 'Usage Drain Lab', description: 'Allowance and weekly credits', icon: BrainCircuit },
+  { id: 'usage-drain', label: 'Limits', description: 'Allowance intelligence', icon: TimerReset },
   { id: 'cache-context', label: 'Cache And Context', description: 'Cache and cold resumes', icon: Database },
   { id: 'diagnostics', label: 'Diagnostics Notebook', description: 'Technical report', icon: BookOpen },
   { id: 'reports', label: 'Reports', description: 'Generated analyses', icon: BarChart3 },
@@ -52,5 +43,5 @@ export const secondaryNavItems: Array<{ label: string; icon: LucideIcon; target:
 ];
 
 export function isViewId(value: string | null): value is ViewId {
-  return value === 'call' || navItems.some(item => item.id === value);
+  return isDashboardViewId(value);
 }

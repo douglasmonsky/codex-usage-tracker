@@ -317,19 +317,11 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
 
   it('opens full-page call investigator from investigator evidence table rows', () => {
     render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Investigator$/i }));
-  expect(screen.getByRole('heading', { name: 'Investigator Workbench' })).toBeInTheDocument();
-  expect(screen.getByText('Evidence Profile')).toBeInTheDocument();
-  expect(screen.getByText('Evidence Basis')).toBeInTheDocument();
-  expect(screen.getByText('Selection: highest-impact calls across loaded threads')).toBeInTheDocument();
-  expect(screen.getByText('Order: total tokens descending, then estimated cost')).toBeInTheDocument();
-  expect(screen.getByText('Limit: top 8 loaded aggregate rows')).toBeInTheDocument();
-  expect(screen.getAllByRole('button', { name: /Open investigator for workbench call/i }).length).toBeGreaterThan(0);
-
-    const table = screen.getByRole('table', { name: 'Investigator evidence calls' });
-    const firstRow = table.querySelector('tbody tr');
-    expect(firstRow).not.toBeNull();
-    fireEvent.doubleClick(firstRow as HTMLTableRowElement);
+    fireEvent.click(screen.getByRole('button', { name: /^Investigate$/i }));
+    expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Waste fingerprint matrix' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Evidence ledger' })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /Open call for/i })[0]);
 
     expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
     expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
@@ -355,6 +347,9 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     window.__CODEX_USAGE_BOOT__ = {
       api_token: 'diagnostic-fact-paging-token',
       context_api_enabled: true,
+      default_load_window: 'rows',
+      load_window: 'rows',
+      limit: 1,
       loaded_row_count: 1,
       total_available_rows: 12,
       has_more: true,

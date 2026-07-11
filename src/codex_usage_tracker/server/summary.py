@@ -9,7 +9,11 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 from codex_usage_tracker.reports.api import build_summary_report
-from codex_usage_tracker.server.utils import first_query_value, parse_report_limit
+from codex_usage_tracker.server.utils import (
+    first_query_value,
+    parse_api_limit,
+    parse_bool_query_value,
+)
 
 ErrorSender = Callable[[HTTPStatus, str], None]
 ExceptionSender = Callable[[str, BaseException], None]
@@ -59,11 +63,15 @@ def summary_payload(
         db_path=db_path,
         pricing_path=pricing_path,
         group_by=first_query_value(params.get("group_by")) or "thread",
-        limit=parse_report_limit(first_query_value(params.get("limit")), 20),
+        limit=parse_api_limit(first_query_value(params.get("limit")), 20),
         preset=first_query_value(params.get("preset")),
         since=first_query_value(params.get("since")),
         projects_path=projects_path,
         privacy_mode=privacy_mode,
+        include_archived=parse_bool_query_value(
+            first_query_value(params.get("include_archived")),
+            False,
+        ),
     )
     payload = report.payload()
     payload["raw_context_included"] = False

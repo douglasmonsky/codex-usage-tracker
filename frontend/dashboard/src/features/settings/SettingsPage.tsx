@@ -1,319 +1,202 @@
-import { AlertTriangle, Database, History, LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  Database,
+  Gauge,
+  Languages,
+  LockKeyhole,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react';
 
-import type { DashboardBootPayload, DashboardModel } from '../../api/types';
+import type { DashboardBootPayload, DashboardLanguage, DashboardModel } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadWindowLabel, type LoadWindow } from '../../data/dataScope';
+import {
+  allowanceWindowSubtitle,
+  allowanceWindowSummary,
+  projectMetadataPrivacyLabel,
+  sourceHealthSummary,
+  sourceLabel,
+} from './settingsModel';
+import { settingsSections, useSettingsSection } from './useSettingsSection';
+import styles from './SettingsPage.module.css';
 
 type HistoryScope = 'active' | 'all';
 
-const nonActionableParserDiagnostics = new Set(['duplicate_cumulative_total']);
+type ApplicationI18n = {
+  language: string;
+  direction: 'ltr' | 'rtl';
+  languages: DashboardLanguage[];
+};
 
 type SettingsPageProps = {
   model: DashboardModel;
   payload: DashboardBootPayload | null;
   historyScope: HistoryScope;
+  loadWindow: LoadWindow;
   loadLimit: number;
+  scopeSince: string | null;
   loadedRowCount: number;
   totalAvailableRows: number;
   canUseLiveApi: boolean;
   autoRefreshEnabled: boolean;
   refreshState: string;
+  applicationI18n: ApplicationI18n;
 };
 
-export function SettingsPage({
-  model,
-  payload,
-  historyScope,
-  loadLimit,
-  loadedRowCount,
-  totalAvailableRows,
-  canUseLiveApi,
-  autoRefreshEnabled,
-  refreshState,
-}: SettingsPageProps) {
+const sectionCopy = {
+  data: ['Data', 'Loaded history and local runtime state.'],
+  estimates: ['Estimates', 'Pricing and allowance inputs used for local estimates.'],
+  content: ['Content Access', 'Privacy boundaries and explicit raw-context gates.'],
+  application: ['Application', 'Dashboard refresh, API, and language visibility.'],
+  sources: ['Source Health', 'Configuration and parser diagnostics.'],
+} as const;
+
+export function SettingsPage(props: SettingsPageProps) {
+  const { selectedSection, selectSection } = useSettingsSection();
+  const { model, payload, canUseLiveApi } = props;
   const contextRuntime = model.contextRuntime;
-  const sourceSummary = sourceLabel(payload?.pricing_source) || 'local pricing config';
-  const allowanceSummary = sourceLabel(payload?.allowance_source) || 'local allowance config';
-  const privacyMode = payload?.privacy_mode || 'aggregate-only snapshot';
-  const metadataPrivacySummary = projectMetadataPrivacyLabel(payload?.project_metadata_privacy, payload?.privacy_mode);
-  const rawContextSummary = contextRuntime.contextApiEnabled
-    ? 'Explicit localhost request, selected call only'
-    : 'Disabled until context API is enabled';
-  const liveApiSummary = canUseLiveApi ? 'Local API token present' : 'Static embedded snapshot';
-  const loadedLabel = `${formatNumber(loadedRowCount)} of ${formatNumber(totalAvailableRows || loadedRowCount)}`;
-  const sourceHealthRows = sourceHealthSummary(payload);
-  const allowanceWindowRows = allowanceWindowSummary(payload);
 
   return (
-    <div className="page-grid">
-      <div className="page-title-row">
+    <div className={styles.page}>
+      <header className={styles.header}>
         <div>
+          <p className={styles.eyebrow}>Local configuration</p>
           <h1>Settings</h1>
-          <p>Local dashboard runtime, source, and privacy state.</p>
+          <p>Inspect dashboard behavior and configuration truth without changing server-owned settings.</p>
         </div>
-        <div className="toolbar">
+        <div className={styles.badges}>
           <StatusBadge label={canUseLiveApi ? 'Live API available' : 'Static snapshot'} tone={canUseLiveApi ? 'green' : 'orange'} />
-          <StatusBadge label={contextRuntime.contextApiEnabled ? 'Context API enabled' : 'Context API gated'} tone={contextRuntime.contextApiEnabled ? 'blue' : 'orange'} />
+          <StatusBadge label={contextRuntime.contextApiEnabled ? 'Content access enabled' : 'Content access gated'} tone={contextRuntime.contextApiEnabled ? 'blue' : 'orange'} />
         </div>
-      </div>
+      </header>
 
-      <div className="dashboard-grid two">
-        <Panel title="Runtime State" subtitle={refreshState}>
-          <div className="setting-list">
-            <span>
-              <Database size={18} /> Rows loaded <strong>{loadedLabel}</strong>
-            </span>
-            <span>
-              <History size={18} /> History scope <strong>{historyScope === 'all' ? 'All history' : 'Active history'}</strong>
-            </span>
-            <span>
-              <RefreshCw size={18} /> Row request <strong>{loadLimit === 0 ? 'No cap' : formatNumber(loadLimit)}</strong>
-            </span>
-            <span>
-              <RefreshCw size={18} /> Auto refresh <strong>{autoRefreshEnabled ? 'Enabled' : 'Paused'}</strong>
-            </span>
-          </div>
-        </Panel>
+      <nav className={styles.navigator} aria-label="Settings sections">
+        {settingsSections.map(section => (
+          <button
+            key={section}
+            type="button"
+            aria-pressed={selectedSection === section}
+            onClick={() => selectSection(section)}
+          >
+            {sectionCopy[section][0]}
+          </button>
+        ))}
+      </nav>
 
-        <Panel title="Data Sources" subtitle={canUseLiveApi ? 'Localhost API token present' : 'Embedded snapshot only'}>
-          <div className="setting-list">
-            <span>
-              <Database size={18} /> Usage index <strong>{payload?.shell_boot ? 'served shell' : 'embedded payload'}</strong>
-            </span>
-            <span>
-              <ShieldCheck size={18} /> Pricing <strong>{sourceSummary}</strong>
-            </span>
-            <span>
-              <ShieldCheck size={18} /> Allowance <strong>{allowanceSummary}</strong>
-            </span>
-            <span>
-              <LockKeyhole size={18} /> Raw context <strong>{contextRuntime.contextApiEnabled ? 'Explicit localhost request' : 'Disabled'}</strong>
-            </span>
-          </div>
-        </Panel>
-
-        <Panel title="Allowance Windows" className="span-all" subtitle={allowanceWindowSubtitle(payload)}>
-          <div className="setting-list">
-            {allowanceWindowRows.map(row => (
-              <span key={`${row.source}-${row.label}`}>
-                <RefreshCw size={18} /> {row.label} <strong>{row.value}</strong>
-              </span>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel title="Source Health" className="span-all" subtitle="Legacy dashboard warnings and metadata privacy">
-          <div className="setting-list">
-            {sourceHealthRows.map(row => (
-              <span key={row.label}>
-                {row.issue ? <AlertTriangle size={18} /> : <ShieldCheck size={18} />} {row.label} <strong>{row.value}</strong>
-              </span>
-            ))}
-          </div>
-        </Panel>
-
-      <Panel title="Privacy Boundary" className="span-all" subtitle={privacyMode}>
-        <div className="setting-list">
-          <span>
-            <ShieldCheck size={18} /> Payload mode <strong>{privacyMode}</strong>
-          </span>
-          <span>
-            <ShieldCheck size={18} /> Project metadata <strong>{metadataPrivacySummary}</strong>
-          </span>
-          <span>
-            <LockKeyhole size={18} /> Raw context <strong>{rawContextSummary}</strong>
-          </span>
-          <span>
-            <Database size={18} /> Live requests <strong>{liveApiSummary}</strong>
-          </span>
+      <section aria-labelledby={`settings-${selectedSection}-title`}>
+        <div className={styles.sectionHeading}>
+          <h2 id={`settings-${selectedSection}-title`}>{sectionCopy[selectedSection][0]}</h2>
+          <p>{sectionCopy[selectedSection][1]}</p>
         </div>
-        <ul className="compact-list">
-          <li>Aggregate dashboard payloads avoid prompts, assistant text, and raw tool output.</li>
-            <li>Raw context actions remain gated behind explicit Call Investigator controls.</li>
-            <li>Live refresh and context requests stay local and require the dashboard API token.</li>
-          </ul>
-        </Panel>
-      </div>
+        {selectedSection === 'data' && <DataSection {...props} />}
+        {selectedSection === 'estimates' && <EstimatesSection payload={payload} />}
+        {selectedSection === 'content' && <ContentAccessSection {...props} />}
+        {selectedSection === 'application' && <ApplicationSection {...props} />}
+        {selectedSection === 'sources' && <SourceHealthSection payload={payload} />}
+      </section>
     </div>
   );
 }
 
-type SourceHealthRow = { label: string; value: string; issue: boolean };
-
-type AllowanceWindowRow = { source: string; label: string; value: string };
-
-function allowanceWindowSummary(payload: DashboardBootPayload | null): AllowanceWindowRow[] {
-  const observedRows = observedUsageWindowRows(payload?.observed_usage);
-  const configuredRows = configuredAllowanceWindowRows(payload?.allowance_windows);
-  const rows = [...observedRows, ...configuredRows];
-  if (rows.length) return rows;
-  return [{ source: 'allowance', label: 'Allowance config', value: 'No allowance windows configured' }];
+function DataSection({ payload, historyScope, loadWindow, loadLimit, loadedRowCount, totalAvailableRows }: SettingsPageProps) {
+  const loadedLabel = `${formatNumber(loadedRowCount)} of ${formatNumber(totalAvailableRows || loadedRowCount)}`;
+  return (
+    <div className={styles.grid}>
+      <FactPanel title="Loaded Data" subtitle={payload?.shell_boot ? 'Served shell payload' : 'Embedded payload'} facts={[
+        ['Data window', loadWindowLabel(loadWindow, loadLimit), Gauge],
+        ['Evidence rows', loadedLabel, Database],
+        ['Session scope', historyScope === 'all' ? 'Include archived' : 'Active sessions', Activity],
+        ['Usage index', payload?.shell_boot ? 'served shell' : 'embedded payload', Database],
+      ]} />
+    </div>
+  );
 }
 
-function observedUsageWindowRows(observedUsage: DashboardBootPayload['observed_usage']): AllowanceWindowRow[] {
-  const windows = Array.isArray(observedUsage?.windows) ? observedUsage.windows : [];
-  if (!observedUsage?.available || !windows.length) return [];
-  return weeklyFirst(windows).map(window => {
-    const usedPercent = numericValue(window.used_percent);
-    const remaining = usedPercent === null ? null : Math.max(0, Math.min(100, 100 - usedPercent));
-    const details = [
-      remaining === null ? '' : `${formatPercent(remaining)} remaining`,
-      usedPercent === null ? '' : `${formatPercent(usedPercent)} used`,
-      resetLabel(window.resets_at),
-    ].filter(Boolean);
-    return {
-      source: 'observed',
-      label: `Observed ${shortLabel(window.label || window.key, 'Usage')}`,
-      value: details.length ? details.join(' · ') : 'Observed usage available',
-    };
-  });
+function EstimatesSection({ payload }: { payload: DashboardBootPayload | null }) {
+  const windows = allowanceWindowSummary(payload);
+  return (
+    <div className={styles.grid}>
+      <FactPanel title="Estimate Inputs" subtitle="Read-only local configuration" facts={[
+        ['Pricing', sourceLabel(payload?.pricing_source) || 'local pricing config', Gauge],
+        ['Allowance', sourceLabel(payload?.allowance_source) || 'local allowance config', Gauge],
+        ['Rate card', payload?.rate_card_configured ? 'Loaded' : 'Not loaded', Gauge],
+      ]} />
+      <FactPanel title="Allowance Windows" subtitle={allowanceWindowSubtitle(payload)} facts={windows.map(row => [row.label, row.value, RefreshCw])} />
+    </div>
+  );
 }
 
-function configuredAllowanceWindowRows(windows: DashboardBootPayload['allowance_windows']): AllowanceWindowRow[] {
-  if (!Array.isArray(windows) || !windows.length) return [];
-  return weeklyFirst(windows).map(window => {
-    const remainingPercent = numericValue(window.remaining_percent);
-    const remainingCredits = numericValue(window.remaining_credits);
-    const totalCredits = numericValue(window.total_credits);
-    const details = [
-      remainingPercent === null ? '' : `${formatPercent(remainingPercent)} remaining`,
-      remainingCredits === null ? '' : `${formatCredits(remainingCredits)} left`,
-      totalCredits === null ? '' : `${formatCredits(totalCredits)} total`,
-      resetLabel(window.reset_at),
-    ].filter(Boolean);
-    return {
-      source: 'configured',
-      label: `Configured ${shortLabel(window.label || window.key, 'Window')}`,
-      value: details.length ? details.join(' · ') : 'Configured allowance window',
-    };
-  });
+function ContentAccessSection({ model, payload, canUseLiveApi }: SettingsPageProps) {
+  const runtime = model.contextRuntime;
+  const privacyMode = payload?.privacy_mode || 'aggregate-only snapshot';
+  return (
+    <div className={styles.grid}>
+      <FactPanel title="Privacy Boundary" subtitle={privacyMode} facts={[
+        ['Payload mode', privacyMode, ShieldCheck],
+        ['Project metadata', projectMetadataPrivacyLabel(payload?.project_metadata_privacy, payload?.privacy_mode), ShieldCheck],
+        ['Raw context', runtime.contextApiEnabled ? 'Explicit localhost request, selected call only' : 'Disabled until context API is enabled', LockKeyhole],
+        ['Live requests', canUseLiveApi ? 'Local API token present' : 'Static embedded snapshot', Database],
+      ]} />
+      <Panel title="Content Access Rules" subtitle="Local and explicit">
+        <ul className={styles.rules}>
+          <li>Aggregate payloads avoid prompts, assistant text, and raw tool output.</li>
+          <li>Raw context actions remain gated behind explicit Call Investigator controls.</li>
+          <li>Live refresh and context requests stay local and require the dashboard API token.</li>
+        </ul>
+      </Panel>
+    </div>
+  );
 }
 
-function weeklyFirst<T extends { key?: unknown; label?: unknown; window_minutes?: unknown }>(windows: T[]): T[] {
-  return [...windows].sort((left, right) => Number(isWeeklyWindow(right)) - Number(isWeeklyWindow(left)));
+function ApplicationSection({
+  canUseLiveApi,
+  autoRefreshEnabled,
+  refreshState,
+  applicationI18n,
+}: SettingsPageProps) {
+  return (
+    <div className={styles.grid}>
+      <FactPanel title="Dashboard Runtime" subtitle={refreshState} facts={[
+        ['Data connection', canUseLiveApi ? 'Local API token present' : 'Static embedded snapshot', Database],
+        ['Auto refresh', autoRefreshEnabled ? 'Enabled' : 'Paused', RefreshCw],
+        ['Interface language', applicationI18n.language, Languages],
+        ['Available languages', applicationI18n.languages.map(item => item.code).join(', ') || 'English (en)', Languages],
+        ['Text direction', applicationI18n.direction, Languages],
+      ]} />
+    </div>
+  );
 }
 
-function isWeeklyWindow(window: { key?: unknown; label?: unknown; window_minutes?: unknown }): boolean {
-  const minutes = numericValue(window.window_minutes);
-  const label = `${window.key ?? ''} ${window.label ?? ''}`.toLowerCase();
-  return minutes === 10_080 || /\b(weekly|week|7d|7-day|7 day)\b/.test(label);
+function SourceHealthSection({ payload }: { payload: DashboardBootPayload | null }) {
+  return (
+    <div className={styles.grid}>
+      <FactPanel title="Configuration Checks" subtitle="Configuration and ingestion facts" facts={sourceHealthSummary(payload).map(row => [
+        row.label,
+        row.value,
+        row.issue ? AlertTriangle : ShieldCheck,
+      ])} />
+    </div>
+  );
 }
 
-function allowanceWindowSubtitle(payload: DashboardBootPayload | null): string {
-  const observedUsage = payload?.observed_usage;
-  if (observedUsage?.available) {
-    const parts = [
-      observedUsage.source || 'token_count.rate_limits',
-      observedUsage.plan_type ? `plan ${observedUsage.plan_type}` : '',
-      observedUsage.limit_id ? `limit ${observedUsage.limit_id}` : '',
-      observedUsage.observed_at ? `observed ${formatStableTimestamp(observedUsage.observed_at)}` : '',
-    ].filter(Boolean);
-    return parts.join(' · ');
-  }
-  return 'Manual allowance windows and live observed usage';
-}
+type Fact = readonly [label: string, value: string, icon: typeof Database];
 
-function sourceHealthSummary(payload: DashboardBootPayload | null): SourceHealthRow[] {
-  const pricingWarning = payload?.pricing_snapshot_warning || '';
-  const allowanceError = payload?.allowance_error || '';
-  const rateCardError = payload?.rate_card_error || '';
-  const parserDiagnostics = parserDiagnosticsLabel(payload?.parser_diagnostics);
-  const metadataPrivacy = projectMetadataPrivacyLabel(payload?.project_metadata_privacy, payload?.privacy_mode);
-  return [
-    {
-      label: 'Pricing snapshot',
-      value: pricingWarning || (payload?.pricing_configured ? 'Configured' : 'Not configured'),
-      issue: Boolean(pricingWarning) || !payload?.pricing_configured,
-    },
-    {
-      label: 'Allowance config',
-      value: allowanceError
-        ? `Config error: ${allowanceError}`
-        : (payload?.allowance_configured ? 'Configured' : 'Not configured'),
-      issue: Boolean(allowanceError) || !payload?.allowance_configured,
-    },
-    {
-      label: 'Rate card',
-      value: rateCardError
-        ? `Rate-card error: ${rateCardError}`
-        : (payload?.rate_card_configured ? 'Loaded' : 'Not loaded'),
-      issue: Boolean(rateCardError) || !payload?.rate_card_configured,
-    },
-    {
-      label: 'Parser diagnostics',
-      value: parserDiagnostics,
-      issue: parserDiagnostics !== 'No parser warnings',
-    },
-    {
-      label: 'Project metadata',
-      value: metadataPrivacy,
-      issue: metadataPrivacy !== 'Normal metadata',
-    },
-  ];
-}
-
-function parserDiagnosticsLabel(parserDiagnostics: DashboardBootPayload['parser_diagnostics']): string {
-  const entries = Object.entries(parserDiagnostics ?? {})
-    .filter(([key, value]) => Number(value || 0) > 0 && !nonActionableParserDiagnostics.has(key));
-  if (!entries.length) return 'No parser warnings';
-  const total = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
-  return `${formatNumber(total)} parser diagnostics: ${entries.map(([key, value]) => `${key}=${Number(value || 0)}`).join(', ')}`;
-}
-
-function projectMetadataPrivacyLabel(
-  projectMetadataPrivacy: DashboardBootPayload['project_metadata_privacy'],
-  fallbackMode?: string,
-): string {
-  const mode = projectMetadataPrivacy?.mode || fallbackMode || 'normal';
-  if (mode === 'normal') return 'Normal metadata';
-  const flags = [
-    projectMetadataPrivacy?.cwd_redacted ? 'cwd redacted' : '',
-    projectMetadataPrivacy?.project_names_redacted ? 'project names redacted' : '',
-    projectMetadataPrivacy?.git_remote_label_hidden ? 'git remote hidden' : '',
-    projectMetadataPrivacy?.relative_cwd_hidden ? 'relative cwd hidden' : '',
-    projectMetadataPrivacy?.git_branch_hidden ? 'git branch hidden' : '',
-    projectMetadataPrivacy?.tags_hidden ? 'tags hidden' : '',
-    projectMetadataPrivacy?.aliases_preserved ? 'aliases preserved' : '',
-  ].filter(Boolean);
-  return flags.length ? `${mode}: ${flags.join(', ')}` : mode;
-}
-
-function numericValue(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function formatPercent(value: number): string {
-  const digits = Math.abs(value) >= 10 ? 0 : 1;
-  return `${value.toFixed(digits)}%`;
-}
-
-function formatCredits(value: number): string {
-  return `${formatNumber(value)} cr`;
-}
-
-function resetLabel(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return '';
-  const timestamp = typeof value === 'number' ? value * 1000 : Date.parse(value);
-  if (!Number.isFinite(timestamp)) return '';
-  return `resets ${formatStableTimestamp(timestamp)}`;
-}
-
-function formatStableTimestamp(value: string | number): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return `${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-}
-
-function shortLabel(value: string | undefined, fallback: string): string {
-  const label = value?.trim();
-  return label || fallback;
-}
-
-function sourceLabel(source: DashboardBootPayload['pricing_source']): string {
-  if (!source) return '';
-  if (typeof source === 'string') return source;
-  const label = source.label ?? source.name ?? source.type ?? source.path ?? '';
-  return typeof label === 'string' ? label : '';
+function FactPanel({ title, subtitle, facts }: { title: string; subtitle: string; facts: readonly Fact[] }) {
+  return (
+    <Panel title={title} subtitle={subtitle}>
+      <dl className={styles.facts}>
+        {facts.map(([label, value, Icon]) => (
+          <div key={label}>
+            <dt><Icon aria-hidden="true" />{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Panel>
+  );
 }
 
 function formatNumber(value: number): string {

@@ -62,24 +62,16 @@ it('copies call investigator links from cache context row actions', async () => 
   expect(timelineUrl.searchParams.get('record')).toBe('fixture-call-0');
 });
 
-it('copies call investigator links from workspace side evidence lists', async () => {
+it('copies call investigator links from report and investigation evidence lists', async () => {
   const writeText = mockClipboardWrite();
 
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-  fireEvent.click(screen.getByRole('button', { name: /Copy link for usage drain evidence call thread-6a5b4c codex-1/i }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-  const usageDrainUrl = new URL(writeText.mock.calls[0][0]);
-  expect(usageDrainUrl.searchParams.get('view')).toBe('call');
-  expect(usageDrainUrl.searchParams.get('record')).toBe('fixture-call-6');
-  expect(usageDrainUrl.searchParams.get('return')).toBe('usage-drain');
-
 fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
 window.history.replaceState(null, '', '/?view=reports&report=weekly-credits&mode=full&max_entries=50&include_tool_output=1');
 fireEvent.click(screen.getByRole('button', { name: /Copy link for report side evidence call thread-6a5b4c codex-1/i }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
-  const reportUrl = new URL(writeText.mock.calls[1][0]);
+  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+  const reportUrl = new URL(writeText.mock.calls[0][0]);
 expect(reportUrl.searchParams.get('view')).toBe('call');
 expect(reportUrl.searchParams.get('record')).toBe('fixture-call-6');
 expect(reportUrl.searchParams.get('return')).toBe('reports');
@@ -89,9 +81,12 @@ expect(reportUrl.searchParams.has('max_entries')).toBe(false);
 expect(reportUrl.searchParams.has('include_tool_output')).toBe(false);
 
 fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
-  fireEvent.click(screen.getByRole('button', { name: /Copy link for workbench evidence call thread-6a5b4c codex-1/i }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(3));
-  const investigatorUrl = new URL(writeText.mock.calls[2][0]);
+  const investigatorEvidenceRow = screen.getByRole('row', {
+    name: /thread-6a5b4c cache-risk 1 425\.65K medium/i,
+  });
+  fireEvent.click(within(investigatorEvidenceRow).getByRole('button', { name: /Copy call link for cache-risk/i }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+  const investigatorUrl = new URL(writeText.mock.calls[1][0]);
   expect(investigatorUrl.searchParams.get('view')).toBe('call');
   expect(investigatorUrl.searchParams.get('record')).toBe('fixture-call-6');
   expect(investigatorUrl.searchParams.get('return')).toBe('investigator');
@@ -147,24 +142,18 @@ it('opens full-page call investigator from cache context thread table rows', () 
 });
 
 
-it('opens full-page call investigator from usage drain evidence calls', () => {
+it('opens the weekly-first Limits workspace and evaluates URL-backed hypotheses', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-    expect(screen.getByRole('heading', { name: 'Usage Drain Lab' })).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'Usage drain evidence calls' })).toBeInTheDocument();
-    expect(screen.getByText('Drain Evidence Profile')).toBeInTheDocument();
-    expect(screen.getByText('Evidence Basis')).toBeInTheDocument();
-    expect(screen.getByText('Selection: all efforts, including subagents')).toBeInTheDocument();
-    expect(screen.getByText('Order: estimated Codex credits descending, then total tokens')).toBeInTheDocument();
-    expect(screen.getByText('Limit: active sample top 20 calls; table shows first 8')).toBeInTheDocument();
-    expect(screen.getByText('Top Evidence Calls')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
+    expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Weekly local capacity evidence' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Allowance evidence windows and linked calls' })).toBeInTheDocument();
+    expect(screen.getByText('Supporting windows')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Open investigator for usage drain call thread-6a5b4c codex-1/i }));
-
-    expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-    expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
-    expect(window.location.search).toContain('view=call');
-    expect(window.location.search).toContain('record=fixture-call-6');
+    fireEvent.click(screen.getByRole('button', { name: 'Behavior stayed stable' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Test weekly claim' }));
+    expect(screen.getByText('The loaded weekly history cannot test this claim yet')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('limit_hypothesis')).toBe('stable');
   });
 
 
@@ -172,23 +161,22 @@ it('opens full-page call investigator from usage drain evidence calls', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
-expect(screen.getByRole('table', { name: 'Report evidence calls' })).toBeInTheDocument();
-expect(screen.getByText('Report Evidence Profile')).toBeInTheDocument();
-expect(screen.getByText('Evidence Basis')).toBeInTheDocument();
-expect(screen.getByText('Selection: highest estimated Codex credit impact')).toBeInTheDocument();
-expect(screen.getByText('Order: Codex credits descending, then total tokens')).toBeInTheDocument();
-expect(screen.getByText('Evidence Calls')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Selected report evidence calls' })).toBeInTheDocument();
+    expect(screen.getByText('Research Notes')).toBeInTheDocument();
+    expect(screen.getByText('Method')).toBeInTheDocument();
+    expect(screen.getByText('Caveat')).toBeInTheDocument();
+    expect(screen.getByText(/Rank aggregate calls by estimated Codex credit impact/)).toBeInTheDocument();
 
-fireEvent.click(screen.getByRole('button', { name: /Cost Curves/i }));
-expect(screen.getByText('Selection: highest estimated local aggregate cost')).toBeInTheDocument();
-expect(screen.getByText('Order: estimated cost descending, then total tokens')).toBeInTheDocument();
-window.history.replaceState(
-  null,
-  '',
-  '/?view=reports&report=cost-curves&mode=full&max_entries=50&diagnostic_fact=tool:read',
-);
+    fireEvent.click(screen.getByRole('button', { name: /Cost Curves/i }));
+    expect(screen.getByRole('heading', { name: 'Cost Curves' })).toBeInTheDocument();
+    expect(screen.getByText(/Rank aggregate calls by estimated cost/)).toBeInTheDocument();
+    window.history.replaceState(
+      null,
+      '',
+      '/?view=reports&report=cost-curves&mode=full&max_entries=50&diagnostic_fact=tool:read',
+    );
 
-fireEvent.click(screen.getByRole('button', { name: /Open investigator for report evidence call thread-6a5b4c codex-1/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Open investigator for report side evidence call thread-6a5b4c codex-1/i }));
 
 expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
 expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
@@ -208,16 +196,14 @@ it('ports Fast Mode Proxy report duration distribution', () => {
 
   fireEvent.click(screen.getByRole('button', { name: /Fast Mode Proxy/i }));
 
-  expect(screen.getByText('4 fast candidates by duration; rows below open Call Investigator')).toBeInTheDocument();
-  expect(screen.getByText('Fast Candidate Breakdown')).toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: 'Fast Mode Proxy' }))
+    .getByText(/4 loaded calls are fast-tagged or low effort/)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Speed proxy evidence' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Table view' }));
   expect(screen.getByText('Under 5s')).toBeInTheDocument();
   expect(screen.getByText('5-15s')).toBeInTheDocument();
-  expect(screen.getByText('fastest candidate')).toBeInTheDocument();
-  expect(screen.getByText('median duration')).toBeInTheDocument();
-  expect(screen.getByText('low-effort calls')).toBeInTheDocument();
-  expect(screen.getByText('fast-tagged calls')).toBeInTheDocument();
-  expect(document.body).toHaveTextContent('fast candidates or low-effort calls');
-  expect(document.body).toHaveTextContent('shortest duration, then highest Codex credit impact');
+  expect(document.body).toHaveTextContent('Filter fast-tagged and low-effort calls');
+  expect(document.body).toHaveTextContent('Aggregate timing cannot distinguish model latency');
 });
 
 it('loads live report-pack evidence rows in Reports', async () => {
@@ -296,7 +282,8 @@ it('loads live report-pack evidence rows in Reports', async () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
 
-  expect(await screen.findByText('Live report pack: 1 reports, 1 evidence rows')).toBeInTheDocument();
+  expect(await screen.findByText('Live report pack ready.')).toBeInTheDocument();
+  expect(screen.getByText('Live localhost report pack')).toBeInTheDocument();
   expect(screen.getAllByText('server-report-thread').length).toBeGreaterThan(0);
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   expect(String(fetchMock.mock.calls[0][0])).toContain('/api/reports/pack?');
@@ -366,7 +353,8 @@ it('surfaces legacy source health metadata in Settings', () => {
 
   render(<App />);
 
-expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Estimates' }));
   expect(screen.getByText('Allowance Windows')).toBeInTheDocument();
   expect(screen.getByText('token_count.rate_limits · plan pro · limit codex · observed 2026-07-01 10:15 UTC')).toBeInTheDocument();
   const allowancePanel = screen.getByText('Allowance Windows').closest('section') as HTMLElement;
@@ -381,20 +369,24 @@ expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   expect(screen.getByText('79% remaining · 21% used · resets 2026-07-01 16:30 UTC')).toBeInTheDocument();
   expect(screen.getByText('Observed Weekly')).toBeInTheDocument();
   expect(screen.getByText('33% remaining · 67% used · resets 2026-07-04 00:00 UTC')).toBeInTheDocument();
-expect(screen.getByText('Configured 5h')).toBeInTheDocument();
-expect(screen.getByText('79% remaining · 2.75 cr left · 5 cr total · resets 2026-07-01 16:30 UTC')).toBeInTheDocument();
-expect(screen.getByText('Source Health')).toBeInTheDocument();
+  expect(screen.getByText('Configured 5h')).toBeInTheDocument();
+  expect(screen.getByText('79% remaining · 2.75 cr left · 5 cr total · resets 2026-07-01 16:30 UTC')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Source Health' }));
+  expect(screen.getByRole('heading', { name: 'Source Health' })).toBeInTheDocument();
   expect(screen.getByText('Pricing snapshot changed since last refresh.')).toBeInTheDocument();
   expect(screen.getByText('Config error: missing allowance.json')).toBeInTheDocument();
   expect(screen.getByText('Rate-card error: rate card stale')).toBeInTheDocument();
-expect(screen.getByText('6 parser diagnostics: unknown_model=4, malformed_jsonl=2')).toBeInTheDocument();
-expect(screen.queryByText(/duplicate_cumulative_total/)).not.toBeInTheDocument();
-expect(screen.getAllByText('strict: cwd redacted, git branch hidden, aliases preserved').length).toBeGreaterThan(0);
-expect(screen.getByText('Privacy Boundary')).toBeInTheDocument();
-expect(screen.getByText('Payload mode')).toBeInTheDocument();
-expect(screen.getAllByText('Project metadata').length).toBeGreaterThan(1);
-expect(screen.getAllByText('strict: cwd redacted, git branch hidden, aliases preserved').length).toBeGreaterThan(1);
-expect(screen.getByText('Explicit localhost request, selected call only')).toBeInTheDocument();
-expect(screen.getByText('Local API token present')).toBeInTheDocument();
+  expect(screen.getByText('6 parser diagnostics: unknown_model=4, malformed_jsonl=2')).toBeInTheDocument();
+  expect(screen.queryByText(/duplicate_cumulative_total/)).not.toBeInTheDocument();
+  expect(screen.getByText('strict: cwd redacted, git branch hidden, aliases preserved')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Content Access' }));
+  expect(screen.getByText('Privacy Boundary')).toBeInTheDocument();
+  expect(screen.getByText('Payload mode')).toBeInTheDocument();
+  expect(screen.getByText('Project metadata')).toBeInTheDocument();
+  expect(screen.getByText('strict: cwd redacted, git branch hidden, aliases preserved')).toBeInTheDocument();
+  expect(screen.getByText('Explicit localhost request, selected call only')).toBeInTheDocument();
+  expect(screen.getByText('Local API token present')).toBeInTheDocument();
 });
 });

@@ -1,11 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { App } from './App';
+import './design/tokens.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
 import './styles/controls.css';
+import './styles/row-limit.css';
 import './styles/components.css';
 import './styles/charts.css';
 import './styles/tables.css';
@@ -23,8 +24,39 @@ if (!root) {
   throw new Error('Dashboard root element was not found.');
 }
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+const reactRoot = createRoot(root);
+
+async function mountDashboard() {
+  const lab = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('lab') : null;
+  const isVisualContractLab = lab === 'visual-contract';
+  if (isVisualContractLab) {
+    const { VisualContractLab } = await import('./design/lab/VisualContractLab');
+    reactRoot.render(
+      <StrictMode>
+        <VisualContractLab />
+      </StrictMode>,
+    );
+    return;
+  }
+  if (lab === 'visualization-contract') {
+    const { VisualizationContractLab } = await import('./visualization/lab/VisualizationContractLab');
+    reactRoot.render(
+      <StrictMode>
+        <VisualizationContractLab />
+      </StrictMode>,
+    );
+    return;
+  }
+
+  const [{ RouterProvider }, { dashboardRouter }] = await Promise.all([
+    import('@tanstack/react-router'),
+    import('./app/dashboardRouter'),
+  ]);
+  reactRoot.render(
+    <StrictMode>
+      <RouterProvider router={dashboardRouter} />
+    </StrictMode>,
+  );
+}
+
+void mountDashboard();

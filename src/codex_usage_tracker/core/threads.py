@@ -59,10 +59,8 @@ def _build_parent_candidates(rows: list[dict[str, Any]]) -> dict[str, dict[str, 
                 latest=event_timestamp,
             ),
         )
-        if event_timestamp < candidate.first:
-            candidate.first = event_timestamp
-        if event_timestamp > candidate.latest:
-            candidate.latest = event_timestamp
+        candidate.first = min(candidate.first, event_timestamp)
+        candidate.latest = max(candidate.latest, event_timestamp)
 
     for candidate in by_session.values():
         if not candidate.cwd:

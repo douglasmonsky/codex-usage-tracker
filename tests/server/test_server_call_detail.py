@@ -103,7 +103,7 @@ def test_call_detail_payload_includes_annotated_adjacent_records(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    rows = {
+    rows: dict[str, dict[str, object]] = {
         "previous": {"record_id": "previous"},
         "current": {
             "record_id": "current",

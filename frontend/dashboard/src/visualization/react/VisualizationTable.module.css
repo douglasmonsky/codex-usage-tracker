@@ -1,0 +1,118 @@
+.tableFrame {
+  position: relative;
+  min-width: 0;
+}
+
+.tableFrame::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  pointer-events: none;
+  content: "";
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface-panel) 92%, transparent));
+  border-right: 2px solid var(--line-strong);
+  transition: opacity var(--motion-fast);
+}
+
+.tableFrame[data-overflow-right="true"]::after {
+  opacity: 1;
+}
+
+.tableScroll {
+  max-width: 100%;
+  overflow: auto;
+  scrollbar-color: var(--line-strong) var(--surface-subtle);
+  scrollbar-width: thin;
+  border: 1px solid var(--line-subtle);
+}
+
+.tableScroll:focus-visible,
+.table tr:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.tableScroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tableScroll::-webkit-scrollbar-track {
+  background: var(--surface-subtle);
+}
+
+.tableScroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 2px solid var(--surface-subtle);
+  border-radius: var(--radius-control);
+}
+
+.table {
+  width: max(100%, 720px);
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-control);
+}
+
+.table caption {
+  padding: var(--space-3);
+  color: var(--ink-muted);
+  font-size: var(--text-metadata);
+  text-align: left;
+  caption-side: top;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: var(--ink-muted);
+  font-size: var(--text-metadata);
+  text-transform: uppercase;
+}
+
+.table th:first-child,
+.table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 1px 0 0 var(--line-subtle);
+}
+
+.table th:first-child {
+  z-index: 3;
+}
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+.table tbody tr:hover td {
+  background: var(--surface-subtle);
+}
+
+.table tbody tr[aria-selected="true"] td {
+  background: var(--signal-selection-surface);
+}
+
+.table tbody tr[aria-selected="true"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--signal-selection), 1px 0 0 var(--line-subtle);
+}
+
+.numeric {
+  font-family: var(--font-numeric);
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}

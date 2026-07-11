@@ -46,6 +46,10 @@ jobs:
         run: npm run dashboard:test
       - name: Dashboard build
         run: npm run dashboard:build
+      - name: Dashboard governance
+        run: npm run dashboard:governance
+      - name: Dashboard bundle budget
+        run: node scripts/check-dashboard-bundles.mjs
       - name: Whole-source Pyright
         run: python -m pyright --pythonpath "$(command -v python)" src
       - name: Dependency hygiene
@@ -78,6 +82,33 @@ jobs:
           check-jsonschema \
             --builtin-schema vendor.dependabot \
             .github/dependabot.yml
+
+  dashboard-visualization:
+    name: Dashboard visualization contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dashboard tooling
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Visualization renderer budget
+        run: npm run dashboard:visualization-bundle
+      - name: Visualization browser contracts
+        run: npm run dashboard:visualization-smoke
+      - name: Upload visualization evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-visualization-evidence
+          path: test-results/**/*.png
+          if-no-files-found: warn
+          retention-days: 14
 
   test:
     name: Test Python ${{ matrix.python-version }}

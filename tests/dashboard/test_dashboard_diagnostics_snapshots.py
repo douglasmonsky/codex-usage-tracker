@@ -1,54 +1,8 @@
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
-from pathlib import Path
-
-import pytest
-
-
-def _run_snapshot_renderer_script(script: str) -> dict[str, object]:
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for dashboard diagnostic snapshot renderer tests")
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = (
-        repo_root
-        / "src"
-        / "codex_usage_tracker"
-        / "plugin_data"
-        / "dashboard"
-        / "dashboard_diagnostics_snapshots.js"
-    )
-    wrapped = f"""
-const fs = require('fs');
-const vm = require('vm');
-const code = fs.readFileSync({json.dumps(str(script_path))}, 'utf8');
-const context = {{
-  window: {{}},
-  console,
-}};
-vm.createContext(context);
-vm.runInContext(code, context);
-const factory = context.window.CodexUsageDashboardDiagnosticSnapshots;
-function escapeHtml(value) {{
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}}
-{script}
-"""
-    result = subprocess.run(
-        [node, "-e", wrapped],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return json.loads(result.stdout)
+from tests.dashboard.dashboard_node_test_helpers import (
+    run_snapshot_renderer_script as _run_snapshot_renderer_script,
+)
 
 
 def test_dashboard_commands_snapshot_renders_collapsible_children() -> None:

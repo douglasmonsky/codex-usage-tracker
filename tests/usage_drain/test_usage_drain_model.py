@@ -13,6 +13,12 @@ from codex_usage_tracker.usage_drain.model import (
     load_fast_proxy_annotations,
     summarize_usage_drain_model,
 )
+from tests.usage_drain.model_test_helpers import (
+    coefficients_by_feature as _coefficients_by_feature,
+)
+from tests.usage_drain.model_test_helpers import (
+    component_credits as _component_credits,
+)
 
 
 def _row(
@@ -602,22 +608,6 @@ def test_token_component_regression_recovers_rate_card_and_fast_weighting() -> N
         "reasoning_output_tokens": 750.0,
         "nonreasoning_output_tokens": 750.0,
     }
-
-
-def _component_credits(
-    *,
-    uncached: int,
-    cached: int,
-    reasoning: int,
-    nonreasoning: int,
-) -> float:
-    return (
-        (uncached * 125.0) + (cached * 12.5) + ((reasoning + nonreasoning) * 750.0)
-    ) / 1_000_000.0
-
-
-def _coefficients_by_feature(rows: list[dict[str, object]]) -> dict[str, float | None]:
-    return {str(row["feature"]): row["coefficient"] for row in rows}
 
 
 def test_fit_usage_drain_proxy_recovers_documented_multiplier() -> None:

@@ -50,7 +50,7 @@ describe('React dashboard threads workspace', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
     expect(within(threadsTable).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
     expect(within(threadsTable).getByText('thread-9f3a').closest('td')).toHaveClass('sticky-column');
@@ -101,13 +101,29 @@ describe('React dashboard threads workspace', () => {
     });
   });
 
-  it('applies legacy shell model filters to threads workspace and export', () => { window.history.replaceState(null, '', '/?view=threads&model=o4-mini'); render(<App />); const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' }); expect(within(threadsTable).getByText('thread-7b2e91')).toBeInTheDocument(); expect(within(threadsTable).getByText('thread-2f9e7d')).toBeInTheDocument(); expect(within(threadsTable).queryByText('thread-9f3a')).not.toBeInTheDocument(); const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined); fireEvent.click(screen.getByRole('button', { name: /Export CSV/i })); expect(clickSpy).toHaveBeenCalledTimes(1); expect(screen.getAllByText('Exported 2 call rows').length).toBeGreaterThan(0); }); it('exports thread workspace call rows from the local toolbar', () => {
+  it('applies legacy shell model filters to threads workspace and export', async () => {
+    window.history.replaceState(null, '', '/?view=threads&model=o4-mini');
+    render(<App />);
+
+    const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
+    expect(within(threadsTable).getByText('thread-7b2e91')).toBeInTheDocument();
+    expect(within(threadsTable).getByText('thread-2f9e7d')).toBeInTheDocument();
+    expect(within(threadsTable).queryByText('thread-9f3a')).not.toBeInTheDocument();
+
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findAllByText('Exported 2 call rows')).not.toHaveLength(0);
+  });
+
+  it('exports thread workspace call rows from the local toolbar', () => {
   const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=threads&risk=Low');
 
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', { name: /Export calls/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Export thread calls/i }));
   expect(clickSpy).toHaveBeenCalledTimes(1);
   expect(screen.getAllByText(/Exported \d+ calls/).length).toBeGreaterThan(0);
 });
@@ -116,7 +132,7 @@ it('opens the full-page call investigator from selected thread calls', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     expect(screen.getByText('Thread Calls')).toBeInTheDocument();
     const threadCallList = screen.getByText('Thread Calls').closest('.thread-call-list');
     expect(threadCallList).not.toBeNull();
@@ -143,7 +159,7 @@ it('opens full-page call investigator from thread leaderboard rows', () => {
   expect(window.location.search).toContain('record=fixture-call-0');
   expect(window.location.search).toContain('return=threads');
   fireEvent.click(screen.getByRole('button', { name: /Back to Threads/i }));
-  expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
   expect(window.location.search).toContain('view=threads');
   expect(window.location.search).not.toContain('record=');
   expect(window.location.search).not.toContain('return=');
@@ -432,7 +448,7 @@ it('hydrates and syncs selected thread URL state', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     expect(screen.getByText('No loaded aggregate call rows belong to this thread.')).toBeInTheDocument();
 
 const row = within(screen.getByRole('table', { name: 'Thread leaderboard' })).getByText('thread-9f3a').closest('tr');
@@ -449,7 +465,7 @@ it('hydrates and syncs thread filter URL state', async () => {
 
   render(<App />);
 
-  expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveValue('thread-0e16');
     expect(screen.getByLabelText('Cold risk')).toHaveValue('Low');
     expect(screen.getAllByText('thread-0e16').length).toBeGreaterThan(0);
@@ -509,7 +525,7 @@ it('clears thread filters and selected thread URL state', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
   expect(window.location.search).toContain('thread=thread-3c5d');
   fireEvent.change(screen.getByPlaceholderText('Search threads, risks, token totals...'), { target: { value: 'thread-0e16' } });
   fireEvent.change(screen.getByDisplayValue('All risks'), { target: { value: 'Low' } });
@@ -519,7 +535,7 @@ it('clears thread filters and selected thread URL state', () => {
   expect(params.get('thread_q')).toBe('thread-0e16');
   expect(params.get('risk')).toBe('Low');
 
-  fireEvent.click(screen.getByRole('button', { name: /Clear thread filters/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Reset thread view/i }));
 
   expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveValue('');
   expect(screen.getByDisplayValue('All risks')).toBeInTheDocument();

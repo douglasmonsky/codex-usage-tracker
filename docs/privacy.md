@@ -82,7 +82,15 @@ The localhost server:
 - protects refresh/context API calls with a random per-server token
 - can disable the context API entirely
 - serves aggregate dashboard/API routes without embedding raw transcript content into generated dashboard HTML
-- serves `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, `/api/recommendations`, and compatibility `/api/usage` from SQLite-backed aggregate data
+- serves `/api/status`, `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls`, `/api/summary`, `/api/recommendations`, `/api/reports/pack`, `/api/investigations/agentic`, and compatibility `/api/usage` from SQLite-backed aggregate data
+- exposes repeated-file, shell-churn, and large-low-output reports through
+  `/api/investigations/*` with the same safe fields and raw-fragment flags as the
+  corresponding MCP reports; the explicit investigation-walk route can use the
+  local content/event index but still omits raw fragments
+
+The report pack contains aggregate report definitions, linked aggregate call
+rows, a schema marker, and a server generation timestamp. It does not include
+prompts, assistant text, tool output, command output, or indexed content.
 
 Source JSONL reads happen during refresh/indexing, explicit on-demand context loading for one selected call, and explicit synthetic benchmark/diagnostic runs. Live refresh records source metadata and parser cursors so unchanged logs can be skipped and append-only growth can parse from the last indexed byte. Live aggregate APIs do not return indexed content unless an endpoint is explicitly documented as a local content investigation endpoint.
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
+from codex_usage_tracker.store.query_values import row_float, row_int
+
 
 def query_large_low_output_calls(
     conn: sqlite3.Connection,
@@ -109,17 +111,17 @@ def query_large_low_output_calls(
 
 
 def _candidate(row: sqlite3.Row) -> dict[str, Any]:
-    input_tokens = int(row["input_tokens"] or 0)
-    cached_input_tokens = int(row["cached_input_tokens"] or 0)
-    uncached_input_tokens = int(row["uncached_input_tokens"] or 0)
-    output_tokens = int(row["output_tokens"] or 0)
-    total_tokens = int(row["total_tokens"] or 0)
-    context_window_percent = float(row["context_window_percent"] or 0.0)
-    tool_output_size_bytes = int(row["tool_output_size_bytes"] or 0)
-    command_output_size_bytes = int(row["command_output_size_bytes"] or 0)
-    tool_call_count = int(row["tool_call_count"] or 0)
-    command_run_count = int(row["command_run_count"] or 0)
-    file_event_count = int(row["file_event_count"] or 0)
+    input_tokens = row_int(row, "input_tokens")
+    cached_input_tokens = row_int(row, "cached_input_tokens")
+    uncached_input_tokens = row_int(row, "uncached_input_tokens")
+    output_tokens = row_int(row, "output_tokens")
+    total_tokens = row_int(row, "total_tokens")
+    context_window_percent = row_float(row, "context_window_percent")
+    tool_output_size_bytes = row_int(row, "tool_output_size_bytes")
+    command_output_size_bytes = row_int(row, "command_output_size_bytes")
+    tool_call_count = row_int(row, "tool_call_count")
+    command_run_count = row_int(row, "command_run_count")
+    file_event_count = row_int(row, "file_event_count")
     explanation, reasons = _candidate_explanation(
         input_tokens=input_tokens,
         cached_input_tokens=cached_input_tokens,
@@ -149,7 +151,7 @@ def _candidate(row: sqlite3.Row) -> dict[str, Any]:
         "cached_input_tokens": cached_input_tokens,
         "uncached_input_tokens": uncached_input_tokens,
         "output_tokens": output_tokens,
-        "reasoning_output_tokens": int(row["reasoning_output_tokens"] or 0),
+        "reasoning_output_tokens": row_int(row, "reasoning_output_tokens"),
         "cache_ratio": _ratio(cached_input_tokens, input_tokens),
         "uncached_input_ratio": _ratio(uncached_input_tokens, input_tokens),
         "model_context_window": row["model_context_window"],
@@ -160,10 +162,10 @@ def _candidate(row: sqlite3.Row) -> dict[str, Any]:
         "nearby_activity": {
             "tool_call_count": tool_call_count,
             "command_run_count": command_run_count,
-            "failed_command_count": int(row["failed_command_count"] or 0),
+            "failed_command_count": row_int(row, "failed_command_count"),
             "file_event_count": file_event_count,
-            "file_read_count": int(row["file_read_count"] or 0),
-            "file_write_count": int(row["file_write_count"] or 0),
+            "file_read_count": row_int(row, "file_read_count"),
+            "file_write_count": row_int(row, "file_write_count"),
             "tool_output_size_bytes": tool_output_size_bytes,
             "command_output_size_bytes": command_output_size_bytes,
         },
@@ -191,29 +193,71 @@ def _candidate_explanation(
     uncached_ratio = _ratio(uncached_input_tokens, input_tokens)
     activity_count = tool_call_count + command_run_count + file_event_count
     output_bytes = tool_output_size_bytes + command_output_size_bytes
-    reasons: list[str] = []
+    rules = (
+        (
+            _is_large_uncached_input(
+                input_tokens=input_tokens,
+                uncached_input_tokens=uncached_input_tokens,
+                uncached_ratio=uncached_ratio,
+                cache_ratio=cache_ratio,
+            ),
+            "large_uncached_input",
+        ),
+        (context_window_percent >= 0.60, "high_context_window_share"),
+        (
+            _has_activity_pressure(
+                output_bytes=output_bytes,
+                activity_count=activity_count,
+            ),
+            "tool_or_file_activity_pressure",
+        ),
+        (
+            _has_very_low_output_share(
+                total_tokens=total_tokens,
+                output_tokens=output_tokens,
+            ),
+            "very_low_output_share",
+        ),
+    )
+    reasons = [reason for applies, reason in rules if applies]
+    return _explanation_kind(reasons), reasons
 
-    if (
-        input_tokens
-        and uncached_input_tokens >= 10_000
-        and uncached_ratio >= 0.65
-        and cache_ratio <= 0.35
-    ):
-        reasons.append("large_uncached_input")
-    if context_window_percent >= 0.60:
-        reasons.append("high_context_window_share")
-    if output_bytes >= 50_000 or activity_count >= 8:
-        reasons.append("tool_or_file_activity_pressure")
-    if total_tokens and output_tokens <= max(250, int(total_tokens * 0.02)):
-        reasons.append("very_low_output_share")
 
-    if "large_uncached_input" in reasons:
-        return "cold_resume_or_cache_miss", reasons
-    if "tool_or_file_activity_pressure" in reasons:
-        return "tool_output_pressure", reasons
-    if "high_context_window_share" in reasons:
-        return "stale_thread_low_value_continuation", reasons
-    return "large_context_low_output", reasons
+def _is_large_uncached_input(
+    *,
+    input_tokens: int,
+    uncached_input_tokens: int,
+    uncached_ratio: float,
+    cache_ratio: float,
+) -> bool:
+    return all(
+        (
+            bool(input_tokens),
+            uncached_input_tokens >= 10_000,
+            uncached_ratio >= 0.65,
+            cache_ratio <= 0.35,
+        )
+    )
+
+
+def _has_activity_pressure(*, output_bytes: int, activity_count: int) -> bool:
+    return output_bytes >= 50_000 or activity_count >= 8
+
+
+def _has_very_low_output_share(*, total_tokens: int, output_tokens: int) -> bool:
+    return bool(total_tokens) and output_tokens <= max(250, int(total_tokens * 0.02))
+
+
+def _explanation_kind(reasons: list[str]) -> str:
+    priorities = (
+        ("large_uncached_input", "cold_resume_or_cache_miss"),
+        ("tool_or_file_activity_pressure", "tool_output_pressure"),
+        ("high_context_window_share", "stale_thread_low_value_continuation"),
+    )
+    for reason, explanation in priorities:
+        if reason in reasons:
+            return explanation
+    return "large_context_low_output"
 
 
 def _ratio(numerator: int, denominator: int) -> float:

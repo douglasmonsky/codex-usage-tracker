@@ -111,6 +111,32 @@ target-version = "py310"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
 
+[tool.pylint."messages control"]
+disable = ["all"]
+enable = [
+  "F",
+  "E",
+  "W0101", # unreachable
+  "W0102", # dangerous-default-value
+  "W0120", # useless-else-on-loop
+  "W0123", # eval-used
+  "W0129", # assert-on-string-literal
+  "W0150", # lost-exception
+  "W0199", # assert-on-tuple
+  "W0702", # bare-except
+  "W0705", # duplicate-except
+  "W0707", # raise-missing-from
+  "W0711", # binary-op-exception
+  "W1404", # implicit-str-concat
+  "W1501", # bad-open-mode
+  "W1508", # invalid-envvar-default
+  "W1510", # subprocess-run-check
+  "R0124", # comparison-with-itself
+  "R1716", # chained-comparison
+  "R1730", # consider-using-min-builtin
+  "R1731", # consider-using-max-builtin
+]
+
 [tool.agent_maintainer]
 mode = "legacy-ratchet"
 architecture_tool = "tach"
@@ -224,6 +250,29 @@ max_physical_lines = 600
 max_nonblank_lines = 500
 changed_file_warn = 8
 changed_line_warn = 700
+
+[tool.agent_maintainer.file_baselines.groups.dashboard-redesign-core]
+include = [
+  "frontend/dashboard/src/data/**/*.ts",
+  "frontend/dashboard/src/data/**/*.tsx",
+  "frontend/dashboard/src/design/**/*.ts",
+  "frontend/dashboard/src/design/**/*.tsx",
+  "frontend/dashboard/src/entities/**/*.ts",
+  "frontend/dashboard/src/entities/**/*.tsx",
+  "frontend/dashboard/src/routes/**/*.ts",
+  "frontend/dashboard/src/routes/**/*.tsx",
+  "frontend/dashboard/src/visualization/**/*.ts",
+  "frontend/dashboard/src/visualization/**/*.tsx",
+]
+exclude = [
+  "frontend/dashboard/src/**/*.test.ts",
+  "frontend/dashboard/src/**/*.test.tsx",
+]
+role = "source"
+max_physical_lines = 400
+max_nonblank_lines = 300
+changed_file_warn = 10
+changed_line_warn = 800
 
 [tool.deptry]
 known_first_party = ["codex_usage_tracker"]

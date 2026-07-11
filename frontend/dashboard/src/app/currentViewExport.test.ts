@@ -11,7 +11,9 @@ const runtime: RuntimeExportState = {
     fileMode: false,
   },
   historyScope: 'all',
+  loadWindow: 'all',
   loadLimit: rowLimitNoCap,
+  scopeSince: null,
   loadedRowCount: 8,
   totalAvailableRows: 25,
   canUseLiveApi: true,
@@ -25,6 +27,8 @@ describe('current view export helpers', () => {
       { field: 'live_api', value: 'available' },
       { field: 'context_api', value: 'enabled' },
       { field: 'history_scope', value: 'all' },
+      { field: 'data_window', value: 'All time' },
+      { field: 'scope_since', value: 'none' },
       { field: 'row_request', value: 'no cap' },
       { field: 'loaded_rows', value: '8' },
       { field: 'total_available_rows', value: '25' },
@@ -35,20 +39,23 @@ describe('current view export helpers', () => {
     ]);
   });
 
-  it('exports settings runtime state as a two-column CSV', () => {
-    const exportSpec = currentViewCsvExport('settings', fixtureModel, runtime);
+  it('exports settings runtime state as a two-column CSV', async () => {
+    const exportSpec = await currentViewCsvExport('settings', fixtureModel, runtime);
 
     expect(exportSpec.filename).toMatch(/^codex-dashboard-settings-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(exportSpec.label).toBe('settings rows');
-    expect(exportSpec.rowCount).toBe(10);
+    expect(exportSpec.rowCount).toBe(12);
     expect(exportSpec.csv).toContain('Field,Value');
     expect(exportSpec.csv).toContain('row_request,no cap');
+    expect(exportSpec.csv).toContain('data_window,All time');
     expect(exportSpec.csv).toContain('history_scope,all');
   });
 
- it('keeps current-view export routing scoped active call data', () => {
-    const threadsExport = currentViewCsvExport('threads', fixtureModel, runtime, 'thread-9f3a');
-    const callsExport = currentViewCsvExport('calls', fixtureModel, runtime, 'thread-9f3a');
+ it('keeps current-view export routing scoped active call data', async () => {
+    const [threadsExport, callsExport] = await Promise.all([
+      currentViewCsvExport('threads', fixtureModel, runtime, 'thread-9f3a'),
+      currentViewCsvExport('calls', fixtureModel, runtime, 'thread-9f3a'),
+    ]);
 
  expect(threadsExport.filename).toMatch(/^codex-thread-filtered-calls-\d{4}-\d{2}-\d{2}\.csv$/);
  expect(threadsExport.label).toBe('call rows');

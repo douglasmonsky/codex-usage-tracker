@@ -102,7 +102,7 @@ def _source_metadata_matches(row: sqlite3.Row, metadata: dict[str, int]) -> bool
 def _can_incrementally_parse_source(metadata: dict[str, int], row: sqlite3.Row) -> bool:
     previous_size = int(row["size_bytes"])
     previous_byte = int(row["parsed_until_byte"])
-    return metadata["size_bytes"] > previous_size and 0 < previous_byte <= previous_size
+    return 0 < previous_byte <= previous_size < metadata["size_bytes"]
 
 
 def upsert_source_file_metadata(

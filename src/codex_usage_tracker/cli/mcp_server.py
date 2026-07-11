@@ -6,6 +6,7 @@ import threading
 import uuid
 from typing import Any
 
+from codex_usage_tracker.cli import mcp_visualization as mcp_visualization
 from codex_usage_tracker.cli.mcp_allowance import (
     usage_allowance_diagnostics as usage_allowance_diagnostics,
 )
@@ -158,12 +159,7 @@ from codex_usage_tracker.reports.api import (
     build_summary_report,
 )
 from codex_usage_tracker.server.usage_refresh import RefreshJobRegistry
-from codex_usage_tracker.store.api import (
-    query_session_usage,
-)
-from codex_usage_tracker.store.api import (
-    refresh_usage_index as refresh_index,
-)
+from codex_usage_tracker.store import api as store_api
 
 _REFRESH_JOB_REGISTRY = RefreshJobRegistry()
 _REFRESH_JOB_LOCK = threading.Lock()
@@ -176,7 +172,7 @@ def refresh_usage_index(
 ) -> dict[str, Any]:
     """Scan local Codex logs into SQLite usage and content indexes."""
 
-    result = refresh_index(
+    result = store_api.refresh_usage_index(
         codex_home=DEFAULT_CODEX_HOME,
         db_path=DEFAULT_DB_PATH,
         include_archived=include_archived,
@@ -253,7 +249,7 @@ def session_usage(
     """Show aggregate per-call usage for one session, defaulting to the latest indexed session."""
 
     rows = apply_project_privacy_to_rows(
-        query_session_usage(DEFAULT_DB_PATH, session_id=session_id, limit=limit),
+        store_api.query_session_usage(DEFAULT_DB_PATH, session_id=session_id, limit=limit),
         privacy_mode=privacy_mode,
     )
     if response_format == "json":

@@ -72,8 +72,12 @@ def _group_expression(group_by: str) -> str:
         raise ValueError(f"group_by must be one of: {allowed}") from exc
 
 
-def _since_where_clause(since: str | None) -> tuple[str, list[Any]]:
-    return _usage_where_clause(since=since)
+def _since_where_clause(
+    since: str | None,
+    *,
+    include_archived: bool = True,
+) -> tuple[str, list[Any]]:
+    return _usage_where_clause(since=since, include_archived=include_archived)
 
 
 def _thread_key_expression(prefix: str = "") -> str:
@@ -175,7 +179,7 @@ def _extend_archive_filter(
     archived_path_clause = " OR ".join(
         f"{prefix}source_file LIKE ?" for _pattern in _ARCHIVED_SOURCE_PATTERNS
     )
-    clauses.append(f"(coalesce({prefix}is_archived, 0) = 0 AND NOT ({archived_path_clause}))")
+    clauses.append(f"({prefix}is_archived = 0 AND NOT ({archived_path_clause}))")
     params.extend(_ARCHIVED_SOURCE_PATTERNS)
 
 

@@ -79,16 +79,32 @@ expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=calls');
 
 fireEvent.keyDown(window, { key: '3' });
-expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=threads');
 
 fireEvent.keyDown(searchInput, { key: '4' });
-expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=threads');
 
 fireEvent.keyDown(window, { key: '4' });
 expect(screen.getByRole('heading', { name: 'Diagnostics Notebook' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=diagnostics');
+});
+
+it('creates navigation history entries and rehydrates shell state on popstate', () => {
+  const pushState = vi.spyOn(window.history, 'pushState');
+  render(<App />);
+
+  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  expect(pushState).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
+
+  window.history.replaceState(null, '', '/?view=overview&q=cache&preset=cache-heavy&history=all');
+  fireEvent.popState(window);
+
+  expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Search dashboard')).toHaveValue('cache');
+  expect(new URLSearchParams(window.location.search).get('history')).toBe('all');
 });
 
 it('shows legacy back-to-top control after scrolling', () => {
@@ -128,7 +144,7 @@ it('copies the current dashboard view link from the topbar', async () => {
   );
 
 render(<App />);
-fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: /^Copy link$/i }));
+fireEvent.click(within(screen.getByRole('banner', { name: 'Dashboard toolbar' })).getByRole('button', { name: /^Copy link$/i }));
 
 await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 const copiedUrl = new URL(writeText.mock.calls[0][0]);
@@ -154,7 +170,7 @@ it('copies call investigator view links with return workspace context', async ()
   );
 
   render(<App />);
-  fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: /^Copy link$/i }));
+fireEvent.click(within(screen.getByRole('banner', { name: 'Dashboard toolbar' })).getByRole('button', { name: /^Copy link$/i }));
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copiedUrl = new URL(writeText.mock.calls[0][0]);
@@ -238,7 +254,7 @@ it('clears stale usage drain state leaving Usage Drain workspace', () => {
   window.history.replaceState(
     null,
     '',
-    '/?view=usage-drain&usage_plan=Weekly&usage_effort=high&usage_subagents=0&usage_sample=80&usage_confidence=0.55',
+    '/?view=usage-drain&usage_plan=Weekly&usage_effort=high&usage_subagents=0&usage_sample=80&usage_confidence=0.55&limit_window=five_hour&limit_hypothesis=stable',
   );
 
   render(<App />);
@@ -246,7 +262,7 @@ it('clears stale usage drain state leaving Usage Drain workspace', () => {
 
   const params = new URLSearchParams(window.location.search);
   expect(params.get('view')).toBe('overview');
-  for (const name of ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence']) {
+  for (const name of ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence', 'limit_window', 'limit_hypothesis']) {
     expect(params.get(name)).toBeNull();
   }
 });
@@ -290,9 +306,9 @@ it('clears stale Calls table state leaving Calls workspace but preserves global 
 
 it('switches between feature workspaces and preserves active navigation state', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-    expect(screen.getByRole('heading', { name: 'Usage Drain Lab' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Usage Drain Lab/i })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
+    expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Limits$/i })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
@@ -304,39 +320,39 @@ it('wires quick links and local prototype action controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Models' }));
     expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
 
-fireEvent.click(screen.getByRole('button', { name: /More Filters/i }));
-expect(screen.getByPlaceholderText('Search calls, cwd, projects, models...')).toHaveFocus();
+fireEvent.click(screen.getByText('More filters'));
+expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     const sortButton = screen.getByRole('button', { name: 'Sort by Est. Cost' });
     fireEvent.click(sortButton);
     expect(sortButton.closest('th')).toHaveAttribute('aria-sort', 'descending');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Files' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Quick Links' })).getByRole('button', { name: 'Files' }));
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
-    expect(screen.getByText('Runtime State')).toBeInTheDocument();
- expect(screen.getAllByText('Rows loaded').length).toBeGreaterThan(0);
+    expect(screen.getByText('Loaded Data')).toBeInTheDocument();
+ expect(screen.getAllByText('Evidence rows').length).toBeGreaterThan(0);
     expect(screen.getByText('8 of 8')).toBeInTheDocument();
     expect(screen.getByText('Static snapshot')).toBeInTheDocument();
-    expect(screen.getByText('Context API gated')).toBeInTheDocument();
+    expect(screen.getByText('Content access gated')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
-    expect(screen.getByRole('heading', { name: 'Investigator Workbench' })).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: /^Inspect/i })[0]);
-    expect(screen.getByText(/Selected Long Thread/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Cache Misses \(Large Inputs\)/i }));
+    expect(screen.getByRole('heading', { name: 'Cache Misses (Large Inputs)' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
     fireEvent.click(screen.getByRole('button', { name: /Cost Curves/i }));
     expect(screen.getAllByText('Cost Curves').length).toBeGreaterThan(1);
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    fireEvent.click(screen.getByRole('button', { name: /Export Pack/i }));
-    expect(screen.getByText(/Exported 6 report snapshots/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export selected' }));
+    expect(screen.getByText('Exported Cost Curves')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Usage Drain Lab/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Refresh Diagnostics/i }));
-    expect(screen.getByText(/Diagnostics refreshed/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
+    fireEvent.click(screen.getByRole('button', { name: '5-hour' }));
+    expect(screen.getByRole('heading', { level: 2, name: '5-hour rolling context' })).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('limit_window')).toBe('five_hour');
 
     fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Filters$/i }));
-    expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveFocus();
+    expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toBeVisible();
   });
 
 it('surfaces legacy environment status chips in the shell', () => {

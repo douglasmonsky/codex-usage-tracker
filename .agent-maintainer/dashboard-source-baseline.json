@@ -1,0 +1,65 @@
+{
+  "exceptions": {
+    "frontend/dashboard/src/App.live-refresh.test.tsx": {
+      "group": "tests",
+      "nonblank": 546,
+      "physical": 579
+    },
+    "frontend/dashboard/src/App.tsx": {
+      "group": "source",
+      "nonblank": 726,
+      "physical": 771
+    },
+    "frontend/dashboard/src/api/client.ts": {
+      "group": "source",
+      "nonblank": 767,
+      "physical": 829
+    },
+    "frontend/dashboard/src/api/types.ts": {
+      "group": "source",
+      "nonblank": 411,
+      "physical": 436
+    },
+    "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": {
+      "group": "source",
+      "nonblank": 762,
+      "physical": 808
+    },
+    "frontend/dashboard/src/features/diagnostics/DiagnosticFactsPanels.tsx": {
+      "group": "source",
+      "nonblank": 534,
+      "physical": 555
+    },
+    "frontend/dashboard/src/features/diagnostics/DiagnosticsPage.tsx": {
+      "group": "source",
+      "nonblank": 611,
+      "physical": 654
+    },
+    "frontend/dashboard/src/features/diagnostics/diagnosticSnapshotCards.ts": {
+      "group": "source",
+      "nonblank": 413,
+      "physical": 445
+    },
+    "frontend/dashboard/src/features/shared/tables.tsx": {
+      "group": "source",
+      "nonblank": 487,
+      "physical": 509
+    },
+    "frontend/dashboard/src/styles/context-evidence.css": {
+      "group": "styles",
+      "nonblank": 352,
+      "physical": 405
+    },
+    "frontend/dashboard/src/styles/diagnostics.css": {
+      "group": "styles",
+      "nonblank": 381,
+      "physical": 436
+    },
+    "frontend/dashboard/src/styles/workspaces.css": {
+      "group": "styles",
+      "nonblank": 410,
+      "physical": 473
+    }
+  },
+  "version": 1
+}

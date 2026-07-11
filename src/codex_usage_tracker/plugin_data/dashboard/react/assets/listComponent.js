@@ -1,0 +1,1 @@
+import{z as g,R as s}from"./extension.js";function h(r,t){var a=g(t.get("padding")),i=t.getItemStyle(["color","opacity"]);i.fill=t.get("backgroundColor");var e=new s({shape:{x:r.x-a[3],y:r.y-a[0],width:r.width+a[1]+a[3],height:r.height+a[0]+a[2],r:t.get("borderRadius")},style:i,silent:!0,z2:-1});return e}export{h as m};

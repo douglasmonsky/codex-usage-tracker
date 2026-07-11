@@ -18,6 +18,7 @@ from codex_usage_tracker.store.schema import init_db
 from codex_usage_tracker.store.usage_timing import (
     USAGE_TIMING_JOIN_SQL,
     USAGE_TIMING_SELECT_SQL,
+    usage_parent_select_sql,
 )
 
 OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
@@ -45,16 +46,10 @@ def query_dashboard_events(
         table_alias="usage_events",
         include_archived=include_archived,
     )
-    parent_where_clause, parent_params = usage_where_clause(include_archived=include_archived)
-    parent_thread_filter = (
-        f"{parent_where_clause} AND thread_name IS NOT NULL"
-        if parent_where_clause
-        else "WHERE thread_name IS NOT NULL"
-    )
     normalized_limit = normalize_limit(limit)
     normalized_offset = normalize_offset(offset)
     limit_clause = ""
-    query_params = [*parent_params, *params]
+    query_params = list(params)
     if normalized_limit is not None:
         limit_clause = "LIMIT ?"
         query_params.append(normalized_limit)
@@ -71,26 +66,9 @@ def query_dashboard_events(
             SELECT
                 usage_events.*,
                 {USAGE_TIMING_SELECT_SQL},
-                coalesce(
-                    usage_events.parent_thread_name,
-                    parent_threads.thread_name
-                ) AS resolved_parent_thread_name,
-                coalesce(
-                    usage_events.parent_session_updated_at,
-                    parent_threads.session_updated_at
-                ) AS resolved_parent_session_updated_at
+                {usage_parent_select_sql(include_archived=include_archived)}
             FROM usage_events
             {USAGE_TIMING_JOIN_SQL}
-            LEFT JOIN (
-                SELECT
-                    session_id,
-                    max(thread_name) AS thread_name,
-                    max(session_updated_at) AS session_updated_at
-                FROM usage_events
-                {parent_thread_filter}
-                GROUP BY session_id
-            ) AS parent_threads
-            ON usage_events.parent_session_id = parent_threads.session_id
             {where_clause}
             ORDER BY usage_events.event_timestamp DESC, usage_events.cumulative_total_tokens DESC
             {limit_clause}

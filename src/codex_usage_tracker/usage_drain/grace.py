@@ -159,6 +159,23 @@ def small_break_age_after_one_percent_run(
 ) -> int | None:
     if not values or is_one_percent_delta(values[-1]):
         return None
+    break_age, preceding_index = _trailing_small_break(
+        values,
+        max_break_delta=max_break_delta,
+    )
+    if not break_age:
+        return None
+    preceding_streak = _preceding_one_percent_streak(values, preceding_index)
+    if preceding_streak < streak_threshold:
+        return None
+    return break_age
+
+
+def _trailing_small_break(
+    values: list[float],
+    *,
+    max_break_delta: float,
+) -> tuple[int, int]:
     index = len(values) - 1
     break_age = 0
     while (
@@ -166,12 +183,12 @@ def small_break_age_after_one_percent_run(
     ):
         break_age += 1
         index -= 1
-    if break_age == 0:
-        return None
-    preceding_streak = 0
+    return break_age, index
+
+
+def _preceding_one_percent_streak(values: list[float], index: int) -> int:
+    streak = 0
     while index >= 0 and is_one_percent_delta(values[index]):
-        preceding_streak += 1
+        streak += 1
         index -= 1
-    if preceding_streak >= streak_threshold:
-        return break_age
-    return None
+    return streak

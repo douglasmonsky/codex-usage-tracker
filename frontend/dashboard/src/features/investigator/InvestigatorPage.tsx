@@ -1,444 +1,371 @@
-import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowRight, Copy, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowRight,
+  Download,
+  FlaskConical,
+  RefreshCw,
+  Search,
+  Settings,
+  ShieldCheck,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
-import type { CallRow, DashboardModel, Finding } from '../../api/types';
-import { LineChart } from '../../charts/LineChart';
-import { DataTable } from '../../components/DataTable';
-import { Panel } from '../../components/Panel';
-import { StatusBadge } from '../../components/StatusBadge';
-import { formatCompact, formatNumber, money, pct } from '../shared/format';
-import { callActionColumn, callColumns, callInvestigatorRowLabel } from '../shared/tables';
-import { stopRowActionKeyDown } from '../shared/rowActionEvents';
+import {
+  diagnosticSnapshotDefinitions,
+  loadDiagnosticSnapshot,
+  refreshDiagnosticSnapshots,
+  type DiagnosticSnapshotMap,
+} from '../../api/diagnostics';
+import {
+  loadAgenticInvestigation,
+  loadInvestigationWalk,
+  type InvestigationWalkBranch,
+} from '../../api/investigations';
+import type { CallRow, ContextRuntime, DashboardModel } from '../../api/types';
+import { Button, MetricReadout, StatusBadge, Surface } from '../../design';
+import type { DashboardViewId } from '../../routes/dashboardSearch';
+import { Visualization } from '../../visualization';
+import { fallbackDiagnosticSnapshots } from '../diagnostics/diagnosticSnapshotFallbacks';
+import { csvDateStamp } from '../shared/exportCsv';
+import { formatCompact } from '../shared/format';
+import answerStyles from './InvestigationAnswer.module.css';
+import { InvestigationEvidenceLedger } from './InvestigationEvidenceLedger';
+import traceStyles from './InvestigationTrace.module.css';
+import {
+  buildInvestigationWorkspace,
+  buildWasteFingerprintSpec,
+  callsForFinding,
+  type InvestigationFinding,
+  type InvestigationTone,
+} from './investigationModel';
+import styles from './InvestigatorPage.module.css';
 
 type InvestigatorPageProps = {
   model: DashboardModel;
+  contextRuntime: ContextRuntime;
+  includeArchived?: boolean;
+  sourceRevision?: string;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
+  onNavigateView: (view: DashboardViewId) => void;
 };
 
-type EvidenceProfile = {
-  callCount: number;
-  totalTokens: number;
-  avgCachePct: number;
-  estimatedCost: number;
-  modelCount: number;
-};
-
-type EvidenceBasis = {
-  selection: string;
-  ordering: string;
-  limit: string;
-  summary: string;
-};
+const defaultQuestion = 'Where is avoidable token waste concentrated?';
 
 export function investigatorCallsForCurrentUrl(model: DashboardModel): CallRow[] {
-  const selected = findingFromUrl(model.findings);
-  return selected ? callsForFinding(selected, model.calls) : topCalls(model.calls, 8);
+  const rank = Number(new URLSearchParams(window.location.search).get('finding') ?? '');
+  const finding = model.findings.find(candidate => candidate.rank === rank) ?? model.findings[0];
+  return finding ? callsForFinding(finding, model.calls) : topCalls(model.calls, 8);
 }
 
-export function InvestigatorPage({ model, onOpenInvestigator, onCopyCallLink }: InvestigatorPageProps) {
-  const [selectedRank, setSelectedRank] = useState(() => findingFromUrl(model.findings)?.rank ?? model.findings[0]?.rank ?? 0);
-  const [evidenceStatus, setEvidenceStatus] = useState('Select a finding to inspect aggregate evidence.');
-  const selected = model.findings.find(finding => finding.rank === selectedRank) ?? model.findings[0];
-  const evidenceCalls = useMemo(
-    () => (selected ? callsForFinding(selected, model.calls) : topCalls(model.calls, 8)),
-    [model.calls, selected],
+export function InvestigatorPage({
+  model,
+  contextRuntime,
+  includeArchived = false,
+  sourceRevision = '',
+  onOpenInvestigator,
+  onCopyCallLink,
+  onNavigateView,
+}: InvestigatorPageProps) {
+  const queryClient = useQueryClient();
+  const canUseLive = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
+  const fallbackSnapshots = useMemo(() => fallbackDiagnosticSnapshots(model), [model]);
+  const agenticQueryKey = ['investigations', 'agentic', contextRuntime.apiToken, includeArchived, sourceRevision] as const;
+  const agenticQuery = useQuery({
+    queryKey: agenticQueryKey,
+    queryFn: () => loadAgenticInvestigation(contextRuntime, { includeArchived, evidenceLimit: 8 }),
+    enabled: canUseLive,
+    staleTime: 10 * 60_000,
+    placeholderData: previous => previous,
+  });
+  const snapshotQueries = useQueries({
+    queries: diagnosticSnapshotDefinitions.map(definition => ({
+      queryKey: snapshotQueryKey(definition.key, contextRuntime, sourceRevision),
+      queryFn: () => loadDiagnosticSnapshot(definition.key, contextRuntime),
+      enabled: canUseLive,
+      staleTime: 10 * 60_000,
+    })),
+  });
+  const liveSnapshots = useMemo<DiagnosticSnapshotMap>(() => Object.fromEntries(
+    snapshotQueries.flatMap((query, index) => query.data
+      ? [[diagnosticSnapshotDefinitions[index].key, query.data] as const]
+      : []),
+  ), [snapshotQueries]);
+  const effectiveSnapshots = canUseLive
+    ? { ...fallbackSnapshots, ...liveSnapshots }
+    : fallbackSnapshots;
+  const workspace = useMemo(
+    () => buildInvestigationWorkspace(model, agenticQuery.data, effectiveSnapshots),
+    [agenticQuery.data, effectiveSnapshots, model],
   );
-  const evidenceProfile = useMemo(() => summarizeEvidence(evidenceCalls), [evidenceCalls]);
-  const evidenceBasis = useMemo(() => findingEvidenceBasis(selected, model.calls), [model.calls, selected]);
-  const evidenceColumns = useMemo<Array<ColumnDef<CallRow>>>(
-    () => [...callColumns.slice(0, 8), callActionColumn({ onOpenInvestigator, onCopyCallLink, labelPrefix: 'workbench call' })],
-    [onCopyCallLink, onOpenInvestigator],
+  const requestedFinding = readFindingParam();
+  const [selectedId, setSelectedId] = useState(requestedFinding);
+  const selected = resolveSelectedFinding(workspace.findings, selectedId || requestedFinding);
+  const [question, setQuestion] = useState(defaultQuestion);
+  const [refreshing, setRefreshing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('Stored diagnostics ready');
+  const walkQuery = useQuery({
+    queryKey: ['investigations', 'walk', contextRuntime.apiToken, includeArchived, question],
+    queryFn: () => loadInvestigationWalk(contextRuntime, question, { includeArchived, evidenceLimit: 6 }),
+    enabled: false,
+    retry: false,
+  });
+  const fingerprintSpec = useMemo(
+    () => buildWasteFingerprintSpec(workspace.findings, includeArchived ? 'all' : 'active', sourceRevision),
+    [includeArchived, sourceRevision, workspace.findings],
   );
+  const loadedSnapshotCount = snapshotQueries.filter(query => query.data).length;
+  const loadingSnapshots = snapshotQueries.some(query => query.isFetching);
 
-  function selectFinding(finding: Finding) {
-    setSelectedRank(finding.rank);
-    syncSelectedFindingUrl(finding.rank);
-    setEvidenceStatus(`Selected ${finding.title}`);
+  useEffect(() => {
+    if (!selected && workspace.findings[0]) setSelectedId(workspace.findings[0].id);
+  }, [selected, workspace.findings]);
+
+  function selectFinding(finding: InvestigationFinding) {
+    setSelectedId(finding.id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'investigator');
+    url.searchParams.set('finding', finding.id);
+    window.history.replaceState(null, '', url);
+    setStatusMessage(`Selected ${finding.title}`);
   }
 
-  function inspectCalls(finding: Finding) {
-    const calls = callsForFinding(finding, model.calls);
-    setEvidenceStatus(`Evidence table focused on ${finding.title}: ${calls.length} aggregate rows`);
+  function openThread(thread: string) {
+    onNavigateView('threads');
+    const url = new URL(window.location.href);
+    url.searchParams.set('thread_q', thread);
+    window.history.replaceState(null, '', url);
+  }
+
+  async function refreshEvidence() {
+    if (!canUseLive || refreshing) return;
+    setRefreshing(true);
+    setStatusMessage('Refreshing investigation evidence...');
+    try {
+      const snapshots = await refreshDiagnosticSnapshots(contextRuntime);
+      for (const definition of diagnosticSnapshotDefinitions) {
+        const payload = snapshots[definition.key];
+        if (payload) queryClient.setQueryData(snapshotQueryKey(definition.key, contextRuntime, sourceRevision), payload);
+      }
+      await agenticQuery.refetch();
+      setStatusMessage(`Live evidence refreshed · ${Object.keys(snapshots).length} diagnostic modules`);
+    } catch (error) {
+      setStatusMessage(`Refresh failed: ${errorMessage(error)}`);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  function runLocalTrace() {
+    if (!contextRuntime.contextApiEnabled) {
+      onNavigateView('settings');
+      return;
+    }
+    void walkQuery.refetch();
+  }
+
+  function exportEvidence() {
+    downloadJson(`codex-investigation-${csvDateStamp()}.json`, {
+      schema: 'codex-usage-dashboard-investigation-export-v1',
+      generated_at: new Date().toISOString(),
+      selected_finding: selected,
+      findings: workspace.findings,
+      caveats: workspace.caveats,
+      local_trace: walkQuery.data,
+      includes_raw_fragments: false,
+    });
+    setStatusMessage('Strict local evidence bundle exported');
+  }
+
+  if (!selected) {
+    return <section className="route-state" role="status">No investigation evidence is available for the loaded scope.</section>;
   }
 
   return (
-    <div className="workbench-layout">
-      <div className="page-title-row span-all">
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
         <div>
-          <h1>Investigator Workbench</h1>
-          <p>Ranked findings, evidence, and aggregate-only drilldowns.</p>
+          <p className={styles.eyebrow}>Root-cause workspace</p>
+          <h1>Investigate</h1>
+          <p>Ranked waste signals, linked evidence, and one explicit verification path.</p>
         </div>
-        <div className="toolbar">
-          <StatusBadge label="Stored Snapshot" tone="blue" />
-          <StatusBadge label="Live API" tone="green" />
+        <div className={styles.headerActions}>
+          <Button onClick={exportEvidence}><Download />Export evidence</Button>
+          <Button variant="primary" onClick={refreshEvidence} disabled={!canUseLive || refreshing}>
+            <RefreshCw />{refreshing ? 'Refreshing' : 'Refresh evidence'}
+          </Button>
         </div>
+      </header>
+
+      <div className={styles.statusRow} role="status" aria-live="polite">
+        <StatusBadge tone={workspace.live ? 'positive' : 'neutral'}>{workspace.live ? 'Live report services' : 'Loaded aggregate fallback'}</StatusBadge>
+        <StatusBadge tone={loadingSnapshots ? 'caution' : 'context'}>
+          {loadingSnapshots ? `Loading diagnostics ${loadedSnapshotCount}/${diagnosticSnapshotDefinitions.length}` : `${loadedSnapshotCount || diagnosticSnapshotDefinitions.length} diagnostic modules`}
+        </StatusBadge>
+        <span>{agenticQuery.isError ? `Live report unavailable: ${errorMessage(agenticQuery.error)}` : statusMessage}</span>
       </div>
 
-      <Panel title="What Is Driving Usage?" subtitle="Ranked by estimated credit impact">
-        <div className="finding-list">
-          {model.findings.map(finding => (
-            <FindingCard
-              key={finding.rank}
-              finding={finding}
-              active={finding.rank === selected?.rank}
-              onSelect={() => selectFinding(finding)}
-            />
-          ))}
+      <section className={answerStyles.answerBand} data-tone={selected.tone} aria-labelledby="investigation-answer-title">
+        <div className={answerStyles.answerCopy}>
+          <span>Selected finding</span>
+          <h2 id="investigation-answer-title">{selected.title}</h2>
+          <p>{selected.summary}</p>
         </div>
-      </Panel>
+        <div className={answerStyles.answerMetrics}>
+          <MetricReadout label="Confidence" value={selected.confidence} detail={selected.source} />
+          <MetricReadout label="Evidence" value={selected.evidenceCount.toLocaleString()} detail="Linked rows" />
+          <MetricReadout label="Impact signal" value={formatCompact(selected.impactScore)} detail="Ranking score" />
+        </div>
+      </section>
 
-      <div className="stacked-panels">
-        <Panel title="Usage Drain Over Time" subtitle="Observed credits vs baseline">
-          <LineChart series={model.actualVsPredictedSeries} yLabel="Credits" height={230} />
-        </Panel>
-        <Panel title="Projected Weekly Credits" subtitle="Plan trend with confidence intervals">
-          <LineChart series={model.weeklyCreditSeries} yLabel="Credits" height={230} />
-        </Panel>
-        <Panel title="Cache Ratio Over Time" subtitle="Cache behavior around usage windows">
-          <LineChart
-            series={model.cacheSeries}
-            yLabel="Cache Hit %"
-            height={220}
-            valueFormatter={value => `${value}%`}
-          />
-        </Panel>
-        <Panel
-          title="Evidence Table"
-          subtitle={evidenceStatus || `${formatNumber(evidenceCalls.length)} preview calls - ${evidenceBasis.summary}`}
-          action={<StatusBadge label="Rows open investigator" tone="green" />}
-        >
-          <DataTable
-            columns={evidenceColumns}
-            data={evidenceCalls}
-            compact
-            emptyLabel="No loaded aggregate calls match this finding."
-getRowId={call => call.id}
-getRowActionLabel={call => callInvestigatorRowLabel(call, 'workbench call')}
-onRowActivate={call => onOpenInvestigator(call.id)}
-            ariaLabel="Investigator evidence calls"
-          />
-        </Panel>
+      <div className={styles.analysisGrid}>
+        <Surface className={styles.findingsPanel}>
+          <div className={styles.panelHeader}>
+            <div><h2>Ranked findings</h2><p>Confidence, scope, and evidence stay visible while comparing.</p></div>
+            <StatusBadge tone="context">{workspace.findings.length} signals</StatusBadge>
+          </div>
+          <div className={styles.findingList}>
+            {workspace.findings.map(finding => (
+              <button
+                className={styles.findingButton}
+                data-selected={finding.id === selected.id}
+                key={finding.id}
+                type="button"
+                onClick={() => selectFinding(finding)}
+              >
+                <i className={styles.findingSignal} data-tone={finding.tone} aria-hidden="true" />
+                <span className={styles.findingCopy}><strong>{finding.title}</strong><span>{finding.category}</span></span>
+                <span className={styles.findingEvidence}>{finding.evidenceCount} rows</span>
+                <ArrowRight aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </Surface>
+
+        <Surface tone="subtle" className={styles.recommendationPanel}>
+          <div className={styles.panelHeader}>
+            <div><h2>Recommended change</h2><p>Deterministic action from the selected evidence family.</p></div>
+            <StatusBadge tone={toneToBadge(selected.tone)}>{selected.confidence}</StatusBadge>
+          </div>
+          <p className={styles.recommendation}>{selected.action}</p>
+          <dl className={styles.methodList}>
+            <div><dt>Verify with</dt><dd>{selected.verification.join(', ') || 'linked evidence rows'}</dd></div>
+            <div><dt>Missing access</dt><dd>{selected.missingAccess}</dd></div>
+            <div><dt>Privacy</dt><dd>{selected.privacyNote}</dd></div>
+          </dl>
+          <Button variant="primary" onClick={() => selected.evidence[0]?.recordId && onOpenInvestigator(selected.evidence[0].recordId)} disabled={!selected.evidence.some(row => row.recordId)}>
+            <Search />Verify in call
+          </Button>
+        </Surface>
       </div>
 
-      {selected ? (
-        <SelectedFinding
-          finding={selected}
-          calls={evidenceCalls}
-            evidenceBasis={evidenceBasis}
-            evidenceProfile={evidenceProfile}
-            onInspectCalls={() => inspectCalls(selected)}
-            onCopyCallLink={onCopyCallLink}
-            onOpenInvestigator={onOpenInvestigator}
-          />
-      ) : null}
+      <Surface className={styles.fingerprintPanel}>
+        <Visualization
+          spec={fingerprintSpec}
+          height={Math.min(480, Math.max(300, workspace.findings.length * 34))}
+          onSelectionChange={selection => {
+            const findingId = selection.split(':')[0];
+            const finding = workspace.findings.find(candidate => candidate.id === findingId);
+            if (finding) selectFinding(finding);
+          }}
+        />
+      </Surface>
+
+      <section className={styles.ledgerSection}>
+        <div className={styles.panelHeader}>
+          <div><h2>Evidence ledger</h2><p>Each supported row opens the underlying call or thread.</p></div>
+          <StatusBadge tone="positive">{selected.evidence.length} linked</StatusBadge>
+        </div>
+        <InvestigationEvidenceLedger
+          findingTitle={selected.title}
+          rows={selected.evidence}
+          onOpenCall={onOpenInvestigator}
+          onCopyCallLink={onCopyCallLink}
+          onOpenThread={openThread}
+        />
+      </section>
+
+      <Surface className={traceStyles.hypothesisPanel}>
+        <div className={styles.panelHeader}>
+          <div><h2>Local hypothesis trace</h2><p>Bounded pattern exploration over the local content/event index.</p></div>
+          <StatusBadge tone={contextRuntime.contextApiEnabled ? 'positive' : 'neutral'}>
+            {contextRuntime.contextApiEnabled ? 'Content access enabled' : 'Content access off'}
+          </StatusBadge>
+        </div>
+        <div className={traceStyles.hypothesisControls}>
+          <label>
+            <span className="sr-only">Investigation question</span>
+            <FlaskConical aria-hidden="true" />
+            <input value={question} onChange={event => setQuestion(event.target.value)} />
+          </label>
+          <Button variant="primary" onClick={runLocalTrace} disabled={!canUseLive || walkQuery.isFetching}>
+            {contextRuntime.contextApiEnabled ? <FlaskConical /> : <Settings />}
+            {walkQuery.isFetching ? 'Testing' : contextRuntime.contextApiEnabled ? 'Test hypothesis' : 'Enable in Settings'}
+          </Button>
+        </div>
+        {walkQuery.isError ? <p className={traceStyles.errorState}>Local trace failed: {errorMessage(walkQuery.error)}</p> : null}
+        {walkQuery.data ? <TraceResults branches={walkQuery.data.branches} /> : null}
+      </Surface>
+
+      <details className={traceStyles.caveats}>
+        <summary><ShieldCheck />Method and caveats</summary>
+        <ul>{workspace.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul>
+      </details>
     </div>
   );
 }
 
-function FindingCard({
-  finding,
-  active,
-  onSelect,
-}: {
-  finding: Finding;
-  active: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <article className={active ? 'finding-card active' : 'finding-card'}>
-      <div className="finding-rank">{finding.rank}</div>
-      <div className="finding-body">
-        <h3>{finding.title}</h3>
-        <p>{finding.summary}</p>
-        <div className="finding-stats">
-          <strong>{formatNumber(finding.credits)}</strong>
-          <span>{finding.share.toFixed(1)}% total</span>
-        </div>
-      </div>
-      <StatusBadge label={finding.severity} tone={finding.severity === 'High' ? 'red' : 'orange'} />
-      <button className="inline-button" type="button" onClick={onSelect}>
-        Inspect <ArrowRight size={14} />
-      </button>
-    </article>
-  );
+function TraceResults({ branches }: { branches: InvestigationWalkBranch[] }) {
+  const supported = branches.filter(branch => branch.status !== 'no_evidence');
+  return supported.length ? (
+    <div className={traceStyles.traceResults}>
+      {supported.slice(0, 5).map((branch, index) => (
+        <article key={`${branch.scan_type ?? 'branch'}-${index}`}>
+          <StatusBadge tone={Number(branch.score ?? 0) >= 60 ? 'positive' : 'caution'}>{String(branch.status ?? 'evidence')}</StatusBadge>
+          <strong>{String(branch.hypothesis ?? branch.scan_type ?? 'Local pattern')}</strong>
+          <span>{Number(branch.score ?? 0).toLocaleString()} score</span>
+        </article>
+      ))}
+    </div>
+  ) : <p className={traceStyles.emptyState}>No supported local pattern met the current threshold.</p>;
 }
 
-function SelectedFinding({
-  finding,
-  calls,
-  evidenceBasis,
-  evidenceProfile,
-  onInspectCalls,
-  onCopyCallLink,
-  onOpenInvestigator,
-}: {
-  finding: Finding;
-  calls: CallRow[];
-  evidenceBasis: EvidenceBasis;
-  evidenceProfile: EvidenceProfile;
-  onInspectCalls: () => void;
-  onCopyCallLink: (recordId: string) => void;
-  onOpenInvestigator: (recordId: string) => void;
-}) {
-  return (
-    <aside className="side-panel">
-      <Panel title="Selected Finding" subtitle={finding.title}>
-        <div className="detail-stat-grid">
-          <span>
-            <strong>{formatNumber(finding.credits)}</strong>
-            Est. Credits
-          </span>
-          <span>
-            <strong>{finding.share.toFixed(1)}%</strong>
-            Share
-          </span>
-          <span>
-            <strong>2.4x</strong>
-            vs baseline
-          </span>
-        </div>
-
-        <h3>Why This Matters</h3>
-        <p>{finding.summary} The signal is visible in aggregate timing, token, cache, and cost measures.</p>
-
-        <div className="finding-module">
-          <div className="section-heading compact">
-            <h3>Evidence Profile</h3>
-            <span>{calls.length ? `${calls.length} matched` : 'No matches'}</span>
-          </div>
-          <div className="evidence-list">
-            <span>
-              Calls <strong>{formatNumber(evidenceProfile.callCount)}</strong>
-            </span>
-            <span>
-              Tokens <strong>{formatCompact(evidenceProfile.totalTokens)}</strong>
-            </span>
-            <span>
-              Cache hit <strong>{pct(evidenceProfile.avgCachePct)}</strong>
-            </span>
-            <span>
-              Cost <strong>{money(evidenceProfile.estimatedCost)}</strong>
-            </span>
-            <span>
-              Models <strong>{formatNumber(evidenceProfile.modelCount)}</strong>
-            </span>
-          </div>
-      </div>
-
-      <div className="finding-module">
-        <h3>Evidence Basis</h3>
-        <ul className="compact-list">
-          <li>Selection: {evidenceBasis.selection}</li>
-          <li>Order: {evidenceBasis.ordering}</li>
-          <li>Limit: {evidenceBasis.limit}</li>
-        </ul>
-      </div>
-
-      <div className="finding-module">
-        <div className="section-heading compact">
-          <h3>Evidence Calls</h3>
-            <span>{calls.length ? 'Open any row' : 'No loaded rows'}</span>
-          </div>
-          {calls.length ? (
-            <ol className="thread-mini-timeline">
-              {calls.slice(0, 4).map(call => (
-              <li
-                key={`${finding.rank}-${call.id}`}
-                className="workbench-call-row has-row-action"
-                tabIndex={0}
-                aria-label={`Open investigator for workbench evidence call ${call.thread} ${call.model}`}
-                onClick={() => onOpenInvestigator(call.id)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onOpenInvestigator(call.id);
-                  }
-                }}
-              >
-                  <span>{call.time}</span>
-                  <strong>{call.thread}</strong>
-                  <em>
-                    {call.model} / {call.effort} - {formatCompact(call.totalTokens)} tokens - {pct(call.cachedPct)} cache
-                  </em>
-                  <div className="thread-call-actions table-action-group">
-                    <button
-                      className="table-action-button"
-                      type="button"
-                      aria-label={`Open investigator for workbench evidence call ${call.thread} ${call.model}`}
- onKeyDown={stopRowActionKeyDown}
-                      onClick={event => {
-                        event.stopPropagation();
-                        onOpenInvestigator(call.id);
-                      }}
-                    >
-                      <Search size={14} />
-                      Open
-                    </button>
-                    <button
-                      className="table-action-button"
-                      type="button"
-                      aria-label={`Copy link for workbench evidence call ${call.thread} ${call.model}`}
- onKeyDown={stopRowActionKeyDown}
-                      onClick={event => {
-                        event.stopPropagation();
-                        onCopyCallLink(call.id);
-                      }}
-                    >
-                      <Copy size={14} />
-                      Copy
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="empty-state">No loaded aggregate calls match this finding.</p>
-          )}
-        </div>
-
-        <div className="finding-module">
-          <h3>Suggested Next Step</h3>
-          <ul className="compact-list">
-            <li>{recommendationForFinding(finding)}</li>
-          </ul>
-        </div>
-
-        <button className="primary-button stretch" type="button" onClick={onInspectCalls}>
-          Inspect Calls <ArrowRight size={16} />
-        </button>
-      </Panel>
-    </aside>
-  );
+function snapshotQueryKey(key: string, runtime: ContextRuntime, revision: string) {
+  return ['investigations', 'snapshot', key, runtime.apiToken, revision] as const;
 }
 
-function callsForFinding(finding: Finding, calls: CallRow[]): CallRow[] {
-  const title = finding.title.toLowerCase();
-  const rows = [...calls];
-
-  if (title.includes('cache')) {
-    return rows
-      .filter(call => call.signal === 'cache-risk' || call.cachedPct < 35 || call.uncachedInput > 50_000)
-      .sort(
-        (left, right) =>
-          left.cachedPct - right.cachedPct ||
-          right.uncachedInput - left.uncachedInput ||
-          right.totalTokens - left.totalTokens,
-      )
-      .slice(0, 8);
-  }
-
-  if (title.includes('effort') || title.includes('reasoning')) {
-    return rows
-      .filter(call => call.effort.toLowerCase() === 'high' || call.reasoningOutput > 0)
-      .sort((left, right) => right.reasoningOutput - left.reasoningOutput || right.totalTokens - left.totalTokens)
-      .slice(0, 8);
-  }
-
-  if (title.includes('tool') || title.includes('output')) {
-    return rows
-      .filter(call => call.tags.some(tag => ['file-heavy', 'subagent', 'large'].includes(tag)) || call.output > 25_000)
-      .sort((left, right) => right.output - left.output || right.input - left.input)
-      .slice(0, 8);
-  }
-
-  const threadHint = threadHintFromFinding(title);
-  if (threadHint) {
-    const matches = rows.filter(call => call.thread.toLowerCase().includes(threadHint));
-    if (matches.length) {
-      return topCalls(matches, 8);
-    }
-  }
-
-  if (title.includes('thread')) {
-    return topCalls(rows, 8);
-  }
-
-  return rows.sort((left, right) => right.credits - left.credits || right.totalTokens - left.totalTokens).slice(0, 8);
+function resolveSelectedFinding(findings: InvestigationFinding[], requested: string): InvestigationFinding | undefined {
+  const direct = findings.find(finding => finding.id === requested);
+  if (direct) return direct;
+  const rank = Number(requested);
+  return Number.isFinite(rank) && rank > 0 ? findings[rank - 1] ?? findings[0] : findings[0];
 }
 
-function findingFromUrl(findings: Finding[]): Finding | undefined {
-  const rank = Number(new URLSearchParams(window.location.search).get('finding') ?? '');
-  return Number.isFinite(rank) ? findings.find(finding => finding.rank === rank) : undefined;
-}
-
-function syncSelectedFindingUrl(rank: number) {
-  const url = new URL(window.location.href);
-  url.searchParams.set('view', 'investigator');
-  url.searchParams.set('finding', String(rank));
-  window.history.replaceState(null, '', url);
-}
-
-function findingEvidenceBasis(finding: Finding | undefined, calls: CallRow[]): EvidenceBasis {
-  const title = finding?.title.toLowerCase() ?? '';
-  if (title.includes('cache')) {
-    return {
-      selection: 'cache-risk, cache below 35%, or uncached input above 50K',
-      ordering: 'lowest cache hit rate, then highest uncached input',
-      limit: 'top 8 loaded aggregate rows',
-      summary: 'cache-risk evidence sorted by weakest cache',
-    };
-  }
-  if (title.includes('effort') || title.includes('reasoning')) {
-    return {
-      selection: 'high-effort calls or calls with reasoning output',
-      ordering: 'reasoning output descending, then total tokens',
-      limit: 'top 8 loaded aggregate rows',
-      summary: 'effort evidence sorted by reasoning output',
-    };
-  }
-  if (title.includes('tool') || title.includes('output')) {
-    return {
-      selection: 'file-heavy, subagent, large-tag, or high-output calls',
-      ordering: 'output tokens descending, then input tokens',
-      limit: 'top 8 loaded aggregate rows',
-      summary: 'tool/output evidence sorted by output tokens',
-    };
-  }
-  const threadHint = threadHintFromFinding(title);
-  if (threadHint && calls.some(call => call.thread.toLowerCase().includes(threadHint))) {
-    return {
-      selection: 'calls matching the thread named in this finding',
-      ordering: 'total tokens descending, then estimated cost',
-      limit: 'top 8 loaded aggregate rows',
-      summary: 'thread-matched evidence sorted by total tokens',
-    };
-  }
-  return {
-    selection: title.includes('thread') ? 'highest-impact calls across loaded threads' : 'highest estimated Codex credit impact',
-    ordering: title.includes('thread') ? 'total tokens descending, then estimated cost' : 'Codex credits descending, then total tokens',
-    limit: 'top 8 loaded aggregate rows',
-    summary: title.includes('thread') ? 'thread evidence sorted by total tokens' : 'credit-impact evidence sorted by credits',
-  };
+function readFindingParam(): string {
+  return new URLSearchParams(window.location.search).get('finding') ?? '';
 }
 
 function topCalls(calls: CallRow[], limit: number): CallRow[] {
-  return [...calls].sort((left, right) => right.totalTokens - left.totalTokens || right.cost - left.cost).slice(0, limit);
+  return [...calls].sort((left, right) => right.totalTokens - left.totalTokens).slice(0, limit);
 }
 
-function threadHintFromFinding(title: string): string {
-  const threadMatch = title.match(/thread:\s*([a-z0-9._-]+)/i);
-  return threadMatch?.[1]?.toLowerCase() ?? '';
+function toneToBadge(tone: InvestigationTone): 'neutral' | 'positive' | 'caution' | 'risk' | 'context' {
+  return tone;
 }
 
-function summarizeEvidence(calls: CallRow[]): EvidenceProfile {
-  const callCount = calls.length;
-  const totalTokens = calls.reduce((sum, call) => sum + call.totalTokens, 0);
-  const estimatedCost = calls.reduce((sum, call) => sum + call.cost, 0);
-  const avgCachePct = callCount ? calls.reduce((sum, call) => sum + call.cachedPct, 0) / callCount : 0;
-  const modelCount = new Set(calls.map(call => call.model)).size;
-  return { callCount, totalTokens, avgCachePct, estimatedCost, modelCount };
+function downloadJson(filename: string, payload: unknown): void {
+  const serialized = JSON.stringify(payload, null, 2);
+  const blob = new Blob([serialized], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
-function recommendationForFinding(finding: Finding): string {
-  const title = finding.title.toLowerCase();
-  if (title.includes('cache')) return 'Open the lowest-cache evidence call and inspect uncached input before continuing.';
-  if (title.includes('effort') || title.includes('reasoning')) {
-    return 'Open a high-effort call and verify the effort level matched the task complexity.';
-  }
-  if (title.includes('tool') || title.includes('output')) {
-    return 'Open a tool-heavy call and trim noisy command output before the next model turn.';
-  }
-  return 'Open the highest-impact call and inspect thread context before deciding whether to split or summarize.';
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

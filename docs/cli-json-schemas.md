@@ -53,6 +53,9 @@ Tracked schema ids:
 | `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
 | `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
 | `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response, MCP `usage_report_pack(...)` |
+| | Includes the UTC `generated_at` timestamp, aggregate report definitions, aggregate linked-call evidence, and `raw_context_included: false`. |
+| `codex-usage-tracker-visualization-suggestions-v1` | MCP `usage_visualization_suggest(...)`; ranked semantic visualization intents |
+| `codex-usage-tracker-visualization-result-v1` | MCP `usage_visualization_render(...)`; `VisualizationSpecV1`, compact table-equivalent evidence, narrative, and caveats |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
@@ -83,13 +86,13 @@ Tracked schema ids:
 | `codex-usage-tracker-content-search-v1` | MCP `usage_content_search(...)`; explicit local content-index search, may include indexed snippets |
 | `codex-usage-tracker-thread-trace-v1` | MCP `usage_thread_trace(...)`; explicit local content-index thread/session timeline |
 | `codex-usage-tracker-pattern-scan-v1` | MCP `usage_repetition_scan(...)`, `usage_command_loop_scan(...)`, `usage_file_churn_scan(...)`, `usage_context_bloat_scan(...)`; explicit local content/event-index pattern diagnostics |
-| `codex-usage-tracker-repeated-file-rediscovery-v1` | MCP `usage_repeated_file_rediscovery(...)`; repeated safe file identity rediscovery candidates without full paths |
-| `codex-usage-tracker-shell-churn-v1` | MCP `usage_shell_churn(...)`; repeated shell command family diagnostics without raw command output |
-| `codex-usage-tracker-large-low-output-v1` | MCP `usage_large_low_output_calls(...)`; high-token low-output call candidates without raw fragments |
+| `codex-usage-tracker-repeated-file-rediscovery-v1` | MCP `usage_repeated_file_rediscovery(...)`, dashboard server `/api/investigations/repeated-files`; repeated safe file identity rediscovery candidates without full paths |
+| `codex-usage-tracker-shell-churn-v1` | MCP `usage_shell_churn(...)`, dashboard server `/api/investigations/shell-churn`; repeated shell command family diagnostics without raw command output |
+| `codex-usage-tracker-large-low-output-v1` | MCP `usage_large_low_output_calls(...)`, dashboard server `/api/investigations/large-low-output`; high-token low-output call candidates without raw fragments |
 | `codex-usage-tracker-investigation-suggestions-v1` | MCP `usage_suggest_investigations(...)`; goal-led usage investigation suggestions for agents |
-| `codex-usage-tracker-agentic-investigation-v1` | MCP `usage_investigate(...)`; goal-led aggregate investigation findings and next tools |
+| `codex-usage-tracker-agentic-investigation-v1` | MCP `usage_investigate(...)`, dashboard server `/api/investigations/agentic`; goal-led aggregate investigation findings and next tools |
 | `codex-usage-tracker-hypothesis-test-v1` | MCP `usage_test_hypotheses(...)`; explicit true/false/partial/insufficient hypothesis tests |
-| `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`; bounded local hypothesis walk over normalized pattern evidence |
+| `codex-usage-tracker-investigation-walk-v1` | MCP `usage_investigation_walk(question=...)`, dashboard server `/api/investigations/walk`; bounded local hypothesis walk over normalized pattern evidence |
 | `codex-usage-tracker-local-evidence-export-v1` | MCP `usage_local_evidence_export(question=...)`; strict shareable local evidence summary without raw/indexed content |
 | `codex-usage-tracker-export-v1` | CLI `export --json`, MCP `export_usage_csv(...)` |
 | `codex-usage-tracker-init-pricing-v1` | CLI `init-pricing --json`, MCP `init_usage_pricing_config()` |
@@ -133,6 +136,7 @@ Schema: `codex-usage-tracker-summary-v1`
   "schema": "codex-usage-tracker-summary-v1",
   "group_by": "model",
   "is_expensive": false,
+  "include_archived": true,
   "privacy_mode": "normal",
   "row_count": 1,
   "rows": []
@@ -140,6 +144,10 @@ Schema: `codex-usage-tracker-summary-v1`
 ```
 
 `rows` contains aggregate summary rows for `summary` and aggregate per-call rows for `expensive`.
+`include_archived` records the resolved history scope. CLI and MCP summary calls retain their
+existing all-history default; the dashboard `/api/summary` endpoint defaults to active history and
+accepts `include_archived=true` when the user selects all history.
+Summary and expensive-call reports treat `limit=0` as no finite row cap.
 
 ## Query
 

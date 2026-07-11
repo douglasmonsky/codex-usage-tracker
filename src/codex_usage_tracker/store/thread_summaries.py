@@ -68,13 +68,49 @@ def query_thread_summaries(
 ) -> list[dict[str, Any]]:
     """Return materialized thread summaries for live dashboard APIs."""
 
-    clauses = ["is_archived_scope = ?"]
-    params: list[Any] = ["all-history" if include_archived else "active"]
-    if search:
-        like = f"%{search}%"
-        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
-        params.extend([like, like])
-    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
+    where_clause, params = _thread_summary_where_clause(
+        search=search,
+        include_archived=include_archived,
+    )
+    sort_column = _thread_summary_sort_column(sort)
+    direction_sql = normalize_sort_direction(direction)
+    normalized_limit = normalize_limit(limit)
+    normalized_offset = normalize_offset(offset)
+    limit_clause, query_params = _thread_summary_limit_clause(
+        normalized_limit,
+        normalized_offset,
+        params,
+    )
+    usage_thread_key = thread_key_expression("u.")
+    active_usage_filter = _active_usage_filter(include_archived)
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                t.*,
+                (
+                    SELECT u.record_id
+                    FROM usage_events AS u
+                    WHERE {usage_thread_key} = t.thread_key
+                    {active_usage_filter}
+                    ORDER BY
+                        u.event_timestamp DESC,
+                        u.cumulative_total_tokens DESC,
+                        u.record_id DESC
+                    LIMIT 1
+                ) AS latest_record_id
+            FROM thread_summaries AS t
+            {where_clause}
+            ORDER BY {sort_column} {direction_sql}, latest_event_timestamp DESC
+            {limit_clause}
+            """,
+            query_params,
+        ).fetchall()
+    return [row_to_dict(row) for row in rows]
+
+
+def _thread_summary_sort_column(sort: str) -> str:
     sort_map = {
         "tokens": "total_tokens",
         "time": "latest_event_timestamp",
@@ -85,33 +121,66 @@ def query_thread_summaries(
     if sort not in sort_map:
         allowed = ", ".join(sorted(sort_map))
         raise ValueError(f"sort must be one of: {allowed}")
-    direction_sql = normalize_sort_direction(direction)
-    normalized_limit = normalize_limit(limit)
-    normalized_offset = normalize_offset(offset)
-    limit_clause = ""
+    return sort_map[sort]
+
+
+def _thread_summary_limit_clause(
+    limit: int | None,
+    offset: int,
+    params: list[Any],
+) -> tuple[str, list[Any]]:
     query_params = list(params)
-    if normalized_limit is not None:
-        limit_clause = "LIMIT ?"
-        query_params.append(normalized_limit)
-        if normalized_offset:
-            limit_clause += " OFFSET ?"
-            query_params.append(normalized_offset)
-    elif normalized_offset:
-        limit_clause = "LIMIT -1 OFFSET ?"
-        query_params.append(normalized_offset)
+    if limit is not None:
+        query_params.append(limit)
+        if offset:
+            query_params.append(offset)
+            return "LIMIT ? OFFSET ?", query_params
+        return "LIMIT ?", query_params
+    if offset:
+        query_params.append(offset)
+        return "LIMIT -1 OFFSET ?", query_params
+    return "", query_params
+
+
+def _active_usage_filter(include_archived: bool) -> str:
+    if include_archived:
+        return ""
+    return "AND coalesce(u.is_archived, 0) = 0"
+
+
+def query_thread_summary_count(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    search: str | None = None,
+    include_archived: bool = False,
+) -> int:
+    """Return the number of thread summaries matching list filters."""
+
+    where_clause, params = _thread_summary_where_clause(
+        search=search,
+        include_archived=include_archived,
+    )
     with connect(db_path) as conn:
         init_db(conn)
-        rows = conn.execute(
-            f"""
-            SELECT *
-            FROM thread_summaries
-            {where_clause}
-            ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
-            {limit_clause}
-            """,
-            query_params,
-        ).fetchall()
-    return [row_to_dict(row) for row in rows]
+        row = conn.execute(
+            f"SELECT COUNT(*) AS row_count FROM thread_summaries {where_clause}",
+            params,
+        ).fetchone()
+    return int(row["row_count"] if row is not None else 0)
+
+
+def _thread_summary_where_clause(
+    *,
+    search: str | None,
+    include_archived: bool,
+) -> tuple[str, list[Any]]:
+    clauses = ["is_archived_scope = ?"]
+    params: list[Any] = ["all-history" if include_archived else "active"]
+    if search:
+        like = f"%{search}%"
+        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
+        params.extend([like, like])
+    return "WHERE " + " AND ".join(f"({clause})" for clause in clauses), params
 
 
 def _insert_thread_summary_scope(
