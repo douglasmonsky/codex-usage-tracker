@@ -53,6 +53,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     """Create or repair the aggregate usage schema in-place."""
 
     user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if _schema_is_current(conn, user_version):
+        _validate_usage_events_schema(conn)
+        return
     _ensure_migrations_table(conn)
     for version, migrate in _schema_migrations():
         _apply_schema_migration(
@@ -63,6 +66,20 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
     _validate_usage_events_schema(conn)
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+def _schema_is_current(conn: sqlite3.Connection, user_version: int) -> bool:
+    if user_version != SCHEMA_VERSION:
+        return False
+    migrations_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"
+    ).fetchone()
+    if migrations_table is None:
+        return False
+    recorded_versions = {
+        int(row[0]) for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+    }
+    return all(version in recorded_versions for version, _ in _schema_migrations())
 
 
 def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None]], ...]:

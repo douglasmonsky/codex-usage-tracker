@@ -17,7 +17,9 @@ def connect(db_path: Path = DEFAULT_DB_PATH) -> Iterator[sqlite3.Connection]:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout = 5000")
     with suppress(sqlite3.DatabaseError):
-        conn.execute("PRAGMA journal_mode = WAL")
+        journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        if str(journal_mode).lower() != "wal":
+            conn.execute("PRAGMA journal_mode = WAL")
     try:
         yield conn
         conn.commit()
