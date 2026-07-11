@@ -65,6 +65,7 @@ def test_allowance_visualization_preserves_backend_grade_and_candidate() -> None
 def test_visualization_numbers_reject_non_finite_values() -> None:
     assert _optional_number(float("nan")) is None
     assert _optional_number(float("inf")) is None
+    assert _optional_number("not-a-number") is None
     assert _optional_number("12.5") == 12.5
 
 

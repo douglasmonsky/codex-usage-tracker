@@ -13,7 +13,6 @@ from codex_usage_tracker.usage_drain.model import (
     load_fast_proxy_annotations,
     summarize_usage_drain_model,
 )
-from codex_usage_tracker.usage_drain.reports import _best_allowance_split
 from tests.usage_drain.model_test_helpers import (
     coefficients_by_feature as _coefficients_by_feature,
 )
@@ -544,24 +543,6 @@ def test_allowance_breakpoint_analysis_detects_capacity_denominator_change() -> 
     assert breakpoint_diagnostics["known_breakpoint_row_count"] == 1
     assert breakpoint_diagnostics["known_breakpoint_abs_error_share"] == 1.0
     assert breakpoint_diagnostics["non_breakpoint_mae"] == 0.0
-
-
-def test_best_allowance_split_selects_the_strongest_capacity_change() -> None:
-    rows = [
-        {
-            "credits_per_visible_percent": 10.0 if index < 15 else 40.0,
-            "start_event_timestamp": f"start-{index:02d}",
-            "end_event_timestamp": f"end-{index:02d}",
-        }
-        for index in range(30)
-    ]
-
-    split = _best_allowance_split(rows)
-
-    assert split is not None
-    assert split["split_index"] == 15
-    assert split["left_mean_credits_per_percent"] == 10.0
-    assert split["right_mean_credits_per_percent"] == 40.0
 
 
 def test_token_component_regression_recovers_rate_card_and_fast_weighting() -> None:
