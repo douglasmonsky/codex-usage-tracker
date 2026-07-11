@@ -1,4 +1,4 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, within } from './test-utils/appTestHarness';
 
 describe('React dashboard shell global filters', () => {
   installAppTestHooks();
@@ -14,8 +14,9 @@ describe('React dashboard shell global filters', () => {
     expect(params.get('model')).toBe('o4-mini');
     expect(params.get('effort')).toBe('medium');
     expect(params.get('confidence')).toBe('cost-estimated');
-    expect(screen.getByText('thread-7b2e91')).toBeInTheDocument();
-    expect(screen.queryByText('thread-9f3a1c')).not.toBeInTheDocument();
+    const recentCalls = screen.getByRole('table', { name: 'Recent calls' });
+    expect(within(recentCalls).getByText('thread-7b2e91')).toBeInTheDocument();
+    expect(within(recentCalls).queryByText('thread-9f3a1c')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Global start date'), { target: { value: '2026-05-01' } });
     fireEvent.change(screen.getByLabelText('Global end date'), { target: { value: '2026-05-01' } });
@@ -39,7 +40,7 @@ describe('React dashboard shell global filters', () => {
     expect(clearedParams.get('from')).toBeNull();
     expect(clearedParams.get('to')).toBeNull();
     expect(screen.queryByText('Custom: 2026-05-01 to 2026-05-01')).not.toBeInTheDocument();
-    expect(screen.getByText('thread-9f3a1c')).toBeInTheDocument();
+    expect(within(recentCalls).getByText('thread-9f3a1c')).toBeInTheDocument();
   });
 
   it('ports the legacy invalid custom date range status', () => {

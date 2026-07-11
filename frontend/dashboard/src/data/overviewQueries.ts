@@ -2,6 +2,11 @@ import { queryOptions } from '@tanstack/react-query';
 
 import type { ContextRuntime } from '../api/types';
 import {
+  persistentOverviewEndpointCache,
+  type OverviewEndpointCache,
+  type OverviewEndpointCacheIdentity,
+} from './overviewEndpointCache';
+import {
   decodeOverviewRecommendations,
   decodeOverviewSummary,
   type OverviewRecommendationsReport,
@@ -22,6 +27,8 @@ type OverviewEndpointRequest = {
   runtime: ContextRuntime;
   includeArchived: boolean;
   since?: string;
+  sourceRevision?: string;
+  cache?: OverviewEndpointCache;
   signal?: AbortSignal;
 };
 
@@ -50,9 +57,14 @@ export async function loadOverviewEndpoints({
   runtime,
   includeArchived,
   since,
+  sourceRevision,
+  cache = persistentOverviewEndpointCache,
   signal,
 }: OverviewEndpointRequest): Promise<OverviewEndpointBundle> {
   assertOverviewApiAvailable(runtime);
+  const cacheIdentity = overviewCacheIdentity(includeArchived, since, sourceRevision);
+  const cachedBundle = cacheIdentity ? cache.read(cacheIdentity) : null;
+  if (cachedBundle) return cachedBundle;
   const [summary, recommendations] = await Promise.allSettled([
     loadSummary(runtime, includeArchived, since, signal),
     loadRecommendations(runtime, includeArchived, since, signal),
@@ -63,10 +75,23 @@ export async function loadOverviewEndpoints({
       'Overview summary and recommendations are unavailable.',
     );
   }
-  return {
+  const bundle = {
     summary: settledResource(summary),
     recommendations: settledResource(recommendations),
   };
+  if (cacheIdentity && !bundle.summary.error && !bundle.recommendations.error) {
+    cache.write(cacheIdentity, bundle);
+  }
+  return bundle;
+}
+
+function overviewCacheIdentity(
+  includeArchived: boolean,
+  since: string | undefined,
+  sourceRevision: string | undefined,
+): OverviewEndpointCacheIdentity | null {
+  if (!sourceRevision) return null;
+  return { includeArchived, since: since ?? '', sourceRevision };
 }
 
 async function loadSummary(

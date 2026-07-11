@@ -232,7 +232,7 @@ fireEvent.click(screen.getByRole('button', { name: /^Refresh$/i }));
 
     expect(await screen.findByText('after-refresh-thread')).toBeInTheDocument();
     expect(screen.queryByText('before-refresh-thread')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Live refresh loaded 1 of 44 aggregate rows').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Refreshed index; loaded 1 of 44 calls from Most recent 500').length).toBeGreaterThan(0);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/usage?');
     expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=1');
@@ -315,7 +315,7 @@ it('applies typed row limits only after Load is clicked', async () => {
   expect(String(fetchMock.mock.calls[0][0])).toContain('limit=250000');
 });
 
-it('can request an uncapped row range', async () => {
+it('switches to all-history scope without materializing an uncapped browser payload', async () => {
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'row-limit-token',
     context_api_enabled: true,
@@ -349,7 +349,8 @@ it('can request an uncapped row range', async () => {
         context_api_enabled: true,
         loaded_row_count: 2,
         total_available_rows: 2,
-        limit: null,
+        limit: 500,
+        load_window: 'all',
         rows: [
           {
             record_id: 'row-limit-after-a',
@@ -382,21 +383,14 @@ it('can request an uncapped row range', async () => {
   vi.stubGlobal('fetch', fetchMock);
 
 render(<App />);
-const rowLimitSlider = screen.getByLabelText('Rows to load slider');
-fireEvent.click(screen.getByLabelText('No row cap'));
-
-    expect(screen.getByText('No cap enabled')).toBeInTheDocument();
-    expect(screen.getAllByText('No cap').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText('No row cap')).toBeChecked();
-    expect(rowLimitSlider).not.toBeDisabled();
-    expect(rowLimitSlider.getAttribute('aria-valuetext')).toContain('No row cap');
-
-  fireEvent.click(screen.getByRole('button', { name: /^Load all$/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'All time' }));
 
   expect(await screen.findByText('row-limit-after-thread-a')).toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=10000');
-  expect(screen.getAllByText(/no row cap/i).length).toBeGreaterThan(0);
+  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
+  expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('refreshes usage rows when history scope changes', async () => {
@@ -473,11 +467,11 @@ it('refreshes usage rows when history scope changes', async () => {
 
     expect(await screen.findByText('all-history-thread')).toBeInTheDocument();
   expect(screen.queryByText('active-history-thread')).not.toBeInTheDocument();
-  expect(screen.getAllByText('All history - 500 rows').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('All sessions - Most recent 500').length).toBeGreaterThan(0);
   expect(screen.getByText('All history includes 6 archived calls')).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/usage?');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=1');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
     expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
     expect(String(fetchMock.mock.calls[0][0])).toContain('include_archived=1');
   expect(fetchMock.mock.calls[0][1]).toEqual(
@@ -565,7 +559,7 @@ it('refreshes aggregate report evidence through the shell live usage API', async
 
   fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
-  expect((await screen.findAllByText('Live refresh loaded 1 of 7 aggregate rows')).length).toBeGreaterThan(0);
+  expect((await screen.findAllByText('Refreshed index; loaded 1 of 7 calls from Most recent 500')).length).toBeGreaterThan(0);
   expect(screen.getAllByText('report-after-thread').length).toBeGreaterThan(0);
   expect(screen.queryByText('report-before-thread')).not.toBeInTheDocument();
   await waitFor(() => expect(usageCalls()).toHaveLength(1));

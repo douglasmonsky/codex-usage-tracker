@@ -7,8 +7,8 @@ deferred work so the final switch does not rely on an informal visual review.
 Status meanings:
 
 - **Complete**: implemented and covered by focused tests or browser evidence.
-- **R11 gate**: behavior exists, but release-candidate accessibility,
-  performance, package, or viewport evidence is still required.
+- **R11 gate**: behavior exists, but release-candidate evidence is still
+  required. No ledger row remains in this state after the local R11 pass.
 - **Deferred**: deliberately outside the redesign release, with the current
   behavior retained.
 
@@ -39,12 +39,12 @@ Overview instead of producing a broken route.
 | Unofficial-project notice | Complete | Persistent trust strip and sidebar status. |
 | Global search | Complete | Filters compatible workspace evidence and exports. |
 | Active/all-history scope | Complete | URL and session preference persistence; live refresh retains scope. |
-| Finite row limit, slider, typed input, No cap, Load more | Complete | `limit=0` remains unbounded; session settings restore after reload. |
+| All-time/24-hour/7-day/recent-row windows | Complete | All time is the live default with exact full-scope totals and 500 bounded evidence rows; typed recent-row limits remain available. API `limit=0` remains compatible. |
 | Loading progress, cancel, stale-data retention | Complete | Refresh keeps the stored snapshot visible and exposes phase/progress when available. |
 | Static/live state, refresh, auto refresh | Complete | Static controls are honestly disabled; live token-gated requests stay local. |
 | Current-view CSV and copy link | Complete | Route-specific exports and URL-backed state are tested. |
 | Language and text direction | Complete | Existing catalog selection, local persistence, `lang`, and `dir` behavior remain in the shell. |
-| Query/cache reuse across routes and reload | R11 gate | Implemented through shared query/runtime metadata; benchmark and invalidation evidence remains an R11 gate. |
+| Query/cache reuse across routes and reload | Complete | TanStack Query handles route reuse; revision-matched IndexedDB snapshots restore bounded usage evidence, and the small Overview endpoint bundle restores from revision-matched browser storage. Real-data warm reloads issue no usage, summary, or recommendation request. |
 
 ## Workspace Parity
 
@@ -65,7 +65,7 @@ Overview instead of producing a broken route.
 
 | Contract | Status | Notes |
 | --- | --- | --- |
-| Static packaged dashboard | R11 gate | All workspaces retain fixture fallback; package-asset and install smoke remain release-candidate gates. |
+| Static packaged dashboard | Complete | All workspaces retain fixture fallback; wheel install, package-resource, React-route, and legacy rollback smoke checks pass. |
 | Localhost token-gated API | Complete | Server state is shared through typed clients and query caching; raw context is opt-in only. |
 | Calls and threads APIs | Complete | Filtering, sorting, paging, `limit=0`, and linked identities retained. |
 | Allowance history/diagnostics/export APIs | Complete | Limits renders the shared detector payload instead of reimplementing detection in React. |
@@ -86,9 +86,9 @@ The following items are not silent omissions:
 - The redesign does not add writable pricing, allowance, privacy, or parser
   configuration controls. Settings reports the authoritative local state and
   points users to existing configuration workflows.
-- R11 still owns full route/viewport automation, axe and keyboard evidence,
-  200% zoom, reduced motion, contrast, large-row performance, reload/cache
-  benchmarks, package verification, synthetic documentation screenshots, and
-  rollback/default-switch instructions.
-- The final default switch and merge to `main` remain blocked until the R11
-  evidence and R12 maintainer review are complete.
+- R11 completed the desktop route matrix, axe and keyboard evidence, 200% zoom,
+  reduced motion, contrast, large-row performance, reload/cache benchmarks,
+  package verification, synthetic documentation screenshots, and rollback
+  rehearsal.
+- The final merge to `main` remains blocked on the R12 branch audit, PR checks,
+  and maintainer approval.

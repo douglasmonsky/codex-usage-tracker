@@ -33,6 +33,7 @@ from codex_usage_tracker.parser.state import ParserState, optional_str
 KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset(
     {
         "agent_message",
+        "agent_reasoning",
         "context_compacted",
         "image_generation_end",
         "item_completed",
@@ -44,9 +45,11 @@ KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset(
         "skill_selected",
         "skill_started",
         "skill_used",
+        "sub_agent_activity",
         "task_complete",
         "task_started",
         "thread_goal_updated",
+        "thread_settings_applied",
         "thread_rolled_back",
         "turn_aborted",
         "user_message",

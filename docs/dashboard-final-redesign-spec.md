@@ -95,21 +95,31 @@ work without requiring the record to be in the loaded page.
 
 Data loading is a product concept, not an implementation detail.
 
-- The command bar shows `5,000 loaded / 42,318 indexed`, history scope, freshness,
-  and active refresh progress in one compact control.
-- Activating the control opens a Data Scope popover on desktop and a sheet on
-  mobile.
-- Users can type any finite limit, use a continuous range control for common
-  values, select No cap, and Load more without losing page/filter state.
-- `limit=0` and `limit=None` keep their documented unbounded semantics.
+- The compact Data Window control shows the selected time range, bounded evidence
+  rows, exact matching-call total, history scope, and active refresh progress.
+- `All time` is the live default. `Last 24h`, `Last 7 days`, and a typed recent-row
+  window remain one action away without losing page/filter state.
+- Uncapped time windows aggregate the complete selected scope server-side while
+  materializing at most 500 recent evidence rows in the browser. Focused tables
+  page the complete result set instead of downloading it all at once.
+- API/CLI `limit=0` and `limit=None` keep their documented unbounded compatibility
+  semantics; the dashboard no longer requires that memory-heavy path for All time.
 - Refresh progress exposes phase, processed files/records, percent when known,
   elapsed time, and cancel/retry where supported.
-- Query cache and persisted scope preferences survive route changes and normal
-  page reloads. New source events invalidate only affected queries.
+- TanStack Query handles route-level reuse, and revision-validated IndexedDB
+  snapshots survive normal page reloads. Explicit refresh bypasses the persistent
+  snapshot; a new index revision invalidates old entries. The compact Overview
+  endpoint bundle uses the same revision contract in browser storage so warm
+  reloads do not repeat its full-history summary and recommendation scans.
 - Stale data remains visible while background refresh runs; the application does
   not replace useful content with an empty loading page.
 
 ## Visual Language
+
+The release target is a desktop-first professional workstation UI. Visual QA
+and interaction budgets cover compact desktop (1280x800) and standard desktop
+(1600x900). Narrower windows should remain recoverable, but tablet and mobile
+polish are not release criteria for this dashboard.
 
 ### Character
 
@@ -191,6 +201,8 @@ Used by Calls, Threads, Tools and Files:
 - Adopt modular Apache ECharts core for complex interactive visualizations, using
   only required chart/components and the SVG renderer. Wrap it in an internal
   React adapter rather than exposing ECharts options to feature modules.
+- Reserve Three.js for the specialized, lazy Overview usage constellation in ADR
+  0008; it is not a second general chart API.
 - Lazy-load the visualization runtime and route-specific chart modules.
 - Define an app-owned `VisualizationSpecV1` contract. API, MCP, tests, and features
   depend on this semantic contract; ECharts remains a replaceable renderer.
@@ -235,6 +247,9 @@ raw renderer options.
    supporting-call count, freshness, and next verification action.
 8. **Content-index trace**: opt-in local-only view for matched fragments, tool
    calls, commands, and file events along a thread timeline.
+9. **Usage constellation**: a bounded spatial view of chronology, token volume,
+   cache reuse, model families, waste pressure, and thread continuity with direct
+   Call Investigator links and a synchronized table.
 
 ### Chart interaction and accessibility
 

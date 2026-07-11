@@ -2,22 +2,22 @@
   "exceptions": {
     "frontend/dashboard/src/App.live-refresh.test.tsx": {
       "group": "tests",
-      "nonblank": 550,
-      "physical": 585
+      "nonblank": 546,
+      "physical": 579
     },
     "frontend/dashboard/src/App.tsx": {
       "group": "source",
-      "nonblank": 732,
-      "physical": 780
+      "nonblank": 726,
+      "physical": 771
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
-      "nonblank": 817,
-      "physical": 881
+      "nonblank": 767,
+      "physical": 829
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",
-      "nonblank": 412,
+      "nonblank": 411,
       "physical": 436
     },
     "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": {

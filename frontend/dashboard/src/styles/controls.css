@@ -35,7 +35,7 @@
 
 .topbar-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(430px, 1fr) auto;
   align-items: center;
   justify-content: stretch;
   gap: 8px;
@@ -59,7 +59,7 @@
 }
 
 .topbar-meta {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   justify-self: end;
 }
@@ -178,64 +178,36 @@
   opacity: 0.55;
 }
 
-@media (min-width: 761px) and (max-width: 1719px) {
-  .topbar-actions {
-    display: contents;
-  }
-
-  .topbar-scope-controls,
-  .topbar-meta {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .topbar-scope-controls {
-    justify-self: start;
-  }
-
-}
-
-@media (min-width: 1720px) {
-  .topbar-actions {
-    grid-template-columns: auto minmax(470px, 1fr) auto;
-  }
-
-  .topbar-scope-controls,
-  .topbar-meta {
-    grid-row: 1;
-  }
-
-  .topbar-scope-controls {
-    grid-column: 1;
-  }
-
-  .topbar-meta {
-    grid-column: 3;
-  }
-}
-
-@media (max-width: 760px) {
+@media (max-width: 1500px) {
   .topbar {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .topbar-actions {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: auto minmax(430px, 1fr) auto;
   }
+}
 
-  .topbar-scope-controls,
-  .topbar-meta {
-    grid-column: 1;
+@media (max-width: 1180px) {
+  .topbar-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .topbar-scope-controls {
+    grid-column: 1;
     grid-row: 1;
   }
 
   .topbar-meta {
-    grid-row: 3;
-    justify-self: start;
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
     flex-wrap: wrap;
+  }
+
+  .data-window-control {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .topbar-statuses {
@@ -246,5 +218,22 @@
     width: 100%;
     flex-wrap: wrap;
     overflow-x: visible;
+  }
+}
+
+@media (max-width: 620px) {
+  .topbar-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topbar-scope-controls,
+  .topbar-meta,
+  .data-window-control {
+    grid-column: 1;
+  }
+
+  .topbar-meta {
+    grid-row: 3;
+    justify-self: start;
   }
 }

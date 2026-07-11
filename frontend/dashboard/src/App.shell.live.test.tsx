@@ -11,6 +11,8 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
     loaded_row_count: 0,
     total_available_rows: 2,
     active_available_rows: 2,
+    default_load_window: 'all',
+    load_window: 'rows',
     limit: 500,
     history_scope: 'active',
     rows: [],
@@ -35,6 +37,8 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
         context_api_enabled: true,
         loaded_row_count: 1,
         total_available_rows: 2,
+        default_load_window: 'all',
+        load_window: 'all',
         limit: 500,
         rows: [
           {
@@ -62,6 +66,8 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
   expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
+  expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
+  expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('renders Reports live boot payloads without embedded report summaries', () => {
@@ -126,34 +132,26 @@ it('hydrates legacy history scope from the URL and exposes granular row controls
     render(<App />);
 
   expect(screen.getByLabelText('History scope')).toHaveValue('all');
-  expect(screen.getAllByText('All history - 500 rows').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('All sessions - Most recent 500').length).toBeGreaterThan(0);
   expect(screen.getByText('All history includes 49,378 archived calls')).toBeInTheDocument();
   expect(screen.getByLabelText('Rows to load')).toHaveValue(500);
   const rowLimitSlider = screen.getByLabelText('Rows to load slider');
   expect(rowLimitSlider).toHaveAttribute('max', '1600');
   expect(rowLimitSlider).toHaveAttribute(
     'aria-valuetext',
-    '500 rows; slider expands as needed, or type any count',
+    '500 recent rows',
   );
   expect(screen.getByLabelText('Rows to load')).not.toHaveAttribute('max');
-  expect(screen.getByLabelText('No row cap')).not.toBeChecked();
-  expect(screen.getByText('No fixed max')).toBeInTheDocument();
- expect(screen.getByText('Use Load all rows for the full history, or type any finite row count.')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Rows to load'), { target: { value: '0' } });
-    expect(screen.getByLabelText('Rows to load')).toHaveValue(0);
-    expect(screen.getByLabelText('Rows to load')).not.toBeDisabled();
-    expect(screen.getByLabelText('No row cap')).toBeChecked();
-  expect(rowLimitSlider).toHaveAttribute(
-    'aria-valuetext',
-    'No row cap; move slider or type a count to restore a finite limit',
-  );
+  expect(screen.getByRole('button', { name: 'Last 24h' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Last 7 days' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Recent rows' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'All time' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Rows to load'), { target: { value: '250000' } });
-    expect(screen.getByLabelText('No row cap')).not.toBeChecked();
   expect(rowLimitSlider).toHaveAttribute('max', '251100');
     expect((rowLimitSlider as HTMLInputElement).value).toBe('250000');
     expect(rowLimitSlider).toHaveAttribute(
       'aria-valuetext',
-      '250,000 rows; slider expands as needed, or type any count',
+      '250,000 recent rows',
     );
   });
 
@@ -217,7 +215,7 @@ it('loads the next finite row batch from recent calls controls', async () => {
   render(<App />);
 
 expect(screen.getAllByText('Loaded 500 of 900').length).toBeGreaterThan(0);
-expect(screen.getByText('Most recent 500 calls')).toBeInTheDocument();
+expect(screen.getByText('Most recent 500')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Load more recent calls' }));
 

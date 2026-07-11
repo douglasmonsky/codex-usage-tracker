@@ -577,6 +577,26 @@ def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Pat
     )
 
 
+def test_dashboard_payload_cache_identity_is_stable_across_data_scopes(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    active_payload = dashboard_payload(
+        db_path=db_path,
+        api_token="test-token",
+        limit=500,
+    )
+    scoped_payload = dashboard_payload(
+        db_path=db_path,
+        api_token="test-token",
+        include_archived=True,
+        limit=500,
+        since="2026-07-04T00:00:00Z",
+    )
+
+    assert active_payload["payload_cache_version"] == 2
+    assert scoped_payload["payload_cache_version"] == 2
+    assert active_payload["payload_cache_key"] == scoped_payload["payload_cache_key"]
+
+
 def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> None:
     from codex_usage_tracker.server.api import _UsageDashboardHandler
 

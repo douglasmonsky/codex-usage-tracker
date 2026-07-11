@@ -14,6 +14,7 @@ from codex_usage_tracker.parser.api import (
     parse_usage_events_from_file,
     parse_usage_events_from_file_with_state,
 )
+from codex_usage_tracker.parser.jsonl_v1 import KNOWN_NON_TOKEN_EVENT_MSG_TYPES
 
 SESSION_ID = "019e374d-c19f-7da3-a44f-8de043a7a64e"
 
@@ -212,20 +213,8 @@ def test_parser_ignores_known_non_token_context_compaction_event(tmp_path: Path)
 
 def test_parser_ignores_known_non_token_event_messages(tmp_path: Path) -> None:
     log_path = tmp_path / f"rollout-2026-05-17T14-58-23-{SESSION_ID}.jsonl"
-    known_event_types = [
-        "agent_message",
-        "image_generation_end",
-        "item_completed",
-        "mcp_tool_call_end",
-        "patch_apply_end",
-        "task_complete",
-        "task_started",
-        "thread_goal_updated",
-        "thread_rolled_back",
-        "turn_aborted",
-        "user_message",
-        "web_search_end",
-    ]
+    known_event_types = KNOWN_NON_TOKEN_EVENT_MSG_TYPES
+    assert {"agent_reasoning", "sub_agent_activity", "thread_settings_applied"} <= known_event_types
     _write_jsonl(
         log_path,
         [

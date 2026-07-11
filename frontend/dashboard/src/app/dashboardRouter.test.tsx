@@ -6,7 +6,7 @@ import {
   normalizeDashboardView,
   validateDashboardSearch,
 } from '../routes/dashboardSearch';
-import { createDashboardRouter } from './dashboardRouter';
+import { createDashboardRouter, dashboardBasepath } from './dashboardRouter';
 
 describe('dashboard search contract', () => {
   it('normalizes legacy and unknown views without dropping feature search state', () => {
@@ -37,6 +37,10 @@ describe('dashboard search contract', () => {
 });
 
 describe('dashboard router', () => {
+  it('keeps the served dashboard document outside the Vite asset base', () => {
+    expect(dashboardBasepath()).toBe('/');
+  });
+
   it('hydrates legacy query routes and preserves view-specific parameters', async () => {
     const history = createMemoryHistory({
       initialEntries: ['/?view=call&record=call-9&return=threads&mode=full&max_entries=50'],

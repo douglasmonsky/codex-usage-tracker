@@ -85,7 +85,7 @@ expect(params.get(name)).toBeNull();
     await waitFor(() => expect(within(recentCallsTable).getByText('live-overview-thread')).toBeInTheDocument());
     expect(screen.getByText('Loaded 1 of 1 available calls')).toBeInTheDocument();
     expect(within(recentCallsSection).getByRole('button', { name: 'Load more recent calls' })).toBeDisabled();
-    expect(screen.getAllByRole('button', { name: /Load all rows/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /Browse all calls/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText('32.4%')).not.toBeInTheDocument();
     expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();
   });

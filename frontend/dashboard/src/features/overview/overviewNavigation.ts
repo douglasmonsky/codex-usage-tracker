@@ -1,1 +1,1 @@
-export type OverviewNavigationTarget = 'investigator' | 'usage-drain' | 'threads';
+export type OverviewNavigationTarget = 'calls' | 'investigator' | 'usage-drain' | 'threads';

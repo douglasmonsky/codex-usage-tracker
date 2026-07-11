@@ -77,7 +77,7 @@ test.describe('R11 dashboard release candidate', () => {
             - globalThis.document.documentElement.clientWidth,
           filters: box(globalThis.document.querySelector('[aria-label="Dashboard filters"]')),
           pageHeader: box(heading?.closest('header') || null),
-          rowLimit: box(globalThis.document.querySelector('[aria-label="Row limit control"]')),
+          rowLimit: box(globalThis.document.querySelector('[aria-label="Data window"]')),
           toolbar: box(globalThis.document.querySelector('[aria-label="Dashboard toolbar"]')),
           wrappedCommands: buttons
             .filter(element => element.getBoundingClientRect().height > 44)

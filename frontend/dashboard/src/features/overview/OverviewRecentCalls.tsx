@@ -19,9 +19,8 @@ type OverviewRecentCallsProps = {
   totalAvailableRows: number;
   refreshing: boolean;
   canLoadMoreRows: boolean;
-  canLoadAllRows: boolean;
   onLoadMoreRows: () => void;
-  onLoadAllRows: () => void;
+  onBrowseCalls: () => void;
   onOpenCall: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 };
@@ -122,7 +121,7 @@ export function OverviewRecentCalls(props: OverviewRecentCallsProps) {
           <span>Loaded {formatNumber(props.loadedRowCount)} of {formatNumber(props.totalAvailableRows)} available calls</span>
           <div className={styles.actions}>
             <Button aria-label="Load more recent calls" onClick={props.onLoadMoreRows} disabled={!props.canLoadMoreRows || props.refreshing}>{props.refreshing ? 'Loading...' : loadMoreLabel}</Button>
-            <Button onClick={props.onLoadAllRows} disabled={!props.canLoadAllRows || props.refreshing}>Load all rows</Button>
+            <Button onClick={props.onBrowseCalls}>Browse all calls</Button>
           </div>
         </footer>
       </Surface>

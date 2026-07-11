@@ -347,6 +347,9 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     window.__CODEX_USAGE_BOOT__ = {
       api_token: 'diagnostic-fact-paging-token',
       context_api_enabled: true,
+      default_load_window: 'rows',
+      load_window: 'rows',
+      limit: 1,
       loaded_row_count: 1,
       total_available_rows: 12,
       has_more: true,

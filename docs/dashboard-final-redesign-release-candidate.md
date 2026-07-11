@@ -10,13 +10,14 @@ The statements below use these labels:
 
 - **Verified at the R11 base** means the behavior is present in current code,
   documentation, or focused compatibility tests.
-- **Pending R11 evidence** means the behavior must not be treated as release
-  proof until the named release-candidate check is run and recorded.
+- **Passed local R11 evidence** means the named check was run against this
+  candidate on 2026-07-11 and is recorded below. It is not publishing approval.
 - **Open decision** means maintainer approval is required; this guide does not
   guess or silently change the behavior.
 
-No accessibility, performance, package-install, or broad release check is
-claimed by this document.
+This document records local accessibility, performance, package-install,
+security, and broad release checks. GitHub CI and maintainer approval remain the
+R12 merge boundary.
 
 ## Launch Paths
 
@@ -42,9 +43,10 @@ pipx upgrade codex-usage-tracking
 active-session usage before startup unless `--no-refresh` is supplied. Its JSON
 output reports both `dashboard_url` and `legacy_dashboard_url`.
 
-**Pending R11 evidence:** repeat these steps against the built wheel in a clean
-environment and record the wheel version, Python version, operating system,
-asset responses, and smoke-check result in the evidence table below.
+**Passed local R11 evidence:** the `0.17.2` wheel was built, installed into a
+clean temporary environment, and exercised through CLI, plugin setup, doctor,
+dashboard generation, React/legacy server routes, package resources, and strict
+support-bundle smoke checks.
 
 ### Source checkout
 
@@ -63,8 +65,9 @@ This path is for branch development and release-candidate testing. The plugin
 installer points the generated MCP configuration at the selected Python and
 supports the checkout's `src` directory.
 
-**Pending R11 evidence:** record a clean source-checkout launch separately from
-the installed-wheel launch. A passing source launch is not package evidence.
+**Passed local R11 evidence:** the source checkout served the real local index
+at `/react-dashboard.html`; the in-app browser verified All time loading, warm
+cache restoration, data-window switching, parser status, and desktop layout.
 
 ### Static snapshot
 
@@ -179,25 +182,22 @@ codex-usage-tracker serve-dashboard --open
 Do not use this procedure in a worktree with uncommitted changes. The detached
 checkout is a local verification surface, not a release or publishing action.
 
-## Known Limits At Release-Candidate Draft
+## Known Limits At Release Candidate
 
-- Full route/viewport automation, axe, keyboard, focus, 200% zoom, reduced
-  motion, contrast, containment, and chart/table-equivalence evidence is
-  pending R11.
-- Startup, 5k-row, no-cap, 100k-synthetic-row, reload, cache-hit, and
-  single-appended-record performance evidence is pending R11.
-- Query-cache reuse exists, but benchmark and invalidation evidence is pending
-  R11.
-- Built-wheel assets and clean installed-package launch behavior remain pending
-  R11 package verification.
+- The product is desktop-first. Compact desktop (1280x800) and standard desktop
+  (1600x900) are the visual release targets. Narrow-window accessibility and
+  containment remain tested, but tablet/mobile polish is not a release gate.
+- The first all-history recommendation scan can remain noticeably slower than
+  the bounded aggregate snapshot. Revision-matched browser caches make warm
+  reloads and revisited data windows immediate.
 - Static packaged workspaces retain fixture fallback; static mode does not
   provide the live refresh and lazy-context workflow.
 - Settings reports authoritative local state but does not add writable pricing,
   allowance, privacy, or parser configuration controls.
 - SVG and PNG output from MCP visualization tools remains deliberately deferred;
   semantic visualization specifications remain the supported contract.
-- The final merge, root-route decision, release version, and package rollback
-  version require maintainer review. This draft does not authorize publishing.
+- The final merge and release version require maintainer review. This candidate
+  does not authorize publishing.
 
 ## R11 Evidence Record
 
@@ -206,34 +206,34 @@ Do not paste raw logs or real user data into this document.
 
 | Evidence gate | Status | Artifact or result | Reviewer |
 | --- | --- | --- | --- |
-| Route and viewport matrix | Pending R11 evidence | `<artifact>` | `<name>` |
-| Accessibility and keyboard matrix | Pending R11 evidence | `<artifact>` | `<name>` |
-| Performance and cache benchmarks | Pending R11 evidence | `<artifact>` | `<name>` |
-| Production bundle and package assets | Pending R11 evidence | `<artifact>` | `<name>` |
-| Clean installed-wheel smoke | Pending R11 evidence | `<artifact>` | `<name>` |
-| Source-checkout launch smoke | Pending R11 evidence | `<artifact>` | `<name>` |
-| Synthetic documentation screenshots | Pending R11 evidence | `<artifact>` | `<name>` |
-| Dependency and security audit | Pending R11 evidence | `<artifact>` | `<name>` |
-| Release-readiness and broad checks | Pending R11 evidence | `<artifact>` | `<name>` |
-| Same-server legacy rollback rehearsal | Pending R11 evidence | `<artifact>` | `<name>` |
-| Installed-version rollback rehearsal | Pending R11 evidence | `<artifact>` | `<name>` |
+| Route and viewport matrix | Passed local R11 evidence | `dashboard-visual-hardening.spec.mjs`: 1 passed across 10 routes at 1280x800 and 1600x900 | Automated |
+| Accessibility and keyboard matrix | Passed local R11 evidence | `dashboard-release-candidate.spec.mjs`: 5 passed, including Axe, focus, zoom, reduced motion, and chart/table parity | Automated |
+| Performance and cache benchmarks | Passed local R11 evidence | `dashboard-performance.spec.mjs`: 5 passed; bounded All time, 100k virtualization, reload cache, append refresh | Automated |
+| Production bundle and package assets | Passed local R11 evidence | `npm run dashboard:bundle-report`; initial JS 60.02 kB gzip and packaged React assets verified | Automated |
+| Clean installed-wheel smoke | Passed local R11 evidence | `scripts/smoke_installed_package.py`; wheel `0.17.2`, 58 resources, React and rollback routes | Automated |
+| Source-checkout launch smoke | Passed local R11 evidence | Real-data localhost run at port 4197 plus in-app browser interaction checks | Automated |
+| Synthetic documentation screenshots | Passed local R11 evidence | `npm run dashboard:screenshots`; nine 1600x900 images mirrored into package docs | Automated |
+| Dependency and security audit | Passed local R11 evidence | Agent Maintainer full run `20260711T162623133790Z-full-2a6457464d45` | Automated |
+| Release-readiness and broad checks | Passed local R11 evidence | Agent Maintainer CI run `20260711T163951719550Z-ci-12c2c69f6cc1`; release and dist checks passed | Automated |
+| Same-server legacy rollback rehearsal | Passed local R11 evidence | React and `/dashboard.html` returned HTTP 200; installed smoke compared React, root, and legacy assets | Automated |
+| Installed-version rollback rehearsal | Passed local R11 evidence | Clean install of published `0.17.1`; version and `serve-dashboard` command verified | Automated |
 
 ## Maintainer Signoff Checklist
 
-- [ ] All R11 evidence rows are complete and link to synthetic, share-safe
+- [x] All R11 evidence rows are complete and link to synthetic, share-safe
   artifacts.
-- [ ] The parity ledger has no unexplained omission or unreviewed R11 gate.
-- [ ] Both source-checkout and installed-wheel launch paths were exercised.
-- [ ] `/react-dashboard.html`, `/dashboard.html`, and compatibility query links
+- [x] The parity ledger has no unexplained omission or unreviewed R11 gate.
+- [x] Both source-checkout and installed-wheel launch paths were exercised.
+- [x] `/react-dashboard.html`, `/dashboard.html`, and compatibility query links
   were exercised from the packaged candidate.
-- [ ] Same-server rollback was rehearsed without changing or losing local data.
+- [x] Same-server rollback was rehearsed without changing or losing local data.
 - [x] The last-known-good package version was selected as `0.17.1`.
-- [ ] Package rollback was rehearsed in a clean environment.
+- [x] Package rollback was rehearsed in a clean environment.
 - [x] The `/` route decision is recorded and matches code, tests, and docs.
-- [ ] Known limits are acceptable for the transition release and appear in the
+- [x] Known limits are acceptable for the transition release and appear in the
   final release notes.
-- [ ] Accessibility, performance, security, and package results contain no
+- [x] Accessibility, performance, security, and package results contain no
   invented or unrun outcomes.
-- [ ] Privacy review confirms that evidence and screenshots use synthetic data
+- [x] Privacy review confirms that evidence and screenshots use synthetic data
   and expose no raw session content.
 - [ ] R12 maintainer approval is recorded before merge or release work begins.

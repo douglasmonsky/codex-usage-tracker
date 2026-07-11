@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "build": "tsc --noEmit -p tsconfig.json && vite build && node ../../scripts/normalize_dashboard_assets.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json --pretty false",
     "test": "vitest run",
     "lint": "eslint .",
@@ -21,7 +21,8 @@
     "echarts": "^6.1.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -33,6 +34,7 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "4.3.4",
     "eslint": "^9.17.0",
     "jsdom": "^25.0.1",

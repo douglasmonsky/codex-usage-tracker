@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 
 const budgetsMs = {
   startup5k: 15_000,
-  uncapped5k: 15_000,
+  allTime5k: 15_000,
   startup100k: 60_000,
   cachedReload5k: 15_000,
   appendedRefresh5k: 15_000,
@@ -33,8 +33,8 @@ test.describe('dashboard release-candidate performance evidence', () => {
     await attachEvidence(testInfo, 'startup-5k', { elapsedMs, budgetMs: budgetsMs.startup5k, rows: 5_000 });
   });
 
-  test('loads the 5k synthetic history in No cap mode inside the paging budget', async ({ page }, testInfo) => {
-    const allRows = syntheticRows(5_000);
+  test('loads All time totals with a bounded 500-row evidence window', async ({ page }, testInfo) => {
+    const evidenceRows = syntheticRows(500);
     await installSyntheticBoot(page, { rowCount: 500, limit: 500, totalRows: 5_000, apiToken: 'performance-token' });
     let usageRequests = 0;
     await page.route('**/api/usage?**', async route => {
@@ -42,24 +42,38 @@ test.describe('dashboard release-candidate performance evidence', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(syntheticPayload(allRows, { limit: 10_000, totalRows: 5_000, apiToken: 'performance-token' })),
+        body: JSON.stringify(syntheticPayload(evidenceRows, {
+          limit: 500,
+          totalRows: 5_000,
+          apiToken: 'performance-token',
+          loadWindow: 'all',
+          revision: 'synthetic-r11-initial',
+        })),
       });
     });
-    await page.goto('/?view=calls&sort=cost&qa=r11-performance-no-cap');
+    await page.goto('./?view=calls&sort=cost&qa=r11-performance-all-time');
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
 
     const startedAt = performance.now();
-    await page.getByRole('button', { name: 'Load all rows', exact: true }).click();
-    await expect(page.getByText('5,000 ranked evidence rows', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Row limit control')).toContainText('All rows mode');
+    await page.getByRole('button', { name: 'All time', exact: true }).click();
+    await expect.poll(() => usageRequests).toBe(1);
+    await expect(page.getByRole('button', { name: 'All time', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('region', { name: 'Data window' })).toContainText('500 loaded / 5,000 total');
+    await expect(page.getByText('500 ranked evidence rows', { exact: true })).toBeVisible();
     const elapsedMs = performance.now() - startedAt;
 
-    expect(usageRequests, 'No cap should fetch the bounded 5k synthetic history in one 10k page.').toBe(1);
+    expect(usageRequests, 'All time should issue one bounded aggregate request.').toBe(1);
     expect(
       elapsedMs,
-      `No cap loading took ${formatMs(elapsedMs)}, exceeding the ${formatMs(budgetsMs.uncapped5k)} RC budget; inspect /api/usage paging and model replacement.`,
-    ).toBeLessThanOrEqual(budgetsMs.uncapped5k);
-    await attachEvidence(testInfo, 'no-cap-5k', { elapsedMs, budgetMs: budgetsMs.uncapped5k, rows: 5_000, usageRequests });
+      `All time loading took ${formatMs(elapsedMs)}, exceeding the ${formatMs(budgetsMs.allTime5k)} RC budget; inspect aggregate queries and bounded model replacement.`,
+    ).toBeLessThanOrEqual(budgetsMs.allTime5k);
+    await attachEvidence(testInfo, 'all-time-5k', {
+      elapsedMs,
+      budgetMs: budgetsMs.allTime5k,
+      evidenceRows: 500,
+      totalRows: 5_000,
+      usageRequests,
+    });
   });
 
   test('keeps a 100k synthetic history virtualized inside the focused-load budget', async ({ page }, testInfo) => {
@@ -83,7 +97,7 @@ test.describe('dashboard release-candidate performance evidence', () => {
     });
 
     const startedAt = performance.now();
-    await page.goto('/?view=calls&qa=r11-performance-virtualized');
+    await page.goto('./?view=calls&qa=r11-performance-virtualized');
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible({ timeout: budgetsMs.startup100k });
     await expect(page.getByText('100,000 ranked evidence rows', { exact: true })).toBeVisible({ timeout: budgetsMs.startup100k });
     const elapsedMs = performance.now() - startedAt;
@@ -101,31 +115,53 @@ test.describe('dashboard release-candidate performance evidence', () => {
     });
   });
 
-  test('reuses the loaded 5k snapshot across reload without a usage request', async ({ page }, testInfo) => {
-    await installSyntheticBoot(page, { rowCount: 5_000, limit: 5_000, apiToken: 'performance-token' });
+  test('restores a revision-matched All time snapshot across reload', async ({ page }, testInfo) => {
+    await installSyntheticBoot(page, {
+      rowCount: 0,
+      limit: 500,
+      totalRows: 5_000,
+      apiToken: 'performance-token',
+      defaultLoadWindow: 'all',
+      shellBoot: true,
+    });
     let usageRequests = 0;
     await page.route('**/api/usage?**', async route => {
       usageRequests += 1;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(syntheticPayload(syntheticRows(5_000), { limit: 5_000, apiToken: 'performance-token' })),
+        body: JSON.stringify(syntheticPayload(syntheticRows(500), {
+          limit: 500,
+          totalRows: 5_000,
+          apiToken: 'performance-token',
+          loadWindow: 'all',
+          revision: 'synthetic-r11-initial',
+        })),
       });
     });
-    await page.goto('/?view=calls&sort=cost&qa=r11-performance-cache');
-    await expect(page.getByText('5,000 ranked evidence rows', { exact: true })).toBeVisible();
+    await page.goto('./?view=calls&sort=cost&qa=r11-performance-cache');
+    await expect(page.getByText('500 ranked evidence rows', { exact: true })).toBeVisible();
+    await expect.poll(() => usageRequests).toBe(1);
 
     const startedAt = performance.now();
-    await page.reload();
-    await expect(page.getByText('5,000 ranked evidence rows', { exact: true })).toBeVisible();
+    await page.goto('./?view=calls&sort=cost&qa=r11-performance-cache');
+    await expect(page.getByText('500 ranked evidence rows', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Cache hit; loaded 500 of 5,000 calls from All time/i)).toBeVisible();
     const elapsedMs = performance.now() - startedAt;
 
-    expect(usageRequests, 'A complete loaded snapshot should be reused on reload instead of issuing /api/usage.').toBe(0);
+    expect(usageRequests, 'Reload should restore the revision-matched IndexedDB snapshot without another /api/usage request.').toBe(1);
     expect(
       elapsedMs,
       `Cached 5k reload took ${formatMs(elapsedMs)}, exceeding the ${formatMs(budgetsMs.cachedReload5k)} RC budget; inspect snapshot hydration and duplicate startup work.`,
     ).toBeLessThanOrEqual(budgetsMs.cachedReload5k);
-    await attachEvidence(testInfo, 'cached-reload-5k', { elapsedMs, budgetMs: budgetsMs.cachedReload5k, rows: 5_000, usageRequests });
+    await attachEvidence(testInfo, 'cached-reload-5k', {
+      elapsedMs,
+      budgetMs: budgetsMs.cachedReload5k,
+      evidenceRows: 500,
+      totalRows: 5_000,
+      usageRequestsBeforeReload: 1,
+      usageRequestsAfterReload: usageRequests,
+    });
   });
 
   test('refreshes exactly one appended synthetic record inside the refresh budget', async ({ page }, testInfo) => {
@@ -142,7 +178,7 @@ test.describe('dashboard release-candidate performance evidence', () => {
         body: JSON.stringify(syntheticPayload(refreshedRows, { limit: 5_000, totalRows: 5_001, apiToken: 'performance-token' })),
       });
     });
-    await page.goto('/?view=calls&sort=cost&qa=r11-performance-append');
+    await page.goto('./?view=calls&sort=cost&qa=r11-performance-append');
     await expect(page.getByText('5,000 ranked evidence rows', { exact: true })).toBeVisible();
 
     const startedAt = performance.now();
@@ -167,9 +203,16 @@ test.describe('dashboard release-candidate performance evidence', () => {
   });
 });
 
-async function installSyntheticBoot(page, { rowCount, limit, totalRows = rowCount, apiToken = '' }) {
+async function installSyntheticBoot(page, {
+  rowCount,
+  limit,
+  totalRows = rowCount,
+  apiToken = '',
+  defaultLoadWindow = 'rows',
+  shellBoot = false,
+}) {
   await page.addInitScript(
-    ({ syntheticRowCount, syntheticLimit, syntheticTotalRows, syntheticApiToken }) => {
+    ({ syntheticRowCount, syntheticLimit, syntheticTotalRows, syntheticApiToken, syntheticDefaultLoadWindow, syntheticShellBoot }) => {
       const rows = Array.from({ length: syntheticRowCount }, (_, index) => ({
         record_id: `synthetic-call-${index}`,
         session_id: `synthetic-session-${index % 500}`,
@@ -191,10 +234,15 @@ async function installSyntheticBoot(page, { rowCount, limit, totalRows = rowCoun
         refresh_jobs_available: false,
         history_scope: 'active',
         include_archived: false,
+        load_window: 'rows',
+        default_load_window: syntheticDefaultLoadWindow,
         limit: syntheticLimit,
         limit_label: syntheticLimit === 0 ? 'All' : String(syntheticLimit),
         has_more: syntheticRowCount < syntheticTotalRows,
         latest_refresh_at: 'synthetic-r11-initial',
+        payload_cache_key: 'synthetic-r11-source',
+        payload_cache_version: 2,
+        shell_boot: syntheticShellBoot,
         loaded_row_count: syntheticRowCount,
         total_available_rows: syntheticTotalRows,
         active_available_rows: syntheticTotalRows,
@@ -206,6 +254,8 @@ async function installSyntheticBoot(page, { rowCount, limit, totalRows = rowCoun
       syntheticLimit: limit,
       syntheticTotalRows: totalRows,
       syntheticApiToken: apiToken,
+      syntheticDefaultLoadWindow: defaultLoadWindow,
+      syntheticShellBoot: shellBoot,
     },
   );
 }
@@ -228,17 +278,27 @@ function syntheticRows(rowCount) {
   }));
 }
 
-function syntheticPayload(rows, { limit, totalRows = rows.length, apiToken }) {
+function syntheticPayload(rows, {
+  limit,
+  totalRows = rows.length,
+  apiToken,
+  loadWindow = 'rows',
+  revision = `synthetic-r11-${rows.length}`,
+}) {
   return {
     api_token: apiToken,
     context_api_enabled: false,
     refresh_jobs_available: false,
     history_scope: 'active',
     include_archived: false,
+    load_window: loadWindow,
+    default_load_window: loadWindow,
     limit,
     limit_label: String(limit),
     has_more: rows.length < totalRows,
-    latest_refresh_at: `synthetic-r11-${rows.length}`,
+    latest_refresh_at: revision,
+    payload_cache_key: 'synthetic-r11-source',
+    payload_cache_version: 2,
     loaded_row_count: rows.length,
     total_available_rows: totalRows,
     active_available_rows: totalRows,
@@ -248,7 +308,7 @@ function syntheticPayload(rows, { limit, totalRows = rows.length, apiToken }) {
 
 async function openCallsAndMeasure(page) {
   const startedAt = performance.now();
-  await page.goto('/?view=calls&sort=cost&qa=r11-performance');
+  await page.goto('./?view=calls&sort=cost&qa=r11-performance');
   await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible({ timeout: budgetsMs.startup100k });
   await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible({ timeout: budgetsMs.startup100k });
   return performance.now() - startedAt;

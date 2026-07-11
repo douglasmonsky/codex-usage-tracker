@@ -22,6 +22,9 @@ it('keeps the React home route labeled Overview when legacy Insights translation
 it('hydrates legacy language selector from dashboard i18n payload', () => {
   window.localStorage?.removeItem('codex-usage-dashboard-language');
   window.__CODEX_USAGE_BOOT__ = {
+    default_load_window: 'rows',
+    load_window: 'rows',
+    limit: 500,
     language: 'es',
     language_direction: 'ltr',
     available_languages: [
@@ -91,7 +94,7 @@ it('hydrates legacy language selector from dashboard i18n payload', () => {
     expect(screen.getByText('Análisis locales de Codex')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Cargar$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Cargar más$/i })).toBeInTheDocument();
-expect(screen.getAllByText('estática').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Static').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Investigador abierto.*i18n-thread codex-1/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Exportar CSV/i })).toBeInTheDocument();
 

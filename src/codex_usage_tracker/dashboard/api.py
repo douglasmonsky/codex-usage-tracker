@@ -36,6 +36,7 @@ from codex_usage_tracker.dashboard.assets import (
     render_dashboard_template,
     versioned_asset_href,
 )
+from codex_usage_tracker.dashboard.load_window import dashboard_load_window_payload
 from codex_usage_tracker.dashboard.pricing_snapshot import pricing_snapshot_warning
 from codex_usage_tracker.pricing.allowance import (
     annotate_rows_with_allowance,
@@ -72,6 +73,7 @@ def dashboard_payload(
     include_archived: bool = False,
     language: str | None = None,
     include_rows: bool = True,
+    load_window: str | None = None,
 ) -> dict[str, object]:
     """Return aggregate-only dashboard data without rendering HTML."""
 
@@ -140,6 +142,9 @@ def dashboard_payload(
         **row_counts,
         "include_archived": include_archived,
         "history_scope": "all-history" if include_archived else "active",
+        **dashboard_load_window_payload(
+            load_window, since=since, limit=normalized_limit, live=bool(api_token)
+        ),
         **_dashboard_pagination_payload(
             limit=normalized_limit,
             offset=normalized_offset,
@@ -152,11 +157,9 @@ def dashboard_payload(
         "payload_cache_key": _payload_cache_key(
             db_path=db_path,
             api_token=api_token,
-            include_archived=include_archived,
-            since=since,
             privacy_mode=privacy_mode,
         ),
-        "payload_cache_version": 1,
+        "payload_cache_version": 2,
         "api_token": api_token or "",
         "context_api_enabled": context_api_enabled,
         "refresh_jobs_available": bool(api_token),
@@ -501,18 +504,14 @@ def _payload_cache_key(
     *,
     db_path: Path,
     api_token: str | None,
-    include_archived: bool,
-    since: str | None,
     privacy_mode: str,
 ) -> str:
     source = "|".join(
         [
             str(db_path),
             api_token or "static",
-            "all" if include_archived else "active",
-            since or "",
             privacy_mode,
-            "dashboard-payload-v1",
+            "dashboard-payload-v2",
         ]
     )
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:24]

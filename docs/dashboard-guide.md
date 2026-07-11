@@ -51,6 +51,18 @@ The server keeps the HTML aggregate-only and enables two live features:
 - `Refresh` rescans local Codex logs and updates the dashboard rows.
 - The call investigator automatically reads the selected model call from the original local JSONL file when the localhost context API is enabled.
 
+The live dashboard defaults to the `All time` data window. It calculates exact
+aggregate totals across the selected active/all-session scope while sending only
+the 500 most recent evidence rows to the browser; the Calls workspace pages the
+full matching history on demand. `Last 24h`, `Last 7 days`, and a typed recent-row
+window are available from the same compact control. Revision-matched snapshots
+are stored in local IndexedDB, so a normal reload can restore the last view
+without repeating the aggregate query. The smaller Overview summary and
+recommendation bundle is cached separately in browser storage under the same
+source revision, so the answer layer also restores without another full-history
+scan. Explicit `Refresh` bypasses those caches, incrementally scans local logs,
+and invalidates snapshots when the index revision changes.
+
 For a static snapshot, use:
 
 ```bash
@@ -70,6 +82,7 @@ Open `Overview` when you want a quick read on current aggregate usage before sor
 - Global dashboard filters narrow Overview and the secondary workspaces by model, reasoning effort, pricing/credit confidence, and time range using the same URL parameters as legacy dashboard links.
 - Metric cards summarize loaded aggregate rows without exposing prompts, assistant text, or raw tool output.
 - Time-series charts open on the most recent dates first and can scroll left for earlier history while keeping the value axis visible.
+- `Usage constellation` maps chronology, token volume, cache reuse, model family, waste pressure, and thread continuity in a lazy 3D view. Select a point to open Call Investigator, or switch to the synchronized evidence table for keyboard review and non-WebGL environments.
 - `Recent Calls` keeps the homepage modular: it shows the latest matching calls and lets any row open Call Investigator directly.
 - Use `Investigate` or `Calls` when you need deeper ranking, filtering, or evidence review.
 

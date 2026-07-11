@@ -12,6 +12,7 @@ import {
 import type { DashboardBootPayload, DashboardLanguage, DashboardModel } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { loadWindowLabel, type LoadWindow } from '../../data/dataScope';
 import {
   allowanceWindowSubtitle,
   allowanceWindowSummary,
@@ -34,7 +35,9 @@ type SettingsPageProps = {
   model: DashboardModel;
   payload: DashboardBootPayload | null;
   historyScope: HistoryScope;
+  loadWindow: LoadWindow;
   loadLimit: number;
+  scopeSince: string | null;
   loadedRowCount: number;
   totalAvailableRows: number;
   canUseLiveApi: boolean;
@@ -98,14 +101,14 @@ export function SettingsPage(props: SettingsPageProps) {
   );
 }
 
-function DataSection({ payload, historyScope, loadLimit, loadedRowCount, totalAvailableRows }: SettingsPageProps) {
+function DataSection({ payload, historyScope, loadWindow, loadLimit, loadedRowCount, totalAvailableRows }: SettingsPageProps) {
   const loadedLabel = `${formatNumber(loadedRowCount)} of ${formatNumber(totalAvailableRows || loadedRowCount)}`;
   return (
     <div className={styles.grid}>
       <FactPanel title="Loaded Data" subtitle={payload?.shell_boot ? 'Served shell payload' : 'Embedded payload'} facts={[
-        ['Rows loaded', loadedLabel, Database],
-        ['History scope', historyScope === 'all' ? 'All history' : 'Active history', Activity],
-        ['Row request', loadLimit === 0 ? 'No cap' : formatNumber(loadLimit), Gauge],
+        ['Data window', loadWindowLabel(loadWindow, loadLimit), Gauge],
+        ['Evidence rows', loadedLabel, Database],
+        ['Session scope', historyScope === 'all' ? 'Include archived' : 'Active sessions', Activity],
         ['Usage index', payload?.shell_boot ? 'served shell' : 'embedded payload', Database],
       ]} />
     </div>

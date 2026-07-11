@@ -19,7 +19,8 @@ describe('SettingsPage', () => {
     for (const label of ['Data', 'Estimates', 'Content Access', 'Application', 'Source Health']) {
       expect(navigation).toHaveTextContent(label);
     }
-    expect(screen.getByText('Rows loaded')).toBeInTheDocument();
+    expect(screen.getByText('Data window')).toBeInTheDocument();
+    expect(screen.getByText('Evidence rows')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Estimates' }));
     expect(screen.getByText('custom-pricing.json')).toBeInTheDocument();
@@ -69,7 +70,9 @@ function renderPage(applicationI18n = { language: 'en', direction: 'ltr' as cons
       model={fixtureModel}
       payload={payload}
       historyScope="all"
+      loadWindow="week"
       loadLimit={500}
+      scopeSince="2026-07-04T00:00:00Z"
       loadedRowCount={400}
       totalAvailableRows={900}
       canUseLiveApi

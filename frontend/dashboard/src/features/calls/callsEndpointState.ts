@@ -30,6 +30,7 @@ export type CallsEndpointStateInput = {
   activePreset: string;
   sourceFilter: SourceFilter;
   sortKey: CallsSortKey;
+  scopeSince?: string | null;
   timeFilter: TimeFilter;
   dateStart: string;
   dateEnd: string;
@@ -60,7 +61,7 @@ export function callsEndpointState(input: CallsEndpointStateInput): CallsEndpoin
       model: input.modelFilter === 'all' ? undefined : input.modelFilter,
       effort: input.effortFilter === 'all' ? undefined : input.effortFilter,
       ...confidenceApiFilters(input.confidenceFilter),
-      ...dateApiFilters(dateRange.start, dateRange.endExclusive),
+      ...dateApiFilters(dateRange.start, dateRange.endExclusive, input.scopeSince),
     },
   };
 }
@@ -90,9 +91,13 @@ function confidenceApiFilters(filter: ConfidenceFilter): Pick<CallsQueryFilters,
   return {};
 }
 
-function dateApiFilters(start: Date | null, endExclusive: Date | null): Pick<CallsQueryFilters, 'since' | 'until'> {
+function dateApiFilters(
+  start: Date | null,
+  endExclusive: Date | null,
+  scopeSince?: string | null,
+): Pick<CallsQueryFilters, 'since' | 'until'> {
   return {
-    since: start?.toISOString(),
+    since: start?.toISOString() ?? scopeSince ?? undefined,
     until: endExclusive ? new Date(endExclusive.getTime() - 1).toISOString() : undefined,
   };
 }

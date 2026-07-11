@@ -1,0 +1,298 @@
+.section {
+  min-width: 0;
+  overflow: hidden;
+  padding: 20px;
+  color: #edf6ff;
+  background: #10161d;
+  border-block: 1px solid #25394d;
+}
+
+.header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.header h2 {
+  margin: 2px 0 4px;
+  color: #fff;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.question,
+.summary {
+  margin: 0;
+  color: #aebdca;
+  line-height: 1.5;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #6fb6ff;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.controls,
+.viewControls,
+.legend,
+.legend span,
+.axes {
+  display: flex;
+  align-items: center;
+}
+
+.controls {
+  justify-content: end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.viewControls {
+  gap: 8px;
+}
+
+.viewControls > div {
+  background: #f8fafc;
+}
+
+.viewControls > button {
+  color: #e6f2ff;
+  background: #182532;
+  border-color: #39536d;
+}
+
+.legend {
+  gap: 8px 16px;
+  min-height: 34px;
+  padding: 7px 0 10px;
+  flex-wrap: wrap;
+  color: #c4d1dd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.legend span {
+  gap: 6px;
+}
+
+.legend i,
+.tableSwatch {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  box-shadow: 0 0 10px currentcolor;
+}
+
+.legend small {
+  color: #8093a5;
+  font-size: 10px;
+}
+
+.stage,
+.canvasFrame {
+  position: relative;
+  min-width: 0;
+  height: clamp(340px, 40vw, 440px);
+  overflow: hidden;
+  background: #0b1016;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.canvasFrame {
+  height: 100%;
+}
+
+.axes {
+  position: absolute;
+  inset: auto 14px 12px;
+  justify-content: space-between;
+  gap: 12px;
+  color: #8397aa;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  max-width: min(240px, calc(100% - 24px));
+  padding: 8px 10px;
+  color: #17202a;
+  background: rgb(255 255 255 / 94%);
+  border: 1px solid #c8d6e3;
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 28%);
+  font-size: 11px;
+  pointer-events: none;
+  transform: translate(12px, calc(-100% - 12px));
+}
+
+.tooltip strong {
+  font-size: 12px;
+}
+
+.tooltip small {
+  max-width: 210px;
+  overflow: hidden;
+  color: #5b6b7b;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loading,
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  gap: 8px;
+  color: #b8c8d7;
+  background: #0b1016;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.loading svg {
+  width: 18px;
+  height: 18px;
+  animation: constellation-spin 900ms linear infinite;
+}
+
+.summary {
+  padding-top: 10px;
+  font-size: 11px;
+}
+
+.tableFrame {
+  max-height: 440px;
+  overflow: auto;
+  color: #17202a;
+  background: #fff;
+  border: 1px solid #31475d;
+}
+
+.tableFrame table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.tableFrame th,
+.tableFrame td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #dbe3ea;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tableFrame thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #526170;
+  background: #eef3f7;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.tableFrame tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+.tableFrame button {
+  min-height: 28px;
+  padding: 0 9px;
+  color: #194ea7;
+  background: #eef5ff;
+  border: 1px solid #b8cff4;
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.tableFrame td:nth-child(3) {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+@keyframes constellation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading svg {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .header {
+    display: grid;
+  }
+
+  .controls {
+    justify-content: start;
+  }
+
+  .stage,
+  .canvasFrame {
+    height: 360px;
+  }
+}
+
+@media (max-width: 560px) {
+  .section {
+    padding: 16px 12px;
+  }
+
+  .header h2 {
+    font-size: 21px;
+  }
+
+  .controls {
+    align-items: stretch;
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .viewControls > div {
+    flex: 1 1 auto;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .stage,
+  .canvasFrame {
+    height: 330px;
+  }
+
+  .axes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .axes span:first-child {
+    grid-column: 1 / -1;
+  }
+}
