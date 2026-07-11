@@ -328,11 +328,11 @@ expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
 
     fireEvent.click(within(screen.getByRole('group', { name: 'Quick Links' })).getByRole('button', { name: 'Files' }));
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
-    expect(screen.getByText('Runtime State')).toBeInTheDocument();
+    expect(screen.getByText('Loaded Data')).toBeInTheDocument();
  expect(screen.getAllByText('Rows loaded').length).toBeGreaterThan(0);
     expect(screen.getByText('8 of 8')).toBeInTheDocument();
     expect(screen.getByText('Static snapshot')).toBeInTheDocument();
-    expect(screen.getByText('Context API gated')).toBeInTheDocument();
+    expect(screen.getByText('Content access gated')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
     expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
@@ -343,8 +343,8 @@ expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /Cost Curves/i }));
     expect(screen.getAllByText('Cost Curves').length).toBeGreaterThan(1);
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    fireEvent.click(screen.getByRole('button', { name: /Export Pack/i }));
-    expect(screen.getByText(/Exported 6 report snapshots/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export selected' }));
+    expect(screen.getByText('Exported Cost Curves')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
     fireEvent.click(screen.getByRole('button', { name: '5-hour' }));

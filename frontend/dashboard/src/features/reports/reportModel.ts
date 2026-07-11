@@ -98,8 +98,8 @@ export function reportBarData(report: ReportView | undefined, model: DashboardMo
   const durations = calls.map(call => call.durationSeconds).filter(value => Number.isFinite(value) && value >= 0);
   return [
     { label: 'Under 5s', value: durations.filter(value => value < 5).length },
-    { label: '5–15s', value: durations.filter(value => value >= 5 && value < 15).length },
-    { label: '15–30s', value: durations.filter(value => value >= 15 && value < 30).length },
+    { label: '5-15s', value: durations.filter(value => value >= 5 && value < 15).length },
+    { label: '15-30s', value: durations.filter(value => value >= 15 && value < 30).length },
     { label: '30s+', value: durations.filter(value => value >= 30).length },
   ];
 }
@@ -109,5 +109,5 @@ export function callCredits(call: CallRow): number {
 }
 
 function reportText(report: ReportView | undefined): string {
-  return `${report?.title ?? ''} ${report?.owner ?? ''}`.toLowerCase();
+  return (report?.title ?? '').toLowerCase();
 }

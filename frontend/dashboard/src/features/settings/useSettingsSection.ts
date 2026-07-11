@@ -16,7 +16,7 @@ function storage(): Storage | undefined {
   }
 }
 
-export function readSettingsSection(): SettingsSection {
+function readSettingsSection(): SettingsSection {
   try {
     const stored = JSON.parse(storage()?.getItem(settingsSectionStorageKey) ?? 'null') as unknown;
     return isSettingsSection(stored) ? stored : 'data';

@@ -8,7 +8,6 @@
 .actions,
 .status,
 .selectedMeta,
-.panelHeading,
 .switcher {
   display: flex;
   align-items: center;
@@ -22,7 +21,6 @@
 
 .header h1,
 .selected h2,
-.panelHeading h2,
 .research h3 {
   margin: 0;
   color: var(--ink-strong);
@@ -33,7 +31,6 @@
 }
 
 .header p,
-.panelHeading p,
 .selected p,
 .research p {
   color: var(--ink-muted);
@@ -77,6 +74,12 @@
 .action:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.action:focus-visible,
+.switcher button:focus-visible {
+  outline: 2px solid var(--signal-context);
+  outline-offset: 2px;
 }
 
 .status {
@@ -126,15 +129,19 @@
   gap: 7px;
   align-items: flex-end;
   flex-direction: column;
+  max-width: 240px;
   color: var(--ink-muted);
   font-size: 11px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .switcher {
   gap: 6px;
-  padding: 2px;
+  padding: 2px 2px 6px;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
 }
 
 .switcher button {
@@ -169,21 +176,6 @@
   gap: 14px;
   align-content: start;
   min-width: 0;
-}
-
-.panelHeading {
-  gap: 16px;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.panelHeading h2 {
-  font-size: 17px;
-}
-
-.panelHeading p {
-  margin: 4px 0 0;
-  font-size: 12px;
 }
 
 .research section + section {
@@ -242,6 +234,8 @@
 
   .selectedMeta {
     align-items: flex-start;
+    max-width: none;
+    text-align: left;
   }
 
   .status {

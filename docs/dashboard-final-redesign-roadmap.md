@@ -348,6 +348,33 @@ Gate:
 - settings persistence and source-health tests;
 - complete route and feature-parity ledger with no unexplained omission.
 
+Implementation checkpoint (2026-07-11):
+
+- `Reports` is now a selected-report-first workspace with URL-backed selection,
+  a compact switcher, shared visualization specs, report-specific method and
+  caveat text, generation provenance, selected-report JSON export, and one
+  investigator-linked evidence table;
+- live mode consumes the validated `codex-usage-tracker-reports-pack-v1`
+  contract through TanStack Query, preserves `limit=0`, caches the report pack
+  for five minutes, and reports stale or refresh-error states without dropping
+  cached evidence. Static mode identifies its aggregate fallback and disables
+  server refresh honestly;
+- report packs now include an actual UTC server generation timestamp, while the
+  browser query key excludes the API token and reuses the existing local-only
+  authorization boundary;
+- `Settings` is grouped into Data, Estimates, Content Access, Application, and
+  Source Health. Its selected group persists locally, and Application reports
+  the current shell language/direction instead of stale boot-payload values;
+- the completed [route and feature-parity ledger](dashboard-final-redesign-parity.md)
+  accounts for every maintained route, shell control, workspace, data contract,
+  export, compatibility alias, and explicitly deferred R10/R11 gate;
+- focused report, API, visualization, settings, shell-refresh, static/live, and
+  persistence tests pass. The full dashboard gate passes 339 tests plus
+  dependency, dead-code, style, source-budget, and production-build checks;
+- in-app browser checks confirmed report selection, chart/table switching,
+  disabled static refresh, settings persistence, linked evidence, zero
+  document overflow, and no console errors at the active desktop viewport.
+
 ### R10. MCP Visualization Experiment
 
 Target PR: `redesign/10-mcp-visualization` -> experiment

@@ -90,7 +90,7 @@ it('renders Reports live boot payloads without embedded report summaries', () =>
     render(<App />);
 
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'Report evidence calls' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Selected report evidence calls' })).toBeInTheDocument();
     expect(screen.getAllByText('live-report-thread').length).toBeGreaterThan(0);
   });
 

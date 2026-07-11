@@ -1,0 +1,96 @@
+# Dashboard Final Redesign Parity Ledger
+
+This ledger is the review contract for the experimental dashboard redesign.
+It records preserved behavior, intentional route aliases, and explicitly
+deferred work so the final switch does not rely on an informal visual review.
+
+Status meanings:
+
+- **Complete**: implemented and covered by focused tests or browser evidence.
+- **R10 optional**: useful MCP visualization experiment, not a dashboard-release
+  blocker unless it changes a public contract.
+- **R11 gate**: behavior exists, but release-candidate accessibility,
+  performance, package, or viewport evidence is still required.
+- **Deferred**: deliberately outside the redesign release, with the current
+  behavior retained.
+
+## Route Compatibility
+
+| URL contract | Destination | Status | Compatibility notes |
+| --- | --- | --- | --- |
+| `view=overview` | Overview | Complete | Default route and invalid-view fallback. |
+| `view=insights` | Overview | Complete | Historical alias is normalized to `overview`; `return=insights` is normalized too. |
+| `view=investigator` | Investigate | Complete | Finding and investigation-walk state remain URL-backed. |
+| `view=calls` | Calls | Complete | Search, source, sort, density, page, and legacy filter parameters remain supported. |
+| `view=call&record=...` | Call Investigator | Complete | Direct records can hydrate outside the loaded page; return-route and context-option parameters remain valid. |
+| `view=threads` | Threads | Complete | Selected thread, expansion aliases, call sort, and paging state remain supported. |
+| `view=usage-drain` | Limits | Complete | Stable route identifier is retained while the visible navigation label is `Limits`. |
+| `view=cache-context` | Cache And Context | Complete | Selected cache thread remains URL-backed. |
+| `view=diagnostics` | Diagnostics Notebook | Complete | Source, fact, and snapshot state remain URL-backed. |
+| `view=reports` | Reports | Complete | Selected report remains URL-backed through `report=...`. |
+| `view=settings` | Settings | Complete | Selected settings group is local preference state; the route remains stable. |
+
+No other historical `view` values are present in the maintained dashboard
+documentation or compatibility tests. Unknown values continue to resolve to
+Overview instead of producing a broken route.
+
+## Shell And Data Scope
+
+| Capability | Status | Evidence or disposition |
+| --- | --- | --- |
+| Unofficial-project notice | Complete | Persistent trust strip and sidebar status. |
+| Global search | Complete | Filters compatible workspace evidence and exports. |
+| Active/all-history scope | Complete | URL and session preference persistence; live refresh retains scope. |
+| Finite row limit, slider, typed input, No cap, Load more | Complete | `limit=0` remains unbounded; session settings restore after reload. |
+| Loading progress, cancel, stale-data retention | Complete | Refresh keeps the stored snapshot visible and exposes phase/progress when available. |
+| Static/live state, refresh, auto refresh | Complete | Static controls are honestly disabled; live token-gated requests stay local. |
+| Current-view CSV and copy link | Complete | Route-specific exports and URL-backed state are tested. |
+| Language and text direction | Complete | Existing catalog selection, local persistence, `lang`, and `dir` behavior remain in the shell. |
+| Query/cache reuse across routes and reload | R11 gate | Implemented through shared query/runtime metadata; benchmark and invalidation evidence remains an R11 gate. |
+
+## Workspace Parity
+
+| Workspace | Preserved or improved behavior | Status |
+| --- | --- | --- |
+| Overview | Loaded-call totals, four-part token accounting, recent-first scrollable trends, weekly-first remaining usage, findings, and investigator-linked recent calls | Complete |
+| Investigate | Finding selection, queryable evidence, token-waste patterns, bounded investigation walks, linked calls, and URL-restorable state | Complete |
+| Calls | Search and filters beside the table, stable sort/paging/density, frozen identity/header cells, token/cache/context/estimate fields, row and action-button investigator navigation, CSV export | Complete |
+| Call Investigator | Aggregate identity, previous/next, source metadata, token accounting, gated raw context, compaction/tool-output controls, copy link, and source-aware return | Complete |
+| Threads | Search/risk filters, dense sortable table, selected-thread lifecycle, child-call paging/sort, frozen identity/header cells, investigator links, call-grain export | Complete |
+| Limits | Weekly-primary allowance evidence, explicitly secondary 5-hour context, detector grade, change candidates, exact available intervals, hypothesis test, strict export, linked supporting calls | Complete |
+| Cache And Context | Cache segments, pressure/risk evidence, selected-thread calls, context controls, and investigator links | Complete |
+| Diagnostics Notebook | Cached snapshots, refresh/stale/error states, facts and sections, source/fact selection, evidence tables, and investigator links | Complete |
+| Reports | Selected-report-first narrative, compact switcher, report-specific visualization, source/generation metadata, methods, caveats, export, cached refresh states, and linked evidence | Complete |
+| Settings | Data, Estimates, Content Access, Application, and Source Health groups; persisted group selection; pricing, allowance, parser, privacy, content, runtime, and i18n facts | Complete |
+
+## Data And Contract Parity
+
+| Contract | Status | Notes |
+| --- | --- | --- |
+| Static packaged dashboard | R11 gate | All workspaces retain fixture fallback; package-asset and install smoke remain release-candidate gates. |
+| Localhost token-gated API | Complete | Server state is shared through typed clients and query caching; raw context is opt-in only. |
+| Calls and threads APIs | Complete | Filtering, sorting, paging, `limit=0`, and linked identities retained. |
+| Allowance history/diagnostics/export APIs | Complete | Limits renders the shared detector payload instead of reimplementing detection in React. |
+| Diagnostics snapshots and facts APIs | Complete | Cached notebook data and linked evidence retained. |
+| Reports pack API | Complete | Existing schema remains compatible; the UI adds presentation metadata without changing server semantics. |
+| CSV/JSON exports | Complete | Aggregate exports retain compatibility headers; strict allowance export omits local identifiers. |
+| MCP structured payloads | R10 optional | Existing structured MCP tools remain unchanged; visualization-spec usefulness is evaluated separately. |
+
+## Explicit Non-Blockers And R11 Evidence
+
+The following items are not silent omissions:
+
+- R10 may stop after a documented negative result if MCP visualization specs are
+  not materially more useful than current structured tool payloads.
+- Raw prompts, assistant text, file content, and command output remain absent
+  from aggregate dashboard payloads. Explicit Call Investigator content access
+  stays local and gated.
+- The redesign does not add writable pricing, allowance, privacy, or parser
+  configuration controls. Settings reports the authoritative local state and
+  points users to existing configuration workflows.
+- R11 still owns full route/viewport automation, axe and keyboard evidence,
+  200% zoom, reduced motion, contrast, large-row performance, reload/cache
+  benchmarks, package verification, synthetic documentation screenshots, and
+  rollback/default-switch instructions.
+- The final default switch and merge to `main` remain blocked until the R11
+  evidence and R12 maintainer review are complete.

@@ -798,7 +798,7 @@ Use Load all rows for the full history, or type any finite row count.
         loadedRowCount={loadedRowCount}
         totalAvailableRows={totalAvailableRows}
         canUseLiveApi={canUseLiveApi}
-        autoRefreshEnabled={autoRefreshEnabled}
+        autoRefreshEnabled={autoRefreshEnabled} applicationI18n={shellI18n}
         refreshing={refreshing}
         hasMoreRows={hasMoreRows}
         canLoadAllRows={canLoadAllRows}

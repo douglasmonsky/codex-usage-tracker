@@ -4,28 +4,24 @@ import { useMemo, useState } from 'react';
 
 import { loadReportsPack } from '../../api/reports';
 import type { CallRow, DashboardModel } from '../../api/types';
-import { BarChart } from '../../charts/BarChart';
-import { LineChart } from '../../charts/LineChart';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { Visualization } from '../../visualization';
 import { csvDateStamp } from '../shared/exportCsv';
-import { formatNumber, money } from '../shared/format';
 import { ReportEvidenceTable } from './ReportEvidenceTable';
 import {
-  reportBarData,
   reportDetails,
   reportEvidenceCalls,
   reportFromUrl,
   reportKey,
-  reportLineSeries,
   syncReportUrl,
   type ReportView,
 } from './reportModel';
+import { buildReportVisualizationSpec } from './reportVisualization';
 import styles from './ReportsPage.module.css';
 
 type ReportsPageProps = {
   model: DashboardModel;
-  onRefresh: () => void;
   refreshState: string;
   includeArchived: boolean;
   loadLimit: number;
@@ -39,7 +35,6 @@ export function reportCallsForCurrentUrl(model: DashboardModel): CallRow[] {
 
 export function ReportsPage({
   model,
-  onRefresh,
   refreshState,
   includeArchived,
   loadLimit,
@@ -50,9 +45,9 @@ export function ReportsPage({
   const [actionStatus, setActionStatus] = useState('');
   const canUseLive = Boolean(model.contextRuntime.apiToken) && !model.contextRuntime.fileMode;
   const reportQuery = useQuery({
-    queryKey: ['reports', 'pack', model.contextRuntime.apiToken, includeArchived, loadLimit],
+    queryKey: ['reports', 'pack', canUseLive, includeArchived, loadLimit],
     queryFn: () => loadReportsPack(model.contextRuntime, {
-      limit: loadLimit || model.calls.length || 500,
+      limit: loadLimit,
       evidenceLimit: 8,
       includeArchived,
     }),
@@ -61,7 +56,7 @@ export function ReportsPage({
     placeholderData: previous => previous,
     retry: false,
   });
-  const pack = reportQuery.data;
+  const pack = canUseLive ? reportQuery.data : undefined;
   const reports: ReportView[] = pack?.reports.length ? pack.reports : model.reports;
   const active = reports.find(report => reportKey(report) === selectedKey) ?? reports[0];
   const evidenceCalls = useMemo(() => {
@@ -69,18 +64,19 @@ export function ReportsPage({
     return liveRows === undefined ? reportEvidenceCalls(active, model.calls) : liveRows;
   }, [active, model.calls, pack]);
   const details = reportDetails(active, evidenceCalls);
-  const barData = reportBarData(active, model, evidenceCalls);
   const source = pack ? 'Live localhost report pack' : 'Loaded dashboard aggregates';
   const generated = pack?.generatedAt || (pack ? 'Server timestamp unavailable' : 'Current dashboard snapshot');
   const status = reportStatus(canUseLive, reportQuery, actionStatus, refreshState);
+  const visualizationSpec = useMemo(() => buildReportVisualizationSpec(active, model, evidenceCalls, {
+    generatedAt: generated,
+    historyScope: includeArchived ? 'all' : 'active',
+    source,
+    sourceRevision: pack?.schema || 'dashboard aggregate model',
+  }), [active, evidenceCalls, generated, includeArchived, model, pack?.schema, source]);
 
   async function refreshReport() {
+    if (!canUseLive) return;
     setActionStatus('Refreshing selected report…');
-    onRefresh();
-    if (!canUseLive) {
-      setActionStatus('Loaded aggregate snapshot refreshed');
-      return;
-    }
     const result = await reportQuery.refetch();
     setActionStatus(result.isError
       ? `Refresh failed: ${errorMessage(result.error)}. Showing cached live report pack.`
@@ -118,8 +114,16 @@ export function ReportsPage({
           <button className={styles.action} type="button" onClick={exportSelectedReport} disabled={!active}>
             <Download size={16} aria-hidden="true" />Export selected
           </button>
-          <button className={styles.action} data-primary="true" type="button" onClick={refreshReport} disabled={reportQuery.isFetching}>
-            <RefreshCw size={16} aria-hidden="true" />{reportQuery.isFetching ? 'Refreshing' : 'Refresh report'}
+          <button
+            className={styles.action}
+            data-primary="true"
+            type="button"
+            onClick={refreshReport}
+            disabled={!canUseLive || reportQuery.isFetching}
+            title={canUseLive ? undefined : 'Live report refresh requires the localhost server.'}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            {canUseLive ? (reportQuery.isFetching ? 'Refreshing' : 'Refresh report') : 'Live refresh unavailable'}
           </button>
         </div>
       </header>
@@ -157,13 +161,7 @@ export function ReportsPage({
 
       <div className={styles.workspace}>
         <main className={styles.main}>
-          <Panel title="Selected Report Visualization" subtitle={details.selection}>
-            {barData ? (
-              <BarChart data={barData} valueLabel={details.chartLabel === 'USD' ? money : value => `${formatNumber(value)} calls`} />
-            ) : (
-              <LineChart series={reportLineSeries(active, model)} yLabel={details.chartLabel} />
-            )}
-          </Panel>
+          <Visualization spec={visualizationSpec} height={320} />
           <Panel
             title="Report Evidence Calls"
             subtitle={`${evidenceCalls.length} aggregate rows · select a row to open Call Investigator`}

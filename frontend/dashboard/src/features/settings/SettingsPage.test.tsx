@@ -55,9 +55,15 @@ describe('SettingsPage', () => {
     expect(screen.getByText('2 parser diagnostics: malformed_event=2')).toBeInTheDocument();
     expect(screen.queryByText(/duplicate_cumulative_total=/)).not.toBeInTheDocument();
   });
+
+  it('keeps a readable language fallback when the shell catalog is empty', () => {
+    window.localStorage.setItem(settingsSectionStorageKey, '"application"');
+    renderPage({ language: 'en', direction: 'ltr', languages: [] });
+    expect(screen.getByText('English (en)')).toBeInTheDocument();
+  });
 });
 
-function renderPage() {
+function renderPage(applicationI18n = { language: 'en', direction: 'ltr' as const, languages: [{ code: 'en' }, { code: 'es' }] }) {
   return render(
     <SettingsPage
       model={fixtureModel}
@@ -69,6 +75,7 @@ function renderPage() {
       canUseLiveApi
       autoRefreshEnabled={false}
       refreshState="Refresh idle"
+      applicationI18n={applicationI18n}
     />,
   );
 }

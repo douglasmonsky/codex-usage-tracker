@@ -1,7 +1,7 @@
 import { lazyRouteComponent } from '@tanstack/react-router';
 import { Suspense, type ReactNode } from 'react';
 
-import type { ContextRuntime, DashboardBootPayload, DashboardModel } from '../api/types';
+import type { ContextRuntime, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
 import type { HistoryScope } from '../data/dataScope';
 import type { DashboardViewId } from './dashboardSearch';
 
@@ -41,6 +41,7 @@ type DashboardRouteViewProps = {
   activeRecordId: string;
   activeView: DashboardViewId;
   autoRefreshEnabled: boolean;
+  applicationI18n: { language: string; direction: 'ltr' | 'rtl'; languages: DashboardLanguage[] };
   backFromCallInvestigator: () => void;
   callBackLabel: string;
   canLoadAllRows: boolean;
@@ -81,6 +82,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     activeRecordId,
     activeView,
     autoRefreshEnabled,
+    applicationI18n,
     backFromCallInvestigator,
     callBackLabel,
     canLoadAllRows,
@@ -221,7 +223,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
       return (
         <ReportsPage
           model={model}
-          onRefresh={onRefresh}
           refreshState={refreshState}
           includeArchived={historyScope === 'all'}
           loadLimit={loadLimit}
@@ -241,6 +242,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           canUseLiveApi={canUseLiveApi}
           autoRefreshEnabled={autoRefreshEnabled}
           refreshState={refreshState}
+          applicationI18n={applicationI18n}
         />
       );
   }

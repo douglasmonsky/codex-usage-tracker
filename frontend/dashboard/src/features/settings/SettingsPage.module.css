@@ -4,7 +4,7 @@
 .header p:not(.eyebrow) { max-width: 76ch; margin: 5px 0 0; color: var(--ink-muted); font-size: 13px; line-height: 1.45; }
 .eyebrow { margin: 0 0 4px; color: var(--signal-context); font-size: 11px; font-weight: 800; text-transform: uppercase; }
 .badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.navigator { display: flex; gap: 4px; padding: 4px; overflow-x: auto; background: var(--surface-subtle); border: 1px solid var(--line-subtle); border-radius: 8px; }
+.navigator { display: flex; gap: 4px; padding: 4px 4px 7px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; background: var(--surface-subtle); border: 1px solid var(--line-subtle); border-radius: 8px; }
 .navigator button { flex: 0 0 auto; padding: 7px 11px; color: var(--ink-muted); font: inherit; font-size: 12px; font-weight: 700; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
 .navigator button:hover { color: var(--ink-strong); background: var(--surface-raised); }
 .navigator button[aria-pressed='true'] { color: var(--signal-context); background: var(--surface-raised); border-color: var(--line-strong); }

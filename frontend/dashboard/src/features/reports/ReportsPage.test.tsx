@@ -27,6 +27,7 @@ describe('Reports selected-report workspace', () => {
 
     expect(screen.getByRole('heading', { name: 'Cost Curves' })).toBeInTheDocument();
     expect(screen.getByText('Loaded dashboard aggregates')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Live refresh unavailable' })).toBeDisabled();
     expect(screen.getByRole('table', { name: 'Selected report evidence calls' })).toBeInTheDocument();
     expect(screen.getAllByRole('table')).toHaveLength(1);
 
@@ -73,7 +74,6 @@ function renderReports(overrides: {
     <QueryClientProvider client={createDashboardQueryClient()}>
       <ReportsPage
         model={overrides.model ?? fixtureModel}
-        onRefresh={vi.fn()}
         refreshState="Loaded snapshot ready"
         includeArchived={false}
         loadLimit={500}

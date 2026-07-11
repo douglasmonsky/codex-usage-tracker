@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Callable
+from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs
@@ -78,6 +79,7 @@ def reports_pack_payload(
     reports = _report_summaries(rows)
     return {
         "schema": "codex-usage-tracker-reports-pack-v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "reports": reports,
         "evidence": {
             str(report["key"]): _report_evidence_payload(str(report["key"]), rows, evidence_limit)

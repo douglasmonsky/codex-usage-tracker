@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { Copy, Search } from 'lucide-react';
 import { useShellI18n } from '../../app/i18nContext';
-import type { CallRow, ThreadRow, WeeklyWindow } from '../../api/types';
+import type { CallRow, ThreadRow } from '../../api/types';
 import type { ColumnChoice } from '../../components/ColumnChooser';
 import type { CsvColumn } from './exportCsv';
 import { formatCompact, formatNumber, money, pct } from './format';
@@ -493,27 +493,6 @@ export const threadColumnChoices: ColumnChoice[] = [
   { id: 'coldResumeRisk', label: 'Cold Resume Risk' },
   { id: 'productivity', label: 'Productivity' },
   { id: 'investigate', label: 'Investigate', locked: true },
-];
-
-export const weeklyColumns: Array<ColumnDef<WeeklyWindow>> = [
-  { accessorKey: 'week', header: 'Week' },
-  { accessorKey: 'plan', header: 'Plan' },
-  {
-    accessorKey: 'credits',
-    header: 'Credits',
-    cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
-  },
-  {
-    accessorKey: 'projected',
-    header: 'Projected',
-    cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
-  },
-  {
-    accessorKey: 'confidence',
-    header: 'Confidence',
-    cell: info => <span className={`status-badge ${riskTone(String(info.getValue()))}`}>{String(info.getValue())}</span>,
-  },
-  { accessorKey: 'note', header: 'Note' },
 ];
 
 function riskTone(value: string): 'green' | 'orange' | 'red' | 'neutral' {

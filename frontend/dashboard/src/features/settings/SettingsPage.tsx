@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-import type { DashboardBootPayload, DashboardModel } from '../../api/types';
+import type { DashboardBootPayload, DashboardLanguage, DashboardModel } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
 import {
@@ -24,6 +24,12 @@ import styles from './SettingsPage.module.css';
 
 type HistoryScope = 'active' | 'all';
 
+type ApplicationI18n = {
+  language: string;
+  direction: 'ltr' | 'rtl';
+  languages: DashboardLanguage[];
+};
+
 type SettingsPageProps = {
   model: DashboardModel;
   payload: DashboardBootPayload | null;
@@ -34,6 +40,7 @@ type SettingsPageProps = {
   canUseLiveApi: boolean;
   autoRefreshEnabled: boolean;
   refreshState: string;
+  applicationI18n: ApplicationI18n;
 };
 
 const sectionCopy = {
@@ -141,17 +148,20 @@ function ContentAccessSection({ model, payload, canUseLiveApi }: SettingsPagePro
   );
 }
 
-function ApplicationSection({ payload, canUseLiveApi, autoRefreshEnabled, refreshState }: SettingsPageProps) {
-  const languages = payload?.available_languages?.filter(language => language.code) ?? [];
-  const language = payload?.language || 'en';
+function ApplicationSection({
+  canUseLiveApi,
+  autoRefreshEnabled,
+  refreshState,
+  applicationI18n,
+}: SettingsPageProps) {
   return (
     <div className={styles.grid}>
       <FactPanel title="Dashboard Runtime" subtitle={refreshState} facts={[
         ['Data connection', canUseLiveApi ? 'Local API token present' : 'Static embedded snapshot', Database],
         ['Auto refresh', autoRefreshEnabled ? 'Enabled' : 'Paused', RefreshCw],
-        ['Interface language', language, Languages],
-        ['Available languages', languages.length ? languages.map(item => item.code).join(', ') : 'English (en)', Languages],
-        ['Text direction', payload?.language_direction || 'ltr', Languages],
+        ['Interface language', applicationI18n.language, Languages],
+        ['Available languages', applicationI18n.languages.map(item => item.code).join(', ') || 'English (en)', Languages],
+        ['Text direction', applicationI18n.direction, Languages],
       ]} />
     </div>
   );
@@ -160,7 +170,7 @@ function ApplicationSection({ payload, canUseLiveApi, autoRefreshEnabled, refres
 function SourceHealthSection({ payload }: { payload: DashboardBootPayload | null }) {
   return (
     <div className={styles.grid}>
-      <FactPanel title="Source Health" subtitle="Configuration and ingestion facts" facts={sourceHealthSummary(payload).map(row => [
+      <FactPanel title="Configuration Checks" subtitle="Configuration and ingestion facts" facts={sourceHealthSummary(payload).map(row => [
         row.label,
         row.value,
         row.issue ? AlertTriangle : ShieldCheck,
