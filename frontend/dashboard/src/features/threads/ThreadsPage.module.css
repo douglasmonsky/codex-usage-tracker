@@ -5,9 +5,15 @@
 .pageHeader,
 .tableHeading {
   display: flex;
-  align-items: start;
+  align-items: center;
   justify-content: space-between;
   gap: 18px;
+  min-width: 0;
+}
+
+.pageHeader > div:first-child {
+  min-width: 0;
+  max-width: 780px;
 }
 
 .pageHeader h1,
@@ -42,6 +48,14 @@
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.headerActions {
+  flex-wrap: nowrap;
+}
+
+.headerActions :global(.toolbar-button) {
+  white-space: nowrap;
 }
 
 .queryBar {
@@ -102,6 +116,10 @@
 }
 
 @media (max-width: 1120px) {
+  .headerActions {
+    flex-wrap: wrap;
+  }
+
   .splitWorkspace {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -112,6 +130,17 @@
     overflow: visible;
     overscroll-behavior: auto;
     scrollbar-gutter: auto;
+  }
+}
+
+@media (max-width: 1400px) {
+  .pageHeader {
+    display: grid;
+    gap: 10px;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
   }
 }
 

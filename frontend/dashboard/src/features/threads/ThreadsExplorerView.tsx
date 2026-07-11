@@ -1,5 +1,5 @@
 import type { ColumnDef, OnChangeFn, SortingState } from '@tanstack/react-table';
-import { Download, Search, X } from 'lucide-react';
+import { Download, RotateCcw, Search } from 'lucide-react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type { CallRow, ThreadRow } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -121,11 +121,11 @@ export function ThreadsExplorerView({
           }} />
           <button className="toolbar-button" type="button" onClick={onExport} disabled={exportDisabled}>
             <Download size={16} />
-            Export calls
+            Export thread calls
           </button>
-          <button className="toolbar-button" type="button" aria-label="Clear thread filters" onClick={onClearFilters}>
-            <X size={16} />
-            Clear filters
+          <button className="toolbar-button" type="button" aria-label="Reset thread view" onClick={onClearFilters}>
+            <RotateCcw size={16} />
+            Reset view
           </button>
         </div>
       </header>

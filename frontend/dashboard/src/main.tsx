@@ -6,6 +6,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
 import './styles/controls.css';
+import './styles/row-limit.css';
 import './styles/components.css';
 import './styles/charts.css';
 import './styles/tables.css';

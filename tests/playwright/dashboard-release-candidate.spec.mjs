@@ -56,6 +56,50 @@ test.describe('R11 dashboard release candidate', () => {
     expect(axeIssues, 'serious or critical Axe violations').toEqual([]);
   });
 
+  test('keeps the dense toolbar and Threads controls compact without wrapping commands', async ({ page }) => {
+    for (const viewport of [{ width: 2048, height: 900 }, { width: 1280, height: 720 }]) {
+      await page.setViewportSize(viewport);
+      await openWorkspace(page, 'Threads', '/?view=threads&thread=thread-9f3a1c&qa=r11-toolbar-density');
+
+      const geometry = await page.evaluate(() => {
+        const box = element => {
+          const rect = element?.getBoundingClientRect();
+          return rect
+            ? { height: rect.height, width: rect.width, top: rect.top, bottom: rect.bottom }
+            : null;
+        };
+        const heading = Array.from(globalThis.document.querySelectorAll('h1'))
+          .find(element => element.textContent?.trim() === 'Threads');
+        const buttons = Array.from(globalThis.document.querySelectorAll('button'))
+          .filter(element => ['Export thread calls', 'Reset view'].includes(element.textContent?.trim() || ''));
+        return {
+          documentOverflow: globalThis.document.documentElement.scrollWidth
+            - globalThis.document.documentElement.clientWidth,
+          filters: box(globalThis.document.querySelector('[aria-label="Dashboard filters"]')),
+          pageHeader: box(heading?.closest('header') || null),
+          rowLimit: box(globalThis.document.querySelector('[aria-label="Row limit control"]')),
+          toolbar: box(globalThis.document.querySelector('[aria-label="Dashboard toolbar"]')),
+          wrappedCommands: buttons
+            .filter(element => element.getBoundingClientRect().height > 44)
+            .map(element => element.textContent?.trim()),
+          workspace: box(globalThis.document.querySelector('main')),
+        };
+      });
+
+      expect(geometry.documentOverflow, `${viewport.width}px document overflow`).toBeLessThanOrEqual(2);
+      expect(geometry.toolbar?.height, `${viewport.width}px toolbar height`)
+        .toBeLessThanOrEqual(viewport.width >= 1720 ? 84 : 132);
+      expect(geometry.rowLimit?.bottom, `${viewport.width}px row controls before page content`)
+        .toBeLessThanOrEqual(geometry.pageHeader?.top ?? 0);
+      expect(geometry.filters?.height, `${viewport.width}px filter strip height`).toBeLessThanOrEqual(72);
+      expect(geometry.wrappedCommands, `${viewport.width}px wrapped page commands`).toEqual([]);
+      if (viewport.width >= 1720) {
+        expect(geometry.filters?.width, 'wide filter strip should fit its controls')
+          .toBeLessThan((geometry.workspace?.width ?? 0) - 300);
+      }
+    }
+  });
+
   test('reflows every workspace at a 200 percent desktop zoom equivalent', async ({ page }) => {
     const browserIssues = collectBrowserIssues(page);
 

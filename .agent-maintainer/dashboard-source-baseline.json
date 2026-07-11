@@ -7,8 +7,8 @@
     },
     "frontend/dashboard/src/App.tsx": {
       "group": "source",
-      "nonblank": 801,
-      "physical": 849
+      "nonblank": 732,
+      "physical": 780
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
@@ -49,11 +49,6 @@
       "group": "styles",
       "nonblank": 352,
       "physical": 405
-    },
-    "frontend/dashboard/src/styles/controls.css": {
-      "group": "styles",
-      "nonblank": 378,
-      "physical": 424
     },
     "frontend/dashboard/src/styles/diagnostics.css": {
       "group": "styles",

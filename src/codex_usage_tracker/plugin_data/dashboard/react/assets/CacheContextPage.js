@@ -1,4 +1,4 @@
-import{j as e,r as u}from"./dashboard-react.js";import{L as P}from"./LineChart.js";import{D as S}from"./DataTable.js";import{G as D}from"./gauge.js";import{k as f,A as N,l as L,e as A,g as H,c as j,d as T,p,f as M,a as b,m as g,s as w,S as W,b as z}from"./App.js";import{P as m}from"./Panel.js";import"./index2.js";import"./dashboardRouter.js";import"./router.js";/**
+import{j as e,r as u}from"./dashboard-react.js";import{L as P}from"./LineChart.js";import{D as S}from"./DataTable.js";import{G as D}from"./gauge.js";import{c as f,A as N,l as L,g as A,h as H,d as j,e as T,p,f as M,a as b,m as g,s as w,S as W,b as z}from"./App.js";import{P as m}from"./Panel.js";import"./index2.js";import"./dashboardRouter.js";import"./router.js";/**
  * @license lucide-react v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.
