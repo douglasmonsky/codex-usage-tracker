@@ -570,7 +570,7 @@ return (
 );
           })}
         </nav>
-        <div className="secondary-block">
+        <div className="secondary-block" role="group" aria-label="Quick Links">
           <span>Quick Links</span>
           {secondaryNavItems.map(item => {
             const Icon = item.icon;
@@ -603,7 +603,7 @@ return (
             supported by OpenAI.
           </span>
         </div>
-        <header className="topbar">
+        <header className="topbar" aria-label="Dashboard toolbar">
 <label className="global-search">
 <span className="sr-only">{shellI18n.t('filter.search', 'Search dashboard')}</span>
 <input

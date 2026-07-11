@@ -1,0 +1,229 @@
+.page {
+  gap: 14px;
+}
+
+.pageHeader,
+.tableHeading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.pageHeader h1,
+.tableHeading h2 {
+  margin: 0;
+  color: var(--ink-strong, var(--dashboard-text));
+}
+
+.pageHeader h1 {
+  font-size: 28px;
+}
+
+.pageHeader p:not(.eyebrow),
+.tableHeading p {
+  margin: 5px 0 0;
+  color: var(--ink-muted, var(--dashboard-muted));
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--signal-info-ink, var(--dashboard-accent-strong));
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.headerActions,
+.inspectorActions,
+.gridFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.queryBar {
+  padding: 10px;
+  border: 1px solid var(--line-subtle, var(--dashboard-border));
+  border-radius: 8px;
+  background: var(--surface-panel, var(--dashboard-surface));
+}
+
+.queryBar :global(.search-box) {
+  width: 100%;
+}
+
+.tableHeading {
+  align-items: end;
+}
+
+.tableHeading h2 {
+  font-size: 16px;
+}
+
+.tableHeading p {
+  font-size: 12px;
+}
+
+.splitWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 400px);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+
+.evidenceSurface {
+  min-width: 0;
+}
+
+.splitWorkspace > :global(.side-panel) {
+  position: sticky;
+  top: 18px;
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.gridFooter {
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 7px 10px;
+  color: var(--ink-muted, var(--dashboard-muted));
+  font-size: 12px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line-subtle, var(--dashboard-border));
+  border-radius: 8px;
+  background: var(--line-subtle, var(--dashboard-border));
+}
+
+.metricGrid > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  color: var(--ink-muted, var(--dashboard-muted));
+  background: var(--surface-panel, var(--dashboard-surface));
+  font-size: 11px;
+}
+
+.metricGrid strong {
+  overflow-wrap: anywhere;
+  color: var(--ink-strong, var(--dashboard-text));
+  font-size: 15px;
+}
+
+.actionHint {
+  margin: 12px 0;
+  padding: 10px;
+  border-left: 3px solid var(--signal-info, var(--dashboard-accent));
+  color: var(--ink-muted, var(--dashboard-muted));
+  background: var(--surface-subtle, var(--dashboard-surface-muted));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.inspectorActions {
+  justify-content: flex-start;
+  margin-bottom: 14px;
+}
+
+.callLedger {
+  display: grid;
+  gap: 7px;
+}
+
+.callLedger > button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line-subtle, var(--dashboard-border));
+  border-radius: 7px;
+  color: var(--ink-strong, var(--dashboard-text));
+  text-align: left;
+  background: var(--surface-panel, var(--dashboard-surface));
+  cursor: pointer;
+}
+
+.callLedger > button:hover,
+.callLedger > button:focus-visible {
+  border-color: var(--signal-info, var(--dashboard-accent));
+}
+
+.callLedger span {
+  overflow-wrap: anywhere;
+  color: var(--ink-muted, var(--dashboard-muted));
+  font-size: 11px;
+}
+
+.provenanceList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.provenanceList > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.provenanceList dt {
+  color: var(--ink-muted, var(--dashboard-muted));
+  font-size: 11px;
+}
+
+.provenanceList dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink-strong, var(--dashboard-text));
+  font-size: 12px;
+}
+
+@media (max-width: 1120px) {
+  .splitWorkspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .splitWorkspace > :global(.side-panel) {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+    scrollbar-gutter: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .pageHeader,
+  .tableHeading {
+    display: grid;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .metricGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .provenanceList > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+}

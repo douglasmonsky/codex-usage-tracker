@@ -63,6 +63,10 @@
 .drilldown-panel {
   position: sticky;
   top: 18px;
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .call-summary,

@@ -50,7 +50,7 @@ describe('React dashboard threads workspace', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
     expect(within(threadsTable).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
     expect(within(threadsTable).getByText('thread-9f3a').closest('td')).toHaveClass('sticky-column');
@@ -132,7 +132,7 @@ it('opens the full-page call investigator from selected thread calls', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     expect(screen.getByText('Thread Calls')).toBeInTheDocument();
     const threadCallList = screen.getByText('Thread Calls').closest('.thread-call-list');
     expect(threadCallList).not.toBeNull();
@@ -159,7 +159,7 @@ it('opens full-page call investigator from thread leaderboard rows', () => {
   expect(window.location.search).toContain('record=fixture-call-0');
   expect(window.location.search).toContain('return=threads');
   fireEvent.click(screen.getByRole('button', { name: /Back to Threads/i }));
-  expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
   expect(window.location.search).toContain('view=threads');
   expect(window.location.search).not.toContain('record=');
   expect(window.location.search).not.toContain('return=');
@@ -448,7 +448,7 @@ it('hydrates and syncs selected thread URL state', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     expect(screen.getByText('No loaded aggregate call rows belong to this thread.')).toBeInTheDocument();
 
 const row = within(screen.getByRole('table', { name: 'Thread leaderboard' })).getByText('thread-9f3a').closest('tr');
@@ -465,7 +465,7 @@ it('hydrates and syncs thread filter URL state', async () => {
 
   render(<App />);
 
-  expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveValue('thread-0e16');
     expect(screen.getByLabelText('Cold risk')).toHaveValue('Low');
     expect(screen.getAllByText('thread-0e16').length).toBeGreaterThan(0);
@@ -525,7 +525,7 @@ it('clears thread filters and selected thread URL state', () => {
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
   expect(window.location.search).toContain('thread=thread-3c5d');
   fireEvent.change(screen.getByPlaceholderText('Search threads, risks, token totals...'), { target: { value: 'thread-0e16' } });
   fireEvent.change(screen.getByDisplayValue('All risks'), { target: { value: 'Low' } });

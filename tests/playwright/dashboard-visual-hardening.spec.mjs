@@ -5,7 +5,7 @@ const routes = [
   ['Investigator', 'Investigator Workbench', '/?view=investigator&qa=visual-hardening'],
   ['Calls', 'Calls', '/?view=calls&qa=visual-hardening'],
   ['Call Investigator', 'Call Investigator', '/?view=call&record=fixture-call-2&qa=visual-hardening'],
-  ['Threads', 'Thread Efficiency', '/?view=threads&thread=thread-9f3a1c&qa=visual-hardening'],
+  ['Threads', 'Threads', '/?view=threads&thread=thread-9f3a1c&qa=visual-hardening'],
   ['Usage Drain Lab', 'Usage Drain Lab', '/?view=usage-drain&qa=visual-hardening'],
   ['Cache And Context Lab', 'Cache And Context Lab', '/?view=cache-context&qa=visual-hardening'],
   ['Diagnostics Notebook', 'Diagnostics Notebook', '/?view=diagnostics&qa=visual-hardening'],
@@ -48,6 +48,7 @@ test.describe('React dashboard visual hardening', () => {
             '.chart-scroll',
             '.chart-scroll-shell',
             '.column-menu',
+            '[data-layout-scroll="true"]',
           ].join(',');
           const hiddenSelector = [
             '.sr-only',
@@ -57,6 +58,10 @@ test.describe('React dashboard visual hardening', () => {
           ].join(',');
 
           function isVisible(element) {
+            const closedDetails = element.closest('details:not([open])');
+            if (closedDetails && !closedDetails.querySelector('summary')?.contains(element)) {
+              return false;
+            }
             const style = getComputedStyle(element);
             const rect = element.getBoundingClientRect();
             return (

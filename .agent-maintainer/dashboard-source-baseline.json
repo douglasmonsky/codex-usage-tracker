@@ -12,28 +12,18 @@
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
-      "nonblank": 816,
-      "physical": 880
-    },
-    "frontend/dashboard/src/api/diagnostics.ts": {
-      "group": "source",
-      "nonblank": 442,
-      "physical": 477
+      "nonblank": 817,
+      "physical": 881
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",
-      "nonblank": 410,
-      "physical": 434
+      "nonblank": 412,
+      "physical": 436
     },
     "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": {
       "group": "source",
       "nonblank": 762,
       "physical": 808
-    },
-    "frontend/dashboard/src/features/calls/CallsPage.tsx": {
-      "group": "source",
-      "nonblank": 1303,
-      "physical": 1364
     },
     "frontend/dashboard/src/features/diagnostics/DiagnosticFactsPanels.tsx": {
       "group": "source",
@@ -62,13 +52,8 @@
     },
     "frontend/dashboard/src/features/shared/tables.tsx": {
       "group": "source",
-      "nonblank": 528,
-      "physical": 552
-    },
-    "frontend/dashboard/src/features/threads/ThreadsPage.tsx": {
-      "group": "source",
-      "nonblank": 962,
-      "physical": 1016
+      "nonblank": 507,
+      "physical": 530
     },
     "frontend/dashboard/src/features/usage-drain/UsageDrainPage.tsx": {
       "group": "source",

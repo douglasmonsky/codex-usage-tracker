@@ -1,0 +1,211 @@
+.page {
+  gap: 14px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.pageHeader h1,
+.tableHeading h2 {
+  margin: 0;
+  color: var(--ink-strong, var(--dashboard-text));
+}
+
+.pageHeader h1 {
+  font-size: 28px;
+}
+
+.pageHeader p:not(.eyebrow),
+.tableHeading p {
+  margin: 5px 0 0;
+  color: var(--ink-muted, var(--dashboard-muted));
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--signal-info-ink, var(--dashboard-accent-strong));
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.headerActions,
+.tableActions,
+.gridFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.queryBar {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.4fr) repeat(4, minmax(130px, 0.5fr)) auto auto;
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid var(--line-subtle, var(--dashboard-border));
+  border-radius: 8px;
+  background: var(--surface-panel, var(--dashboard-surface));
+}
+
+.queryBar :global(.search-box),
+.queryBar :global(.filter-field) {
+  min-width: 0;
+}
+
+.queryBar :global(.filter-field) select,
+.queryBar :global(.filter-field) input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.queryBar input[type='date'] {
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 8px;
+  color: var(--dashboard-text);
+  background: var(--dashboard-surface);
+}
+
+.advancedFilters {
+  position: relative;
+}
+
+.advancedFilters > summary,
+.patternsDisclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong, var(--dashboard-border));
+  border-radius: 8px;
+  color: var(--ink-strong, var(--dashboard-text));
+  background: var(--surface-panel, var(--dashboard-surface));
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.advancedFilters > summary::-webkit-details-marker,
+.patternsDisclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advancedFilterGrid {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+  width: min(720px, calc(100vw - 48px));
+  padding: 12px;
+  border: 1px solid var(--line-strong, var(--dashboard-border));
+  border-radius: 8px;
+  background: var(--surface-panel, var(--dashboard-surface));
+  box-shadow: 0 18px 42px rgb(15 23 42 / 16%);
+}
+
+.tableHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.tableHeading h2 {
+  font-size: 16px;
+}
+
+.tableHeading p {
+  font-size: 12px;
+}
+
+.gridColumn {
+  min-width: 0;
+}
+
+.gridFooter {
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 7px 10px;
+  color: var(--ink-muted, var(--dashboard-muted));
+  font-size: 12px;
+}
+
+.patternsDisclosure {
+  padding-top: 2px;
+}
+
+.patternsDisclosure > summary {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 1320px) {
+  .queryBar {
+    grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(140px, 0.5fr)) auto auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .pageHeader,
+  .tableHeading {
+    display: grid;
+  }
+
+  .headerActions,
+  .tableActions {
+    justify-content: flex-start;
+  }
+
+  .queryBar {
+    grid-template-columns: minmax(0, 1fr) minmax(130px, 0.45fr);
+  }
+
+  .queryBar :global(.search-box) {
+    grid-column: 1 / -1;
+  }
+
+  .advancedFilterGrid {
+    position: fixed;
+    top: 96px;
+    right: 12px;
+    left: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: auto;
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .queryBar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .queryBar :global(.search-box) {
+    grid-column: 1;
+  }
+
+  .advancedFilterGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gridFooter {
+    align-items: flex-start;
+  }
+}

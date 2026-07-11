@@ -30,6 +30,7 @@ from codex_usage_tracker.store.api import (
     schema_state,
     upsert_usage_events,
 )
+from codex_usage_tracker.store.thread_summaries import query_thread_summary_count
 from tests.store_dashboard_helpers import (
     SECOND_SESSION_ID,
     SESSION_ID,
@@ -1237,6 +1238,9 @@ def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
     by_key = {row["thread_key"]: row for row in summaries}
 
     assert set(by_key) == {"thread:Alpha", "thread:Beta"}
+    assert query_thread_summary_count(db_path=db_path) == 2
+    assert query_thread_summary_count(db_path=db_path, search="alpha") == 1
+    assert query_thread_summary_count(db_path=db_path, search="missing") == 0
     assert by_key["thread:Alpha"]["call_count"] == 2
     assert by_key["thread:Alpha"]["session_count"] == 1
     assert by_key["thread:Alpha"]["total_tokens"] == 220
@@ -1245,6 +1249,8 @@ def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
     assert by_key["thread:Alpha"]["is_archived_scope"] == "active"
     assert by_key["thread:Alpha"]["estimated_cost_usd"] is None
     assert by_key["thread:Alpha"]["usage_credits"] is None
+    assert by_key["thread:Alpha"]["latest_record_id"] == "a2"
+    assert by_key["thread:Beta"]["latest_record_id"] == "b1"
 
     with connect(db_path) as conn:
         init_db(conn)
@@ -1274,6 +1280,8 @@ def test_thread_summaries_keep_active_and_all_history_scopes_separate(
     assert sum(row["call_count"] for row in all_summaries) == 5
     assert sum(row["archived_call_count"] for row in active_summaries) == 0
     assert sum(row["archived_call_count"] for row in all_summaries) == 1
+    assert all(row["latest_record_id"] for row in active_summaries)
+    assert all(row["latest_record_id"] for row in all_summaries)
 
 
 def test_dashboard_query_limit_zero_loads_all_rows(tmp_path: Path) -> None:

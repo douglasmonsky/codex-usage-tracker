@@ -47,7 +47,7 @@ const inactiveViewSearchParams: Partial<Record<ViewId, string[]>> = {
   reports: ['report'],
   'usage-drain': ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence'],
   diagnostics: ['diagnostic_source', 'diagnostic_fact'],
-  calls: ['detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page'],
+  calls: ['explore', 'detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page'],
   call: ['record', 'return', 'mode', 'max_entries', 'max_chars', 'include_tool_output', 'include_compaction_history'],
 };
 

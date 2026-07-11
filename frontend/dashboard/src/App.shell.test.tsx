@@ -79,11 +79,11 @@ expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=calls');
 
 fireEvent.keyDown(window, { key: '3' });
-expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=threads');
 
 fireEvent.keyDown(searchInput, { key: '4' });
-expect(screen.getByRole('heading', { name: 'Thread Efficiency' })).toBeInTheDocument();
+expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=threads');
 
 fireEvent.keyDown(window, { key: '4' });
@@ -144,7 +144,7 @@ it('copies the current dashboard view link from the topbar', async () => {
   );
 
 render(<App />);
-fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: /^Copy link$/i }));
+fireEvent.click(within(screen.getByRole('banner', { name: 'Dashboard toolbar' })).getByRole('button', { name: /^Copy link$/i }));
 
 await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 const copiedUrl = new URL(writeText.mock.calls[0][0]);
@@ -170,7 +170,7 @@ it('copies call investigator view links with return workspace context', async ()
   );
 
   render(<App />);
-  fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: /^Copy link$/i }));
+fireEvent.click(within(screen.getByRole('banner', { name: 'Dashboard toolbar' })).getByRole('button', { name: /^Copy link$/i }));
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copiedUrl = new URL(writeText.mock.calls[0][0]);
@@ -320,13 +320,13 @@ it('wires quick links and local prototype action controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Models' }));
     expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
 
-fireEvent.click(screen.getByRole('button', { name: /More Filters/i }));
-expect(screen.getByPlaceholderText('Search calls, cwd, projects, models...')).toHaveFocus();
+fireEvent.click(screen.getByText('More filters'));
+expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     const sortButton = screen.getByRole('button', { name: 'Sort by Est. Cost' });
     fireEvent.click(sortButton);
     expect(sortButton.closest('th')).toHaveAttribute('aria-sort', 'descending');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Files' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Quick Links' })).getByRole('button', { name: 'Files' }));
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     expect(screen.getByText('Runtime State')).toBeInTheDocument();
  expect(screen.getAllByText('Rows loaded').length).toBeGreaterThan(0);
@@ -351,8 +351,7 @@ expect(screen.getByPlaceholderText('Search calls, cwd, projects, models...')).to
     expect(screen.getByText(/Diagnostics refreshed/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Filters$/i }));
-    expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toHaveFocus();
+    expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toBeVisible();
   });
 
 it('surfaces legacy environment status chips in the shell', () => {

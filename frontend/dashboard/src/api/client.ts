@@ -595,6 +595,7 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
 
   return {
     id,
+    threadKey: String(row.thread_key ?? ''),
     rawTime,
     eventTimestamp,
     callStartedAt,
