@@ -10,11 +10,14 @@ from urllib.parse import parse_qs
 
 from codex_usage_tracker.server.utils import (
     first_query_value,
+    has_more_rows,
+    next_row_offset,
     parse_api_limit,
     parse_api_offset,
     parse_bool_query_value,
 )
 from codex_usage_tracker.store.api import query_thread_summaries
+from codex_usage_tracker.store.thread_summaries import query_thread_summary_count
 
 ErrorSender = Callable[[HTTPStatus, str], None]
 ExceptionSender = Callable[[str, BaseException], None]
@@ -60,21 +63,30 @@ def threads_payload(
         first_query_value(params.get("include_archived")),
         include_archived_default,
     )
+    search = first_query_value(params.get("q")) or first_query_value(params.get("search"))
     rows = query_thread_summaries(
         db_path=db_path,
         limit=limit,
         offset=offset,
-        search=first_query_value(params.get("q")) or first_query_value(params.get("search")),
+        search=search,
         include_archived=include_archived,
         sort=first_query_value(params.get("sort")) or "tokens",
         direction=first_query_value(params.get("direction")) or "desc",
+    )
+    total_matched = query_thread_summary_count(
+        db_path=db_path,
+        search=search,
+        include_archived=include_archived,
     )
     return {
         "schema": "codex-usage-tracker-threads-v1",
         "rows": rows,
         "row_count": len(rows),
+        "total_matched_rows": total_matched,
         "limit": limit,
         "offset": offset,
+        "has_more": has_more_rows(limit, offset, len(rows), total_matched),
+        "next_offset": next_row_offset(limit, offset, len(rows), total_matched),
         "include_archived": include_archived,
         "raw_context_included": False,
     }

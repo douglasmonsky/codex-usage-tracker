@@ -1,56 +1,8 @@
 import { usageRowToCall } from './client';
+import { clearDiagnosticSnapshotCache } from './diagnosticSnapshots';
 import type { CallRow, ContextRuntime, UsageRow } from './types';
 
-export const diagnosticSnapshotDefinitions = [
-  { key: 'overview', title: 'Overview', path: '/api/diagnostics/overview', refreshPath: '/api/diagnostics/overview/refresh' },
-  { key: 'toolOutput', title: 'Tool Output', path: '/api/diagnostics/tool-output', refreshPath: '/api/diagnostics/tool-output/refresh' },
-  { key: 'commands', title: 'Commands', path: '/api/diagnostics/commands', refreshPath: '/api/diagnostics/commands/refresh' },
-  {
-    key: 'gitInteractions',
-    title: 'Git Interactions',
-    path: '/api/diagnostics/git-interactions',
-    refreshPath: '/api/diagnostics/git-interactions/refresh',
-  },
-  { key: 'fileReads', title: 'File Reads', path: '/api/diagnostics/file-reads', refreshPath: '/api/diagnostics/file-reads/refresh' },
-  {
-    key: 'fileModifications',
-    title: 'File Modifications',
-    path: '/api/diagnostics/file-modifications',
-    refreshPath: '/api/diagnostics/file-modifications/refresh',
-  },
-  {
-    key: 'readProductivity',
-    title: 'Read Productivity',
-    path: '/api/diagnostics/read-productivity',
-    refreshPath: '/api/diagnostics/read-productivity/refresh',
-  },
-  { key: 'concentration', title: 'Concentration', path: '/api/diagnostics/concentration', refreshPath: '/api/diagnostics/concentration/refresh' },
-  {
-    key: 'guidedSummary',
-    title: 'What Is Driving Usage?',
-    path: '/api/diagnostics/guided-summary',
-    refreshPath: '/api/diagnostics/guided-summary/refresh',
-  },
-  { key: 'usageDrain', title: 'Usage Drain', path: '/api/diagnostics/usage-drain', refreshPath: '/api/diagnostics/usage-drain/refresh' },
-] as const;
-
-export type DiagnosticSnapshotDefinition = (typeof diagnosticSnapshotDefinitions)[number];
-export type DiagnosticSnapshotKey = DiagnosticSnapshotDefinition['key'];
-export type DiagnosticSnapshotPayload = Record<string, unknown> & {
-  schema?: string;
-  section?: string;
-  status?: string;
-  refreshed?: boolean;
-  raw_context_included?: boolean;
-  snapshot?: {
-    computed_at?: string;
-    history_scope?: string;
-    source_logs_scanned?: number;
-    usage_rows_scanned?: number;
-  } | null;
-  notes?: string[];
-};
-export type DiagnosticSnapshotMap = Partial<Record<DiagnosticSnapshotKey, DiagnosticSnapshotPayload>>;
+export * from './diagnosticSnapshots';
 
 export const diagnosticFactSourceDefinitions = [
   { key: 'facts', label: 'Top Facts', title: 'Top Diagnostic Facts', path: '/api/diagnostics/facts', limit: 50 },
@@ -113,7 +65,7 @@ export type DiagnosticFactCallsResult = {
   rawPayload: DiagnosticFactCallsPayload;
 };
 
-type DiagnosticFactSortKey =
+export type DiagnosticFactSortKey =
   | 'uncached'
   | 'total'
   | 'tokens'
@@ -126,7 +78,7 @@ type DiagnosticFactSortKey =
   | 'cached'
   | 'output'
   | 'largest';
-type DiagnosticFactCallSortKey =
+export type DiagnosticFactCallSortKey =
   | 'tokens'
   | 'input'
   | 'cached'
@@ -154,76 +106,15 @@ export type DiagnosticFactCallsOptions = {
   direction?: DiagnosticSortDirection;
 };
 
-const diagnosticSnapshotCache = new Map<string, Promise<DiagnosticSnapshotMap> | DiagnosticSnapshotMap>();
 const diagnosticFactsCache = new Map<string, Promise<DiagnosticFactsPayload> | DiagnosticFactsPayload>();
 const diagnosticFactCallsCache = new Map<string, Promise<DiagnosticFactCallsResult> | DiagnosticFactCallsResult>();
 const diagnosticMergedFactCallsCache = new Map<string, DiagnosticFactCallsResult>();
 
 export function clearDiagnosticApiCache(): void {
-  diagnosticSnapshotCache.clear();
+  clearDiagnosticSnapshotCache();
   diagnosticFactsCache.clear();
   diagnosticFactCallsCache.clear();
   diagnosticMergedFactCallsCache.clear();
-}
-
-export function cachedDiagnosticSnapshots(runtime: ContextRuntime): DiagnosticSnapshotMap | null {
-  return resolvedCachedValue(diagnosticSnapshotCache, runtimeCacheKey(runtime));
-}
-
-export async function loadDiagnosticSnapshots(runtime: ContextRuntime): Promise<DiagnosticSnapshotMap> {
-  ensureDiagnosticsRuntime(runtime);
-  return cachedRequest(
-    diagnosticSnapshotCache,
-    runtimeCacheKey(runtime),
-    async () => {
-      const entries = await Promise.all(
-        diagnosticSnapshotDefinitions.map(async definition => [
-          definition.key,
-          await readDiagnosticSnapshot(definition, runtime),
-        ] as const),
-      );
-      return Object.fromEntries(entries) as DiagnosticSnapshotMap;
-    },
-  );
-}
-
-export async function refreshDiagnosticSnapshots(runtime: ContextRuntime): Promise<DiagnosticSnapshotMap> {
-  ensureDiagnosticsRuntime(runtime);
-  const response = await fetch(`/api/diagnostics/refresh?_=${Date.now()}`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'X-Codex-Usage-Token': runtime.apiToken,
-    },
-    cache: 'no-store',
-  });
-  const payload = (await readJsonResponse(response, 'Diagnostic snapshot refresh')) as {
-    sections?: DiagnosticSnapshotMap;
-  };
-  const sections = payload.sections ?? {};
-  diagnosticSnapshotCache.set(runtimeCacheKey(runtime), sections);
-  return sections;
-}
-
-export async function refreshDiagnosticSnapshot(
-  definition: DiagnosticSnapshotDefinition,
-  runtime: ContextRuntime,
-): Promise<DiagnosticSnapshotPayload> {
-  ensureDiagnosticsRuntime(runtime);
-  const response = await fetch(`${definition.refreshPath}?_=${Date.now()}`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'X-Codex-Usage-Token': runtime.apiToken,
-    },
-    cache: 'no-store',
-  });
-  const payload = (await readJsonResponse(response, definition.title)) as DiagnosticSnapshotPayload;
-  const cacheKey = runtimeCacheKey(runtime);
-  const cached = diagnosticSnapshotCache.get(cacheKey);
-  const current = cached ? await Promise.resolve(cached) : {};
-  diagnosticSnapshotCache.set(cacheKey, { ...current, [definition.key]: payload });
-  return payload;
 }
 
 export function cachedDiagnosticFactSource(
@@ -440,20 +331,6 @@ function mergedFactCallsCacheKey(
     sort,
     direction,
   ].join(':');
-}
-
-async function readDiagnosticSnapshot(
-  definition: DiagnosticSnapshotDefinition,
-  runtime: ContextRuntime,
-): Promise<DiagnosticSnapshotPayload> {
-  const response = await fetch(`${definition.path}?_=${Date.now()}`, {
-    headers: {
-      Accept: 'application/json',
-      'X-Codex-Usage-Token': runtime.apiToken,
-    },
-    cache: 'no-store',
-  });
-  return (await readJsonResponse(response, definition.title)) as DiagnosticSnapshotPayload;
 }
 
 function ensureDiagnosticsRuntime(runtime: ContextRuntime): void {

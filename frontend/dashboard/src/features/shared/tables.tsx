@@ -143,28 +143,6 @@ export const callCsvColumns: Array<CsvColumn<CallRow>> = [
   { header: 'efficiency_flags', value: row => row.efficiencyFlags.join('|') },
 ];
 
-export const callColumnChoices: ColumnChoice[] = [
-  { id: 'time', label: 'Time', locked: true },
-  { id: 'thread', label: 'Thread', locked: true },
-  { id: 'model', label: 'Model' },
-  { id: 'effort', label: 'Effort' },
-  { id: 'input', label: 'Input Tokens' },
-  { id: 'totalTokens', label: 'Total Tokens' },
-  { id: 'cachedInput', label: 'Cached Input' },
-  { id: 'uncachedInput', label: 'Uncached Input' },
-  { id: 'output', label: 'Output Tokens' },
-  { id: 'reasoningOutput', label: 'Reasoning Output' },
-  { id: 'cachedPct', label: 'Cached %' },
-  { id: 'cost', label: 'Est. Cost' },
-  { id: 'credits', label: 'Codex Credits' },
-  { id: 'contextWindowPct', label: 'Context %' },
-  { id: 'duration', label: 'Duration' },
-  { id: 'previousCallGap', label: 'Prev Gap' },
-  { id: 'initiator', label: 'Initiated' },
-  { id: 'signal', label: 'Signals' },
-  { id: 'investigate', label: 'Investigate', locked: true },
-];
-
 export type CallSignalPuck = {
   key: string;
   label: string;

@@ -10,7 +10,7 @@ export default {
     'property-no-unknown': true,
     'selector-max-compound-selectors': 8,
     'selector-max-id': 0,
-    'selector-pseudo-class-no-unknown': true,
+    'selector-pseudo-class-no-unknown': [true, { ignorePseudoClasses: ['global'] }],
     'selector-pseudo-element-no-unknown': true,
     'unit-no-unknown': true
   }

@@ -194,6 +194,10 @@ grid-column: 1;
 
 .drilldown-panel {
 position: static;
+max-height: none;
+overflow: visible;
+overscroll-behavior: auto;
+scrollbar-gutter: auto;
 }
 }
 

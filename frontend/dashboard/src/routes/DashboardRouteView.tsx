@@ -7,7 +7,7 @@ import type { DashboardViewId } from './dashboardSearch';
 
 const OverviewPage = lazyRouteComponent(() => import('../features/overview/OverviewPage'), 'OverviewPage');
 const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
-const CallsPage = lazyRouteComponent(() => import('../features/calls/CallsPage'), 'CallsPage');
+const ExploreRoutePage = lazyRouteComponent(() => import('../features/explore/ExploreRoutePage'), 'ExploreRoutePage');
 const CallInvestigatorPage = lazyRouteComponent(
   () => import('../features/call-investigator/CallInvestigatorPage'),
   'CallInvestigatorPage',
@@ -22,7 +22,7 @@ const SettingsPage = lazyRouteComponent(() => import('../features/settings/Setti
 const dashboardRouteComponents = [
   OverviewPage,
   InvestigatorPage,
-  CallsPage,
+  ExploreRoutePage,
   CallInvestigatorPage,
   ThreadsPage,
   UsageDrainPage,
@@ -134,15 +134,18 @@ function renderDashboardView(props: DashboardRouteViewProps) {
       return <InvestigatorPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
     case 'calls':
       return (
-        <CallsPage
+        <ExploreRoutePage
           model={model}
           globalQuery={globalQuery}
           activePreset={activePreset}
           onRefresh={onRefresh}
           contextRuntime={contextRuntime}
+          includeArchived={historyScope === 'all'}
+          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
           onContextApiEnabledChange={setContextApiEnabled}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
+          onNavigateView={navigateView}
         />
       );
     case 'call':
@@ -159,7 +162,19 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         />
       );
     case 'threads':
-      return <ThreadsPage model={model} globalQuery={globalQuery} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} globalFilters={globalFilters} />;
+      return (
+        <ThreadsPage
+          model={model}
+          globalQuery={globalQuery}
+          onOpenInvestigator={openCallInvestigator}
+          onCopyCallLink={copyCallInvestigatorLink}
+          globalFilters={globalFilters}
+          contextRuntime={contextRuntime}
+          includeArchived={historyScope === 'all'}
+          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          onNavigateView={navigateView}
+        />
+      );
     case 'usage-drain':
       return <UsageDrainPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
     case 'cache-context':

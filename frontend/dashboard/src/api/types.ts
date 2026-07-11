@@ -11,6 +11,7 @@ export type UsageRow = {
   turn_timestamp?: string;
   time?: string;
   thread_name?: string | null;
+  thread_key?: string | null;
   thread?: string;
   resolved_parent_thread_name?: string | null;
   parent_thread_name?: string | null;
@@ -277,6 +278,7 @@ export type Finding = {
 
 export type CallRow = {
   id: string;
+  threadKey?: string;
   rawTime: string;
   eventTimestamp: string;
   callStartedAt: string;

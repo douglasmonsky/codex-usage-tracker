@@ -230,7 +230,7 @@ expect(screen.getAllByText('Loaded 1,500 rows').length).toBeGreaterThan(0);
 expect(screen.getByRole('button', { name: /^Load more$/i })).toBeDisabled();
 });
 
-it('windows large table hydrates and syncs page URL state', async () => {
+it('virtualizes large tables while preserving page URL state', () => {
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'large-table-token',
     context_api_enabled: true,
@@ -255,16 +255,11 @@ it('windows large table hydrates and syncs page URL state', async () => {
   render(<App />);
 
   const table = screen.getByRole('table', { name: 'Model calls' });
-  expect(within(table).getAllByRole('row')).toHaveLength(501);
-  expect(screen.getByText('Showing 500 of 520 table rows')).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Show 20 more rows' }));
-
-  expect(within(table).getAllByRole('row')).toHaveLength(521);
-  await waitFor(() => {
-    expect(new URLSearchParams(window.location.search).get('page')).toBe('3');
-  });
-  expect(screen.queryByText('Showing 500 of 520 table rows')).not.toBeInTheDocument();
+  expect(table).toHaveAttribute('aria-rowcount', '521');
+  expect(within(table).getAllByRole('row').length).toBeLessThan(40);
+  expect(table.parentElement).toHaveAttribute('data-virtualized', 'true');
+  expect(screen.getByText('520 loaded / 520 matched')).toBeInTheDocument();
+  expect(new URLSearchParams(window.location.search).get('page')).toBe('2');
 });
 
 it('restores session row loading preferences on browser refresh', async () => {

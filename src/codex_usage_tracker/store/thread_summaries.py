@@ -68,13 +68,10 @@ def query_thread_summaries(
 ) -> list[dict[str, Any]]:
     """Return materialized thread summaries for live dashboard APIs."""
 
-    clauses = ["is_archived_scope = ?"]
-    params: list[Any] = ["all-history" if include_archived else "active"]
-    if search:
-        like = f"%{search}%"
-        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
-        params.extend([like, like])
-    where_clause = "WHERE " + " AND ".join(f"({clause})" for clause in clauses)
+    where_clause, params = _thread_summary_where_clause(
+        search=search,
+        include_archived=include_archived,
+    )
     sort_map = {
         "tokens": "total_tokens",
         "time": "latest_event_timestamp",
@@ -88,6 +85,8 @@ def query_thread_summaries(
     direction_sql = normalize_sort_direction(direction)
     normalized_limit = normalize_limit(limit)
     normalized_offset = normalize_offset(offset)
+    usage_thread_key = thread_key_expression("u.")
+    active_usage_filter = "" if include_archived else "AND coalesce(u.is_archived, 0) = 0"
     limit_clause = ""
     query_params = list(params)
     if normalized_limit is not None:
@@ -103,8 +102,20 @@ def query_thread_summaries(
         init_db(conn)
         rows = conn.execute(
             f"""
-            SELECT *
-            FROM thread_summaries
+            SELECT
+                t.*,
+                (
+                    SELECT u.record_id
+                    FROM usage_events AS u
+                    WHERE {usage_thread_key} = t.thread_key
+                    {active_usage_filter}
+                    ORDER BY
+                        u.event_timestamp DESC,
+                        u.cumulative_total_tokens DESC,
+                        u.record_id DESC
+                    LIMIT 1
+                ) AS latest_record_id
+            FROM thread_summaries AS t
             {where_clause}
             ORDER BY {sort_map[sort]} {direction_sql}, latest_event_timestamp DESC
             {limit_clause}
@@ -112,6 +123,41 @@ def query_thread_summaries(
             query_params,
         ).fetchall()
     return [row_to_dict(row) for row in rows]
+
+
+def query_thread_summary_count(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    search: str | None = None,
+    include_archived: bool = False,
+) -> int:
+    """Return the number of thread summaries matching list filters."""
+
+    where_clause, params = _thread_summary_where_clause(
+        search=search,
+        include_archived=include_archived,
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            f"SELECT COUNT(*) AS row_count FROM thread_summaries {where_clause}",
+            params,
+        ).fetchone()
+    return int(row["row_count"] if row is not None else 0)
+
+
+def _thread_summary_where_clause(
+    *,
+    search: str | None,
+    include_archived: bool,
+) -> tuple[str, list[Any]]:
+    clauses = ["is_archived_scope = ?"]
+    params: list[Any] = ["all-history" if include_archived else "active"]
+    if search:
+        like = f"%{search}%"
+        clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
+        params.extend([like, like])
+    return "WHERE " + " AND ".join(f"({clause})" for clause in clauses), params
 
 
 def _insert_thread_summary_scope(

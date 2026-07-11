@@ -79,6 +79,14 @@ Open `Overview` when you want a quick read on current aggregate usage before sor
 
 Use `Calls` view when you want to inspect individual model calls.
 
+- The Explore switcher moves directly between Calls, Threads, Tools, and Files
+  without losing the Call Investigator return location.
+- On localhost, Calls pages through the focused `/api/calls` contract. Static
+  snapshots and unavailable focused endpoints continue to render the loaded
+  dashboard model instead of leaving the evidence surface blank.
+- The table virtualizes its visible rows, keeps the header and Thread identity
+  column in place, remembers density and visible columns, and becomes a ranked
+  evidence list on narrow screens.
 - The header stays compact: refresh controls on the right, and short status chips on the left. Exact refresh time, pricing source, and credit-rate source live in hover titles so live refreshes do not reflow the page.
 - The top cards include cached input, uncached input, Codex credit usage, and optional usage remaining instead of estimated-token, unpriced-token, and price-coverage counters.
 - The `Confidence` filter separates exact cost, estimated cost, unpriced cost, exact credit-rate matches, inferred credit mappings, user credit overrides, and missing credit rates.
@@ -121,12 +129,34 @@ Useful interpretation notes:
 
 Use `Threads` view when you want to understand a work session as a group instead of one call at a time.
 
+- Threads pages through `/api/threads` on localhost and hydrates the selected
+  thread's supporting calls through `/api/thread-calls`; loaded snapshot rows
+  remain the fallback.
+- Switch between the virtualized table, cache-efficiency frontier, and lifecycle
+  view. Chart selections update the same selected-thread evidence used by the
+  inspector.
 - Each thread row groups the filtered model calls by thread name, falling back to session id when no name is available.
 - Thread rows show latest activity, call count, model mix, effort mix, total tokens, estimated cost, Codex credits, cache ratio, and signal count.
 - Mixed model summaries prefer the primary non-review model; `codex-auto-review` appears as the thread model only for review-only threads.
-- Click a thread row to expand or collapse its calls. Multiple thread rows can stay open.
-- Expanded calls default to newest first. Click an expanded-call header such as `Time`, `Tokens`, `Cost`, or `Cache` to sort that thread's visible calls without changing the top-level Threads ranking.
+- Hover or keyboard-select a thread to scan its aggregate inspector. Activating
+  a row opens the latest supporting call in Call Investigator.
+- The inspector's call timeline supports independent sorting, incremental
+  disclosure, copy-link actions, and direct Call Investigator navigation.
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
+
+### Tools And Files Explorers
+
+Use the Explore switcher when a Calls or Threads pattern needs a narrower source
+view.
+
+- `Tools` reads the focused `/api/diagnostics/tools` fact feed, supports paging
+  and sorting, and loads supporting calls only for the selected fact.
+- `Files` combines stored file-read and file-modification diagnostics by safe
+  path hash. It does not require raw paths or file contents in the aggregate
+  dashboard payload.
+- Both views expose explicit live, stored, unavailable, empty, and error states,
+  preserve direct Call Investigator actions, and export the currently loaded
+  evidence rows.
 
 ## Diagnostics View
 

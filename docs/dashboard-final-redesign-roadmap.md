@@ -204,6 +204,29 @@ Gate:
 - sticky containment and keyboard grid tests;
 - Calls, Threads, and Call Investigator manual parity review.
 
+Implementation checkpoint (2026-07-11):
+
+- Calls and Threads now prefer focused, paged localhost contracts while keeping
+  the loaded dashboard model as the static/fallback source;
+- the shared evidence grid virtualizes large result sets, persists density and
+  visible columns, freezes the identity column, keeps headers sticky, exposes a
+  compact mobile ranked list, and preserves keyboard row activation;
+- Threads includes table, cache-frontier, and lifecycle views backed by
+  `VisualizationSpecV1`, plus selected-thread call hydration;
+- the Explore switcher now reaches Calls, Threads, Tools, and Files. Tools use
+  focused diagnostic facts and supporting-call lookups; Files join stored file
+  read/modification diagnostics by safe path hash;
+- Calls, Threads, their inspectors, context evidence, filters, view components,
+  and analysis/controller logic were split so every touched source module stays
+  below the redesign's 400-nonblank-line budget;
+- desktop inspectors are viewport-bounded with internal scrolling while tablet
+  and mobile retain normal page flow; the strict desktop/tablet/mobile overflow
+  and control-overlap matrix passes across all dashboard routes;
+- focused contract, URL, i18n, paging, investigator, and 100k-row virtualization
+  tests pass, along with the full 314-test dashboard suite, governance/build and
+  bundle gates, 43 focused Python integration tests, Playwright workflow smoke,
+  and release-readiness checks.
+
 ### R7. Investigate And Waste Intelligence
 
 Target PR: `redesign/07-investigate` -> experiment
