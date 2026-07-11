@@ -4,11 +4,12 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 
-def _run_dashboard_live_script(script: str) -> dict[str, object]:
+def _run_dashboard_live_script(script: str) -> dict[str, Any]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is required for dashboard live helper tests")

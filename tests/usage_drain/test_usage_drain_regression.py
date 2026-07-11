@@ -20,7 +20,9 @@ def test_prepare_design_standardizes_numeric_and_filters_sparse_categories() -> 
         {"tokens": 6.0, "duration": 5.0, "mode": "B"},
     ]
 
-    feature_names, means, stddevs, category_levels = prepare_design(rows, spec)
+    design = prepare_design(rows, spec)
+    assert design is not None
+    feature_names, means, stddevs, category_levels = design
 
     assert feature_names == ["tokens", "duration", "mode=A"]
     assert means == {"tokens": 4.0, "duration": 3.0}

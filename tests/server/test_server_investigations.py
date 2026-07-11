@@ -92,8 +92,11 @@ def test_investigation_payload_matches_existing_report_payload(
 
     assert payload == expected
     assert payload["includes_raw_fragments"] is False
-    assert "content" not in payload["rows"][0]
-    assert "raw_fragment" not in payload["rows"][0]
+    rows = payload["rows"]
+    assert isinstance(rows, list)
+    assert isinstance(rows[0], dict)
+    assert "content" not in rows[0]
+    assert "raw_fragment" not in rows[0]
     assert calls["since"] == "2026-07-01"
     assert calls["include_archived"] is True
     assert calls["privacy_mode"] == "strict"

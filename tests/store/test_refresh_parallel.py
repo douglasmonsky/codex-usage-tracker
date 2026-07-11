@@ -116,9 +116,13 @@ def test_refresh_reports_phase_progress(tmp_path: Path, monkeypatch) -> None:
     assert "indexing_content" in phases
     assert phases[-1] == "finalizing"
     assert events[-1]["status"] == "completed"
-    assert events[-1]["result"]["parsed_events"] == result.parsed_events
+    final_result = events[-1]["result"]
+    assert isinstance(final_result, dict)
+    assert final_result["parsed_events"] == result.parsed_events
     content_events = [event for event in events if event["phase"] == "indexing_content"]
     assert content_events
     assert content_events[-1]["status"] == "completed"
     assert content_events[-1]["percent"] == 100.0
-    assert content_events[-1]["content_fragments"] > 0
+    content_fragments = content_events[-1]["content_fragments"]
+    assert isinstance(content_fragments, (int, float))
+    assert content_fragments > 0
