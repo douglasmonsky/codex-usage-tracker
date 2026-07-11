@@ -4,11 +4,12 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 
-def _run_snapshot_renderer_script(script: str) -> dict[str, object]:
+def _run_snapshot_renderer_script(script: str) -> dict[str, Any]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is required for dashboard diagnostic snapshot renderer tests")

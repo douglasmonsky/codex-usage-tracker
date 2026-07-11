@@ -256,11 +256,18 @@ def test_context_loading_uses_one_source_scan_for_evidence_and_serialized_estima
     open_count = 0
     real_open = Path.open
 
-    def counting_open(path: Path, *args: object, **kwargs: object):
+    def counting_open(
+        path: Path,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ):
         nonlocal open_count
         if path == source_file:
             open_count += 1
-        return real_open(path, *args, **kwargs)
+        return real_open(path, mode, buffering, encoding, errors, newline)
 
     monkeypatch.setattr(Path, "open", counting_open)
 

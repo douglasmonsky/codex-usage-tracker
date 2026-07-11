@@ -26,6 +26,10 @@ class _AutoClosingConnection:
     def __getattr__(self, name: str) -> Any:
         return getattr(self._conn, name)
 
+    @property
+    def connection(self) -> sqlite3.Connection:
+        return self._conn
+
     def close(self) -> None:
         self._conn.close()
 
@@ -52,9 +56,9 @@ def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
     unchanged_path.write_text("{}\n", encoding="utf-8")
     grown_path.write_text("{}\n{}\n", encoding="utf-8")
     state = ParserState(session_id="session")
-    _insert_source_metadata(conn, unchanged_path, state=state)
+    _insert_source_metadata(conn.connection, unchanged_path, state=state)
     _insert_source_metadata(
-        conn,
+        conn.connection,
         grown_path,
         size_bytes=len("{}\n"),
         parsed_until_byte=len("{}\n"),
@@ -63,7 +67,8 @@ def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
     )
 
     plans = source_logs_requiring_parse(
-        conn, [new_path, unchanged_path, grown_path, tmp_path / "missing.jsonl"]
+        conn.connection,
+        [new_path, unchanged_path, grown_path, tmp_path / "missing.jsonl"],
     )
 
     by_path = {plan.path: plan for plan in plans}
@@ -102,7 +107,7 @@ def test_upsert_source_file_metadata_records_latest_event_and_parser_state(
     )
 
     upsert_source_file_metadata(
-        conn,
+        conn.connection,
         parsed_files=[(source_path, [earlier, latest], {"malformed_json": 1}, state)],
     )
 
@@ -129,7 +134,10 @@ def test_upsert_source_file_metadata_uses_parser_state_when_no_events(
         latest_event_timestamp="2026-06-01T09:00:00Z",
     )
 
-    upsert_source_file_metadata(conn, parsed_files=[(source_path, [], {}, state)])
+    upsert_source_file_metadata(
+        conn.connection,
+        parsed_files=[(source_path, [], {}, state)],
+    )
 
     row = conn.execute(
         "SELECT latest_record_id, latest_event_timestamp FROM source_files WHERE source_file = ?",
