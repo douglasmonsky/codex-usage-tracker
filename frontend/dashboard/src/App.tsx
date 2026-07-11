@@ -1,6 +1,6 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ArrowUp, Copy, Download, RefreshCw, ShieldAlert, Terminal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { currentViewCsvExport } from './app/currentViewExport';
 import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyScope';
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
@@ -13,6 +13,7 @@ import {
   loadLimitFromPayload,
   nextRowLoadLimit,
   normalizeRowLimit,
+  readDataScopePreference,
   rowLimitMin,
   rowLimitNoCap,
   rowLimitSliderMaxValue,
@@ -20,6 +21,7 @@ import {
   rowLimitSummaryLabel,
   rowLimitValueLabel,
   rowLoadStatusLabel,
+  storeDataScopePreference,
 } from './app/rowLimit';
 import {
   callReturnViewFromSearch,
@@ -32,24 +34,21 @@ import {
   type HistoryScope,
   viewFromUrlParam,
 } from './app/shellUrl';
-import { loadUsagePayload, modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
+import { modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
+import {
+  cancelUsageQueries,
+  dashboardQueryClient,
+  isUsageQueryCancelled,
+  queryUsageSnapshot,
+} from './data/queryRuntime';
 import { EnvironmentStatus } from './components/EnvironmentStatus';
 import { StatusBadge } from './components/StatusBadge';
-import { CallInvestigatorPage } from './features/call-investigator/CallInvestigatorPage';
-import { CacheContextPage } from './features/cache-context/CacheContextPage';
-import { CallsPage } from './features/calls/CallsPage';
-import { DiagnosticsPage } from './features/diagnostics/DiagnosticsPage';
-import { InvestigatorPage } from './features/investigator/InvestigatorPage';
-import { OverviewPage } from './features/overview/OverviewPage';
-import { ReportsPage } from './features/reports/ReportsPage';
-import { SettingsPage } from './features/settings/SettingsPage';
 import { copyText } from './features/shared/copyText';
 import { downloadCsv } from './features/shared/exportCsv';
-import { presetLabel, type InvestigationPresetAction } from './features/shared/investigationPresets';
-import { ThreadsPage } from './features/threads/ThreadsPage';
-import { UsageDrainPage } from './features/usage-drain/UsageDrainPage';
+import { presetLabel } from './features/shared/investigationPresets';
+import { DashboardRouteView } from './routes/DashboardRouteView';
 
 type RefreshOptions = {
   loadLimit?: number;
@@ -58,7 +57,6 @@ type RefreshOptions = {
 };
 
 const autoRefreshIntervalMs = 10_000;
-const usageLoadSessionKey = 'codexUsageDashboardLoadSettings';
 const keyboardShortcutViews: Record<string, ViewId> = {
   '1': 'overview',
   '2': 'calls',
@@ -74,35 +72,6 @@ export function shouldAutoRefreshUsageView(view: ViewId): boolean {
 function isKeyboardShortcutTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
   return Boolean(target.closest('input, select, textarea, button, [contenteditable="true"]'));
-}
-
-function readUsageLoadSessionSettings(): RefreshOptions | null {
-  try {
-    const rawValue = window.sessionStorage?.getItem(usageLoadSessionKey);
-    if (!rawValue) return null;
-    const parsed = JSON.parse(rawValue) as { loadLimit?: unknown; historyScope?: unknown };
-    const loadLimit =
-      typeof parsed.loadLimit === 'number' && Number.isFinite(parsed.loadLimit)
-        ? normalizeRowLimit(parsed.loadLimit)
-        : undefined;
-    const historyScope: HistoryScope | undefined =
-      parsed.historyScope === 'all' || parsed.historyScope === 'active' ? parsed.historyScope : undefined;
-    if (loadLimit === undefined && historyScope === undefined) return null;
-    return { loadLimit, historyScope };
-  } catch {
-    return null;
-  }
-}
-
-function storeUsageLoadSessionSettings(loadLimit: number, historyScope: HistoryScope) {
-  try {
-    window.sessionStorage?.setItem(
-      usageLoadSessionKey,
-      JSON.stringify({ loadLimit: normalizeRowLimit(loadLimit), historyScope }),
-    );
-  } catch {
-    // Storage can be disabled in private or embedded browser contexts.
-  }
 }
 
 export function App() {
@@ -133,6 +102,7 @@ const initialLiveLoadAttempted = useRef(false);
   const [pendingLoadLimit, setPendingLoadLimit] = useState(() => loadLimitFromPayload(initialPayload));
   const [historyScope, setHistoryScope] = useState<HistoryScope>(() => historyScopeFromUrl(historyScopeFromPayload(initialPayload)));
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
+  const [navigationRevision, setNavigationRevision] = useState(0);
 const canUseLiveApi = Boolean(dashboardPayload?.api_token);
 const shellI18n = useMemo(() => createShellI18n(dashboardPayload, language), [dashboardPayload, language]);
 const contextRuntime = useMemo<ContextRuntime>(
@@ -201,11 +171,16 @@ function setView(view: ViewId) {
   if (view !== 'call') {
     setActiveRecordId('');
   }
-  replaceShellUrl(url);
+  pushShellUrl(url);
 }
 
 function replaceShellUrl(url: URL) {
   window.history.replaceState(null, '', url);
+  setLocationSearch(url.search);
+}
+
+function pushShellUrl(url: URL) {
+  window.history.pushState(null, '', url);
   setLocationSearch(url.search);
 }
 
@@ -215,6 +190,25 @@ useEffect(() => {
     replaceShellUrl(url);
   }
 }, []);
+
+useEffect(() => {
+  function hydrateShellFromLocation() {
+    const search = window.location.search;
+    const params = new URLSearchParams(search);
+    setActiveView(viewFromUrlParam(params.get('view')));
+    setActiveRecordId(params.get('record') ?? '');
+    setCallReturnView(callReturnViewFromSearch(search));
+    setCallReturnViewExplicit(hasCallReturnViewParam(search));
+    setGlobalQuery(params.get('q') ?? '');
+    setActivePreset(params.get('preset') ?? '');
+    setHistoryScope(historyScopeFromUrl(historyScopeFromPayload(dashboardPayload), search));
+    setLocationSearch(search);
+    setNavigationRevision(revision => revision + 1);
+  }
+
+  window.addEventListener('popstate', hydrateShellFromLocation);
+  return () => window.removeEventListener('popstate', hydrateShellFromLocation);
+}, [dashboardPayload]);
 
   useEffect(() => {
     function handleKeyboardShortcut(event: KeyboardEvent) {
@@ -258,7 +252,7 @@ clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callRetur
 url.searchParams.set('view', 'call');
 url.searchParams.set('record', recordId);
 url.searchParams.set('return', returnView);
-replaceShellUrl(url);
+pushShellUrl(url);
 }
 
 function openFindingInvestigator(rank: number) {
@@ -270,7 +264,7 @@ url.searchParams.set('view', 'investigator');
 url.searchParams.set('finding', String(rank));
 url.searchParams.delete('preset');
 clearInactiveViewSearchParams(url, 'investigator');
-replaceShellUrl(url);
+pushShellUrl(url);
 }
 
 function backFromCallInvestigator() {
@@ -288,23 +282,6 @@ setView(callReturnView);
     url.searchParams.delete('q');
   }
   replaceShellUrl(url);
-}
-
-  function applyInvestigationPreset(action: InvestigationPresetAction) {
-    setActiveView(action.view);
-    setActivePreset(action.presetKey);
-    setGlobalQuery(action.query ?? '');
-    setActiveRecordId('');
-const url = new URL(window.location.href);
-url.searchParams.set('view', action.view);
-url.searchParams.set('preset', action.presetKey);
-clearInactiveViewSearchParams(url, action.view);
-if (action.query) {
-url.searchParams.set('q', action.query);
-} else {
-url.searchParams.delete('q');
-}
-replaceShellUrl(url);
 }
 
 async function refreshDashboard(options: RefreshOptions = {}) {
@@ -329,16 +306,17 @@ async function refreshDashboard(options: RefreshOptions = {}) {
   setRefreshState(
     `${shouldRefreshIndex ? 'Refreshing' : 'Loading'} ${nextHistoryScope === 'all' ? 'all history' : 'active'} aggregate rows...`,
   );
- try {
-      const payload = await loadUsagePayload(dashboardPayload, {
+  try {
+    const payload = await queryUsageSnapshot({
+      currentPayload: dashboardPayload,
       refresh: shouldRefreshIndex,
-      limit: nextLoadLimit,
-      includeArchived: nextHistoryScope === 'all',
+      loadLimit: nextLoadLimit,
+      historyScope: nextHistoryScope,
       onProgress: progress => {
         setRefreshProgress(progress);
         setRefreshState(refreshProgressLabel(progress, nextHistoryScope));
       },
-      });
+    });
     clearDiagnosticApiCache();
     setDashboardPayload(payload);
       setModel(modelFromBootPayload(payload));
@@ -348,18 +326,29 @@ async function refreshDashboard(options: RefreshOptions = {}) {
     setPendingLoadLimit(appliedLoadLimit);
     const appliedHistoryScope = historyScopeFromPayload(payload, nextHistoryScope);
     setHistoryScope(appliedHistoryScope);
-    storeUsageLoadSessionSettings(appliedLoadLimit, appliedHistoryScope);
+    storeDataScopePreference(appliedLoadLimit, appliedHistoryScope);
     const loaded = payload.loaded_row_count ?? payload.rows?.length ?? 0;
     const total = payload.total_available_rows ?? loaded;
     setRefreshState(`Live refresh loaded ${loaded} of ${total} aggregate rows`);
   } catch (error) {
     setRefreshProgress(null);
+    if (isUsageQueryCancelled(error)) {
+      setRefreshState('Refresh cancelled; stored snapshot remains visible');
+      return;
+    }
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setRefreshState(`${errorMessage(error)} Stored snapshot kept at ${timestamp}`);
   } finally {
     setRefreshProgress(null);
     setRefreshing(false);
   }
+}
+
+async function cancelDashboardRefresh() {
+  await cancelUsageQueries();
+  setRefreshProgress(null);
+  setRefreshing(false);
+  setRefreshState('Refresh cancelled; stored snapshot remains visible');
 }
 
 useEffect(() => {
@@ -370,7 +359,7 @@ document.documentElement.dir = shellI18n.direction;
 useEffect(() => {
   const availableRows = Number(dashboardPayload?.total_available_rows ?? 0);
   const loadedRows = Number(dashboardPayload?.loaded_row_count ?? dashboardPayload?.rows?.length ?? 0);
-  const sessionSettings = readUsageLoadSessionSettings();
+  const sessionSettings = readDataScopePreference();
   const nextHistoryScope = sessionSettings?.historyScope ?? historyScope;
   const nextLoadLimit = sessionSettings?.loadLimit ?? loadLimit;
   const needsSessionRestore =
@@ -508,8 +497,8 @@ setRefreshState('Copy unavailable in browser');
 }
 }
 
-function exportCurrentViewCsv() {
-const exportSpec = currentViewCsvExport(
+async function exportCurrentViewCsv() {
+const exportSpec = await currentViewCsvExport(
 activeView,
 scopedModel,
       {
@@ -724,7 +713,18 @@ disabled={refreshing || !canUseLiveApi}
               >
                 <span style={{ width: `${refreshProgressPercent ?? 8}%` }} />
               </div>
-              <span>{refreshProgressPercent === null ? 'Preparing...' : `${Math.round(refreshProgressPercent)}% loaded`}</span>
+              <span>
+                {refreshProgressPercent === null ? 'Preparing...' : `${Math.round(refreshProgressPercent)}% loaded`}
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={() => void cancelDashboardRefresh()}
+                  aria-label="Cancel refresh"
+                  title="Cancel refresh"
+                >
+                  <X size={13} />
+                </button>
+              </span>
             </div>
           ) : null}
           <button className="row-limit-load-all" type="button" onClick={loadAllRows} disabled={!canLoadAllRows}>
@@ -772,38 +772,47 @@ Use Load all rows for the full history, or type any finite row count.
 </button>
           </div>
       </header>
-      {renderView(
-        activeView,
-        scopedModel,
-          onRefresh,
-          refreshState,
-          globalQuery,
-          activePreset,
-          activeRecordId,
-          contextRuntime,
-          setContextApiEnabled,
-openCallInvestigator,
-copyCallInvestigatorLink,
-openFindingInvestigator,
-applyInvestigationPreset,
-callReturnViewExplicit
-  ? `Back to ${callReturnViewLabel(callReturnView)}`
-  : shellI18n.t('button.back_to_dashboard', 'Back to dashboard'),
-backFromCallInvestigator,
- dashboardPayload,
- historyScope,
- loadLimit,
- loadedRowCount,
- totalAvailableRows,
- canUseLiveApi,
- autoRefreshEnabled,
- refreshing,
- hasMoreRows,
- canLoadAllRows,
- loadMoreRows,
- loadAllRows,
- <ShellGlobalFilters activeView={activeView} locationSearch={locationSearch} model={model} onUrlChange={replaceShellUrl} />,
-)}
+      <DashboardRouteView
+        key={navigationRevision}
+        activeView={activeView}
+        model={scopedModel}
+        onRefresh={onRefresh}
+        refreshState={refreshState}
+        globalQuery={globalQuery}
+        activePreset={activePreset}
+        activeRecordId={activeRecordId}
+        contextRuntime={contextRuntime}
+        setContextApiEnabled={setContextApiEnabled}
+        openCallInvestigator={openCallInvestigator}
+        copyCallInvestigatorLink={copyCallInvestigatorLink}
+        openFindingInvestigator={openFindingInvestigator}
+        callBackLabel={
+          callReturnViewExplicit
+            ? `Back to ${callReturnViewLabel(callReturnView)}`
+            : shellI18n.t('button.back_to_dashboard', 'Back to dashboard')
+        }
+        backFromCallInvestigator={backFromCallInvestigator}
+        dashboardPayload={dashboardPayload}
+        historyScope={historyScope}
+        loadLimit={loadLimit}
+        loadedRowCount={loadedRowCount}
+        totalAvailableRows={totalAvailableRows}
+        canUseLiveApi={canUseLiveApi}
+        autoRefreshEnabled={autoRefreshEnabled}
+        refreshing={refreshing}
+        hasMoreRows={hasMoreRows}
+        canLoadAllRows={canLoadAllRows}
+        loadMoreRows={loadMoreRows}
+        loadAllRows={loadAllRows}
+        globalFilters={
+          <ShellGlobalFilters
+            activeView={activeView}
+            locationSearch={locationSearch}
+            model={model}
+            onUrlChange={replaceShellUrl}
+          />
+        }
+      />
       </main>
       {showBackToTop ? (
         <button className="to-top-button" type="button" onClick={scrollToTop} aria-label="Back to top">
@@ -820,150 +829,12 @@ backFromCallInvestigator,
   }
 }
 
-function renderView(
-  activeView: ViewId,
-  model: DashboardModel,
-  onRefresh: () => void,
-  refreshState: string,
-  globalQuery: string,
-  activePreset: string,
-  activeRecordId: string,
-  contextRuntime: ContextRuntime,
-  setContextApiEnabled: (enabled: boolean) => void,
-openCallInvestigator: (recordId: string) => void,
-copyCallInvestigatorLink: (recordId: string) => void,
-openFindingInvestigator: (rank: number) => void,
-_applyInvestigationPreset: (action: InvestigationPresetAction) => void,
-  callBackLabel: string,
-  backFromCallInvestigator: () => void,
-  dashboardPayload: DashboardBootPayload | null,
-  historyScope: HistoryScope,
-  loadLimit: number,
- loadedRowCount: number,
- totalAvailableRows: number,
- canUseLiveApi: boolean,
- autoRefreshEnabled: boolean,
- refreshing: boolean,
- hasMoreRows: boolean,
- canLoadAllRows: boolean,
- loadMoreRows: () => void,
- loadAllRows: () => void,
- globalFilters: ReactNode,
-) {
-  switch (activeView) {
-    case 'overview':
-      return (
-        <OverviewPage
-          model={model}
-          onRefresh={onRefresh}
-        refreshState={refreshState}
-        globalQuery={globalQuery}
-        runtime={{ historyScope, loadLimit, loadedRowCount, totalAvailableRows }}
-        refreshing={refreshing}
-        canLoadMoreRows={canUseLiveApi && hasMoreRows}
-        canLoadAllRows={canLoadAllRows}
-        onLoadMoreRows={loadMoreRows}
-        onLoadAllRows={loadAllRows}
-	onOpenInvestigator={openCallInvestigator}
-	onCopyCallLink={copyCallInvestigatorLink}
-	onOpenFinding={openFindingInvestigator}
-	globalFilters={globalFilters}
-/>
-      );
-    case 'investigator':
-      return <InvestigatorPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
-    case 'calls':
-      return (
-        <CallsPage
-          model={model}
-          globalQuery={globalQuery}
-          activePreset={activePreset}
-          onRefresh={onRefresh}
-          contextRuntime={contextRuntime}
-          onContextApiEnabledChange={setContextApiEnabled}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-    case 'call':
-      return (
-        <CallInvestigatorPage
-          model={model}
-          recordId={activeRecordId}
-          contextRuntime={contextRuntime}
-          onContextApiEnabledChange={setContextApiEnabled}
-          onNavigateRecord={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          onBackToCalls={backFromCallInvestigator}
-          backLabel={callBackLabel}
-        />
-      );
-    case 'threads':
-      return (
-        <ThreadsPage
-          model={model}
-          globalQuery={globalQuery}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          globalFilters={globalFilters}
-        />
-      );
-    case 'usage-drain':
-      return <UsageDrainPage model={model} onOpenInvestigator={openCallInvestigator} onCopyCallLink={copyCallInvestigatorLink} />;
-    case 'cache-context':
-      return (
-        <CacheContextPage
-          model={model}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-    case 'diagnostics':
-      return (
-        <DiagnosticsPage
-          model={model}
-          contextRuntime={contextRuntime}
-          rowLoadControls={{
-            loadedRowCount,
-            totalAvailableRows,
-            canLoadMoreRows: canUseLiveApi && hasMoreRows,
-            canLoadAllRows,
-            refreshing,
-            onLoadMoreRows: loadMoreRows,
-            onLoadAllRows: loadAllRows,
-          }}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          globalFilters={globalFilters}
-        />
-      );
-    case 'reports':
-      return (
-        <ReportsPage
-          model={model}
-          onRefresh={onRefresh}
-          refreshState={refreshState}
-          includeArchived={historyScope === 'all'}
-          loadLimit={loadLimit}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-case 'settings':
-return (
-<SettingsPage
-          model={model}
-          payload={dashboardPayload}
-          historyScope={historyScope}
-          loadLimit={loadLimit}
-          loadedRowCount={loadedRowCount}
-          totalAvailableRows={totalAvailableRows}
-          canUseLiveApi={canUseLiveApi}
-          autoRefreshEnabled={autoRefreshEnabled}
-          refreshState={refreshState}
-        />
-);
-}
+export function RoutedApp() {
+  return (
+    <QueryClientProvider client={dashboardQueryClient}>
+      <App />
+    </QueryClientProvider>
+  );
 }
 
 function errorMessage(error: unknown): string {

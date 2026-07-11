@@ -1,5 +1,4 @@
 import type { CallRow } from '../../api/types';
-import type { ViewId } from '../../app/navigation';
 
 type InvestigationPresetKey =
   | 'highest-cost'
@@ -8,12 +7,6 @@ type InvestigationPresetKey =
   | 'pricing-gaps'
   | 'codex-credits'
   | 'reasoning-spike';
-
-export type InvestigationPresetAction = {
-  presetKey: InvestigationPresetKey;
-  view: ViewId;
-  query?: string;
-};
 
 const presetLabels: Record<InvestigationPresetKey, string> = {
   'highest-cost': 'Highest Cost Threads',

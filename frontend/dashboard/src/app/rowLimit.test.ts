@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   finiteRowLimitFallback,
+  dataScopeFromCompatibilityLimit,
   loadLimitFromPayload,
   nextRowLoadLimit,
   normalizeRowLimit,
+  readDataScopePreference,
+  requestLimitForDataScope,
   rowLimitNoCap,
   rowLimitSliderMaxValue,
   rowLimitSummaryLabel,
   rowLimitValueLabel,
   rowLoadStatusLabel,
+  storeDataScopePreference,
 } from './rowLimit';
 
 describe('row limit helpers', () => {
@@ -21,18 +25,28 @@ describe('row limit helpers', () => {
   });
 
   it('normalizes typed row counts while keeping zero as no cap', () => {
-    expect(normalizeRowLimit(Number.NaN)).toBe(100);
+    expect(normalizeRowLimit(Number.NaN)).toBe(1);
     expect(normalizeRowLimit(-1)).toBe(rowLimitNoCap);
     expect(normalizeRowLimit(0)).toBe(rowLimitNoCap);
-    expect(normalizeRowLimit(42)).toBe(100);
+    expect(normalizeRowLimit(42)).toBe(42);
     expect(normalizeRowLimit(1250.4)).toBe(1250);
   });
 
   it('chooses finite fallbacks and expands the quick slider past current data', () => {
     expect(finiteRowLimitFallback(null, rowLimitNoCap, 250)).toBe(250);
-    expect(finiteRowLimitFallback(null, rowLimitNoCap, Number.NaN)).toBe(100);
+    expect(finiteRowLimitFallback(null, rowLimitNoCap, Number.NaN)).toBe(1);
     expect(rowLimitSliderMaxValue({ currentLimit: 500, loadedRows: 900, pendingLimit: 750 })).toBe(1900);
     expect(rowLimitSliderMaxValue({ currentLimit: rowLimitNoCap, loadedRows: 12_300, pendingLimit: rowLimitNoCap })).toBe(13_300);
+  });
+
+  it('uses null internally for no-cap requests and restores session preferences', () => {
+    expect(dataScopeFromCompatibilityLimit(rowLimitNoCap, 'all')).toEqual({ historyScope: 'all', limit: null });
+    expect(requestLimitForDataScope({ historyScope: 'active', limit: null })).toBe(rowLimitNoCap);
+    expect(requestLimitForDataScope({ historyScope: 'active', limit: 37 })).toBe(37);
+
+    window.sessionStorage.clear();
+    storeDataScopePreference(37, 'all');
+    expect(readDataScopePreference()).toEqual({ historyScope: 'all', loadLimit: 37 });
   });
 
   it('increments finite load-more requests without switching to no cap', () => {

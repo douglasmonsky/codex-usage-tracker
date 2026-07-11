@@ -13,18 +13,9 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
+import { isDashboardViewId, type DashboardViewId } from '../routes/dashboardSearch';
 
-export type ViewId =
-  | 'overview'
-  | 'investigator'
-  | 'calls'
-  | 'call'
-  | 'threads'
-  | 'usage-drain'
-  | 'cache-context'
-  | 'diagnostics'
-  | 'reports'
-  | 'settings';
+export type ViewId = DashboardViewId;
 
 export type NavItem = {
   id: ViewId;
@@ -52,5 +43,5 @@ export const secondaryNavItems: Array<{ label: string; icon: LucideIcon; target:
 ];
 
 export function isViewId(value: string | null): value is ViewId {
-  return value === 'call' || navItems.some(item => item.id === value);
+  return isDashboardViewId(value);
 }

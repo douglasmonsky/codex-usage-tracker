@@ -35,8 +35,8 @@ describe('current view export helpers', () => {
     ]);
   });
 
-  it('exports settings runtime state as a two-column CSV', () => {
-    const exportSpec = currentViewCsvExport('settings', fixtureModel, runtime);
+  it('exports settings runtime state as a two-column CSV', async () => {
+    const exportSpec = await currentViewCsvExport('settings', fixtureModel, runtime);
 
     expect(exportSpec.filename).toMatch(/^codex-dashboard-settings-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(exportSpec.label).toBe('settings rows');
@@ -46,9 +46,11 @@ describe('current view export helpers', () => {
     expect(exportSpec.csv).toContain('history_scope,all');
   });
 
- it('keeps current-view export routing scoped active call data', () => {
-    const threadsExport = currentViewCsvExport('threads', fixtureModel, runtime, 'thread-9f3a');
-    const callsExport = currentViewCsvExport('calls', fixtureModel, runtime, 'thread-9f3a');
+ it('keeps current-view export routing scoped active call data', async () => {
+    const [threadsExport, callsExport] = await Promise.all([
+      currentViewCsvExport('threads', fixtureModel, runtime, 'thread-9f3a'),
+      currentViewCsvExport('calls', fixtureModel, runtime, 'thread-9f3a'),
+    ]);
 
  expect(threadsExport.filename).toMatch(/^codex-thread-filtered-calls-\d{4}-\d{2}-\d{2}\.csv$/);
  expect(threadsExport.label).toBe('call rows');

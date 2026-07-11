@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { App } from './App';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
@@ -28,13 +27,23 @@ const reactRoot = createRoot(root);
 async function mountDashboard() {
   const isVisualContractLab =
     import.meta.env.DEV && new URLSearchParams(window.location.search).get('lab') === 'visual-contract';
-  const Dashboard = isVisualContractLab
-    ? (await import('./design/lab/VisualContractLab')).VisualContractLab
-    : App;
+  if (isVisualContractLab) {
+    const { VisualContractLab } = await import('./design/lab/VisualContractLab');
+    reactRoot.render(
+      <StrictMode>
+        <VisualContractLab />
+      </StrictMode>,
+    );
+    return;
+  }
 
+  const [{ RouterProvider }, { dashboardRouter }] = await Promise.all([
+    import('@tanstack/react-router'),
+    import('./app/dashboardRouter'),
+  ]);
   reactRoot.render(
     <StrictMode>
-      <Dashboard />
+      <RouterProvider router={dashboardRouter} />
     </StrictMode>,
   );
 }

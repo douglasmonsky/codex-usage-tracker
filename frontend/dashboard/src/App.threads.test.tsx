@@ -101,7 +101,23 @@ describe('React dashboard threads workspace', () => {
     });
   });
 
-  it('applies legacy shell model filters to threads workspace and export', () => { window.history.replaceState(null, '', '/?view=threads&model=o4-mini'); render(<App />); const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' }); expect(within(threadsTable).getByText('thread-7b2e91')).toBeInTheDocument(); expect(within(threadsTable).getByText('thread-2f9e7d')).toBeInTheDocument(); expect(within(threadsTable).queryByText('thread-9f3a')).not.toBeInTheDocument(); const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined); fireEvent.click(screen.getByRole('button', { name: /Export CSV/i })); expect(clickSpy).toHaveBeenCalledTimes(1); expect(screen.getAllByText('Exported 2 call rows').length).toBeGreaterThan(0); }); it('exports thread workspace call rows from the local toolbar', () => {
+  it('applies legacy shell model filters to threads workspace and export', async () => {
+    window.history.replaceState(null, '', '/?view=threads&model=o4-mini');
+    render(<App />);
+
+    const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
+    expect(within(threadsTable).getByText('thread-7b2e91')).toBeInTheDocument();
+    expect(within(threadsTable).getByText('thread-2f9e7d')).toBeInTheDocument();
+    expect(within(threadsTable).queryByText('thread-9f3a')).not.toBeInTheDocument();
+
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(await screen.findAllByText('Exported 2 call rows')).not.toHaveLength(0);
+  });
+
+  it('exports thread workspace call rows from the local toolbar', () => {
   const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
   window.history.replaceState(null, '', '/?view=threads&risk=Low');
 
