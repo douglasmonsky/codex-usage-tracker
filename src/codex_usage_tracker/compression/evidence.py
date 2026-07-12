@@ -40,6 +40,17 @@ class TurnEvidence:
     content_size_bytes: int
     indexed_content_included: bool
 
+    def revision_identity(self) -> tuple[Any, ...]:
+        return (
+            self.turn_key,
+            self.record_id,
+            self.session_id,
+            self.role,
+            self.event_timestamp,
+            self.content_size_bytes,
+            self.indexed_content_included,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ToolCallEvidence:
@@ -90,6 +101,19 @@ class ContentFragmentEvidence:
     @property
     def estimated_tokens(self) -> int:
         return (self.content_size_bytes + 3) // 4
+
+    def revision_identity(self) -> tuple[Any, ...]:
+        return (
+            self.fragment_id,
+            self.record_id,
+            self.turn_key,
+            self.fragment_kind,
+            self.role,
+            self.safe_label,
+            self.content_hash,
+            self.content_size_bytes,
+            self.includes_raw_fragment,
+        )
 
 
 @dataclass(frozen=True, slots=True)

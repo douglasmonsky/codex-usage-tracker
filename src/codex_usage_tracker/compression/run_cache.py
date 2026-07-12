@@ -10,7 +10,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol, TypeVar, cast
 
-from codex_usage_tracker.compression.evidence import CompressionEvidenceSnapshot
+from codex_usage_tracker.compression.evidence import (
+    CompressionEvidenceSnapshot,
+    ContentFragmentEvidence,
+    TurnEvidence,
+)
 from codex_usage_tracker.compression.identifiers import (
     stable_candidate_id,
     stable_scope_hash,
@@ -110,6 +114,7 @@ def record_manifest(
         metadata[manifest_key] = {"thread_key": call.thread_key, "record_id": ""}
         _accumulate(accumulators[manifest_key], "call", call)
     _append_event_manifest(accumulators, metadata, threads, "tool", snapshot.tool_calls)
+    _append_event_manifest(accumulators, metadata, threads, "turn", snapshot.turns)
     _append_event_manifest(
         accumulators,
         metadata,
@@ -216,8 +221,14 @@ def _append_event_manifest(
         _accumulate(
             accumulators[manifest_key],
             kind,
-            event,
+            _revision_identity(event),
         )
+
+
+def _revision_identity(event: Any) -> Any:
+    if isinstance(event, (TurnEvidence, ContentFragmentEvidence)):
+        return event.revision_identity()
+    return event
 
 
 def _manifest_key(record_id: str, thread_key: str) -> str:
