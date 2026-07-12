@@ -9,6 +9,31 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+def create_investigation_run_tables(conn: sqlite3.Connection) -> None:
+    """Create the bounded investigation-run summary table."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS investigation_runs (
+            run_key TEXT PRIMARY KEY,
+            run_kind TEXT NOT NULL,
+            question TEXT NOT NULL DEFAULT '',
+            payload_schema TEXT NOT NULL,
+            content_mode TEXT NOT NULL,
+            includes_indexed_content INTEGER NOT NULL DEFAULT 0,
+            includes_raw_fragments INTEGER NOT NULL DEFAULT 0,
+            privacy_mode TEXT NOT NULL,
+            summary_json TEXT NOT NULL DEFAULT '{}',
+            branch_count INTEGER NOT NULL DEFAULT 0,
+            evidence_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_investigation_runs_kind_created
+        ON investigation_runs(run_kind, created_at);
+        """
+    )
+
+
 def insert_investigation_run(
     conn: sqlite3.Connection,
     *,

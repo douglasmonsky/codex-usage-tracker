@@ -99,28 +99,17 @@ def allocate_overlaps(
     """Allocate competing claims without exceeding unique component capacity."""
     ordered = sorted(drafts, key=lambda draft: draft.candidate_id)
     validate_candidate_claims(ordered, ledger)
-    grouped_claims: dict[tuple[str, ComponentName], list[tuple[str, EstimateRange]]] = defaultdict(list)
+    grouped_claims = _group_claims(ordered)
     overlaps: dict[str, set[str]] = defaultdict(set)
     adjusted: dict[str, list[int]] = {draft.candidate_id: [0, 0, 0] for draft in ordered}
 
-    for draft in ordered:
-        for claim in draft.claims:
-            grouped_claims[(claim.record_id, claim.component)].append(
-                (draft.candidate_id, claim.estimate)
-            )
-
     for (record_id, component), claims in grouped_claims.items():
-        capacity = ledger.capacity(record_id, component)
-        allocations = _allocate_claim_ranges(claims, capacity)
-        active_ids = sorted(candidate_id for candidate_id, estimate in claims if estimate.high > 0)
-        if len(active_ids) > 1:
-            for candidate_id in active_ids:
-                overlaps[candidate_id].update(other for other in active_ids if other != candidate_id)
-        for candidate_id, estimate in allocations.items():
-            totals = adjusted[candidate_id]
-            totals[0] += estimate.low
-            totals[1] += estimate.likely
-            totals[2] += estimate.high
+        _apply_group_allocation(
+            claims=claims,
+            capacity=ledger.capacity(record_id, component),
+            adjusted=adjusted,
+            overlaps=overlaps,
+        )
 
     return [
         CompressionCandidate(
@@ -142,6 +131,43 @@ def portfolio_estimate(candidates: Iterable[CompressionCandidate]) -> EstimateRa
     )
 
 
+def _group_claims(
+    drafts: list[CandidateDraft],
+) -> dict[tuple[str, ComponentName], list[tuple[str, EstimateRange]]]:
+    grouped: dict[tuple[str, ComponentName], list[tuple[str, EstimateRange]]] = defaultdict(list)
+    for draft in drafts:
+        for claim in draft.claims:
+            grouped[(claim.record_id, claim.component)].append((draft.candidate_id, claim.estimate))
+    return grouped
+
+
+def _apply_group_allocation(
+    *,
+    claims: list[tuple[str, EstimateRange]],
+    capacity: int,
+    adjusted: dict[str, list[int]],
+    overlaps: dict[str, set[str]],
+) -> None:
+    allocations = _allocate_claim_ranges(claims, capacity)
+    active_ids = sorted(candidate_id for candidate_id, estimate in claims if estimate.high > 0)
+    _record_overlaps(active_ids, overlaps)
+    for candidate_id, estimate in allocations.items():
+        _add_estimate(adjusted[candidate_id], estimate)
+
+
+def _record_overlaps(active_ids: list[str], overlaps: dict[str, set[str]]) -> None:
+    if len(active_ids) < 2:
+        return
+    for candidate_id in active_ids:
+        overlaps[candidate_id].update(other for other in active_ids if other != candidate_id)
+
+
+def _add_estimate(total: list[int], estimate: EstimateRange) -> None:
+    total[0] += estimate.low
+    total[1] += estimate.likely
+    total[2] += estimate.high
+
+
 def _allocate_claim_ranges(
     claims: list[tuple[str, EstimateRange]],
     capacity: int,
@@ -150,8 +176,7 @@ def _allocate_claim_ranges(
     bounds: list[dict[str, int]] = []
     for attribute in ("low", "likely", "high"):
         targets = {
-            candidate_id: int(getattr(estimate, attribute))
-            for candidate_id, estimate in claims
+            candidate_id: int(getattr(estimate, attribute)) for candidate_id, estimate in claims
         }
         remaining = max(0, capacity - sum(current.values()))
         desired = {
@@ -181,8 +206,7 @@ def _allocate_amounts(desired: dict[str, int], capacity: int) -> dict[str, int]:
     if capacity <= 0 or total <= 0:
         return {candidate_id: 0 for candidate_id in desired}
     allocated = {
-        candidate_id: amount * capacity // total
-        for candidate_id, amount in desired.items()
+        candidate_id: amount * capacity // total for candidate_id, amount in desired.items()
     }
     remainder = capacity - sum(allocated.values())
     priority = sorted(

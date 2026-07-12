@@ -151,28 +151,9 @@ class CandidateDraft:
     data_quality_warnings: tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
-        if not self.candidate_id or not self.family or not self.pattern_key:
-            raise ValueError("candidate identity fields are required")
-        if not self.record_ids:
-            raise ValueError("candidate requires at least one record_id")
-        if len(set(self.record_ids)) != len(self.record_ids):
-            raise ValueError("candidate record_ids must be unique")
-        if len(set(self.thread_keys)) != len(self.thread_keys):
-            raise ValueError("candidate thread_keys must be unique")
-        if self.observation_count < 1:
-            raise ValueError("candidate observation_count must be positive")
-        if not 0 <= self.confidence_score <= 1:
-            raise ValueError("candidate confidence_score must be between 0 and 1")
-        for claim in self.claims:
-            if claim.record_id not in self.record_ids:
-                raise ValueError("claim record_id must belong to candidate record_ids")
-        claim_total = EstimateRange(
-            low=sum(claim.estimate.low for claim in self.claims),
-            likely=sum(claim.estimate.likely for claim in self.claims),
-            high=sum(claim.estimate.high for claim in self.claims),
-        )
-        if claim_total != self.gross_estimate:
-            raise ValueError("candidate gross_estimate must equal the sum of component claims")
+        _validate_candidate_identity(self)
+        _validate_candidate_counts(self)
+        _validate_candidate_claims(self)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -231,3 +212,33 @@ class CompressionCandidate:
         payload["adjusted_estimate"] = self.adjusted_estimate.as_dict()
         payload["overlapping_candidate_ids"] = list(self.overlapping_candidate_ids)
         return payload
+
+
+def _validate_candidate_identity(candidate: CandidateDraft) -> None:
+    if not candidate.candidate_id or not candidate.family or not candidate.pattern_key:
+        raise ValueError("candidate identity fields are required")
+    if not candidate.record_ids:
+        raise ValueError("candidate requires at least one record_id")
+    if len(set(candidate.record_ids)) != len(candidate.record_ids):
+        raise ValueError("candidate record_ids must be unique")
+    if len(set(candidate.thread_keys)) != len(candidate.thread_keys):
+        raise ValueError("candidate thread_keys must be unique")
+
+
+def _validate_candidate_counts(candidate: CandidateDraft) -> None:
+    if candidate.observation_count < 1:
+        raise ValueError("candidate observation_count must be positive")
+    if not 0 <= candidate.confidence_score <= 1:
+        raise ValueError("candidate confidence_score must be between 0 and 1")
+
+
+def _validate_candidate_claims(candidate: CandidateDraft) -> None:
+    if any(claim.record_id not in candidate.record_ids for claim in candidate.claims):
+        raise ValueError("claim record_id must belong to candidate record_ids")
+    claim_total = EstimateRange(
+        low=sum(claim.estimate.low for claim in candidate.claims),
+        likely=sum(claim.estimate.likely for claim in candidate.claims),
+        high=sum(claim.estimate.high for claim in candidate.claims),
+    )
+    if claim_total != candidate.gross_estimate:
+        raise ValueError("candidate gross_estimate must equal the sum of component claims")
