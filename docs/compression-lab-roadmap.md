@@ -176,27 +176,35 @@ Validated behavior at this checkpoint:
 - Cold success, zero findings, structured partial detector failure, exact cache reuse, forced replacement, and appended-record incremental recomputation.
 - Deterministic per-thread cache manifests and candidate IDs.
 - Staged progress through evidence, each detector, attribution, persistence, profile, and completion.
-- Focused checkpoint: 42 compression/store tests passed.
-- Real local aggregate dogfood completed with 324,982 calls, 30,215 candidates, no detector warnings, and no raw content printed or committed.
+- Focused checkpoint: 66 compression/store tests passed; the full suite passed all 722 tests after keeping the unreleased schema at v15.
+- Real local aggregate dogfood completed with 404,176 calls, 32,087 candidates, no detector warnings, and no raw content printed or committed.
+- Exact cache hits use a compact public profile plus a transaction-level source generation, so they do not rebuild evidence or decode the private incremental manifest.
+- All-history evidence reads bypass temporary scope materialization only when the scope is truly unfiltered.
 
-Latest first-user benchmark (`include_archived=true`, fresh all-history scope):
+Latest replacement benchmark (`include_archived=true`, all-history scope):
 
-- Total: 77.575 seconds; the under-60-second exit target is not met yet.
-- Evidence loaded: 32.58 seconds.
-- All detectors complete: 52.59 seconds.
-- Attribution complete / persistence started: 57.44 seconds.
-- Candidate persistence complete / profile started: 71.23 seconds.
-- Profile complete: 77.20 seconds.
+- Total: 47.939 seconds, including deletion and replacement of the prior 32,087-candidate run.
+- Evidence loaded: 18.69 seconds.
+- All detectors complete: 26.18 seconds.
+- Attribution complete / persistence started: 30.40 seconds.
+- Candidate persistence complete / profile started: 42.30 seconds.
+- Profile complete: 47.59 seconds.
+- Exact warm profile: 6.2 ms, below the 500 ms target.
+- The prior comparable run took 77.575 seconds on 324,982 calls; the optimized run is 38 percent faster while processing 24 percent more calls.
+
+Measured optimizations:
+
+- Removed quadratic claim-to-record membership validation during candidate estimation.
+- Reused a source-generation counter instead of hashing the complete normalized snapshot twice.
+- Replaced per-event cryptographic manifest hashing with deterministic order-independent checksums and removed duplicate event identity encoding.
+- Built attribution capacity directly from the estimator index rather than materializing generic row dictionaries.
+- Removed an unused candidate-record secondary index and persisted compact public profiles separately from private incremental manifests.
 
 Resume in this order:
 
-1. Run `git status --short --branch`; preserve all current changes and leave `.idea/` and `.serena/` unstaged.
-2. Re-run `tests/compression`, `tests/store/test_compression_runs.py`, and `tests/store/test_compression_evidence.py` before changing performance code.
-3. Profile the 32.58-second evidence query and 13.79-second candidate persistence separately. Do not weaken detector coverage or omit component claims merely to hit the target.
-4. Bring the cold benchmark below 60 seconds, then verify the exact-cache profile/candidate path stays below 500 ms without rebuilding evidence.
-5. Consolidate detector test files or otherwise return the PR to the 20-file ceiling before final staging; `compression_candidates.py` was added to the touched set during persistence hardening.
-6. Run Ruff, mypy, Pyright, Xenon, Tach, release sanity, full Agent Maintainer, and `git diff --check`.
-7. Commit the run-builder slice as `feat: build compression analysis profiles`, update PR 2 status, then push/open/merge PR 2 before starting PR 3.
+1. Keep the PR at or below the 20-file ceiling and leave `.idea/` unstaged.
+2. Commit the run-builder slice as `feat: build compression analysis profiles`.
+3. Merge current `origin/main` without rewriting history, resolve only genuine conflicts, then push/open/merge PR 2 before starting PR 3.
 
 ## Resume Instructions
 

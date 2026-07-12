@@ -40,6 +40,7 @@ class FileRediscoveryDetector:
     ) -> list[CandidateDraft]:
         calls = {call.record_id: call for call in snapshot.calls}
         groups = _file_groups(snapshot.file_events, calls)
+        fragment_index = _fragment_exposure_index(snapshot.content_fragments)
         candidates = (
             _file_candidate(
                 detector=self,
@@ -49,6 +50,7 @@ class FileRediscoveryDetector:
                 thread_key=thread_key,
                 path_hash=path_hash,
                 events=events,
+                fragment_index=fragment_index,
             )
             for (thread_key, path_hash), events in sorted(groups.items())
         )
@@ -191,6 +193,7 @@ def _command_candidate(
         pattern_key=f"{thread_key}:{group_key}",
         detector_version=version,
         claims=claims,
+        thread_keys=(thread_key,),
         observation_count=len(commands),
         confidence_grade=confidence_grade,
         confidence_score=confidence_score,
@@ -240,10 +243,11 @@ def _file_candidate(
     thread_key: str,
     path_hash: str,
     events: list[FileEventEvidence],
+    fragment_index: _FragmentExposureIndex,
 ) -> CandidateDraft | None:
     if len(events) < detector.min_occurrences:
         return None
-    claims = _fragment_claims(events, snapshot.content_fragments)
+    claims = _fragment_claims(events, fragment_index)
     if not claims:
         return None
     timestamps = [calls[event.record_id].event_timestamp for event in events]
@@ -255,6 +259,7 @@ def _file_candidate(
         pattern_key=f"{thread_key}:{path_hash}",
         detector_version=detector.version,
         claims=claims,
+        thread_keys=(thread_key,),
         observation_count=len(events),
         confidence_grade="medium",
         confidence_score=0.72,
@@ -297,7 +302,7 @@ def _command_confidence(commands: list[CommandRunEvidence]) -> tuple[str, float]
 
 def _fragment_claims(
     events: list[FileEventEvidence],
-    fragments: tuple[ContentFragmentEvidence, ...],
+    fragment_index: _FragmentExposureIndex,
 ) -> tuple[tuple[str, ComponentName, int], ...]:
     claims: list[tuple[str, ComponentName, int]] = []
     evidence_keys = sorted(
@@ -305,15 +310,33 @@ def _fragment_claims(
         key=lambda row: (row[0], row[1] or ""),
     )
     for record_id, turn_key in evidence_keys:
-        exposure = sum(
-            fragment.estimated_tokens
-            for fragment in fragments
-            if fragment.record_id == record_id
-            and (turn_key is None or fragment.turn_key == turn_key)
-        )
+        exposure = fragment_index.exposure(record_id, turn_key)
         if exposure > 0:
             claims.append((record_id, "content_fragment", exposure))
     return tuple(claims)
+
+
+@dataclass(frozen=True, slots=True)
+class _FragmentExposureIndex:
+    by_record: dict[str, int]
+    by_turn: dict[tuple[str, str], int]
+
+    def exposure(self, record_id: str, turn_key: str | None) -> int:
+        if turn_key is None:
+            return self.by_record.get(record_id, 0)
+        return self.by_turn.get((record_id, turn_key), 0)
+
+
+def _fragment_exposure_index(
+    fragments: tuple[ContentFragmentEvidence, ...],
+) -> _FragmentExposureIndex:
+    by_record: dict[str, int] = defaultdict(int)
+    by_turn: dict[tuple[str, str], int] = defaultdict(int)
+    for fragment in fragments:
+        by_record[fragment.record_id] += fragment.estimated_tokens
+        if fragment.turn_key is not None:
+            by_turn[(fragment.record_id, fragment.turn_key)] += fragment.estimated_tokens
+    return _FragmentExposureIndex(dict(by_record), dict(by_turn))
 
 
 def _unique_files(events: tuple[FileEventEvidence, ...]) -> tuple[FileEventEvidence, ...]:

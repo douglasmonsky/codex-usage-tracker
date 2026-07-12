@@ -46,6 +46,7 @@ def build_candidate(
     pattern_key: str,
     detector_version: str,
     claims: Iterable[tuple[str, ComponentName, int]],
+    thread_keys: Iterable[str],
     observation_count: int,
     confidence_grade: str,
     confidence_score: float,
@@ -71,16 +72,7 @@ def build_candidate(
         for (record_id, component), exposure in sorted(aggregated.items())
     )
     record_ids = tuple(sorted({claim.record_id for claim in component_claims}))
-    call_by_record = {call.record_id: call for call in snapshot.calls}
-    thread_keys = tuple(
-        sorted(
-            {
-                call_by_record[record_id].thread_key
-                for record_id in record_ids
-                if record_id in call_by_record
-            }
-        )
-    )
+    normalized_thread_keys = tuple(sorted(set(thread_keys)))
     exposure_by_component: dict[ComponentName, int] = defaultdict(int)
     for claim in component_claims:
         exposure_by_component[claim.component] += claim.exposure_tokens
@@ -100,7 +92,7 @@ def build_candidate(
         detector_version=detector_version,
         estimator_version=UNESTIMATED_VERSION,
         record_ids=record_ids,
-        thread_keys=thread_keys,
+        thread_keys=normalized_thread_keys,
         observation_count=observation_count,
         observed_exposure=observed_exposure,
         claims=component_claims,

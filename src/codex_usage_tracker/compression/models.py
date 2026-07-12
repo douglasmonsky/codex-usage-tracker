@@ -240,7 +240,8 @@ def _validate_candidate_counts(candidate: CandidateDraft) -> None:
 
 
 def _validate_candidate_claims(candidate: CandidateDraft) -> None:
-    if any(claim.record_id not in candidate.record_ids for claim in candidate.claims):
+    record_ids = set(candidate.record_ids)
+    if any(claim.record_id not in record_ids for claim in candidate.claims):
         raise ValueError("claim record_id must belong to candidate record_ids")
     claim_total = EstimateRange(
         low=sum(claim.estimate.low for claim in candidate.claims),

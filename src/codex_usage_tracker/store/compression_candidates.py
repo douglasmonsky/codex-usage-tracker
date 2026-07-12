@@ -19,12 +19,38 @@ _SORT_SQL = {
     "recency": "COALESCE(last_seen, '') DESC, candidate_id ASC",
 }
 
+_CANDIDATE_INSERT_SQL = """
+    INSERT INTO compression_candidates (
+        candidate_id, run_id, family, pattern, pattern_key, rank,
+        confidence_grade, confidence_score, observation_count,
+        observed_exposure_tokens, observed_exposure_json,
+        gross_low, gross_likely, gross_high,
+        adjusted_low, adjusted_likely, adjusted_high,
+        detector_version, estimator_version, estimator_tier, estimator_name,
+        confidence_reasons_json, estimator_assumptions_json,
+        evidence_handles_json, intervention_json, verification_json,
+        warnings_json, overlaps_json, thread_keys_json, first_seen, last_seen
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?)
+"""
+
+_CLAIM_INSERT_SQL = """
+    INSERT INTO compression_candidate_records (
+        candidate_id, record_id, component, exposure_tokens,
+        estimate_low, estimate_likely, estimate_high,
+        evidence_role, trace_handle_json
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
 
 def replace_compression_candidates(
     db_path: Path = DEFAULT_DB_PATH,
     *,
     run_id: str,
     candidates: Iterable[Mapping[str, Any]],
+    supersede_run_id: str | None = None,
 ) -> int:
     """Replace a run's candidate set and claims in one transaction."""
     ordered = sorted(
@@ -38,9 +64,24 @@ def replace_compression_candidates(
         init_db(conn)
         if not _run_exists(conn, run_id):
             raise KeyError(f"unknown compression run: {run_id}")
+        if supersede_run_id and supersede_run_id != run_id:
+            conn.execute(
+                """
+                DELETE FROM compression_candidate_records
+                WHERE candidate_id IN (
+                    SELECT candidate_id FROM compression_candidates WHERE run_id = ?
+                )
+                """,
+                (supersede_run_id,),
+            )
+            conn.execute(
+                "DELETE FROM compression_candidates WHERE run_id = ?",
+                (supersede_run_id,),
+            )
+            conn.execute("DELETE FROM compression_runs WHERE run_id = ?", (supersede_run_id,))
         conn.execute("DELETE FROM compression_candidates WHERE run_id = ?", (run_id,))
-        for rank, candidate in enumerate(ordered, start=1):
-            _insert_candidate(conn, run_id=run_id, rank=rank, candidate=candidate)
+        conn.executemany(_CANDIDATE_INSERT_SQL, _candidate_rows(ordered, run_id=run_id))
+        conn.executemany(_CLAIM_INSERT_SQL, _claim_rows(ordered))
         conn.execute(
             "UPDATE compression_runs SET candidate_count = ? WHERE run_id = ?",
             (len(ordered), run_id),
@@ -154,40 +195,31 @@ def get_compression_candidate(
     return result
 
 
-def _insert_candidate(
-    conn: sqlite3.Connection,
+def _candidate_rows(
+    candidates: list[Mapping[str, Any]],
     *,
     run_id: str,
-    rank: int,
-    candidate: Mapping[str, Any],
-) -> None:
-    candidate_id = _text(candidate, "candidate_id")
-    handles = _mapping_list(candidate.get("evidence_handles"))
-    conn.execute(
-        """
-        INSERT INTO compression_candidates (
-            candidate_id, run_id, family, pattern, pattern_key, rank,
-            confidence_grade, confidence_score, observation_count,
-            observed_exposure_tokens, observed_exposure_json,
-            gross_low, gross_likely, gross_high,
-            adjusted_low, adjusted_likely, adjusted_high,
-            detector_version, estimator_version, estimator_tier, estimator_name,
-            confidence_reasons_json, estimator_assumptions_json,
-            evidence_handles_json, intervention_json, verification_json,
-            warnings_json, overlaps_json, thread_keys_json, first_seen, last_seen
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        _candidate_insert_values(
+) -> Iterable[tuple[Any, ...]]:
+    for rank, candidate in enumerate(candidates, start=1):
+        candidate_id = _text(candidate, "candidate_id")
+        handles = _mapping_list(candidate.get("evidence_handles"))
+        yield _candidate_insert_values(
             candidate,
             candidate_id=candidate_id,
             run_id=run_id,
             rank=rank,
             handles=handles,
-        ),
-    )
-    for claim in _mapping_list(candidate.get("claims")):
-        _insert_claim(conn, candidate_id=candidate_id, handles=handles, claim=claim)
+        )
+
+
+def _claim_rows(candidates: list[Mapping[str, Any]]) -> Iterable[tuple[Any, ...]]:
+    for candidate in candidates:
+        candidate_id = _text(candidate, "candidate_id")
+        for claim in _mapping_list(candidate.get("claims")):
+            yield _claim_insert_values(
+                candidate_id=candidate_id,
+                claim=claim,
+            )
 
 
 def _candidate_insert_values(
@@ -238,35 +270,23 @@ def _candidate_insert_values(
     )
 
 
-def _insert_claim(
-    conn: sqlite3.Connection,
+def _claim_insert_values(
     *,
     candidate_id: str,
-    handles: list[dict[str, Any]],
     claim: Mapping[str, Any],
-) -> None:
+) -> tuple[Any, ...]:
     estimate = _mapping(claim.get("estimate"))
     record_id = str(claim.get("record_id") or "")
-    conn.execute(
-        """
-        INSERT INTO compression_candidate_records (
-            candidate_id, record_id, component, exposure_tokens,
-            estimate_low, estimate_likely, estimate_high,
-            evidence_role, trace_handle_json
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            candidate_id,
-            record_id,
-            str(claim.get("component") or ""),
-            int(claim.get("exposure_tokens") or 0),
-            int(estimate.get("low") or 0),
-            int(estimate.get("likely") or 0),
-            int(estimate.get("high") or 0),
-            "supporting",
-            _json_dump(_trace_handle_for_record(handles, record_id)),
-        ),
+    return (
+        candidate_id,
+        record_id,
+        str(claim.get("component") or ""),
+        int(claim.get("exposure_tokens") or 0),
+        int(estimate.get("low") or 0),
+        int(estimate.get("likely") or 0),
+        int(estimate.get("high") or 0),
+        "supporting",
+        _json_dump({"record_id": record_id}),
     )
 
 
@@ -337,16 +357,6 @@ def _run_exists(conn: sqlite3.Connection, run_id: str) -> bool:
     return (
         conn.execute("SELECT 1 FROM compression_runs WHERE run_id = ?", (run_id,)).fetchone()
         is not None
-    )
-
-
-def _trace_handle_for_record(
-    handles: list[dict[str, Any]],
-    record_id: str,
-) -> dict[str, Any]:
-    return next(
-        (dict(handle) for handle in handles if handle.get("record_id") == record_id),
-        {"record_id": record_id},
     )
 
 

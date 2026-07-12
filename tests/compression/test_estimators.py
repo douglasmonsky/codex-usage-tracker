@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from codex_usage_tracker.compression.estimators import (
     ESTIMATOR_POLICY_V1,
+    build_estimator_index,
     estimate_candidate,
     percentile,
 )
@@ -55,6 +56,27 @@ def test_matched_estimator_uses_comparable_call_percentiles() -> None:
     assert estimated.estimator_name == "matched-component-percentiles"
     assert "4 comparable calls" in estimated.estimator_assumptions
     assert estimated.confidence_grade == "medium"
+
+
+def test_shared_estimator_index_excludes_the_candidate_thread() -> None:
+    calls = [
+        call("target", uncached=100),
+        call("same-thread", uncached=999, thread="thread:one"),
+        call("peer-1", uncached=20),
+        call("peer-2", uncached=30),
+        call("peer-3", uncached=40),
+        call("peer-4", uncached=50),
+    ]
+    evidence = snapshot(calls)
+
+    estimated = estimate_candidate(
+        candidate_draft(),
+        evidence,
+        index=build_estimator_index(evidence),
+    )
+
+    assert estimated.gross_estimate == EstimateRange(58, 65, 72)
+    assert "4 comparable calls" in estimated.estimator_assumptions
 
 
 def test_fallback_estimator_is_bounded_and_downgrades_confidence() -> None:
@@ -121,11 +143,16 @@ def snapshot(calls: list[CallEvidence]) -> CompressionEvidenceSnapshot:
     )
 
 
-def call(record_id: str, *, uncached: int) -> CallEvidence:
+def call(
+    record_id: str,
+    *,
+    uncached: int,
+    thread: str | None = None,
+) -> CallEvidence:
     return CallEvidence(
         record_id=record_id,
         session_id=f"session-{record_id}",
-        thread_key="thread:one" if record_id == "target" else f"thread:{record_id}",
+        thread_key=thread or ("thread:one" if record_id == "target" else f"thread:{record_id}"),
         event_timestamp="2026-07-10T10:00:00+00:00",
         model="gpt-5.5",
         effort="high",

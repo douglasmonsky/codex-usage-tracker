@@ -5,9 +5,10 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.store.compression_schema import read_compression_source_generation
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
 
@@ -16,30 +17,36 @@ def query_compression_evidence(
     db_path: Path = DEFAULT_DB_PATH,
     *,
     scope: Mapping[str, Any],
+    include_turns: bool = True,
 ) -> dict[str, Any]:
     """Load one deduplicated evidence snapshot for a normalized scope."""
     with connect(db_path) as conn:
         init_db(conn)
-        _populate_scope_records(conn, scope)
-        calls = _rows(conn, _CALLS_SQL)
-        turns = _rows(conn, _TURNS_SQL)
-        tool_calls = _rows(conn, _TOOL_CALLS_SQL)
-        command_runs = _rows(conn, _COMMAND_RUNS_SQL)
-        file_events = _rows(conn, _FILE_EVENTS_SQL)
-        fragments = _rows(conn, _FRAGMENTS_SQL)
-        source_coverage = _source_coverage(conn)
+        scoped = not _is_unfiltered_all_history(scope)
+        if scoped:
+            _populate_scope_records(conn, scope)
+        calls = _rows(conn, _scoped_sql(_CALLS_SQL, "u", scoped=scoped))
+        turns = _rows(conn, _scoped_sql(_TURNS_SQL, "t", scoped=scoped)) if include_turns else []
+        tool_calls = _rows(conn, _scoped_sql(_TOOL_CALLS_SQL, "t", scoped=scoped))
+        command_runs = _rows(conn, _scoped_sql(_COMMAND_RUNS_SQL, "c", scoped=scoped))
+        file_events = _rows(conn, _scoped_sql(_FILE_EVENTS_SQL, "f", scoped=scoped))
+        fragments = _rows(conn, _scoped_sql(_FRAGMENTS_SQL, "f", scoped=scoped))
+        source_coverage = _source_coverage(conn, scoped=scoped)
         content_index_enabled = _content_index_enabled(conn)
+        turn_coverage = None if include_turns else _turn_coverage(conn, scoped=scoped)
+        source_generation = read_compression_source_generation(conn)
     compactions = [
         row for row in fragments if row.get("fragment_kind") in {"compaction", "compaction_history"}
     ]
     return {
-        "calls": _deduplicate(calls, "record_id"),
-        "turns": _deduplicate(turns, "turn_key"),
-        "tool_calls": _deduplicate(tool_calls, "tool_call_key"),
-        "command_runs": _deduplicate(command_runs, "command_run_key"),
-        "file_events": _deduplicate(file_events, "file_event_key"),
-        "content_fragments": _deduplicate(fragments, "fragment_id"),
-        "compactions": _deduplicate(compactions, "fragment_id"),
+        "calls": calls,
+        "turns": turns,
+        "tool_calls": tool_calls,
+        "command_runs": command_runs,
+        "file_events": file_events,
+        "content_fragments": fragments,
+        "compactions": compactions,
+        "source_generation": source_generation,
         "coverage": _coverage_payload(
             calls=calls,
             turns=turns,
@@ -50,6 +57,7 @@ def query_compression_evidence(
             compactions=compactions,
             source_coverage=source_coverage,
             content_index_enabled=content_index_enabled,
+            turn_coverage=turn_coverage,
         ),
     }
 
@@ -100,12 +108,29 @@ def _populate_scope_records(conn: sqlite3.Connection, scope: Mapping[str, Any]) 
 
 
 def _rows(conn: sqlite3.Connection, sql: str) -> list[dict[str, Any]]:
-    return [dict(row) for row in conn.execute(sql).fetchall()]
+    return [cast(dict[str, Any], dict(row)) for row in conn.execute(sql)]
 
 
-def _source_coverage(conn: sqlite3.Connection) -> dict[str, Any]:
+def _is_unfiltered_all_history(scope: Mapping[str, Any]) -> bool:
+    return bool(scope.get("include_archived")) and all(
+        _optional_text(scope.get(key)) is None
+        for key in ("since", "until", "model", "effort", "thread")
+    )
+
+
+def _scoped_sql(sql: str, alias: str, *, scoped: bool) -> str:
+    scope_join = (
+        f"JOIN compression_scope_records AS scoped ON scoped.record_id = {alias}.record_id"
+        if scoped
+        else ""
+    )
+    return sql.format(scope_join=scope_join)
+
+
+def _source_coverage(conn: sqlite3.Connection, *, scoped: bool) -> dict[str, Any]:
     row = conn.execute(
-        """
+        _scoped_sql(
+            """
         SELECT
             COUNT(*) AS source_record_count,
             SUM(
@@ -114,10 +139,13 @@ def _source_coverage(conn: sqlite3.Connection) -> dict[str, Any]:
             GROUP_CONCAT(DISTINCT sr.parser_adapter) AS parser_adapters,
             GROUP_CONCAT(DISTINCT sr.parser_version) AS parser_versions
         FROM source_records AS sr
-        JOIN compression_scope_records AS scoped ON scoped.record_id = sr.record_id
-        """
+        {scope_join}
+        """,
+            "sr",
+            scoped=scoped,
+        )
     ).fetchone()
-    return dict(row) if row is not None else {}
+    return cast(dict[str, Any], dict(row)) if row is not None else {}
 
 
 def _content_index_enabled(conn: sqlite3.Connection) -> bool:
@@ -131,6 +159,27 @@ def _content_index_enabled(conn: sqlite3.Connection) -> bool:
     return bool(row and int(row["enabled"]))
 
 
+def _turn_coverage(conn: sqlite3.Connection, *, scoped: bool) -> dict[str, int]:
+    row = conn.execute(
+        _scoped_sql(
+            """
+        SELECT
+            COUNT(*) AS turn_count,
+            COUNT(DISTINCT CASE WHEN t.indexed_content_included = 1 THEN t.record_id END)
+                AS indexed_call_count
+        FROM conversation_turns AS t
+        {scope_join}
+        """,
+            "t",
+            scoped=scoped,
+        )
+    ).fetchone()
+    return {
+        "turn_count": int(row["turn_count"] or 0),
+        "indexed_call_count": int(row["indexed_call_count"] or 0),
+    }
+
+
 def _coverage_payload(
     *,
     calls: list[dict[str, Any]],
@@ -142,34 +191,28 @@ def _coverage_payload(
     compactions: list[dict[str, Any]],
     source_coverage: dict[str, Any],
     content_index_enabled: bool,
+    turn_coverage: dict[str, int] | None,
 ) -> dict[str, Any]:
     indexed_calls = {
         str(row["record_id"]) for row in turns if bool(row.get("indexed_content_included"))
     }
     return {
-        "call_count": len(_deduplicate(calls, "record_id")),
-        "turn_count": len(_deduplicate(turns, "turn_key")),
-        "tool_call_count": len(_deduplicate(tool_calls, "tool_call_key")),
-        "command_run_count": len(_deduplicate(command_runs, "command_run_key")),
-        "file_event_count": len(_deduplicate(file_events, "file_event_key")),
-        "content_fragment_count": len(_deduplicate(fragments, "fragment_id")),
-        "compaction_count": len(_deduplicate(compactions, "fragment_id")),
-        "indexed_call_count": len(indexed_calls),
+        "call_count": len(calls),
+        "turn_count": turn_coverage["turn_count"] if turn_coverage else len(turns),
+        "tool_call_count": len(tool_calls),
+        "command_run_count": len(command_runs),
+        "file_event_count": len(file_events),
+        "content_fragment_count": len(fragments),
+        "compaction_count": len(compactions),
+        "indexed_call_count": (
+            turn_coverage["indexed_call_count"] if turn_coverage else len(indexed_calls)
+        ),
         "source_record_count": int(source_coverage.get("source_record_count") or 0),
         "parser_warning_record_count": int(source_coverage.get("parser_warning_record_count") or 0),
         "parser_adapters": _csv_values(source_coverage.get("parser_adapters")),
         "parser_versions": _csv_values(source_coverage.get("parser_versions")),
         "content_index_enabled": content_index_enabled,
     }
-
-
-def _deduplicate(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
-    unique: dict[str, dict[str, Any]] = {}
-    for row in rows:
-        value = str(row.get(key) or "")
-        if value and value not in unique:
-            unique[value] = row
-    return list(unique.values())
 
 
 def _csv_values(value: Any) -> list[str]:
@@ -199,41 +242,79 @@ SELECT
     u.cache_ratio,
     u.context_window_percent
 FROM usage_events AS u
-JOIN compression_scope_records AS scoped ON scoped.record_id = u.record_id
+{scope_join}
 ORDER BY u.event_timestamp, u.record_id
 """
 
 _TURNS_SQL = """
-SELECT t.*
+SELECT
+    t.turn_key,
+    t.record_id,
+    t.session_id,
+    t.role,
+    t.event_timestamp,
+    t.content_size_bytes,
+    t.indexed_content_included
 FROM conversation_turns AS t
-JOIN compression_scope_records AS scoped ON scoped.record_id = t.record_id
+{scope_join}
 ORDER BY t.event_timestamp, t.turn_key
 """
 
 _TOOL_CALLS_SQL = """
-SELECT t.*
+SELECT
+    t.tool_call_key,
+    t.record_id,
+    t.turn_key,
+    t.tool_name,
+    t.status,
+    t.duration_ms,
+    t.output_size_bytes
 FROM tool_calls AS t
-JOIN compression_scope_records AS scoped ON scoped.record_id = t.record_id
+{scope_join}
 ORDER BY COALESCE(t.started_at, ''), t.tool_call_key
 """
 
 _COMMAND_RUNS_SQL = """
-SELECT c.*
+SELECT
+    c.command_run_key,
+    c.record_id,
+    c.turn_key,
+    c.command_root,
+    c.command_root AS command_label,
+    c.exit_code,
+    c.status,
+    c.output_size_bytes,
+    c.retry_group
 FROM command_runs AS c
-JOIN compression_scope_records AS scoped ON scoped.record_id = c.record_id
+{scope_join}
 ORDER BY c.command_run_key
 """
 
 _FILE_EVENTS_SQL = """
-SELECT f.*
+SELECT
+    f.file_event_key,
+    f.record_id,
+    f.turn_key,
+    f.operation,
+    f.path_hash,
+    f.path_hash AS path_identity
 FROM file_events AS f
-JOIN compression_scope_records AS scoped ON scoped.record_id = f.record_id
+{scope_join}
 ORDER BY f.file_event_key
 """
 
 _FRAGMENTS_SQL = """
-SELECT f.*
+SELECT
+    f.fragment_id,
+    f.record_id,
+    f.turn_key,
+    f.fragment_kind,
+    f.role,
+    f.fragment_kind AS safe_label,
+    f.content_hash,
+    f.content_size_bytes,
+    f.includes_raw_fragment
 FROM content_fragments AS f
-JOIN compression_scope_records AS scoped ON scoped.record_id = f.record_id
+{scope_join}
 ORDER BY f.created_at, f.fragment_id
 """

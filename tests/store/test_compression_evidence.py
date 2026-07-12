@@ -3,10 +3,46 @@ from __future__ import annotations
 from pathlib import Path
 
 from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.store import compression_evidence
 from codex_usage_tracker.store.api import upsert_usage_events
 from codex_usage_tracker.store.compression_evidence import query_compression_evidence
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
+
+
+def test_unfiltered_all_history_query_skips_scope_materialization(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            usage_event("active", timestamp="2026-07-10T10:00:00+00:00"),
+            usage_event(
+                "archived",
+                timestamp="2026-07-10T11:00:00+00:00",
+                archived=True,
+            ),
+        ],
+        db_path=db_path,
+    )
+
+    def unexpected_scope_materialization(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("unfiltered all-history reads must not build a scope table")
+
+    monkeypatch.setattr(
+        compression_evidence,
+        "_populate_scope_records",
+        unexpected_scope_materialization,
+    )
+
+    payload = query_compression_evidence(
+        db_path,
+        scope={"include_archived": True},
+        include_turns=False,
+    )
+
+    assert [row["record_id"] for row in payload["calls"]] == ["active", "archived"]
 
 
 def test_evidence_query_deduplicates_calls_and_reports_normalized_coverage(
@@ -37,6 +73,7 @@ def test_evidence_query_deduplicates_calls_and_reports_normalized_coverage(
     assert len(payload["command_runs"]) == 1
     assert len(payload["file_events"]) == 2
     assert len(payload["content_fragments"]) == 2
+    assert "fragment_text" not in payload["content_fragments"][0]
     assert [row["fragment_id"] for row in payload["compactions"]] == ["fragment-compaction"]
     assert payload["coverage"] == {
         "call_count": 1,

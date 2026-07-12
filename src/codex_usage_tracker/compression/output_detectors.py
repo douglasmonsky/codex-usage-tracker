@@ -61,6 +61,7 @@ def _tool_output_candidate(
         pattern_key=f"tool:{tool_call.tool_call_key}",
         detector_version=detector.version,
         claims=((tool_call.record_id, "tool_output", output_tokens),),
+        thread_keys=(call.thread_key,) if call is not None else (),
         observation_count=1,
         confidence_grade=confidence_grade,
         confidence_score=confidence_score,

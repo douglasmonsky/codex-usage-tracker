@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codex_usage_tracker.compression.models import (
     ComponentExposure,
@@ -154,8 +152,9 @@ class CompressionEvidenceSnapshot:
         return 0
 
 
-_CALL_COMPONENTS: frozenset[ComponentName] = frozenset(
-    {"cached_input", "uncached_input", "output", "reasoning_output"}
+_CALL_COMPONENTS = cast(
+    frozenset[ComponentName],
+    frozenset({"cached_input", "uncached_input", "output", "reasoning_output"}),
 )
 
 
@@ -185,7 +184,11 @@ def load_compression_evidence(
     scope: CompressionScope,
 ) -> CompressionEvidenceSnapshot:
     """Load and normalize one scoped evidence snapshot from SQLite."""
-    payload = query_compression_evidence(db_path, scope=scope.as_dict())
+    payload = query_compression_evidence(
+        db_path,
+        scope=scope.as_dict(),
+        include_turns=False,
+    )
     calls = tuple(_call(row) for row in payload["calls"])
     turns = tuple(_turn(row) for row in payload["turns"])
     tools = tuple(_tool_call(row) for row in payload["tool_calls"])
@@ -203,14 +206,7 @@ def load_compression_evidence(
         content_fragments=fragments,
         compactions=tuple(row for row in fragments if row.fragment_id in compaction_ids),
         coverage=coverage,
-        source_revision=_source_revision(
-            calls=calls,
-            turns=turns,
-            tools=tools,
-            commands=commands,
-            files=files,
-            fragments=fragments,
-        ),
+        source_revision=f"generation:{int(payload['source_generation'])}",
     )
 
 
@@ -315,28 +311,6 @@ def _coverage(row: dict[str, Any]) -> EvidenceCoverage:
         parser_versions=tuple(str(value) for value in row.get("parser_versions") or []),
         content_index_enabled=bool(row.get("content_index_enabled")),
     )
-
-
-def _source_revision(**groups: tuple[Any, ...]) -> str:
-    identities = {name: [_identity(row) for row in rows] for name, rows in sorted(groups.items())}
-    encoded = json.dumps(identities, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _identity(row: Any) -> tuple[Any, ...]:
-    if isinstance(row, CallEvidence):
-        return (row.record_id, row.event_timestamp, row.exposure.as_dict())
-    for attribute in (
-        "turn_key",
-        "tool_call_key",
-        "command_run_key",
-        "file_event_key",
-        "fragment_id",
-    ):
-        value = getattr(row, attribute, None)
-        if value:
-            return (value,)
-    return (repr(row),)
 
 
 def _optional_text(value: Any) -> str | None:
