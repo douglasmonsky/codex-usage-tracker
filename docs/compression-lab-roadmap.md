@@ -23,7 +23,11 @@ Turn the MCP into a compact, measurement-first laboratory for finding and simula
 
 ### PR 1: Attribution Kernel And Run Cache
 
-Status: implemented; awaiting PR validation
+Status: complete
+
+PR: [#221](https://github.com/douglasmonsky/codex-usage-tracker/pull/221)
+
+Merge: `702d038edb55fe604e467a8f85706eeac77d7553`
 
 Deliverables:
 
@@ -43,7 +47,7 @@ Exit gates:
 
 ### PR 2: Detectors And Estimators
 
-Status: pending
+Status: in progress
 
 Deliverables:
 
@@ -155,6 +159,8 @@ Exit gates:
 - 2026-07-11: Detector/simulator milestone approved; persisted experiments deferred.
 - 2026-07-11: Unified opportunity ledger, async persistent cache, compact MCP contracts, detector set, and five-PR rollout approved.
 - 2026-07-11: PR 1 attribution contracts, bounded overlap allocation, schema v15 run cache, and SQL-paged candidate repository implemented locally.
+- 2026-07-11: Compression Lab preflight PR #220 merged at `7261d3f` with roadmap and hardening-tool compatibility.
+- 2026-07-11: PR 1 merged as #221 at `702d038`; PR 2 detector and estimator work started from that exact base.
 
 ## Resume Instructions
 
