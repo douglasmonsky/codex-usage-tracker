@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: pricing-source-compatibility
+  cancel-in-progress: false
+
 jobs:
   parse-live-pricing:
     name: Parse live OpenAI pricing source

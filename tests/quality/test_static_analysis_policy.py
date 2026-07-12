@@ -68,10 +68,10 @@ def test_bandit_baseline_contains_only_reviewed_heuristics() -> None:
     baseline = json.loads((ROOT / "config" / "bandit-baseline.json").read_text(encoding="utf-8"))
     findings = baseline["results"]
     assert Counter(finding["test_id"] for finding in findings) == {
-        "B105": 15,
+        "B105": 14,
         "B310": 1,
         "B404": 1,
         "B603": 1,
-        "B608": 66,
+        "B608": 58,
     }
     assert all(finding["issue_severity"] in {"LOW", "MEDIUM"} for finding in findings)
