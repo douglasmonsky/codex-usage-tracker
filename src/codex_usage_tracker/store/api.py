@@ -49,6 +49,13 @@ from codex_usage_tracker.store.dashboard_queries import (
 from codex_usage_tracker.store.dashboard_queries import (
     query_usage_status as query_usage_status,
 )
+from codex_usage_tracker.store.diagnostic_api import (
+    query_large_low_output_calls as query_large_low_output_calls,
+)
+from codex_usage_tracker.store.diagnostic_api import (
+    query_repeated_file_rediscovery as query_repeated_file_rediscovery,
+)
+from codex_usage_tracker.store.diagnostic_api import query_shell_churn as query_shell_churn
 from codex_usage_tracker.store.diagnostic_call_queries import (
     query_diagnostic_fact_call_count as query_diagnostic_fact_call_count,
 )
@@ -63,12 +70,6 @@ from codex_usage_tracker.store.diagnostic_queries import (
 )
 from codex_usage_tracker.store.exports import export_usage_csv as export_usage_csv
 from codex_usage_tracker.store.investigation_runs import insert_investigation_run
-from codex_usage_tracker.store.large_low_output import (
-    query_large_low_output_calls as query_large_low_output_calls_rows,
-)
-from codex_usage_tracker.store.repeated_files import (
-    query_repeated_file_rediscovery as query_repeated_file_rediscovery_rows,
-)
 from codex_usage_tracker.store.rows import (
     row_to_dict as _row_to_dict,
 )
@@ -76,9 +77,6 @@ from codex_usage_tracker.store.schema import (
     SCHEMA_VERSION,
     SchemaMigrationError,
     init_db,
-)
-from codex_usage_tracker.store.shell_churn import (
-    query_shell_churn as query_shell_churn_rows,
 )
 from codex_usage_tracker.store.source_records import (
     query_source_record_coverage as query_source_record_coverage,
@@ -89,7 +87,9 @@ from codex_usage_tracker.store.source_records import (
 from codex_usage_tracker.store.source_records import (
     query_source_records as query_source_records,
 )
-from codex_usage_tracker.store.source_records import sync_source_records
+from codex_usage_tracker.store.source_records import (
+    sync_source_records,
+)
 from codex_usage_tracker.store.sources import (
     ParsedSourceFile,
     upsert_source_file_metadata,
@@ -281,87 +281,6 @@ def query_pattern_scan(
             thread=thread,
             include_archived=include_archived,
             min_occurrences=min_occurrences,
-            limit=limit,
-        )
-
-
-def query_repeated_file_rediscovery(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    min_occurrences: int = 2,
-    limit: int | None = 20,
-    sample_limit: int = 3,
-) -> dict[str, Any]:
-    """Return repeated safe file-identity rediscovery candidates."""
-
-    with connect(db_path) as conn:
-        init_db(conn)
-        return query_repeated_file_rediscovery_rows(
-            conn,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            min_occurrences=min_occurrences,
-            limit=limit,
-            sample_limit=sample_limit,
-        )
-
-
-def query_shell_churn(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    min_occurrences: int = 3,
-    limit: int | None = 20,
-    sample_limit: int = 3,
-) -> dict[str, Any]:
-    """Return repeated shell command family churn candidates."""
-
-    with connect(db_path) as conn:
-        init_db(conn)
-        return query_shell_churn_rows(
-            conn,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            min_occurrences=min_occurrences,
-            limit=limit,
-            sample_limit=sample_limit,
-        )
-
-
-def query_large_low_output_calls(
-    db_path: Path = DEFAULT_DB_PATH,
-    *,
-    since: str | None = None,
-    until: str | None = None,
-    thread: str | None = None,
-    include_archived: bool = False,
-    min_total_tokens: int = 20_000,
-    max_output_tokens: int = 1_000,
-    limit: int | None = 20,
-) -> dict[str, Any]:
-    """Return large aggregate-token calls that produced little output."""
-
-    with connect(db_path) as conn:
-        init_db(conn)
-        return query_large_low_output_calls_rows(
-            conn,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            min_total_tokens=min_total_tokens,
-            max_output_tokens=max_output_tokens,
             limit=limit,
         )
 

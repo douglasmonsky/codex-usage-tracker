@@ -23,7 +23,7 @@ Turn the MCP into a compact, measurement-first laboratory for finding and simula
 
 ### PR 1: Attribution Kernel And Run Cache
 
-Status: pending
+Status: implemented; awaiting PR validation
 
 Deliverables:
 
@@ -154,6 +154,7 @@ Exit gates:
 - 2026-07-11: Automatic internal content analysis with summarized defaults approved.
 - 2026-07-11: Detector/simulator milestone approved; persisted experiments deferred.
 - 2026-07-11: Unified opportunity ledger, async persistent cache, compact MCP contracts, detector set, and five-PR rollout approved.
+- 2026-07-11: PR 1 attribution contracts, bounded overlap allocation, schema v15 run cache, and SQL-paged candidate repository implemented locally.
 
 ## Resume Instructions
 
