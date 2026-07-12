@@ -7,12 +7,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   hardening:
     name: Hardening gates
     runs-on: ubuntu-latest
     env:
-      AGENT_MAINTAINER_REV: 90a860e6a6b2e3918d7fcd5333bc5415f5ace77a
+      AGENT_MAINTAINER_REV: 1129570a725256dcc5f04bee33cdc32c35af911d
     steps:
       - uses: actions/checkout@v4
         with:
