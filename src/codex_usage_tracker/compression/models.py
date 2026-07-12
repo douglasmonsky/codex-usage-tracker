@@ -68,7 +68,14 @@ class ComponentExposure:
         return int(getattr(self, component))
 
     def as_dict(self) -> dict[str, int]:
-        return {component: int(getattr(self, component)) for component in COMPONENT_NAMES}
+        return {
+            "cached_input": self.cached_input,
+            "uncached_input": self.uncached_input,
+            "output": self.output,
+            "reasoning_output": self.reasoning_output,
+            "content_fragment": self.content_fragment,
+            "tool_output": self.tool_output,
+        }
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,6 +1,2 @@
 [root]
-depends_on = [
-  "//codex_usage_tracker.core",
-  "//codex_usage_tracker.pricing",
-  "//codex_usage_tracker.store",
-]
+depends_on = []

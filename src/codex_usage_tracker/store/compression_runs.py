@@ -93,37 +93,61 @@ def update_compression_run(
     aggregate_profile: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Update run lifecycle metadata while keeping progress monotonic."""
-    assignments: list[str] = ["last_accessed_at = ?"]
-    values: list[Any] = [_utc_now()]
-    if status is not None:
-        assignments.append("status = ?")
-        values.append(status)
-        if status == "running":
-            assignments.append("started_at = COALESCE(started_at, ?)")
-            values.append(_utc_now())
-        if status in _TERMINAL_STATUSES:
-            assignments.append("completed_at = COALESCE(completed_at, ?)")
-            values.append(_utc_now())
-    if progress_percent is not None:
-        assignments.append("progress_percent = MAX(progress_percent, ?)")
-        values.append(min(100.0, max(0.0, float(progress_percent))))
-    _append_scalar(assignments, values, "stage", stage)
-    _append_scalar(assignments, values, "current_detector", current_detector)
-    _append_scalar(assignments, values, "completed_detectors", completed_detectors)
-    _append_scalar(assignments, values, "total_detectors", total_detectors)
-    _append_scalar(assignments, values, "records_examined", records_examined)
-    if cache_reused is not None:
-        _append_scalar(assignments, values, "cache_reused", int(cache_reused))
-    _append_json(assignments, values, "coverage_json", coverage)
-    _append_json(assignments, values, "timing_json", timing)
-    _append_json(assignments, values, "error_summary_json", error_summary)
-    _append_json(assignments, values, "aggregate_profile_json", aggregate_profile)
-    values.append(run_id)
+    now = _utc_now()
+    normalized_progress = _normalize_progress(progress_percent)
     with connect(db_path) as conn:
         init_db(conn)
         conn.execute(
-            f"UPDATE compression_runs SET {', '.join(assignments)} WHERE run_id = ?",
-            values,
+            """
+            UPDATE compression_runs
+            SET last_accessed_at = ?,
+                status = COALESCE(?, status),
+                started_at = CASE
+                    WHEN ? = 'running' THEN COALESCE(started_at, ?)
+                    ELSE started_at
+                END,
+                completed_at = CASE
+                    WHEN ? IN ('completed', 'completed_with_warnings', 'failed', 'cancelled')
+                        THEN COALESCE(completed_at, ?)
+                    ELSE completed_at
+                END,
+                progress_percent = CASE
+                    WHEN ? IS NULL THEN progress_percent
+                    ELSE MAX(progress_percent, ?)
+                END,
+                stage = COALESCE(?, stage),
+                current_detector = COALESCE(?, current_detector),
+                completed_detectors = COALESCE(?, completed_detectors),
+                total_detectors = COALESCE(?, total_detectors),
+                records_examined = COALESCE(?, records_examined),
+                cache_reused = COALESCE(?, cache_reused),
+                coverage_json = COALESCE(?, coverage_json),
+                timing_json = COALESCE(?, timing_json),
+                error_summary_json = COALESCE(?, error_summary_json),
+                aggregate_profile_json = COALESCE(?, aggregate_profile_json)
+            WHERE run_id = ?
+            """,
+            (
+                now,
+                status,
+                status,
+                now,
+                status,
+                now,
+                normalized_progress,
+                normalized_progress,
+                stage,
+                current_detector,
+                completed_detectors,
+                total_detectors,
+                records_examined,
+                _optional_bool_int(cache_reused),
+                _json_or_none(coverage),
+                _json_or_none(timing),
+                _json_or_none(error_summary),
+                _json_or_none(aggregate_profile),
+                run_id,
+            ),
         )
         row = _select_run(conn, run_id)
     return _decode_run(row) if row is not None else None
@@ -194,13 +218,12 @@ def delete_stale_compression_runs(
     before: str,
 ) -> int:
     """Delete terminal runs not accessed since the supplied UTC timestamp."""
-    placeholders = ", ".join("?" for _status in _TERMINAL_STATUSES)
     with connect(db_path) as conn:
         init_db(conn)
         cursor = conn.execute(
-            f"""
+            """
             DELETE FROM compression_runs
-            WHERE status IN ({placeholders}) AND last_accessed_at < ?
+            WHERE status IN (?, ?, ?, ?) AND last_accessed_at < ?
             """,
             [*_TERMINAL_STATUSES, before],
         )
@@ -229,27 +252,6 @@ def _select_run(conn: sqlite3.Connection, run_id: str) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def _append_scalar(
-    assignments: list[str],
-    values: list[Any],
-    column: str,
-    value: Any,
-) -> None:
-    if value is not None:
-        assignments.append(f"{column} = ?")
-        values.append(value)
-
-
-def _append_json(
-    assignments: list[str],
-    values: list[Any],
-    column: str,
-    value: Mapping[str, Any] | None,
-) -> None:
-    if value is not None:
-        _append_scalar(assignments, values, column, _json_dump(value))
-
-
 def _json_dump(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
@@ -263,3 +265,15 @@ def _json_load(value: str) -> Any:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _normalize_progress(value: float | None) -> float | None:
+    return None if value is None else min(100.0, max(0.0, float(value)))
+
+
+def _optional_bool_int(value: bool | None) -> int | None:
+    return None if value is None else int(value)
+
+
+def _json_or_none(value: Mapping[str, Any] | None) -> str | None:
+    return None if value is None else _json_dump(value)

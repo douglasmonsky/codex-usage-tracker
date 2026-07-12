@@ -61,40 +61,63 @@ def list_compression_candidates(
     offset: int = 0,
 ) -> dict[str, Any]:
     """Page compact candidate rows without loading nested claims."""
-    where = ["run_id = ?", "observed_exposure_tokens >= ?", "adjusted_likely >= ?"]
-    params: list[Any] = [run_id, max(0, min_exposure), max(0, min_likely_savings)]
-    if family:
-        where.append("family = ?")
-        params.append(family)
-    if confidence_grade:
-        where.append("confidence_grade = ?")
-        params.append(confidence_grade)
-    where_sql = " AND ".join(where)
-    order_sql = _SORT_SQL.get(sort, _SORT_SQL["adjusted_likely"])
-    page_sql = ""
-    page_params: list[Any] = []
-    if limit not in (None, 0):
-        page_sql = " LIMIT ? OFFSET ?"
-        page_params = [max(1, int(limit)), max(0, int(offset))]
+    normalized_family = family or None
+    normalized_confidence = confidence_grade or None
+    normalized_sort = sort if sort in _SORT_SQL else "adjusted_likely"
+    normalized_limit = -1 if limit in (None, 0) else max(1, int(limit))
+    normalized_offset = max(0, int(offset))
+    filter_params: list[Any] = [
+        run_id,
+        max(0, min_exposure),
+        max(0, min_likely_savings),
+        normalized_family,
+        normalized_family,
+        normalized_confidence,
+        normalized_confidence,
+    ]
     with connect(db_path) as conn:
         init_db(conn)
         total = int(
             conn.execute(
-                f"SELECT COUNT(*) FROM compression_candidates WHERE {where_sql}",
-                params,
+                """
+                SELECT COUNT(*)
+                FROM compression_candidates
+                WHERE run_id = ?
+                    AND observed_exposure_tokens >= ?
+                    AND adjusted_likely >= ?
+                    AND (? IS NULL OR family = ?)
+                    AND (? IS NULL OR confidence_grade = ?)
+                """,
+                filter_params,
             ).fetchone()[0]
         )
         rows = conn.execute(
-            f"""
+            """
             SELECT * FROM compression_candidates
-            WHERE {where_sql}
-            ORDER BY {order_sql}
-            {page_sql}
+            WHERE run_id = ?
+                AND observed_exposure_tokens >= ?
+                AND adjusted_likely >= ?
+                AND (? IS NULL OR family = ?)
+                AND (? IS NULL OR confidence_grade = ?)
+            ORDER BY
+                CASE WHEN ? = 'confidence' THEN confidence_score END DESC,
+                CASE WHEN ? = 'exposure' THEN observed_exposure_tokens END DESC,
+                CASE WHEN ? = 'recency' THEN COALESCE(last_seen, '') END DESC,
+                adjusted_likely DESC,
+                rank ASC,
+                candidate_id ASC
+            LIMIT ? OFFSET ?
             """,
-            [*params, *page_params],
+            [
+                *filter_params,
+                normalized_sort,
+                normalized_sort,
+                normalized_sort,
+                normalized_limit,
+                normalized_offset,
+            ],
         ).fetchall()
     decoded = [_decode_candidate_row(row, include_detail=False) for row in rows]
-    normalized_offset = max(0, int(offset))
     return {
         "rows": decoded,
         "total": total,
