@@ -145,24 +145,39 @@ class CompressionEvidenceSnapshot:
 
     def component_exposure(self, record_id: str, component: ComponentName) -> int:
         call = self.call(record_id)
-        if call is not None and component in {
-            "cached_input",
-            "uncached_input",
-            "output",
-            "reasoning_output",
-        }:
+        if call is not None and component in _CALL_COMPONENTS:
             return call.exposure.value(component)
         if component == "content_fragment":
-            return sum(
-                row.estimated_tokens for row in self.content_fragments if row.record_id == record_id
-            )
+            return _content_fragment_exposure(self.content_fragments, record_id)
         if component == "tool_output":
-            return sum(
-                (row.output_size_bytes + 3) // 4
-                for row in self.tool_calls
-                if row.record_id == record_id
-            )
+            return _tool_output_exposure(self.tool_calls, self.command_runs, record_id)
         return 0
+
+
+_CALL_COMPONENTS: frozenset[ComponentName] = frozenset(
+    {"cached_input", "uncached_input", "output", "reasoning_output"}
+)
+
+
+def _content_fragment_exposure(
+    fragments: tuple[ContentFragmentEvidence, ...],
+    record_id: str,
+) -> int:
+    return sum(row.estimated_tokens for row in fragments if row.record_id == record_id)
+
+
+def _tool_output_exposure(
+    tools: tuple[ToolCallEvidence, ...],
+    commands: tuple[CommandRunEvidence, ...],
+    record_id: str,
+) -> int:
+    tool_output = sum(
+        (row.output_size_bytes + 3) // 4 for row in tools if row.record_id == record_id
+    )
+    command_output = sum(
+        (row.output_size_bytes + 3) // 4 for row in commands if row.record_id == record_id
+    )
+    return max(tool_output, command_output)
 
 
 def load_compression_evidence(
