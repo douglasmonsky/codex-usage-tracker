@@ -105,7 +105,7 @@ jobs:
         run: npm run dashboard:visualization-smoke
       - name: Upload visualization evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dashboard-visualization-evidence
           path: test-results/**/*.png
