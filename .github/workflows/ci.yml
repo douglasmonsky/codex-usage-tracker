@@ -15,8 +15,6 @@ jobs:
   hardening:
     name: Hardening gates
     runs-on: ubuntu-latest
-    env:
-      AGENT_MAINTAINER_REV: 1129570a725256dcc5f04bee33cdc32c35af911d
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,7 +33,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
           python -m pip install --force-reinstall --no-deps \
-            "agent-maintainer @ git+https://github.com/douglasmonsky/agent-maintainer.git@${AGENT_MAINTAINER_REV}"
+            "agent-maintainer @ git+https://github.com/douglasmonsky/agent-maintainer.git@1129570a725256dcc5f04bee33cdc32c35af911d"
           npm ci
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           go install github.com/zricethezav/gitleaks/v8@v8.30.1
