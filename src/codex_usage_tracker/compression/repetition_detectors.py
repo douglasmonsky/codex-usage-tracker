@@ -11,7 +11,6 @@ from codex_usage_tracker.compression.evidence import (
     CallEvidence,
     CommandRunEvidence,
     CompressionEvidenceSnapshot,
-    ContentFragmentEvidence,
     FileEventEvidence,
 )
 from codex_usage_tracker.compression.models import (
@@ -40,7 +39,7 @@ class FileRediscoveryDetector:
     ) -> list[CandidateDraft]:
         calls = {call.record_id: call for call in snapshot.calls}
         groups = _file_groups(snapshot.file_events, calls)
-        fragment_index = _fragment_exposure_index(snapshot.content_fragments)
+        fragment_index = _fragment_exposure_index(snapshot)
         candidates = (
             _file_candidate(
                 detector=self,
@@ -328,11 +327,16 @@ class _FragmentExposureIndex:
 
 
 def _fragment_exposure_index(
-    fragments: tuple[ContentFragmentEvidence, ...],
+    snapshot: CompressionEvidenceSnapshot,
 ) -> _FragmentExposureIndex:
+    if snapshot.content_exposure_by_record or snapshot.content_exposure_by_turn:
+        return _FragmentExposureIndex(
+            dict(snapshot.content_exposure_by_record),
+            dict(snapshot.content_exposure_by_turn),
+        )
     by_record: dict[str, int] = defaultdict(int)
     by_turn: dict[tuple[str, str], int] = defaultdict(int)
-    for fragment in fragments:
+    for fragment in snapshot.content_fragments:
         by_record[fragment.record_id] += fragment.estimated_tokens
         if fragment.turn_key is not None:
             by_turn[(fragment.record_id, fragment.turn_key)] += fragment.estimated_tokens

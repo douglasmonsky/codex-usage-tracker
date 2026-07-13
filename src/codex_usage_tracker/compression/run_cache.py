@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import zlib
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol, TypeVar, cast
@@ -106,38 +106,66 @@ def latest_compatible_run(
     return get_compression_run(db_path, run_id=str(row["run_id"]))
 
 
+class RecordManifestBuilder:
+    """Accumulate the existing order-independent manifest without retaining events."""
+
+    def __init__(self) -> None:
+        self._threads: dict[str, str] = {}
+        self._accumulators: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
+        self._metadata: dict[str, dict[str, str]] = {}
+
+    def add_call(self, call: CallEvidence) -> None:
+        self._threads[call.record_id] = call.thread_key
+        manifest_key = _manifest_key(call.record_id, call.thread_key)
+        self._metadata[manifest_key] = {
+            "thread_key": call.thread_key,
+            "record_id": "",
+        }
+        _accumulate(self._accumulators[manifest_key], "call", call)
+
+    def add_event(self, kind: str, event: Any) -> None:
+        self.add_identity(kind, str(event.record_id), _revision_identity(event))
+
+    def add_identity(self, kind: str, record_id: str, identity: Any) -> None:
+        thread_key = self._threads.get(record_id, "")
+        manifest_key = _manifest_key(record_id, thread_key)
+        self._metadata.setdefault(
+            manifest_key,
+            {
+                "thread_key": thread_key,
+                "record_id": record_id if not thread_key else "",
+            },
+        )
+        _accumulate(
+            self._accumulators[manifest_key],
+            kind,
+            identity,
+        )
+
+    def build(self) -> dict[str, dict[str, str]]:
+        return {
+            key: {**self._metadata[key], "revision": _manifest_hash(accumulator)}
+            for key, accumulator in sorted(self._accumulators.items())
+        }
+
+
 def record_manifest(
     snapshot: CompressionEvidenceSnapshot,
 ) -> dict[str, dict[str, str]]:
     """Hash bounded evidence metadata per thread for incremental invalidation."""
-    threads = {call.record_id: call.thread_key for call in snapshot.calls}
-    accumulators: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
-    metadata: dict[str, dict[str, str]] = {}
+    builder = RecordManifestBuilder()
     for call in snapshot.calls:
-        manifest_key = _manifest_key(call.record_id, call.thread_key)
-        metadata[manifest_key] = {"thread_key": call.thread_key, "record_id": ""}
-        _accumulate(accumulators[manifest_key], "call", call)
-    _append_event_manifest(accumulators, metadata, threads, "tool", snapshot.tool_calls)
-    _append_event_manifest(accumulators, metadata, threads, "turn", snapshot.turns)
-    _append_event_manifest(
-        accumulators,
-        metadata,
-        threads,
-        "command",
-        snapshot.command_runs,
-    )
-    _append_event_manifest(accumulators, metadata, threads, "file", snapshot.file_events)
-    _append_event_manifest(
-        accumulators,
-        metadata,
-        threads,
-        "fragment",
-        snapshot.content_fragments,
-    )
-    return {
-        key: {**metadata[key], "revision": _manifest_hash(accumulator)}
-        for key, accumulator in sorted(accumulators.items())
-    }
+        builder.add_call(call)
+    for kind, events in (
+        ("tool", snapshot.tool_calls),
+        ("turn", snapshot.turns),
+        ("command", snapshot.command_runs),
+        ("file", snapshot.file_events),
+        ("fragment", snapshot.content_fragments),
+    ):
+        for event in events:
+            builder.add_event(kind, event)
+    return builder.build()
 
 
 def _load_previous_drafts(
@@ -205,28 +233,6 @@ def _draft_from_stored(
         last_seen=_optional_text(payload.get("last_seen")),
         data_quality_warnings=tuple(str(row) for row in payload.get("data_quality_warnings", [])),
     )
-
-
-def _append_event_manifest(
-    accumulators: dict[str, list[int]],
-    metadata: dict[str, dict[str, str]],
-    threads: Mapping[str, str],
-    kind: str,
-    events: Sequence[Any],
-) -> None:
-    for event in events:
-        record_id = str(event.record_id)
-        thread_key = threads.get(record_id, "")
-        manifest_key = _manifest_key(record_id, thread_key)
-        metadata.setdefault(
-            manifest_key,
-            {"thread_key": thread_key, "record_id": record_id if not thread_key else ""},
-        )
-        _accumulate(
-            accumulators[manifest_key],
-            kind,
-            _revision_identity(event),
-        )
 
 
 def _revision_identity(event: Any) -> Any:
@@ -312,6 +318,21 @@ def _subset_snapshot(
         file_events=_matching_records(snapshot.file_events, record_ids),
         content_fragments=_matching_records(snapshot.content_fragments, record_ids),
         compactions=_matching_records(snapshot.compactions, record_ids),
+        content_exposure_by_record={
+            record_id: exposure
+            for record_id, exposure in snapshot.content_exposure_by_record.items()
+            if record_id in record_ids
+        },
+        content_exposure_by_turn={
+            key: exposure
+            for key, exposure in snapshot.content_exposure_by_turn.items()
+            if key[0] in record_ids
+        },
+        tool_output_exposure_by_record={
+            record_id: exposure
+            for record_id, exposure in snapshot.tool_output_exposure_by_record.items()
+            if record_id in record_ids
+        },
     )
 
 

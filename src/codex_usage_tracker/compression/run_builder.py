@@ -24,10 +24,7 @@ from codex_usage_tracker.compression.estimators import (
     build_estimator_index,
     estimate_candidate,
 )
-from codex_usage_tracker.compression.evidence import (
-    CompressionEvidenceSnapshot,
-    load_compression_evidence,
-)
+from codex_usage_tracker.compression.evidence import CompressionEvidenceSnapshot
 from codex_usage_tracker.compression.identifiers import stable_scope_hash
 from codex_usage_tracker.compression.models import (
     CandidateDraft,
@@ -37,7 +34,9 @@ from codex_usage_tracker.compression.profile import build_profile, public_profil
 from codex_usage_tracker.compression.run_cache import (
     incremental_inputs,
     latest_compatible_run,
-    record_manifest,
+)
+from codex_usage_tracker.compression.streaming_evidence import (
+    load_streaming_compression_evidence,
 )
 from codex_usage_tracker.store.compression_candidates import replace_compression_candidates
 from codex_usage_tracker.store.compression_runs import (
@@ -76,7 +75,9 @@ def build_compression_run(
         _emit(progress_callback, stage="complete", progress_percent=100.0, cache_reused=True)
         return cached_profile
 
-    snapshot = load_compression_evidence(db_path, scope)
+    loaded_evidence = load_streaming_compression_evidence(db_path, scope)
+    snapshot = loaded_evidence.snapshot
+    current_manifest = loaded_evidence.record_manifest
     cache_identity = _cache_identity(snapshot, scope_hash, detector_version)
     exact = find_compression_run(db_path, **cache_identity)
     if exact is not None and not force:
@@ -109,7 +110,6 @@ def build_compression_run(
         total_detectors=len(detectors),
     )
     try:
-        current_manifest = record_manifest(snapshot)
         reused, detector_snapshot, cache_mode = incremental_inputs(
             db_path,
             snapshot=snapshot,

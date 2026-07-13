@@ -61,8 +61,16 @@ class EstimatorIndex:
     def __init__(self, snapshot: CompressionEvidenceSnapshot) -> None:
         self._snapshot = snapshot
         self._calls = {call.record_id: call for call in snapshot.calls}
-        self._content = _content_totals(snapshot)
-        self._tool_output = _tool_output_totals(snapshot)
+        self._content = (
+            dict(snapshot.content_exposure_by_record)
+            if snapshot.content_exposure_by_record
+            else _content_totals(snapshot)
+        )
+        self._tool_output = (
+            dict(snapshot.tool_output_exposure_by_record)
+            if snapshot.tool_output_exposure_by_record
+            else _tool_output_totals(snapshot)
+        )
         self._groups: dict[ComponentName, dict[_GroupKey, tuple[int, ...]]] = {}
         self._threads: dict[ComponentName, dict[tuple[_GroupKey, str], tuple[int, ...]]] = {}
         self._peer_cache: dict[

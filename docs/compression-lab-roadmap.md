@@ -194,6 +194,10 @@ Status: in progress
 
 Issue: [#225](https://github.com/douglasmonsky/codex-usage-tracker/issues/225)
 
+Foundation PR: [#226](https://github.com/douglasmonsky/codex-usage-tracker/pull/226)
+
+Foundation merge: `d0db081f77434e13e4874a56e89b69f577633fb6`
+
 Deliverables:
 
 - A bounded evidence-batch reader over the existing normalized SQLite tables.

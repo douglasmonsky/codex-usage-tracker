@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -215,6 +216,21 @@ class CompressionEvidenceSnapshot:
     compactions: tuple[ContentFragmentEvidence, ...]
     coverage: EvidenceCoverage
     source_revision: str
+    content_exposure_by_record: Mapping[str, int] = field(
+        default_factory=dict,
+        repr=False,
+        compare=False,
+    )
+    content_exposure_by_turn: Mapping[tuple[str, str], int] = field(
+        default_factory=dict,
+        repr=False,
+        compare=False,
+    )
+    tool_output_exposure_by_record: Mapping[str, int] = field(
+        default_factory=dict,
+        repr=False,
+        compare=False,
+    )
 
     def call(self, record_id: str) -> CallEvidence | None:
         return next((row for row in self.calls if row.record_id == record_id), None)
@@ -224,8 +240,12 @@ class CompressionEvidenceSnapshot:
         if call is not None and component in _CALL_COMPONENTS:
             return call.exposure.value(component)
         if component == "content_fragment":
+            if record_id in self.content_exposure_by_record:
+                return self.content_exposure_by_record[record_id]
             return _content_fragment_exposure(self.content_fragments, record_id)
         if component == "tool_output":
+            if record_id in self.tool_output_exposure_by_record:
+                return self.tool_output_exposure_by_record[record_id]
             return _tool_output_exposure(self.tool_calls, self.command_runs, record_id)
         return 0
 

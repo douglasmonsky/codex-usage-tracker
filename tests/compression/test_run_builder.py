@@ -7,10 +7,11 @@ from typing import Any
 
 import pytest
 
-from codex_usage_tracker.compression import run_builder, run_cache
+from codex_usage_tracker.compression import run_builder
 from codex_usage_tracker.compression.context_detectors import StaleContextDetector
 from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.compression.run_cache import record_manifest
+from codex_usage_tracker.compression.streaming_evidence import StreamingEvidenceBundle
 from codex_usage_tracker.store.compression_candidates import list_compression_candidates
 from codex_usage_tracker.store.compression_runs import get_compression_run
 from codex_usage_tracker.store.compression_schema import touch_compression_source_generation
@@ -35,14 +36,18 @@ def _stale_snapshot(*record_ids: str, source_revision: str = "revision-1"):
     return replace(evidence, source_revision=source_revision)
 
 
+def _bundle(evidence: Any) -> StreamingEvidenceBundle:
+    return StreamingEvidenceBundle(evidence, record_manifest(evidence))
+
+
 def _use_snapshot(
     monkeypatch: pytest.MonkeyPatch,
     evidence: Any,
 ) -> None:
     monkeypatch.setattr(
         run_builder,
-        "load_compression_evidence",
-        lambda _db_path, _scope: evidence,
+        "load_streaming_compression_evidence",
+        lambda _db_path, _scope: _bundle(evidence),
     )
 
 
@@ -93,7 +98,11 @@ def test_build_compression_run_reuses_an_exact_persisted_cache_hit(
     def unexpected_evidence_load(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("exact cache hits must not rebuild normalized evidence")
 
-    monkeypatch.setattr(run_builder, "load_compression_evidence", unexpected_evidence_load)
+    monkeypatch.setattr(
+        run_builder,
+        "load_streaming_compression_evidence",
+        unexpected_evidence_load,
+    )
     warm = run_builder.build_compression_run(
         db_path,
         CompressionScope(),
@@ -201,23 +210,19 @@ def test_appended_record_recomputes_only_its_affected_thread(
 ) -> None:
     first = _stale_snapshot("a-1", "b-1", source_revision="revision-1")
     second = _stale_snapshot("a-1", "b-1", "a-2", source_revision="revision-2")
-    snapshots = iter((first, second))
+    third = replace(
+        second,
+        tool_calls=(tool("a-event", "a-2", output_bytes=400),),
+        source_revision="revision-3",
+    )
+    snapshots = iter((first, second, third))
     db_path = tmp_path / "usage.sqlite3"
     monkeypatch.setattr(
         run_builder,
-        "load_compression_evidence",
-        lambda _db_path, _scope: next(snapshots),
+        "load_streaming_compression_evidence",
+        lambda _db_path, _scope: _bundle(next(snapshots)),
     )
     observed_scopes: list[set[str]] = []
-    manifest_calls = 0
-
-    def counted_manifest(evidence):
-        nonlocal manifest_calls
-        manifest_calls += 1
-        return record_manifest(evidence)
-
-    monkeypatch.setattr(run_builder, "record_manifest", counted_manifest)
-    monkeypatch.setattr(run_cache, "record_manifest", counted_manifest)
 
     class RecordingDetector(StaleContextDetector):
         def detect(self, snapshot: Any, scope: CompressionScope):
@@ -235,9 +240,17 @@ def test_appended_record_recomputes_only_its_affected_thread(
     with connect(db_path) as conn:
         touch_compression_source_generation(conn)
     incremental = run_builder.build_compression_run(db_path, CompressionScope())
+    with connect(db_path) as conn:
+        touch_compression_source_generation(conn)
+    event_incremental = run_builder.build_compression_run(db_path, CompressionScope())
 
     assert cold["candidate_count"] == 2
     assert incremental["candidate_count"] == 3
     assert incremental["cache"] == {"mode": "incremental", "reused": True}
-    assert observed_scopes == [{"a-1", "b-1"}, {"a-1", "a-2"}]
-    assert manifest_calls == 2
+    assert event_incremental["candidate_count"] == 3
+    assert event_incremental["cache"] == {"mode": "incremental", "reused": True}
+    assert observed_scopes == [
+        {"a-1", "b-1"},
+        {"a-1", "a-2"},
+        {"a-1", "a-2"},
+    ]

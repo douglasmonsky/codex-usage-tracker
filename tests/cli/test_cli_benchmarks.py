@@ -112,6 +112,14 @@ def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
     assert payload["cold_build"]["peak_rss_mb"] > 0
     assert payload["cold_build"]["candidate_fingerprint"]
     assert payload["cold_build"]["profile_fingerprint"]
+    assert (
+        payload["cold_build"]["candidate_fingerprint"]
+        == "2dd80ca48382546f39943c4567124038e5e50f44d833a18073bf69aa7dd85de3"
+    )
+    assert (
+        payload["cold_build"]["profile_fingerprint"]
+        == "a04e19e6e6cb127ee3b879d963b8995d9426908dc25737078b61e2ba799e9983"
+    )
     assert payload["cold_build"]["stage_timings_seconds"]["evidence_loaded"] >= 0
     assert payload["warm_build"]["cache_mode"] == "exact"
     assert payload["threshold_failures"] == []
