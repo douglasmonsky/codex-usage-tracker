@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -58,6 +58,11 @@ KNOWN_NON_TOKEN_EVENT_MSG_TYPES = frozenset(
     }
 )
 
+JsonlEntryObserver = Callable[
+    [dict[str, Any], dict[str, Any], int, UsageEvent | None],
+    None,
+]
+
 
 @dataclass(frozen=True)
 class ParsedUsageFile:
@@ -92,6 +97,7 @@ def parse_codex_jsonl_v1(
     start_byte: int = 0,
     start_line: int = 0,
     initial_state: ParserState | None = None,
+    entry_observer: JsonlEntryObserver | None = None,
 ) -> ParsedUsageFile:
     """Parse one Codex JSONL v1 log without storing raw message content."""
 
@@ -116,6 +122,7 @@ def parse_codex_jsonl_v1(
                 line_number=line_number,
                 raw_line=raw_line,
                 stats=stats,
+                entry_observer=entry_observer,
             )
 
     return ParsedUsageFile(
@@ -169,6 +176,7 @@ def _handle_jsonl_line(
     line_number: int,
     raw_line: bytes,
     stats: MutableMapping[str, int] | None,
+    entry_observer: JsonlEntryObserver | None,
 ) -> None:
     envelope = _jsonl_envelope(raw_line, stats)
     if envelope is None:
@@ -176,6 +184,32 @@ def _handle_jsonl_line(
     payload = _jsonl_payload(envelope, stats)
     if payload is None:
         return
+
+    previous_event_count = len(state.events)
+    _handle_decoded_jsonl_entry(
+        path=path,
+        index=index,
+        state=state,
+        line_number=line_number,
+        envelope=envelope,
+        payload=payload,
+        stats=stats,
+    )
+    if entry_observer is not None:
+        emitted_event = state.events[-1] if len(state.events) > previous_event_count else None
+        entry_observer(envelope, payload, line_number, emitted_event)
+
+
+def _handle_decoded_jsonl_entry(
+    *,
+    path: Path,
+    index: dict[str, SessionInfo],
+    state: _JsonlParseState,
+    line_number: int,
+    envelope: dict[str, Any],
+    payload: dict[str, Any],
+    stats: MutableMapping[str, int] | None,
+) -> None:
 
     entry_type = envelope.get("type")
     timestamp = optional_str(envelope.get("timestamp")) or ""

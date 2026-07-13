@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,14 +17,94 @@ from codex_usage_tracker.store.content_index_events import (
 )
 from codex_usage_tracker.store.content_index_models import (
     _ExtractedContentRows,
+    _PendingContentRows,
     _PendingFragment,
 )
 from codex_usage_tracker.store.content_rows import (
     _append_pending_content_rows,
+    _content_row_timestamp,
     _empty_pending_content_rows,
 )
 
 MAX_FRAGMENT_CHARS = 4000
+
+
+@dataclass
+class ContentRowAccumulator:
+    """Accumulate normalized content while a parser decodes one source file."""
+
+    source_path: Path
+    pending: list[_PendingFragment] = field(default_factory=list)
+    pending_tool_calls: list[PendingToolCall] = field(default_factory=list)
+    pending_command_runs: list[PendingCommandRun] = field(default_factory=list)
+    pending_file_events: list[PendingFileEvent] = field(default_factory=list)
+    pending_rows: _PendingContentRows = field(default_factory=_empty_pending_content_rows)
+    turn_id: str | None = None
+    turn_index: int = 0
+    parse_warnings: int = 0
+    has_usage_rows: bool = False
+    created_at: str = field(default_factory=_content_row_timestamp)
+
+    def consume(
+        self,
+        *,
+        envelope: dict[str, Any],
+        payload: dict[str, Any],
+        line_number: int,
+        usage_row: Mapping[str, object] | None,
+    ) -> None:
+        entry_type = envelope.get("type")
+        timestamp = optional_str(envelope.get("timestamp"))
+        if entry_type == "turn_context":
+            self.turn_id = optional_str(payload.get("turn_id"))
+            self.turn_index += 1
+            return
+        if _is_token_count(entry_type, payload):
+            if usage_row is not None:
+                self.has_usage_rows = True
+                _append_pending_content_rows(
+                    self.pending_rows,
+                    pending=self.pending,
+                    tool_calls=self.pending_tool_calls,
+                    command_runs=self.pending_command_runs,
+                    file_events=self.pending_file_events,
+                    usage_row=usage_row,
+                    created_at=self.created_at,
+                )
+                self.pending.clear()
+                self.pending_tool_calls.clear()
+                self.pending_command_runs.clear()
+                self.pending_file_events.clear()
+            return
+        self.pending.extend(
+            _extract_pending_fragments(
+                envelope=envelope,
+                payload=payload,
+                line_number=line_number,
+                timestamp=timestamp,
+                turn_id=self.turn_id,
+                turn_index=self.turn_index,
+            )
+        )
+        events = extract_pending_local_events(
+            envelope=envelope,
+            payload=payload,
+            line_number=line_number,
+            timestamp=timestamp,
+        )
+        self.pending_tool_calls.extend(events.tool_calls)
+        self.pending_command_runs.extend(events.command_runs)
+        self.pending_file_events.extend(events.file_events)
+
+    def finish(self) -> _ExtractedContentRows:
+        return _ExtractedContentRows(
+            source_path=str(self.source_path),
+            has_usage_rows=self.has_usage_rows,
+            turn_rows=self.pending_rows.turn_rows,
+            fragment_rows=self.pending_rows.fragment_rows,
+            event_rows=self.pending_rows.event_rows,
+            parse_warnings=self.parse_warnings,
+        )
 
 
 def _extract_content_rows_for_source_file(
@@ -36,14 +117,7 @@ def _extract_content_rows_for_source_file(
     if not usage_rows:
         return _empty_extracted_content_rows(source_path=source_path, has_usage_rows=False)
 
-    pending: list[_PendingFragment] = []
-    pending_tool_calls: list[PendingToolCall] = []
-    pending_command_runs: list[PendingCommandRun] = []
-    pending_file_events: list[PendingFileEvent] = []
-    pending_rows = _empty_pending_content_rows()
-    turn_id: str | None = None
-    turn_index = 0
-    parse_warnings = 0
+    accumulator = ContentRowAccumulator(source_path=source_path, has_usage_rows=True)
     try:
         with source_path.open("rb") as handle:
             if start_byte > 0:
@@ -51,61 +125,19 @@ def _extract_content_rows_for_source_file(
             for line_number, raw_line in enumerate(handle, start_line + 1):
                 decoded = _decode_content_envelope(raw_line)
                 if decoded is None:
-                    parse_warnings += 1
+                    accumulator.parse_warnings += 1
                     continue
                 envelope, payload = decoded
-                entry_type = envelope.get("type")
-                timestamp = optional_str(envelope.get("timestamp"))
-                if entry_type == "turn_context":
-                    turn_id = optional_str(payload.get("turn_id"))
-                    turn_index += 1
-                    continue
-                if _is_token_count(entry_type, payload):
-                    usage_row = usage_rows.get(line_number)
-                    if usage_row is not None:
-                        _append_pending_content_rows(
-                            pending_rows,
-                            pending=pending,
-                            tool_calls=pending_tool_calls,
-                            command_runs=pending_command_runs,
-                            file_events=pending_file_events,
-                            usage_row=usage_row,
-                        )
-                        pending = []
-                        pending_tool_calls = []
-                        pending_command_runs = []
-                        pending_file_events = []
-                    continue
-                pending.extend(
-                    _extract_pending_fragments(
-                        envelope=envelope,
-                        payload=payload,
-                        line_number=line_number,
-                        timestamp=timestamp,
-                        turn_id=turn_id,
-                        turn_index=turn_index,
-                    )
-                )
-                events = extract_pending_local_events(
+                accumulator.consume(
                     envelope=envelope,
                     payload=payload,
                     line_number=line_number,
-                    timestamp=timestamp,
+                    usage_row=usage_rows.get(line_number),
                 )
-                pending_tool_calls.extend(events.tool_calls)
-                pending_command_runs.extend(events.command_runs)
-                pending_file_events.extend(events.file_events)
     except OSError:
         return _empty_extracted_content_rows(source_path=source_path, has_usage_rows=False)
 
-    return _ExtractedContentRows(
-        source_path=str(source_path),
-        has_usage_rows=True,
-        turn_rows=pending_rows.turn_rows,
-        fragment_rows=pending_rows.fragment_rows,
-        event_rows=pending_rows.event_rows,
-        parse_warnings=parse_warnings,
-    )
+    return accumulator.finish()
 
 
 def _decode_content_envelope(raw_line: bytes) -> tuple[dict[str, Any], dict[str, Any]] | None:

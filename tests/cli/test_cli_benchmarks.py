@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import sqlite3
@@ -217,6 +218,67 @@ def test_compression_lab_benchmark_with_normalized_evidence(tmp_path: Path) -> N
     )
 
 
+def test_refresh_ingestion_benchmark_reports_table_equivalence(tmp_path: Path) -> None:
+    payload = _run_benchmark_json(
+        [
+            "scripts/benchmark_refresh_ingestion.py",
+            "--rows",
+            "100",
+            "--runs",
+            "1",
+            "--parallel-workers",
+            "2",
+            "--db-dir",
+            str(tmp_path),
+            "--json",
+        ]
+    )
+
+    assert payload["equivalent"] is True
+    assert payload["differing_tables"] == []
+    assert payload["serial"]["max_workers"] == 1
+    assert payload["parallel"]["max_workers"] == 2
+    assert payload["serial"]["table_fingerprints"]
+    assert "indexing_content" in payload["parallel"]["progress_phase_elapsed_seconds"]
+    assert payload["parallel"]["max_process_tree_peak_rss_mb"] > 0
+    assert {
+        "thread_summaries",
+        "source_files",
+        "content_index_features",
+        "content_fts",
+        "allowance_observations",
+        "compression_fact_state",
+        "compression_revision_state",
+    } <= set(payload["parallel"]["table_fingerprints"])
+
+
+def test_refresh_ingestion_fingerprint_covers_summary_and_fts_state(tmp_path: Path) -> None:
+    benchmark = _load_refresh_ingestion_benchmark()
+    db_path = tmp_path / "fingerprint.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE thread_summaries (thread_key TEXT, updated_at TEXT)")
+        conn.execute("INSERT INTO thread_summaries VALUES ('thread:one', 'volatile')")
+        conn.execute("CREATE VIRTUAL TABLE content_fts USING fts5(content)")
+        conn.execute("INSERT INTO content_fts(content) VALUES ('first fragment')")
+    first = benchmark._database_fingerprint(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE thread_summaries SET thread_key = 'thread:two'")
+        conn.execute("DELETE FROM content_fts")
+        conn.execute("INSERT INTO content_fts(content) VALUES ('second fragment')")
+    second = benchmark._database_fingerprint(db_path)
+
+    assert first[0] != second[0]
+    assert first[2]["thread_summaries"] != second[2]["thread_summaries"]
+    assert first[2]["content_fts"] != second[2]["content_fts"]
+
+
+def test_refresh_ingestion_process_tree_rss_includes_descendants_only() -> None:
+    benchmark = _load_refresh_ingestion_benchmark()
+    ps_output = "10 1 100\n11 10 200\n12 11 300\n20 1 999\n"
+
+    assert benchmark._process_tree_rss_kib_from_ps_output(ps_output, root_pid=10) == 600
+
+
 def _run_benchmark_json(args: list[str]) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
@@ -251,6 +313,19 @@ def _run_benchmark_json(args: list[str]) -> dict[str, Any]:
             f"payload={json.dumps(payload, indent=2)}"
         )
     return payload
+
+
+def _load_refresh_ingestion_benchmark() -> Any:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "benchmark_refresh_ingestion.py"
+    scripts_path = str(script_path.parent)
+    if scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
+    spec = importlib.util.spec_from_file_location("refresh_ingestion_benchmark_test", script_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _subprocess_env() -> dict[str, str]:

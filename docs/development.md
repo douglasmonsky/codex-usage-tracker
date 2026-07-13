@@ -264,6 +264,25 @@ python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --j
 python scripts/benchmark_synthetic_history.py --rows 500000 --json --enforce-thresholds
 ```
 
+For changes to the true first-refresh JSONL ingestion pipeline, run the
+dedicated serial/parallel parity benchmark:
+
+```bash
+uv run python scripts/benchmark_refresh_ingestion.py \
+  --rows 100000 --runs 3 --json --enforce-thresholds
+```
+
+The benchmark creates synthetic source logs and fresh databases only. It
+requires exact row-count and table-fingerprint parity, a parallel median below
+20 seconds, a worst-of-three below 25 seconds, at least 10 percent speedup over
+forced serial mode, and both coordinator and one-second sampled process-tree peak
+RSS below 544 MiB. Progress-phase elapsed values describe overlapping user-visible
+phase lifecycles; use the pipeline timings for exclusive attribution.
+`CODEX_USAGE_TRACKER_REFRESH_WORKERS`
+overrides aggregate refresh workers; `CODEX_USAGE_TRACKER_CONTENT_INDEX_WORKERS`
+overrides standalone content-index workers. Automatic mode caps each pool at
+four workers and retains serial fallback for small histories and worker failure.
+
 The default mode creates synthetic aggregate-only SQLite databases and times common release-sensitive paths. The optional `--with-source-logs` mode writes synthetic JSONL source files, points aggregate rows at matching synthetic `token_count` lines, times explicit one-call context loading, and fails if normal dashboard payload assembly opens those generated source files. Neither mode reads real Codex logs.
 
 Thresholds are regression sentinels, not universal performance guarantees. Each timed path uses:
