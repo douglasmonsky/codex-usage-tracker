@@ -57,8 +57,8 @@ reusable results.
 
 | Slice | Status | Tracking | Completion evidence |
 | --- | --- | --- | --- |
-| Loading and cancellation repair | Ready for PR | #243 / `7408439` | Independent module cache/progress and real-data navigation QA |
-| PR 0: Measurement and route inventory | Pending | #244 | Branch, PR, route inventory, benchmark artifact |
+| Loading and cancellation repair | Merged | #243 / #245 / `39fdcea` | Independent module cache/progress and real-data navigation QA |
+| PR 0: Measurement and route inventory | Ready for PR | #244 | Machine-readable route inventory, timing header, synthetic benchmark artifact |
 | PR 1: Recommendation facts | Pending | #244 | Branch, PR, migration/backfill tests |
 | PR 2: Indexed recommendations API | Pending | #244 | Branch, PR, parity and latency results |
 | PR 3: Frontend module query registry | Pending | #244 | Branch, PR, lifecycle/browser tests |

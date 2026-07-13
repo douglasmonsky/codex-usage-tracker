@@ -7,6 +7,7 @@ from http import HTTPStatus
 from codex_usage_tracker.server.responses import (
     send_error_response,
     send_exception_response,
+    send_json_response,
 )
 
 
@@ -65,3 +66,16 @@ def test_send_exception_response_adds_exception_message() -> None:
     assert json.loads(handler.wfile.getvalue()) == {
         "error": "Database error while reading usage data: database locked",
     }
+
+
+def test_send_json_response_includes_server_timing_when_provided() -> None:
+    handler = RecordingHandler()
+
+    send_json_response(
+        handler,
+        HTTPStatus.OK,
+        {"status": "ok"},
+        server_timing="app;dur=12.500",
+    )
+
+    assert dict(handler.headers)["Server-Timing"] == "app;dur=12.500"

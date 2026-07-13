@@ -7,6 +7,7 @@ import webbrowser
 from http import HTTPStatus
 from http.server import HTTPServer
 from pathlib import Path
+from time import perf_counter
 from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
@@ -138,6 +139,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
+        self._request_started_at = perf_counter()
         parsed = urlparse(self.path)
         if not self._request_origin_allowed():
             self._send_error(
@@ -165,6 +167,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
+        self._request_started_at = perf_counter()
         parsed = urlparse(self.path)
         if not self._request_origin_allowed():
             self._send_error(
