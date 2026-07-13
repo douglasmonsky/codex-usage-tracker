@@ -287,9 +287,11 @@ Exit gates:
 
 ### CP5: Candidate Persistence Pipeline
 
-Status: implementation complete; PR pending
+Status: implementation complete; PR open
 
 Issue: [#234](https://github.com/douglasmonsky/codex-usage-tracker/issues/234)
+
+PR: [#235](https://github.com/douglasmonsky/codex-usage-tracker/pull/235)
 
 Deliverables:
 
@@ -435,8 +437,8 @@ Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
 Branch: `feature/compression-candidate-persistence`
 
-CP4 merged through PR #233 at `0809875`. CP5 issue #234 is implemented locally
-and awaiting final ratchet verification, commit, and PR.
+CP4 merged through PR #233 at `0809875`. CP5 is committed at `0fccb04` and open
+for review in PR #235 after passing the precommit and full verifier profiles.
 
 Validated behavior at this checkpoint:
 
