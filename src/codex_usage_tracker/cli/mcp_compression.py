@@ -14,6 +14,8 @@ from codex_usage_tracker.compression.api import (
 )
 from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.compression.payloads import CANDIDATE_PAGE_BUDGET_BYTES
+from codex_usage_tracker.compression.simulation_api import compression_simulate
+from codex_usage_tracker.compression.simulation_payloads import SIMULATION_BUDGET_BYTES
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
 
 
@@ -111,6 +113,20 @@ def usage_compression_candidate_detail(
         evidence_mode=evidence_mode,
         evidence_limit=evidence_limit,
         max_excerpt_chars=max_excerpt_chars,
+    )
+
+
+@mcp.tool()
+def usage_compression_simulate(
+    run_id: str,
+    candidate_ids: list[str],
+) -> dict[str, Any]:
+    """Recalculate a bounded selected-candidate portfolio without double counting."""
+    return compression_simulate(
+        DEFAULT_DB_PATH,
+        run_id=run_id,
+        candidate_ids=candidate_ids,
+        max_payload_bytes=SIMULATION_BUDGET_BYTES,
     )
 
 

@@ -23,7 +23,7 @@ _DEFAULT_CAVEATS = [
 
 
 def compression_status_payload(run: Mapping[str, Any]) -> dict[str, Any]:
-    payload = _envelope(run, kind="status")
+    payload = compression_envelope(run, kind="status")
     payload.update(
         {
             "progress": _status_progress(run),
@@ -36,7 +36,7 @@ def compression_status_payload(run: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def compression_profile_payload(run: Mapping[str, Any]) -> dict[str, Any]:
-    payload = _envelope(run, kind="profile")
+    payload = compression_envelope(run, kind="profile")
     profile = dict(run.get("public_profile") or {})
     payload["profile"] = profile
     canonical_run_id = str(profile.get("run_id") or run.get("run_id") or "")
@@ -55,7 +55,7 @@ def compression_candidate_page_payload(
     *,
     max_bytes: int | None,
 ) -> dict[str, Any]:
-    payload = _envelope(run, kind="candidate_page")
+    payload = compression_envelope(run, kind="candidate_page")
     source_rows = [dict(row) for row in page.get("rows") or []]
     source_count = len(source_rows)
     payload["candidates"] = [dict(row) for row in source_rows]
@@ -77,7 +77,7 @@ def compression_candidate_detail_payload(
     evidence: Sequence[Mapping[str, Any]],
     max_bytes: int = CANDIDATE_DETAIL_BUDGET_BYTES,
 ) -> dict[str, Any]:
-    payload = _envelope(run, kind="candidate_detail")
+    payload = compression_envelope(run, kind="candidate_detail")
     compact_candidate = {
         key: value for key, value in candidate.items() if key not in {"claims", "evidence_handles"}
     }
@@ -226,9 +226,10 @@ def compression_error_payload(
     next_tool: str,
     next_arguments: Mapping[str, Any] | None = None,
     run: Mapping[str, Any] | None = None,
+    details: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if run is not None:
-        payload = _envelope(run, kind=kind)
+        payload = compression_envelope(run, kind=kind)
         payload["status"] = "error"
     else:
         payload = {
@@ -255,12 +256,13 @@ def compression_error_payload(
             "caveats": list(_DEFAULT_CAVEATS),
             "payload_truncated": False,
         }
-    payload["error"] = {"code": code, "message": message}
+    payload["error"] = {"code": code, "message": message, **dict(details or {})}
     payload["next"] = {"tool": next_tool, "arguments": dict(next_arguments or {})}
     return payload
 
 
-def _envelope(run: Mapping[str, Any], *, kind: str) -> dict[str, Any]:
+def compression_envelope(run: Mapping[str, Any], *, kind: str) -> dict[str, Any]:
+    """Build the stable common envelope shared by Compression Lab responses."""
     public_profile = _public_profile(run)
     raw_mappings, compact_mappings = _envelope_mappings(run, public_profile)
     payload = {

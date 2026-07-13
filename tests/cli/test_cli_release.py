@@ -87,6 +87,7 @@ MCP_TOOL_NAMES = {
     "usage_compression_profile",
     "usage_compression_candidates",
     "usage_compression_candidate_detail",
+    "usage_compression_simulate",
     "usage_recommendations",
     "session_usage",
     "usage_call_context",
