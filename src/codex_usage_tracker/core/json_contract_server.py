@@ -57,6 +57,28 @@ SERVER_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "percent_complete": int,
         }
     },
+    "codex-usage-tracker-compression-api-v1": {
+        "required": {
+            "kind": str,
+            "versions": dict,
+            "run_id": (str, NoneType),
+            "status": str,
+            "source_revision": str,
+            "scope": dict,
+            "filters": dict,
+            "include_archived": bool,
+            "coverage": dict,
+            "timing": dict,
+            "cache": dict,
+            "content_mode": str,
+            "includes_indexed_content": bool,
+            "includes_raw_fragments": bool,
+            "warnings": list,
+            "caveats": list,
+            "payload_truncated": bool,
+            "next": dict,
+        }
+    },
     "codex-usage-tracker-status-v1": {
         "required": {
             "payload_schema": str,

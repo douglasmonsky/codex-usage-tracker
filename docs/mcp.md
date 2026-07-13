@@ -122,6 +122,11 @@ the highest-token thread summaries instead.
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
+- `usage_compression_start`
+- `usage_compression_status`
+- `usage_compression_profile`
+- `usage_compression_candidates`
+- `usage_compression_candidate_detail`
 - `usage_recommendations`
 - `session_usage`
 - `usage_call_context`
@@ -176,6 +181,47 @@ Dashboard-shaped MCP tools return JSON dictionaries that reuse the same aggregat
 - `usage_allowance_export(...)` returns strict-privacy evidence bundles for manual sharing.
 
 Use allowance tools when users ask whether limits changed, whether weekly allowance behavior shifted, why the 5-hour counter looks noisy, or how to share aggregate allowance evidence safely. The tracker cannot read the user's logged-in Codex account plan, native remaining allowance, or usage from other agentic surfaces. Remaining allowance context is only as accurate as values manually copied into `~/.codex-usage-tracker/allowance.json`.
+
+## Compression Lab
+
+Compression Lab is the profile-first MCP workflow for finding context and token
+waste without returning one cloudy nested report:
+
+```text
+usage_compression_start(include_archived=false)
+usage_compression_status(run_id="compression_...")
+usage_compression_profile(run_id="compression_...")
+usage_compression_candidates(run_id="compression_...", limit=20)
+usage_compression_candidate_detail(candidate_id="cmp_...", evidence_mode="handles")
+```
+
+- `usage_compression_start(...)` returns immediately. It reuses an exact
+  completed profile or an identical active request and otherwise launches one
+  daemon worker. `refresh=true` forces a new analysis; it does not rescan source
+  logs.
+- `usage_compression_status(run_id=...)` returns monotonic percent, stage,
+  detector counts, records examined, candidate count, cache state, and exact
+  next-poll arguments. A pending/running row not owned by the current MCP process
+  reports `status="interrupted"` instead of pretending that work is progressing.
+- `usage_compression_profile(...)` reads only a completed profile. Supplying no
+  run ID looks up the current exact scope/detector cache; it never silently starts
+  analysis.
+- `usage_compression_candidates(...)` supports family, confidence, model,
+  thread/session, time, exposure, savings, sort, limit, and offset filters.
+  `limit=0` or `limit=null` requests the complete local result set, while the MCP
+  response still honors its byte budget and returns `next_offset` when another
+  page is required.
+- `usage_compression_candidate_detail(...)` defaults to content-free evidence
+  handles. `evidence_mode="summaries"` returns bounded claim summaries.
+  `evidence_mode="excerpts"` is the explicit opt-in that may return raw local
+  indexed text; `evidence_limit` and `max_excerpt_chars` remain bounded.
+
+All five tools use `codex-usage-tracker-compression-api-v1`. Common fields disclose run,
+scope, versions, coverage, cache/timing state, warnings/caveats, pagination,
+recommended next-tool arguments, `content_mode`, `includes_indexed_content`, and
+`includes_raw_fragments`. Default status, profile, candidate-page, and detail
+targets are 4 KiB, 8 KiB, 16 KiB, and 24 KiB respectively. Candidate pages never
+embed claims or excerpts.
 
 ## Local Content And Raw Context
 

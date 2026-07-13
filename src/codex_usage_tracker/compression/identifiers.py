@@ -38,6 +38,18 @@ def stable_candidate_id(
     return f"cmp_{digest}"
 
 
+def stable_candidate_variant_id(*, candidate_id: str, detector_set_version: str) -> str:
+    """Namespace a candidate for a non-default detector selection."""
+    digest = _stable_hash(
+        "compression-candidate-variant-v1",
+        {
+            "candidate_id": candidate_id,
+            "detector_set_version": detector_set_version,
+        },
+    )
+    return f"cmp_{digest}"
+
+
 def _stable_hash(namespace: str, payload: dict[str, Any]) -> str:
     encoded = json.dumps(
         {"namespace": namespace, "payload": payload},

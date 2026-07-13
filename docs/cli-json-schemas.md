@@ -52,6 +52,7 @@ Tracked schema ids:
 | `codex-usage-tracker-allowance-history-v1` | CLI `allowance-history --json`, MCP `usage_allowance_history(...)`, dashboard server `/api/allowance/history` |
 | `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
 | `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
+| `codex-usage-tracker-compression-api-v1` | MCP `usage_compression_start/status/profile/candidates/candidate_detail`; compact Compression Lab lifecycle and query envelope |
 | `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response, MCP `usage_report_pack(...)` |
 | | Includes the UTC `generated_at` timestamp, aggregate report definitions, aggregate linked-call evidence, and `raw_context_included: false`. |
 | `codex-usage-tracker-visualization-suggestions-v1` | MCP `usage_visualization_suggest(...)`; ranked semantic visualization intents |
@@ -337,6 +338,89 @@ HTTP report endpoints accept `limit=all`, `limit=0`, `limit=none`, and `limit=nu
     }
   ],
   "notes": []
+}
+```
+
+## Compression Lab
+
+MCP lifecycle:
+
+```text
+usage_compression_start(include_archived=false, detector_families=["stale_context"])
+usage_compression_status(run_id="compression_...")
+usage_compression_profile(run_id="compression_...")
+usage_compression_candidates(run_id="compression_...", limit=20, offset=0)
+usage_compression_candidate_detail(candidate_id="cmp_...", evidence_mode="handles")
+```
+
+Schema: `codex-usage-tracker-compression-api-v1`
+
+Every response includes `kind`, run/status identity when available, version and
+scope metadata, coverage, cache/timing state, content-disclosure flags, caveats,
+and exact `next` tool arguments. Payload kinds are `status`, `profile`,
+`candidate_page`, `candidate_detail`, and the corresponding error kind.
+
+Status progress is persistent and monotonic. `usage_compression_start` returns a
+reserved run ID before evidence loading; duplicate active requests reuse that ID.
+Completed exact requests return the cached run. Profile lookup never launches a
+worker.
+
+Candidate pages contain compact ranked rows only. `limit=0` and `limit=null`
+retain unbounded local query semantics, but MCP serializes only rows that fit the
+16 KiB response budget and reports `pagination.truncated` plus `next_offset`.
+Model, thread/session, and time filters are applied in SQLite through each
+candidate's supporting record claims rather than after pagination.
+
+Candidate detail supports these disclosure levels:
+
+- `handles`: bounded record/trace handles; no indexed text.
+- `summaries`: bounded component, exposure, estimate, and evidence-role facts;
+  no indexed text.
+- `excerpts`: explicit bounded local fragment text. This is the only mode that
+  may set both `includes_indexed_content` and `includes_raw_fragments` to true.
+
+The serialized targets are 4 KiB for status, 8 KiB for profile, 16 KiB for a
+candidate page, and 24 KiB for candidate detail. Excerpts are additionally capped
+at 50 rows and 2,000 characters per excerpt even when larger values are supplied.
+
+```json
+{
+  "schema": "codex-usage-tracker-compression-api-v1",
+  "kind": "status",
+  "versions": {
+    "compression_schema": 1,
+    "detector_set": "compression-detectors-v1",
+    "estimator": "compression-estimator-policy-v1"
+  },
+  "run_id": "compression_example",
+  "status": "running",
+  "source_revision": "revision-example",
+  "scope": {"include_archived": false},
+  "filters": {},
+  "include_archived": false,
+  "coverage": {"call_count": 1000},
+  "timing": {},
+  "cache": {"reused": false, "mode": null, "request_reused": "none"},
+  "progress": {
+    "percent": 45.0,
+    "stage": "detectors",
+    "current_detector": "stale_context",
+    "completed_detectors": 2,
+    "total_detectors": 6,
+    "records_examined": 1000,
+    "candidate_count": 12
+  },
+  "content_mode": "aggregate",
+  "includes_indexed_content": false,
+  "includes_raw_fragments": false,
+  "warnings": [],
+  "caveats": ["Savings are heuristic ranges, not an OpenAI usage ledger."],
+  "payload_truncated": false,
+  "next": {
+    "tool": "usage_compression_status",
+    "arguments": {"run_id": "compression_example"},
+    "poll_after_ms": 250
+  }
 }
 ```
 

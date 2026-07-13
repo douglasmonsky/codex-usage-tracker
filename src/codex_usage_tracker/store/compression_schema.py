@@ -9,6 +9,7 @@ MIGRATION_NAMES = {
     15: "persist compression analysis runs",
     16: "persist compression detector facts",
     17: "persist compression revision state",
+    19: "snapshot compression candidate evidence metadata",
 }
 
 
@@ -257,6 +258,9 @@ def create_compression_run_tables(conn: sqlite3.Connection) -> None:
             estimate_high INTEGER NOT NULL,
             evidence_role TEXT NOT NULL,
             trace_handle_json TEXT NOT NULL,
+            model TEXT,
+            thread_key TEXT,
+            event_timestamp TEXT,
             PRIMARY KEY(candidate_id, record_id, component),
             FOREIGN KEY(candidate_id)
                 REFERENCES compression_candidates(candidate_id) ON DELETE CASCADE
@@ -421,3 +425,33 @@ def _ensure_compression_storage(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE compression_runs ADD COLUMN source_generation INTEGER NOT NULL DEFAULT 0"
         )
+
+
+def add_candidate_record_metadata(conn: sqlite3.Connection) -> None:
+    """Persist stable model/thread/time facts with each candidate claim."""
+    columns = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(compression_candidate_records)").fetchall()
+    }
+    for column in ("model", "thread_key", "event_timestamp"):
+        if column not in columns:
+            conn.execute(f"ALTER TABLE compression_candidate_records ADD COLUMN {column} TEXT")
+    conn.execute(
+        """
+        UPDATE compression_candidate_records
+        SET model = COALESCE(model, (
+                SELECT u.model FROM usage_events AS u
+                WHERE u.record_id = compression_candidate_records.record_id
+            )),
+            thread_key = COALESCE(thread_key, (
+                SELECT COALESCE(u.thread_key, u.thread_name, u.session_id)
+                FROM usage_events AS u
+                WHERE u.record_id = compression_candidate_records.record_id
+            )),
+            event_timestamp = COALESCE(event_timestamp, (
+                SELECT u.event_timestamp FROM usage_events AS u
+                WHERE u.record_id = compression_candidate_records.record_id
+            ))
+        WHERE model IS NULL OR thread_key IS NULL OR event_timestamp IS NULL
+        """
+    )

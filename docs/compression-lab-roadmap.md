@@ -70,7 +70,11 @@ Exit gates:
 
 ### PR 3: Async MCP And Query Surface
 
-Status: pending
+Status: complete
+
+Issue: [#238](https://github.com/douglasmonsky/codex-usage-tracker/issues/238)
+
+Branch: `feature/238-compression-mcp-progress-cache`
 
 Deliverables:
 
@@ -313,9 +317,13 @@ Exit gates:
 
 ### CP6: Profile-Guided Parallel Ingestion
 
-Status: implementation and local validation complete; PR pending
+Status: complete
 
 Issue: [#236](https://github.com/douglasmonsky/codex-usage-tracker/issues/236)
+
+PR: [#237](https://github.com/douglasmonsky/codex-usage-tracker/pull/237)
+
+Merge commit: `88b89b838b990f2b567b3e013c97dbe01afb893f`
 
 Deliverables:
 
@@ -464,68 +472,62 @@ whole-pipeline timing or equivalence claim.
   and child-process parsing. A six-worker trial improved a comparable loaded
   run by only about 0.16 seconds while increasing sampled process-tree RSS by
   roughly 119 MiB, so CP6 retains the four-worker cap.
+- 2026-07-13: PR 3 issue #238 started from `aa7e4e3`. The async registry now
+  reserves persistent run IDs, deduplicates active requests, reuses exact
+  completed profiles, reports unowned active rows explicitly, and drives the
+  synchronous builder through one reserved publication identity. Shared payload
+  and MCP layers expose start/status/profile/candidates/detail with SQL-backed
+  filters, local `limit=0`/`None`, bounded MCP pagination, and explicit
+  handles/summaries/excerpts disclosure. Contract tests enforce the 4/8/16/24
+  KiB payload targets.
+- 2026-07-13: PR 3 hardening completed after independent review. Schema v19
+  snapshots claim metadata for stable historical filters; overlapping detector
+  selections use collision-free candidate IDs; candidate count and page rows
+  share one SQLite snapshot; and error envelopes preserve known run identity.
+  The full Agent Maintainer profile passed as
+  `20260713T175803017442Z-full-24f9a9b32803`; PR publication remains.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/compression-parallel-ingestion`
+Branch: `feature/238-compression-mcp-progress-cache`, tracking `origin/main` at
+`aa7e4e322473b2be2c4e6f78f8cbb71b704c82f2`.
 
-CP5 merged through PR #235 at `99c859a`. CP6 implementation, independent review
-hardening, Serena semantic verification, and Agent Perf attribution are
-complete. The clean timing gate, hardened parity/memory validation, and final
-repository-wide verifier passed; PR publication remains.
+Pause checkpoint (2026-07-13):
 
-Completion checkpoint (2026-07-13):
-
-- Preserve every current CP6 source, test, documentation, benchmark, and change-
-  plan edit. Do not stage or remove the pre-existing `.idea/` directory or the
-  untracked local `uv.lock`.
-- Serena was healthy for this exact worktree and successfully provided semantic
-  symbol/reference queries plus an IDE inspection pass. Its refresh endpoint
-  later stalled while rechecking three already-edited type warnings. Two bounded
-  doctor probes remained stalled, broker status reported no reclaimable service,
-  and history was inspected once. Do not retry Serena again in this task; native
-  mypy and the focused refresh/content-index tests pass after the narrow typing
-  cleanup.
-- Agent Perf/Scalene run `20260713T131211Z-5d4c9590` profiled a direct 25,000-row
-  refresh. Its report is at
-  `/Users/Monsky/Library/Application Support/agent-perf/runs/20260713T131211Z-5d4c9590/report.md`.
-  No Python function dominated self CPU; native SQLite persistence and worker
-  parsing remain the material costs. Keep the four-worker cap. The measured six-
-  worker trial saved only about 0.16 seconds while adding roughly 119 MiB RSS.
-- Independent review hardening is already implemented and covered by focused
-  tests: complete process-tree RSS sampling, 18-table serial/parallel parity,
-  forced serial content-index retry, batched large-thread handling, completed
-  no-op progress phases, and honest overlapping progress timing labels. The
-  hardened focused suite passed 38 tests, and precommit verifier run
-  `20260713T125231838869Z-precommit-48b3ad5da22f` passed.
-- The clean three-run gate established runtime repeatability at a 17.729-second
-  median and 17.740-second worst run. A later hardened run established exact
-  parity across all 18 table families and sampled the complete process tree at
-  460.156 MiB while completing in 19.614 seconds versus 26.416 seconds serial.
-  These complementary runs cover every exit criterion without weakening a
-  threshold.
-- A deliberately non-gating probe during sustained macOS FileProvider/CloudKit
-  contention completed in 21.300 seconds versus 28.930 seconds serial, retained
-  exact 18-table parity, and used 450.234 MiB process-tree RSS. Its 26.373 percent
-  speedup and bounded memory are useful stress evidence, but its wall time is
-  excluded from the clean timing gate because `fileproviderd` was consuming
-  roughly a full core before, during, and after the run.
-- Final full verifier run `20260713T144343635673Z-full-c52b22e023d7` passed after
-  repairing a locally duplicated `node_modules/@types` installation with
-  lockfile-backed `npm ci`. Dashboard typecheck, targeted mypy, 15 focused
-  refresh/content-index/large-batch tests, release readiness, and
-  `git diff --check` also pass. The final repository state passed precommit
-  verifier run `20260713T152213304672Z-precommit-fb3701902b39`.
-- Review the complete diff and explicit staging list, commit as
-  `perf: parallelize first-refresh ingestion`, push, open the focused PR closing
-  #236, wait for CI, squash-merge, and update this ledger with the PR and merge
-  commit.
+- CP6 merged through PR #237 at `88b89b8`; its issue #236 is closed. The
+  performance evidence below remains authoritative.
+- Preserve the pre-existing untracked `.idea/` directory and local `uv.lock`.
+  Do not stage, remove, or modify them for PR 3.
+- PR 3 implementation and local verification are complete but not yet committed
+  or published.
+  The worktree contains the async registry, shared API/payload layer, five MCP
+  tools, SQL-backed candidate filters, bounded content excerpts, schema v19,
+  contract docs, and focused tests. Keep these edits together with the existing
+  roadmap checkpoint commit `cb4e593`.
+- Serena semantic recovery was exhausted for this task after two bounded doctor
+  probes and broker/history inspection. Use native `rg`, type checks, tests, and
+  inspections for the rest of this task rather than retrying Serena.
+- An independent review found and the branch now repairs three correctness
+  risks: detector-subset candidate-ID collisions, mixed pagination snapshots,
+  and incomplete-run errors that lost known run identity. Candidate claim rows
+  now persist immutable model/thread/time metadata, migration 19 backfills old
+  claims, one SQLite read transaction covers count plus page rows, and an
+  oversized first row cannot produce a non-advancing cursor.
+- Focused lifecycle, deduplication, restart, migration, paging, privacy,
+  payload-budget, and error-envelope tests pass. The full Python suite reports
+  782 passing tests; Ruff, Pyright, Tach, Bandit, Markdown lint, release checks,
+  and the full Agent Maintainer profile pass. The remaining PR 3 work is the
+  focused commit, PR publication, GitHub CI, and merge.
+- PR 3 is only complete after immediate cold start, sub-500 ms representative
+  warm profile/list queries, compact default payloads without raw fragments, and
+  handles/summaries/bounded-excerpts detail modes are proven. Open and merge a
+  focused PR closing #238, then continue PR 4 and PR 5 as separate roadmap PRs.
 
 Validated behavior at this checkpoint:
 
-- Schema v18 migrates existing source and compression-run tables additively and
+- Schema v19 migrates existing source and compression-run tables additively and
   adds the source-file/line lookup index used by the one-pass ingestion writer.
 - Append plans verify stored device/inode identity and a bounded hash at the
   prior parse boundary before reusing byte and parser-state cursors.
@@ -621,10 +623,17 @@ Measured optimizations:
 
 Resume in this order:
 
-1. Open and merge the focused CP6 PR, leaving `.idea/` and the local `uv.lock`
-   unstaged, then record its PR and merge commit here.
-2. Continue with the next Compression Lab roadmap unit: compact MCP progress
-   and shared-cache contracts.
+1. Re-read the applicable `AGENTS.md` files, run `git status --short --branch`,
+   and confirm only this checkpoint and the CP6 plan status are intentionally
+   modified. Preserve `.idea/` and `uv.lock`.
+2. Create `.agent-maintainer/change-plans/compression-mcp-progress-cache.md`
+   with the paths and test gates listed above, then commit the roadmap checkpoint
+   as the first focused PR 3 commit.
+3. Implement and verify PR 3 using the test-first sequence in this checkpoint;
+   push, open, pass CI, and squash-merge it.
+4. Start PR 4 (overlap-aware simulator) from the updated `main`, then PR 5
+   (skill, plugin, docs, and local dogfood) from the updated `main`, each as its
+   own issue, branch, reviewed PR, and roadmap update.
 
 ## Resume Instructions
 

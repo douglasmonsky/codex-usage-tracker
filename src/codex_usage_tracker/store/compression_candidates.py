@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.store.compression_candidate_metadata import (
+    RecordMetadata,
+    record_metadata_by_id,
+)
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
 
@@ -39,9 +43,9 @@ _CLAIM_INSERT_SQL = """
     INSERT INTO compression_candidate_records (
         candidate_id, record_id, component, exposure_tokens,
         estimate_low, estimate_likely, estimate_high,
-        evidence_role, trace_handle_json
+        evidence_role, trace_handle_json, model, thread_key, event_timestamp
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -89,8 +93,19 @@ def replace_compression_candidates(
             (run_id,),
         )
         conn.execute("DELETE FROM compression_candidates WHERE run_id = ?", (run_id,))
+        record_metadata = record_metadata_by_id(
+            conn,
+            (
+                str(claim.get("record_id") or "")
+                for candidate in ordered
+                for claim in _mapping_list(candidate.get("claims"))
+            ),
+        )
         conn.executemany(_CANDIDATE_INSERT_SQL, _candidate_rows(ordered, run_id=run_id))
-        conn.executemany(_CLAIM_INSERT_SQL, _claim_rows(ordered))
+        conn.executemany(
+            _CLAIM_INSERT_SQL,
+            _claim_rows(ordered, record_metadata=record_metadata),
+        )
         conn.execute(
             "UPDATE compression_runs SET candidate_count = ? WHERE run_id = ?",
             (len(ordered), run_id),
@@ -104,6 +119,10 @@ def list_compression_candidates(
     run_id: str,
     family: str | None = None,
     confidence_grade: str | None = None,
+    model: str | None = None,
+    thread: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
     min_exposure: int = 0,
     min_likely_savings: int = 0,
     sort: str = "adjusted_likely",
@@ -116,48 +135,40 @@ def list_compression_candidates(
     normalized_sort = sort if sort in _SORT_SQL else "adjusted_likely"
     normalized_limit = -1 if limit in (None, 0) else max(1, int(limit))
     normalized_offset = max(0, int(offset))
-    filter_params: list[Any] = [
-        run_id,
-        max(0, min_exposure),
-        max(0, min_likely_savings),
-        normalized_family,
-        normalized_family,
-        normalized_confidence,
-        normalized_confidence,
-    ]
+    where_sql, filter_params = _candidate_where(
+        run_id=run_id,
+        family=normalized_family,
+        confidence_grade=normalized_confidence,
+        model=model,
+        thread=thread,
+        since=since,
+        until=until,
+        min_exposure=min_exposure,
+        min_likely_savings=min_likely_savings,
+    )
     with connect(db_path) as conn:
         init_db(conn)
-        total = int(
-            conn.execute(
-                """
-                SELECT COUNT(*)
-                FROM compression_candidates
-                WHERE run_id = ?
-                    AND observed_exposure_tokens >= ?
-                    AND adjusted_likely >= ?
-                    AND (? IS NULL OR family = ?)
-                    AND (? IS NULL OR confidence_grade = ?)
-                """,
-                filter_params,
-            ).fetchone()[0]
+        conn.commit()
+        conn.execute("BEGIN")
+        count_query = "\n".join(
+            ("SELECT COUNT(*)", "FROM compression_candidates AS c", "WHERE", where_sql)
+        )
+        total = int(conn.execute(count_query, filter_params).fetchone()[0])
+        page_query = "\n".join(
+            (
+                "SELECT c.* FROM compression_candidates AS c",
+                "WHERE",
+                where_sql,
+                "ORDER BY",
+                "CASE WHEN ? = 'confidence' THEN confidence_score END DESC,",
+                "CASE WHEN ? = 'exposure' THEN observed_exposure_tokens END DESC,",
+                "CASE WHEN ? = 'recency' THEN COALESCE(last_seen, '') END DESC,",
+                "adjusted_likely DESC, rank ASC, candidate_id ASC",
+                "LIMIT ? OFFSET ?",
+            )
         )
         rows = conn.execute(
-            """
-            SELECT * FROM compression_candidates
-            WHERE run_id = ?
-                AND observed_exposure_tokens >= ?
-                AND adjusted_likely >= ?
-                AND (? IS NULL OR family = ?)
-                AND (? IS NULL OR confidence_grade = ?)
-            ORDER BY
-                CASE WHEN ? = 'confidence' THEN confidence_score END DESC,
-                CASE WHEN ? = 'exposure' THEN observed_exposure_tokens END DESC,
-                CASE WHEN ? = 'recency' THEN COALESCE(last_seen, '') END DESC,
-                adjusted_likely DESC,
-                rank ASC,
-                candidate_id ASC
-            LIMIT ? OFFSET ?
-            """,
+            page_query,
             [
                 *filter_params,
                 normalized_sort,
@@ -175,6 +186,59 @@ def list_compression_candidates(
         "limit": None if limit in (None, 0) else max(1, int(limit)),
         "truncated": normalized_offset + len(decoded) < total,
     }
+
+
+def _candidate_where(
+    *,
+    run_id: str,
+    family: str | None,
+    confidence_grade: str | None,
+    model: str | None,
+    thread: str | None,
+    since: str | None,
+    until: str | None,
+    min_exposure: int,
+    min_likely_savings: int,
+) -> tuple[str, list[Any]]:
+    clauses = [
+        "c.run_id = ?",
+        "c.observed_exposure_tokens >= ?",
+        "c.adjusted_likely >= ?",
+    ]
+    params: list[Any] = [run_id, max(0, min_exposure), max(0, min_likely_savings)]
+    for value, clause in (
+        (family, "c.family = ?"),
+        (confidence_grade, "c.confidence_grade = ?"),
+    ):
+        if value:
+            clauses.append(clause)
+            params.append(value)
+    evidence_clauses = ["cr.candidate_id = c.candidate_id"]
+    evidence_params: list[Any] = []
+    if model:
+        evidence_clauses.append("cr.model = ?")
+        evidence_params.append(model)
+    if thread:
+        evidence_clauses.append("cr.thread_key = ?")
+        evidence_params.append(thread)
+    if since:
+        evidence_clauses.append("cr.event_timestamp >= ?")
+        evidence_params.append(since)
+    if until:
+        evidence_clauses.append("cr.event_timestamp <= ?")
+        evidence_params.append(until)
+    if evidence_params:
+        clauses.append(
+            "".join(
+                (
+                    "EXISTS (SELECT 1 FROM compression_candidate_records AS cr WHERE ",
+                    " AND ".join(evidence_clauses),
+                    ")",
+                )
+            )
+        )
+        params.extend(evidence_params)
+    return " AND ".join(clauses), params
 
 
 def get_compression_candidate(
@@ -221,13 +285,18 @@ def _candidate_rows(
         )
 
 
-def _claim_rows(candidates: list[Mapping[str, Any]]) -> Iterable[tuple[Any, ...]]:
+def _claim_rows(
+    candidates: list[Mapping[str, Any]],
+    *,
+    record_metadata: Mapping[str, RecordMetadata],
+) -> Iterable[tuple[Any, ...]]:
     for candidate in candidates:
         candidate_id = _text(candidate, "candidate_id")
         for claim in _mapping_list(candidate.get("claims")):
             yield _claim_insert_values(
                 candidate_id=candidate_id,
                 claim=claim,
+                record_metadata=record_metadata.get(str(claim.get("record_id") or "")),
             )
 
 
@@ -283,9 +352,11 @@ def _claim_insert_values(
     *,
     candidate_id: str,
     claim: Mapping[str, Any],
+    record_metadata: RecordMetadata | None,
 ) -> tuple[Any, ...]:
     estimate = _mapping(claim.get("estimate"))
     record_id = str(claim.get("record_id") or "")
+    model, thread_key, event_timestamp = record_metadata or (None, None, None)
     return (
         candidate_id,
         record_id,
@@ -296,6 +367,9 @@ def _claim_insert_values(
         int(estimate.get("high") or 0),
         "supporting",
         _json_dump({"record_id": record_id}),
+        model,
+        thread_key,
+        event_timestamp,
     )
 
 
@@ -344,7 +418,7 @@ def _candidate_detail_fields(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def _decode_claim_row(row: sqlite3.Row) -> dict[str, Any]:
-    return {
+    result = {
         "record_id": row["record_id"],
         "component": row["component"],
         "exposure_tokens": int(row["exposure_tokens"]),
@@ -352,6 +426,10 @@ def _decode_claim_row(row: sqlite3.Row) -> dict[str, Any]:
         "evidence_role": row["evidence_role"],
         "trace_handle": _json_load(row["trace_handle_json"]),
     }
+    for key in ("model", "thread_key", "event_timestamp"):
+        if row[key] is not None:
+            result[key] = row[key]
+    return result
 
 
 def _range_from_row(row: sqlite3.Row, prefix: str) -> dict[str, int]:

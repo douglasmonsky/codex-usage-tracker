@@ -97,7 +97,9 @@ def update_compression_run(
     error_summary: Mapping[str, Any] | None = None,
     aggregate_profile: Mapping[str, Any] | None = None,
     public_profile: Mapping[str, Any] | None = None,
+    source_revision: str | None = None,
     source_generation: int | None = None,
+    revision_key: str | None = None,
 ) -> dict[str, Any] | None:
     """Update run lifecycle metadata while keeping progress monotonic."""
     now = _utc_now()
@@ -133,7 +135,9 @@ def update_compression_run(
                 error_summary_json = COALESCE(?, error_summary_json),
                 aggregate_profile_json = COALESCE(?, aggregate_profile_json),
                 public_profile_json = COALESCE(?, public_profile_json),
-                source_generation = COALESCE(?, source_generation)
+                source_revision = COALESCE(?, source_revision),
+                source_generation = COALESCE(?, source_generation),
+                revision_key = COALESCE(?, revision_key)
             WHERE run_id = ?
             """,
             (
@@ -156,7 +160,9 @@ def update_compression_run(
                 _json_or_none(error_summary),
                 _json_or_none(aggregate_profile),
                 _json_or_none(public_profile),
+                source_revision,
                 source_generation,
+                revision_key,
                 run_id,
             ),
         )
