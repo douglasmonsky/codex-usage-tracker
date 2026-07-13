@@ -260,9 +260,11 @@ Exit gates:
 
 ### CP4: Revision-State And Incremental Invalidation
 
-Status: implementation complete; PR pending
+Status: implementation complete; PR open
 
 Issue: [#232](https://github.com/douglasmonsky/codex-usage-tracker/issues/232)
+
+PR: [#233](https://github.com/douglasmonsky/codex-usage-tracker/pull/233)
 
 Deliverables:
 
@@ -416,8 +418,8 @@ Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
 Branch: `feature/compression-pricing-revision`
 
-CP3 merged through PR #231 at `29f6cad`. CP4 issue #232 is implemented locally
-and awaiting final review, commit, and PR.
+CP3 merged through PR #231 at `29f6cad`. CP4 is committed at `bf9bfdf` and open
+for review in PR #233 after passing the precommit and full verifier profiles.
 
 Validated behavior at this checkpoint:
 
