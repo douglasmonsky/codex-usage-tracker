@@ -36,12 +36,14 @@ from codex_usage_tracker.compression.run_cache import (
     latest_compatible_run,
 )
 from codex_usage_tracker.compression.streaming_evidence import (
-    load_streaming_compression_evidence,
+    load_fact_compression_evidence,
 )
-from codex_usage_tracker.store.compression_candidates import replace_compression_candidates
+from codex_usage_tracker.store.compression_publication import publish_compression_run
+from codex_usage_tracker.store.compression_revisions import (
+    current_compression_revision_vector,
+)
 from codex_usage_tracker.store.compression_runs import (
     create_compression_run,
-    current_compression_source_generation,
     find_compression_run,
     find_current_compression_profile,
     update_compression_run,
@@ -61,12 +63,19 @@ def build_compression_run(
     """Build, persist, and return one compact compression profile."""
     started = time.perf_counter()
     detectors = select_detectors(detector_families)
+    selected_families = tuple(detector.family for detector in detectors)
     detector_version = _detector_set_version(detectors)
     scope_hash = stable_scope_hash(scope)
-    source_generation = current_compression_source_generation(db_path)
+    revision_vector = current_compression_revision_vector(
+        db_path,
+        detector_families=selected_families,
+        estimator_revision=ESTIMATOR_POLICY_V1.version,
+    )
+    source_generation = revision_vector.generation
     cached_profile = _fast_cached_profile(
         db_path,
-        source_generation=source_generation,
+        revision_key=revision_vector.cache_key,
+        detector_families=selected_families,
         scope_hash=scope_hash,
         detector_version=detector_version,
         force=force,
@@ -75,7 +84,7 @@ def build_compression_run(
         _emit(progress_callback, stage="complete", progress_percent=100.0, cache_reused=True)
         return cached_profile
 
-    loaded_evidence = load_streaming_compression_evidence(db_path, scope)
+    loaded_evidence = load_fact_compression_evidence(db_path, scope)
     snapshot = loaded_evidence.snapshot
     current_manifest = loaded_evidence.record_manifest
     cache_identity = _cache_identity(snapshot, scope_hash, detector_version)
@@ -97,6 +106,7 @@ def build_compression_run(
         source_generation=source_generation,
         coverage=snapshot.coverage.as_dict(),
         status="running",
+        revision_key=revision_vector.cache_key,
     )
     run_id = str(run["run_id"])
     warnings: list[dict[str, Any]] = []
@@ -142,19 +152,6 @@ def build_compression_run(
             db_path,
             run_id,
             progress_callback,
-            stage="persistence",
-            percent=92.0,
-        )
-        replace_compression_candidates(
-            db_path,
-            run_id=run_id,
-            candidates=(candidate.as_dict() for candidate in candidates),
-            supersede_run_id=_superseded_run_id(exact, force=force),
-        )
-        _progress(
-            db_path,
-            run_id,
-            progress_callback,
             stage="profile",
             percent=97.0,
         )
@@ -173,12 +170,18 @@ def build_compression_run(
             estimator_index=estimator_index,
         )
         compact_profile = public_profile(stored_profile)
-        update_compression_run(
+        _progress(
+            db_path,
+            run_id,
+            progress_callback,
+            stage="persistence",
+            percent=98.0,
+        )
+        publish_compression_run(
             db_path,
             run_id=run_id,
+            candidates=candidates,
             status=status,
-            progress_percent=100.0,
-            stage="complete",
             completed_detectors=len(detectors) - len(warnings),
             total_detectors=len(detectors),
             cache_reused=cache_mode == "incremental",
@@ -187,6 +190,7 @@ def build_compression_run(
             aggregate_profile=stored_profile,
             public_profile=compact_profile,
             source_generation=source_generation,
+            supersede_run_id=_superseded_run_id(exact, force=force),
         )
         _emit(
             progress_callback,
@@ -209,7 +213,8 @@ def build_compression_run(
 def _fast_cached_profile(
     db_path: Path,
     *,
-    source_generation: int,
+    revision_key: str,
+    detector_families: Sequence[str],
     scope_hash: str,
     detector_version: str,
     force: bool,
@@ -218,7 +223,7 @@ def _fast_cached_profile(
         return None
     cached_profile = find_current_compression_profile(
         db_path,
-        source_generation=source_generation,
+        revision_key=revision_key,
         scope_hash=scope_hash,
         detector_set_version=detector_version,
         estimator_version=ESTIMATOR_POLICY_V1.version,
@@ -226,7 +231,12 @@ def _fast_cached_profile(
     )
     if cached_profile is None:
         return None
-    if current_compression_source_generation(db_path) != source_generation:
+    current_revision = current_compression_revision_vector(
+        db_path,
+        detector_families=detector_families,
+        estimator_revision=ESTIMATOR_POLICY_V1.version,
+    )
+    if current_revision.cache_key != revision_key:
         return None
     return public_profile(cached_profile, cache_mode="exact")
 

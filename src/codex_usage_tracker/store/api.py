@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,11 +28,14 @@ from codex_usage_tracker.store.allowance_observations import (
 from codex_usage_tracker.store.allowance_observations import (
     sync_allowance_observations_for_record_ids,
 )
-from codex_usage_tracker.store.compression_schema import touch_compression_source_generation
+from codex_usage_tracker.store.compression_fact_sync import (
+    clear_compression_detector_facts,
+    sync_compression_detector_facts,
+)
+from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import (
     clear_content_index_rows,
-    delete_content_index_rows_for_source_files,
     search_content_fragments,
     trace_thread_content,
 )
@@ -90,6 +95,18 @@ from codex_usage_tracker.store.source_records import (
 )
 from codex_usage_tracker.store.source_records import (
     sync_source_records,
+)
+from codex_usage_tracker.store.source_replacement import (
+    delete_usage_events_for_source_files as _delete_usage_events_for_source_files,
+)
+from codex_usage_tracker.store.source_replacement import (
+    source_file_strings as _source_file_strings,
+)
+from codex_usage_tracker.store.source_replacement import (
+    thread_keys_for_source_files as _thread_keys_for_source_files,
+)
+from codex_usage_tracker.store.source_replacement import (
+    thread_keys_for_usage_rows as _thread_keys_for_usage_rows,
 )
 from codex_usage_tracker.store.sources import (
     ParsedSourceFile,
@@ -173,6 +190,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
         deleted_rows = int(row["count"] if row is not None else 0)
         clear_content_index_rows(conn)
+        clear_compression_detector_facts(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM allowance_observations")
@@ -181,7 +199,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
-        touch_compression_source_generation(conn)
+        touch_compression_revisions(conn)
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
 
@@ -502,36 +520,129 @@ def upsert_usage_events(
     replace_source_files: Iterable[Path] | None = None,
     diagnostic_facts: Iterable[DiagnosticFact] | None = None,
 ) -> int:
+    with connect(db_path) as conn:
+        init_db(conn)
+        result = _upsert_usage_events_in_connection(
+            conn,
+            events,
+            refresh_links=refresh_links,
+            replace_source_files=replace_source_files,
+            diagnostic_facts=diagnostic_facts,
+        )
+    return result.inserted_or_updated_events
+
+
+@dataclass(frozen=True)
+class _UsageEventUpsertResult:
+    inserted_or_updated_events: int
+    record_ids: tuple[str, ...]
+    affected_thread_keys: frozenset[str]
+
+
+def _upsert_usage_events_in_connection(
+    conn: sqlite3.Connection,
+    events: Iterable[UsageEvent],
+    *,
+    refresh_links: bool = True,
+    replace_source_files: Iterable[Path] | None = None,
+    diagnostic_facts: Iterable[DiagnosticFact] | None = None,
+    maintain_source_records: bool = True,
+    maintain_compression_facts: bool = True,
+    maintain_allowance_observations: bool = True,
+    touch_revisions: bool = True,
+    sync_content_fts_on_replace: bool = True,
+    defer_usage_indexes: bool = False,
+) -> _UsageEventUpsertResult:
     rows = _usage_event_rows(events)
     fact_rows = _diagnostic_fact_rows(diagnostic_facts)
     source_files_to_replace = _source_file_strings(replace_source_files)
-    with connect(db_path) as conn:
-        init_db(conn)
-        affected_thread_keys = _thread_keys_for_source_files(conn, source_files_to_replace)
-        _delete_usage_events_for_source_files(conn, source_files_to_replace)
-        if not rows:
-            _refresh_after_empty_source_replacement(
-                conn,
-                refresh_links=refresh_links,
-                affected_thread_keys=affected_thread_keys,
-            )
-            if source_files_to_replace:
-                touch_compression_source_generation(conn)
-            return 0
-        affected_thread_keys.update(_thread_keys_for_usage_rows(rows))
-        _delete_diagnostic_facts_for_record_ids(conn, _usage_event_record_ids(rows))
-        _insert_usage_event_rows(conn, rows)
-        record_ids = _usage_event_record_ids(rows)
-        sync_allowance_observations_for_record_ids(conn, record_ids)
-        sync_source_records(conn, record_ids=record_ids)
-        _insert_diagnostic_facts(conn, fact_rows)
-        _refresh_after_usage_event_upsert(
+    affected_thread_keys = _thread_keys_for_source_files(conn, source_files_to_replace)
+    _delete_usage_events_for_source_files(
+        conn,
+        source_files_to_replace,
+        sync_content_fts=sync_content_fts_on_replace,
+    )
+    if not rows:
+        _refresh_after_empty_source_replacement(
             conn,
             refresh_links=refresh_links,
             affected_thread_keys=affected_thread_keys,
         )
-        touch_compression_source_generation(conn)
-        return len(rows)
+        if source_files_to_replace:
+            if touch_revisions:
+                touch_compression_revisions(conn, {"calls", "threads"})
+            if maintain_compression_facts:
+                sync_compression_detector_facts(
+                    conn,
+                    record_ids=(),
+                    affected_thread_keys=affected_thread_keys,
+                )
+        return _UsageEventUpsertResult(0, (), frozenset(affected_thread_keys))
+
+    affected_thread_keys.update(_thread_keys_for_usage_rows(rows))
+    record_ids = _usage_event_record_ids(rows)
+    _delete_diagnostic_facts_for_record_ids(conn, record_ids)
+    with _deferred_usage_event_indexes(conn, enabled=defer_usage_indexes):
+        _insert_usage_event_rows(conn, rows)
+    if maintain_allowance_observations:
+        sync_allowance_observations_for_record_ids(conn, record_ids)
+    if maintain_source_records:
+        sync_source_records(conn, record_ids=record_ids)
+    _insert_diagnostic_facts(conn, fact_rows)
+    _refresh_after_usage_event_upsert(
+        conn,
+        refresh_links=refresh_links,
+        affected_thread_keys=affected_thread_keys,
+    )
+    if touch_revisions:
+        touch_compression_revisions(conn, {"calls", "threads"})
+    if maintain_compression_facts:
+        sync_compression_detector_facts(
+            conn,
+            record_ids=record_ids,
+            affected_thread_keys=affected_thread_keys,
+        )
+    return _UsageEventUpsertResult(
+        len(rows),
+        tuple(record_ids),
+        frozenset(affected_thread_keys),
+    )
+
+
+def _finalize_streamed_usage_event_upserts(
+    conn: sqlite3.Connection,
+    *,
+    record_ids: Iterable[str],
+    affected_thread_keys: Iterable[str],
+    maintain_source_records: bool = True,
+    stage_callback: Callable[[str], None] | None = None,
+) -> _UsageEventUpsertResult:
+    """Finalize derived state once after bounded source-batch upserts."""
+
+    unique_record_ids = tuple(dict.fromkeys(record_ids))
+    unique_thread_keys = frozenset(affected_thread_keys)
+    if unique_record_ids:
+        sync_allowance_observations_for_record_ids(conn, list(unique_record_ids))
+        if maintain_source_records:
+            sync_source_records(conn, record_ids=unique_record_ids)
+    if stage_callback is not None:
+        stage_callback("allowance_and_sources")
+    _refresh_after_usage_event_upsert(
+        conn,
+        refresh_links=True,
+        affected_thread_keys=set(unique_thread_keys),
+    )
+    if stage_callback is not None:
+        stage_callback("links_and_thread_summaries")
+    if unique_record_ids or unique_thread_keys:
+        touch_compression_revisions(conn, {"calls", "threads"})
+    if stage_callback is not None:
+        stage_callback("revisions")
+    return _UsageEventUpsertResult(
+        len(unique_record_ids),
+        unique_record_ids,
+        unique_thread_keys,
+    )
 
 
 def _usage_event_rows(events: Iterable[UsageEvent]) -> list[dict[str, object]]:
@@ -542,105 +653,6 @@ def _diagnostic_fact_rows(
     diagnostic_facts: Iterable[DiagnosticFact] | None,
 ) -> list[dict[str, object]]:
     return [fact.to_row() for fact in diagnostic_facts or []]
-
-
-def _source_file_strings(replace_source_files: Iterable[Path] | None) -> list[str]:
-    return [str(path) for path in replace_source_files or []]
-
-
-def _delete_usage_events_for_source_files(
-    conn: sqlite3.Connection,
-    source_files_to_replace: list[str],
-) -> None:
-    if not source_files_to_replace:
-        return
-    placeholders = ", ".join("?" for _source in source_files_to_replace)
-    delete_content_index_rows_for_source_files(
-        conn,
-        placeholders=placeholders,
-        source_files_to_replace=source_files_to_replace,
-    )
-    conn.execute(
-        f"""
-        DELETE FROM allowance_observations
-        WHERE record_id IN (
-            SELECT record_id
-            FROM usage_events
-            WHERE source_file IN ({placeholders})
-        )
-        """,
-        source_files_to_replace,
-    )
-    conn.execute(
-        f"""
-        DELETE FROM source_records
-        WHERE record_id IN (
-            SELECT record_id
-            FROM usage_events
-            WHERE source_file IN ({placeholders})
-        )
-        """,
-        source_files_to_replace,
-    )
-    conn.execute(
-        f"""
-        DELETE FROM call_diagnostic_facts
-        WHERE record_id IN (
-            SELECT record_id
-            FROM usage_events
-            WHERE source_file IN ({placeholders})
-        )
-        """,
-        source_files_to_replace,
-    )
-    conn.execute(
-        f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",
-        source_files_to_replace,
-    )
-
-
-def _thread_keys_for_source_files(
-    conn: sqlite3.Connection,
-    source_files_to_replace: list[str],
-) -> set[str]:
-    if not source_files_to_replace:
-        return set()
-    placeholders = ", ".join("?" for _source in source_files_to_replace)
-    rows = conn.execute(
-        f"""
-        SELECT thread_key, session_id
-        FROM usage_events
-        WHERE source_file IN ({placeholders})
-        """,
-        source_files_to_replace,
-    ).fetchall()
-    return _thread_keys_for_usage_rows(rows)
-
-
-def _thread_keys_for_usage_rows(
-    rows: Iterable[Mapping[str, object] | sqlite3.Row],
-) -> set[str]:
-    keys: set[str] = set()
-    for row in rows:
-        session_id = _usage_row_value(row, "session_id")
-        thread_key = _usage_row_value(row, "thread_key") or (
-            f"session:{session_id}" if session_id else None
-        )
-        if thread_key:
-            keys.add(str(thread_key))
-    return keys
-
-
-def _usage_row_value(
-    row: Mapping[str, object] | sqlite3.Row,
-    key: str,
-) -> object | None:
-    if isinstance(row, Mapping):
-        return row.get(key)
-    try:
-        return row[key]
-    except (IndexError, KeyError, TypeError):
-        return None
 
 
 def _refresh_after_empty_source_replacement(
@@ -678,6 +690,42 @@ def _insert_usage_event_rows(
         _usage_event_upsert_sql(),
         [[row[column] for column in EVENT_COLUMNS] for row in rows],
     )
+
+
+@contextmanager
+def _deferred_usage_event_indexes(
+    conn: sqlite3.Connection,
+    *,
+    enabled: bool,
+    additional_tables: tuple[str, ...] = (),
+) -> Iterator[None]:
+    if not enabled:
+        yield
+        return
+    table_names = ("usage_events", *additional_tables)
+    placeholders = ", ".join("?" for _table_name in table_names)
+    indexes = [
+        (str(row["name"]), str(row["sql"]))
+        for row in conn.execute(
+            f"""
+            SELECT name, sql
+            FROM sqlite_master
+            WHERE type = 'index'
+              AND tbl_name IN ({placeholders})
+              AND sql IS NOT NULL
+            ORDER BY name
+            """,  # nosec B608 - placeholders are generated, values remain parameterized
+            table_names,
+        )
+    ]
+    for name, _sql in indexes:
+        quoted_name = name.replace('"', '""')
+        conn.execute(f'DROP INDEX "{quoted_name}"')  # nosec B608 - schema-owned identifier
+    try:
+        yield
+    finally:
+        for _name, sql in indexes:
+            conn.execute(sql)
 
 
 def _refresh_after_usage_event_upsert(
@@ -747,14 +795,19 @@ def _refresh_usage_event_links_for_threads(
     thread_keys = sorted({key for key in affected_thread_keys if key})
     if not thread_keys:
         return 0
-    placeholders = ", ".join("?" for _key in thread_keys)
-    return _refresh_usage_event_links_scoped(
-        conn,
-        where_clause=(
-            f"WHERE coalesce(nullif(thread_key, ''), 'session:' || session_id) IN ({placeholders})"
-        ),
-        params=thread_keys,
-    )
+    changed = 0
+    for start in range(0, len(thread_keys), SQLITE_VARIABLE_BATCH_SIZE):
+        chunk = thread_keys[start : start + SQLITE_VARIABLE_BATCH_SIZE]
+        placeholders = ", ".join("?" for _key in chunk)
+        changed += _refresh_usage_event_links_scoped(
+            conn,
+            where_clause=(
+                "WHERE coalesce(nullif(thread_key, ''), 'session:' || session_id) "
+                f"IN ({placeholders})"
+            ),
+            params=chunk,
+        )
+    return changed
 
 
 def _refresh_usage_event_links(conn: sqlite3.Connection) -> int:
@@ -768,58 +821,36 @@ def _refresh_usage_event_links_scoped(
     params: Iterable[object] = (),
 ) -> int:
     before = conn.total_changes
-    conn.execute("DROP TABLE IF EXISTS temp_usage_event_links")
     conn.execute(
         f"""
-        CREATE TEMP TABLE temp_usage_event_links AS
-        SELECT
-            record_id,
-            ROW_NUMBER() OVER (
-                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
-                ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
-            ) AS next_thread_call_index,
-            LAG(record_id) OVER (
-                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
-                ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
-            ) AS previous_id,
-            LEAD(record_id) OVER (
-                PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
-                ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
-            ) AS next_id
-        FROM usage_events
-        {where_clause}
+        WITH usage_event_links AS (
+            SELECT
+                record_id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                    ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
+                ) AS next_thread_call_index,
+                LAG(record_id) OVER (
+                    PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                    ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
+                ) AS previous_id,
+                LEAD(record_id) OVER (
+                    PARTITION BY coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                    ORDER BY event_timestamp, cumulative_total_tokens, line_number, record_id
+                ) AS next_id
+            FROM usage_events
+            {where_clause}
+        )
+        UPDATE usage_events AS target
+        SET
+            thread_call_index = links.next_thread_call_index,
+            previous_record_id = links.previous_id,
+            next_record_id = links.next_id
+        FROM usage_event_links AS links
+        WHERE target.record_id = links.record_id
         """,
         list(params),
     )
-    conn.execute(
-        "CREATE UNIQUE INDEX temp_usage_event_links_record_id ON temp_usage_event_links(record_id)"
-    )
-    conn.execute(
-        """
-        UPDATE usage_events
-        SET
-            thread_call_index = (
-                SELECT next_thread_call_index
-                FROM temp_usage_event_links
-                WHERE temp_usage_event_links.record_id = usage_events.record_id
-            ),
-            previous_record_id = (
-                SELECT previous_id
-                FROM temp_usage_event_links
-                WHERE temp_usage_event_links.record_id = usage_events.record_id
-            ),
-            next_record_id = (
-                SELECT next_id
-                FROM temp_usage_event_links
-                WHERE temp_usage_event_links.record_id = usage_events.record_id
-            )
-        WHERE record_id IN (
-            SELECT record_id
-            FROM temp_usage_event_links
-        )
-        """
-    )
-    conn.execute("DROP TABLE IF EXISTS temp_usage_event_links")
     return conn.total_changes - before
 
 

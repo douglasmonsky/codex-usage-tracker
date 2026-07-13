@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
-from codex_usage_tracker.store.compression_schema import read_compression_source_generation
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
 
@@ -28,6 +27,7 @@ def create_compression_run(
     estimator_version: str,
     compression_schema_version: int,
     source_generation: int = 0,
+    revision_key: str = "",
     scope: Mapping[str, Any],
     run_id: str | None = None,
     status: str = "pending",
@@ -48,9 +48,10 @@ def create_compression_run(
                 run_id, status, source_revision, scope_hash,
                 detector_set_version, estimator_version, compression_schema_version,
                 scope_json, filters_json, coverage_json, progress_percent, stage,
-                source_generation, created_at, started_at, completed_at, last_accessed_at
+                source_generation, revision_key,
+                created_at, started_at, completed_at, last_accessed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 resolved_run_id,
@@ -66,6 +67,7 @@ def create_compression_run(
                 100.0 if status in _CACHEABLE_STATUSES else 0.0,
                 "complete" if status in _CACHEABLE_STATUSES else status,
                 int(source_generation),
+                revision_key,
                 timestamp,
                 started_at,
                 completed_at,
@@ -162,17 +164,10 @@ def update_compression_run(
     return _decode_run(row) if row is not None else None
 
 
-def current_compression_source_generation(db_path: Path = DEFAULT_DB_PATH) -> int:
-    """Return the cheap generation used to invalidate exact compression caches."""
-    with connect(db_path) as conn:
-        init_db(conn)
-        return read_compression_source_generation(conn)
-
-
 def find_current_compression_profile(
     db_path: Path = DEFAULT_DB_PATH,
     *,
-    source_generation: int,
+    revision_key: str,
     scope_hash: str,
     detector_set_version: str,
     estimator_version: str,
@@ -185,7 +180,7 @@ def find_current_compression_profile(
             """
             SELECT run_id, public_profile_json
             FROM compression_runs
-            WHERE source_generation = ?
+            WHERE revision_key = ?
                 AND scope_hash = ?
                 AND detector_set_version = ?
                 AND estimator_version = ?
@@ -196,7 +191,7 @@ def find_current_compression_profile(
             LIMIT 1
             """,
             (
-                int(source_generation),
+                revision_key,
                 scope_hash,
                 detector_set_version,
                 estimator_version,

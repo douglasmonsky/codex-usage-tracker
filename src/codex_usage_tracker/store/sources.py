@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.parser.state import (
@@ -19,6 +19,8 @@ from codex_usage_tracker.parser.state import (
     parser_state_from_json,
     parser_state_to_json,
 )
+
+_PREFIX_TAIL_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -30,7 +32,7 @@ class SourceParsePlan:
     replace_existing: bool = True
 
 
-ParsedSourceFile = (
+ParsedSourceFile: TypeAlias = (
     tuple[Path, list[UsageEvent], dict[str, int], ParserState]
     | tuple[Path, list[UsageEvent], dict[str, int], ParserState, int]
 )
@@ -60,7 +62,9 @@ def _source_file_parse_row(conn: sqlite3.Connection, path: Path) -> sqlite3.Row 
     return conn.execute(
         """
         SELECT size_bytes, mtime_ns, parsed_until_line
-             , parsed_until_byte, parser_adapter, parser_state_json
+             , parsed_until_byte, parsed_prefix_tail_hash
+             , source_device, source_inode
+             , parser_adapter, parser_state_json
         FROM source_files
         WHERE source_file = ?
         """,
@@ -76,7 +80,7 @@ def _source_parse_plan_from_row(
         return SourceParsePlan(path=path)
     if _source_metadata_matches(row, metadata):
         return None
-    if _can_incrementally_parse_source(metadata, row):
+    if _can_incrementally_parse_source(path, metadata, row):
         return SourceParsePlan(
             path=path,
             start_byte=int(row["parsed_until_byte"]),
@@ -96,13 +100,22 @@ def _source_metadata_matches(row: sqlite3.Row, metadata: dict[str, int]) -> bool
     return (
         int(row["size_bytes"]) == metadata["size_bytes"]
         and int(row["mtime_ns"]) == metadata["mtime_ns"]
+        and int(row["source_device"]) == metadata["source_device"]
+        and int(row["source_inode"]) == metadata["source_inode"]
     )
 
 
-def _can_incrementally_parse_source(metadata: dict[str, int], row: sqlite3.Row) -> bool:
+def _can_incrementally_parse_source(path: Path, metadata: dict[str, int], row: sqlite3.Row) -> bool:
     previous_size = int(row["size_bytes"])
     previous_byte = int(row["parsed_until_byte"])
-    return 0 < previous_byte <= previous_size < metadata["size_bytes"]
+    expected_tail = str(row["parsed_prefix_tail_hash"] or "")
+    return (
+        0 < previous_byte <= previous_size < metadata["size_bytes"]
+        and int(row["source_device"]) == metadata["source_device"]
+        and int(row["source_inode"]) == metadata["source_inode"]
+        and bool(expected_tail)
+        and _parsed_prefix_tail_hash(path, previous_byte) == expected_tail
+    )
 
 
 def upsert_source_file_metadata(
@@ -142,6 +155,11 @@ def upsert_source_file_metadata(
         "mtime_ns",
         "parsed_until_line",
         "parsed_until_byte",
+        "parsed_prefix_tail_hash",
+        "parsed_row_count",
+        "source_generation",
+        "source_device",
+        "source_inode",
         "latest_record_id",
         "latest_event_timestamp",
         "parser_adapter",
@@ -151,8 +169,18 @@ def upsert_source_file_metadata(
     ]
     placeholders = ", ".join("?" for _column in columns)
     update_clause = ", ".join(
-        f"{column}=excluded.{column}" for column in columns if column != "source_file_id"
+        f"{column}=excluded.{column}"
+        for column in columns
+        if column not in {"source_file_id", "source_generation"}
     )
+    update_clause += """,
+        source_generation = source_files.source_generation + CASE
+            WHEN source_files.parsed_until_byte != excluded.parsed_until_byte
+              OR source_files.parsed_until_line != excluded.parsed_until_line
+              OR source_files.parsed_prefix_tail_hash != excluded.parsed_prefix_tail_hash
+              OR source_files.parser_adapter != excluded.parser_adapter
+            THEN 1 ELSE 0 END
+    """
     conn.executemany(
         (
             f"INSERT INTO source_files ({', '.join(columns)}) "
@@ -184,6 +212,8 @@ def _source_file_metadata_row(
     if metadata is None:
         return None
     latest_event = _latest_source_usage_event(events)
+    parsed_until_line = final_line_number or _count_lines(path)
+    parsed_until_byte = int(metadata["size_bytes"])
     return {
         "source_file_id": _source_file_id(path),
         "source_file": str(path),
@@ -191,8 +221,13 @@ def _source_file_metadata_row(
         "is_archived": int(metadata["is_archived"]),
         "size_bytes": int(metadata["size_bytes"]),
         "mtime_ns": int(metadata["mtime_ns"]),
-        "parsed_until_line": final_line_number or _count_lines(path),
-        "parsed_until_byte": int(metadata["size_bytes"]),
+        "parsed_until_line": parsed_until_line,
+        "parsed_until_byte": parsed_until_byte,
+        "parsed_prefix_tail_hash": _parsed_prefix_tail_hash(path, parsed_until_byte),
+        "parsed_row_count": parsed_until_line,
+        "source_generation": 1,
+        "source_device": int(metadata["source_device"]),
+        "source_inode": int(metadata["source_inode"]),
         "latest_record_id": _latest_source_record_id(latest_event, parser_state),
         "latest_event_timestamp": _latest_source_event_timestamp(latest_event, parser_state),
         "parser_adapter": PARSER_ADAPTER_VERSION,
@@ -238,6 +273,8 @@ def _source_file_metadata(path: Path) -> dict[str, int] | None:
     return {
         "size_bytes": int(stat.st_size),
         "mtime_ns": int(stat.st_mtime_ns),
+        "source_device": int(stat.st_dev),
+        "source_inode": int(stat.st_ino),
         "is_archived": _is_archived_source_file(path),
     }
 
@@ -253,6 +290,14 @@ def _source_file_id(path: Path) -> str:
 
 def _source_file_hash(path: Path) -> str:
     return hashlib.sha256(str(path).encode("utf-8")).hexdigest()
+
+
+def _parsed_prefix_tail_hash(path: Path, parsed_until_byte: int) -> str:
+    start = max(0, parsed_until_byte - _PREFIX_TAIL_BYTES)
+    with path.open("rb") as handle:
+        handle.seek(start)
+        payload = handle.read(parsed_until_byte - start)
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _count_lines(path: Path) -> int:

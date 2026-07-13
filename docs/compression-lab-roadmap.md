@@ -190,7 +190,7 @@ Exit gates:
 
 ### CP2: Streaming Detector Consumption
 
-Status: in progress
+Status: complete
 
 Issue: [#225](https://github.com/douglasmonsky/codex-usage-tracker/issues/225)
 
@@ -201,6 +201,10 @@ Foundation merge: `d0db081f77434e13e4874a56e89b69f577633fb6`
 Engine PR: [#227](https://github.com/douglasmonsky/codex-usage-tracker/pull/227)
 
 Engine merge: `b253a97a6615b609ba0d31bc7cc47d9b45f0a620`
+
+Benchmark PR: [#228](https://github.com/douglasmonsky/codex-usage-tracker/pull/228)
+
+Benchmark merge: `980b9546131427a3e2f4411b1975590bfd6dc787`
 
 Deliverables:
 
@@ -223,20 +227,31 @@ Exit gates:
 
 ### CP3: Detector-Ready Ingestion Aggregates
 
-Status: pending
+Status: complete
+
+Issue: [#230](https://github.com/douglasmonsky/codex-usage-tracker/issues/230)
+
+PR: [#231](https://github.com/douglasmonsky/codex-usage-tracker/pull/231)
+
+Merge: `29f6cad`
 
 Deliverables:
 
-- Persisted per-call token, cache, output, and estimated-credit facts.
+- Persisted per-call token, cache, and output facts. Cost and credit columns are
+  intentionally nullable until CP4 can bind derived pricing to a rate-card
+  revision instead of persisting silently stale estimates.
 - Persisted sequence/count facts for shell churn, repeated validation, file
   rediscovery, and tool-output concentration.
 - Per-thread lifecycle and cache-resume summaries.
-- Idempotent backfill from existing normalized content-index records.
+- Fast schema-only migration plus an explicit idempotent backfill from existing
+  normalized content-index records. Automatic initialization never pays the
+  full historical backfill cost.
 - Detector queries over compact facts instead of repeated raw reconstruction.
 
 Exit gates:
 
-- Existing databases migrate and backfill without reparsing raw logs.
+- Existing databases migrate immediately and can be explicitly backfilled
+  without reparsing raw logs.
 - Aggregate facts remain reproducible from normalized source records.
 - Append ingestion updates only affected calls, threads, and sequence windows.
 - Detector outputs remain equivalent to the CP2 streaming reference.
@@ -245,7 +260,13 @@ Exit gates:
 
 ### CP4: Revision-State And Incremental Invalidation
 
-Status: pending
+Status: complete
+
+Issue: [#232](https://github.com/douglasmonsky/codex-usage-tracker/issues/232)
+
+PR: [#233](https://github.com/douglasmonsky/codex-usage-tracker/pull/233)
+
+Merge: `0809875`
 
 Deliverables:
 
@@ -266,7 +287,13 @@ Exit gates:
 
 ### CP5: Candidate Persistence Pipeline
 
-Status: pending
+Status: complete
+
+Issue: [#234](https://github.com/douglasmonsky/codex-usage-tracker/issues/234)
+
+PR: [#235](https://github.com/douglasmonsky/codex-usage-tracker/pull/235)
+
+Merge: `99c859a`
 
 Deliverables:
 
@@ -286,7 +313,9 @@ Exit gates:
 
 ### CP6: Profile-Guided Parallel Ingestion
 
-Status: pending
+Status: implementation and local validation complete; PR pending
+
+Issue: [#236](https://github.com/douglasmonsky/codex-usage-tracker/issues/236)
 
 Deliverables:
 
@@ -346,36 +375,229 @@ whole-pipeline timing or equivalence claim.
   7.325 seconds; CP2 used 337.938 MiB and 6.704 seconds with identical 15,030
   candidates and canonical fingerprints. The isolated exact warm hit was
   3.831 ms.
+- 2026-07-13: CP3 added schema v16 detector-ready record, sequence, and thread
+  facts with targeted ingestion/content-index maintenance and a safe CP2
+  fallback whenever fact state is incomplete or stale. Automatic migration is
+  schema-only after profiling showed an eager real-data backfill would add
+  52.625 seconds to unrelated database initialization.
+- 2026-07-13: Independent CP3 review reproduced stale-cache risk after content
+  changes, orphan facts after reset/source replacement with SQLite foreign keys
+  disabled, and partial sequence-store acceptance. The branch now advances
+  generation during content synchronization, explicitly clears/replaces facts,
+  stores integrity counts in fact state, and falls back whenever any persisted
+  fact family is incomplete or version-mismatched. Benchmark fixtures compare
+  fallback and fact-backed fingerprints on the same normalized database.
+- 2026-07-13: On the current 404,176-call aggregate database, the final CP3
+  comparison completed the fallback rebuild in 36.613 seconds and the prepared
+  fact-backed rebuild in 27.598 seconds. Evidence loading plus detectors fell
+  from 24.815 to 15.473 seconds, 37.7 percent, while both paths produced the
+  same 32,087 candidates and canonical candidate/profile fingerprints. Exact
+  reuse completed in 4.219 ms.
+- 2026-07-13: Explicit fact preparation completed in 72.968 seconds after
+  replacing planner-hostile target predicates and rebuilding secondary indexes
+  once around the bulk load. This one-time, opt-in path spent 26.620 seconds on
+  record facts, 15.652 on sequence facts, 10.960 on index creation, and 9.731
+  on manifests; ordinary schema migration remains immediate and backfill-free.
+  The final normalized 100,000-call gate completed in 3.861 seconds total with
+  329.156 MiB peak RSS; evidence loading plus detectors took 2.237 seconds,
+  58.8 percent below CP1's 5.428-second baseline while preserving CP2's exact
+  candidate and profile fingerprints.
+- 2026-07-13: CP3 merged through PR #231 at `29f6cad`. CP4 added schema v17
+  source checkpoints with byte/row cursors, per-source generations, device and
+  inode identity, and a bounded 64 KiB parsed-prefix tail hash. Append planning
+  now rejects truncation, rotation, parser drift, and larger in-place
+  replacements before trusting the previous byte cursor.
+- 2026-07-13: CP4 added detector-aware revision vectors for calls, threads,
+  tools, commands, files, and fragments. Exact cache lookup reads one compact
+  state row and hashes only dimensions consumed by the selected detectors;
+  unknown detector families fail closed to the complete vector. The estimator
+  policy revision remains part of every key, while derived cost/credit facts
+  stay nullable until an explicit rate-card-backed estimator consumes them.
+- 2026-07-13: The final 100,000-call CP4 benchmark preserved CP2/CP3's exact
+  candidate and profile fingerprints. Revision lookup median was 0.982 ms,
+  targeted aggregate append refresh was 0.376 seconds, and an actual one-event
+  JSONL append refresh was 19.8 ms. Cold analysis remained 3.935 seconds with
+  evidence plus detectors at 2.238 seconds and exact warm reuse at 3.302 ms.
+  Agent Perf run `20260713T070642Z-044ace6a` attributed the next material work
+  to fact folding and candidate/claim persistence, confirming CP5 as the next
+  optimization boundary.
+- 2026-07-13: CP4 merged through PR #233 at `0809875`. CP5 replaced the hot
+  public-mapping round trip with a read-only structural write protocol. The
+  store consumes validated allocated candidates directly without importing the
+  compression domain, and bounded canonical-JSON caches reuse repeated detector
+  metadata while preserving decoded payloads and fingerprints.
+- 2026-07-13: Candidate rows, claim rows, prior-run supersession, and completed
+  aggregate/public profiles now publish in one SQLite transaction. Synthetic
+  claim failure proves rollback leaves the prior cacheable generation intact;
+  retry coverage proves the same run can publish cleanly after the fault clears.
+- 2026-07-13: The 100,000-call CP5 gate measured 44.884 percent faster
+  candidate-heavy persistence, 3.555-second cold analysis, and 3.737 ms exact
+  reuse. Candidate/profile fingerprints remained unchanged, one-event JSONL
+  append refresh remained 20.0 ms, and peak RSS fell to 320.484 MiB.
+- 2026-07-13: CP5 merged through PR #235 at `99c859a`. Agent Perf run
+  `20260713T104332Z-7a85ad69` identified repeated persistence passes as the
+  dominant true first-refresh cost, so CP6 moved aggregate, normalized content,
+  provenance, diagnostic, and compression-fact production onto one parser pass
+  with a bounded process queue and one deterministic SQLite writer.
+- 2026-07-13: The initial clean post-refactor three-run CP6 gate generated
+  100,000 synthetic token rows across 400 JSONL files (138.5 MB). Parallel
+  refresh median was 17.729 seconds and worst-of-three was 17.740 seconds
+  versus a 25.638-second serial median, a 30.850 percent speedup. Peak RSS was
+  455.578 MiB coordinator RSS. Every benchmarked aggregate, summary, source,
+  content, FTS, provenance, allowance, diagnostic, revision, and
+  compression-fact table had identical row counts and fingerprints between
+  serial and parallel builds. A subsequent hardened validation added sampled
+  process-tree RSS rather than relying on coordinator memory alone, expanded
+  parity to all 18 persisted table families, and exercised serial retry without
+  re-entering the content-index process pool. It completed in 19.614 seconds
+  parallel versus 26.416 seconds serial with 460.156 MiB process-tree RSS.
+- 2026-07-13: CP6 rejected in-memory SQLite temporary storage after it raised
+  peak RSS to 604.8 MiB, rejected multi-row fact inserts after they regressed
+  persistence, and rejected larger worker payload batches that increased IPC
+  and memory without improving wall time. The selected defaults cap workers at
+  four, batch 16 source files per write cycle, use a bounded queue, and retain
+  deterministic serial fallback.
+- 2026-07-13: Agent Perf run `20260713T131211Z-5d4c9590` found no dominant
+  Python hot loop in a direct 25,000-row refresh. The largest individual self
+  CPU attributions were SQLite connection and bounded persistence helpers, each
+  below 0.5 percent; the remaining elapsed time is primarily native SQLite I/O
+  and child-process parsing. A six-worker trial improved a comparable loaded
+  run by only about 0.16 seconds while increasing sampled process-tree RSS by
+  roughly 119 MiB, so CP6 retains the four-worker cap.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/compression-cold-path`
+Branch: `feature/compression-parallel-ingestion`
 
-PR #222 merged the detector and run-builder foundation as `98f2cd7`. Issue #223 tracks the focused cold-path follow-up.
+CP5 merged through PR #235 at `99c859a`. CP6 implementation, independent review
+hardening, Serena semantic verification, and Agent Perf attribution are
+complete. The clean timing gate, hardened parity/memory validation, and final
+repository-wide verifier passed; PR publication remains.
+
+Completion checkpoint (2026-07-13):
+
+- Preserve every current CP6 source, test, documentation, benchmark, and change-
+  plan edit. Do not stage or remove the pre-existing `.idea/` directory or the
+  untracked local `uv.lock`.
+- Serena was healthy for this exact worktree and successfully provided semantic
+  symbol/reference queries plus an IDE inspection pass. Its refresh endpoint
+  later stalled while rechecking three already-edited type warnings. Two bounded
+  doctor probes remained stalled, broker status reported no reclaimable service,
+  and history was inspected once. Do not retry Serena again in this task; native
+  mypy and the focused refresh/content-index tests pass after the narrow typing
+  cleanup.
+- Agent Perf/Scalene run `20260713T131211Z-5d4c9590` profiled a direct 25,000-row
+  refresh. Its report is at
+  `/Users/Monsky/Library/Application Support/agent-perf/runs/20260713T131211Z-5d4c9590/report.md`.
+  No Python function dominated self CPU; native SQLite persistence and worker
+  parsing remain the material costs. Keep the four-worker cap. The measured six-
+  worker trial saved only about 0.16 seconds while adding roughly 119 MiB RSS.
+- Independent review hardening is already implemented and covered by focused
+  tests: complete process-tree RSS sampling, 18-table serial/parallel parity,
+  forced serial content-index retry, batched large-thread handling, completed
+  no-op progress phases, and honest overlapping progress timing labels. The
+  hardened focused suite passed 38 tests, and precommit verifier run
+  `20260713T125231838869Z-precommit-48b3ad5da22f` passed.
+- The clean three-run gate established runtime repeatability at a 17.729-second
+  median and 17.740-second worst run. A later hardened run established exact
+  parity across all 18 table families and sampled the complete process tree at
+  460.156 MiB while completing in 19.614 seconds versus 26.416 seconds serial.
+  These complementary runs cover every exit criterion without weakening a
+  threshold.
+- A deliberately non-gating probe during sustained macOS FileProvider/CloudKit
+  contention completed in 21.300 seconds versus 28.930 seconds serial, retained
+  exact 18-table parity, and used 450.234 MiB process-tree RSS. Its 26.373 percent
+  speedup and bounded memory are useful stress evidence, but its wall time is
+  excluded from the clean timing gate because `fileproviderd` was consuming
+  roughly a full core before, during, and after the run.
+- Final full verifier run `20260713T144343635673Z-full-c52b22e023d7` passed after
+  repairing a locally duplicated `node_modules/@types` installation with
+  lockfile-backed `npm ci`. Dashboard typecheck, targeted mypy, 15 focused
+  refresh/content-index/large-batch tests, release readiness, and
+  `git diff --check` also pass. The final repository state passed precommit
+  verifier run `20260713T152213304672Z-precommit-fb3701902b39`.
+- Review the complete diff and explicit staging list, commit as
+  `perf: parallelize first-refresh ingestion`, push, open the focused PR closing
+  #236, wait for CI, squash-merge, and update this ledger with the PR and merge
+  commit.
 
 Validated behavior at this checkpoint:
 
-- Cold success, zero findings, structured partial detector failure, exact cache reuse, forced replacement, and appended-record incremental recomputation.
-- Deterministic per-thread cache manifests and candidate IDs.
-- Staged progress through evidence, each detector, attribution, persistence, profile, and completion.
-- Focused checkpoint: 66 compression/store tests passed; the full suite passed all 722 tests after keeping the unreleased schema at v15.
-- Real local aggregate dogfood completed with 404,176 calls, 32,087 candidates, no detector warnings, and no raw content printed or committed.
-- Exact cache hits use a compact public profile plus a transaction-level source generation, so they do not rebuild evidence or decode the private incremental manifest.
-- All-history evidence reads bypass temporary scope materialization only when the scope is truly unfiltered.
+- Schema v18 migrates existing source and compression-run tables additively and
+  adds the source-file/line lookup index used by the one-pass ingestion writer.
+- Append plans verify stored device/inode identity and a bounded hash at the
+  prior parse boundary before reusing byte and parser-state cursors.
+- Source rows persist byte offsets, row counts, parser revision, bounded source
+  identity, and a generation that advances only when the parsed checkpoint
+  changes.
+- Compression writes advance only the affected call/thread or content fact
+  dimensions; reset and the compatibility generation API advance all dimensions.
+- Exact cache identity includes selected detector dependencies and estimator
+  policy revision without traversing record manifests.
+- Existing manifest comparison still scopes incremental detector work to changed
+  records and threads after a relevant revision changes.
+- Public compression schema version and candidate/profile payloads remain
+  unchanged.
+- Completed profiles and their candidate/claim generations publish atomically.
+- The compatibility mapping writer remains available for existing callers;
+  the run builder uses the structural typed path without `candidate.as_dict()`.
+- Bounded multi-row statements stay within SQLite's conservative variable
+  limit, while 4,096-entry canonical-JSON caches avoid repeated immutable-field
+  encoding.
+- Estimation still runs immediately after each detector while evidence is
+  resident. Global overlap allocation remains intentionally portfolio-wide.
+- Default first refresh parses each source once and streams aggregate rows,
+  normalized content, provenance, diagnostics, and compression facts through a
+  bounded queue to one SQLite writer.
+- Refreshes replacing more than SQLite's variable limit of source files batch
+  cleanup safely and rebuild content FTS once after the complete replacement.
+- Worker output is merged in source-plan order; one-file, small-history, custom
+  parser, and process-pool-failure paths remain serial.
 
-Latest replacement benchmark (`include_archived=true`, all-history scope):
+Latest CP3 real-data benchmark (`include_archived=true`, all-history scope):
 
-- Total: 38.708 seconds, including deletion and replacement of the prior 32,087-candidate run.
-- Evidence loaded: 14.221 seconds.
-- Manifest and all detectors complete: 24.576 seconds.
-- Attribution complete / persistence started: 28.730 seconds.
-- Candidate persistence complete / profile started: 37.617 seconds.
-- Profile complete: 38.386 seconds.
-- Estimated first-ever cold time: about 35.5 seconds after excluding the separately measured 3.2-second prior-run deletion cost.
-- Exact warm profile: 6.2 ms, below the 500 ms target.
-- The immediate pre-follow-up baseline was 48.115 seconds on the same 404,176 calls and 32,087 candidates; the current forced rebuild is 19.5 percent faster.
+- Calls: 404,176; normalized sequence facts: 714,571; candidates: 32,087.
+- Reviewed safe migration plus CP2 fallback rebuild: 36.613 seconds.
+- Reviewed explicit fact preparation: 72.968 seconds, paid only when requested.
+- Reviewed prepared fact-backed rebuild: 27.598 seconds; evidence 9.640
+  seconds; evidence plus detectors 15.473 seconds.
+- Reviewed exact warm profile: 4.219 ms.
+- Fact-backed and fallback runs produced identical candidate and stable public
+  profile fingerprints.
+
+Latest CP4 synthetic gate (100,000 calls, 500,000 normalized evidence rows):
+
+- Revision lookup median: 0.982 ms against the 10 ms exit gate.
+- Targeted aggregate one-event append: 0.376 seconds against the 1 second gate.
+- Actual JSONL one-event append refresh: 19.8 ms, one source scanned and one
+  usage event inserted or updated.
+- Cold build: 3.935 seconds; evidence plus detectors: 2.238 seconds; warm exact
+  reuse: 3.302 ms; peak RSS: 330.359 MiB.
+- Canonical candidate fingerprint:
+  `566d9962a31e65cdf8b7a3cbba3be23992b4ceb5c457cd418226e33ff8e5cded`.
+- Canonical profile fingerprint:
+  `96afabe6c8cfdeea77c708570939c1157a43f333b0cfc49e6173f107861ceeeb`.
+
+Latest CP5 synthetic gate (100,000 calls, 500,000 normalized evidence rows):
+
+- Candidate-heavy 5,000-row mapping path: 192.169 ms; typed atomic path:
+  105.916 ms.
+- Persistence improvement: 44.884 percent against the 40 percent exit gate.
+- Cold build: 3.555 seconds; exact warm reuse: 3.737 ms; peak RSS: 320.484 MiB.
+- Revision lookup median: 0.989 ms; aggregate append: 0.295 seconds; actual
+  one-event JSONL append refresh: 20.0 ms.
+- Canonical candidate and profile fingerprints match CP2-CP4 exactly.
+
+Latest CP6 true first-refresh gate (100,000 token rows, 400 JSONL files):
+
+- Parallel median: 17.729 seconds; worst-of-three: 17.740 seconds.
+- Serial median: 25.638 seconds; measured speedup: 30.850 percent.
+- Hardened validation: 19.614 seconds parallel versus 26.416 seconds serial,
+  with 460.156 MiB sampled process-tree RSS against the 544 MiB ceiling.
+- All 18 persisted table families had exact serial/parallel row-count and
+  fingerprint parity. Coordinator RSS remains a secondary diagnostic.
 
 Measured optimizations:
 
@@ -387,6 +609,9 @@ Measured optimizations:
 - Materialized typed evidence directly from positional SQLite rows, avoiding roughly 1.5 million intermediate dictionaries.
 - Removed unnecessary ordering from tool, command, file, and fragment evidence queries after verifying detectors and manifests are order-independent.
 - Computed the incremental manifest once per run and added compact revision identities for every evidence family.
+- Replaced planner-hostile bound target predicates with a fixed internal SQL
+  fragment whitelist and rebuilt fact-table secondary indexes once around full
+  backfills. Incremental refreshes retain their targeted indexed updates.
 - Used `agent-perf`/Scalene on a 100,000-call synthetic workload. `_raw_rows` fell from 4.68 to 1.94 percent CPU attribution (`20260713T004417Z-167fcc53` to `20260713T005309Z-b5750e1d`), while unprofiled time fell from 8.75 to 8.01 seconds with the same 9,269 candidates.
 - Rejected a direct candidate serializer after it improved the synthetic workload by only 0.13 seconds, and rejected BLAKE2b manifest hashing after it regressed the workload to 9.27 seconds.
 - Added `scripts/benchmark_compression_lab.py` as the durable CP equivalence
@@ -396,14 +621,10 @@ Measured optimizations:
 
 Resume in this order:
 
-1. Finish CP1 verification, leave `.idea/` unstaged, and merge the focused
-   cold-path PR.
-2. Start CP2 from current `main`; do not combine schema or parallel-ingestion
-   work with the streaming detector contract.
-3. Land CP3, CP4, and CP5 serially because each changes the persisted inputs or
-   cache identity consumed by the next phase.
-4. Add CP6 only after a fresh profile proves source parsing is the dominant
-   remaining first-build cost.
+1. Open and merge the focused CP6 PR, leaving `.idea/` and the local `uv.lock`
+   unstaged, then record its PR and merge commit here.
+2. Continue with the next Compression Lab roadmap unit: compact MCP progress
+   and shared-cache contracts.
 
 ## Resume Instructions
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import zlib
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import replace
@@ -36,6 +34,7 @@ from codex_usage_tracker.store.compression_candidates import (
     get_compression_candidate,
     list_compression_candidates,
 )
+from codex_usage_tracker.store.compression_fact_contract import ManifestAccumulator
 from codex_usage_tracker.store.compression_runs import get_compression_run
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
@@ -47,7 +46,6 @@ class _RecordEvidence(Protocol):
 
 
 _RecordEvidenceT = TypeVar("_RecordEvidenceT", bound=_RecordEvidence)
-_HASH_MODULUS = 1 << 256
 
 
 def incremental_inputs(
@@ -111,7 +109,7 @@ class RecordManifestBuilder:
 
     def __init__(self) -> None:
         self._threads: dict[str, str] = {}
-        self._accumulators: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
+        self._accumulators: dict[str, ManifestAccumulator] = defaultdict(ManifestAccumulator)
         self._metadata: dict[str, dict[str, str]] = {}
 
     def add_call(self, call: CallEvidence) -> None:
@@ -121,7 +119,7 @@ class RecordManifestBuilder:
             "thread_key": call.thread_key,
             "record_id": "",
         }
-        _accumulate(self._accumulators[manifest_key], "call", call)
+        self._accumulators[manifest_key].add("call", call.revision_identity())
 
     def add_event(self, kind: str, event: Any) -> None:
         self.add_identity(kind, str(event.record_id), _revision_identity(event))
@@ -136,15 +134,11 @@ class RecordManifestBuilder:
                 "record_id": record_id if not thread_key else "",
             },
         )
-        _accumulate(
-            self._accumulators[manifest_key],
-            kind,
-            identity,
-        )
+        self._accumulators[manifest_key].add(kind, identity)
 
     def build(self) -> dict[str, dict[str, str]]:
         return {
-            key: {**self._metadata[key], "revision": _manifest_hash(accumulator)}
+            key: {**self._metadata[key], "revision": accumulator.revision()}
             for key, accumulator in sorted(self._accumulators.items())
         }
 
@@ -253,19 +247,6 @@ def _revision_identity(event: Any) -> Any:
 
 def _manifest_key(record_id: str, thread_key: str) -> str:
     return f"thread:{thread_key}" if thread_key else f"record:{record_id}"
-
-
-def _accumulate(accumulator: list[int], *parts: Any) -> None:
-    encoded = "\x1f".join(repr(part) for part in parts).encode("utf-8")
-    value = (zlib.crc32(encoded) << 32) | zlib.adler32(encoded)
-    accumulator[0] += 1
-    accumulator[1] = (accumulator[1] + value) % _HASH_MODULUS
-    accumulator[2] ^= value
-
-
-def _manifest_hash(accumulator: list[int]) -> str:
-    encoded = f"{accumulator[0]}:{accumulator[1]:064x}:{accumulator[2]:064x}".encode()
-    return hashlib.sha256(encoded).hexdigest()[:24]
 
 
 def _affected_scope(

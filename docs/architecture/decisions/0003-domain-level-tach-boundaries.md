@@ -29,3 +29,11 @@ truth.
 positives. New cross-domain imports require an explicit contract change, and
 the store-to-diagnostics cycle found during migration is removed rather than
 allowlisted.
+
+## 2026-07-13 Amendment
+
+The compression domain no longer declares a dependency on `core`. Detector-ready
+fact loading now depends only on the store contract, and no compression module
+imports `core`. Removing the stale edge keeps the declared graph aligned with
+the implementation and lets Tach continue detecting accidental dependency
+growth.

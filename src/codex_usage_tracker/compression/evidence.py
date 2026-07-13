@@ -14,6 +14,7 @@ from codex_usage_tracker.compression.models import (
     CompressionScope,
 )
 from codex_usage_tracker.store.compression_evidence import query_compression_evidence_rows
+from codex_usage_tracker.store.compression_fact_contract import call_revision_identity
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,22 +33,24 @@ class CallEvidence:
     context_window_percent: float
 
     def revision_identity(self) -> tuple[Any, ...]:
-        return (
-            self.record_id,
-            self.session_id,
-            self.thread_key,
-            self.event_timestamp,
-            self.model,
-            self.effort,
-            self.is_archived,
-            self.thread_call_index,
-            self.previous_record_id,
-            self.exposure.cached_input,
-            self.exposure.uncached_input,
-            self.exposure.output,
-            self.exposure.reasoning_output,
-            self.cache_ratio,
-            self.context_window_percent,
+        return call_revision_identity(
+            (
+                self.record_id,
+                self.session_id,
+                self.thread_key,
+                self.event_timestamp,
+                self.model,
+                self.effort,
+                self.is_archived,
+                self.thread_call_index,
+                self.previous_record_id,
+                self.exposure.cached_input,
+                self.exposure.uncached_input,
+                self.exposure.output,
+                self.exposure.reasoning_output,
+                self.cache_ratio,
+                self.context_window_percent,
+            )
         )
 
 

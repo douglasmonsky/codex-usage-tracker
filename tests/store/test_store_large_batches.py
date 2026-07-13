@@ -12,6 +12,7 @@ import pytest
 from codex_usage_tracker import store
 from codex_usage_tracker.core.models import DiagnosticFact
 from codex_usage_tracker.store.api import connect, upsert_usage_events
+from codex_usage_tracker.store.thread_summaries import rebuild_thread_summaries
 from tests.store_dashboard_helpers import SESSION_ID, _usage_event
 
 
@@ -99,6 +100,96 @@ def test_upsert_usage_events_batches_diagnostic_fact_deletes(
 
     upsert_usage_events(events, db_path=db_path, refresh_links=False)
     assert _diagnostic_fact_row_count(db_path) == 0
+
+
+def test_upsert_usage_events_batches_source_file_replacements(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+
+    @contextmanager
+    def limited_connect(db_path: Path) -> Iterator[_LimitedVariableConnection]:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db_path, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield _LimitedVariableConnection(conn, max_variables=600)
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    monkeypatch.setattr(store, "connect", limited_connect)
+    event = _usage_event(
+        record_id="replace-record",
+        session_id=SESSION_ID,
+        thread_key="thread:replace",
+        event_timestamp="2026-05-17T18:00:00Z",
+        cumulative_total_tokens=100,
+    )
+    upsert_usage_events([event], db_path=db_path, refresh_links=False)
+
+    source_files = [Path(f"/tmp/synthetic/missing-{index}.jsonl") for index in range(1200)]
+    source_files.append(Path(event.source_file))
+    upsert_usage_events(
+        [],
+        db_path=db_path,
+        refresh_links=False,
+        replace_source_files=source_files,
+    )
+
+    with connect(db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0] == 0
+
+
+def test_upsert_usage_events_batches_thread_derived_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+
+    @contextmanager
+    def limited_connect(db_path: Path) -> Iterator[_LimitedVariableConnection]:
+        conn = sqlite3.connect(db_path, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield _LimitedVariableConnection(conn, max_variables=600)
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    monkeypatch.setattr(store, "connect", limited_connect)
+    base_timestamp = datetime(2026, 5, 17, 18, 0, tzinfo=timezone.utc)
+    events = [
+        _usage_event(
+            record_id=f"thread-batch-{index:04d}",
+            session_id=f"session-{index:04d}",
+            thread_key=f"thread:batch-{index:04d}",
+            event_timestamp=(base_timestamp + timedelta(seconds=index)).isoformat(),
+            cumulative_total_tokens=index + 1,
+        )
+        for index in range(1200)
+    ]
+
+    upsert_usage_events(events, db_path=db_path, refresh_links=False)
+    with connect(db_path) as conn:
+        rebuild_thread_summaries(conn)
+    upsert_usage_events(
+        [],
+        db_path=db_path,
+        refresh_links=True,
+        replace_source_files=[Path(event.source_file) for event in events],
+    )
+
+    with connect(db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM thread_summaries").fetchone()[0] == 0
 
 
 def _diagnostic_fact_row_count(db_path: Path) -> int:

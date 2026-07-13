@@ -22,7 +22,13 @@ SRC_PATH = REPO_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+import compression_persistence_benchmark as persistence_benchmark  # noqa: E402
 from benchmark_synthetic_history import _synthetic_events  # noqa: E402
+from compression_revision_benchmark import (  # noqa: E402
+    benchmark_revision_and_append,
+    benchmark_source_append,
+    revision_threshold_failures,
+)
 
 from codex_usage_tracker.compression.models import CompressionScope  # noqa: E402
 from codex_usage_tracker.compression.run_builder import build_compression_run  # noqa: E402
@@ -30,10 +36,15 @@ from codex_usage_tracker.store.api import (  # noqa: E402
     refresh_usage_event_links,
     upsert_usage_events,
 )
+from codex_usage_tracker.store.compression_facts import (  # noqa: E402
+    backfill_compression_detector_facts,
+)
 from codex_usage_tracker.store.connection import connect  # noqa: E402
+from codex_usage_tracker.store.schema import init_db  # noqa: E402
 
 DEFAULT_ROWS = 100_000
 DEFAULT_MAX_COLD_SECONDS = 20.0
+DEFAULT_MAX_EVIDENCE_DETECTOR_SECONDS = 3.53
 _VOLATILE_PROFILE_KEYS = {
     "cache",
     "completed_at",
@@ -54,12 +65,22 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--enforce-thresholds", action="store_true")
     parser.add_argument("--max-cold-seconds", type=float, default=DEFAULT_MAX_COLD_SECONDS)
+    parser.add_argument(
+        "--max-evidence-detector-seconds",
+        type=float,
+        default=DEFAULT_MAX_EVIDENCE_DETECTOR_SECONDS,
+    )
     parser.add_argument("--max-peak-rss-mb", type=float)
     parser.add_argument("--with-normalized-evidence", action="store_true")
+    parser.add_argument("--benchmark-source-append", action="store_true")
     parser.add_argument("--run-db", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--prepare-facts-db", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     _validate_args(parser, args)
 
+    if args.prepare_facts_db is not None:
+        print(json.dumps(_prepare_facts(args.prepare_facts_db), separators=(",", ":")))
+        return 0
     if args.run_db is not None:
         print(json.dumps(_run_builds(args.run_db), separators=(",", ":")))
         return 0
@@ -81,9 +102,16 @@ def main() -> int:
             with_normalized_evidence=args.with_normalized_evidence,
         )
         run_payload = _run_in_child(db_path)
+        run_payload["revision_state"] = benchmark_revision_and_append(db_path, rows=args.rows)
+        run_payload["candidate_persistence"] = persistence_benchmark.benchmark_persistence(
+            db_path, rows=args.rows
+        )
+        if args.benchmark_source_append:
+            run_payload["source_append_refresh"] = benchmark_source_append(db_dir)
         failures = _threshold_failures(
             run_payload,
             max_cold_seconds=args.max_cold_seconds,
+            max_evidence_detector_seconds=args.max_evidence_detector_seconds,
             max_peak_rss_mb=args.max_peak_rss_mb,
         )
         payload = {
@@ -95,6 +123,7 @@ def main() -> int:
             "normalized_evidence": args.with_normalized_evidence,
             "normalized_evidence_rows": normalized_evidence_rows,
             "max_cold_seconds": args.max_cold_seconds,
+            "max_evidence_detector_seconds": args.max_evidence_detector_seconds,
             "max_peak_rss_mb": args.max_peak_rss_mb,
             **run_payload,
             "threshold_status": "fail" if failures else "pass",
@@ -114,6 +143,8 @@ def _validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) ->
         parser.error("--batch-size must be positive")
     if args.max_cold_seconds <= 0:
         parser.error("--max-cold-seconds must be positive")
+    if args.max_evidence_detector_seconds <= 0:
+        parser.error("--max-evidence-detector-seconds must be positive")
     if args.max_peak_rss_mb is not None and args.max_peak_rss_mb <= 0:
         parser.error("--max-peak-rss-mb must be positive")
 
@@ -152,6 +183,7 @@ def _populate_database(
         normalized_evidence_rows = (
             _seed_normalized_evidence(conn) if with_normalized_evidence else 0
         )
+        backfill_compression_detector_facts(conn)
         conn.commit()
     return time.perf_counter() - started, normalized_evidence_rows
 
@@ -321,6 +353,36 @@ def _run_builds(db_path: Path) -> dict[str, Any]:
     return {"cold_build": cold_payload, "warm_build": warm_payload}
 
 
+def _prepare_facts(db_path: Path) -> dict[str, Any]:
+    started = time.perf_counter()
+    stage_started = started
+    stage_timings: dict[str, float] = {}
+
+    def record_stage(stage: str) -> None:
+        nonlocal stage_started
+        now = time.perf_counter()
+        stage_timings[stage] = round(now - stage_started, 6)
+        stage_started = now
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        record_stage("init")
+        backfill_compression_detector_facts(conn, stage_callback=record_stage)
+        record_count = int(
+            conn.execute("SELECT COUNT(*) FROM compression_record_facts").fetchone()[0]
+        )
+        sequence_count = int(
+            conn.execute("SELECT COUNT(*) FROM compression_sequence_facts").fetchone()[0]
+        )
+        conn.commit()
+    return {
+        "total_seconds": round(time.perf_counter() - started, 6),
+        "record_count": record_count,
+        "sequence_count": sequence_count,
+        "stage_timings_seconds": stage_timings,
+    }
+
+
 def _candidate_fingerprint(db_path: Path) -> str:
     digest = hashlib.sha256()
     with connect(db_path) as conn:
@@ -394,15 +456,25 @@ def _threshold_failures(
     payload: dict[str, Any],
     *,
     max_cold_seconds: float,
+    max_evidence_detector_seconds: float,
     max_peak_rss_mb: float | None,
 ) -> list[str]:
     failures = []
     elapsed = float(payload["cold_build"]["total_seconds"])
     if elapsed > max_cold_seconds:
         failures.append(f"cold_build.total_seconds {elapsed:.3f} exceeded {max_cold_seconds:.3f}")
+    evidence_detector_seconds = float(payload["cold_build"]["stage_timings_seconds"]["detectors"])
+    if evidence_detector_seconds > max_evidence_detector_seconds:
+        failures.append(
+            "cold_build.stage_timings_seconds.detectors "
+            f"{evidence_detector_seconds:.3f} exceeded "
+            f"{max_evidence_detector_seconds:.3f}"
+        )
     peak_rss_mb = float(payload["cold_build"]["peak_rss_mb"])
     if max_peak_rss_mb is not None and peak_rss_mb > max_peak_rss_mb:
         failures.append(f"cold_build.peak_rss_mb {peak_rss_mb:.3f} exceeded {max_peak_rss_mb:.3f}")
+    failures.extend(revision_threshold_failures(payload))
+    failures.extend(persistence_benchmark.persistence_threshold_failures(payload))
     return failures
 
 

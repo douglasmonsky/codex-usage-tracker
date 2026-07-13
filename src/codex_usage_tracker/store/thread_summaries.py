@@ -20,6 +20,8 @@ from codex_usage_tracker.store.query_sql import (
 from codex_usage_tracker.store.rows import row_to_dict
 from codex_usage_tracker.store.schema import init_db
 
+_THREAD_KEY_BATCH_SIZE = 500
+
 
 def rebuild_thread_summaries(
     conn: sqlite3.Connection,
@@ -30,30 +32,46 @@ def rebuild_thread_summaries(
 
     before = conn.total_changes
     normalized_thread_keys = sorted({key for key in thread_keys or [] if key})
-    if normalized_thread_keys:
-        placeholders = ", ".join("?" for _key in normalized_thread_keys)
+    if not normalized_thread_keys:
+        conn.execute("DELETE FROM thread_summaries")
+        _insert_thread_summary_scopes(conn, updated_at=_summary_timestamp())
+        return conn.total_changes - before
+    updated_at = _summary_timestamp()
+    for start in range(0, len(normalized_thread_keys), _THREAD_KEY_BATCH_SIZE):
+        chunk = normalized_thread_keys[start : start + _THREAD_KEY_BATCH_SIZE]
+        placeholders = ", ".join("?" for _key in chunk)
         conn.execute(
             f"DELETE FROM thread_summaries WHERE thread_key IN ({placeholders})",
-            normalized_thread_keys,
+            chunk,
         )
-    else:
-        conn.execute("DELETE FROM thread_summaries")
-    updated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        _insert_thread_summary_scopes(conn, updated_at=updated_at, thread_keys=chunk)
+    return conn.total_changes - before
+
+
+def _summary_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _insert_thread_summary_scopes(
+    conn: sqlite3.Connection,
+    *,
+    updated_at: str,
+    thread_keys: Iterable[str] | None = None,
+) -> None:
     _insert_thread_summary_scope(
         conn,
         scope="active",
         include_archived=False,
         updated_at=updated_at,
-        thread_keys=normalized_thread_keys,
+        thread_keys=thread_keys,
     )
     _insert_thread_summary_scope(
         conn,
         scope="all-history",
         include_archived=True,
         updated_at=updated_at,
-        thread_keys=normalized_thread_keys,
+        thread_keys=thread_keys,
     )
-    return conn.total_changes - before
 
 
 def query_thread_summaries(
