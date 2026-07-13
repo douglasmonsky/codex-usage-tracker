@@ -95,7 +95,15 @@
     function observedWindowText(window) {
       const remaining = observedRemainingPercent(window.used_percent);
       if (!remaining) return '';
-      return `${short(window.label || window.key, 'Usage')}: ${remaining}`;
+      return `${observedWindowLabel(window)}: ${remaining}`;
+    }
+
+    function observedWindowLabel(window) {
+      const raw = short(window.label || window.key, 'Usage');
+      if (String(window.key || '').toLowerCase() === 'weekly' || raw.toLowerCase() === 'weekly') {
+        return t('allowance.window_weekly');
+      }
+      return raw;
     }
 
     function observedUsageTooltip() {
@@ -185,7 +193,7 @@
       sourceEl.textContent = t('badge.credits');
       sourceEl.dataset.state = coverage > 0 ? 'ready' : 'missing';
       setFastTooltip(sourceEl, [
-        allowanceSource.url ? `Source: ${allowanceSource.url}` : '',
+        allowanceSource.url ? `${t('pricing.source')}: ${allowanceSource.url}` : '',
         allowanceSource.fetched_at ? `rate card snapshot ${allowanceSource.fetched_at}` : '',
         tf('allowance.credit_rates', { source: sourceName }),
         tf('allowance.credit_coverage', { ratio: pct(coverage) }),

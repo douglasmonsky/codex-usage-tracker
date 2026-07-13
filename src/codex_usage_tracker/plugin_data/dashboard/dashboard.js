@@ -165,6 +165,7 @@
     let threadAttachmentByRecordId = new Map();
     let callAdjacencyByRecordId = new Map();
     let supplementalRowsByRecordId = new Map();
+    const rowSearchTextCache = new WeakMap();
     const callFetchInFlightByRecordId = new Set();
     const expandedThreads = new Set();
     const liveRefreshSupported = window.location.protocol !== 'file:';
@@ -173,7 +174,9 @@
     if (liveRefreshSupported && initialState.historyScope === 'all') includeArchived = true;
     const needsInitialHistoryRefresh = liveRefreshSupported && includeArchived !== initialPayloadIncludeArchived;
     const liveRefreshIntervalMs = 10000;
-    const pageSize = 500;
+    // Keep the legacy table responsive even when the backing payload contains
+    // tens of thousands of calls. Only the visible window becomes DOM nodes.
+    const pageSize = 100;
     const initialHydrationChunkSize = 500;
     const backgroundHydrationChunkSize = 2000;
     const threadCallPageSize = 100;
@@ -711,28 +714,32 @@
       const effort = effortEl.value;
       const pricingStatus = pricingStatusEl.value;
       const rows = data.filter(row => {
-        const haystack = [
-          rowThreadLabel(row),
-          row.cwd,
-          row.project_name,
-          row.project_relative_cwd,
-          Array.isArray(row.project_tags) ? row.project_tags.join(' ') : '',
-          row.git_branch,
-          row.git_remote_label,
-          row.model,
-          row.effort,
-          row.session_id,
-          row.turn_id,
-          row.call_initiator,
-          row.call_initiator_reason,
-          row.thread_source,
-          row.subagent_type,
-          row.agent_role,
-          row.agent_nickname,
-          row.parent_session_id,
-          row.parent_thread_name,
-          row.resolved_parent_thread_name,
-        ].join(' ').toLowerCase();
+        let haystack = rowSearchTextCache.get(row);
+        if (haystack === undefined) {
+          haystack = [
+            rowThreadLabel(row),
+            row.cwd,
+            row.project_name,
+            row.project_relative_cwd,
+            Array.isArray(row.project_tags) ? row.project_tags.join(' ') : '',
+            row.git_branch,
+            row.git_remote_label,
+            row.model,
+            row.effort,
+            row.session_id,
+            row.turn_id,
+            row.call_initiator,
+            row.call_initiator_reason,
+            row.thread_source,
+            row.subagent_type,
+            row.agent_role,
+            row.agent_nickname,
+            row.parent_session_id,
+            row.parent_thread_name,
+            row.resolved_parent_thread_name,
+          ].join(' ').toLowerCase();
+          rowSearchTextCache.set(row, haystack);
+        }
         const statusMatches = !pricingStatus
           || (pricingStatus === 'official' && row.pricing_model && !row.pricing_estimated)
           || (pricingStatus === 'estimated' && row.pricing_estimated)
