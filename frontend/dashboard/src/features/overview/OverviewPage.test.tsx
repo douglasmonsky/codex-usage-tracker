@@ -19,6 +19,50 @@ vi.mock('../../visualization/renderer/echartsRenderer', () => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Overview focused evidence flow', () => {
+  it('reports module progress while recommendations are still loading', async () => {
+    let resolveRecommendations: ((response: Response) => void) | undefined;
+    const recommendations = new Promise<Response>((resolve) => {
+      resolveRecommendations = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => (
+      String(input).startsWith('/api/summary')
+        ? Promise.resolve(summaryResponse())
+        : recommendations
+    )));
+
+    renderOverview(createDashboardQueryClient());
+
+    await waitFor(() => expect(screen.getByText('1 of 2 modules ready')).toBeInTheDocument());
+    expect(screen.getByText('Usage summary ready')).toBeInTheDocument();
+    expect(screen.getByText('Recommendations loading')).toBeInTheDocument();
+
+    resolveRecommendations?.(recommendationsResponse());
+    await waitFor(() => expect(screen.queryByRole('progressbar', { name: 'Loading overview evidence' })).not.toBeInTheDocument());
+  });
+
+  it('keeps completed module data when navigation cancels a slow peer', async () => {
+    let recommendationCalls = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).startsWith('/api/summary')) return Promise.resolve(summaryResponse());
+      recommendationCalls += 1;
+      if (recommendationCalls > 1) return Promise.resolve(recommendationsResponse());
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const queryClient = createDashboardQueryClient();
+    const firstView = renderOverview(queryClient);
+    await waitFor(() => expect(screen.getByText('1 of 2 modules ready')).toBeInTheDocument());
+
+    firstView.unmount();
+    renderOverview(queryClient);
+
+    await waitFor(() => expect(screen.getByText('Focused endpoints')).toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/summary'))).toHaveLength(1);
+    expect(recommendationCalls).toBe(2);
+  });
+
   it('keeps endpoint-backed summaries without duplicating investigation surfaces', async () => {
     const model = {
       ...fixtureModel,
@@ -118,3 +162,53 @@ describe('Overview focused evidence flow', () => {
     expect(fetchMock.mock.calls.every(([url]) => String(url).includes('include_archived=false'))).toBe(true);
   });
 });
+
+function renderOverview(queryClient: ReturnType<typeof createDashboardQueryClient>) {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <OverviewPage
+        model={fixtureModel}
+        contextRuntime={{ apiToken: 'local-token', contextApiEnabled: false, fileMode: false }}
+        sourceRevision="progress-revision"
+        onRefresh={vi.fn()}
+        globalQuery=""
+        runtime={{
+          historyScope: 'all',
+          loadLimit: 0,
+          loadWindow: 'all',
+          loadedRowCount: 500,
+          scopeSince: null,
+          totalAvailableRows: 404_176,
+        }}
+        refreshing={false}
+        canLoadMoreRows={false}
+        onLoadMoreRows={vi.fn()}
+        onOpenInvestigator={vi.fn()}
+        onCopyCallLink={vi.fn()}
+        onNavigateView={vi.fn()}
+        focusedEndpointsEnabled
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function summaryResponse() {
+  return new Response(JSON.stringify({
+    schema: 'codex-usage-tracker-summary-v1',
+    group_by: 'date',
+    include_archived: true,
+    privacy_mode: 'normal',
+    rows: [],
+  }), { status: 200 });
+}
+
+function recommendationsResponse() {
+  return new Response(JSON.stringify({
+    schema: 'codex-usage-tracker-recommendations-v1',
+    filters: { include_archived: true },
+    row_count: 0,
+    total_matched_rows: 0,
+    truncated: false,
+    rows: [],
+  }), { status: 200 });
+}

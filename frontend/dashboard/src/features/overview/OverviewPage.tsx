@@ -5,7 +5,11 @@ import { useMemo, type ReactNode } from 'react';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
 import type { LoadWindow } from '../../data/dataScope';
 import { Button, PageLoadProgress, StatusBadge } from '../../design';
-import { overviewQueryOptions, type OverviewEndpointBundle } from '../../data/overviewQueries';
+import {
+  overviewRecommendationsQueryOptions,
+  overviewSummaryQueryOptions,
+  type OverviewEndpointBundle,
+} from '../../data/overviewQueries';
 import { Visualization } from '../../visualization';
 import { OverviewMetrics } from './OverviewMetrics';
 import styles from './OverviewPage.module.css';
@@ -44,41 +48,84 @@ type OverviewPageProps = {
 export function OverviewPage(props: OverviewPageProps) {
   const focusedEndpointsEnabled = props.focusedEndpointsEnabled ?? import.meta.env.MODE !== 'test';
   const canUseFocusedEndpoints = focusedEndpointsEnabled && !props.contextRuntime.fileMode && Boolean(props.contextRuntime.apiToken);
-  const focusedQuery = useQuery({
-    ...overviewQueryOptions({
-      runtime: props.contextRuntime,
-      includeArchived: props.runtime.historyScope === 'all',
-      since: props.runtime.scopeSince ?? undefined,
-      sourceRevision: props.sourceRevision,
-    }),
+  const queryRequest = {
+    runtime: props.contextRuntime,
+    includeArchived: props.runtime.historyScope === 'all',
+    since: props.runtime.scopeSince ?? undefined,
+    sourceRevision: props.sourceRevision,
+  };
+  const summaryQuery = useQuery({
+    ...overviewSummaryQueryOptions(queryRequest),
     enabled: canUseFocusedEndpoints,
     placeholderData: previous => previous,
   });
+  const recommendationsQuery = useQuery({
+    ...overviewRecommendationsQueryOptions(queryRequest),
+    enabled: canUseFocusedEndpoints,
+    placeholderData: previous => previous,
+  });
+  const focusedData = useMemo<OverviewEndpointBundle | undefined>(() => (
+    canUseFocusedEndpoints
+      ? {
+          summary: {
+            data: summaryQuery.data ?? null,
+            error: summaryQuery.error ? queryErrorMessage(summaryQuery.error) : null,
+          },
+          recommendations: {
+            data: recommendationsQuery.data ?? null,
+            error: recommendationsQuery.error ? queryErrorMessage(recommendationsQuery.error) : null,
+          },
+        }
+      : undefined
+  ), [
+    canUseFocusedEndpoints,
+    recommendationsQuery.data,
+    recommendationsQuery.error,
+    summaryQuery.data,
+    summaryQuery.error,
+  ]);
   const viewModel = useMemo(
-    () => buildOverviewViewModel(props.model, focusedQuery.data, props.runtime.historyScope),
-    [focusedQuery.data, props.model, props.runtime.historyScope],
+    () => buildOverviewViewModel(props.model, focusedData, props.runtime.historyScope),
+    [focusedData, props.model, props.runtime.historyScope],
   );
-  const completedModules = Number(Boolean(focusedQuery.data?.summary.data))
-    + Number(Boolean(focusedQuery.data?.recommendations.data));
-  const endpointError = focusedQuery.error
-    ? queryErrorMessage(focusedQuery.error)
-    : focusedQuery.data?.summary.error || focusedQuery.data?.recommendations.error || null;
+  const completedModules = Number(Boolean(summaryQuery.data))
+    + Number(Boolean(recommendationsQuery.data));
+  const queryError = summaryQuery.error ?? recommendationsQuery.error;
+  const endpointError = queryError
+    ? queryErrorMessage(queryError)
+    : focusedData?.summary.error || focusedData?.recommendations.error || null;
+  const isFetching = summaryQuery.isFetching || recommendationsQuery.isFetching;
+  const modules = [
+    {
+      label: 'Usage summary',
+      status: moduleStatus(summaryQuery.data, summaryQuery.error, summaryQuery.isFetching),
+    },
+    {
+      label: 'Recommendations',
+      status: moduleStatus(
+        recommendationsQuery.data,
+        recommendationsQuery.error,
+        recommendationsQuery.isFetching,
+      ),
+    },
+  ];
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div><p className={styles.eyebrow}>Usage pulse</p><h1>Overview</h1><p>The important changes first, with direct paths into supporting evidence.</p></div>
         <div className={styles.headerActions}>
-          <StatusBadge tone={endpointTone(focusedQuery.data, focusedQuery.error, canUseFocusedEndpoints)}>{endpointLabel(focusedQuery.isFetching, focusedQuery.data, focusedQuery.error, canUseFocusedEndpoints)}</StatusBadge>
+          <StatusBadge tone={endpointTone(focusedData, queryError, canUseFocusedEndpoints)}>{endpointLabel(isFetching, focusedData, queryError, canUseFocusedEndpoints)}</StatusBadge>
           <Button variant="primary" onClick={props.onRefresh} disabled={props.refreshing}><RefreshCw /> {props.refreshing ? 'Refreshing...' : 'Refresh data'}</Button>
         </div>
       </header>
 
       <PageLoadProgress
-        active={canUseFocusedEndpoints && focusedQuery.isFetching}
+        active={canUseFocusedEndpoints && isFetching}
         completed={completedModules}
         total={2}
         label="Loading overview evidence"
         error={canUseFocusedEndpoints ? endpointError : null}
+        modules={modules}
         updating={completedModules > 0}
       />
 
@@ -114,9 +161,19 @@ function queryErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function moduleStatus(
+  data: unknown,
+  error: unknown,
+  isFetching: boolean,
+): 'error' | 'loading' | 'ready' | 'waiting' {
+  if (data) return 'ready';
+  if (error) return 'error';
+  return isFetching ? 'loading' : 'waiting';
+}
+
 function endpointLabel(isFetching: boolean, data: OverviewEndpointBundle | undefined, error: Error | null, enabled: boolean): string {
   if (!enabled) return 'Stored snapshot';
-  if (isFetching && data) return 'Updating evidence';
+  if (isFetching && (data?.summary.data || data?.recommendations.data)) return 'Updating evidence';
   if (isFetching) return 'Loading evidence';
   if (error) return 'Endpoint fallback';
   if (data?.summary.error || data?.recommendations.error) return 'Partial endpoint evidence';

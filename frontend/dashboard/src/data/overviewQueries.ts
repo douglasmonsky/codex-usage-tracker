@@ -37,20 +37,80 @@ type OverviewQueryRequest = OverviewEndpointRequest & {
 };
 
 const overviewQueryKeys = {
-  bundle: (includeArchived: boolean, since: string, sourceRevision: string) =>
-    ['overview', includeArchived ? 'all' : 'active', since, sourceRevision] as const,
+  recommendations: (includeArchived: boolean, since: string, sourceRevision: string) =>
+    ['overview', 'recommendations', includeArchived ? 'all' : 'active', since, sourceRevision] as const,
+  summary: (includeArchived: boolean, since: string, sourceRevision: string) =>
+    ['overview', 'summary', includeArchived ? 'all' : 'active', since, sourceRevision] as const,
 };
 
-export function overviewQueryOptions(request: OverviewQueryRequest) {
+export function overviewSummaryQueryOptions(request: OverviewQueryRequest) {
   return queryOptions({
-    queryKey: overviewQueryKeys.bundle(
+    queryKey: overviewQueryKeys.summary(
       request.includeArchived,
       request.since ?? '',
       request.sourceRevision,
     ),
-    queryFn: ({ signal }) => loadOverviewEndpoints({ ...request, signal }),
+    queryFn: ({ signal }) => loadOverviewSummaryEndpoint({ ...request, signal }),
     staleTime: 30_000,
   });
+}
+
+export function overviewRecommendationsQueryOptions(request: OverviewQueryRequest) {
+  return queryOptions({
+    queryKey: overviewQueryKeys.recommendations(
+      request.includeArchived,
+      request.since ?? '',
+      request.sourceRevision,
+    ),
+    queryFn: ({ signal }) => loadOverviewRecommendationsEndpoint({ ...request, signal }),
+    staleTime: 30_000,
+  });
+}
+
+async function loadOverviewSummaryEndpoint({
+  runtime,
+  includeArchived,
+  since,
+  sourceRevision,
+  cache = persistentOverviewEndpointCache,
+  signal,
+}: OverviewEndpointRequest): Promise<OverviewSummaryReport> {
+  assertOverviewApiAvailable(runtime);
+  const cacheIdentity = overviewCacheIdentity(includeArchived, since, sourceRevision);
+  const cached = cacheIdentity ? cache.read(cacheIdentity) : null;
+  if (cached?.summary.data && !cached.summary.error) return cached.summary.data;
+  const data = await loadSummary(runtime, includeArchived, since, signal);
+  if (cacheIdentity) {
+    cache.write(cacheIdentity, {
+      ...(cache.read(cacheIdentity) ?? emptyOverviewBundle()),
+      summary: { data, error: null },
+    });
+  }
+  return data;
+}
+
+async function loadOverviewRecommendationsEndpoint({
+  runtime,
+  includeArchived,
+  since,
+  sourceRevision,
+  cache = persistentOverviewEndpointCache,
+  signal,
+}: OverviewEndpointRequest): Promise<OverviewRecommendationsReport> {
+  assertOverviewApiAvailable(runtime);
+  const cacheIdentity = overviewCacheIdentity(includeArchived, since, sourceRevision);
+  const cached = cacheIdentity ? cache.read(cacheIdentity) : null;
+  if (cached?.recommendations.data && !cached.recommendations.error) {
+    return cached.recommendations.data;
+  }
+  const data = await loadRecommendations(runtime, includeArchived, since, signal);
+  if (cacheIdentity) {
+    cache.write(cacheIdentity, {
+      ...(cache.read(cacheIdentity) ?? emptyOverviewBundle()),
+      recommendations: { data, error: null },
+    });
+  }
+  return data;
 }
 
 export async function loadOverviewEndpoints({
@@ -149,4 +209,11 @@ function assertOverviewApiAvailable(runtime: ContextRuntime): void {
   if (runtime.fileMode || !runtime.apiToken) {
     throw new Error('Focused Overview endpoints require the localhost dashboard server.');
   }
+}
+
+function emptyOverviewBundle(): OverviewEndpointBundle {
+  return {
+    summary: { data: null, error: null },
+    recommendations: { data: null, error: null },
+  };
 }

@@ -35,6 +35,65 @@
     position: relative;
   }
 
+  .segmentedTrack {
+    background: transparent;
+    display: grid;
+    gap: 3px;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    overflow: visible;
+  }
+
+  .segment {
+    background: rgb(47 111 237 / 16%);
+    border-radius: 999px;
+    display: block;
+    height: 5px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .segmentReady {
+    background: var(--signal-selection);
+  }
+
+  .segmentLoading::after {
+    animation: page-progress 1.2s ease-in-out infinite;
+    background: var(--signal-selection);
+    border-radius: inherit;
+    content: '';
+    inset: 0 auto 0 0;
+    position: absolute;
+    width: 35%;
+  }
+
+  .segmentError {
+    background: var(--signal-risk);
+  }
+
+  .segmentWaiting {
+    background: rgb(47 111 237 / 10%);
+  }
+
+  .modules {
+    color: var(--ink-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font: var(--text-metadata) / 1.35 var(--font-interface);
+    gap: var(--space-1) var(--space-4);
+  }
+
+  .module::before {
+    color: var(--signal-selection);
+    content: '\2022';
+    margin-right: var(--space-1);
+  }
+
+  .inlineError {
+    color: var(--signal-risk-ink);
+    font: 600 var(--text-metadata) / 1.35 var(--font-interface);
+  }
+
   .fill,
   .indeterminate {
     background: var(--signal-selection);
@@ -69,6 +128,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .fill { transition: none; }
-    .indeterminate { animation: none; transform: translateX(0); }
+    .indeterminate,
+    .segmentLoading::after { animation: none; transform: translateX(0); }
   }
 }
