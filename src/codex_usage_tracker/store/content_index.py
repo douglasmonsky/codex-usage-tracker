@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from codex_usage_tracker.store.compression_schema import touch_compression_source_generation
 from codex_usage_tracker.store.content_extract import (
     MAX_FRAGMENT_CHARS as MAX_FRAGMENT_CHARS,
 )
@@ -122,19 +123,23 @@ def index_content_for_source_plans(
     defer_full_fts_rebuild = any(plan.replace_existing for plan in source_plans)
     worker_count = _parallel_content_index_worker_count(len(source_plans))
     if worker_count > 1:
-        return _index_content_for_source_plans_parallel(
+        result = _index_content_for_source_plans_parallel(
             conn,
             source_plans=source_plans,
             sync_fts=not defer_full_fts_rebuild,
             progress_callback=progress_callback,
             worker_count=worker_count,
         )
-    return _index_content_for_source_plans_serial(
-        conn,
-        source_plans=source_plans,
-        sync_fts=not defer_full_fts_rebuild,
-        progress_callback=progress_callback,
-    )
+    else:
+        result = _index_content_for_source_plans_serial(
+            conn,
+            source_plans=source_plans,
+            sync_fts=not defer_full_fts_rebuild,
+            progress_callback=progress_callback,
+        )
+    if source_plans:
+        touch_compression_source_generation(conn)
+    return result
 
 
 def _index_content_for_source_plans_serial(

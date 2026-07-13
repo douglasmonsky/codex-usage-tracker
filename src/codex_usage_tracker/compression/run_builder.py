@@ -1,0 +1,359 @@
+"""Synchronous, cache-aware Compression Lab analysis builder."""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable, Sequence
+from pathlib import Path
+from typing import Any
+
+from codex_usage_tracker.compression.attribution import (
+    COMPONENT_NAMES,
+    CapacityLedger,
+    allocate_overlaps,
+)
+from codex_usage_tracker.compression.detector_protocol import CompressionDetector
+from codex_usage_tracker.compression.detector_registry import (
+    DETECTOR_FAMILIES,
+    DETECTOR_SET_VERSION,
+    select_detectors,
+)
+from codex_usage_tracker.compression.estimators import (
+    ESTIMATOR_POLICY_V1,
+    EstimatorIndex,
+    build_estimator_index,
+    estimate_candidate,
+)
+from codex_usage_tracker.compression.evidence import (
+    CompressionEvidenceSnapshot,
+    load_compression_evidence,
+)
+from codex_usage_tracker.compression.identifiers import stable_scope_hash
+from codex_usage_tracker.compression.models import (
+    CandidateDraft,
+    CompressionScope,
+)
+from codex_usage_tracker.compression.profile import build_profile, public_profile
+from codex_usage_tracker.compression.run_cache import (
+    incremental_inputs,
+    latest_compatible_run,
+    record_manifest,
+)
+from codex_usage_tracker.store.compression_candidates import replace_compression_candidates
+from codex_usage_tracker.store.compression_runs import (
+    create_compression_run,
+    current_compression_source_generation,
+    find_compression_run,
+    find_current_compression_profile,
+    update_compression_run,
+)
+
+COMPRESSION_SCHEMA_VERSION = 1
+ProgressCallback = Callable[[dict[str, Any]], None]
+
+
+def build_compression_run(
+    db_path: Path,
+    scope: CompressionScope,
+    progress_callback: ProgressCallback | None = None,
+    detector_families: Sequence[str] | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Build, persist, and return one compact compression profile."""
+    started = time.perf_counter()
+    detectors = select_detectors(detector_families)
+    detector_version = _detector_set_version(detectors)
+    scope_hash = stable_scope_hash(scope)
+    source_generation = current_compression_source_generation(db_path)
+    cached_profile = _fast_cached_profile(
+        db_path,
+        source_generation=source_generation,
+        scope_hash=scope_hash,
+        detector_version=detector_version,
+        force=force,
+    )
+    if cached_profile is not None:
+        _emit(progress_callback, stage="complete", progress_percent=100.0, cache_reused=True)
+        return cached_profile
+
+    snapshot = load_compression_evidence(db_path, scope)
+    cache_identity = _cache_identity(snapshot, scope_hash, detector_version)
+    exact = find_compression_run(db_path, **cache_identity)
+    if exact is not None and not force:
+        _emit(progress_callback, stage="complete", progress_percent=100.0, cache_reused=True)
+        return public_profile(exact["aggregate_profile"], cache_mode="exact")
+
+    previous = _previous_compatible_run(
+        db_path,
+        scope_hash=scope_hash,
+        detector_version=detector_version,
+        force=force,
+    )
+    run = create_compression_run(
+        db_path,
+        **cache_identity,
+        scope=scope.as_dict(),
+        source_generation=source_generation,
+        coverage=snapshot.coverage.as_dict(),
+        status="running",
+    )
+    run_id = str(run["run_id"])
+    warnings: list[dict[str, Any]] = []
+    _progress(
+        db_path,
+        run_id,
+        progress_callback,
+        stage="evidence_loaded",
+        percent=10.0,
+        records_examined=len(snapshot.calls),
+        total_detectors=len(detectors),
+    )
+    try:
+        reused, detector_snapshot, cache_mode = incremental_inputs(
+            db_path,
+            snapshot=snapshot,
+            previous=previous,
+            scope=scope,
+        )
+        estimator_index = build_estimator_index(snapshot)
+        detected = _run_detectors(
+            db_path=db_path,
+            run_id=run_id,
+            snapshot=snapshot,
+            detector_snapshot=detector_snapshot,
+            scope=scope,
+            detectors=detectors,
+            estimator_index=estimator_index,
+            progress_callback=progress_callback,
+            warnings=warnings,
+        )
+        drafts = [*reused, *detected]
+        _progress(
+            db_path,
+            run_id,
+            progress_callback,
+            stage="attribution",
+            percent=82.0,
+        )
+        candidates = allocate_overlaps(drafts, _capacity_ledger(snapshot, estimator_index))
+        _progress(
+            db_path,
+            run_id,
+            progress_callback,
+            stage="persistence",
+            percent=92.0,
+        )
+        replace_compression_candidates(
+            db_path,
+            run_id=run_id,
+            candidates=(candidate.as_dict() for candidate in candidates),
+            supersede_run_id=_superseded_run_id(exact, force=force),
+        )
+        _progress(
+            db_path,
+            run_id,
+            progress_callback,
+            stage="profile",
+            percent=97.0,
+        )
+        status = _completed_status(warnings)
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        stored_profile = build_profile(
+            run_id=run_id,
+            status=status,
+            snapshot=snapshot,
+            candidates=candidates,
+            scope=scope.as_dict(),
+            warnings=warnings,
+            cache_mode=cache_mode,
+            duration_ms=duration_ms,
+            record_manifest=record_manifest(snapshot),
+            estimator_index=estimator_index,
+        )
+        compact_profile = public_profile(stored_profile)
+        update_compression_run(
+            db_path,
+            run_id=run_id,
+            status=status,
+            progress_percent=100.0,
+            stage="complete",
+            completed_detectors=len(detectors) - len(warnings),
+            total_detectors=len(detectors),
+            cache_reused=cache_mode == "incremental",
+            timing={"duration_ms": duration_ms},
+            error_summary={"detector_errors": warnings},
+            aggregate_profile=stored_profile,
+            public_profile=compact_profile,
+            source_generation=source_generation,
+        )
+        _emit(
+            progress_callback,
+            stage="complete",
+            progress_percent=100.0,
+            cache_reused=cache_mode == "incremental",
+        )
+        return compact_profile
+    except Exception as exc:
+        update_compression_run(
+            db_path,
+            run_id=run_id,
+            status="failed",
+            stage="failed",
+            error_summary={"code": "compression_run_failed", "type": type(exc).__name__},
+        )
+        raise
+
+
+def _fast_cached_profile(
+    db_path: Path,
+    *,
+    source_generation: int,
+    scope_hash: str,
+    detector_version: str,
+    force: bool,
+) -> dict[str, Any] | None:
+    if force:
+        return None
+    cached_profile = find_current_compression_profile(
+        db_path,
+        source_generation=source_generation,
+        scope_hash=scope_hash,
+        detector_set_version=detector_version,
+        estimator_version=ESTIMATOR_POLICY_V1.version,
+        compression_schema_version=COMPRESSION_SCHEMA_VERSION,
+    )
+    if cached_profile is None:
+        return None
+    if current_compression_source_generation(db_path) != source_generation:
+        return None
+    return public_profile(cached_profile, cache_mode="exact")
+
+
+def _previous_compatible_run(
+    db_path: Path,
+    *,
+    scope_hash: str,
+    detector_version: str,
+    force: bool,
+) -> dict[str, Any] | None:
+    if force:
+        return None
+    return latest_compatible_run(
+        db_path,
+        scope_hash=scope_hash,
+        detector_set_version=detector_version,
+        estimator_version=ESTIMATOR_POLICY_V1.version,
+        schema_version=COMPRESSION_SCHEMA_VERSION,
+    )
+
+
+def _superseded_run_id(exact: dict[str, Any] | None, *, force: bool) -> str | None:
+    return str(exact["run_id"]) if exact is not None and force else None
+
+
+def _completed_status(warnings: Sequence[dict[str, Any]]) -> str:
+    return "completed_with_warnings" if warnings else "completed"
+
+
+def _run_detectors(
+    *,
+    db_path: Path,
+    run_id: str,
+    snapshot: CompressionEvidenceSnapshot,
+    detector_snapshot: CompressionEvidenceSnapshot,
+    scope: CompressionScope,
+    detectors: Sequence[CompressionDetector],
+    estimator_index: EstimatorIndex,
+    progress_callback: ProgressCallback | None,
+    warnings: list[dict[str, Any]],
+) -> list[CandidateDraft]:
+    drafts: list[CandidateDraft] = []
+    total = len(detectors)
+    for index, detector in enumerate(detectors, start=1):
+        percent = 10.0 + (index / max(1, total)) * 65.0
+        try:
+            detected = detector.detect(detector_snapshot, scope)
+            drafts.extend(
+                estimate_candidate(row, snapshot, index=estimator_index) for row in detected
+            )
+        except Exception as exc:
+            warnings.append(
+                {
+                    "family": detector.family,
+                    "code": "detector_failed",
+                    "error_type": type(exc).__name__,
+                }
+            )
+        _progress(
+            db_path,
+            run_id,
+            progress_callback,
+            stage="detectors",
+            percent=percent,
+            current_detector=detector.family,
+            completed_detectors=index,
+            total_detectors=total,
+        )
+    return drafts
+
+
+def _capacity_ledger(
+    snapshot: CompressionEvidenceSnapshot,
+    estimator_index: EstimatorIndex,
+):
+    capacities = {}
+    for call in snapshot.calls:
+        for component in COMPONENT_NAMES:
+            exposure = estimator_index.component_exposure(call.record_id, component)
+            if exposure > 0:
+                capacities[(call.record_id, component)] = exposure
+    return CapacityLedger(capacities)
+
+
+def _cache_identity(
+    snapshot: CompressionEvidenceSnapshot,
+    scope_hash: str,
+    detector_set_version: str,
+) -> dict[str, Any]:
+    return {
+        "source_revision": snapshot.source_revision,
+        "scope_hash": scope_hash,
+        "detector_set_version": detector_set_version,
+        "estimator_version": ESTIMATOR_POLICY_V1.version,
+        "compression_schema_version": COMPRESSION_SCHEMA_VERSION,
+    }
+
+
+def _detector_set_version(detectors: Sequence[CompressionDetector]) -> str:
+    families = tuple(detector.family for detector in detectors)
+    if families == DETECTOR_FAMILIES:
+        return DETECTOR_SET_VERSION
+    return f"{DETECTOR_SET_VERSION}:{','.join(families)}"
+
+
+def _progress(
+    db_path: Path,
+    run_id: str,
+    callback: ProgressCallback | None,
+    *,
+    stage: str,
+    percent: float,
+    **metadata: Any,
+) -> None:
+    update_compression_run(
+        db_path,
+        run_id=run_id,
+        stage=stage,
+        progress_percent=percent,
+        **metadata,
+    )
+    _emit(callback, stage=stage, progress_percent=percent, **metadata)
+
+
+def _emit(callback: ProgressCallback | None, **payload: Any) -> None:
+    if callback is None:
+        return
+    try:
+        callback(dict(payload))
+    except Exception:
+        return

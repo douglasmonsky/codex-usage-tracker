@@ -23,7 +23,11 @@ Turn the MCP into a compact, measurement-first laboratory for finding and simula
 
 ### PR 1: Attribution Kernel And Run Cache
 
-Status: implemented; awaiting PR validation
+Status: complete
+
+PR: [#221](https://github.com/douglasmonsky/codex-usage-tracker/pull/221)
+
+Merge: `702d038edb55fe604e467a8f85706eeac77d7553`
 
 Deliverables:
 
@@ -43,7 +47,7 @@ Exit gates:
 
 ### PR 2: Detectors And Estimators
 
-Status: pending
+Status: in progress
 
 Deliverables:
 
@@ -155,6 +159,52 @@ Exit gates:
 - 2026-07-11: Detector/simulator milestone approved; persisted experiments deferred.
 - 2026-07-11: Unified opportunity ledger, async persistent cache, compact MCP contracts, detector set, and five-PR rollout approved.
 - 2026-07-11: PR 1 attribution contracts, bounded overlap allocation, schema v15 run cache, and SQL-paged candidate repository implemented locally.
+- 2026-07-11: Compression Lab preflight PR #220 merged at `7261d3f` with roadmap and hardening-tool compatibility.
+- 2026-07-11: PR 1 merged as #221 at `702d038`; PR 2 detector and estimator work started from that exact base.
+- 2026-07-12: PR 2 detector contracts, all six detector families, shared estimator indexing, cache-aware run building, staged progress, exact/incremental cache handling, and compact profiles implemented on `feature/compression-lab-detectors`.
+
+## Current Restart Checkpoint
+
+Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
+
+Branch: `feature/compression-lab-detectors`
+
+Last completed commit before the current run-builder slice: `0094dca` (`feat: add compression opportunity detectors`). The run-builder/performance work after that commit is intentionally left intact in the worktree and must not be discarded.
+
+Validated behavior at this checkpoint:
+
+- Cold success, zero findings, structured partial detector failure, exact cache reuse, forced replacement, and appended-record incremental recomputation.
+- Deterministic per-thread cache manifests and candidate IDs.
+- Staged progress through evidence, each detector, attribution, persistence, profile, and completion.
+- Focused checkpoint: 66 compression/store tests passed; the full suite passed all 722 tests after keeping the unreleased schema at v15.
+- Real local aggregate dogfood completed with 404,176 calls, 32,087 candidates, no detector warnings, and no raw content printed or committed.
+- Exact cache hits use a compact public profile plus a transaction-level source generation, so they do not rebuild evidence or decode the private incremental manifest.
+- All-history evidence reads bypass temporary scope materialization only when the scope is truly unfiltered.
+
+Latest replacement benchmark (`include_archived=true`, all-history scope):
+
+- Total: 47.939 seconds, including deletion and replacement of the prior 32,087-candidate run.
+- Evidence loaded: 18.69 seconds.
+- All detectors complete: 26.18 seconds.
+- Attribution complete / persistence started: 30.40 seconds.
+- Candidate persistence complete / profile started: 42.30 seconds.
+- Profile complete: 47.59 seconds.
+- Exact warm profile: 6.2 ms, below the 500 ms target.
+- The prior comparable run took 77.575 seconds on 324,982 calls; the optimized run is 38 percent faster while processing 24 percent more calls.
+
+Measured optimizations:
+
+- Removed quadratic claim-to-record membership validation during candidate estimation.
+- Reused a source-generation counter instead of hashing the complete normalized snapshot twice.
+- Replaced per-event cryptographic manifest hashing with deterministic order-independent checksums and removed duplicate event identity encoding.
+- Built attribution capacity directly from the estimator index rather than materializing generic row dictionaries.
+- Removed an unused candidate-record secondary index and persisted compact public profiles separately from private incremental manifests.
+
+Resume in this order:
+
+1. Keep the PR at or below the 20-file ceiling and leave `.idea/` unstaged.
+2. Commit the run-builder slice as `feat: build compression analysis profiles`.
+3. Merge current `origin/main` without rewriting history, resolve only genuine conflicts, then push/open/merge PR 2 before starting PR 3.
 
 ## Resume Instructions
 

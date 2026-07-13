@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.store.compression_schema import read_compression_source_generation
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
 
@@ -26,6 +27,7 @@ def create_compression_run(
     detector_set_version: str,
     estimator_version: str,
     compression_schema_version: int,
+    source_generation: int = 0,
     scope: Mapping[str, Any],
     run_id: str | None = None,
     status: str = "pending",
@@ -46,9 +48,9 @@ def create_compression_run(
                 run_id, status, source_revision, scope_hash,
                 detector_set_version, estimator_version, compression_schema_version,
                 scope_json, filters_json, coverage_json, progress_percent, stage,
-                created_at, started_at, completed_at, last_accessed_at
+                source_generation, created_at, started_at, completed_at, last_accessed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 resolved_run_id,
@@ -63,6 +65,7 @@ def create_compression_run(
                 _json_dump(coverage or {}),
                 100.0 if status in _CACHEABLE_STATUSES else 0.0,
                 "complete" if status in _CACHEABLE_STATUSES else status,
+                int(source_generation),
                 timestamp,
                 started_at,
                 completed_at,
@@ -91,6 +94,8 @@ def update_compression_run(
     timing: Mapping[str, Any] | None = None,
     error_summary: Mapping[str, Any] | None = None,
     aggregate_profile: Mapping[str, Any] | None = None,
+    public_profile: Mapping[str, Any] | None = None,
+    source_generation: int | None = None,
 ) -> dict[str, Any] | None:
     """Update run lifecycle metadata while keeping progress monotonic."""
     now = _utc_now()
@@ -124,7 +129,9 @@ def update_compression_run(
                 coverage_json = COALESCE(?, coverage_json),
                 timing_json = COALESCE(?, timing_json),
                 error_summary_json = COALESCE(?, error_summary_json),
-                aggregate_profile_json = COALESCE(?, aggregate_profile_json)
+                aggregate_profile_json = COALESCE(?, aggregate_profile_json),
+                public_profile_json = COALESCE(?, public_profile_json),
+                source_generation = COALESCE(?, source_generation)
             WHERE run_id = ?
             """,
             (
@@ -146,11 +153,63 @@ def update_compression_run(
                 _json_or_none(timing),
                 _json_or_none(error_summary),
                 _json_or_none(aggregate_profile),
+                _json_or_none(public_profile),
+                source_generation,
                 run_id,
             ),
         )
         row = _select_run(conn, run_id)
     return _decode_run(row) if row is not None else None
+
+
+def current_compression_source_generation(db_path: Path = DEFAULT_DB_PATH) -> int:
+    """Return the cheap generation used to invalidate exact compression caches."""
+    with connect(db_path) as conn:
+        init_db(conn)
+        return read_compression_source_generation(conn)
+
+
+def find_current_compression_profile(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    source_generation: int,
+    scope_hash: str,
+    detector_set_version: str,
+    estimator_version: str,
+    compression_schema_version: int,
+) -> dict[str, Any] | None:
+    """Read only the compact profile for an exact current-generation cache hit."""
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            """
+            SELECT run_id, public_profile_json
+            FROM compression_runs
+            WHERE source_generation = ?
+                AND scope_hash = ?
+                AND detector_set_version = ?
+                AND estimator_version = ?
+                AND compression_schema_version = ?
+                AND status IN ('completed', 'completed_with_warnings')
+                AND public_profile_json != '{}'
+            ORDER BY completed_at DESC, created_at DESC
+            LIMIT 1
+            """,
+            (
+                int(source_generation),
+                scope_hash,
+                detector_set_version,
+                estimator_version,
+                int(compression_schema_version),
+            ),
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "UPDATE compression_runs SET last_accessed_at = ? WHERE run_id = ?",
+            (_utc_now(), row["run_id"]),
+        )
+        return _json_load(row["public_profile_json"])
 
 
 def find_compression_run(
@@ -239,6 +298,7 @@ def _decode_run(row: sqlite3.Row) -> dict[str, Any]:
         ("timing_json", "timing"),
         ("error_summary_json", "error_summary"),
         ("aggregate_profile_json", "aggregate_profile"),
+        ("public_profile_json", "public_profile"),
     ):
         result[output_key] = _json_load(result.pop(key))
     result["cache_reused"] = bool(result["cache_reused"])

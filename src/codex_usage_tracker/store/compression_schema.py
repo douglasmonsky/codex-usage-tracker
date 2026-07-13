@@ -31,6 +31,8 @@ def create_compression_run_tables(conn: sqlite3.Connection) -> None:
             timing_json TEXT NOT NULL DEFAULT '{}',
             error_summary_json TEXT NOT NULL DEFAULT '{}',
             aggregate_profile_json TEXT NOT NULL DEFAULT '{}',
+            public_profile_json TEXT NOT NULL DEFAULT '{}',
+            source_generation INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             started_at TEXT,
             completed_at TEXT,
@@ -110,7 +112,54 @@ def create_compression_run_tables(conn: sqlite3.Connection) -> None:
                 REFERENCES compression_candidates(candidate_id) ON DELETE CASCADE
         );
 
-        CREATE INDEX IF NOT EXISTS idx_compression_candidate_records_record
-        ON compression_candidate_records(record_id, component);
+        CREATE TABLE IF NOT EXISTS compression_source_state (
+            singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+            generation INTEGER NOT NULL
+        );
+
+        INSERT OR IGNORE INTO compression_source_state(singleton, generation)
+        VALUES (1, 0);
         """
     )
+
+
+def read_compression_source_generation(conn: sqlite3.Connection) -> int:
+    _ensure_compression_storage(conn)
+    row = conn.execute(
+        "SELECT generation FROM compression_source_state WHERE singleton = 1"
+    ).fetchone()
+    return int(row["generation"] if row is not None else 0)
+
+
+def touch_compression_source_generation(conn: sqlite3.Connection) -> int:
+    """Invalidate exact compression caches once per aggregate write transaction."""
+    _ensure_compression_storage(conn)
+    conn.execute(
+        "UPDATE compression_source_state SET generation = generation + 1 WHERE singleton = 1"
+    )
+    return read_compression_source_generation(conn)
+
+
+def _ensure_compression_storage(conn: sqlite3.Connection) -> None:
+    conn.execute("DROP INDEX IF EXISTS idx_compression_candidate_records_record")
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS compression_source_state (
+            singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+            generation INTEGER NOT NULL
+        );
+        INSERT OR IGNORE INTO compression_source_state(singleton, generation)
+        VALUES (1, 0);
+        """
+    )
+    columns = {
+        str(row["name"]) for row in conn.execute("PRAGMA table_info(compression_runs)").fetchall()
+    }
+    if "public_profile_json" not in columns:
+        conn.execute(
+            "ALTER TABLE compression_runs ADD COLUMN public_profile_json TEXT NOT NULL DEFAULT '{}'"
+        )
+    if "source_generation" not in columns:
+        conn.execute(
+            "ALTER TABLE compression_runs ADD COLUMN source_generation INTEGER NOT NULL DEFAULT 0"
+        )
