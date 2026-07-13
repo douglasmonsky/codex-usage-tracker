@@ -95,7 +95,15 @@
     function observedWindowText(window) {
       const remaining = observedRemainingPercent(window.used_percent);
       if (!remaining) return '';
-      return `${short(window.label || window.key, 'Usage')}: ${remaining}`;
+      return `${observedWindowLabel(window)}: ${remaining}`;
+    }
+
+    function observedWindowLabel(window) {
+      const raw = short(window.label || window.key, 'Usage');
+      if (String(window.key || '').toLowerCase() === 'weekly' || raw.toLowerCase() === 'weekly') {
+        return t('allowance.window_weekly');
+      }
+      return raw;
     }
 
     function observedUsageTooltip() {
@@ -126,9 +134,9 @@
       if (!used) return '';
       const remaining = observedRemainingPercent(window.used_percent);
       const reset = observedResetText(window.resets_at);
-      const label = short(window.label || window.key, 'Usage');
+      const label = observedWindowLabel(window);
       const usage = remaining
-        ? `${label}: ${tf('allowance.remaining', { value: remaining })}; ${used} used`
+        ? `${label}: ${tf('allowance.used_vs_remaining', { used, remaining })}`
         : tf('allowance.observed_window', { label, used });
       return reset ? `${usage} ${tf('allowance.resets', { resets: reset })}` : usage;
     }
@@ -185,7 +193,7 @@
       sourceEl.textContent = t('badge.credits');
       sourceEl.dataset.state = coverage > 0 ? 'ready' : 'missing';
       setFastTooltip(sourceEl, [
-        allowanceSource.url ? `Source: ${allowanceSource.url}` : '',
+        allowanceSource.url ? `${t('pricing.source')}: ${allowanceSource.url}` : '',
         allowanceSource.fetched_at ? `rate card snapshot ${allowanceSource.fetched_at}` : '',
         tf('allowance.credit_rates', { source: sourceName }),
         tf('allowance.credit_coverage', { ratio: pct(coverage) }),
