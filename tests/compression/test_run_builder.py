@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from codex_usage_tracker.compression import run_builder
+from codex_usage_tracker.compression import run_builder, run_cache
 from codex_usage_tracker.compression.context_detectors import StaleContextDetector
 from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.compression.run_cache import record_manifest
@@ -209,11 +209,20 @@ def test_appended_record_recomputes_only_its_affected_thread(
         lambda _db_path, _scope: next(snapshots),
     )
     observed_scopes: list[set[str]] = []
+    manifest_calls = 0
+
+    def counted_manifest(evidence):
+        nonlocal manifest_calls
+        manifest_calls += 1
+        return record_manifest(evidence)
+
+    monkeypatch.setattr(run_builder, "record_manifest", counted_manifest)
+    monkeypatch.setattr(run_cache, "record_manifest", counted_manifest)
 
     class RecordingDetector(StaleContextDetector):
-        def detect(self, evidence: Any, scope: CompressionScope):
-            observed_scopes.append({row.record_id for row in evidence.calls})
-            return super().detect(evidence, scope)
+        def detect(self, snapshot: Any, scope: CompressionScope):
+            observed_scopes.append({row.record_id for row in snapshot.calls})
+            return super().detect(snapshot, scope)
 
     detector = RecordingDetector()
     monkeypatch.setattr(
@@ -231,3 +240,4 @@ def test_appended_record_recomputes_only_its_affected_thread(
     assert incremental["candidate_count"] == 3
     assert incremental["cache"] == {"mode": "incremental", "reused": True}
     assert observed_scopes == [{"a-1", "b-1"}, {"a-1", "a-2"}]
+    assert manifest_calls == 2
