@@ -227,11 +227,13 @@ Exit gates:
 
 ### CP3: Detector-Ready Ingestion Aggregates
 
-Status: implementation complete; PR open
+Status: complete
 
 Issue: [#230](https://github.com/douglasmonsky/codex-usage-tracker/issues/230)
 
 PR: [#231](https://github.com/douglasmonsky/codex-usage-tracker/pull/231)
+
+Merge: `29f6cad`
 
 Deliverables:
 
@@ -258,7 +260,11 @@ Exit gates:
 
 ### CP4: Revision-State And Incremental Invalidation
 
-Status: pending
+Status: implementation complete; PR open
+
+Issue: [#232](https://github.com/douglasmonsky/codex-usage-tracker/issues/232)
+
+PR: [#233](https://github.com/douglasmonsky/codex-usage-tracker/pull/233)
 
 Deliverables:
 
@@ -386,32 +392,51 @@ whole-pipeline timing or equivalence claim.
   329.156 MiB peak RSS; evidence loading plus detectors took 2.237 seconds,
   58.8 percent below CP1's 5.428-second baseline while preserving CP2's exact
   candidate and profile fingerprints.
+- 2026-07-13: CP3 merged through PR #231 at `29f6cad`. CP4 added schema v17
+  source checkpoints with byte/row cursors, per-source generations, device and
+  inode identity, and a bounded 64 KiB parsed-prefix tail hash. Append planning
+  now rejects truncation, rotation, parser drift, and larger in-place
+  replacements before trusting the previous byte cursor.
+- 2026-07-13: CP4 added detector-aware revision vectors for calls, threads,
+  tools, commands, files, and fragments. Exact cache lookup reads one compact
+  state row and hashes only dimensions consumed by the selected detectors;
+  unknown detector families fail closed to the complete vector. The estimator
+  policy revision remains part of every key, while derived cost/credit facts
+  stay nullable until an explicit rate-card-backed estimator consumes them.
+- 2026-07-13: The final 100,000-call CP4 benchmark preserved CP2/CP3's exact
+  candidate and profile fingerprints. Revision lookup median was 0.982 ms,
+  targeted aggregate append refresh was 0.376 seconds, and an actual one-event
+  JSONL append refresh was 19.8 ms. Cold analysis remained 3.935 seconds with
+  evidence plus detectors at 2.238 seconds and exact warm reuse at 3.302 ms.
+  Agent Perf run `20260713T070642Z-044ace6a` attributed the next material work
+  to fact folding and candidate/claim persistence, confirming CP5 as the next
+  optimization boundary.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/compression-detector-facts`
+Branch: `feature/compression-pricing-revision`
 
-CP2 merged through PR #228 at `980b954`. CP3 is committed at `83af336` and open
-for review in PR #231 after passing the precommit and full verifier profiles.
+CP3 merged through PR #231 at `29f6cad`. CP4 is committed at `bf9bfdf` and open
+for review in PR #233 after passing the precommit and full verifier profiles.
 
 Validated behavior at this checkpoint:
 
-- Schema v16 creates detector fact tables without blocking ordinary commands on
-  a historical backfill.
-- Record, relevant sequence, and thread facts reproduce CP2 snapshots,
-  compaction coverage, manifests, candidates, and public profiles.
-- Usage and content-index writes refresh only affected records and threads; a
-  trigger-backed append test rejects accidental full record-fact rebuilds.
-- Incomplete, stale, or version-mismatched fact stores fail closed to the CP2
-  streaming loader.
-- Reset and source replacement explicitly clear affected facts rather than
-  relying on disabled SQLite foreign-key cascades.
-- A hidden benchmark preparation mode measures explicit normalized backfill
-  separately from cold analysis and warm reuse.
-- Public compression schema version remains 1 because CP3 changes only internal
-  evidence representation, not public profile or candidate contracts.
+- Schema v17 migrates existing source and compression-run tables additively.
+- Append plans verify stored device/inode identity and a bounded hash at the
+  prior parse boundary before reusing byte and parser-state cursors.
+- Source rows persist byte offsets, row counts, parser revision, bounded source
+  identity, and a generation that advances only when the parsed checkpoint
+  changes.
+- Compression writes advance only the affected call/thread or content fact
+  dimensions; reset and the compatibility generation API advance all dimensions.
+- Exact cache identity includes selected detector dependencies and estimator
+  policy revision without traversing record manifests.
+- Existing manifest comparison still scopes incremental detector work to changed
+  records and threads after a relevant revision changes.
+- Public compression schema version and candidate/profile payloads remain
+  unchanged.
 
 Latest CP3 real-data benchmark (`include_archived=true`, all-history scope):
 
@@ -423,6 +448,19 @@ Latest CP3 real-data benchmark (`include_archived=true`, all-history scope):
 - Reviewed exact warm profile: 4.219 ms.
 - Fact-backed and fallback runs produced identical candidate and stable public
   profile fingerprints.
+
+Latest CP4 synthetic gate (100,000 calls, 500,000 normalized evidence rows):
+
+- Revision lookup median: 0.982 ms against the 10 ms exit gate.
+- Targeted aggregate one-event append: 0.376 seconds against the 1 second gate.
+- Actual JSONL one-event append refresh: 19.8 ms, one source scanned and one
+  usage event inserted or updated.
+- Cold build: 3.935 seconds; evidence plus detectors: 2.238 seconds; warm exact
+  reuse: 3.302 ms; peak RSS: 330.359 MiB.
+- Canonical candidate fingerprint:
+  `566d9962a31e65cdf8b7a3cbba3be23992b4ceb5c457cd418226e33ff8e5cded`.
+- Canonical profile fingerprint:
+  `96afabe6c8cfdeea77c708570939c1157a43f333b0cfc49e6173f107861ceeeb`.
 
 Measured optimizations:
 
@@ -446,11 +484,10 @@ Measured optimizations:
 
 Resume in this order:
 
-1. Merge CP3 PR #231 after its remote checks pass, leaving `.idea/` unstaged.
-2. Start CP4 from updated `main` and add revision-aware invalidation, including
-   a pricing/rate-card revision before derived costs or credits are persisted.
-3. Land CP5 serially because candidate persistence consumes CP4 cache identity.
-4. Add CP6 only after a fresh profile identifies the dominant remaining
+1. Finish CP4 verification, leave `.idea/` unstaged, and merge the focused
+   revision-state PR.
+2. Land CP5 serially because candidate persistence consumes CP4 cache identity.
+3. Add CP6 only after a fresh profile identifies the dominant remaining
    first-build stages; explicit fact preparation is currently a measured
    parallelization/ingestion-time target.
 

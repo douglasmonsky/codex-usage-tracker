@@ -123,6 +123,8 @@ def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
     )
     assert payload["cold_build"]["stage_timings_seconds"]["evidence_loaded"] >= 0
     assert payload["warm_build"]["cache_mode"] == "exact"
+    assert payload["revision_state"]["lookup_median_seconds"] <= 0.01
+    assert payload["revision_state"]["append_refresh_seconds"] <= 1.0
     assert payload["threshold_failures"] == []
     assert (
         repeated["cold_build"]["candidate_fingerprint"]

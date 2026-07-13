@@ -31,7 +31,7 @@ from codex_usage_tracker.store.compression_fact_sync import (
     delete_compression_facts_for_source_files,
     sync_compression_detector_facts,
 )
-from codex_usage_tracker.store.compression_schema import touch_compression_source_generation
+from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import (
     clear_content_index_rows,
@@ -187,7 +187,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
         conn.execute("DELETE FROM refresh_meta")
-        touch_compression_source_generation(conn)
+        touch_compression_revisions(conn)
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
 
@@ -522,7 +522,7 @@ def upsert_usage_events(
                 affected_thread_keys=affected_thread_keys,
             )
             if source_files_to_replace:
-                touch_compression_source_generation(conn)
+                touch_compression_revisions(conn, {"calls", "threads"})
                 sync_compression_detector_facts(
                     conn,
                     record_ids=(),
@@ -541,7 +541,7 @@ def upsert_usage_events(
             refresh_links=refresh_links,
             affected_thread_keys=affected_thread_keys,
         )
-        touch_compression_source_generation(conn)
+        touch_compression_revisions(conn, {"calls", "threads"})
         sync_compression_detector_facts(
             conn,
             record_ids=record_ids,

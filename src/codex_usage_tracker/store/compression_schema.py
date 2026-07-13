@@ -3,6 +3,23 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
+
+MIGRATION_NAMES = {
+    15: "persist compression analysis runs",
+    16: "persist compression detector facts",
+    17: "persist compression revision state",
+}
+
+
+def schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None]], ...]:
+    """Return schema migrations owned by the compression domain."""
+    return (
+        (15, create_compression_run_tables),
+        (16, create_compression_fact_tables),
+        (17, create_compression_revision_tables),
+    )
+
 
 _COMPRESSION_FACT_INDEX_STATEMENTS = (
     "CREATE INDEX IF NOT EXISTS idx_compression_record_facts_scope "
@@ -165,6 +182,7 @@ def create_compression_run_tables(conn: sqlite3.Connection) -> None:
             aggregate_profile_json TEXT NOT NULL DEFAULT '{}',
             public_profile_json TEXT NOT NULL DEFAULT '{}',
             source_generation INTEGER NOT NULL DEFAULT 0,
+            revision_key TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             started_at TEXT,
             completed_at TEXT,
@@ -255,6 +273,71 @@ def create_compression_run_tables(conn: sqlite3.Connection) -> None:
     )
 
 
+def create_compression_revision_tables(conn: sqlite3.Connection) -> None:
+    """Create bounded source checkpoints and detector dependency revisions."""
+    source_columns = {
+        str(row["name"]) for row in conn.execute("PRAGMA table_info(source_files)").fetchall()
+    }
+    source_additions = {
+        "parsed_prefix_tail_hash": "TEXT NOT NULL DEFAULT ''",
+        "parsed_row_count": "INTEGER NOT NULL DEFAULT 0",
+        "source_generation": "INTEGER NOT NULL DEFAULT 0",
+        "source_device": "INTEGER NOT NULL DEFAULT 0",
+        "source_inode": "INTEGER NOT NULL DEFAULT 0",
+    }
+    for column, definition in source_additions.items():
+        if column not in source_columns:
+            conn.execute(f"ALTER TABLE source_files ADD COLUMN {column} {definition}")
+
+    run_columns = {
+        str(row["name"]) for row in conn.execute("PRAGMA table_info(compression_runs)").fetchall()
+    }
+    if "revision_key" not in run_columns:
+        conn.execute(
+            "ALTER TABLE compression_runs ADD COLUMN revision_key TEXT NOT NULL DEFAULT ''"
+        )
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS compression_revision_state (
+            singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+            generation INTEGER NOT NULL DEFAULT 0,
+            call_generation INTEGER NOT NULL DEFAULT 0,
+            thread_generation INTEGER NOT NULL DEFAULT 0,
+            tool_generation INTEGER NOT NULL DEFAULT 0,
+            command_generation INTEGER NOT NULL DEFAULT 0,
+            file_generation INTEGER NOT NULL DEFAULT 0,
+            fragment_generation INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT OR IGNORE INTO compression_revision_state(singleton) VALUES (1);
+        UPDATE compression_revision_state
+        SET generation = (SELECT generation FROM compression_source_state WHERE singleton = 1),
+            call_generation = (SELECT generation FROM compression_source_state WHERE singleton = 1),
+            thread_generation = (SELECT generation FROM compression_source_state WHERE singleton = 1),
+            tool_generation = (SELECT generation FROM compression_source_state WHERE singleton = 1),
+            command_generation = (SELECT generation FROM compression_source_state WHERE singleton = 1),
+            file_generation = (SELECT generation FROM compression_source_state WHERE singleton = 1),
+            fragment_generation = (SELECT generation FROM compression_source_state WHERE singleton = 1)
+        WHERE generation = 0
+          AND call_generation = 0
+          AND thread_generation = 0
+          AND tool_generation = 0
+          AND command_generation = 0
+          AND file_generation = 0
+          AND fragment_generation = 0;
+        CREATE INDEX IF NOT EXISTS idx_compression_runs_revision_cache
+        ON compression_runs(
+            revision_key,
+            scope_hash,
+            detector_set_version,
+            estimator_version,
+            compression_schema_version,
+            status,
+            completed_at DESC
+        );
+        """
+    )
+
+
 def read_compression_source_generation(conn: sqlite3.Connection) -> int:
     _ensure_compression_storage(conn)
     row = conn.execute(
@@ -265,11 +348,10 @@ def read_compression_source_generation(conn: sqlite3.Connection) -> int:
 
 def touch_compression_source_generation(conn: sqlite3.Connection) -> int:
     """Invalidate exact compression caches once per aggregate write transaction."""
+    from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
+
     _ensure_compression_storage(conn)
-    conn.execute(
-        "UPDATE compression_source_state SET generation = generation + 1 WHERE singleton = 1"
-    )
-    return read_compression_source_generation(conn)
+    return touch_compression_revisions(conn)
 
 
 def stamp_compression_fact_state(

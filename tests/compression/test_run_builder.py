@@ -13,6 +13,7 @@ from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.compression.run_cache import record_manifest
 from codex_usage_tracker.compression.streaming_evidence import StreamingEvidenceBundle
 from codex_usage_tracker.store.compression_candidates import list_compression_candidates
+from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.compression_runs import get_compression_run
 from codex_usage_tracker.store.compression_schema import touch_compression_source_generation
 from codex_usage_tracker.store.connection import connect
@@ -97,6 +98,38 @@ def test_build_compression_run_reuses_an_exact_persisted_cache_hit(
 
     def unexpected_evidence_load(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("exact cache hits must not rebuild normalized evidence")
+
+    monkeypatch.setattr(
+        run_builder,
+        "load_fact_compression_evidence",
+        unexpected_evidence_load,
+    )
+    warm = run_builder.build_compression_run(
+        db_path,
+        CompressionScope(),
+        detector_families=("stale_context",),
+    )
+
+    assert warm["run_id"] == cold["run_id"]
+    assert warm["cache"] == {"mode": "exact", "reused": True}
+
+
+def test_exact_cache_ignores_unrelated_detector_revision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    _use_snapshot(monkeypatch, _stale_snapshot("thread-a-1"))
+    cold = run_builder.build_compression_run(
+        db_path,
+        CompressionScope(),
+        detector_families=("stale_context",),
+    )
+    with connect(db_path) as conn:
+        touch_compression_revisions(conn, {"files"})
+
+    def unexpected_evidence_load(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("unrelated revisions must retain the exact cache hit")
 
     monkeypatch.setattr(
         run_builder,

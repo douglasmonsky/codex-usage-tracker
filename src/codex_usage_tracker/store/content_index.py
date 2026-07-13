@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from codex_usage_tracker.store.compression_schema import touch_compression_source_generation
+from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.content_extract import (
     MAX_FRAGMENT_CHARS as MAX_FRAGMENT_CHARS,
 )
@@ -138,7 +138,7 @@ def index_content_for_source_plans(
             progress_callback=progress_callback,
         )
     if source_plans:
-        touch_compression_source_generation(conn)
+        touch_compression_revisions(conn, {"commands", "files", "fragments", "tools"})
     return result
 
 

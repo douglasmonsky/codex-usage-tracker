@@ -14,7 +14,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -30,8 +30,7 @@ MIGRATION_NAMES = {
     12: "persist source record provenance",
     13: "create normalized content index tables",
     14: "persist investigation run summaries",
-    15: "persist compression analysis runs",
-    16: "persist compression detector facts",
+    **compression_schema.MIGRATION_NAMES,
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -101,8 +100,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (12, _migrate_v12),
         (13, _migrate_v13),
         (14, _migrate_v14),
-        (15, compression_schema.create_compression_run_tables),
-        (16, compression_schema.create_compression_fact_tables),
+        *compression_schema.schema_migrations(),
     )
 
 

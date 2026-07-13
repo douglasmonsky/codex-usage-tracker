@@ -13,9 +13,9 @@ from codex_usage_tracker.store.compression_facts import (
     _update_record_manifests,
     _update_thread_manifests,
 )
+from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.compression_schema import (
     stamp_compression_fact_state,
-    touch_compression_source_generation,
 )
 from codex_usage_tracker.store.content_index_models import ContentIndexPlan
 from codex_usage_tracker.store.sources import SourceParsePlan
@@ -90,7 +90,7 @@ def sync_content_plan_compression_facts(
     content_plans = tuple(plans)
     if not content_plans:
         return
-    touch_compression_source_generation(conn)
+    touch_compression_revisions(conn, {"commands", "files", "fragments", "tools"})
     record_ids: set[str] = set()
     for plan in content_plans:
         minimum_line = 0 if plan.replace_existing else plan.start_line + 1

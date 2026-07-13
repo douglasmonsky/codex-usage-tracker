@@ -95,7 +95,11 @@ class EstimatorIndex:
         group = (target.model, target.effort, claim.component)
         values = self._groups[claim.component].get(group, ())
         excluded_threads = tuple(sorted(set(draft.thread_keys)))
-        cache_key = (group, excluded_threads, ())
+        cache_key: tuple[_GroupKey, tuple[str, ...], tuple[str, ...]] = (
+            group,
+            excluded_threads,
+            (),
+        )
         cached = self._peer_cache.get(cache_key)
         if cached is not None:
             return cached

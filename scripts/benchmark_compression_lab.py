@@ -23,6 +23,11 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from benchmark_synthetic_history import _synthetic_events  # noqa: E402
+from compression_revision_benchmark import (  # noqa: E402
+    benchmark_revision_and_append,
+    benchmark_source_append,
+    revision_threshold_failures,
+)
 
 from codex_usage_tracker.compression.models import CompressionScope  # noqa: E402
 from codex_usage_tracker.compression.run_builder import build_compression_run  # noqa: E402
@@ -66,6 +71,7 @@ def main() -> int:
     )
     parser.add_argument("--max-peak-rss-mb", type=float)
     parser.add_argument("--with-normalized-evidence", action="store_true")
+    parser.add_argument("--benchmark-source-append", action="store_true")
     parser.add_argument("--run-db", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--prepare-facts-db", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -95,6 +101,10 @@ def main() -> int:
             with_normalized_evidence=args.with_normalized_evidence,
         )
         run_payload = _run_in_child(db_path)
+        revision_payload = benchmark_revision_and_append(db_path, rows=args.rows)
+        run_payload["revision_state"] = revision_payload
+        if args.benchmark_source_append:
+            run_payload["source_append_refresh"] = benchmark_source_append(db_dir)
         failures = _threshold_failures(
             run_payload,
             max_cold_seconds=args.max_cold_seconds,
@@ -460,6 +470,7 @@ def _threshold_failures(
     peak_rss_mb = float(payload["cold_build"]["peak_rss_mb"])
     if max_peak_rss_mb is not None and peak_rss_mb > max_peak_rss_mb:
         failures.append(f"cold_build.peak_rss_mb {peak_rss_mb:.3f} exceeded {max_peak_rss_mb:.3f}")
+    failures.extend(revision_threshold_failures(payload))
     return failures
 
 
