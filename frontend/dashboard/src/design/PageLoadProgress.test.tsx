@@ -5,13 +5,24 @@ import { PageLoadProgress } from './PageLoadProgress';
 
 describe('PageLoadProgress', () => {
   it('renders determinate module progress', () => {
-    render(<PageLoadProgress active completed={1} total={2} label="Loading allowance evidence" />);
+    render(<PageLoadProgress
+      active
+      completed={1}
+      total={2}
+      label="Loading allowance evidence"
+      modules={[
+        { label: 'Allowance history', status: 'ready' },
+        { label: 'Change detector', status: 'loading' },
+      ]}
+    />);
 
     const progress = screen.getByRole('progressbar', { name: 'Loading allowance evidence' });
     expect(progress).toHaveAttribute('aria-valuemin', '0');
     expect(progress).toHaveAttribute('aria-valuemax', '2');
     expect(progress).toHaveAttribute('aria-valuenow', '1');
     expect(screen.getByText('1 of 2 modules ready')).toBeInTheDocument();
+    expect(screen.getByText('Allowance history ready')).toBeInTheDocument();
+    expect(screen.getByText('Change detector loading')).toBeInTheDocument();
   });
 
   it('renders indeterminate progress without a fabricated value', () => {

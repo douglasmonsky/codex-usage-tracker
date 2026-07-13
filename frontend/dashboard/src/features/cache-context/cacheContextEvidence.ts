@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { buildOverviewSeriesFromDailyValues } from '../../api/overviewSeries';
 import type { CallRow, ContextRuntime, DashboardModel, HeatmapRow, MetricCard, Series, ThreadRow } from '../../api/types';
 import { threadCallsQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
-import { overviewQueryOptions } from '../../data/overviewQueries';
+import { overviewSummaryQueryOptions } from '../../data/overviewQueries';
 import { formatCompact, formatNumber, pct } from '../shared/format';
 import { threadSummaryToRow, type ExploreThreadRow } from '../threads/threadSummaryAdapter';
 
@@ -38,8 +38,8 @@ export type CacheContextEvidence = {
 
 export function useCacheContextEvidence(request: CacheContextEvidenceRequest): CacheContextEvidence {
   const focused = request.enabled && !request.runtime.fileMode && Boolean(request.runtime.apiToken);
-  const overviewQuery = useQuery({
-    ...overviewQueryOptions({
+  const summaryQuery = useQuery({
+    ...overviewSummaryQueryOptions({
       runtime: request.runtime,
       includeArchived: request.includeArchived,
       since: request.scopeSince ?? undefined,
@@ -91,14 +91,13 @@ export function useCacheContextEvidence(request: CacheContextEvidenceRequest): C
     enabled: focused && Boolean(selectedThreadKey),
     placeholderData: previous => previous,
   });
-  const summary = overviewQuery.data?.summary.data;
+  const summary = summaryQuery.data;
   const selectedCallsRequired = Boolean(selectedThreadKey);
   const completedModules = Number(Boolean(summary))
     + Number(Boolean(threadsQuery.data))
     + Number(!selectedCallsRequired || Boolean(selectedCallsQuery.data));
   const totalModules = selectedCallsRequired ? 3 : 2;
-  const queryError = overviewQuery.error ?? threadsQuery.error ?? selectedCallsQuery.error;
-  const summaryError = overviewQuery.data?.summary.error;
+  const queryError = summaryQuery.error ?? threadsQuery.error ?? selectedCallsQuery.error;
   return {
     cacheSeries: summary ? cacheSeriesFromSummary(summary.rows) : request.model.cacheSeries,
     cards: summary ? cacheCardsFromSummary(summary.rows) : request.model.cards.slice(2, 5),
@@ -111,10 +110,10 @@ export function useCacheContextEvidence(request: CacheContextEvidenceRequest): C
     totalThreads: threadsQuery.data?.pages[0]?.totalMatchedRows ?? threads.length,
     usingFocusedEndpoints,
     progress: {
-      active: focused && (overviewQuery.isFetching || threadsQuery.isFetching || selectedCallsQuery.isFetching),
+      active: focused && (summaryQuery.isFetching || threadsQuery.isFetching || selectedCallsQuery.isFetching),
       completed: Math.min(completedModules, totalModules),
       total: totalModules,
-      error: queryError ? queryErrorMessage(queryError) : summaryError ?? null,
+      error: queryError ? queryErrorMessage(queryError) : null,
       updating: completedModules > 0,
     },
   };
