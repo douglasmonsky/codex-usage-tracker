@@ -126,9 +126,8 @@ def _cache_break_candidate(
     call: CallEvidence,
     previous: CallEvidence | None,
 ) -> CandidateDraft | None:
-    if not detector._qualifies(call, previous):
+    if previous is None or not detector._qualifies(call, previous):
         return None
-    assert previous is not None
     return build_candidate(
         snapshot=snapshot,
         scope=scope,
