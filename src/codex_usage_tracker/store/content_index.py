@@ -342,6 +342,37 @@ def _configured_parallel_content_index_workers() -> int | None:
         return None
 
 
+def _stream_content_rows(
+    conn: sqlite3.Connection,
+    *,
+    source_path: Path,
+    start_byte: int,
+    start_line: int,
+    usage_rows: dict[int, sqlite3.Row],
+) -> _StreamingContentAccumulator | None:
+    accumulator = _StreamingContentAccumulator()
+    try:
+        with source_path.open("rb") as handle:
+            if start_byte > 0:
+                handle.seek(start_byte)
+            for line_number, raw_line in enumerate(handle, start_line + 1):
+                decoded = _decode_content_envelope(raw_line)
+                if decoded is None:
+                    accumulator.parse_warnings += 1
+                    continue
+                envelope, payload = decoded
+                accumulator.consume(
+                    conn,
+                    envelope=envelope,
+                    payload=payload,
+                    line_number=line_number,
+                    usage_row=usage_rows.get(line_number),
+                )
+    except OSError:
+        return None
+    return accumulator
+
+
 def _index_content_for_source_file(
     conn: sqlite3.Connection,
     *,
@@ -368,25 +399,14 @@ def _index_content_for_source_file(
             source_files_to_replace=[str(source_path)],
             sync_fts=sync_fts,
         )
-    accumulator = _StreamingContentAccumulator()
-    try:
-        with source_path.open("rb") as handle:
-            if start_byte > 0:
-                handle.seek(start_byte)
-            for line_number, raw_line in enumerate(handle, start_line + 1):
-                decoded = _decode_content_envelope(raw_line)
-                if decoded is None:
-                    accumulator.parse_warnings += 1
-                    continue
-                envelope, payload = decoded
-                accumulator.consume(
-                    conn,
-                    envelope=envelope,
-                    payload=payload,
-                    line_number=line_number,
-                    usage_row=usage_rows.get(line_number),
-                )
-    except OSError:
+    accumulator = _stream_content_rows(
+        conn,
+        source_path=source_path,
+        start_byte=start_byte,
+        start_line=start_line,
+        usage_rows=usage_rows,
+    )
+    if accumulator is None:
         return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
 
     _flush_pending_content_rows(conn, accumulator.rows)

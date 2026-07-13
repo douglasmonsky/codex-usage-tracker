@@ -190,7 +190,7 @@ Exit gates:
 
 ### CP2: Streaming Detector Consumption
 
-Status: in progress
+Status: complete
 
 Issue: [#225](https://github.com/douglasmonsky/codex-usage-tracker/issues/225)
 
@@ -201,6 +201,10 @@ Foundation merge: `d0db081f77434e13e4874a56e89b69f577633fb6`
 Engine PR: [#227](https://github.com/douglasmonsky/codex-usage-tracker/pull/227)
 
 Engine merge: `b253a97a6615b609ba0d31bc7cc47d9b45f0a620`
+
+Benchmark PR: [#228](https://github.com/douglasmonsky/codex-usage-tracker/pull/228)
+
+Benchmark merge: `980b9546131427a3e2f4411b1975590bfd6dc787`
 
 Deliverables:
 
@@ -223,20 +227,29 @@ Exit gates:
 
 ### CP3: Detector-Ready Ingestion Aggregates
 
-Status: pending
+Status: implementation complete; PR open
+
+Issue: [#230](https://github.com/douglasmonsky/codex-usage-tracker/issues/230)
+
+PR: [#231](https://github.com/douglasmonsky/codex-usage-tracker/pull/231)
 
 Deliverables:
 
-- Persisted per-call token, cache, output, and estimated-credit facts.
+- Persisted per-call token, cache, and output facts. Cost and credit columns are
+  intentionally nullable until CP4 can bind derived pricing to a rate-card
+  revision instead of persisting silently stale estimates.
 - Persisted sequence/count facts for shell churn, repeated validation, file
   rediscovery, and tool-output concentration.
 - Per-thread lifecycle and cache-resume summaries.
-- Idempotent backfill from existing normalized content-index records.
+- Fast schema-only migration plus an explicit idempotent backfill from existing
+  normalized content-index records. Automatic initialization never pays the
+  full historical backfill cost.
 - Detector queries over compact facts instead of repeated raw reconstruction.
 
 Exit gates:
 
-- Existing databases migrate and backfill without reparsing raw logs.
+- Existing databases migrate immediately and can be explicitly backfilled
+  without reparsing raw logs.
 - Aggregate facts remain reproducible from normalized source records.
 - Append ingestion updates only affected calls, threads, and sequence windows.
 - Detector outputs remain equivalent to the CP2 streaming reference.
@@ -346,36 +359,70 @@ whole-pipeline timing or equivalence claim.
   7.325 seconds; CP2 used 337.938 MiB and 6.704 seconds with identical 15,030
   candidates and canonical fingerprints. The isolated exact warm hit was
   3.831 ms.
+- 2026-07-13: CP3 added schema v16 detector-ready record, sequence, and thread
+  facts with targeted ingestion/content-index maintenance and a safe CP2
+  fallback whenever fact state is incomplete or stale. Automatic migration is
+  schema-only after profiling showed an eager real-data backfill would add
+  52.625 seconds to unrelated database initialization.
+- 2026-07-13: Independent CP3 review reproduced stale-cache risk after content
+  changes, orphan facts after reset/source replacement with SQLite foreign keys
+  disabled, and partial sequence-store acceptance. The branch now advances
+  generation during content synchronization, explicitly clears/replaces facts,
+  stores integrity counts in fact state, and falls back whenever any persisted
+  fact family is incomplete or version-mismatched. Benchmark fixtures compare
+  fallback and fact-backed fingerprints on the same normalized database.
+- 2026-07-13: On the current 404,176-call aggregate database, the final CP3
+  comparison completed the fallback rebuild in 36.613 seconds and the prepared
+  fact-backed rebuild in 27.598 seconds. Evidence loading plus detectors fell
+  from 24.815 to 15.473 seconds, 37.7 percent, while both paths produced the
+  same 32,087 candidates and canonical candidate/profile fingerprints. Exact
+  reuse completed in 4.219 ms.
+- 2026-07-13: Explicit fact preparation completed in 72.968 seconds after
+  replacing planner-hostile target predicates and rebuilding secondary indexes
+  once around the bulk load. This one-time, opt-in path spent 26.620 seconds on
+  record facts, 15.652 on sequence facts, 10.960 on index creation, and 9.731
+  on manifests; ordinary schema migration remains immediate and backfill-free.
+  The final normalized 100,000-call gate completed in 3.861 seconds total with
+  329.156 MiB peak RSS; evidence loading plus detectors took 2.237 seconds,
+  58.8 percent below CP1's 5.428-second baseline while preserving CP2's exact
+  candidate and profile fingerprints.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/compression-cold-path`
+Branch: `feature/compression-detector-facts`
 
-PR #222 merged the detector and run-builder foundation as `98f2cd7`. Issue #223 tracks the focused cold-path follow-up.
+CP2 merged through PR #228 at `980b954`. CP3 is committed at `83af336` and open
+for review in PR #231 after passing the precommit and full verifier profiles.
 
 Validated behavior at this checkpoint:
 
-- Cold success, zero findings, structured partial detector failure, exact cache reuse, forced replacement, and appended-record incremental recomputation.
-- Deterministic per-thread cache manifests and candidate IDs.
-- Staged progress through evidence, each detector, attribution, persistence, profile, and completion.
-- Focused checkpoint: 66 compression/store tests passed; the full suite passed all 722 tests after keeping the unreleased schema at v15.
-- Real local aggregate dogfood completed with 404,176 calls, 32,087 candidates, no detector warnings, and no raw content printed or committed.
-- Exact cache hits use a compact public profile plus a transaction-level source generation, so they do not rebuild evidence or decode the private incremental manifest.
-- All-history evidence reads bypass temporary scope materialization only when the scope is truly unfiltered.
+- Schema v16 creates detector fact tables without blocking ordinary commands on
+  a historical backfill.
+- Record, relevant sequence, and thread facts reproduce CP2 snapshots,
+  compaction coverage, manifests, candidates, and public profiles.
+- Usage and content-index writes refresh only affected records and threads; a
+  trigger-backed append test rejects accidental full record-fact rebuilds.
+- Incomplete, stale, or version-mismatched fact stores fail closed to the CP2
+  streaming loader.
+- Reset and source replacement explicitly clear affected facts rather than
+  relying on disabled SQLite foreign-key cascades.
+- A hidden benchmark preparation mode measures explicit normalized backfill
+  separately from cold analysis and warm reuse.
+- Public compression schema version remains 1 because CP3 changes only internal
+  evidence representation, not public profile or candidate contracts.
 
-Latest replacement benchmark (`include_archived=true`, all-history scope):
+Latest CP3 real-data benchmark (`include_archived=true`, all-history scope):
 
-- Total: 38.708 seconds, including deletion and replacement of the prior 32,087-candidate run.
-- Evidence loaded: 14.221 seconds.
-- Manifest and all detectors complete: 24.576 seconds.
-- Attribution complete / persistence started: 28.730 seconds.
-- Candidate persistence complete / profile started: 37.617 seconds.
-- Profile complete: 38.386 seconds.
-- Estimated first-ever cold time: about 35.5 seconds after excluding the separately measured 3.2-second prior-run deletion cost.
-- Exact warm profile: 6.2 ms, below the 500 ms target.
-- The immediate pre-follow-up baseline was 48.115 seconds on the same 404,176 calls and 32,087 candidates; the current forced rebuild is 19.5 percent faster.
+- Calls: 404,176; normalized sequence facts: 714,571; candidates: 32,087.
+- Reviewed safe migration plus CP2 fallback rebuild: 36.613 seconds.
+- Reviewed explicit fact preparation: 72.968 seconds, paid only when requested.
+- Reviewed prepared fact-backed rebuild: 27.598 seconds; evidence 9.640
+  seconds; evidence plus detectors 15.473 seconds.
+- Reviewed exact warm profile: 4.219 ms.
+- Fact-backed and fallback runs produced identical candidate and stable public
+  profile fingerprints.
 
 Measured optimizations:
 
@@ -387,6 +434,9 @@ Measured optimizations:
 - Materialized typed evidence directly from positional SQLite rows, avoiding roughly 1.5 million intermediate dictionaries.
 - Removed unnecessary ordering from tool, command, file, and fragment evidence queries after verifying detectors and manifests are order-independent.
 - Computed the incremental manifest once per run and added compact revision identities for every evidence family.
+- Replaced planner-hostile bound target predicates with a fixed internal SQL
+  fragment whitelist and rebuilt fact-table secondary indexes once around full
+  backfills. Incremental refreshes retain their targeted indexed updates.
 - Used `agent-perf`/Scalene on a 100,000-call synthetic workload. `_raw_rows` fell from 4.68 to 1.94 percent CPU attribution (`20260713T004417Z-167fcc53` to `20260713T005309Z-b5750e1d`), while unprofiled time fell from 8.75 to 8.01 seconds with the same 9,269 candidates.
 - Rejected a direct candidate serializer after it improved the synthetic workload by only 0.13 seconds, and rejected BLAKE2b manifest hashing after it regressed the workload to 9.27 seconds.
 - Added `scripts/benchmark_compression_lab.py` as the durable CP equivalence
@@ -396,14 +446,13 @@ Measured optimizations:
 
 Resume in this order:
 
-1. Finish CP1 verification, leave `.idea/` unstaged, and merge the focused
-   cold-path PR.
-2. Start CP2 from current `main`; do not combine schema or parallel-ingestion
-   work with the streaming detector contract.
-3. Land CP3, CP4, and CP5 serially because each changes the persisted inputs or
-   cache identity consumed by the next phase.
-4. Add CP6 only after a fresh profile proves source parsing is the dominant
-   remaining first-build cost.
+1. Merge CP3 PR #231 after its remote checks pass, leaving `.idea/` unstaged.
+2. Start CP4 from updated `main` and add revision-aware invalidation, including
+   a pricing/rate-card revision before derived costs or credits are persisted.
+3. Land CP5 serially because candidate persistence consumes CP4 cache identity.
+4. Add CP6 only after a fresh profile identifies the dominant remaining
+   first-build stages; explicit fact preparation is currently a measured
+   parallelization/ingestion-time target.
 
 ## Resume Instructions
 

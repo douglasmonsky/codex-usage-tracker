@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.compression import streaming_evidence as streaming_evidence_module
 from codex_usage_tracker.compression.detector_registry import default_detectors
 from codex_usage_tracker.compression.estimators import (
     build_estimator_index,
@@ -10,13 +12,20 @@ from codex_usage_tracker.compression.estimators import (
 )
 from codex_usage_tracker.compression.evidence import load_compression_evidence
 from codex_usage_tracker.compression.models import CompressionScope
+from codex_usage_tracker.compression.run_builder import build_compression_run
 from codex_usage_tracker.compression.run_cache import record_manifest
 from codex_usage_tracker.compression.streaming_evidence import (
     load_streaming_compression_evidence,
 )
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.store.api import upsert_usage_events
+from codex_usage_tracker.store.compression_fact_sync import (
+    sync_content_plan_compression_facts,
+)
+from codex_usage_tracker.store.compression_facts import backfill_compression_detector_facts
+from codex_usage_tracker.store.compression_schema import read_compression_source_generation
 from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.content_index_models import ContentIndexPlan
 from codex_usage_tracker.store.schema import init_db
 
 
@@ -28,6 +37,24 @@ def test_streaming_evidence_preserves_manifest_and_detector_output(tmp_path: Pat
 
     legacy = load_compression_evidence(db_path, scope)
     streamed = load_streaming_compression_evidence(db_path, scope, batch_size=2)
+    with connect(db_path) as conn:
+        backfill_compression_detector_facts(conn)
+        fact_indexes = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_compression_%_facts_%'"
+            )
+        }
+    assert {
+        "idx_compression_record_facts_scope",
+        "idx_compression_record_facts_thread",
+        "idx_compression_sequence_facts_scope",
+        "idx_compression_sequence_facts_category",
+        "idx_compression_thread_facts_activity",
+    } <= fact_indexes
+    fact_loader = getattr(streaming_evidence_module, "load_fact_compression_evidence", None)
+    assert fact_loader is not None, "fact-backed compression loader is missing"
+    fact_backed = fact_loader(db_path, scope)
 
     assert streamed.record_manifest == record_manifest(legacy)
     assert streamed.snapshot.coverage == legacy.coverage
@@ -36,6 +63,200 @@ def test_streaming_evidence_preserves_manifest_and_detector_output(tmp_path: Pat
     assert len(streamed.snapshot.tool_calls) < len(legacy.tool_calls)
     assert len(streamed.snapshot.content_fragments) < len(legacy.content_fragments)
     assert _detected_candidates(streamed.snapshot, scope) == _detected_candidates(legacy, scope)
+    assert fact_backed.snapshot == streamed.snapshot
+    assert fact_backed.record_manifest == streamed.record_manifest
+    assert _detected_candidates(fact_backed.snapshot, scope) == _detected_candidates(
+        streamed.snapshot, scope
+    )
+
+
+def test_v16_migration_defers_detector_fact_backfill(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(_usage_events(), db_path=db_path)
+    _seed_normalized_evidence(db_path)
+    expected_manifest = load_streaming_compression_evidence(
+        db_path, CompressionScope(include_archived=True)
+    ).record_manifest
+
+    with connect(db_path) as conn:
+        conn.executescript(
+            """
+            DROP TABLE compression_record_facts;
+            DROP TABLE compression_sequence_facts;
+            DROP TABLE compression_thread_facts;
+            DELETE FROM schema_migrations WHERE version = 16;
+            PRAGMA user_version = 15;
+            """
+        )
+        init_db(conn)
+        assert conn.execute("SELECT COUNT(*) FROM compression_record_facts").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM compression_sequence_facts").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM compression_thread_facts").fetchone()[0] == 0
+
+        backfill_compression_detector_facts(conn)
+        backfill_compression_detector_facts(conn)
+        record_count = conn.execute("SELECT COUNT(*) FROM compression_record_facts").fetchone()[0]
+        sequence_count = conn.execute("SELECT COUNT(*) FROM compression_sequence_facts").fetchone()[
+            0
+        ]
+        thread_count = conn.execute("SELECT COUNT(*) FROM compression_thread_facts").fetchone()[0]
+        thread_fact = conn.execute(
+            """
+            SELECT manifest_count, manifest_revision
+            FROM compression_thread_facts
+            WHERE manifest_key = 'thread:thread:one'
+            """
+        ).fetchone()
+
+    assert record_count == 3
+    assert sequence_count == 13
+    assert thread_count == 1
+    assert thread_fact is not None
+    assert thread_fact["manifest_count"] == 21
+    assert thread_fact["manifest_revision"] == expected_manifest["thread:thread:one"]["revision"]
+
+
+def test_usage_upsert_keeps_detector_facts_at_the_current_generation(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+
+    upsert_usage_events(_usage_events(), db_path=db_path)
+
+    with connect(db_path) as conn:
+        record_count = conn.execute("SELECT COUNT(*) FROM compression_record_facts").fetchone()[0]
+        state = conn.execute(
+            """
+            SELECT facts_version, source_generation
+            FROM compression_fact_state WHERE singleton = 1
+            """
+        ).fetchone()
+        generation = read_compression_source_generation(conn)
+
+    assert record_count == 3
+    assert state is not None
+    assert state["source_generation"] == generation
+
+
+def test_usage_append_only_rebuilds_the_affected_record_facts(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = _usage_events()
+    upsert_usage_events(events, db_path=db_path)
+    with connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TRIGGER protect_existing_compression_facts
+            BEFORE DELETE ON compression_record_facts
+            WHEN OLD.record_id != 'call-3'
+            BEGIN
+                SELECT RAISE(ABORT, 'existing fact was rebuilt');
+            END;
+            """
+        )
+
+    appended_at = "2026-07-10T10:03:00+00:00"
+    appended = replace(
+        events[-1],
+        record_id="call-3",
+        event_timestamp=appended_at,
+        line_number=4,
+        previous_record_id="call-2",
+        session_updated_at=appended_at,
+        thread_call_index=4,
+        turn_id="turn-3",
+        turn_timestamp=appended_at,
+    )
+    upsert_usage_events([appended], db_path=db_path)
+
+    with connect(db_path) as conn:
+        record_ids = {
+            str(row[0]) for row in conn.execute("SELECT record_id FROM compression_record_facts")
+        }
+    assert record_ids == {"call-0", "call-1", "call-2", "call-3"}
+
+
+def test_content_fact_sync_invalidates_an_exact_cached_run(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(_usage_events(), db_path=db_path)
+    _seed_normalized_evidence(db_path)
+    with connect(db_path) as conn:
+        backfill_compression_detector_facts(conn)
+
+    scope = CompressionScope(include_archived=True)
+    first = build_compression_run(db_path, scope)
+    with connect(db_path) as conn:
+        generation_before = read_compression_source_generation(conn)
+        conn.execute(
+            """
+            INSERT INTO content_fragments (
+                fragment_id, record_id, turn_key, fragment_kind, role, safe_label,
+                content_hash, content_size_bytes, fragment_text, includes_raw_fragment,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "fragment-cache-invalidation",
+                "call-2",
+                "turn-2",
+                "tool_output",
+                "tool",
+                "tool_output",
+                "hash-cache-invalidation",
+                20_000,
+                "",
+                0,
+                "2026-07-10T10:02:10+00:00",
+            ),
+        )
+        sync_content_plan_compression_facts(
+            conn,
+            plans=(ContentIndexPlan(source_path=Path("/tmp/synthetic/session.jsonl")),),
+        )
+        generation_after = read_compression_source_generation(conn)
+
+    second = build_compression_run(db_path, scope)
+    assert generation_after > generation_before
+    assert second["run_id"] != first["run_id"]
+    assert second["cache"]["mode"] != "exact"
+
+
+def test_source_replacement_removes_orphaned_detector_facts(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(_usage_events(), db_path=db_path)
+
+    upsert_usage_events(
+        [],
+        db_path=db_path,
+        replace_source_files=[Path("/tmp/synthetic/session.jsonl")],
+    )
+
+    with connect(db_path) as conn:
+        counts = {
+            table: int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+            for table in (
+                "compression_record_facts",
+                "compression_sequence_facts",
+                "compression_thread_facts",
+            )
+        }
+    assert counts == {
+        "compression_record_facts": 0,
+        "compression_sequence_facts": 0,
+        "compression_thread_facts": 0,
+    }
+
+
+def test_partial_sequence_facts_fall_back_to_streaming_evidence(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(_usage_events(), db_path=db_path)
+    _seed_normalized_evidence(db_path)
+    scope = CompressionScope(include_archived=True)
+    expected = load_streaming_compression_evidence(db_path, scope)
+    with connect(db_path) as conn:
+        backfill_compression_detector_facts(conn)
+        conn.execute("DELETE FROM compression_sequence_facts WHERE fact_key = 'command:rg-0'")
+
+    loaded = streaming_evidence_module.load_fact_compression_evidence(db_path, scope)
+    assert loaded.snapshot == expected.snapshot
+    assert loaded.record_manifest == expected.record_manifest
 
 
 def _detected_candidates(snapshot: Any, scope: CompressionScope) -> list[dict[str, Any]]:
@@ -204,5 +425,20 @@ def _seed_normalized_evidence(db_path: Path) -> None:
                 )
                 for index in range(3)
                 for part in range(2)
+            ]
+            + [
+                (
+                    "fragment-compaction-history",
+                    "call-2",
+                    "turn-2",
+                    "compaction_history",
+                    "system",
+                    "compaction_history",
+                    "hash-compaction-history",
+                    800,
+                    "",
+                    0,
+                    "2026-07-10T10:02:09+00:00",
+                )
             ],
         )
