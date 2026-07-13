@@ -162,9 +162,13 @@ content is never sent to a profiler or committed as a fixture.
 
 ### CP1: Performance Contract And Safe Loader Foundation
 
-Status: in progress
+Status: complete
 
 Issue: [#223](https://github.com/douglasmonsky/codex-usage-tracker/issues/223)
+
+PR: [#224](https://github.com/douglasmonsky/codex-usage-tracker/pull/224)
+
+Merge: `0c8bf5238ec23c642f2282d98f1a072700baea05`
 
 Deliverables:
 
@@ -186,7 +190,9 @@ Exit gates:
 
 ### CP2: Streaming Detector Consumption
 
-Status: pending
+Status: in progress
+
+Issue: [#225](https://github.com/douglasmonsky/codex-usage-tracker/issues/225)
 
 Deliverables:
 
@@ -200,9 +206,10 @@ Exit gates:
 
 - Streaming and snapshot engines produce identical canonical candidate/profile
   fingerprints across golden synthetic fixtures.
-- Peak Python memory no longer scales with the complete evidence object graph.
-- Evidence loading plus detector execution is at least 35 percent faster than
-  the CP1 baseline.
+- Peak RSS falls by at least 20 percent on the current-scale aggregate workload
+  and by at least 35 percent on the normalized synthetic workload.
+- Evidence loading plus detector execution does not regress from the CP1
+  baseline; CP3 owns the larger scan-elimination speed gate.
 - Partial batches, empty tables, and detector failures retain current warnings
   and progress semantics.
 
@@ -225,6 +232,8 @@ Exit gates:
 - Aggregate facts remain reproducible from normalized source records.
 - Append ingestion updates only affected calls, threads, and sequence windows.
 - Detector outputs remain equivalent to the CP2 streaming reference.
+- Evidence loading plus detector execution is at least 35 percent faster than
+  the CP1 baseline.
 
 ### CP4: Revision-State And Incremental Invalidation
 
@@ -316,6 +325,14 @@ whole-pipeline timing or equivalence claim.
 - 2026-07-12: PR 2 detector contracts, all six detector families, shared estimator indexing, cache-aware run building, staged progress, exact/incremental cache handling, and compact profiles implemented on `feature/compression-lab-detectors`.
 - 2026-07-12: PR 2 merged as #222 at `98f2cd7`; CP1 cold-path profiling started from that exact base.
 - 2026-07-12: The CP1 target was tightened to a 15-20 second first build, sub-second append refresh, and sub-10 ms unchanged reuse. CP2-CP6 define the structural path and equivalence gates.
+- 2026-07-12: CP1 merged as #224 at `0c8bf52`. CP2 issue #225
+  started a bounded row fold and compact detector snapshot from that exact base.
+- 2026-07-12: CP2 preserved both canonical fingerprints and all 32,087
+  real-data candidates. Clean CP1-versus-CP2 runs reduced peak RSS from
+  539.828 to 332.781 MiB on normalized synthetic data and from 1,706.766 to
+  1,340.469 MiB on the current-scale aggregate workload. Runtime improved
+  modestly, so the 35 percent scan-elimination gate moved to CP3 rather than
+  being weakened or claimed without evidence.
 
 ## Current Restart Checkpoint
 

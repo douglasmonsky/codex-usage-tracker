@@ -7,7 +7,10 @@ from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.store import compression_evidence
 from codex_usage_tracker.store.api import upsert_usage_events
-from codex_usage_tracker.store.compression_evidence import query_compression_evidence
+from codex_usage_tracker.store.compression_evidence import (
+    fold_compression_evidence_rows,
+    query_compression_evidence,
+)
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
 
@@ -91,6 +94,95 @@ def test_evidence_query_deduplicates_calls_and_reports_normalized_coverage(
         "parser_adapters": ["codex-jsonl"],
         "parser_versions": ["codex-jsonl-v2"],
         "content_index_enabled": True,
+    }
+
+
+def test_fold_evidence_rows_batches_scoped_results_and_matches_query_metadata(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            usage_event("call-1", timestamp="2026-07-10T10:00:00+00:00"),
+            usage_event(
+                "call-archived",
+                timestamp="2026-07-10T11:00:00+00:00",
+                archived=True,
+            ),
+        ],
+        db_path=db_path,
+    )
+    seed_normalized_evidence(db_path)
+    scope = {"include_archived": False, "thread": "thread:one"}
+    batches: list[tuple[str, list[object]]] = []
+
+    metadata = fold_compression_evidence_rows(
+        db_path,
+        scope=scope,
+        batch_size=1,
+        consumer=lambda category, batch: batches.append((category, batch)),
+    )
+    expected = query_compression_evidence(db_path, scope=scope)
+
+    assert all(len(batch) <= 1 for _, batch in batches)
+    assert [category for category, _ in batches] == [
+        "calls",
+        "turns",
+        "tool_calls",
+        "command_runs",
+        "file_events",
+        "file_events",
+        "content_fragments",
+        "content_fragments",
+    ]
+    assert metadata == {
+        "source_generation": expected["source_generation"],
+        "coverage": expected["coverage"],
+    }
+
+
+def test_fold_evidence_rows_batches_unfiltered_history_and_matches_query_metadata(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            usage_event("call-1", timestamp="2026-07-10T10:00:00+00:00"),
+            usage_event(
+                "call-archived",
+                timestamp="2026-07-10T11:00:00+00:00",
+                archived=True,
+            ),
+        ],
+        db_path=db_path,
+    )
+    seed_normalized_evidence(db_path)
+    scope = {"include_archived": True}
+    batches: list[tuple[str, list[object]]] = []
+
+    metadata = fold_compression_evidence_rows(
+        db_path,
+        scope=scope,
+        include_turns=False,
+        batch_size=1,
+        consumer=lambda category, batch: batches.append((category, batch)),
+    )
+    expected = query_compression_evidence(db_path, scope=scope, include_turns=False)
+
+    assert all(len(batch) <= 1 for _, batch in batches)
+    assert [category for category, _ in batches] == [
+        "calls",
+        "calls",
+        "tool_calls",
+        "command_runs",
+        "file_events",
+        "file_events",
+        "content_fragments",
+        "content_fragments",
+    ]
+    assert metadata == {
+        "source_generation": expected["source_generation"],
+        "coverage": expected["coverage"],
     }
 
 

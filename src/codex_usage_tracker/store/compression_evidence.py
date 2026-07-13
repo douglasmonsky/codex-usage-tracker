@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -88,6 +88,90 @@ def query_compression_evidence_rows(
     }
 
 
+def fold_compression_evidence_rows(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    scope: Mapping[str, Any],
+    consumer: Callable[[str, list[sqlite3.Row]], None],
+    include_turns: bool = True,
+    batch_size: int = 1_000,
+) -> dict[str, Any]:
+    """Stream scoped evidence rows to ``consumer`` and return snapshot metadata."""
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        scoped = not _is_unfiltered_all_history(scope)
+        if scoped:
+            _populate_scope_records(conn, scope)
+        call_count, _ = _fold_rows(
+            conn,
+            _scoped_sql(_CALLS_SQL, "u", scoped=scoped),
+            "calls",
+            consumer,
+            batch_size=batch_size,
+        )
+        turn_count = 0
+        if include_turns:
+            turn_count, _ = _fold_rows(
+                conn,
+                _scoped_sql(_TURNS_SQL, "t", scoped=scoped),
+                "turns",
+                consumer,
+                batch_size=batch_size,
+            )
+        tool_call_count, _ = _fold_rows(
+            conn,
+            _scoped_sql(_TOOL_CALLS_SQL, "t", scoped=scoped),
+            "tool_calls",
+            consumer,
+            batch_size=batch_size,
+        )
+        command_run_count, _ = _fold_rows(
+            conn,
+            _scoped_sql(_COMMAND_RUNS_SQL, "c", scoped=scoped),
+            "command_runs",
+            consumer,
+            batch_size=batch_size,
+        )
+        file_event_count, _ = _fold_rows(
+            conn,
+            _scoped_sql(_FILE_EVENTS_SQL, "f", scoped=scoped),
+            "file_events",
+            consumer,
+            batch_size=batch_size,
+        )
+        fragment_count, compaction_count = _fold_rows(
+            conn,
+            _scoped_sql(_FRAGMENTS_SQL, "f", scoped=scoped),
+            "content_fragments",
+            consumer,
+            batch_size=batch_size,
+            count_compactions=True,
+        )
+        source_coverage = _source_coverage(conn, scoped=scoped)
+        content_index_enabled = _content_index_enabled(conn)
+        turn_coverage = _turn_coverage(conn, scoped=scoped)
+        source_generation = read_compression_source_generation(conn)
+    return {
+        "source_generation": source_generation,
+        "coverage": _coverage_counts_payload(
+            call_count=call_count,
+            turn_count=turn_count,
+            tool_call_count=tool_call_count,
+            command_run_count=command_run_count,
+            file_event_count=file_event_count,
+            fragment_count=fragment_count,
+            compaction_count=compaction_count,
+            indexed_call_count=0,
+            source_coverage=source_coverage,
+            content_index_enabled=content_index_enabled,
+            turn_coverage=turn_coverage,
+        ),
+    }
+
+
 def _populate_scope_records(conn: sqlite3.Connection, scope: Mapping[str, Any]) -> None:
     conn.execute(
         """
@@ -135,6 +219,28 @@ def _populate_scope_records(conn: sqlite3.Connection, scope: Mapping[str, Any]) 
 
 def _raw_rows(conn: sqlite3.Connection, sql: str) -> list[sqlite3.Row]:
     return list(conn.execute(sql))
+
+
+def _fold_rows(
+    conn: sqlite3.Connection,
+    sql: str,
+    category: str,
+    consumer: Callable[[str, list[sqlite3.Row]], None],
+    *,
+    batch_size: int,
+    count_compactions: bool = False,
+) -> tuple[int, int]:
+    cursor = conn.execute(sql)
+    row_count = 0
+    compaction_count = 0
+    while batch := cursor.fetchmany(batch_size):
+        row_count += len(batch)
+        if count_compactions:
+            compaction_count += sum(
+                row["fragment_kind"] in {"compaction", "compaction_history"} for row in batch
+            )
+        consumer(category, batch)
+    return row_count, compaction_count
 
 
 def _rows(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
@@ -226,16 +332,45 @@ def _coverage_payload(
     indexed_calls = {
         str(row["record_id"]) for row in turns if bool(row["indexed_content_included"])
     }
+    return _coverage_counts_payload(
+        call_count=len(calls),
+        turn_count=len(turns),
+        tool_call_count=len(tool_calls),
+        command_run_count=len(command_runs),
+        file_event_count=len(file_events),
+        fragment_count=len(fragments),
+        compaction_count=len(compactions),
+        indexed_call_count=len(indexed_calls),
+        source_coverage=source_coverage,
+        content_index_enabled=content_index_enabled,
+        turn_coverage=turn_coverage,
+    )
+
+
+def _coverage_counts_payload(
+    *,
+    call_count: int,
+    turn_count: int,
+    tool_call_count: int,
+    command_run_count: int,
+    file_event_count: int,
+    fragment_count: int,
+    compaction_count: int,
+    indexed_call_count: int,
+    source_coverage: dict[str, Any],
+    content_index_enabled: bool,
+    turn_coverage: dict[str, int] | None,
+) -> dict[str, Any]:
     return {
-        "call_count": len(calls),
-        "turn_count": turn_coverage["turn_count"] if turn_coverage else len(turns),
-        "tool_call_count": len(tool_calls),
-        "command_run_count": len(command_runs),
-        "file_event_count": len(file_events),
-        "content_fragment_count": len(fragments),
-        "compaction_count": len(compactions),
+        "call_count": call_count,
+        "turn_count": turn_coverage["turn_count"] if turn_coverage else turn_count,
+        "tool_call_count": tool_call_count,
+        "command_run_count": command_run_count,
+        "file_event_count": file_event_count,
+        "content_fragment_count": fragment_count,
+        "compaction_count": compaction_count,
         "indexed_call_count": (
-            turn_coverage["indexed_call_count"] if turn_coverage else len(indexed_calls)
+            turn_coverage["indexed_call_count"] if turn_coverage else indexed_call_count
         ),
         "source_record_count": int(source_coverage.get("source_record_count") or 0),
         "parser_warning_record_count": int(source_coverage.get("parser_warning_record_count") or 0),
