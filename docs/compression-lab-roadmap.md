@@ -227,9 +227,11 @@ Exit gates:
 
 ### CP3: Detector-Ready Ingestion Aggregates
 
-Status: implementation complete; PR pending
+Status: implementation complete; PR open
 
 Issue: [#230](https://github.com/douglasmonsky/codex-usage-tracker/issues/230)
+
+PR: [#231](https://github.com/douglasmonsky/codex-usage-tracker/pull/231)
 
 Deliverables:
 
@@ -391,8 +393,8 @@ Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
 Branch: `feature/compression-detector-facts`
 
-CP2 merged through PR #228 at `980b954`. Issue #230 tracks CP3, which is
-implemented locally and awaiting final verification, commit, and PR.
+CP2 merged through PR #228 at `980b954`. CP3 is committed at `83af336` and open
+for review in PR #231 after passing the precommit and full verifier profiles.
 
 Validated behavior at this checkpoint:
 
@@ -444,8 +446,7 @@ Measured optimizations:
 
 Resume in this order:
 
-1. Finish CP3 verification, leave `.idea/` unstaged, and merge the focused
-   detector-fact PR.
+1. Merge CP3 PR #231 after its remote checks pass, leaving `.idea/` unstaged.
 2. Start CP4 from updated `main` and add revision-aware invalidation, including
    a pricing/rate-card revision before derived costs or credits are persisted.
 3. Land CP5 serially because candidate persistence consumes CP4 cache identity.
