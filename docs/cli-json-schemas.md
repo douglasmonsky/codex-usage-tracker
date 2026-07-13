@@ -351,6 +351,7 @@ usage_compression_status(run_id="compression_...")
 usage_compression_profile(run_id="compression_...")
 usage_compression_candidates(run_id="compression_...", limit=20, offset=0)
 usage_compression_candidate_detail(candidate_id="cmp_...", evidence_mode="handles")
+usage_compression_simulate(run_id="compression_...", candidate_ids=["cmp_..."])
 ```
 
 Schema: `codex-usage-tracker-compression-api-v1`
@@ -382,6 +383,24 @@ Candidate detail supports these disclosure levels:
 The serialized targets are 4 KiB for status, 8 KiB for profile, 16 KiB for a
 candidate page, and 24 KiB for candidate detail. Excerpts are additionally capped
 at 50 rows and 2,000 characters per excerpt even when larger values are supplied.
+
+Simulation accepts 1 to 50 unique candidate IDs from one completed run. It
+loads unique record/component capacity from persisted detector-ready facts,
+reapplies the same deterministic overlap allocator, and returns:
+
+- selected-candidate gross and overlap-adjusted low/likely/high totals;
+- unique eligible capacity and overlap-group counts;
+- per-candidate persisted versus simulated adjusted estimates;
+- a bounded record/component calculation trace; and
+- bounded intervention and verification rows.
+
+Simulation is aggregate-only and targets 16 KiB. Trace, verification, and then
+per-candidate rows are truncated before portfolio totals. Empty, duplicate,
+over-limit, unknown, or foreign-run selections return
+`invalid_candidate_selection`. A stale run returns `compression_run_stale` and
+`usage_compression_start` arguments that preserve its original scope and detector
+set while adding `refresh=true`; it does not return a potentially ambiguous
+historical portfolio.
 
 ```json
 {

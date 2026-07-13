@@ -148,7 +148,7 @@ def _apply_group_allocation(
     adjusted: dict[str, list[int]],
     overlaps: dict[str, set[str]],
 ) -> None:
-    allocations = _allocate_claim_ranges(claims, capacity)
+    allocations = allocate_claim_ranges(claims, capacity)
     active_ids = sorted(candidate_id for candidate_id, estimate in claims if estimate.high > 0)
     _record_overlaps(active_ids, overlaps)
     for candidate_id, estimate in allocations.items():
@@ -168,10 +168,11 @@ def _add_estimate(total: list[int], estimate: EstimateRange) -> None:
     total[2] += estimate.high
 
 
-def _allocate_claim_ranges(
+def allocate_claim_ranges(
     claims: list[tuple[str, EstimateRange]],
     capacity: int,
 ) -> dict[str, EstimateRange]:
+    """Allocate one record/component claim group within a fixed capacity."""
     current = {candidate_id: 0 for candidate_id, _estimate in claims}
     bounds: list[dict[str, int]] = []
     for attribute in ("low", "likely", "high"):

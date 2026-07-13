@@ -95,7 +95,11 @@ Exit gates:
 
 ### PR 4: Overlap-Aware Simulator
 
-Status: pending
+Status: complete
+
+Issue: [#240](https://github.com/douglasmonsky/codex-usage-tracker/issues/240)
+
+Branch: `feature/240-compression-simulator`
 
 Deliverables:
 
@@ -485,45 +489,50 @@ whole-pipeline timing or equivalence claim.
   selections use collision-free candidate IDs; candidate count and page rows
   share one SQLite snapshot; and error envelopes preserve known run identity.
   The full Agent Maintainer profile passed as
-  `20260713T175803017442Z-full-24f9a9b32803`; PR publication remains.
+  `20260713T175803017442Z-full-24f9a9b32803`. PR #239 merged at `792fe36` and
+  issue #238 is closed.
+- 2026-07-13: PR 4 issue #240 started from `792fe36`. The read-only simulator
+  hydrates up to 50 persisted candidates, loads exact record/component capacity
+  from detector-ready facts, reapplies the existing deterministic allocator,
+  and returns compact portfolio totals, bounded calculation groups, and
+  verification plans through `usage_compression_simulate`. Focused pure/API/MCP
+  and lifecycle tests pass.
+- 2026-07-13: Independent PR 4 review found that selected-claim maxima could
+  undercount records containing multiple disjoint tool outputs. The simulator
+  now reads exact detector-ready capacities, rejects stale or missing-capacity
+  runs with equivalent-scope refresh arguments, and forces aggregate-only
+  privacy flags. Eight hundred tests and full Agent Maintainer run
+  `20260713T191209272669Z-full-0eb1ed1f3ae5` pass; PR publication remains.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/238-compression-mcp-progress-cache`, tracking `origin/main` at
-`aa7e4e322473b2be2c4e6f78f8cbb71b704c82f2`.
+Branch: `feature/240-compression-simulator`, tracking `origin/main` at
+`792fe360e68626e1daf7594c790f0d02fb0c6ef4`.
 
 Pause checkpoint (2026-07-13):
 
-- CP6 merged through PR #237 at `88b89b8`; its issue #236 is closed. The
-  performance evidence below remains authoritative.
+- PR 3 merged through PR #239 at `792fe36`; issue #238 is closed. CP1-CP6 and
+  PR 3 evidence below remains authoritative.
 - Preserve the pre-existing untracked `.idea/` directory and local `uv.lock`.
-  Do not stage, remove, or modify them for PR 3.
-- PR 3 implementation and local verification are complete but not yet committed
+  Do not stage, remove, or modify them for PR 4.
+- PR 4 implementation and local verification are complete but not yet committed
   or published.
-  The worktree contains the async registry, shared API/payload layer, five MCP
-  tools, SQL-backed candidate filters, bounded content excerpts, schema v19,
-  contract docs, and focused tests. Keep these edits together with the existing
-  roadmap checkpoint commit `cb4e593`.
+  It adds one pure simulator, one validated API, one compact payload module, and
+  one MCP adapter without adding persistence, migrations, jobs, or detectors.
 - Serena semantic recovery was exhausted for this task after two bounded doctor
   probes and broker/history inspection. Use native `rg`, type checks, tests, and
   inspections for the rest of this task rather than retrying Serena.
-- An independent review found and the branch now repairs three correctness
-  risks: detector-subset candidate-ID collisions, mixed pagination snapshots,
-  and incomplete-run errors that lost known run identity. Candidate claim rows
-  now persist immutable model/thread/time metadata, migration 19 backfills old
-  claims, one SQLite read transaction covers count plus page rows, and an
-  oversized first row cannot produce a non-advancing cursor.
-- Focused lifecycle, deduplication, restart, migration, paging, privacy,
-  payload-budget, and error-envelope tests pass. The full Python suite reports
-  782 passing tests; Ruff, Pyright, Tach, Bandit, Markdown lint, release checks,
-  and the full Agent Maintainer profile pass. The remaining PR 3 work is the
-  focused commit, PR publication, GitHub CI, and merge.
-- PR 3 is only complete after immediate cold start, sub-500 ms representative
-  warm profile/list queries, compact default payloads without raw fragments, and
-  handles/summaries/bounded-excerpts detail modes are proven. Open and merge a
-  focused PR closing #238, then continue PR 4 and PR 5 as separate roadmap PRs.
+- Pure tests prove byte-stable ordering, shared-capacity capping, disjoint
+  preservation, subset reallocation, and lexical trace ordering. API/MCP tests
+  cover empty, duplicate, over-limit, unknown, foreign, incomplete, stale,
+  missing-capacity, multi-tool-output capacity, privacy, lifecycle routing, and
+  payload-budget behavior. Forty-four focused tests pass.
+- The full Python suite reports 800 passing tests. Ruff, Pyright, Tach, Xenon,
+  Bandit, Markdown lint, release checks, and the full Agent Maintainer profile
+  pass. The remaining PR 4 work is final diff/privacy review, focused commit,
+  PR publication, GitHub CI, and merge. Then continue PR 5 separately.
 
 Validated behavior at this checkpoint:
 

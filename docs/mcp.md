@@ -127,6 +127,7 @@ the highest-token thread summaries instead.
 - `usage_compression_profile`
 - `usage_compression_candidates`
 - `usage_compression_candidate_detail`
+- `usage_compression_simulate`
 - `usage_recommendations`
 - `session_usage`
 - `usage_call_context`
@@ -193,6 +194,7 @@ usage_compression_status(run_id="compression_...")
 usage_compression_profile(run_id="compression_...")
 usage_compression_candidates(run_id="compression_...", limit=20)
 usage_compression_candidate_detail(candidate_id="cmp_...", evidence_mode="handles")
+usage_compression_simulate(run_id="compression_...", candidate_ids=["cmp_..."])
 ```
 
 - `usage_compression_start(...)` returns immediately. It reuses an exact
@@ -215,13 +217,20 @@ usage_compression_candidate_detail(candidate_id="cmp_...", evidence_mode="handle
   handles. `evidence_mode="summaries"` returns bounded claim summaries.
   `evidence_mode="excerpts"` is the explicit opt-in that may return raw local
   indexed text; `evidence_limit` and `max_excerpt_chars` remain bounded.
+- `usage_compression_simulate(...)` recalculates overlap allocation for up to 50
+  explicitly selected candidates. It returns deterministic portfolio totals, a
+  bounded record/component calculation trace, and verification plans without
+  persisting state or returning indexed content. Unknown or foreign candidates
+  fail as one structured selection error. Stale runs return a structured error
+  with refresh arguments that preserve the original scope and detector set.
 
-All five tools use `codex-usage-tracker-compression-api-v1`. Common fields disclose run,
+All six tools use `codex-usage-tracker-compression-api-v1`. Common fields disclose run,
 scope, versions, coverage, cache/timing state, warnings/caveats, pagination,
 recommended next-tool arguments, `content_mode`, `includes_indexed_content`, and
 `includes_raw_fragments`. Default status, profile, candidate-page, and detail
 targets are 4 KiB, 8 KiB, 16 KiB, and 24 KiB respectively. Candidate pages never
-embed claims or excerpts.
+embed claims or excerpts. Simulation responses target 16 KiB and trim trace or
+verification rows before portfolio totals.
 
 ## Local Content And Raw Context
 
