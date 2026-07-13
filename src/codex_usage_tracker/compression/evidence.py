@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -11,7 +12,7 @@ from codex_usage_tracker.compression.models import (
     ComponentName,
     CompressionScope,
 )
-from codex_usage_tracker.store.compression_evidence import query_compression_evidence
+from codex_usage_tracker.store.compression_evidence import query_compression_evidence_rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,25 @@ class CallEvidence:
     exposure: ComponentExposure
     cache_ratio: float
     context_window_percent: float
+
+    def revision_identity(self) -> tuple[Any, ...]:
+        return (
+            self.record_id,
+            self.session_id,
+            self.thread_key,
+            self.event_timestamp,
+            self.model,
+            self.effort,
+            self.is_archived,
+            self.thread_call_index,
+            self.previous_record_id,
+            self.exposure.cached_input,
+            self.exposure.uncached_input,
+            self.exposure.output,
+            self.exposure.reasoning_output,
+            self.cache_ratio,
+            self.context_window_percent,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +82,17 @@ class ToolCallEvidence:
     duration_ms: int | None
     output_size_bytes: int
 
+    def revision_identity(self) -> tuple[Any, ...]:
+        return (
+            self.tool_call_key,
+            self.record_id,
+            self.turn_key,
+            self.tool_name,
+            self.status,
+            self.duration_ms,
+            self.output_size_bytes,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class CommandRunEvidence:
@@ -75,6 +106,19 @@ class CommandRunEvidence:
     output_size_bytes: int
     retry_group: str | None
 
+    def revision_identity(self) -> tuple[Any, ...]:
+        return (
+            self.command_run_key,
+            self.record_id,
+            self.turn_key,
+            self.command_root,
+            self.command_label,
+            self.exit_code,
+            self.status,
+            self.output_size_bytes,
+            self.retry_group,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class FileEventEvidence:
@@ -84,6 +128,16 @@ class FileEventEvidence:
     operation: str
     path_hash: str
     path_identity: str
+
+    def revision_identity(self) -> tuple[Any, ...]:
+        return (
+            self.file_event_key,
+            self.record_id,
+            self.turn_key,
+            self.operation,
+            self.path_hash,
+            self.path_identity,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,7 +262,7 @@ def load_compression_evidence(
     scope: CompressionScope,
 ) -> CompressionEvidenceSnapshot:
     """Load and normalize one scoped evidence snapshot from SQLite."""
-    payload = query_compression_evidence(
+    payload = query_compression_evidence_rows(
         db_path,
         scope=scope.as_dict(),
         include_turns=False,
@@ -234,88 +288,90 @@ def load_compression_evidence(
     )
 
 
-def _call(row: dict[str, Any]) -> CallEvidence:
+# Offsets mirror the private SQL projections in store/compression_evidence.py.
+# Positional access avoids millions of named row lookups on cold builds.
+def _call(row: sqlite3.Row) -> CallEvidence:
     return CallEvidence(
-        record_id=str(row["record_id"]),
-        session_id=str(row["session_id"]),
-        thread_key=str(row["thread_key"]),
-        event_timestamp=str(row["event_timestamp"]),
-        model=_optional_text(row.get("model")),
-        effort=_optional_text(row.get("effort")),
-        is_archived=bool(row.get("is_archived")),
-        thread_call_index=_optional_int(row.get("thread_call_index")),
-        previous_record_id=_optional_text(row.get("previous_record_id")),
+        record_id=str(row[0]),
+        session_id=str(row[1]),
+        thread_key=str(row[2]),
+        event_timestamp=str(row[3]),
+        model=_optional_text(row[4]),
+        effort=_optional_text(row[5]),
+        is_archived=bool(row[6]),
+        thread_call_index=_optional_int(row[7]),
+        previous_record_id=_optional_text(row[8]),
         exposure=ComponentExposure(
-            cached_input=_integer(row.get("cached_input_tokens")),
-            uncached_input=_integer(row.get("uncached_input_tokens")),
-            output=_integer(row.get("output_tokens")),
-            reasoning_output=_integer(row.get("reasoning_output_tokens")),
+            cached_input=_integer(row[9]),
+            uncached_input=_integer(row[10]),
+            output=_integer(row[11]),
+            reasoning_output=_integer(row[12]),
         ),
-        cache_ratio=float(row.get("cache_ratio") or 0),
-        context_window_percent=float(row.get("context_window_percent") or 0),
+        cache_ratio=float(row[13] or 0),
+        context_window_percent=float(row[14] or 0),
     )
 
 
-def _turn(row: dict[str, Any]) -> TurnEvidence:
+def _turn(row: sqlite3.Row) -> TurnEvidence:
     return TurnEvidence(
-        turn_key=str(row["turn_key"]),
-        record_id=str(row["record_id"]),
-        session_id=str(row["session_id"]),
-        role=str(row["role"]),
-        event_timestamp=_optional_text(row.get("event_timestamp")),
-        content_size_bytes=_integer(row.get("content_size_bytes")),
-        indexed_content_included=bool(row.get("indexed_content_included")),
+        turn_key=str(row[0]),
+        record_id=str(row[1]),
+        session_id=str(row[2]),
+        role=str(row[3]),
+        event_timestamp=_optional_text(row[4]),
+        content_size_bytes=_integer(row[5]),
+        indexed_content_included=bool(row[6]),
     )
 
 
-def _tool_call(row: dict[str, Any]) -> ToolCallEvidence:
+def _tool_call(row: sqlite3.Row) -> ToolCallEvidence:
     return ToolCallEvidence(
-        tool_call_key=str(row["tool_call_key"]),
-        record_id=str(row["record_id"]),
-        turn_key=_optional_text(row.get("turn_key")),
-        tool_name=str(row["tool_name"]),
-        status=_optional_text(row.get("status")),
-        duration_ms=_optional_int(row.get("duration_ms")),
-        output_size_bytes=_integer(row.get("output_size_bytes")),
+        tool_call_key=str(row[0]),
+        record_id=str(row[1]),
+        turn_key=_optional_text(row[2]),
+        tool_name=str(row[3]),
+        status=_optional_text(row[4]),
+        duration_ms=_optional_int(row[5]),
+        output_size_bytes=_integer(row[6]),
     )
 
 
-def _command_run(row: dict[str, Any]) -> CommandRunEvidence:
+def _command_run(row: sqlite3.Row) -> CommandRunEvidence:
     return CommandRunEvidence(
-        command_run_key=str(row["command_run_key"]),
-        record_id=str(row["record_id"]),
-        turn_key=_optional_text(row.get("turn_key")),
-        command_root=str(row["command_root"]),
-        command_label=str(row.get("command_label") or ""),
-        exit_code=_optional_int(row.get("exit_code")),
-        status=_optional_text(row.get("status")),
-        output_size_bytes=_integer(row.get("output_size_bytes")),
-        retry_group=_optional_text(row.get("retry_group")),
+        command_run_key=str(row[0]),
+        record_id=str(row[1]),
+        turn_key=_optional_text(row[2]),
+        command_root=str(row[3]),
+        command_label=str(row[4] or ""),
+        exit_code=_optional_int(row[5]),
+        status=_optional_text(row[6]),
+        output_size_bytes=_integer(row[7]),
+        retry_group=_optional_text(row[8]),
     )
 
 
-def _file_event(row: dict[str, Any]) -> FileEventEvidence:
+def _file_event(row: sqlite3.Row) -> FileEventEvidence:
     return FileEventEvidence(
-        file_event_key=str(row["file_event_key"]),
-        record_id=str(row["record_id"]),
-        turn_key=_optional_text(row.get("turn_key")),
-        operation=str(row["operation"]),
-        path_hash=str(row["path_hash"]),
-        path_identity=str(row.get("path_identity") or ""),
+        file_event_key=str(row[0]),
+        record_id=str(row[1]),
+        turn_key=_optional_text(row[2]),
+        operation=str(row[3]),
+        path_hash=str(row[4]),
+        path_identity=str(row[5] or ""),
     )
 
 
-def _fragment(row: dict[str, Any]) -> ContentFragmentEvidence:
+def _fragment(row: sqlite3.Row) -> ContentFragmentEvidence:
     return ContentFragmentEvidence(
-        fragment_id=str(row["fragment_id"]),
-        record_id=str(row["record_id"]),
-        turn_key=_optional_text(row.get("turn_key")),
-        fragment_kind=str(row["fragment_kind"]),
-        role=_optional_text(row.get("role")),
-        safe_label=str(row.get("safe_label") or ""),
-        content_hash=str(row["content_hash"]),
-        content_size_bytes=_integer(row.get("content_size_bytes")),
-        includes_raw_fragment=bool(row.get("includes_raw_fragment")),
+        fragment_id=str(row[0]),
+        record_id=str(row[1]),
+        turn_key=_optional_text(row[2]),
+        fragment_kind=str(row[3]),
+        role=_optional_text(row[4]),
+        safe_label=str(row[5] or ""),
+        content_hash=str(row[6]),
+        content_size_bytes=_integer(row[7]),
+        includes_raw_fragment=bool(row[8]),
     )
 
 

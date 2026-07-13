@@ -109,9 +109,11 @@ def build_compression_run(
         total_detectors=len(detectors),
     )
     try:
+        current_manifest = record_manifest(snapshot)
         reused, detector_snapshot, cache_mode = incremental_inputs(
             db_path,
             snapshot=snapshot,
+            current_manifest=current_manifest,
             previous=previous,
             scope=scope,
         )
@@ -167,7 +169,7 @@ def build_compression_run(
             warnings=warnings,
             cache_mode=cache_mode,
             duration_ms=duration_ms,
-            record_manifest=record_manifest(snapshot),
+            record_manifest=current_manifest,
             estimator_index=estimator_index,
         )
         compact_profile = public_profile(stored_profile)

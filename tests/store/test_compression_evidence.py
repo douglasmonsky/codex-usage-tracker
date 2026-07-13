@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from codex_usage_tracker.compression.evidence import load_compression_evidence
+from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.store import compression_evidence
 from codex_usage_tracker.store.api import upsert_usage_events
@@ -90,6 +92,31 @@ def test_evidence_query_deduplicates_calls_and_reports_normalized_coverage(
         "parser_versions": ["codex-jsonl-v2"],
         "content_index_enabled": True,
     }
+
+
+def test_typed_evidence_loader_bypasses_dictionary_materialization(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [usage_event("call-1", timestamp="2026-07-10T10:00:00+00:00")],
+        db_path=db_path,
+    )
+    seed_normalized_evidence(db_path)
+
+    def unexpected_dictionary_materialization(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("typed evidence loading must not materialize row dictionaries")
+
+    monkeypatch.setattr(compression_evidence, "_rows", unexpected_dictionary_materialization)
+
+    evidence = load_compression_evidence(db_path, CompressionScope())
+
+    assert [call.record_id for call in evidence.calls] == ["call-1"]
+    assert len(evidence.tool_calls) == 1
+    assert len(evidence.command_runs) == 1
+    assert len(evidence.file_events) == 2
+    assert len(evidence.content_fragments) == 2
 
 
 def test_evidence_query_applies_time_model_effort_and_archived_scope(tmp_path: Path) -> None:

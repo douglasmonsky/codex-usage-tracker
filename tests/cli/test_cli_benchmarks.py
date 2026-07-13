@@ -87,6 +87,44 @@ def test_synthetic_history_benchmark_with_source_logs_smoke(tmp_path: Path) -> N
     assert benchmark["context_loads"]["middle"]["source_scan_ms"] >= 0
 
 
+def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
+    args = [
+        "scripts/benchmark_compression_lab.py",
+        "--rows",
+        "100",
+        "--batch-size",
+        "25",
+        "--db-dir",
+        str(tmp_path),
+        "--json",
+        "--enforce-thresholds",
+        "--max-cold-seconds",
+        "10",
+    ]
+
+    payload = _run_benchmark_json(args)
+    repeated = _run_benchmark_json(args)
+
+    assert payload["schema_version"] == 1
+    assert payload["synthetic"] is True
+    assert payload["rows"] == 100
+    assert payload["cold_build"]["candidate_count"] == 10
+    assert payload["cold_build"]["peak_rss_mb"] > 0
+    assert payload["cold_build"]["candidate_fingerprint"]
+    assert payload["cold_build"]["profile_fingerprint"]
+    assert payload["cold_build"]["stage_timings_seconds"]["evidence_loaded"] >= 0
+    assert payload["warm_build"]["cache_mode"] == "exact"
+    assert payload["threshold_failures"] == []
+    assert (
+        repeated["cold_build"]["candidate_fingerprint"]
+        == payload["cold_build"]["candidate_fingerprint"]
+    )
+    assert (
+        repeated["cold_build"]["profile_fingerprint"]
+        == payload["cold_build"]["profile_fingerprint"]
+    )
+
+
 def _run_benchmark_json(args: list[str]) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(

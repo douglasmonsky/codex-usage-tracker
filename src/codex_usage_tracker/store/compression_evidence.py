@@ -20,23 +20,49 @@ def query_compression_evidence(
     include_turns: bool = True,
 ) -> dict[str, Any]:
     """Load one deduplicated evidence snapshot for a normalized scope."""
+    payload = query_compression_evidence_rows(
+        db_path,
+        scope=scope,
+        include_turns=include_turns,
+    )
+    return {
+        **payload,
+        "calls": _rows(payload["calls"]),
+        "turns": _rows(payload["turns"]),
+        "tool_calls": _rows(payload["tool_calls"]),
+        "command_runs": _rows(payload["command_runs"]),
+        "file_events": _rows(payload["file_events"]),
+        "content_fragments": _rows(payload["content_fragments"]),
+        "compactions": _rows(payload["compactions"]),
+    }
+
+
+def query_compression_evidence_rows(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    scope: Mapping[str, Any],
+    include_turns: bool = True,
+) -> dict[str, Any]:
+    """Load SQLite rows for direct domain-object materialization."""
     with connect(db_path) as conn:
         init_db(conn)
         scoped = not _is_unfiltered_all_history(scope)
         if scoped:
             _populate_scope_records(conn, scope)
-        calls = _rows(conn, _scoped_sql(_CALLS_SQL, "u", scoped=scoped))
-        turns = _rows(conn, _scoped_sql(_TURNS_SQL, "t", scoped=scoped)) if include_turns else []
-        tool_calls = _rows(conn, _scoped_sql(_TOOL_CALLS_SQL, "t", scoped=scoped))
-        command_runs = _rows(conn, _scoped_sql(_COMMAND_RUNS_SQL, "c", scoped=scoped))
-        file_events = _rows(conn, _scoped_sql(_FILE_EVENTS_SQL, "f", scoped=scoped))
-        fragments = _rows(conn, _scoped_sql(_FRAGMENTS_SQL, "f", scoped=scoped))
+        calls = _raw_rows(conn, _scoped_sql(_CALLS_SQL, "u", scoped=scoped))
+        turns = (
+            _raw_rows(conn, _scoped_sql(_TURNS_SQL, "t", scoped=scoped)) if include_turns else []
+        )
+        tool_calls = _raw_rows(conn, _scoped_sql(_TOOL_CALLS_SQL, "t", scoped=scoped))
+        command_runs = _raw_rows(conn, _scoped_sql(_COMMAND_RUNS_SQL, "c", scoped=scoped))
+        file_events = _raw_rows(conn, _scoped_sql(_FILE_EVENTS_SQL, "f", scoped=scoped))
+        fragments = _raw_rows(conn, _scoped_sql(_FRAGMENTS_SQL, "f", scoped=scoped))
         source_coverage = _source_coverage(conn, scoped=scoped)
         content_index_enabled = _content_index_enabled(conn)
         turn_coverage = None if include_turns else _turn_coverage(conn, scoped=scoped)
         source_generation = read_compression_source_generation(conn)
     compactions = [
-        row for row in fragments if row.get("fragment_kind") in {"compaction", "compaction_history"}
+        row for row in fragments if row["fragment_kind"] in {"compaction", "compaction_history"}
     ]
     return {
         "calls": calls,
@@ -107,8 +133,12 @@ def _populate_scope_records(conn: sqlite3.Connection, scope: Mapping[str, Any]) 
     )
 
 
-def _rows(conn: sqlite3.Connection, sql: str) -> list[dict[str, Any]]:
-    return [cast(dict[str, Any], dict(row)) for row in conn.execute(sql)]
+def _raw_rows(conn: sqlite3.Connection, sql: str) -> list[sqlite3.Row]:
+    return list(conn.execute(sql))
+
+
+def _rows(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
+    return [cast(dict[str, Any], dict(row)) for row in rows]
 
 
 def _is_unfiltered_all_history(scope: Mapping[str, Any]) -> bool:
@@ -182,19 +212,19 @@ def _turn_coverage(conn: sqlite3.Connection, *, scoped: bool) -> dict[str, int]:
 
 def _coverage_payload(
     *,
-    calls: list[dict[str, Any]],
-    turns: list[dict[str, Any]],
-    tool_calls: list[dict[str, Any]],
-    command_runs: list[dict[str, Any]],
-    file_events: list[dict[str, Any]],
-    fragments: list[dict[str, Any]],
-    compactions: list[dict[str, Any]],
+    calls: list[sqlite3.Row],
+    turns: list[sqlite3.Row],
+    tool_calls: list[sqlite3.Row],
+    command_runs: list[sqlite3.Row],
+    file_events: list[sqlite3.Row],
+    fragments: list[sqlite3.Row],
+    compactions: list[sqlite3.Row],
     source_coverage: dict[str, Any],
     content_index_enabled: bool,
     turn_coverage: dict[str, int] | None,
 ) -> dict[str, Any]:
     indexed_calls = {
-        str(row["record_id"]) for row in turns if bool(row.get("indexed_content_included"))
+        str(row["record_id"]) for row in turns if bool(row["indexed_content_included"])
     }
     return {
         "call_count": len(calls),
@@ -271,7 +301,6 @@ SELECT
     t.output_size_bytes
 FROM tool_calls AS t
 {scope_join}
-ORDER BY COALESCE(t.started_at, ''), t.tool_call_key
 """
 
 _COMMAND_RUNS_SQL = """
@@ -287,7 +316,6 @@ SELECT
     c.retry_group
 FROM command_runs AS c
 {scope_join}
-ORDER BY c.command_run_key
 """
 
 _FILE_EVENTS_SQL = """
@@ -300,7 +328,6 @@ SELECT
     f.path_hash AS path_identity
 FROM file_events AS f
 {scope_join}
-ORDER BY f.file_event_key
 """
 
 _FRAGMENTS_SQL = """
@@ -316,5 +343,4 @@ SELECT
     f.includes_raw_fragment
 FROM content_fragments AS f
 {scope_join}
-ORDER BY f.created_at, f.fragment_id
 """

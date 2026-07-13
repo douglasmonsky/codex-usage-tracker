@@ -11,8 +11,12 @@ from pathlib import Path
 from typing import Any, Protocol, TypeVar, cast
 
 from codex_usage_tracker.compression.evidence import (
+    CallEvidence,
+    CommandRunEvidence,
     CompressionEvidenceSnapshot,
     ContentFragmentEvidence,
+    FileEventEvidence,
+    ToolCallEvidence,
     TurnEvidence,
 )
 from codex_usage_tracker.compression.identifiers import (
@@ -50,6 +54,7 @@ def incremental_inputs(
     db_path: Path,
     *,
     snapshot: CompressionEvidenceSnapshot,
+    current_manifest: Mapping[str, Any],
     previous: Mapping[str, Any] | None,
     scope: CompressionScope,
 ) -> tuple[list[CandidateDraft], CompressionEvidenceSnapshot, str]:
@@ -59,7 +64,6 @@ def incremental_inputs(
     old_manifest = _mapping(previous.get("aggregate_profile")).get("_cache_manifest")
     if not isinstance(old_manifest, Mapping):
         return [], snapshot, "cold"
-    current_manifest = record_manifest(snapshot)
     changed_records, affected_threads = _affected_scope(old_manifest, current_manifest)
     previous_drafts = _load_previous_drafts(
         db_path,
@@ -226,7 +230,17 @@ def _append_event_manifest(
 
 
 def _revision_identity(event: Any) -> Any:
-    if isinstance(event, (TurnEvidence, ContentFragmentEvidence)):
+    if isinstance(
+        event,
+        (
+            CallEvidence,
+            TurnEvidence,
+            ToolCallEvidence,
+            CommandRunEvidence,
+            FileEventEvidence,
+            ContentFragmentEvidence,
+        ),
+    ):
         return event.revision_identity()
     return event
 
