@@ -133,6 +133,33 @@ def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
     )
 
 
+def test_compression_lab_benchmark_with_normalized_evidence(tmp_path: Path) -> None:
+    payload = _run_benchmark_json(
+        [
+            "scripts/benchmark_compression_lab.py",
+            "--rows",
+            "100",
+            "--batch-size",
+            "25",
+            "--db-dir",
+            str(tmp_path),
+            "--with-normalized-evidence",
+            "--max-peak-rss-mb",
+            "512",
+            "--json",
+            "--enforce-thresholds",
+            "--max-cold-seconds",
+            "10",
+        ],
+    )
+
+    assert payload["normalized_evidence"] is True
+    assert payload["normalized_evidence_rows"] == 500
+    assert payload["cold_build"]["candidate_count"] > 10
+    assert payload["cold_build"]["peak_rss_mb"] <= 512
+    assert payload["threshold_failures"] == []
+
+
 def _run_benchmark_json(args: list[str]) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
