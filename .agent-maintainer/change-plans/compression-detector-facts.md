@@ -1,7 +1,7 @@
 +++
 id = "compression-detector-facts"
 kind = "cohesive-migration"
-status = "active"
+status = "complete"
 base_ref = "origin/main"
 expires = 2026-07-27
 allowed_paths = [".agent-maintainer/change-plans/compression-detector-facts.md", "src/**", "tests/**", "docs/**", "scripts/benchmark_compression_lab.py"]

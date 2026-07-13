@@ -68,9 +68,9 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(str(source_rows[0]["source_record_hash"])) == 64
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 16
+    assert state["schema_version"] == 17
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == list(range(1, 17))
+    assert [row["version"] for row in state["migrations"]] == list(range(1, 18))
     with connect(db_path) as conn:
         init_db(conn)
         facts = conn.execute("SELECT COUNT(*) AS count FROM call_diagnostic_facts").fetchone()
@@ -101,7 +101,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "16"
+    assert metadata["schema_version"] == "17"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -129,9 +129,24 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
         content_feature = conn.execute(
             "SELECT enabled FROM content_index_features WHERE feature_key = 'fts5'"
         ).fetchone()
+        source_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(source_files)").fetchall()
+        }
+        revision_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(compression_revision_state)").fetchall()
+        }
 
-    assert versions == list(range(1, 17))
-    assert user_version == 16
+    assert versions == list(range(1, 18))
+    assert user_version == 17
+    assert {
+        "parsed_prefix_tail_hash",
+        "parsed_row_count",
+        "source_device",
+        "source_generation",
+        "source_inode",
+    } <= source_columns
+    assert {"call_generation", "command_generation", "file_generation"} <= revision_columns
     assert {
         "content_index_features",
         "conversation_turns",

@@ -39,9 +39,11 @@ from codex_usage_tracker.compression.streaming_evidence import (
     load_fact_compression_evidence,
 )
 from codex_usage_tracker.store.compression_candidates import replace_compression_candidates
+from codex_usage_tracker.store.compression_revisions import (
+    current_compression_revision_vector,
+)
 from codex_usage_tracker.store.compression_runs import (
     create_compression_run,
-    current_compression_source_generation,
     find_compression_run,
     find_current_compression_profile,
     update_compression_run,
@@ -61,12 +63,19 @@ def build_compression_run(
     """Build, persist, and return one compact compression profile."""
     started = time.perf_counter()
     detectors = select_detectors(detector_families)
+    selected_families = tuple(detector.family for detector in detectors)
     detector_version = _detector_set_version(detectors)
     scope_hash = stable_scope_hash(scope)
-    source_generation = current_compression_source_generation(db_path)
+    revision_vector = current_compression_revision_vector(
+        db_path,
+        detector_families=selected_families,
+        estimator_revision=ESTIMATOR_POLICY_V1.version,
+    )
+    source_generation = revision_vector.generation
     cached_profile = _fast_cached_profile(
         db_path,
-        source_generation=source_generation,
+        revision_key=revision_vector.cache_key,
+        detector_families=selected_families,
         scope_hash=scope_hash,
         detector_version=detector_version,
         force=force,
@@ -97,6 +106,7 @@ def build_compression_run(
         source_generation=source_generation,
         coverage=snapshot.coverage.as_dict(),
         status="running",
+        revision_key=revision_vector.cache_key,
     )
     run_id = str(run["run_id"])
     warnings: list[dict[str, Any]] = []
@@ -209,7 +219,8 @@ def build_compression_run(
 def _fast_cached_profile(
     db_path: Path,
     *,
-    source_generation: int,
+    revision_key: str,
+    detector_families: Sequence[str],
     scope_hash: str,
     detector_version: str,
     force: bool,
@@ -218,7 +229,7 @@ def _fast_cached_profile(
         return None
     cached_profile = find_current_compression_profile(
         db_path,
-        source_generation=source_generation,
+        revision_key=revision_key,
         scope_hash=scope_hash,
         detector_set_version=detector_version,
         estimator_version=ESTIMATOR_POLICY_V1.version,
@@ -226,7 +237,12 @@ def _fast_cached_profile(
     )
     if cached_profile is None:
         return None
-    if current_compression_source_generation(db_path) != source_generation:
+    current_revision = current_compression_revision_vector(
+        db_path,
+        detector_families=detector_families,
+        estimator_revision=ESTIMATOR_POLICY_V1.version,
+    )
+    if current_revision.cache_key != revision_key:
         return None
     return public_profile(cached_profile, cache_mode="exact")
 
