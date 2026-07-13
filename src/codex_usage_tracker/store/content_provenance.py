@@ -4,26 +4,6 @@ from __future__ import annotations
 
 import sqlite3
 
-from codex_usage_tracker.store.content_index_models import ContentIndexPlan
-
-
-def _content_usage_rows_for_plans(
-    conn: sqlite3.Connection,
-    *,
-    source_plans: list[ContentIndexPlan],
-) -> dict[str, dict[int, dict[str, object]]]:
-    rows_by_path: dict[str, dict[int, dict[str, object]]] = {}
-    for plan in source_plans:
-        rows_by_path[str(plan.source_path)] = {
-            line_number: dict(row)
-            for line_number, row in _usage_rows_by_token_line(
-                conn,
-                source_file=str(plan.source_path),
-                min_line_number=None if plan.replace_existing else plan.start_line + 1,
-            ).items()
-        }
-    return rows_by_path
-
 
 def _usage_rows_by_token_line(
     conn: sqlite3.Connection,

@@ -10,9 +10,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
-from codex_usage_tracker.store.compression_schema import (
-    create_compression_revision_tables,
-)
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
 
@@ -101,7 +98,6 @@ def touch_compression_revisions(
         raise ValueError(f"unknown compression revision dimensions: {sorted(unknown)}")
     if not selected:
         return _read_global_generation(conn)
-    create_compression_revision_tables(conn)
     assignments = ["generation = generation + 1"]
     assignments.extend(
         f"{_DIMENSION_COLUMNS[dimension]} = {_DIMENSION_COLUMNS[dimension]} + 1"

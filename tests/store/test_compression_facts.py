@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from codex_usage_tracker.store.api import refresh_usage_index, reset_usage_database
+from codex_usage_tracker.store.compression_fact_contract import call_revision_identity
 from codex_usage_tracker.store.compression_facts import backfill_compression_detector_facts
 from codex_usage_tracker.store.compression_schema import (
     read_compression_source_generation,
@@ -40,6 +41,20 @@ def test_content_refresh_updates_detector_fact_exposure(tmp_path: Path) -> None:
     assert fact_row["content_exposure_tokens"] > 0
     assert fact_state is not None
     assert fact_state["source_generation"] == source_generation
+
+
+def test_direct_ingestion_facts_match_legacy_backfill(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    with connect(db_path) as conn:
+        direct = _fact_table_snapshot(conn)
+        backfill_compression_detector_facts(conn)
+        legacy = _fact_table_snapshot(conn)
+
+    assert direct == legacy
 
 
 def test_append_refresh_does_not_rebuild_historical_detector_facts(
@@ -157,3 +172,42 @@ def test_failed_full_backfill_rolls_back_rows_and_indexes(tmp_path: Path) -> Non
     assert restored_count == original_count
     assert "idx_compression_record_facts_scope" in indexes
     assert "idx_compression_sequence_facts_scope" in indexes
+
+
+def _fact_table_snapshot(conn) -> dict[str, list[tuple[object, ...]]]:
+    snapshots: dict[str, list[tuple[object, ...]]] = {}
+    for table in (
+        "compression_record_facts",
+        "compression_sequence_facts",
+        "compression_thread_facts",
+    ):
+        columns = [str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})")]
+        order_columns = ", ".join(str(index + 1) for index in range(len(columns)))
+        rows = conn.execute(
+            f"SELECT * FROM {table} ORDER BY {order_columns}"  # nosec B608
+        ).fetchall()
+        snapshots[table] = [tuple(row) for row in rows]
+    return snapshots
+
+
+def test_call_revision_identity_ignores_derived_thread_links() -> None:
+    unlinked = (
+        "record",
+        "session",
+        "thread",
+        "2026-01-01T00:00:00Z",
+        "model",
+        "high",
+        0,
+        None,
+        None,
+        10,
+        20,
+        30,
+        40,
+        0.5,
+        75.0,
+    )
+    linked = (*unlinked[:7], 3, "previous-record", *unlinked[9:])
+
+    assert call_revision_identity(unlinked) == call_revision_identity(linked)

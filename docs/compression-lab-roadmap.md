@@ -287,11 +287,13 @@ Exit gates:
 
 ### CP5: Candidate Persistence Pipeline
 
-Status: implementation complete; PR open
+Status: complete
 
 Issue: [#234](https://github.com/douglasmonsky/codex-usage-tracker/issues/234)
 
 PR: [#235](https://github.com/douglasmonsky/codex-usage-tracker/pull/235)
+
+Merge: `99c859a`
 
 Deliverables:
 
@@ -311,7 +313,9 @@ Exit gates:
 
 ### CP6: Profile-Guided Parallel Ingestion
 
-Status: pending
+Status: implementation and local validation complete; PR pending
+
+Issue: [#236](https://github.com/douglasmonsky/codex-usage-tracker/issues/236)
 
 Deliverables:
 
@@ -430,19 +434,99 @@ whole-pipeline timing or equivalence claim.
   candidate-heavy persistence, 3.555-second cold analysis, and 3.737 ms exact
   reuse. Candidate/profile fingerprints remained unchanged, one-event JSONL
   append refresh remained 20.0 ms, and peak RSS fell to 320.484 MiB.
+- 2026-07-13: CP5 merged through PR #235 at `99c859a`. Agent Perf run
+  `20260713T104332Z-7a85ad69` identified repeated persistence passes as the
+  dominant true first-refresh cost, so CP6 moved aggregate, normalized content,
+  provenance, diagnostic, and compression-fact production onto one parser pass
+  with a bounded process queue and one deterministic SQLite writer.
+- 2026-07-13: The initial clean post-refactor three-run CP6 gate generated
+  100,000 synthetic token rows across 400 JSONL files (138.5 MB). Parallel
+  refresh median was 17.729 seconds and worst-of-three was 17.740 seconds
+  versus a 25.638-second serial median, a 30.850 percent speedup. Peak RSS was
+  455.578 MiB coordinator RSS. Every benchmarked aggregate, summary, source,
+  content, FTS, provenance, allowance, diagnostic, revision, and
+  compression-fact table had identical row counts and fingerprints between
+  serial and parallel builds. A subsequent hardened validation added sampled
+  process-tree RSS rather than relying on coordinator memory alone, expanded
+  parity to all 18 persisted table families, and exercised serial retry without
+  re-entering the content-index process pool. It completed in 19.614 seconds
+  parallel versus 26.416 seconds serial with 460.156 MiB process-tree RSS.
+- 2026-07-13: CP6 rejected in-memory SQLite temporary storage after it raised
+  peak RSS to 604.8 MiB, rejected multi-row fact inserts after they regressed
+  persistence, and rejected larger worker payload batches that increased IPC
+  and memory without improving wall time. The selected defaults cap workers at
+  four, batch 16 source files per write cycle, use a bounded queue, and retain
+  deterministic serial fallback.
+- 2026-07-13: Agent Perf run `20260713T131211Z-5d4c9590` found no dominant
+  Python hot loop in a direct 25,000-row refresh. The largest individual self
+  CPU attributions were SQLite connection and bounded persistence helpers, each
+  below 0.5 percent; the remaining elapsed time is primarily native SQLite I/O
+  and child-process parsing. A six-worker trial improved a comparable loaded
+  run by only about 0.16 seconds while increasing sampled process-tree RSS by
+  roughly 119 MiB, so CP6 retains the four-worker cap.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/compression-candidate-persistence`
+Branch: `feature/compression-parallel-ingestion`
 
-CP4 merged through PR #233 at `0809875`. CP5 is committed at `0fccb04` and open
-for review in PR #235 after passing the precommit and full verifier profiles.
+CP5 merged through PR #235 at `99c859a`. CP6 implementation, independent review
+hardening, Serena semantic verification, and Agent Perf attribution are
+complete. The clean timing gate, hardened parity/memory validation, and final
+repository-wide verifier passed; PR publication remains.
+
+Completion checkpoint (2026-07-13):
+
+- Preserve every current CP6 source, test, documentation, benchmark, and change-
+  plan edit. Do not stage or remove the pre-existing `.idea/` directory or the
+  untracked local `uv.lock`.
+- Serena was healthy for this exact worktree and successfully provided semantic
+  symbol/reference queries plus an IDE inspection pass. Its refresh endpoint
+  later stalled while rechecking three already-edited type warnings. Two bounded
+  doctor probes remained stalled, broker status reported no reclaimable service,
+  and history was inspected once. Do not retry Serena again in this task; native
+  mypy and the focused refresh/content-index tests pass after the narrow typing
+  cleanup.
+- Agent Perf/Scalene run `20260713T131211Z-5d4c9590` profiled a direct 25,000-row
+  refresh. Its report is at
+  `/Users/Monsky/Library/Application Support/agent-perf/runs/20260713T131211Z-5d4c9590/report.md`.
+  No Python function dominated self CPU; native SQLite persistence and worker
+  parsing remain the material costs. Keep the four-worker cap. The measured six-
+  worker trial saved only about 0.16 seconds while adding roughly 119 MiB RSS.
+- Independent review hardening is already implemented and covered by focused
+  tests: complete process-tree RSS sampling, 18-table serial/parallel parity,
+  forced serial content-index retry, batched large-thread handling, completed
+  no-op progress phases, and honest overlapping progress timing labels. The
+  hardened focused suite passed 38 tests, and precommit verifier run
+  `20260713T125231838869Z-precommit-48b3ad5da22f` passed.
+- The clean three-run gate established runtime repeatability at a 17.729-second
+  median and 17.740-second worst run. A later hardened run established exact
+  parity across all 18 table families and sampled the complete process tree at
+  460.156 MiB while completing in 19.614 seconds versus 26.416 seconds serial.
+  These complementary runs cover every exit criterion without weakening a
+  threshold.
+- A deliberately non-gating probe during sustained macOS FileProvider/CloudKit
+  contention completed in 21.300 seconds versus 28.930 seconds serial, retained
+  exact 18-table parity, and used 450.234 MiB process-tree RSS. Its 26.373 percent
+  speedup and bounded memory are useful stress evidence, but its wall time is
+  excluded from the clean timing gate because `fileproviderd` was consuming
+  roughly a full core before, during, and after the run.
+- Final full verifier run `20260713T144343635673Z-full-c52b22e023d7` passed after
+  repairing a locally duplicated `node_modules/@types` installation with
+  lockfile-backed `npm ci`. Dashboard typecheck, targeted mypy, 15 focused
+  refresh/content-index/large-batch tests, release readiness, and
+  `git diff --check` also pass. The final repository state passed precommit
+  verifier run `20260713T152213304672Z-precommit-fb3701902b39`.
+- Review the complete diff and explicit staging list, commit as
+  `perf: parallelize first-refresh ingestion`, push, open the focused PR closing
+  #236, wait for CI, squash-merge, and update this ledger with the PR and merge
+  commit.
 
 Validated behavior at this checkpoint:
 
-- Schema v17 migrates existing source and compression-run tables additively.
+- Schema v18 migrates existing source and compression-run tables additively and
+  adds the source-file/line lookup index used by the one-pass ingestion writer.
 - Append plans verify stored device/inode identity and a bounded hash at the
   prior parse boundary before reusing byte and parser-state cursors.
 - Source rows persist byte offsets, row counts, parser revision, bounded source
@@ -464,6 +548,13 @@ Validated behavior at this checkpoint:
   encoding.
 - Estimation still runs immediately after each detector while evidence is
   resident. Global overlap allocation remains intentionally portfolio-wide.
+- Default first refresh parses each source once and streams aggregate rows,
+  normalized content, provenance, diagnostics, and compression facts through a
+  bounded queue to one SQLite writer.
+- Refreshes replacing more than SQLite's variable limit of source files batch
+  cleanup safely and rebuild content FTS once after the complete replacement.
+- Worker output is merged in source-plan order; one-file, small-history, custom
+  parser, and process-pool-failure paths remain serial.
 
 Latest CP3 real-data benchmark (`include_archived=true`, all-history scope):
 
@@ -499,6 +590,15 @@ Latest CP5 synthetic gate (100,000 calls, 500,000 normalized evidence rows):
   one-event JSONL append refresh: 20.0 ms.
 - Canonical candidate and profile fingerprints match CP2-CP4 exactly.
 
+Latest CP6 true first-refresh gate (100,000 token rows, 400 JSONL files):
+
+- Parallel median: 17.729 seconds; worst-of-three: 17.740 seconds.
+- Serial median: 25.638 seconds; measured speedup: 30.850 percent.
+- Hardened validation: 19.614 seconds parallel versus 26.416 seconds serial,
+  with 460.156 MiB sampled process-tree RSS against the 544 MiB ceiling.
+- All 18 persisted table families had exact serial/parallel row-count and
+  fingerprint parity. Coordinator RSS remains a secondary diagnostic.
+
 Measured optimizations:
 
 - Removed quadratic claim-to-record membership validation during candidate estimation.
@@ -521,11 +621,10 @@ Measured optimizations:
 
 Resume in this order:
 
-1. Finish CP5 verification, leave `.idea/` unstaged, and merge the focused
-   candidate-persistence PR.
-2. Add CP6 only after a fresh profile identifies the dominant remaining
-   first-build stages; explicit fact preparation is currently a measured
-   parallelization/ingestion-time target.
+1. Open and merge the focused CP6 PR, leaving `.idea/` and the local `uv.lock`
+   unstaged, then record its PR and merge commit here.
+2. Continue with the next Compression Lab roadmap unit: compact MCP progress
+   and shared-cache contracts.
 
 ## Resume Instructions
 

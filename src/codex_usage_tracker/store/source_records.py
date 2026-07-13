@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.parser.state import PARSER_ADAPTER_VERSION
 from codex_usage_tracker.store.connection import connect
@@ -31,6 +32,25 @@ SOURCE_RECORD_HASH_BASIS = "source_file_id:line_number:record_id"
 SOURCE_RECORD_SHAPE_LABEL = "token_count"
 SOURCE_RECORD_CREATED_FROM = "usage_events"
 SQLITE_VARIABLE_BATCH_SIZE = 500
+
+
+def content_usage_row_from_event(event: UsageEvent) -> dict[str, object]:
+    """Build the provenance fields content extraction needs before SQLite insertion."""
+    source_file_id = _stable_hash(event.source_file)
+    return {
+        "record_id": event.record_id,
+        "session_id": event.session_id,
+        "turn_id": event.turn_id,
+        "event_timestamp": event.event_timestamp,
+        "source_file": event.source_file,
+        "line_number": event.line_number,
+        "source_file_id": source_file_id,
+        "source_record_hash": _stable_hash(
+            f"{source_file_id}:{event.line_number}:{event.record_id}"
+        ),
+        "parser_adapter": _parser_adapter_name(PARSER_ADAPTER_VERSION),
+        "parser_version": PARSER_ADAPTER_VERSION,
+    }
 
 
 def sync_source_records(
@@ -57,6 +77,24 @@ def sync_source_records(
             total += _sync_source_records_chunk(conn, "u.source_file", chunk)
         return total
     return _sync_source_records_chunk(conn)
+
+
+def upsert_source_records_from_events(
+    conn: sqlite3.Connection,
+    *,
+    events: Iterable[UsageEvent],
+) -> int:
+    """Persist source provenance directly from parsed usage events."""
+
+    payloads = [_source_record_payload_from_event(event) for event in events]
+    if not payloads:
+        return 0
+    before = conn.total_changes
+    conn.executemany(
+        _source_record_upsert_sql(),
+        ([payload[column] for column in SOURCE_RECORD_COLUMNS] for payload in payloads),
+    )
+    return conn.total_changes - before
 
 
 def query_source_records(
@@ -246,6 +284,26 @@ def _source_record_payload(row: sqlite3.Row) -> dict[str, object]:
         "raw_shape_label": SOURCE_RECORD_SHAPE_LABEL,
         "parser_adapter": _parser_adapter_name(parser_version),
         "parser_version": parser_version,
+        "parse_warnings_json": "[]",
+        "created_from": SOURCE_RECORD_CREATED_FROM,
+    }
+
+
+def _source_record_payload_from_event(event: UsageEvent) -> dict[str, object]:
+    source_file_id = _stable_hash(event.source_file)
+    return {
+        "record_id": event.record_id,
+        "source_file_id": source_file_id,
+        "source_file_hash": source_file_id,
+        "line_number": event.line_number,
+        "event_timestamp": event.event_timestamp,
+        "source_record_hash": _stable_hash(
+            f"{source_file_id}:{event.line_number}:{event.record_id}"
+        ),
+        "hash_basis": SOURCE_RECORD_HASH_BASIS,
+        "raw_shape_label": SOURCE_RECORD_SHAPE_LABEL,
+        "parser_adapter": _parser_adapter_name(PARSER_ADAPTER_VERSION),
+        "parser_version": PARSER_ADAPTER_VERSION,
         "parse_warnings_json": "[]",
         "created_from": SOURCE_RECORD_CREATED_FROM,
     }

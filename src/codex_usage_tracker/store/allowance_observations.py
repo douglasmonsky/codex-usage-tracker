@@ -49,6 +49,25 @@ def sync_allowance_observations_for_record_ids(
     unique_record_ids = list(dict.fromkeys(record_ids))
     if not unique_record_ids:
         return 0
+    has_allowance_source = conn.execute(
+        """
+        SELECT 1
+        FROM usage_events
+        WHERE rate_limit_primary_used_percent IS NOT NULL
+           OR rate_limit_primary_window_minutes IS NOT NULL
+           OR rate_limit_primary_resets_at IS NOT NULL
+           OR rate_limit_secondary_used_percent IS NOT NULL
+           OR rate_limit_secondary_window_minutes IS NOT NULL
+           OR rate_limit_secondary_resets_at IS NOT NULL
+        LIMIT 1
+        """
+    ).fetchone()
+    if has_allowance_source is None:
+        has_existing_observation = conn.execute(
+            "SELECT 1 FROM allowance_observations LIMIT 1"
+        ).fetchone()
+        if has_existing_observation is None:
+            return 0
     inserted = 0
     for start in range(0, len(unique_record_ids), ALLOWANCE_SYNC_BATCH_SIZE):
         chunk = unique_record_ids[start : start + ALLOWANCE_SYNC_BATCH_SIZE]

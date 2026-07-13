@@ -396,14 +396,18 @@ def stamp_compression_fact_state(
 
 def _ensure_compression_storage(conn: sqlite3.Connection) -> None:
     conn.execute("DROP INDEX IF EXISTS idx_compression_candidate_records_record")
-    conn.executescript(
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS compression_source_state (
             singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
             generation INTEGER NOT NULL
-        );
+        )
+        """
+    )
+    conn.execute(
+        """
         INSERT OR IGNORE INTO compression_source_state(singleton, generation)
-        VALUES (1, 0);
+        VALUES (1, 0)
         """
     )
     columns = {

@@ -11,6 +11,7 @@ from codex_usage_tracker.core.models import SessionInfo, UsageEvent
 from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME
 from codex_usage_tracker.parser import state as _parser_state
 from codex_usage_tracker.parser.jsonl_v1 import (
+    JsonlEntryObserver,
     ParsedUsageFile,
     parse_codex_jsonl_v1,
 )
@@ -53,6 +54,7 @@ class ParserAdapter:
         start_byte: int = 0,
         start_line: int = 0,
         initial_state: ParserState | None = None,
+        entry_observer: JsonlEntryObserver | None = None,
     ) -> ParsedUsageFile:
         return parse_codex_jsonl_v1(
             path,
@@ -61,6 +63,7 @@ class ParserAdapter:
             start_byte=start_byte,
             start_line=start_line,
             initial_state=initial_state,
+            entry_observer=entry_observer,
         )
 
 
@@ -135,6 +138,7 @@ def parse_usage_events_from_file_with_state(
     start_byte: int = 0,
     start_line: int = 0,
     initial_state: ParserState | None = None,
+    entry_observer: JsonlEntryObserver | None = None,
 ) -> ParsedUsageFile:
     """Parse one Codex JSONL log and return an aggregate-only continuation cursor."""
 
@@ -145,6 +149,7 @@ def parse_usage_events_from_file_with_state(
         start_byte=start_byte,
         start_line=start_line,
         initial_state=initial_state,
+        entry_observer=entry_observer,
     )
 
 

@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-COMPRESSION_FACTS_VERSION = 1
+COMPRESSION_FACTS_VERSION = 2
 MIN_TOOL_OUTPUT_TOKENS = 4_096
 MIN_TOOL_OUTPUT_BYTES = (MIN_TOOL_OUTPUT_TOKENS * 4) - 3
 SHELL_ROOTS = frozenset({"git", "nl", "rg", "sed"})
@@ -69,8 +69,6 @@ def call_revision_identity(row: Sequence[Any]) -> tuple[object, ...]:
         optional_text(row[4]),
         optional_text(row[5]),
         bool(row[6]),
-        optional_int(row[7]),
-        optional_text(row[8]),
         int(row[9] or 0),
         int(row[10] or 0),
         int(row[11] or 0),

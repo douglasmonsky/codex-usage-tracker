@@ -2,21 +2,29 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.content_extract import (
     MAX_FRAGMENT_CHARS as MAX_FRAGMENT_CHARS,
 )
-from codex_usage_tracker.store.content_extract import (
-    _decode_content_envelope,
-    _extract_content_rows_for_source_file,
+from codex_usage_tracker.store.content_index_bulk import (
+    add_content_index_result as _add_content_index_result,
 )
-from codex_usage_tracker.store.content_index_event_store import upsert_pending_event_rows
+from codex_usage_tracker.store.content_index_bulk import (
+    deferred_content_indexes as _deferred_content_indexes,
+)
+from codex_usage_tracker.store.content_index_bulk import (
+    emit_content_index_progress as _emit_content_index_progress,
+)
+from codex_usage_tracker.store.content_index_bulk import (
+    index_content_entries as _index_content_entries,
+)
+from codex_usage_tracker.store.content_index_bulk import (
+    index_precleaned_content_batches as _index_precleaned_content_batches,
+)
 from codex_usage_tracker.store.content_index_models import (
     ContentIndexPlan as ContentIndexPlan,
 )
@@ -27,9 +35,14 @@ from codex_usage_tracker.store.content_index_models import (
 from codex_usage_tracker.store.content_index_models import (
     ContentIndexResult as ContentIndexResult,
 )
-from codex_usage_tracker.store.content_index_stream import (
-    _flush_pending_content_rows,
-    _StreamingContentAccumulator,
+from codex_usage_tracker.store.content_index_parallel import (
+    index_content_for_source_plans_parallel as _index_content_for_source_plans_parallel,
+)
+from codex_usage_tracker.store.content_index_parallel import (
+    parallel_content_index_worker_count as _parallel_content_index_worker_count,
+)
+from codex_usage_tracker.store.content_index_source import (
+    index_content_for_source_file as _index_content_for_source_file,
 )
 from codex_usage_tracker.store.content_persistence import (
     CONTENT_INDEX_TABLES as CONTENT_INDEX_TABLES,
@@ -38,15 +51,7 @@ from codex_usage_tracker.store.content_persistence import (
     _clear_content_fts as _clear_content_fts,
 )
 from codex_usage_tracker.store.content_persistence import (
-    _content_counts_for_source_file,
-    _sync_content_fts_for_source_file,
-    _upsert_turn_rows,
-)
-from codex_usage_tracker.store.content_persistence import (
     _rebuild_content_fts as _rebuild_content_fts,
-)
-from codex_usage_tracker.store.content_persistence import (
-    _upsert_fragment_rows as _upsert_fragment_rows,
 )
 from codex_usage_tracker.store.content_persistence import (
     _upsert_sql as _upsert_sql,
@@ -56,10 +61,6 @@ from codex_usage_tracker.store.content_persistence import (
 )
 from codex_usage_tracker.store.content_persistence import (
     delete_content_index_rows_for_source_files as delete_content_index_rows_for_source_files,
-)
-from codex_usage_tracker.store.content_provenance import (
-    _content_usage_rows_for_plans,
-    _usage_rows_by_token_line,
 )
 from codex_usage_tracker.store.content_query import (
     DEFAULT_SEARCH_SNIPPET_CHARS as DEFAULT_SEARCH_SNIPPET_CHARS,
@@ -79,10 +80,6 @@ from codex_usage_tracker.store.content_trace import (
 from codex_usage_tracker.store.content_trace import (
     trace_thread_content as trace_thread_content,
 )
-
-_PARALLEL_CONTENT_INDEX_WORKERS_ENV = "CODEX_USAGE_TRACKER_CONTENT_INDEX_WORKERS"
-_PARALLEL_CONTENT_INDEX_MIN_FILES = 4
-_PARALLEL_CONTENT_INDEX_MAX_WORKERS = 8
 
 
 def index_content_for_source_files(
@@ -107,6 +104,7 @@ def index_content_for_source_plans(
     *,
     plans: Iterable[ContentIndexPlan],
     progress_callback: ContentIndexProgressCallback | None = None,
+    force_serial: bool = False,
 ) -> ContentIndexResult:
     """Populate normalized bounded local content rows using refresh parse plans."""
 
@@ -114,14 +112,14 @@ def index_content_for_source_plans(
     total_sources = len(source_plans)
     _emit_content_index_progress(
         progress_callback,
-        status="running",
+        status="running" if total_sources else "completed",
         completed=0,
         total=total_sources,
         message="Indexing local content",
         content_fragments=0,
     )
     defer_full_fts_rebuild = any(plan.replace_existing for plan in source_plans)
-    worker_count = _parallel_content_index_worker_count(len(source_plans))
+    worker_count = 1 if force_serial else _parallel_content_index_worker_count(source_plans)
     if worker_count > 1:
         result = _index_content_for_source_plans_parallel(
             conn,
@@ -140,6 +138,55 @@ def index_content_for_source_plans(
     if source_plans:
         touch_compression_revisions(conn, {"commands", "files", "fragments", "tools"})
     return result
+
+
+def index_preextracted_content_rows(
+    conn: sqlite3.Connection,
+    *,
+    entries: Iterable[tuple[ContentIndexPlan, _ExtractedContentRows]],
+    progress_callback: ContentIndexProgressCallback | None = None,
+    total_sources: int | None = None,
+    defer_full_fts_rebuild: bool | None = None,
+    replacement_cleanup_done: bool = False,
+    write_batch_sources: int = 1,
+    defer_secondary_indexes: bool = False,
+) -> ContentIndexResult:
+    """Persist parser-produced content rows with one deterministic SQLite writer."""
+    extracted_entries, total_sources, defer_full_fts_rebuild = _normalize_preextracted_entries(
+        entries,
+        total_sources=total_sources,
+        defer_full_fts_rebuild=defer_full_fts_rebuild,
+    )
+    _emit_content_index_progress(
+        progress_callback,
+        status="running" if total_sources else "completed",
+        completed=0,
+        total=total_sources,
+        message="Indexing parser-produced content",
+        content_fragments=0,
+    )
+    if _use_precleaned_bulk(
+        replacement_cleanup_done=replacement_cleanup_done,
+        write_batch_sources=write_batch_sources,
+        defer_full_fts_rebuild=defer_full_fts_rebuild,
+    ):
+        return _index_precleaned_with_indexes(
+            conn,
+            entries=extracted_entries,
+            total_sources=total_sources,
+            defer_full_fts_rebuild=defer_full_fts_rebuild,
+            write_batch_sources=write_batch_sources,
+            defer_secondary_indexes=defer_secondary_indexes,
+            progress_callback=progress_callback,
+        )
+    return _index_content_entries(
+        conn,
+        entries=extracted_entries,
+        total_sources=total_sources,
+        defer_full_fts_rebuild=defer_full_fts_rebuild,
+        replacement_cleanup_done=replacement_cleanup_done,
+        progress_callback=progress_callback,
+    )
 
 
 def _index_content_for_source_plans_serial(
@@ -161,13 +208,11 @@ def _index_content_for_source_plans_serial(
             start_line=plan.start_line,
             sync_fts=sync_fts,
         )
-        needs_full_fts_rebuild = needs_full_fts_rebuild or (
-            plan.replace_existing and result.source_files > 0
-        )
+        needs_full_fts_rebuild |= _replaced_source_with_rows(plan, result)
         totals = _add_content_index_result(totals, result)
         _emit_content_index_progress(
             progress_callback,
-            status="running" if index < total_sources else "completed",
+            status=_progress_status(index, total_sources),
             completed=index,
             total=total_sources,
             message="Indexed local content",
@@ -179,95 +224,61 @@ def _index_content_for_source_plans_serial(
     return totals
 
 
-def _index_content_for_source_plans_parallel(
-    conn: sqlite3.Connection,
+def _normalize_preextracted_entries(
+    entries: Iterable[tuple[ContentIndexPlan, _ExtractedContentRows]],
     *,
-    source_plans: list[ContentIndexPlan],
-    sync_fts: bool,
-    progress_callback: ContentIndexProgressCallback | None,
-    worker_count: int,
-) -> ContentIndexResult:
-    usage_rows_by_path = _content_usage_rows_for_plans(conn, source_plans=source_plans)
-    totals = ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
-    needs_full_fts_rebuild = False
-    completed = 0
-    total_sources = len(source_plans)
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = {
-            executor.submit(
-                _extract_content_rows_for_source_file,
-                source_path=plan.source_path,
-                usage_rows=usage_rows_by_path.get(str(plan.source_path), {}),
-                start_byte=0 if plan.replace_existing else plan.start_byte,
-                start_line=0 if plan.replace_existing else plan.start_line,
-            ): plan
-            for plan in source_plans
-        }
-        for future in as_completed(futures):
-            plan = futures[future]
-            extracted = future.result()
-            result = _write_extracted_content_rows(
-                conn,
-                extracted=extracted,
-                replace_existing=plan.replace_existing,
-                sync_fts=sync_fts,
-                start_line=0 if plan.replace_existing else plan.start_line,
-            )
-            needs_full_fts_rebuild = needs_full_fts_rebuild or (
-                plan.replace_existing and result.source_files > 0
-            )
-            totals = _add_content_index_result(totals, result)
-            completed += 1
-            _emit_content_index_progress(
-                progress_callback,
-                status="running" if completed < total_sources else "completed",
-                completed=completed,
-                total=total_sources,
-                message="Indexed local content",
-                content_fragments=totals.content_fragments,
-                conversation_turns=totals.conversation_turns,
-                workers=worker_count,
-            )
-    if needs_full_fts_rebuild:
-        _rebuild_content_fts(conn)
-    return totals
-
-
-def _add_content_index_result(
-    left: ContentIndexResult,
-    right: ContentIndexResult,
-) -> ContentIndexResult:
-    return ContentIndexResult(
-        source_files=left.source_files + right.source_files,
-        conversation_turns=left.conversation_turns + right.conversation_turns,
-        content_fragments=left.content_fragments + right.content_fragments,
-        parse_warnings=left.parse_warnings + right.parse_warnings,
+    total_sources: int | None,
+    defer_full_fts_rebuild: bool | None,
+) -> tuple[Iterable[tuple[ContentIndexPlan, _ExtractedContentRows]], int, bool]:
+    if total_sources is not None and defer_full_fts_rebuild is not None:
+        return entries, total_sources, defer_full_fts_rebuild
+    buffered_entries = list(entries)
+    return (
+        buffered_entries,
+        len(buffered_entries),
+        any(plan.replace_existing for plan, _rows in buffered_entries),
     )
 
 
-def _emit_content_index_progress(
-    progress_callback: ContentIndexProgressCallback | None,
+def _use_precleaned_bulk(
     *,
-    status: str,
-    completed: int,
-    total: int,
-    message: str,
-    **extra: object,
-) -> None:
-    if progress_callback is None:
-        return
-    percent = 100.0 if total <= 0 else round(min(100.0, (completed / total) * 100.0), 1)
-    payload: dict[str, object] = {
-        "schema": "codex-usage-tracker-refresh-progress-v1",
-        "phase": "indexing_content",
-        "status": status,
-        "message": message,
-        "completed": completed,
-        "total": total,
-        "percent": percent,
-    }
-    payload.update(extra)
-    progress_callback(payload)
+    replacement_cleanup_done: bool,
+    write_batch_sources: int,
+    defer_full_fts_rebuild: bool,
+) -> bool:
+    return replacement_cleanup_done and write_batch_sources > 1 and defer_full_fts_rebuild
+
+
+def _index_precleaned_with_indexes(
+    conn: sqlite3.Connection,
+    *,
+    entries: Iterable[tuple[ContentIndexPlan, _ExtractedContentRows]],
+    total_sources: int,
+    defer_full_fts_rebuild: bool,
+    write_batch_sources: int,
+    defer_secondary_indexes: bool,
+    progress_callback: ContentIndexProgressCallback | None,
+) -> ContentIndexResult:
+    with _deferred_content_indexes(conn, enabled=defer_secondary_indexes):
+        return _index_precleaned_content_batches(
+            conn,
+            entries=entries,
+            total_sources=total_sources,
+            defer_full_fts_rebuild=defer_full_fts_rebuild,
+            write_batch_sources=write_batch_sources,
+            progress_callback=progress_callback,
+        )
+
+
+def _replaced_source_with_rows(
+    plan: ContentIndexPlan,
+    result: ContentIndexResult,
+) -> bool:
+    return plan.replace_existing and result.source_files > 0
+
+
+def _progress_status(completed: int, total: int) -> str:
+    return "running" if completed < total else "completed"
 
 
 def _dedupe_content_index_plans(
@@ -279,151 +290,3 @@ def _dedupe_content_index_plans(
         if existing is None or plan.replace_existing or plan.start_byte < existing.start_byte:
             by_path[plan.source_path] = plan
     return by_path.values()
-
-
-def _write_extracted_content_rows(
-    conn: sqlite3.Connection,
-    *,
-    extracted: _ExtractedContentRows,
-    replace_existing: bool,
-    sync_fts: bool,
-    start_line: int,
-) -> ContentIndexResult:
-    if not extracted.has_usage_rows:
-        return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
-
-    if replace_existing:
-        delete_content_index_rows_for_source_files(
-            conn,
-            placeholders="?",
-            source_files_to_replace=[extracted.source_path],
-            sync_fts=sync_fts,
-        )
-    if extracted.turn_rows:
-        _upsert_turn_rows(conn, extracted.turn_rows)
-    if extracted.fragment_rows:
-        _upsert_fragment_rows(conn, extracted.fragment_rows)
-    upsert_pending_event_rows(conn, extracted.event_rows)
-
-    if sync_fts:
-        if replace_existing:
-            _rebuild_content_fts(conn)
-        else:
-            _sync_content_fts_for_source_file(
-                conn,
-                source_file=extracted.source_path,
-                min_line_start=start_line + 1,
-            )
-    counts = _content_counts_for_source_file(conn, source_file=extracted.source_path)
-    return ContentIndexResult(
-        source_files=1,
-        conversation_turns=counts["conversation_turns"],
-        content_fragments=counts["content_fragments"],
-        parse_warnings=extracted.parse_warnings,
-    )
-
-
-def _parallel_content_index_worker_count(plan_count: int) -> int:
-    if plan_count < _PARALLEL_CONTENT_INDEX_MIN_FILES:
-        return 1
-    configured = _configured_parallel_content_index_workers()
-    if configured is not None:
-        return min(plan_count, configured)
-    return min(plan_count, max(1, os.cpu_count() or 1), _PARALLEL_CONTENT_INDEX_MAX_WORKERS)
-
-
-def _configured_parallel_content_index_workers() -> int | None:
-    raw_value = os.environ.get(_PARALLEL_CONTENT_INDEX_WORKERS_ENV)
-    if raw_value is None or raw_value.strip() == "":
-        return None
-    try:
-        return max(1, int(raw_value))
-    except ValueError:
-        return None
-
-
-def _stream_content_rows(
-    conn: sqlite3.Connection,
-    *,
-    source_path: Path,
-    start_byte: int,
-    start_line: int,
-    usage_rows: dict[int, sqlite3.Row],
-) -> _StreamingContentAccumulator | None:
-    accumulator = _StreamingContentAccumulator()
-    try:
-        with source_path.open("rb") as handle:
-            if start_byte > 0:
-                handle.seek(start_byte)
-            for line_number, raw_line in enumerate(handle, start_line + 1):
-                decoded = _decode_content_envelope(raw_line)
-                if decoded is None:
-                    accumulator.parse_warnings += 1
-                    continue
-                envelope, payload = decoded
-                accumulator.consume(
-                    conn,
-                    envelope=envelope,
-                    payload=payload,
-                    line_number=line_number,
-                    usage_row=usage_rows.get(line_number),
-                )
-    except OSError:
-        return None
-    return accumulator
-
-
-def _index_content_for_source_file(
-    conn: sqlite3.Connection,
-    *,
-    source_path: Path,
-    replace_existing: bool = True,
-    start_byte: int = 0,
-    start_line: int = 0,
-    sync_fts: bool = True,
-) -> ContentIndexResult:
-    usage_rows = _usage_rows_by_token_line(
-        conn,
-        source_file=str(source_path),
-        min_line_number=None if replace_existing else start_line + 1,
-    )
-    if not usage_rows:
-        return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
-
-    if replace_existing:
-        start_byte = 0
-        start_line = 0
-        delete_content_index_rows_for_source_files(
-            conn,
-            placeholders="?",
-            source_files_to_replace=[str(source_path)],
-            sync_fts=sync_fts,
-        )
-    accumulator = _stream_content_rows(
-        conn,
-        source_path=source_path,
-        start_byte=start_byte,
-        start_line=start_line,
-        usage_rows=usage_rows,
-    )
-    if accumulator is None:
-        return ContentIndexResult(source_files=0, conversation_turns=0, content_fragments=0)
-
-    _flush_pending_content_rows(conn, accumulator.rows)
-
-    if sync_fts:
-        if replace_existing:
-            _rebuild_content_fts(conn)
-        else:
-            _sync_content_fts_for_source_file(
-                conn,
-                source_file=str(source_path),
-                min_line_start=start_line + 1,
-            )
-    counts = _content_counts_for_source_file(conn, source_file=str(source_path))
-    return ContentIndexResult(
-        source_files=1,
-        conversation_turns=counts["conversation_turns"],
-        content_fragments=counts["content_fragments"],
-        parse_warnings=accumulator.parse_warnings,
-    )

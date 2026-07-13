@@ -1,7 +1,7 @@
 +++
 id = "compression-candidate-persistence"
 kind = "cohesive-migration"
-status = "active"
+status = "complete"
 base_ref = "origin/main"
 expires = 2026-07-27
 allowed_paths = [".agent-maintainer/change-plans/compression-candidate-persistence.md", "src/codex_usage_tracker/compression/**", "src/codex_usage_tracker/store/compression_*.py", "tests/compression/**", "tests/store/test_compression_runs.py", "tests/store/test_compression_publication.py", "tests/cli/test_cli_benchmarks.py", "scripts/benchmark_compression_lab.py", "scripts/compression_*.py", "docs/compression-lab-roadmap.md", "docs/architecture/decisions/**", "src/codex_usage_tracker/compression/tach.domain.toml"]

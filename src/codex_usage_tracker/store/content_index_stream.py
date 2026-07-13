@@ -28,6 +28,7 @@ from codex_usage_tracker.store.content_persistence import (
 )
 from codex_usage_tracker.store.content_rows import (
     _append_pending_content_rows,
+    _content_row_timestamp,
     _empty_pending_content_rows,
 )
 
@@ -61,6 +62,7 @@ class _StreamingContentAccumulator:
     turn_id: str | None = None
     turn_index: int = 0
     parse_warnings: int = 0
+    created_at: str = field(default_factory=_content_row_timestamp)
 
     def consume(
         self,
@@ -114,6 +116,7 @@ class _StreamingContentAccumulator:
             command_runs=self.command_runs,
             file_events=self.file_events,
             usage_row=usage_row,
+            created_at=self.created_at,
         )
         if self.rows.linked_records >= _CONTENT_WRITE_BATCH_RECORDS:
             _flush_pending_content_rows(conn, self.rows)

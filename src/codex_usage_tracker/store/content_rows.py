@@ -44,10 +44,12 @@ def _append_pending_content_rows(
     command_runs: list[PendingCommandRun],
     file_events: list[PendingFileEvent],
     usage_row: UsageContentRow,
+    created_at: str,
 ) -> None:
     turn_rows, fragment_rows = _pending_fragment_rows(
         pending=pending,
         usage_row=usage_row,
+        created_at=created_at,
     )
     event_rows = pending_event_rows(
         tool_calls=tool_calls,
@@ -67,24 +69,36 @@ def _pending_fragment_rows(
     *,
     pending: list[_PendingFragment],
     usage_row: UsageContentRow,
+    created_at: str,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     if not pending:
         return [], []
     turn_rows: list[dict[str, object]] = []
     fragment_rows: list[dict[str, object]] = []
     for index, fragment in enumerate(pending):
+        content_hash = _stable_hash(fragment.text)
+        content_size_bytes = len(fragment.text.encode("utf-8"))
         turn_key = _stable_hash(
             f"turn:{usage_row['record_id']}:{fragment.line_start}:{fragment.role}:{index}"
         )
-        turn_rows.append(_turn_row(turn_key=turn_key, fragment=fragment, usage_row=usage_row))
-        fragment_rows.append(
-            _fragment_row(
-                fragment_id=_stable_hash(
-                    f"fragment:{turn_key}:{index}:{_stable_hash(fragment.text)}"
-                ),
+        turn_rows.append(
+            _turn_row(
                 turn_key=turn_key,
                 fragment=fragment,
                 usage_row=usage_row,
+                content_hash=content_hash,
+                content_size_bytes=content_size_bytes,
+            )
+        )
+        fragment_rows.append(
+            _fragment_row(
+                fragment_id=_stable_hash(f"fragment:{turn_key}:{index}:{content_hash}"),
+                turn_key=turn_key,
+                fragment=fragment,
+                usage_row=usage_row,
+                content_hash=content_hash,
+                content_size_bytes=content_size_bytes,
+                created_at=created_at,
             )
         )
     return turn_rows, fragment_rows
@@ -95,6 +109,8 @@ def _turn_row(
     turn_key: str,
     fragment: _PendingFragment,
     usage_row: UsageContentRow,
+    content_hash: str,
+    content_size_bytes: int,
 ) -> dict[str, object]:
     return {
         "turn_key": turn_key,
@@ -108,8 +124,8 @@ def _turn_row(
         "source_file_id": usage_row["source_file_id"],
         "line_start": fragment.line_start,
         "line_end": fragment.line_end,
-        "content_hash": _stable_hash(fragment.text),
-        "content_size_bytes": len(fragment.text.encode("utf-8")),
+        "content_hash": content_hash,
+        "content_size_bytes": content_size_bytes,
         "indexed_content_included": 1,
         "parser_adapter": usage_row["parser_adapter"] or PARSER_ADAPTER_NAME,
         "parser_version": usage_row["parser_version"] or PARSER_ADAPTER_VERSION,
@@ -123,6 +139,9 @@ def _fragment_row(
     turn_key: str,
     fragment: _PendingFragment,
     usage_row: UsageContentRow,
+    content_hash: str,
+    content_size_bytes: int,
+    created_at: str,
 ) -> dict[str, object]:
     return {
         "fragment_id": fragment_id,
@@ -131,17 +150,21 @@ def _fragment_row(
         "fragment_kind": fragment.fragment_kind,
         "role": fragment.role,
         "safe_label": fragment.safe_label,
-        "content_hash": _stable_hash(fragment.text),
-        "content_size_bytes": len(fragment.text.encode("utf-8")),
+        "content_hash": content_hash,
+        "content_size_bytes": content_size_bytes,
         "fragment_text": fragment.text,
         "includes_raw_fragment": 1,
         "source_file_id": usage_row["source_file_id"],
         "line_start": fragment.line_start,
         "line_end": fragment.line_end,
         "token_link_record_id": str(usage_row["record_id"]),
-        "created_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "created_at": created_at,
     }
 
 
 def _stable_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _content_row_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()

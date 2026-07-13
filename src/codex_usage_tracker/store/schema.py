@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 import codex_usage_tracker.store.compression_schema as compression_schema
+import codex_usage_tracker.store.schema_source_index as schema_source_index
 from codex_usage_tracker.core.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_CREATE_COLUMNS_SQL,
@@ -14,7 +15,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -31,6 +32,7 @@ MIGRATION_NAMES = {
     13: "create normalized content index tables",
     14: "persist investigation run summaries",
     **compression_schema.MIGRATION_NAMES,
+    18: "index usage events by source file and line",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -101,6 +103,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (13, _migrate_v13),
         (14, _migrate_v14),
         *compression_schema.schema_migrations(),
+        (18, schema_source_index.migrate_source_file_line_index),
     )
 
 
@@ -727,9 +730,7 @@ def _ensure_table_columns(
     table_name: str,
     columns: dict[str, str],
 ) -> None:
-    existing = {
-        str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
-    }
+    existing = {str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table_name})")}
     for column, column_type in columns.items():
         if column not in existing:
             try:
