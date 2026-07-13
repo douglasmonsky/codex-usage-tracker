@@ -38,7 +38,7 @@ from codex_usage_tracker.compression.run_cache import (
 from codex_usage_tracker.compression.streaming_evidence import (
     load_fact_compression_evidence,
 )
-from codex_usage_tracker.store.compression_candidates import replace_compression_candidates
+from codex_usage_tracker.store.compression_publication import publish_compression_run
 from codex_usage_tracker.store.compression_revisions import (
     current_compression_revision_vector,
 )
@@ -152,19 +152,6 @@ def build_compression_run(
             db_path,
             run_id,
             progress_callback,
-            stage="persistence",
-            percent=92.0,
-        )
-        replace_compression_candidates(
-            db_path,
-            run_id=run_id,
-            candidates=(candidate.as_dict() for candidate in candidates),
-            supersede_run_id=_superseded_run_id(exact, force=force),
-        )
-        _progress(
-            db_path,
-            run_id,
-            progress_callback,
             stage="profile",
             percent=97.0,
         )
@@ -183,12 +170,18 @@ def build_compression_run(
             estimator_index=estimator_index,
         )
         compact_profile = public_profile(stored_profile)
-        update_compression_run(
+        _progress(
+            db_path,
+            run_id,
+            progress_callback,
+            stage="persistence",
+            percent=98.0,
+        )
+        publish_compression_run(
             db_path,
             run_id=run_id,
+            candidates=candidates,
             status=status,
-            progress_percent=100.0,
-            stage="complete",
             completed_detectors=len(detectors) - len(warnings),
             total_detectors=len(detectors),
             cache_reused=cache_mode == "incremental",
@@ -197,6 +190,7 @@ def build_compression_run(
             aggregate_profile=stored_profile,
             public_profile=compact_profile,
             source_generation=source_generation,
+            supersede_run_id=_superseded_run_id(exact, force=force),
         )
         _emit(
             progress_callback,

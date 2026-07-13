@@ -125,6 +125,8 @@ def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
     assert payload["warm_build"]["cache_mode"] == "exact"
     assert payload["revision_state"]["lookup_median_seconds"] <= 0.01
     assert payload["revision_state"]["append_refresh_seconds"] <= 1.0
+    assert payload["candidate_persistence"]["equivalent"] is True
+    assert payload["candidate_persistence"]["improvement_percent"] >= 40.0
     assert payload["threshold_failures"] == []
     assert (
         repeated["cold_build"]["candidate_fingerprint"]
@@ -253,6 +255,10 @@ def _run_benchmark_json(args: list[str]) -> dict[str, Any]:
 
 def _subprocess_env() -> dict[str, str]:
     env = dict(os.environ)
+    env.pop("COVERAGE_PROCESS_START", None)
+    for key in tuple(env):
+        if key.startswith("COV_CORE_"):
+            env.pop(key)
     repo_root = Path(__file__).resolve().parents[2]
     src_path = str(repo_root / "src")
     env["PYTHONPATH"] = (
