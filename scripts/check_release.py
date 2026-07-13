@@ -125,6 +125,7 @@ REQUIRED_FILES = [
     "docs/assets/plugin-prompts.png",
     "docs/assets/plugin-thread-leaderboard.png",
     "scripts/check_release.py",
+    "scripts/benchmark_compression_lab.py",
     "scripts/benchmark_synthetic_history.py",
     "scripts/smoke_installed_package.py",
     ".github/workflows/ci.yml",
@@ -228,6 +229,7 @@ WHEEL_REQUIRED_MEMBERS = {
 }
 SDIST_REQUIRED_MEMBERS = {
     "docs/cli-json-schemas.md",
+    "scripts/benchmark_compression_lab.py",
     "scripts/benchmark_synthetic_history.py",
     "skills/codex-usage-api/SKILL.md",
     "skills/codex-usage-tracker/SKILL.md",

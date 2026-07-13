@@ -359,6 +359,10 @@ Measured optimizations:
 - Computed the incremental manifest once per run and added compact revision identities for every evidence family.
 - Used `agent-perf`/Scalene on a 100,000-call synthetic workload. `_raw_rows` fell from 4.68 to 1.94 percent CPU attribution (`20260713T004417Z-167fcc53` to `20260713T005309Z-b5750e1d`), while unprofiled time fell from 8.75 to 8.01 seconds with the same 9,269 candidates.
 - Rejected a direct candidate serializer after it improved the synthetic workload by only 0.13 seconds, and rejected BLAKE2b manifest hashing after it regressed the workload to 9.27 seconds.
+- Added `scripts/benchmark_compression_lab.py` as the durable CP equivalence
+  and regression harness. Its 100,000-call synthetic baseline completed cold
+  analysis in 2.698 seconds with 10,000 candidates, 225.969 MiB peak RSS,
+  stable candidate/profile fingerprints, and a 3.37 ms exact warm hit.
 
 Resume in this order:
 
