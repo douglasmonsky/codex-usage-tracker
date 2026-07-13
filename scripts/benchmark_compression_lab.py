@@ -22,6 +22,7 @@ SRC_PATH = REPO_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+import compression_persistence_benchmark as persistence_benchmark  # noqa: E402
 from benchmark_synthetic_history import _synthetic_events  # noqa: E402
 from compression_revision_benchmark import (  # noqa: E402
     benchmark_revision_and_append,
@@ -101,8 +102,10 @@ def main() -> int:
             with_normalized_evidence=args.with_normalized_evidence,
         )
         run_payload = _run_in_child(db_path)
-        revision_payload = benchmark_revision_and_append(db_path, rows=args.rows)
-        run_payload["revision_state"] = revision_payload
+        run_payload["revision_state"] = benchmark_revision_and_append(db_path, rows=args.rows)
+        run_payload["candidate_persistence"] = persistence_benchmark.benchmark_persistence(
+            db_path, rows=args.rows
+        )
         if args.benchmark_source_append:
             run_payload["source_append_refresh"] = benchmark_source_append(db_dir)
         failures = _threshold_failures(
@@ -471,6 +474,7 @@ def _threshold_failures(
     if max_peak_rss_mb is not None and peak_rss_mb > max_peak_rss_mb:
         failures.append(f"cold_build.peak_rss_mb {peak_rss_mb:.3f} exceeded {max_peak_rss_mb:.3f}")
     failures.extend(revision_threshold_failures(payload))
+    failures.extend(persistence_benchmark.persistence_threshold_failures(payload))
     return failures
 
 

@@ -260,11 +260,13 @@ Exit gates:
 
 ### CP4: Revision-State And Incremental Invalidation
 
-Status: implementation complete; PR open
+Status: complete
 
 Issue: [#232](https://github.com/douglasmonsky/codex-usage-tracker/issues/232)
 
 PR: [#233](https://github.com/douglasmonsky/codex-usage-tracker/pull/233)
+
+Merge: `0809875`
 
 Deliverables:
 
@@ -285,7 +287,9 @@ Exit gates:
 
 ### CP5: Candidate Persistence Pipeline
 
-Status: pending
+Status: implementation complete; PR pending
+
+Issue: [#234](https://github.com/douglasmonsky/codex-usage-tracker/issues/234)
 
 Deliverables:
 
@@ -411,15 +415,28 @@ whole-pipeline timing or equivalence claim.
   Agent Perf run `20260713T070642Z-044ace6a` attributed the next material work
   to fact folding and candidate/claim persistence, confirming CP5 as the next
   optimization boundary.
+- 2026-07-13: CP4 merged through PR #233 at `0809875`. CP5 replaced the hot
+  public-mapping round trip with a read-only structural write protocol. The
+  store consumes validated allocated candidates directly without importing the
+  compression domain, and bounded canonical-JSON caches reuse repeated detector
+  metadata while preserving decoded payloads and fingerprints.
+- 2026-07-13: Candidate rows, claim rows, prior-run supersession, and completed
+  aggregate/public profiles now publish in one SQLite transaction. Synthetic
+  claim failure proves rollback leaves the prior cacheable generation intact;
+  retry coverage proves the same run can publish cleanly after the fault clears.
+- 2026-07-13: The 100,000-call CP5 gate measured 44.884 percent faster
+  candidate-heavy persistence, 3.555-second cold analysis, and 3.737 ms exact
+  reuse. Candidate/profile fingerprints remained unchanged, one-event JSONL
+  append refresh remained 20.0 ms, and peak RSS fell to 320.484 MiB.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/compression-pricing-revision`
+Branch: `feature/compression-candidate-persistence`
 
-CP3 merged through PR #231 at `29f6cad`. CP4 is committed at `bf9bfdf` and open
-for review in PR #233 after passing the precommit and full verifier profiles.
+CP4 merged through PR #233 at `0809875`. CP5 issue #234 is implemented locally
+and awaiting final ratchet verification, commit, and PR.
 
 Validated behavior at this checkpoint:
 
@@ -437,6 +454,14 @@ Validated behavior at this checkpoint:
   records and threads after a relevant revision changes.
 - Public compression schema version and candidate/profile payloads remain
   unchanged.
+- Completed profiles and their candidate/claim generations publish atomically.
+- The compatibility mapping writer remains available for existing callers;
+  the run builder uses the structural typed path without `candidate.as_dict()`.
+- Bounded multi-row statements stay within SQLite's conservative variable
+  limit, while 4,096-entry canonical-JSON caches avoid repeated immutable-field
+  encoding.
+- Estimation still runs immediately after each detector while evidence is
+  resident. Global overlap allocation remains intentionally portfolio-wide.
 
 Latest CP3 real-data benchmark (`include_archived=true`, all-history scope):
 
@@ -462,6 +487,16 @@ Latest CP4 synthetic gate (100,000 calls, 500,000 normalized evidence rows):
 - Canonical profile fingerprint:
   `96afabe6c8cfdeea77c708570939c1157a43f333b0cfc49e6173f107861ceeeb`.
 
+Latest CP5 synthetic gate (100,000 calls, 500,000 normalized evidence rows):
+
+- Candidate-heavy 5,000-row mapping path: 192.169 ms; typed atomic path:
+  105.916 ms.
+- Persistence improvement: 44.884 percent against the 40 percent exit gate.
+- Cold build: 3.555 seconds; exact warm reuse: 3.737 ms; peak RSS: 320.484 MiB.
+- Revision lookup median: 0.989 ms; aggregate append: 0.295 seconds; actual
+  one-event JSONL append refresh: 20.0 ms.
+- Canonical candidate and profile fingerprints match CP2-CP4 exactly.
+
 Measured optimizations:
 
 - Removed quadratic claim-to-record membership validation during candidate estimation.
@@ -484,10 +519,9 @@ Measured optimizations:
 
 Resume in this order:
 
-1. Finish CP4 verification, leave `.idea/` unstaged, and merge the focused
-   revision-state PR.
-2. Land CP5 serially because candidate persistence consumes CP4 cache identity.
-3. Add CP6 only after a fresh profile identifies the dominant remaining
+1. Finish CP5 verification, leave `.idea/` unstaged, and merge the focused
+   candidate-persistence PR.
+2. Add CP6 only after a fresh profile identifies the dominant remaining
    first-build stages; explicit fact preparation is currently a measured
    parallelization/ingestion-time target.
 

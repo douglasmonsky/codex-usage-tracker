@@ -9,7 +9,7 @@ import pytest
 
 from codex_usage_tracker.compression import run_builder
 from codex_usage_tracker.compression.context_detectors import StaleContextDetector
-from codex_usage_tracker.compression.models import CompressionScope
+from codex_usage_tracker.compression.models import CompressionCandidate, CompressionScope
 from codex_usage_tracker.compression.run_cache import record_manifest
 from codex_usage_tracker.compression.streaming_evidence import StreamingEvidenceBundle
 from codex_usage_tracker.store.compression_candidates import list_compression_candidates
@@ -81,6 +81,27 @@ def test_build_compression_run_persists_profile_candidates_and_progress(
     assert stored["candidate_count"] == 1
     page = list_compression_candidates(db_path, run_id=profile["run_id"])
     assert page["total"] == 1
+
+
+def test_build_compression_run_does_not_serialize_candidates_before_persistence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    _use_snapshot(monkeypatch, _stale_snapshot("thread-a-1"))
+
+    def unexpected_serialization(candidate: CompressionCandidate) -> dict[str, Any]:
+        raise AssertionError(f"unexpected candidate serialization: {candidate.candidate_id}")
+
+    monkeypatch.setattr(CompressionCandidate, "as_dict", unexpected_serialization)
+
+    profile = run_builder.build_compression_run(
+        db_path,
+        CompressionScope(),
+        detector_families=("stale_context",),
+    )
+
+    assert profile["candidate_count"] == 1
 
 
 def test_build_compression_run_reuses_an_exact_persisted_cache_hit(
