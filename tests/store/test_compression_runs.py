@@ -88,6 +88,7 @@ def test_candidate_replace_lists_compact_rows_and_reconstructs_detail(tmp_path: 
     ]
 
     assert replace_compression_candidates(db_path, run_id="run-1", candidates=candidates) == 2
+    assert replace_compression_candidates(db_path, run_id="run-1", candidates=candidates) == 2
 
     page = list_compression_candidates(
         db_path,

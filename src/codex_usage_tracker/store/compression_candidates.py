@@ -79,6 +79,15 @@ def replace_compression_candidates(
                 (supersede_run_id,),
             )
             conn.execute("DELETE FROM compression_runs WHERE run_id = ?", (supersede_run_id,))
+        conn.execute(
+            """
+            DELETE FROM compression_candidate_records
+            WHERE candidate_id IN (
+                SELECT candidate_id FROM compression_candidates WHERE run_id = ?
+            )
+            """,
+            (run_id,),
+        )
         conn.execute("DELETE FROM compression_candidates WHERE run_id = ?", (run_id,))
         conn.executemany(_CANDIDATE_INSERT_SQL, _candidate_rows(ordered, run_id=run_id))
         conn.executemany(_CLAIM_INSERT_SQL, _claim_rows(ordered))

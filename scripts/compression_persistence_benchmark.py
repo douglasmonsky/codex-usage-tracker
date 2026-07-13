@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import statistics
 import time
 import uuid
 from pathlib import Path
@@ -24,6 +25,7 @@ from codex_usage_tracker.store.compression_runs import (
 )
 
 DEFAULT_MIN_IMPROVEMENT_PERCENT = 40.0
+_BENCHMARK_ROUNDS = 3
 
 
 def benchmark_persistence(db_path: Path, *, rows: int) -> dict[str, Any]:
@@ -36,44 +38,24 @@ def benchmark_persistence(db_path: Path, *, rows: int) -> dict[str, Any]:
         _create_run(mapping_db, "benchmark-mapping")
         _create_run(typed_db, "benchmark-typed")
 
-        mapping_started = time.perf_counter()
-        replace_compression_candidates(
-            mapping_db,
-            run_id="benchmark-mapping",
-            candidates=(candidate.as_dict() for candidate in candidates),
-        )
-        update_compression_run(
-            mapping_db,
-            run_id="benchmark-mapping",
-            status="completed",
-            progress_percent=100.0,
-            stage="complete",
-            completed_detectors=1,
-            total_detectors=1,
-            aggregate_profile={"candidate_count": candidate_count},
-            public_profile={"candidate_count": candidate_count},
-        )
-        mapping_seconds = time.perf_counter() - mapping_started
-
-        typed_started = time.perf_counter()
-        publish_compression_run(
-            typed_db,
-            run_id="benchmark-typed",
-            candidates=candidates,
-            status="completed",
-            completed_detectors=1,
-            total_detectors=1,
-            aggregate_profile={"candidate_count": candidate_count},
-            public_profile={"candidate_count": candidate_count},
-            source_generation=1,
-        )
-        typed_seconds = time.perf_counter() - typed_started
+        mapping_timings: list[float] = []
+        typed_timings: list[float] = []
+        for _ in range(_BENCHMARK_ROUNDS):
+            _reset_candidate_rows(mapping_db)
+            mapping_timings.append(
+                _time_mapping_publication(mapping_db, candidates, candidate_count)
+            )
+            _reset_candidate_rows(typed_db)
+            typed_timings.append(_time_typed_publication(typed_db, candidates, candidate_count))
+        mapping_seconds = statistics.median(mapping_timings)
+        typed_seconds = statistics.median(typed_timings)
 
         mapping_fingerprint = _candidate_fingerprint(mapping_db)
         typed_fingerprint = _candidate_fingerprint(typed_db)
         improvement = 100.0 * (mapping_seconds - typed_seconds) / mapping_seconds
         return {
             "candidate_count": candidate_count,
+            "rounds": _BENCHMARK_ROUNDS,
             "mapping_seconds": round(mapping_seconds, 6),
             "typed_seconds": round(typed_seconds, 6),
             "improvement_percent": round(improvement, 3),
@@ -83,6 +65,57 @@ def benchmark_persistence(db_path: Path, *, rows: int) -> dict[str, Any]:
     finally:
         mapping_db.unlink(missing_ok=True)
         typed_db.unlink(missing_ok=True)
+
+
+def _time_mapping_publication(
+    db_path: Path,
+    candidates: tuple[CompressionCandidate, ...],
+    candidate_count: int,
+) -> float:
+    started = time.perf_counter()
+    replace_compression_candidates(
+        db_path,
+        run_id="benchmark-mapping",
+        candidates=(candidate.as_dict() for candidate in candidates),
+    )
+    update_compression_run(
+        db_path,
+        run_id="benchmark-mapping",
+        status="completed",
+        progress_percent=100.0,
+        stage="complete",
+        completed_detectors=1,
+        total_detectors=1,
+        aggregate_profile={"candidate_count": candidate_count},
+        public_profile={"candidate_count": candidate_count},
+    )
+    return time.perf_counter() - started
+
+
+def _time_typed_publication(
+    db_path: Path,
+    candidates: tuple[CompressionCandidate, ...],
+    candidate_count: int,
+) -> float:
+    started = time.perf_counter()
+    publish_compression_run(
+        db_path,
+        run_id="benchmark-typed",
+        candidates=candidates,
+        status="completed",
+        completed_detectors=1,
+        total_detectors=1,
+        aggregate_profile={"candidate_count": candidate_count},
+        public_profile={"candidate_count": candidate_count},
+        source_generation=1,
+    )
+    return time.perf_counter() - started
+
+
+def _reset_candidate_rows(db_path: Path) -> None:
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM compression_candidate_records")
+        conn.execute("DELETE FROM compression_candidates")
 
 
 def persistence_threshold_failures(payload: dict[str, Any]) -> list[str]:
