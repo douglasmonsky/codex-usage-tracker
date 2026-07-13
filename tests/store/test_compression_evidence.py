@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 from codex_usage_tracker.compression.evidence import load_compression_evidence
@@ -114,7 +115,7 @@ def test_fold_evidence_rows_batches_scoped_results_and_matches_query_metadata(
     )
     seed_normalized_evidence(db_path)
     scope = {"include_archived": False, "thread": "thread:one"}
-    batches: list[tuple[str, list[object]]] = []
+    batches: list[tuple[str, list[sqlite3.Row]]] = []
 
     metadata = fold_compression_evidence_rows(
         db_path,
@@ -158,7 +159,7 @@ def test_fold_evidence_rows_batches_unfiltered_history_and_matches_query_metadat
     )
     seed_normalized_evidence(db_path)
     scope = {"include_archived": True}
-    batches: list[tuple[str, list[object]]] = []
+    batches: list[tuple[str, list[sqlite3.Row]]] = []
 
     metadata = fold_compression_evidence_rows(
         db_path,
