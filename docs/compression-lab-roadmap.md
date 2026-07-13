@@ -198,6 +198,10 @@ Foundation PR: [#226](https://github.com/douglasmonsky/codex-usage-tracker/pull/
 
 Foundation merge: `d0db081f77434e13e4874a56e89b69f577633fb6`
 
+Engine PR: [#227](https://github.com/douglasmonsky/codex-usage-tracker/pull/227)
+
+Engine merge: `b253a97a6615b609ba0d31bc7cc47d9b45f0a620`
+
 Deliverables:
 
 - A bounded evidence-batch reader over the existing normalized SQLite tables.
@@ -337,6 +341,11 @@ whole-pipeline timing or equivalence claim.
   1,340.469 MiB on the current-scale aggregate workload. Runtime improved
   modestly, so the 35 percent scan-elimination gate moved to CP3 rather than
   being weakened or claimed without evidence.
+- 2026-07-12: CP2's durable normalized benchmark generated 500,000 evidence
+  rows for 100,000 calls. Against the same database, CP1 used 562.156 MiB and
+  7.325 seconds; CP2 used 337.938 MiB and 6.704 seconds with identical 15,030
+  candidates and canonical fingerprints. The isolated exact warm hit was
+  3.831 ms.
 
 ## Current Restart Checkpoint
 
