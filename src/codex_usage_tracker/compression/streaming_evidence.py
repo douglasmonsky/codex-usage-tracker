@@ -57,8 +57,15 @@ class _StreamingAccumulator:
     manifest: RecordManifestBuilder = field(default_factory=RecordManifestBuilder)
 
     def consume(self, category: str, rows: list[sqlite3.Row]) -> None:
-        handler = getattr(self, f"_consume_{category}")
-        handler(rows)
+        handlers = {
+            "calls": self._consume_calls,
+            "turns": self._consume_turns,
+            "tool_calls": self._consume_tool_calls,
+            "command_runs": self._consume_command_runs,
+            "file_events": self._consume_file_events,
+            "content_fragments": self._consume_content_fragments,
+        }
+        handlers[category](rows)
 
     def _consume_calls(self, rows: list[sqlite3.Row]) -> None:
         for row in rows:
