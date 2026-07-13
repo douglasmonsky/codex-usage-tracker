@@ -47,7 +47,11 @@ Exit gates:
 
 ### PR 2: Detectors And Estimators
 
-Status: in progress
+Status: complete
+
+PR: [#222](https://github.com/douglasmonsky/codex-usage-tracker/pull/222)
+
+Merge: `98f2cd7be6d1a357279d827bb2190198e7bc1ff5`
 
 Deliverables:
 
@@ -136,11 +140,159 @@ Exit gates:
 
 ## Performance Budget
 
-- Full uncached run: under 60 seconds on data near the maintainer's current scale.
+- Full uncached run: under 20 seconds on data near the maintainer's current scale, with a 25-second P95 ceiling.
+- Single-source append refresh: under 1 second when only bounded detector dependencies change.
 - Warm profile and candidate list: under 500 ms.
+- Exact unchanged warm profile: under 10 ms.
 - Candidate detail: under 1 second.
 - Progress starts immediately and remains monotonic.
 - Incremental refresh recalculates only changed records/threads plus global overlap totals.
+
+## Cold-Build Performance Program
+
+The current typed-row loader reduced the same 404,176-call forced rebuild from
+48.115 seconds to 38.708 seconds. Removing the separately measured prior-run
+deletion cost gives an estimated first-ever cold build of about 35.5 seconds.
+The remaining target requires changing the data flow, not further
+micro-optimizing serialization.
+
+All performance measurements use deterministic synthetic data for profilers and
+report only aggregate timing/count evidence for real local data. Private indexed
+content is never sent to a profiler or committed as a fixture.
+
+### CP1: Performance Contract And Safe Loader Foundation
+
+Status: in progress
+
+Issue: [#223](https://github.com/douglasmonsky/codex-usage-tracker/issues/223)
+
+Deliverables:
+
+- Deterministic 100,000-call synthetic cold-build benchmark.
+- Stage timings for evidence load, manifest, detection, attribution,
+  persistence, and profile generation.
+- Peak-memory and throughput reporting suitable for regression comparisons.
+- Canonical candidate/profile fingerprints for old-versus-new equivalence.
+- Typed SQLite row loading without intermediate row dictionaries.
+- One manifest computation per run and compact revision identities.
+
+Exit gates:
+
+- Candidate count and canonical output fingerprints are unchanged.
+- Real aggregate cold-build time improves by at least 15 percent.
+- Exact warm behavior remains below 10 ms.
+- Public evidence-query contracts remain backward compatible.
+- No benchmark artifact contains private prompts, paths, commands, or content.
+
+### CP2: Streaming Detector Consumption
+
+Status: pending
+
+Deliverables:
+
+- A bounded evidence-batch reader over the existing normalized SQLite tables.
+- A detector lifecycle with initialize, observe-batch, and finalize phases.
+- Compatibility adapters for detectors that still require a complete snapshot.
+- Shared streaming estimator inputs that preserve component-level attribution.
+- Deterministic ordering only for detector families that declare it necessary.
+
+Exit gates:
+
+- Streaming and snapshot engines produce identical canonical candidate/profile
+  fingerprints across golden synthetic fixtures.
+- Peak Python memory no longer scales with the complete evidence object graph.
+- Evidence loading plus detector execution is at least 35 percent faster than
+  the CP1 baseline.
+- Partial batches, empty tables, and detector failures retain current warnings
+  and progress semantics.
+
+### CP3: Detector-Ready Ingestion Aggregates
+
+Status: pending
+
+Deliverables:
+
+- Persisted per-call token, cache, output, and estimated-credit facts.
+- Persisted sequence/count facts for shell churn, repeated validation, file
+  rediscovery, and tool-output concentration.
+- Per-thread lifecycle and cache-resume summaries.
+- Idempotent backfill from existing normalized content-index records.
+- Detector queries over compact facts instead of repeated raw reconstruction.
+
+Exit gates:
+
+- Existing databases migrate and backfill without reparsing raw logs.
+- Aggregate facts remain reproducible from normalized source records.
+- Append ingestion updates only affected calls, threads, and sequence windows.
+- Detector outputs remain equivalent to the CP2 streaming reference.
+
+### CP4: Revision-State And Incremental Invalidation
+
+Status: pending
+
+Deliverables:
+
+- Per-source byte offsets, source hashes, row counts, and generation counters.
+- Per-aggregate and per-detector dependency revisions.
+- A revision-vector cache key that avoids full Python manifest traversal.
+- Dependency-aware invalidation of only affected detector families and threads.
+- Recovery behavior for truncation, rotation, parser-version changes, and
+  explicit replacement.
+
+Exit gates:
+
+- Exact unchanged checks use bounded metadata reads and remain below 10 ms.
+- A representative one-event append refresh completes below 1 second.
+- Truncation or parser drift cannot silently reuse stale detector results.
+- Replacement remains available but is not required for ordinary append-only
+  operation.
+
+### CP5: Candidate Persistence Pipeline
+
+Status: pending
+
+Deliverables:
+
+- One transaction with bounded bulk inserts for candidates and claims.
+- Internal typed persistence that avoids mapping serialization on the hot path.
+- Attribution performed alongside detection when required evidence is already
+  present.
+- Atomic profile publication after candidate and claim persistence succeeds.
+- Rollback and retry coverage for interrupted builds.
+
+Exit gates:
+
+- Candidate-heavy persistence is at least 40 percent faster than CP1.
+- Partial failures leave no visible mixed-generation profile.
+- Public candidate/profile payloads remain unchanged.
+- Candidate IDs and overlap allocation remain deterministic.
+
+### CP6: Profile-Guided Parallel Ingestion
+
+Status: pending
+
+Deliverables:
+
+- Parallel parsing across independent source files only after CP2-CP5 profiling.
+- A single deterministic SQLite writer with bounded worker queues.
+- Stable merge ordering and backpressure under skewed source sizes.
+- Worker-count configuration with a conservative automatic default.
+- Serial fallback for one-file histories and low-resource systems.
+
+Exit gates:
+
+- Current-scale true first build is consistently below 20 seconds and below
+  25 seconds at P95.
+- Parallel output fingerprints match the serial engine exactly.
+- Parallel mode demonstrates a material speedup over the optimized serial path.
+- Memory and writer contention stay within the documented benchmark budget.
+
+### Performance Completion Audit
+
+The program is complete only when all CP1-CP6 exit gates have authoritative
+evidence. Each PR must update this ledger with its benchmark run, tests, PR,
+merge commit, and any rejected optimization. A narrow test cannot establish a
+whole-pipeline timing or equivalence claim.
 
 ## Deferred Queue
 
@@ -162,14 +314,16 @@ Exit gates:
 - 2026-07-11: Compression Lab preflight PR #220 merged at `7261d3f` with roadmap and hardening-tool compatibility.
 - 2026-07-11: PR 1 merged as #221 at `702d038`; PR 2 detector and estimator work started from that exact base.
 - 2026-07-12: PR 2 detector contracts, all six detector families, shared estimator indexing, cache-aware run building, staged progress, exact/incremental cache handling, and compact profiles implemented on `feature/compression-lab-detectors`.
+- 2026-07-12: PR 2 merged as #222 at `98f2cd7`; CP1 cold-path profiling started from that exact base.
+- 2026-07-12: The CP1 target was tightened to a 15-20 second first build, sub-second append refresh, and sub-10 ms unchanged reuse. CP2-CP6 define the structural path and equivalence gates.
 
 ## Current Restart Checkpoint
 
 Worktree: `/Users/Monsky/Documents/Codex/2026-07-11/r11-compression-detectors`
 
-Branch: `feature/compression-lab-detectors`
+Branch: `feature/compression-cold-path`
 
-Last completed commit before the current run-builder slice: `0094dca` (`feat: add compression opportunity detectors`). The run-builder/performance work after that commit is intentionally left intact in the worktree and must not be discarded.
+PR #222 merged the detector and run-builder foundation as `98f2cd7`. Issue #223 tracks the focused cold-path follow-up.
 
 Validated behavior at this checkpoint:
 
@@ -183,14 +337,15 @@ Validated behavior at this checkpoint:
 
 Latest replacement benchmark (`include_archived=true`, all-history scope):
 
-- Total: 47.939 seconds, including deletion and replacement of the prior 32,087-candidate run.
-- Evidence loaded: 18.69 seconds.
-- All detectors complete: 26.18 seconds.
-- Attribution complete / persistence started: 30.40 seconds.
-- Candidate persistence complete / profile started: 42.30 seconds.
-- Profile complete: 47.59 seconds.
+- Total: 38.708 seconds, including deletion and replacement of the prior 32,087-candidate run.
+- Evidence loaded: 14.221 seconds.
+- Manifest and all detectors complete: 24.576 seconds.
+- Attribution complete / persistence started: 28.730 seconds.
+- Candidate persistence complete / profile started: 37.617 seconds.
+- Profile complete: 38.386 seconds.
+- Estimated first-ever cold time: about 35.5 seconds after excluding the separately measured 3.2-second prior-run deletion cost.
 - Exact warm profile: 6.2 ms, below the 500 ms target.
-- The prior comparable run took 77.575 seconds on 324,982 calls; the optimized run is 38 percent faster while processing 24 percent more calls.
+- The immediate pre-follow-up baseline was 48.115 seconds on the same 404,176 calls and 32,087 candidates; the current forced rebuild is 19.5 percent faster.
 
 Measured optimizations:
 
@@ -199,17 +354,27 @@ Measured optimizations:
 - Replaced per-event cryptographic manifest hashing with deterministic order-independent checksums and removed duplicate event identity encoding.
 - Built attribution capacity directly from the estimator index rather than materializing generic row dictionaries.
 - Removed an unused candidate-record secondary index and persisted compact public profiles separately from private incremental manifests.
+- Materialized typed evidence directly from positional SQLite rows, avoiding roughly 1.5 million intermediate dictionaries.
+- Removed unnecessary ordering from tool, command, file, and fragment evidence queries after verifying detectors and manifests are order-independent.
+- Computed the incremental manifest once per run and added compact revision identities for every evidence family.
+- Used `agent-perf`/Scalene on a 100,000-call synthetic workload. `_raw_rows` fell from 4.68 to 1.94 percent CPU attribution (`20260713T004417Z-167fcc53` to `20260713T005309Z-b5750e1d`), while unprofiled time fell from 8.75 to 8.01 seconds with the same 9,269 candidates.
+- Rejected a direct candidate serializer after it improved the synthetic workload by only 0.13 seconds, and rejected BLAKE2b manifest hashing after it regressed the workload to 9.27 seconds.
 
 Resume in this order:
 
-1. Keep the PR at or below the 20-file ceiling and leave `.idea/` unstaged.
-2. Commit the run-builder slice as `feat: build compression analysis profiles`.
-3. Merge current `origin/main` without rewriting history, resolve only genuine conflicts, then push/open/merge PR 2 before starting PR 3.
+1. Finish CP1 verification, leave `.idea/` unstaged, and merge the focused
+   cold-path PR.
+2. Start CP2 from current `main`; do not combine schema or parallel-ingestion
+   work with the streaming detector contract.
+3. Land CP3, CP4, and CP5 serially because each changes the persisted inputs or
+   cache identity consumed by the next phase.
+4. Add CP6 only after a fresh profile proves source parsing is the dominant
+   remaining first-build cost.
 
 ## Resume Instructions
 
 1. Read the canonical design and this execution ledger.
-2. Start the next pending PR from current `main`.
+2. Start the next pending Compression Lab or CP milestone from current `main`.
 3. Update the relevant PR status and append a dated progress-log entry.
 4. Do not skip attribution invariants to add another detector quickly.
 5. Do not route the skill to the new lab until shadow comparisons and MCP contracts pass.
