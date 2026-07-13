@@ -460,6 +460,8 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "button.full_serialized_analysis" in dashboard_call_js
     assert ".grid > section:not(.detail-section)" in dashboard_css
     assert "overflow: visible" in dashboard_css
+    assert "const pageSize = 100" in dashboard_js
+    assert "const rowSearchTextCache = new WeakMap()" in dashboard_js
     assert "table-layout: fixed" in dashboard_css
     assert "position: sticky" in dashboard_css
     assert ".grid > section:first-child > table > thead" in dashboard_css

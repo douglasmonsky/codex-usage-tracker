@@ -89,3 +89,42 @@ console.log(JSON.stringify({
     assert payload["mixedText"] == "badge.parser_warnings"
     assert "missing_total_token_usage=2" in payload["mixedTooltip"]
     assert "duplicate_cumulative_total" not in payload["mixedTooltip"]
+
+
+def test_dashboard_status_localizes_weekly_observed_usage_and_tooltip() -> None:
+    payload = _run_dashboard_status_script(
+        """
+const translations = {
+  'allowance.observed_source_hint': '本地观测数据',
+  'allowance.used_vs_remaining': '已用 {used}，剩余 {remaining}',
+  'allowance.window_weekly': '每周',
+};
+const translate = (key, values = {}) => Object.entries(values).reduce(
+  (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+  translations[key] || key,
+);
+let tooltip = '';
+const allowanceImpactElement = { textContent: '' };
+const runtime = factory.create({
+  allowanceImpactElement,
+  allowanceReconcileElement: null,
+  getAllowanceError: () => '',
+  getAllowanceWindows: () => [],
+  getObservedUsage: () => ({
+    available: true,
+    windows: [{ key: 'weekly', label: 'Weekly', used_percent: 25 }],
+  }),
+  setFastTooltip: (_el, text) => { tooltip = text; },
+  short: value => String(value),
+  t: key => translate(key),
+  tf: translate,
+});
+runtime.updateAllowanceImpact(0);
+console.log(JSON.stringify({ text: allowanceImpactElement.textContent, tooltip }));
+"""
+    )
+
+    assert payload["text"] == "每周: 75%"
+    assert "每周: 已用 25%，剩余 75%" in payload["tooltip"]
+    assert "Weekly" not in payload["tooltip"]
+    assert " used" not in payload["tooltip"]

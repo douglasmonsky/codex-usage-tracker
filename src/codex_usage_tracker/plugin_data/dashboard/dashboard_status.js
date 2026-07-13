@@ -134,9 +134,9 @@
       if (!used) return '';
       const remaining = observedRemainingPercent(window.used_percent);
       const reset = observedResetText(window.resets_at);
-      const label = short(window.label || window.key, 'Usage');
+      const label = observedWindowLabel(window);
       const usage = remaining
-        ? `${label}: ${tf('allowance.remaining', { value: remaining })}; ${used} used`
+        ? `${label}: ${tf('allowance.used_vs_remaining', { used, remaining })}`
         : tf('allowance.observed_window', { label, used });
       return reset ? `${usage} ${tf('allowance.resets', { resets: reset })}` : usage;
     }
