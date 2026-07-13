@@ -16,7 +16,10 @@ vi.mock('../../visualization/renderer/echartsRenderer', () => ({
   })),
 }));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.localStorage?.clear();
+});
 
 describe('Overview focused evidence flow', () => {
   it('reports module progress while recommendations are still loading', async () => {
