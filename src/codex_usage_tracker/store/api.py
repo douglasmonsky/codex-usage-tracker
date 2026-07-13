@@ -26,6 +26,11 @@ from codex_usage_tracker.store.allowance_observations import (
 from codex_usage_tracker.store.allowance_observations import (
     sync_allowance_observations_for_record_ids,
 )
+from codex_usage_tracker.store.compression_fact_sync import (
+    clear_compression_detector_facts,
+    delete_compression_facts_for_source_files,
+    sync_compression_detector_facts,
+)
 from codex_usage_tracker.store.compression_schema import touch_compression_source_generation
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import (
@@ -173,6 +178,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
         deleted_rows = int(row["count"] if row is not None else 0)
         clear_content_index_rows(conn)
+        clear_compression_detector_facts(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM allowance_observations")
@@ -517,6 +523,11 @@ def upsert_usage_events(
             )
             if source_files_to_replace:
                 touch_compression_source_generation(conn)
+                sync_compression_detector_facts(
+                    conn,
+                    record_ids=(),
+                    affected_thread_keys=affected_thread_keys,
+                )
             return 0
         affected_thread_keys.update(_thread_keys_for_usage_rows(rows))
         _delete_diagnostic_facts_for_record_ids(conn, _usage_event_record_ids(rows))
@@ -531,6 +542,11 @@ def upsert_usage_events(
             affected_thread_keys=affected_thread_keys,
         )
         touch_compression_source_generation(conn)
+        sync_compression_detector_facts(
+            conn,
+            record_ids=record_ids,
+            affected_thread_keys=affected_thread_keys,
+        )
         return len(rows)
 
 
@@ -559,6 +575,10 @@ def _delete_usage_events_for_source_files(
         conn,
         placeholders=placeholders,
         source_files_to_replace=source_files_to_replace,
+    )
+    delete_compression_facts_for_source_files(
+        conn,
+        source_files=source_files_to_replace,
     )
     conn.execute(
         f"""

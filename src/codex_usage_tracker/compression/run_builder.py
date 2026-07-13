@@ -36,7 +36,7 @@ from codex_usage_tracker.compression.run_cache import (
     latest_compatible_run,
 )
 from codex_usage_tracker.compression.streaming_evidence import (
-    load_streaming_compression_evidence,
+    load_fact_compression_evidence,
 )
 from codex_usage_tracker.store.compression_candidates import replace_compression_candidates
 from codex_usage_tracker.store.compression_runs import (
@@ -75,7 +75,7 @@ def build_compression_run(
         _emit(progress_callback, stage="complete", progress_percent=100.0, cache_reused=True)
         return cached_profile
 
-    loaded_evidence = load_streaming_compression_evidence(db_path, scope)
+    loaded_evidence = load_fact_compression_evidence(db_path, scope)
     snapshot = loaded_evidence.snapshot
     current_manifest = loaded_evidence.record_manifest
     cache_identity = _cache_identity(snapshot, scope_hash, detector_version)

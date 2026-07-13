@@ -28,11 +28,12 @@ from codex_usage_tracker.store.api import (
     record_source_file_metadata,
     upsert_usage_events,
 )
-from codex_usage_tracker.store.connection import connect
-from codex_usage_tracker.store.content_index import (
-    ContentIndexPlan,
-    index_content_for_source_plans,
+from codex_usage_tracker.store.compression_fact_sync import (
+    content_index_plans,
+    sync_content_plan_compression_facts,
 )
+from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.content_index import index_content_for_source_plans
 from codex_usage_tracker.store.sources import (
     ParsedSourceFile,
     SourceParsePlan,
@@ -169,21 +170,15 @@ def refresh_usage_index(
         message="Updated source metadata",
     )
     if not aggregate_only:
+        content_plans = content_index_plans(parse_plans)
         with connect(db_path) as conn:
             init_db(conn)
             index_content_for_source_plans(
                 conn,
-                plans=(
-                    ContentIndexPlan(
-                        source_path=plan.path,
-                        replace_existing=plan.replace_existing,
-                        start_byte=plan.start_byte,
-                        start_line=plan.start_line,
-                    )
-                    for plan in parse_plans
-                ),
+                plans=content_plans,
                 progress_callback=progress_callback,
             )
+            sync_content_plan_compression_facts(conn, plans=content_plans)
     else:
         _emit_refresh_progress(
             progress_callback,

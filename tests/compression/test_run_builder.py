@@ -46,7 +46,7 @@ def _use_snapshot(
 ) -> None:
     monkeypatch.setattr(
         run_builder,
-        "load_streaming_compression_evidence",
+        "load_fact_compression_evidence",
         lambda _db_path, _scope: _bundle(evidence),
     )
 
@@ -100,7 +100,7 @@ def test_build_compression_run_reuses_an_exact_persisted_cache_hit(
 
     monkeypatch.setattr(
         run_builder,
-        "load_streaming_compression_evidence",
+        "load_fact_compression_evidence",
         unexpected_evidence_load,
     )
     warm = run_builder.build_compression_run(
@@ -219,7 +219,7 @@ def test_appended_record_recomputes_only_its_affected_thread(
     db_path = tmp_path / "usage.sqlite3"
     monkeypatch.setattr(
         run_builder,
-        "load_streaming_compression_evidence",
+        "load_fact_compression_evidence",
         lambda _db_path, _scope: _bundle(next(snapshots)),
     )
     observed_scopes: list[set[str]] = []

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -157,7 +158,59 @@ def test_compression_lab_benchmark_with_normalized_evidence(tmp_path: Path) -> N
     assert payload["normalized_evidence_rows"] == 500
     assert payload["cold_build"]["candidate_count"] > 10
     assert payload["cold_build"]["peak_rss_mb"] <= 512
+    assert payload["max_evidence_detector_seconds"] > 0
+    assert (
+        payload["cold_build"]["stage_timings_seconds"]["detectors"]
+        <= payload["max_evidence_detector_seconds"]
+    )
     assert payload["threshold_failures"] == []
+
+    db_path = tmp_path / "compression-synthetic-100.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            DROP TABLE compression_fact_state;
+            DROP TABLE compression_thread_facts;
+            DROP TABLE compression_sequence_facts;
+            DROP TABLE compression_record_facts;
+            DELETE FROM schema_migrations WHERE version = 16;
+            PRAGMA user_version = 15;
+            """
+        )
+
+    fallback = _run_benchmark_json(
+        ["scripts/benchmark_compression_lab.py", "--run-db", str(db_path)]
+    )
+    prepared = _run_benchmark_json(
+        [
+            "scripts/benchmark_compression_lab.py",
+            "--prepare-facts-db",
+            str(db_path),
+        ],
+    )
+    assert prepared["record_count"] == 100
+    assert prepared["sequence_count"] > 0
+    assert set(prepared["stage_timings_seconds"]) == {
+        "init",
+        "clear",
+        "record_facts",
+        "record_manifests",
+        "sequence_facts",
+        "thread_facts",
+        "indexes",
+        "state",
+    }
+    fact_backed = _run_benchmark_json(
+        ["scripts/benchmark_compression_lab.py", "--run-db", str(db_path)]
+    )
+    assert (
+        fact_backed["cold_build"]["candidate_fingerprint"]
+        == fallback["cold_build"]["candidate_fingerprint"]
+    )
+    assert (
+        fact_backed["cold_build"]["profile_fingerprint"]
+        == fallback["cold_build"]["profile_fingerprint"]
+    )
 
 
 def _run_benchmark_json(args: list[str]) -> dict[str, Any]:

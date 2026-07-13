@@ -4,6 +4,138 @@ from __future__ import annotations
 
 import sqlite3
 
+_COMPRESSION_FACT_INDEX_STATEMENTS = (
+    "CREATE INDEX IF NOT EXISTS idx_compression_record_facts_scope "
+    "ON compression_record_facts(is_archived, event_timestamp, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_compression_record_facts_thread "
+    "ON compression_record_facts(thread_key, thread_call_index, event_timestamp, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_compression_sequence_facts_scope "
+    "ON compression_sequence_facts(fact_kind, thread_key, record_id, fact_key)",
+    "CREATE INDEX IF NOT EXISTS idx_compression_sequence_facts_category "
+    "ON compression_sequence_facts(fact_kind, category, thread_key, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_compression_thread_facts_activity "
+    "ON compression_thread_facts(last_event_at DESC, manifest_key)",
+)
+_COMPRESSION_FACT_INDEX_DROP_STATEMENTS = (
+    "DROP INDEX IF EXISTS idx_compression_record_facts_scope",
+    "DROP INDEX IF EXISTS idx_compression_record_facts_thread",
+    "DROP INDEX IF EXISTS idx_compression_sequence_facts_scope",
+    "DROP INDEX IF EXISTS idx_compression_sequence_facts_category",
+    "DROP INDEX IF EXISTS idx_compression_thread_facts_activity",
+)
+
+
+def create_compression_fact_tables(conn: sqlite3.Connection) -> None:
+    """Create detector-ready record, sequence, and thread fact tables."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS compression_record_facts (
+            record_id TEXT PRIMARY KEY,
+            source_file TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            thread_key TEXT NOT NULL DEFAULT '',
+            event_timestamp TEXT NOT NULL,
+            model TEXT,
+            effort TEXT,
+            is_archived INTEGER NOT NULL DEFAULT 0,
+            thread_call_index INTEGER,
+            previous_record_id TEXT,
+            cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            uncached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_output_tokens INTEGER NOT NULL DEFAULT 0,
+            estimated_cost_usd REAL,
+            usage_credits REAL,
+            cache_ratio REAL NOT NULL DEFAULT 0,
+            context_window_percent REAL NOT NULL DEFAULT 0,
+            turn_count INTEGER NOT NULL DEFAULT 0,
+            indexed_call INTEGER NOT NULL DEFAULT 0,
+            tool_call_count INTEGER NOT NULL DEFAULT 0,
+            command_run_count INTEGER NOT NULL DEFAULT 0,
+            file_event_count INTEGER NOT NULL DEFAULT 0,
+            content_fragment_count INTEGER NOT NULL DEFAULT 0,
+            compaction_count INTEGER NOT NULL DEFAULT 0,
+            source_record_count INTEGER NOT NULL DEFAULT 0,
+            parser_warning_record_count INTEGER NOT NULL DEFAULT 0,
+            parser_adapter TEXT,
+            parser_version TEXT,
+            content_exposure_tokens INTEGER NOT NULL DEFAULT 0,
+            tool_output_exposure_tokens INTEGER NOT NULL DEFAULT 0,
+            manifest_count INTEGER NOT NULL DEFAULT 0,
+            manifest_sum_hex TEXT NOT NULL DEFAULT '',
+            manifest_xor_hex TEXT NOT NULL DEFAULT '',
+            facts_version INTEGER NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS compression_sequence_facts (
+            fact_key TEXT PRIMARY KEY,
+            record_id TEXT NOT NULL,
+            thread_key TEXT NOT NULL DEFAULT '',
+            turn_key TEXT,
+            source_order INTEGER NOT NULL,
+            fact_kind TEXT NOT NULL,
+            category TEXT NOT NULL,
+            status TEXT,
+            duration_ms INTEGER,
+            output_size_bytes INTEGER NOT NULL DEFAULT 0,
+            command_label TEXT,
+            exit_code INTEGER,
+            retry_group TEXT,
+            path_identity TEXT,
+            exposure_tokens INTEGER NOT NULL DEFAULT 0,
+            facts_version INTEGER NOT NULL,
+            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS compression_thread_facts (
+            manifest_key TEXT PRIMARY KEY,
+            thread_key TEXT NOT NULL DEFAULT '',
+            record_id TEXT NOT NULL DEFAULT '',
+            call_count INTEGER NOT NULL DEFAULT 0,
+            first_event_at TEXT,
+            last_event_at TEXT,
+            cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            uncached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_output_tokens INTEGER NOT NULL DEFAULT 0,
+            estimated_cost_usd REAL,
+            usage_credits REAL,
+            cache_break_count INTEGER NOT NULL DEFAULT 0,
+            manifest_count INTEGER NOT NULL DEFAULT 0,
+            manifest_sum_hex TEXT NOT NULL DEFAULT '',
+            manifest_xor_hex TEXT NOT NULL DEFAULT '',
+            manifest_revision TEXT NOT NULL DEFAULT '',
+            facts_version INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS compression_fact_state (
+            singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+            facts_version INTEGER NOT NULL,
+            source_generation INTEGER NOT NULL,
+            record_count INTEGER NOT NULL DEFAULT 0,
+            sequence_count INTEGER NOT NULL DEFAULT 0,
+            thread_count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        );
+        """
+    )
+    create_compression_fact_indexes(conn)
+
+
+def create_compression_fact_indexes(conn: sqlite3.Connection) -> None:
+    """Create secondary indexes used by detector-ready fact queries."""
+    for statement in _COMPRESSION_FACT_INDEX_STATEMENTS:
+        conn.execute(statement)
+
+
+def drop_compression_fact_indexes(conn: sqlite3.Connection) -> None:
+    """Drop secondary fact indexes before an explicit full rebuild."""
+    for statement in _COMPRESSION_FACT_INDEX_DROP_STATEMENTS:
+        conn.execute(statement)
+
 
 def create_compression_run_tables(conn: sqlite3.Connection) -> None:
     """Create persistent run, candidate, and component-claim tables."""
@@ -138,6 +270,46 @@ def touch_compression_source_generation(conn: sqlite3.Connection) -> int:
         "UPDATE compression_source_state SET generation = generation + 1 WHERE singleton = 1"
     )
     return read_compression_source_generation(conn)
+
+
+def stamp_compression_fact_state(
+    conn: sqlite3.Connection,
+    *,
+    facts_version: int,
+) -> None:
+    """Record fact-table integrity counts at the current source generation."""
+    counts = conn.execute(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM compression_record_facts),
+            (SELECT COUNT(*) FROM compression_sequence_facts),
+            (SELECT COUNT(*) FROM compression_thread_facts),
+            (SELECT COALESCE(MAX(updated_at), '') FROM compression_record_facts)
+        """
+    ).fetchone()
+    conn.execute(
+        """
+        INSERT INTO compression_fact_state (
+            singleton, facts_version, source_generation,
+            record_count, sequence_count, thread_count, updated_at
+        ) VALUES (1, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+            facts_version = excluded.facts_version,
+            source_generation = excluded.source_generation,
+            record_count = excluded.record_count,
+            sequence_count = excluded.sequence_count,
+            thread_count = excluded.thread_count,
+            updated_at = excluded.updated_at
+        """,
+        (
+            facts_version,
+            read_compression_source_generation(conn),
+            int(counts[0]),
+            int(counts[1]),
+            int(counts[2]),
+            str(counts[3] or ""),
+        ),
+    )
 
 
 def _ensure_compression_storage(conn: sqlite3.Connection) -> None:
