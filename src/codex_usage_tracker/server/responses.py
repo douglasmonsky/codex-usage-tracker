@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from http import HTTPStatus
+from time import perf_counter
 from typing import Any, Protocol
 
+from codex_usage_tracker.server.request_timing import server_timing_header
 from codex_usage_tracker.server.utils import json_response_body
 
 
@@ -32,11 +34,19 @@ def send_json_response(
     handler: ResponseHandler,
     status: HTTPStatus,
     payload: dict[str, object],
+    *,
+    server_timing: str | None = None,
 ) -> None:
     body = json_response_body(payload)
+    timing = server_timing or server_timing_header(
+        started_at=getattr(handler, "_request_started_at", None),
+        finished_at=perf_counter(),
+    )
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Cache-Control", "no-store")
+    if timing is not None:
+        handler.send_header("Server-Timing", timing)
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     write_response_body(handler, body)
