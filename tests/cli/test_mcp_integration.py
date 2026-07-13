@@ -454,6 +454,66 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
         assert payload["filters"]["include_archived"] is False
 
 
+def test_compression_mcp_async_lifecycle(tmp_path: Path, monkeypatch) -> None:
+    from dataclasses import replace
+
+    from codex_usage_tracker.cli import mcp_compression
+    from codex_usage_tracker.compression import run_builder
+    from codex_usage_tracker.compression.run_cache import record_manifest
+    from codex_usage_tracker.compression.streaming_evidence import StreamingEvidenceBundle
+    from tests.compression.compression_helpers import call, snapshot
+
+    db_path = tmp_path / "usage.sqlite3"
+    evidence = replace(
+        snapshot(
+            calls=(
+                call(
+                    "call-1",
+                    thread="thread:one",
+                    uncached=25_000,
+                    output=100,
+                    context_percent=0.8,
+                ),
+            )
+        ),
+        source_revision="synthetic-revision",
+    )
+    monkeypatch.setattr(mcp_compression, "DEFAULT_DB_PATH", db_path)
+    monkeypatch.setattr(
+        run_builder,
+        "load_fact_compression_evidence",
+        lambda _db_path, _scope: StreamingEvidenceBundle(
+            evidence,
+            record_manifest(evidence),
+        ),
+    )
+
+    started = mcp_compression.usage_compression_start(
+        detector_families=["stale_context"],
+    )
+    run_id = started["run_id"]
+    status = started
+    for _ in range(100):
+        status = mcp_compression.usage_compression_status(run_id)
+        if status["status"] not in {"pending", "running"}:
+            break
+        time.sleep(0.01)
+
+    profile = mcp_compression.usage_compression_profile(run_id=run_id)
+    candidates = mcp_compression.usage_compression_candidates(run_id=run_id, limit=10)
+    detail = mcp_compression.usage_compression_candidate_detail(
+        candidate_id=candidates["candidates"][0]["candidate_id"],
+    )
+
+    assert status["status"] == "completed"
+    assert status["schema"] == "codex-usage-tracker-compression-api-v1"
+    assert status["progress"]["percent"] == 100
+    assert profile["profile"]["candidate_count"] == 1
+    assert candidates["pagination"]["total"] == 1
+    assert detail["evidence_mode"] == "handles"
+    assert detail["includes_raw_fragments"] is False
+
+
 def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> None:
     from codex_usage_tracker.cli import mcp_dogfood, mcp_server
 

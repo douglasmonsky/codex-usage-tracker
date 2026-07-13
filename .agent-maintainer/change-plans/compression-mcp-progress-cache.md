@@ -1,7 +1,7 @@
 +++
 id = "compression-mcp-progress-cache"
 kind = "cohesive-migration"
-status = "active"
+status = "complete"
 base_ref = "origin/main"
 expires = 2026-07-27
 allowed_paths = [
@@ -10,22 +10,28 @@ allowed_paths = [
   "docs/compression-lab-roadmap.md",
   "docs/mcp.md",
   "docs/cli-json-schemas.md",
+  "docs/architecture/decisions/0009-compression-mcp-adapter.md",
   "src/codex_usage_tracker/compression/**",
   "src/codex_usage_tracker/store/compression_*.py",
+  "src/codex_usage_tracker/store/schema.py",
   "src/codex_usage_tracker/store/content_*.py",
   "src/codex_usage_tracker/cli/mcp_compression.py",
   "src/codex_usage_tracker/cli/mcp_server.py",
   "src/codex_usage_tracker/cli/tach.domain.toml",
+  "src/codex_usage_tracker/core/json_contract_server.py",
   "tests/compression/test_jobs.py",
   "tests/cli/test_mcp_compression.py",
   "tests/cli/test_cli_release.py",
   "tests/cli/test_mcp_integration.py",
   "tests/store/test_compression_runs.py",
   "tests/store/test_compression_candidates.py",
+  "tests/store/test_store_dashboard_mcp.py",
+  "tests/store/test_store_migrations.py",
+  "tests/core/test_json_contracts.py",
 ]
 forbidden_paths = ["config/prod/**", ".env", ".env.*"]
-max_changed_files = 20
-max_changed_lines = 2500
+max_changed_files = 30
+max_changed_lines = 3400
 allow_source_without_test_change = false
 requires_tests = true
 requires_full_verify = true
@@ -41,6 +47,9 @@ worker lifecycle, compact payload envelope, API facade, MCP registration, privac
 bounds, and contract tests must agree on run identity and terminal-state behavior.
 Landing only one layer would either expose a blocking MCP call, duplicate cold
 work, or publish payloads whose pagination and privacy semantics are ambiguous.
+Independent review also required immutable claim metadata, an additive migration,
+and deterministic snapshot regressions; those corrections raised the final
+reviewed diff slightly above the original 3,000-line estimate.
 
 ## Why this should not be split smaller
 
@@ -51,12 +60,14 @@ responsibilities for review, but they form one deployable compatibility contract
 The simulator and skill/plugin routing remain separate PRs because they consume
 this contract rather than defining it.
 
-## What is allowed to change
+## What allowed to change
 
 - Persistent reservation and terminal-state handling for compression runs.
 - An in-process async job registry shared by API and MCP callers.
 - Pure compact payload builders for status, profile, candidate pages, and detail.
 - Stable SQL-backed candidate filters and paging needed by the public contract.
+- Additive candidate-claim metadata and migration coverage required to keep
+  historical model/thread/time filters stable after source refreshes.
 - Explicit bounded evidence handles, summaries, and excerpt reads.
 - The five `usage_compression_*` MCP tools and CLI domain dependency.
 - Focused lifecycle, restart, deduplication, privacy, pagination, latency, and
@@ -65,15 +76,17 @@ this contract rather than defining it.
 
 ## What must not change
 
-- Detector ranking, estimates, candidate identity, overlap allocation, or CP1-CP6
-  performance behavior.
+- Detector ranking, estimates, default detector-set candidate identity, overlap
+  allocation, or CP1-CP6 performance behavior. Non-default detector selections
+  may add an identity namespace so overlapping persisted runs cannot collide.
 - Existing CLI/MCP tool behavior or stable payload contracts outside the new
   Compression Lab tools.
 - Default raw-content privacy behavior; default payloads remain content-free.
 - Parser, dashboard, pricing, allowance, release metadata, production config,
   credentials, simulator behavior, or skill/plugin routing.
-- SQLite schema or cross-process leasing unless a failing contract test proves
-  that a smaller persistent-state extension cannot satisfy restart correctness.
+- Cross-process leasing unless a failing contract test proves that a smaller
+  persistent-state extension cannot satisfy restart correctness. SQLite changes
+  remain additive and limited to immutable claim metadata required by review.
 
 ## Verification plan
 

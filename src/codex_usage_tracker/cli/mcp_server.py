@@ -6,6 +6,7 @@ import threading
 import uuid
 from typing import Any
 
+from codex_usage_tracker.cli import mcp_compression as mcp_compression
 from codex_usage_tracker.cli import mcp_visualization as mcp_visualization
 from codex_usage_tracker.cli.mcp_allowance import (
     usage_allowance_diagnostics as usage_allowance_diagnostics,

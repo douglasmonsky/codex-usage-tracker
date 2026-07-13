@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -13,11 +14,7 @@ from codex_usage_tracker.compression.attribution import (
     allocate_overlaps,
 )
 from codex_usage_tracker.compression.detector_protocol import CompressionDetector
-from codex_usage_tracker.compression.detector_registry import (
-    DETECTOR_FAMILIES,
-    DETECTOR_SET_VERSION,
-    select_detectors,
-)
+from codex_usage_tracker.compression.detector_registry import DETECTOR_SET_VERSION, select_detectors
 from codex_usage_tracker.compression.estimators import (
     ESTIMATOR_POLICY_V1,
     EstimatorIndex,
@@ -25,12 +22,17 @@ from codex_usage_tracker.compression.estimators import (
     estimate_candidate,
 )
 from codex_usage_tracker.compression.evidence import CompressionEvidenceSnapshot
-from codex_usage_tracker.compression.identifiers import stable_scope_hash
+from codex_usage_tracker.compression.identifiers import stable_candidate_variant_id
 from codex_usage_tracker.compression.models import (
     CandidateDraft,
     CompressionScope,
 )
 from codex_usage_tracker.compression.profile import build_profile, public_profile
+from codex_usage_tracker.compression.request import (
+    COMPRESSION_SCHEMA_VERSION,
+    PreparedCompressionRequest,
+    prepare_compression_request,
+)
 from codex_usage_tracker.compression.run_cache import (
     incremental_inputs,
     latest_compatible_run,
@@ -49,7 +51,6 @@ from codex_usage_tracker.store.compression_runs import (
     update_compression_run,
 )
 
-COMPRESSION_SCHEMA_VERSION = 1
 ProgressCallback = Callable[[dict[str, Any]], None]
 
 
@@ -59,67 +60,87 @@ def build_compression_run(
     progress_callback: ProgressCallback | None = None,
     detector_families: Sequence[str] | None = None,
     force: bool = False,
+    reserved_run_id: str | None = None,
+    prepared_request: PreparedCompressionRequest | None = None,
 ) -> dict[str, Any]:
     """Build, persist, and return one compact compression profile."""
     started = time.perf_counter()
-    detectors = select_detectors(detector_families)
-    selected_families = tuple(detector.family for detector in detectors)
-    detector_version = _detector_set_version(detectors)
-    scope_hash = stable_scope_hash(scope)
-    revision_vector = current_compression_revision_vector(
+    request = prepared_request or prepare_compression_request(
         db_path,
-        detector_families=selected_families,
-        estimator_revision=ESTIMATOR_POLICY_V1.version,
+        scope,
+        detector_families=None if detector_families is None else tuple(detector_families),
+        detector_selector=select_detectors,
     )
-    source_generation = revision_vector.generation
-    cached_profile = _fast_cached_profile(
-        db_path,
-        revision_key=revision_vector.cache_key,
-        detector_families=selected_families,
-        scope_hash=scope_hash,
-        detector_version=detector_version,
-        force=force,
-    )
-    if cached_profile is not None:
-        _emit(progress_callback, stage="complete", progress_percent=100.0, cache_reused=True)
-        return cached_profile
-
-    loaded_evidence = load_fact_compression_evidence(db_path, scope)
-    snapshot = loaded_evidence.snapshot
-    current_manifest = loaded_evidence.record_manifest
-    cache_identity = _cache_identity(snapshot, scope_hash, detector_version)
-    exact = find_compression_run(db_path, **cache_identity)
-    if exact is not None and not force:
-        _emit(progress_callback, stage="complete", progress_percent=100.0, cache_reused=True)
-        return public_profile(exact["aggregate_profile"], cache_mode="exact")
-
-    previous = _previous_compatible_run(
-        db_path,
-        scope_hash=scope_hash,
-        detector_version=detector_version,
-        force=force,
-    )
-    run = create_compression_run(
-        db_path,
-        **cache_identity,
-        scope=scope.as_dict(),
-        source_generation=source_generation,
-        coverage=snapshot.coverage.as_dict(),
-        status="running",
-        revision_key=revision_vector.cache_key,
-    )
-    run_id = str(run["run_id"])
+    detectors = request.detectors
+    detector_version = request.detector_set_version
+    scope_hash = request.scope_hash
+    source_generation = request.source_generation
+    run_id = reserved_run_id
     warnings: list[dict[str, Any]] = []
-    _progress(
-        db_path,
-        run_id,
-        progress_callback,
-        stage="evidence_loaded",
-        percent=10.0,
-        records_examined=len(snapshot.calls),
-        total_detectors=len(detectors),
-    )
     try:
+        cached_profile = _reuse_before_evidence(
+            db_path,
+            request,
+            progress_callback,
+            force=force,
+            reserved_run_id=run_id,
+        )
+        if cached_profile is not None:
+            return cached_profile
+
+        loaded_evidence = load_fact_compression_evidence(db_path, scope)
+        snapshot = loaded_evidence.snapshot
+        current_manifest = loaded_evidence.record_manifest
+        cache_identity = _cache_identity(snapshot, scope_hash, detector_version)
+        exact = find_compression_run(db_path, **cache_identity)
+        exact_profile = _reuse_exact_after_evidence(
+            db_path,
+            exact,
+            progress_callback,
+            force=force,
+            reserved_run_id=run_id,
+        )
+        if exact_profile is not None:
+            return exact_profile
+
+        previous = _previous_compatible_run(
+            db_path,
+            scope_hash=scope_hash,
+            detector_version=detector_version,
+            force=force,
+        )
+        if run_id is None:
+            run = create_compression_run(
+                db_path,
+                **cache_identity,
+                scope=scope.as_dict(),
+                source_generation=source_generation,
+                coverage=snapshot.coverage.as_dict(),
+                status="running",
+                revision_key=request.revision_key,
+            )
+            run_id = str(run["run_id"])
+        else:
+            reserved = update_compression_run(
+                db_path,
+                run_id=run_id,
+                status="running",
+                source_revision=snapshot.source_revision,
+                source_generation=source_generation,
+                revision_key=request.revision_key,
+                coverage=snapshot.coverage.as_dict(),
+            )
+            if reserved is None:
+                raise KeyError(f"unknown reserved compression run: {run_id}")
+        _progress(
+            db_path,
+            run_id,
+            progress_callback,
+            stage="evidence_loaded",
+            percent=10.0,
+            records_examined=len(snapshot.calls),
+            total_detectors=len(detectors),
+        )
         reused, detector_snapshot, cache_mode = incremental_inputs(
             db_path,
             snapshot=snapshot,
@@ -139,7 +160,7 @@ def build_compression_run(
             progress_callback=progress_callback,
             warnings=warnings,
         )
-        drafts = [*reused, *detected]
+        drafts = _namespace_candidate_ids([*reused, *detected], detector_version)
         _progress(
             db_path,
             run_id,
@@ -200,14 +221,82 @@ def build_compression_run(
         )
         return compact_profile
     except Exception as exc:
+        if run_id is not None:
+            update_compression_run(
+                db_path,
+                run_id=run_id,
+                status="failed",
+                stage="failed",
+                error_summary={"code": "compression_run_failed", "type": type(exc).__name__},
+            )
+        raise
+
+
+def _reuse_before_evidence(
+    db_path: Path,
+    request: PreparedCompressionRequest,
+    progress_callback: ProgressCallback | None,
+    *,
+    force: bool,
+    reserved_run_id: str | None,
+) -> dict[str, Any] | None:
+    if reserved_run_id is not None:
         update_compression_run(
             db_path,
-            run_id=run_id,
-            status="failed",
-            stage="failed",
-            error_summary={"code": "compression_run_failed", "type": type(exc).__name__},
+            run_id=reserved_run_id,
+            status="running",
+            stage="loading_evidence",
+            progress_percent=1,
+            total_detectors=len(request.detectors),
         )
-        raise
+        return None
+    cached = _fast_cached_profile(
+        db_path,
+        revision_key=request.revision_key,
+        detector_families=request.detector_families,
+        scope_hash=request.scope_hash,
+        detector_version=request.detector_set_version,
+        force=force,
+    )
+    if cached is not None:
+        _emit(
+            progress_callback,
+            stage="complete",
+            progress_percent=100.0,
+            cache_reused=True,
+        )
+    return cached
+
+
+def _reuse_exact_after_evidence(
+    db_path: Path,
+    exact: dict[str, Any] | None,
+    progress_callback: ProgressCallback | None,
+    *,
+    force: bool,
+    reserved_run_id: str | None,
+) -> dict[str, Any] | None:
+    if exact is None or force:
+        return None
+    profile = public_profile(exact["aggregate_profile"], cache_mode="exact")
+    if reserved_run_id is not None:
+        update_compression_run(
+            db_path,
+            run_id=reserved_run_id,
+            status="completed",
+            stage="complete",
+            progress_percent=100,
+            cache_reused=True,
+            public_profile=profile,
+            revision_key=f"alias:{reserved_run_id}",
+        )
+    _emit(
+        progress_callback,
+        stage="complete",
+        progress_percent=100.0,
+        cache_reused=True,
+    )
+    return profile
 
 
 def _fast_cached_profile(
@@ -322,6 +411,24 @@ def _capacity_ledger(
     return CapacityLedger(capacities)
 
 
+def _namespace_candidate_ids(
+    drafts: list[CandidateDraft],
+    detector_set_version: str,
+) -> list[CandidateDraft]:
+    if detector_set_version == DETECTOR_SET_VERSION:
+        return drafts
+    return [
+        replace(
+            draft,
+            candidate_id=stable_candidate_variant_id(
+                candidate_id=draft.candidate_id,
+                detector_set_version=detector_set_version,
+            ),
+        )
+        for draft in drafts
+    ]
+
+
 def _cache_identity(
     snapshot: CompressionEvidenceSnapshot,
     scope_hash: str,
@@ -334,13 +441,6 @@ def _cache_identity(
         "estimator_version": ESTIMATOR_POLICY_V1.version,
         "compression_schema_version": COMPRESSION_SCHEMA_VERSION,
     }
-
-
-def _detector_set_version(detectors: Sequence[CompressionDetector]) -> str:
-    families = tuple(detector.family for detector in detectors)
-    if families == DETECTOR_FAMILIES:
-        return DETECTOR_SET_VERSION
-    return f"{DETECTOR_SET_VERSION}:{','.join(families)}"
 
 
 def _progress(

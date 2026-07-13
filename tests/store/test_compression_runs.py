@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TypedDict
@@ -11,6 +14,7 @@ from codex_usage_tracker.compression.models import (
     CompressionCandidate,
     EstimateRange,
 )
+from codex_usage_tracker.store import compression_candidates as candidate_store
 from codex_usage_tracker.store.compression_candidates import (
     get_compression_candidate,
     list_compression_candidates,
@@ -23,6 +27,8 @@ from codex_usage_tracker.store.compression_runs import (
     get_compression_run,
     update_compression_run,
 )
+from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.schema import init_db
 
 
 class CacheKey(TypedDict):
@@ -124,6 +130,102 @@ def test_candidate_replace_lists_compact_rows_and_reconstructs_detail(tmp_path: 
     run = get_compression_run(db_path, run_id="run-1")
     assert run is not None
     assert run["candidate_count"] == 1
+
+
+def test_candidate_record_metadata_migration_backfills_existing_claims(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    create_compression_run(db_path, run_id="run-1", **cache_key("rev-1"))
+    replace_compression_candidates(
+        db_path,
+        run_id="run-1",
+        candidates=[candidate("cmp_old", likely=40).as_dict()],
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute(
+            """
+            INSERT INTO usage_events (
+                record_id, session_id, event_timestamp, source_file, line_number,
+                model, effort, thread_key, input_tokens, cached_input_tokens,
+                output_tokens, reasoning_output_tokens, total_tokens,
+                cumulative_input_tokens, cumulative_cached_input_tokens,
+                cumulative_output_tokens, cumulative_reasoning_output_tokens,
+                cumulative_total_tokens, uncached_input_tokens, cache_ratio,
+                reasoning_output_ratio, context_window_percent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            """,
+            (
+                "record-cmp_old",
+                "session-old",
+                "2026-07-12T12:00:00+00:00",
+                "/synthetic/old.jsonl",
+                1,
+                "gpt-migrated",
+                "high",
+                "thread:migrated",
+            ),
+        )
+        conn.execute("DELETE FROM schema_migrations WHERE version = 19")
+        conn.execute("PRAGMA user_version = 18")
+    with connect(db_path) as conn:
+        init_db(conn)
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 19
+    with connect(db_path) as conn:
+        conn.execute("DELETE FROM usage_events WHERE record_id = ?", ("record-cmp_old",))
+
+    detail = get_compression_candidate(db_path, candidate_id="cmp_old")
+    assert detail is not None
+    assert detail["claims"][0]["model"] == "gpt-migrated"
+    assert detail["claims"][0]["thread_key"] == "thread:migrated"
+    assert detail["claims"][0]["event_timestamp"] == "2026-07-12T12:00:00+00:00"
+    page = list_compression_candidates(
+        db_path,
+        run_id="run-1",
+        model="gpt-migrated",
+        thread="thread:migrated",
+    )
+    assert [row["candidate_id"] for row in page["rows"]] == ["cmp_old"]
+
+
+def test_candidate_page_count_and_rows_share_one_sqlite_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    create_compression_run(db_path, run_id="run-1", **cache_key("rev-1"))
+    replace_compression_candidates(
+        db_path,
+        run_id="run-1",
+        candidates=[candidate("cmp_snapshot", likely=40).as_dict()],
+    )
+    original_connect = candidate_store.connect
+    writer_committed = False
+
+    @contextmanager
+    def interleaved_connect(path: Path) -> Iterator[sqlite3.Connection]:
+        nonlocal writer_committed
+        with original_connect(path) as conn:
+
+            def interleave(statement: str) -> None:
+                nonlocal writer_committed
+                if writer_committed or "SELECT c.*" not in statement:
+                    return
+                with sqlite3.connect(path) as writer:
+                    writer.execute("DELETE FROM compression_candidate_records")
+                    writer.execute("DELETE FROM compression_candidates")
+                writer_committed = True
+
+            conn.set_trace_callback(interleave)
+            yield conn
+
+    monkeypatch.setattr(candidate_store, "connect", interleaved_connect)
+    page = candidate_store.list_compression_candidates(db_path, run_id="run-1")
+
+    assert writer_committed is True
+    assert page["total"] == 1
+    assert [row["candidate_id"] for row in page["rows"]] == ["cmp_snapshot"]
 
 
 def test_delete_stale_runs_leaves_active_and_recent_runs(tmp_path: Path) -> None:

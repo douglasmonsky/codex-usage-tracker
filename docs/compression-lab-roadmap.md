@@ -70,7 +70,7 @@ Exit gates:
 
 ### PR 3: Async MCP And Query Surface
 
-Status: in progress
+Status: complete
 
 Issue: [#238](https://github.com/douglasmonsky/codex-usage-tracker/issues/238)
 
@@ -472,6 +472,20 @@ whole-pipeline timing or equivalence claim.
   and child-process parsing. A six-worker trial improved a comparable loaded
   run by only about 0.16 seconds while increasing sampled process-tree RSS by
   roughly 119 MiB, so CP6 retains the four-worker cap.
+- 2026-07-13: PR 3 issue #238 started from `aa7e4e3`. The async registry now
+  reserves persistent run IDs, deduplicates active requests, reuses exact
+  completed profiles, reports unowned active rows explicitly, and drives the
+  synchronous builder through one reserved publication identity. Shared payload
+  and MCP layers expose start/status/profile/candidates/detail with SQL-backed
+  filters, local `limit=0`/`None`, bounded MCP pagination, and explicit
+  handles/summaries/excerpts disclosure. Contract tests enforce the 4/8/16/24
+  KiB payload targets.
+- 2026-07-13: PR 3 hardening completed after independent review. Schema v19
+  snapshots claim metadata for stable historical filters; overlapping detector
+  selections use collision-free candidate IDs; candidate count and page rows
+  share one SQLite snapshot; and error envelopes preserve known run identity.
+  The full Agent Maintainer profile passed as
+  `20260713T175803017442Z-full-24f9a9b32803`; PR publication remains.
 
 ## Current Restart Checkpoint
 
@@ -486,51 +500,26 @@ Pause checkpoint (2026-07-13):
   performance evidence below remains authoritative.
 - Preserve the pre-existing untracked `.idea/` directory and local `uv.lock`.
   Do not stage, remove, or modify them for PR 3.
-- No PR 3 implementation files have been edited yet. Only this roadmap and the
-  completed CP6 change-plan status should be dirty at the checkpoint.
+- PR 3 implementation and local verification are complete but not yet committed
+  or published.
+  The worktree contains the async registry, shared API/payload layer, five MCP
+  tools, SQL-backed candidate filters, bounded content excerpts, schema v19,
+  contract docs, and focused tests. Keep these edits together with the existing
+  roadmap checkpoint commit `cb4e593`.
 - Serena semantic recovery was exhausted for this task after two bounded doctor
   probes and broker/history inspection. Use native `rg`, type checks, tests, and
   inspections for the rest of this task rather than retrying Serena.
-- Two read-only audits confirmed that none of the five planned
-  `usage_compression_*` MCP tools exist yet. The synchronous run builder,
-  persistent run/profile store, monotonic SQL progress update, candidate paging,
-  and candidate detail primitives already exist and should be reused.
-- The PR 3 implementation should add an in-process `CompressionJobRegistry`
-  shared by the API and MCP surfaces. Under one lock it must reuse an exact
-  completed SQLite profile, deduplicate an identical active request, or reserve
-  a persistent pending run before launching one daemon worker.
-- A reserved run ID must be returned immediately and remain queryable through
-  process restart. Pending/running rows without an owned worker must report an
-  explicit interrupted/orphaned state; do not silently claim that work is still
-  progressing. Avoid cross-process lease/schema machinery unless a failing
-  contract test demonstrates that it is required.
-- Refactor the existing run builder minimally to accept a reserved run ID and
-  update that row from pending to running/completed/failed. Preserve structured
-  failure metadata and never expose raw exception messages or indexed content in
-  default status payloads.
-- Build pure compact payload helpers and one shared API layer before registering
-  MCP tools. The common envelope must carry schema/detector/estimator versions,
-  run/source/scope identity, coverage, pagination/truncation, duration/cache,
-  privacy flags, and warnings/caveats.
-- Proposed serialized payload budgets are 4 KiB for status, 8 KiB for profile,
-  16 KiB for a candidate page, and 24 KiB for candidate detail. Confirm these in
-  the roadmap contract tests before implementation; any change must be recorded
-  here with a reason.
-- Candidate list queries must remain stably sorted and pageable. Extend the SQL
-  query rather than post-filtering when adding model, thread, or time filters.
-  Internal/local API calls retain `limit=0` and `limit=None` unbounded semantics;
-  MCP responses must still obey the serialized page budget and report
-  truncation/next-page information.
-- Candidate detail defaults to bounded evidence handles. `summaries` remains
-  content-free; explicit `excerpts` may read indexed fragments but must apply
-  evidence-count, per-excerpt, and total-character bounds and set honest privacy
-  flags.
-- Start with failing lifecycle, deduplication, monotonic-progress, restart,
-  paging, privacy, and payload-budget tests. Then add `compression/jobs.py`,
-  `compression/payloads.py`, `compression/api.py`, and
-  `cli/mcp_compression.py`; register the five tools, add the compression domain
-  dependency, update release tool-name contracts and MCP/schema docs, and run
-  focused tests before the full verifier.
+- An independent review found and the branch now repairs three correctness
+  risks: detector-subset candidate-ID collisions, mixed pagination snapshots,
+  and incomplete-run errors that lost known run identity. Candidate claim rows
+  now persist immutable model/thread/time metadata, migration 19 backfills old
+  claims, one SQLite read transaction covers count plus page rows, and an
+  oversized first row cannot produce a non-advancing cursor.
+- Focused lifecycle, deduplication, restart, migration, paging, privacy,
+  payload-budget, and error-envelope tests pass. The full Python suite reports
+  782 passing tests; Ruff, Pyright, Tach, Bandit, Markdown lint, release checks,
+  and the full Agent Maintainer profile pass. The remaining PR 3 work is the
+  focused commit, PR publication, GitHub CI, and merge.
 - PR 3 is only complete after immediate cold start, sub-500 ms representative
   warm profile/list queries, compact default payloads without raw fragments, and
   handles/summaries/bounded-excerpts detail modes are proven. Open and merge a
@@ -538,7 +527,7 @@ Pause checkpoint (2026-07-13):
 
 Validated behavior at this checkpoint:
 
-- Schema v18 migrates existing source and compression-run tables additively and
+- Schema v19 migrates existing source and compression-run tables additively and
   adds the source-file/line lookup index used by the one-pass ingestion writer.
 - Append plans verify stored device/inode identity and a bounded hash at the
   prior parse boundary before reusing byte and parser-state cursors.

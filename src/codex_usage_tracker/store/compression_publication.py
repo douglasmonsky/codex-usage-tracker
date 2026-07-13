@@ -13,6 +13,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.store.compression_candidate_metadata import (
+    RecordMetadata,
+    record_metadata_by_id,
+)
 from codex_usage_tracker.store.compression_candidates import (
     _CANDIDATE_INSERT_SQL,
     _CLAIM_INSERT_SQL,
@@ -214,11 +218,19 @@ def _replace_candidate_rows(
         ),
         batch_size=25,
     )
+    record_metadata = record_metadata_by_id(
+        conn,
+        (claim.record_id for candidate in candidates for claim in candidate.draft.claims),
+    )
     _bounded_insert(
         conn,
         _CLAIM_INSERT_SQL,
         (
-            _claim_row(candidate.candidate_id, claim)
+            _claim_row(
+                candidate.candidate_id,
+                claim,
+                record_metadata.get(claim.record_id),
+            )
             for candidate in candidates
             for claim in candidate.draft.claims
         ),
@@ -317,7 +329,12 @@ def _candidate_row(candidate: CandidateWrite, *, run_id: str, rank: int) -> tupl
     )
 
 
-def _claim_row(candidate_id: str, claim: ClaimWrite) -> tuple[Any, ...]:
+def _claim_row(
+    candidate_id: str,
+    claim: ClaimWrite,
+    record_metadata: RecordMetadata | None,
+) -> tuple[Any, ...]:
+    model, thread_key, event_timestamp = record_metadata or (None, None, None)
     return (
         candidate_id,
         claim.record_id,
@@ -328,6 +345,9 @@ def _claim_row(candidate_id: str, claim: ClaimWrite) -> tuple[Any, ...]:
         claim.estimate.high,
         "supporting",
         _json_dump({"record_id": claim.record_id}),
+        model,
+        thread_key,
+        event_timestamp,
     )
 
 
