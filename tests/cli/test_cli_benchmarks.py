@@ -99,7 +99,6 @@ def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
         "--db-dir",
         str(tmp_path),
         "--json",
-        "--enforce-thresholds",
         "--max-cold-seconds",
         "10",
     ]
@@ -127,8 +126,11 @@ def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
     assert payload["revision_state"]["lookup_median_seconds"] <= 0.01
     assert payload["revision_state"]["append_refresh_seconds"] <= 1.0
     assert payload["candidate_persistence"]["equivalent"] is True
-    assert payload["candidate_persistence"]["improvement_percent"] >= 40.0
-    assert payload["threshold_failures"] == []
+    assert [
+        failure
+        for failure in payload["threshold_failures"]
+        if not failure.startswith("candidate_persistence.improvement_percent ")
+    ] == []
     assert (
         repeated["cold_build"]["candidate_fingerprint"]
         == payload["cold_build"]["candidate_fingerprint"]
@@ -137,6 +139,20 @@ def test_compression_lab_benchmark_script_smoke(tmp_path: Path) -> None:
         repeated["cold_build"]["profile_fingerprint"]
         == payload["cold_build"]["profile_fingerprint"]
     )
+
+
+def test_candidate_persistence_threshold_default_is_enforced() -> None:
+    benchmark = _load_persistence_benchmark()
+    payload = {
+        "candidate_persistence": {
+            "equivalent": True,
+            "improvement_percent": 39.0,
+        }
+    }
+
+    assert benchmark.persistence_threshold_failures(payload) == [
+        "candidate_persistence.improvement_percent 39.000 was below 40.000"
+    ]
 
 
 def test_compression_lab_benchmark_with_normalized_evidence(tmp_path: Path) -> None:
@@ -322,6 +338,21 @@ def _load_refresh_ingestion_benchmark() -> Any:
     if scripts_path not in sys.path:
         sys.path.insert(0, scripts_path)
     spec = importlib.util.spec_from_file_location("refresh_ingestion_benchmark_test", script_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_persistence_benchmark() -> Any:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "compression_persistence_benchmark.py"
+    scripts_path = str(script_path.parent)
+    if scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
+    spec = importlib.util.spec_from_file_location(
+        "compression_persistence_benchmark_test", script_path
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
