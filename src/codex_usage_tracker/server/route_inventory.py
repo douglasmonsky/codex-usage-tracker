@@ -162,7 +162,7 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "bounded_report",
         "Normalizes allowance observations over the selected scope.",
         "Default 1,000 observations.",
-        "Live SQLite plus local configuration.",
+        "Generation/config-keyed large-payload cache over live SQLite and local config.",
         may_scan_all_history=True,
     ),
     _profile(
@@ -173,7 +173,7 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "bounded_report",
         "Evaluates at most the configured observation window.",
         "Default 10,000 observations.",
-        "Computed per request from SQLite and config.",
+        "Generation/config-keyed large-payload cache over live SQLite and local config.",
         may_scan_all_history=True,
     ),
     _profile(
@@ -272,7 +272,7 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "bounded_report",
         "Queries persisted diagnostic facts with filters.",
         "Default 50 facts.",
-        "Live SQLite query over persisted facts.",
+        "Generation-keyed response cache over indexed persisted facts.",
         may_scan_all_history=True,
     ),
     _profile(
@@ -294,7 +294,7 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "bounded_report",
         "Queries persisted compaction facts.",
         "Default 50 facts.",
-        "Live SQLite query over persisted facts.",
+        "Generation-keyed response cache over indexed persisted facts.",
         may_scan_all_history=True,
     ),
     _profile(
@@ -305,7 +305,7 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "bounded_report",
         "Queries persisted tool facts.",
         "Default 50 facts.",
-        "Live SQLite query over persisted facts.",
+        "Generation-keyed response cache over indexed persisted facts.",
         may_scan_all_history=True,
     ),
     *_PERSISTED_SNAPSHOT_PROFILES,

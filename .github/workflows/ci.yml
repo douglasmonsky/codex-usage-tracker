@@ -52,6 +52,14 @@ jobs:
         run: npm run dashboard:governance
       - name: Dashboard bundle budget
         run: node scripts/check-dashboard-bundles.mjs
+      - name: Dashboard route performance budget
+        run: |
+          python scripts/benchmark_dashboard_routes.py \
+            --sizes 100000 \
+            --iterations 3 \
+            --skip-compression \
+            --enforce-thresholds \
+            --output-dir /tmp/dashboard-route-budget
       - name: Whole-source Pyright
         run: python -m pyright --pythonpath "$(command -v python)" src
       - name: Dependency hygiene

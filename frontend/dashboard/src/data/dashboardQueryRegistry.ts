@@ -1,6 +1,7 @@
 import type { DataScope, HistoryScope, LoadWindow } from './dataScope';
+import queryContracts from './dashboardQueryContracts.json';
 
-export type DashboardQueryModule =
+export type DashboardQueryId =
   | 'usage-snapshot'
   | 'overview-summary'
   | 'overview-recommendations'
@@ -14,6 +15,8 @@ export type DashboardQueryModule =
   | 'diagnostics-snapshot'
   | 'compression-profile'
   | 'reports';
+
+export type DashboardQueryModule = DashboardQueryId;
 
 export type DashboardQuerySource = {
   sourceKey: string;
@@ -31,6 +34,19 @@ export type DashboardQueryDataClass =
   | 'detail'
   | 'heavyJob'
   | 'userAction';
+
+export type DashboardQueryDefinition = {
+  id: DashboardQueryId;
+  endpoint: string;
+  dataClass: DashboardQueryDataClass;
+  schema: string | null;
+};
+
+export const dashboardQueryDefinitions = queryContracts as DashboardQueryDefinition[];
+
+const dashboardQueryDefinitionMap = new Map(
+  dashboardQueryDefinitions.map(definition => [definition.id, definition]),
+);
 
 export type DashboardModuleState = 'waiting' | 'loading' | 'ready' | 'updating' | 'error';
 
@@ -69,14 +85,14 @@ export function dashboardQuerySource({
 }
 
 export function dashboardQueryKey(
-  module: DashboardQueryModule,
+  definition: DashboardQueryDefinition,
   source: DashboardQuerySource,
   scope: DashboardQueryScope = {},
   ...parts: readonly unknown[]
 ) {
   return [
     'dashboard',
-    module,
+    definition.id,
     source.sourceKey,
     source.sourceRevision,
     normalizedScope(scope),
@@ -84,8 +100,14 @@ export function dashboardQueryKey(
   ] as const;
 }
 
-export function dashboardQueryPrefix(module: DashboardQueryModule) {
-  return ['dashboard', module] as const;
+export function dashboardQueryPrefix(definition: DashboardQueryDefinition) {
+  return ['dashboard', definition.id] as const;
+}
+
+export function dashboardQueryDefinition(id: DashboardQueryId): DashboardQueryDefinition {
+  const definition = dashboardQueryDefinitionMap.get(id);
+  if (!definition) throw new Error(`Unknown dashboard query definition: ${id}`);
+  return definition;
 }
 
 export function dashboardQueryOptions(dataClass: DashboardQueryDataClass) {

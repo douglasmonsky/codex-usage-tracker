@@ -12,11 +12,15 @@ from codex_usage_tracker.store.api import (
     query_dashboard_event_count,
     query_dashboard_events,
     query_thread_summaries,
+    query_usage_api_event_count,
     query_usage_api_events,
     refresh_usage_index,
     upsert_usage_events,
 )
-from codex_usage_tracker.store.thread_summaries import query_thread_summary_count
+from codex_usage_tracker.store.thread_summaries import (
+    _latest_record_id_expression,
+    query_thread_summary_count,
+)
 from tests.store_dashboard_helpers import (
     SECOND_SESSION_ID,
     SESSION_ID,
@@ -327,6 +331,100 @@ def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
         persisted = conn.execute("SELECT COUNT(*) AS count FROM thread_summaries").fetchone()
     assert persisted is not None
     assert persisted["count"] == 4
+
+
+def test_thread_summary_latest_record_lookup_uses_thread_index(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id="indexed",
+                session_id="session-indexed",
+                thread_key="thread:Indexed",
+                event_timestamp="2026-05-17T12:00:00Z",
+                cumulative_total_tokens=100,
+            )
+        ],
+        db_path=db_path,
+    )
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        plan = [
+            str(row["detail"])
+            for row in conn.execute(
+                f"""
+                EXPLAIN QUERY PLAN
+                SELECT {_latest_record_id_expression(include_archived=True)}
+                FROM thread_summaries AS t
+                WHERE t.is_archived_scope = 'all-history'
+                """
+            ).fetchall()
+        ]
+
+    assert any("idx_usage_thread_key_timestamp (thread_key=?)" in detail for detail in plan)
+    assert not any("SCAN u" in detail for detail in plan)
+
+
+def test_thread_summary_latest_record_lookup_preserves_legacy_keys(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    legacy_event = _usage_event(
+        record_id="legacy",
+        session_id="session-legacy",
+        thread_key="thread:Legacy",
+        event_timestamp="2026-05-17T12:00:00Z",
+        cumulative_total_tokens=100,
+    )
+
+    upsert_usage_events([legacy_event], db_path=db_path)
+    with connect(db_path) as conn:
+        conn.execute("UPDATE usage_events SET thread_key = NULL WHERE record_id = 'legacy'")
+
+    summaries = query_thread_summaries(db_path=db_path, limit=0)
+    assert summaries[0]["thread_key"] == "thread:Legacy"
+    assert summaries[0]["latest_record_id"] == "legacy"
+
+
+def test_thread_call_paging_merges_indexed_and_legacy_keys(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id=record_id,
+            session_id="session-alpha",
+            thread_key="thread:Alpha",
+            event_timestamp=f"2026-05-17T12:00:0{index}Z",
+            cumulative_total_tokens=index * 100,
+        )
+        for index, record_id in enumerate(("a1", "a2", "legacy"), start=1)
+    ]
+    upsert_usage_events(events, db_path=db_path)
+    with connect(db_path) as conn:
+        conn.execute("UPDATE usage_events SET thread_key = NULL WHERE record_id = 'legacy'")
+
+    first_page = query_usage_api_events(
+        db_path=db_path,
+        thread_key="thread:Alpha",
+        limit=2,
+        include_archived=True,
+    )
+    second_page = query_usage_api_events(
+        db_path=db_path,
+        thread_key="thread:Alpha",
+        limit=2,
+        offset=2,
+        include_archived=True,
+    )
+
+    assert [row["record_id"] for row in first_page] == ["legacy", "a2"]
+    assert [row["record_id"] for row in second_page] == ["a1"]
+    assert (
+        query_usage_api_event_count(
+            db_path=db_path,
+            thread_key="thread:Alpha",
+            include_archived=True,
+        )
+        == 3
+    )
 
 
 def test_thread_summaries_keep_active_and_all_history_scopes_separate(

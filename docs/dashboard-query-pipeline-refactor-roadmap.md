@@ -1,6 +1,6 @@
 # Dashboard Query Pipeline Refactor Roadmap
 
-Status: Proposed  
+Status: In progress - final enforcement slice
 Tracking issue: [#244](https://github.com/douglasmonsky/codex-usage-tracker/issues/244)  
 Scope: Local dashboard API, persisted analytical facts, async report jobs, and frontend query orchestration
 
@@ -72,8 +72,8 @@ reusable results.
 | PR 3C: Diagnostics query migration | Merged | #244 / #257 / `7d2306c` | Source-aware facts and snapshot queries, paginated evidence calls, thirteen-module progress, cancellation, and desktop interrupted-work retry coverage |
 | PR 4A: Diagnostic refresh jobs | Merged | #244 / #258 / `2eb19e2b` | Shared async analysis lifecycle, persisted-result reload, measurable 10-unit progress, and observer-safe polling |
 | PR 4B: Compression Lab dashboard jobs | Merged | #244 / #261 / `cbc8b511` | Shared MCP/dashboard profile contract; 400k cold start 2.9 ms, active-poll p95 72 ms, warm status/profile p95 1.3 ms; agent-perf `20260714T094938Z-90e678ab` |
-| PR 5: Query and cache hardening | In progress | #244 / `feature/244-query-cache-hardening` | Five 400k route-handler samples: summary 591 ms cold p95 / 1.64 ms warm p95; recommendations 150 ms cold p95 / 2.87 ms warm p95; query-plan-backed diagnostic covering index; agent-perf `20260714T114913Z-d4cd2a28` |
-| PR 6: Cleanup and enforcement | Pending | #244 | Branch, PR, CI ratchets and final route audit |
+| PR 5: Query and cache hardening | Merged | #244 / #262 / `03b6900` | Five 400k route-handler samples: summary 591 ms cold p95 / 1.64 ms warm p95; recommendations 150 ms cold p95 / 2.87 ms warm p95; agent-perf `20260714T114913Z-d4cd2a28` |
+| PR 6: Cleanup and enforcement | In progress | #244 / `feature/244-query-pipeline-enforcement` | Retired recommendation fallback; query/schema registry ratchets; bounded Threads hydration; diagnostic fact covering index, lazy tabs, and cache; allowance running-median detector and large-payload cache; deterministic 100k CI budgets; agent-perf `20260714T154221Z-1ed23e7c` |
 
 Update this table in the same PR that completes each slice. A slice is complete
 only after its acceptance checks pass and the PR is merged to `main`.
@@ -110,6 +110,20 @@ The final 100,000-row `agent-perf` profile
 materialization rather than the cache or route adapters. Its leading
 application-owned functions were usage-row insertion, source-record sync,
 recommendation-fact insertion, and recommendation-summary aggregation.
+
+PR 6's final 100,000-row enforcement profile `20260714T154221Z-1ed23e7c`
+completed in 38.1 seconds under Scalene. Ingestion and materialization remained
+the largest application-owned costs; allowance observation sync accounted for
+2.22 percent of sampled CPU, the diagnostic-fact query for 1.25 percent, and
+the allowance observation read for 0.67 percent. Every enforced cold and warm
+route budget passed in the corresponding unprofiled run.
+
+The final allowance budget extension exposed an 8.32-second quadratic
+change-point scan at 100,000 calls. Replacing repeated candidate slicing and
+median sorting with exact running prefix/suffix medians reduced allowance
+diagnostics cold p95 to 0.377 seconds while preserving the detector payload and
+small-sample exact tests. Allowance history measured 0.417 seconds cold p95;
+their dedicated 8-MiB cache measured 50-63 ms warm p95 for 4.8-5.4 MiB payloads.
 
 ## Architectural Principles
 
@@ -487,17 +501,16 @@ The refactor is complete when:
 - privacy tests prove aggregate defaults remain aggregate-only;
 - the route inventory has no unowned legacy full-scan path.
 
-## Open Decisions
+## Resolved Decisions
 
-Resolve these during PR 0 and PR 1:
-
-1. Whether recommendation facts belong in a dedicated table or a generalized
-   versioned derived-facts table.
-2. Whether server timing belongs in a response metadata block, the
-   `Server-Timing` header, structured logs, or a combination.
-3. Which completed async profiles should persist across process restarts.
-4. Which aggregate browser caches should remain enabled by default and their
-   size/retention limits.
-5. Whether the existing thread summary recommendation approximation should be
-   replaced by exact record-derived aggregation during the recommendation
-   migration.
+1. Recommendation facts use dedicated versioned tables and indexed thread
+   summaries rather than a generalized derived-facts framework.
+2. Privacy-safe handler duration uses `Server-Timing`; cache provenance uses the
+   response `query_cache` block.
+3. Diagnostic snapshots and Compression Lab profiles persist in SQLite across
+   server restarts; process registries own only active jobs.
+4. Browser persistence is data-class-driven and bounded. Raw context and indexed
+   content are never persisted; aggregate server responses use a 64-entry,
+   256-KiB process cache.
+5. Recommendation thread summaries are maintained from record-derived facts;
+   the request-time legacy approximation is retired in PR 6.

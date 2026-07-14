@@ -9,7 +9,10 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 from codex_usage_tracker.core.paths import DEFAULT_RATE_CARD_PATH, DEFAULT_THRESHOLDS_PATH
-from codex_usage_tracker.recommendation_engine.query import build_recommendations_report
+from codex_usage_tracker.recommendation_engine.query import (
+    RecommendationFactsUnavailableError,
+    build_recommendations_report,
+)
 from codex_usage_tracker.server.query_cache import (
     AggregateQueryCache,
     cached_aggregate_payload,
@@ -70,6 +73,9 @@ def handle_recommendations_request(
                 privacy_mode=privacy_mode,
             ),
         )
+    except RecommendationFactsUnavailableError as exc:
+        send_error(HTTPStatus.SERVICE_UNAVAILABLE, str(exc))
+        return
     except ValueError as exc:
         send_error(HTTPStatus.BAD_REQUEST, str(exc))
         return

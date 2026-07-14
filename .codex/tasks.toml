@@ -21,6 +21,24 @@ tail_lines = 80
 max_tail_bytes = 8192
 pass_exit_codes = [0]
 
+[tasks.dashboard-route-budget]
+argv = [
+  "python3",
+  "scripts/benchmark_dashboard_routes.py",
+  "--sizes",
+  "100000",
+  "--iterations",
+  "3",
+  "--skip-compression",
+  "--enforce-thresholds",
+  "--output-dir",
+  ".verify-logs/dashboard-route-budget",
+]
+timeout_seconds = 900
+tail_lines = 80
+max_tail_bytes = 12288
+pass_exit_codes = [0]
+
 [tasks.pr-checks]
 argv = ["gh", "pr", "checks", "--watch"]
 timeout_seconds = 1800

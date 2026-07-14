@@ -31,12 +31,16 @@ type ThreadInspectorProps = {
   selected: ThreadRow | null;
   calls: CallRow[];
   allCalls: CallRow[];
+  totalCallCount: number;
+  hasMoreCalls: boolean;
+  isFetchingMoreCalls: boolean;
   callSort: ThreadCallSortKey;
   callSortDirection: ThreadCallSortDirection;
   visibleCallCount: number;
   onCallSortChange(value: string): void;
   onCallSortDirectionChange(value: string): void;
   onVisibleCallCountChange(count: number | ((current: number) => number)): void;
+  onLoadMoreCalls(): void;
   onOpenInvestigator(recordId: string): void;
   onCopyCallLink(recordId: string): void;
 };
@@ -45,12 +49,16 @@ export function ThreadInspector({
   selected,
   calls,
   allCalls,
+  totalCallCount,
+  hasMoreCalls,
+  isFetchingMoreCalls,
   callSort,
   callSortDirection,
   visibleCallCount,
   onCallSortChange,
   onCallSortDirectionChange,
   onVisibleCallCountChange,
+  onLoadMoreCalls,
   onOpenInvestigator,
   onCopyCallLink,
 }: ThreadInspectorProps) {
@@ -77,8 +85,9 @@ export function ThreadInspector({
     [efficiencySignalCount, relationships, selected, status],
   );
   const visibleCalls = sortedCalls.slice(0, visibleCallCount);
-  const hiddenCallCount = Math.max(sortedCalls.length - visibleCalls.length, 0);
-  const nextThreadCallBatchCount = Math.min(threadCallPageSize, hiddenCallCount);
+  const hiddenLoadedCallCount = Math.max(sortedCalls.length - visibleCalls.length, 0);
+  const remainingCallCount = Math.max(totalCallCount - visibleCalls.length, 0);
+  const nextThreadCallBatchCount = Math.min(threadCallPageSize, remainingCallCount);
 
   if (!selected) {
     return (
@@ -98,7 +107,7 @@ export function ThreadInspector({
             <h3>Thread Calls</h3>
             <span>
               {sortedCalls.length
-                ? `${visibleCalls.length} of ${sortedCalls.length} loaded`
+                ? `${visibleCalls.length} of ${totalCallCount} loaded`
                 : 'No loaded calls'}
             </span>
           </div>
@@ -124,12 +133,20 @@ export function ThreadInspector({
                 <button
                   className="toolbar-button"
                   type="button"
-                  onClick={() => onVisibleCallCountChange(
-                    current => Math.min(current + threadCallPageSize, sortedCalls.length),
-                  )}
-                  disabled={!hiddenCallCount}
+                  onClick={() => {
+                    if (hiddenLoadedCallCount) {
+                      onVisibleCallCountChange(
+                        current => Math.min(current + threadCallPageSize, sortedCalls.length),
+                      );
+                    } else {
+                      onLoadMoreCalls();
+                    }
+                  }}
+                  disabled={!hiddenLoadedCallCount && !hasMoreCalls || isFetchingMoreCalls}
                 >
-                  Show {formatNumber(nextThreadCallBatchCount || threadCallPageSize)} more calls
+                  {isFetchingMoreCalls
+                    ? 'Loading more calls'
+                    : `Show ${formatNumber(nextThreadCallBatchCount || threadCallPageSize)} more calls`}
                 </button>
                 {visibleCallCount > threadCallPageSize ? (
                   <button
@@ -140,7 +157,7 @@ export function ThreadInspector({
                     Show first {threadCallPageSize}
                   </button>
                 ) : null}
-                <span>{hiddenCallCount ? `${hiddenCallCount} more available` : 'All loaded calls visible'}</span>
+                <span>{remainingCallCount ? `${remainingCallCount} more available` : 'All calls visible'}</span>
               </div>
             </>
           ) : (

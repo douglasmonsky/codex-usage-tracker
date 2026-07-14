@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from heapq import heappop, heappush
 from itertools import combinations
 from math import comb
 from statistics import median
@@ -10,6 +11,111 @@ from typing import Any
 _PUBLIC_CLAIM_MIN_SPLIT_SPANS = 6
 _PUBLIC_CLAIM_P_VALUE_THRESHOLD = 0.05
 _PERMUTATION_EXACT_MAX_COMBINATIONS = 50_000
+
+_ChangeSplit = tuple[int, float, float, float]
+
+
+def _candidate_split_specs(
+    spans: list[dict[str, Any]],
+    *,
+    min_baseline_spans: int,
+    min_recent_spans: int,
+    ratio_threshold: float,
+) -> tuple[list[_ChangeSplit], _ChangeSplit | None]:
+    prefix_medians, prefix_counts = _running_credit_medians(spans)
+    suffix_medians, suffix_counts = _running_credit_medians(list(reversed(spans)))
+    exact: list[_ChangeSplit] = []
+    deferred: list[_ChangeSplit] = []
+    for split in range(min_baseline_spans, len(spans) - min_recent_spans + 1):
+        result = _candidate_split_spec(
+            split,
+            total_count=len(spans),
+            prefix_medians=prefix_medians,
+            prefix_counts=prefix_counts,
+            suffix_medians=suffix_medians,
+            suffix_counts=suffix_counts,
+            ratio_threshold=ratio_threshold,
+        )
+        if result is None:
+            continue
+        spec, requires_exact = result
+        (exact if requires_exact else deferred).append(spec)
+    best_deferred = min(
+        deferred,
+        key=lambda item: _deferred_candidate_score(item, total_count=len(spans)),
+        default=None,
+    )
+    return exact, best_deferred
+
+
+def _candidate_split_spec(
+    split: int,
+    *,
+    total_count: int,
+    prefix_medians: list[float | None],
+    prefix_counts: list[int],
+    suffix_medians: list[float | None],
+    suffix_counts: list[int],
+    ratio_threshold: float,
+) -> tuple[_ChangeSplit, bool] | None:
+    recent_size = total_count - split
+    previous_median = prefix_medians[split]
+    recent_median = suffix_medians[recent_size]
+    if previous_median is None or recent_median is None:
+        return None
+    ratio = recent_median / previous_median
+    if ratio >= ratio_threshold:
+        return None
+    requires_exact = _split_requires_exact_statistics(
+        prefix_counts[split], suffix_counts[recent_size]
+    )
+    return (split, previous_median, recent_median, ratio), requires_exact
+
+
+def _split_requires_exact_statistics(previous_count: int, recent_count: int) -> bool:
+    if previous_count == 0 or recent_count == 0:
+        return False
+    return (
+        comb(previous_count + recent_count, previous_count) <= _PERMUTATION_EXACT_MAX_COMBINATIONS
+    )
+
+
+def _running_credit_medians(
+    spans: list[dict[str, Any]],
+) -> tuple[list[float | None], list[int]]:
+    lower: list[float] = []
+    upper: list[float] = []
+    medians: list[float | None] = [None]
+    counts = [0]
+    for span in spans:
+        value = _number(span.get("credits_per_percent"))
+        if value is not None and value > 0:
+            if not lower or value <= -lower[0]:
+                heappush(lower, -value)
+            else:
+                heappush(upper, value)
+            if len(lower) > len(upper) + 1:
+                heappush(upper, -heappop(lower))
+            elif len(upper) > len(lower):
+                heappush(lower, -heappop(upper))
+        counts.append(len(lower) + len(upper))
+        if not lower:
+            medians.append(None)
+        elif len(lower) == len(upper):
+            medians.append((-lower[0] + upper[0]) / 2.0)
+        else:
+            medians.append(-lower[0])
+    return medians, counts
+
+
+def _deferred_candidate_score(
+    item: _ChangeSplit,
+    *,
+    total_count: int,
+) -> tuple[float, int, int]:
+    split, _previous_median, _recent_median, ratio = item
+    recent_count = total_count - split
+    return ratio, -min(split, recent_count), abs(split - recent_count)
 
 
 def _statistical_evidence(

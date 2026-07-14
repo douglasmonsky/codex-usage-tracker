@@ -98,6 +98,10 @@ def serve_dashboard(
     analysis_jobs = AnalysisJobRegistry()
     compression_jobs = compression_routes.CompressionJobRegistry()
     query_cache = AggregateQueryCache()
+    allowance_query_cache = AggregateQueryCache(
+        max_entries=4,
+        max_payload_bytes=8 * 1_024 * 1_024,
+    )
     handler = partial(
         _UsageDashboardHandler,
         directory=str(output.parent),
@@ -123,6 +127,7 @@ def serve_dashboard(
         analysis_jobs=analysis_jobs,
         compression_jobs=compression_jobs,
         query_cache=query_cache,
+        allowance_query_cache=allowance_query_cache,
     )
     server = ThreadingHTTPServer((host, port), handler)
     legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"

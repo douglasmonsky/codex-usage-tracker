@@ -26,7 +26,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 - `dashboard.py` builds aggregate-first static dashboard payloads and writes HTML/assets. `server.py` adds localhost refresh, compatibility `/api/usage`, SQL-backed live API slices, and explicit lazy context loading.
 - `frontend/dashboard/` owns the React dashboard. It should render server/API payloads rather than becoming an independent source of usage calculations.
 - `plugin_installer.py`, `.mcp.json`, `skills/`, `src/codex_usage_tracker/plugin_data/skills/`, and `scripts/check_release.py` own install and packaging behavior.
-- `scripts/benchmark_synthetic_history.py` owns generated large-history query timing checks. It must stay synthetic-only and must not read real Codex logs.
+- `scripts/benchmark_synthetic_history.py` owns broad generated large-history query timing checks. `scripts/benchmark_dashboard_routes.py` owns deterministic cold/warm route budgets for the query pipeline. Both must stay synthetic-only and must not read real Codex logs.
 
 ## Extension Rules
 
@@ -39,6 +39,21 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 7. When editing skill instructions, update both the source `skills/...` file and the bundled `src/codex_usage_tracker/plugin_data/skills/...` copy. `scripts/check_release.py` verifies installable plugin assets stay complete and synced.
 8. When adding fields derived from `cwd`, Git metadata, source paths, log-event metadata, or indexed content, decide how they behave in `normal`, `redacted`, and `strict` privacy modes before exposing them in dashboard, JSON, CSV, MCP, support-bundle, or shareable export output.
 9. Diagnostic snapshot refresh must remain explicit on demand. Normal usage refresh paths may load stored snapshots, but must not rescan source logs for diagnostic sections unless the user calls diagnostics `--refresh` or a `/api/diagnostics/<section>/refresh` endpoint.
+10. Register each new dashboard query in `dashboardQueryContracts.json` with one stable identity, endpoint, data class, and response schema. Query keys must include source, source revision, scope, and every payload-changing option.
+11. Register each dashboard route in `server.route_inventory`. Interactive routes must be bounded and index-backed; unavoidable all-history detector work uses the shared asynchronous job lifecycle.
+12. Cache only immutable aggregate responses. Server keys include source generation and semantic/configuration inputs; browser persistence rejects raw or indexed content.
+13. Add or change a route budget only from repeatable synthetic evidence. Database indexes require an additive migration, query-plan or timing evidence, and focused migration coverage.
+
+Normal aggregate responses use a 64-entry, 256-KiB-per-entry process cache.
+Allowance history and diagnostics use a separate four-entry, 8-MiB-per-entry
+cache because their bounded evidence payloads are materially larger. Both caches
+invalidate on source revision and semantic/configuration inputs; neither stores
+raw or indexed content.
+
+Recommendation-fact refresh identity includes the active pricing, allowance,
+rate-card, and threshold configuration paths. Every refresh entry point must
+forward those paths; after any of those configurations changes, refresh the
+index before serving indexed recommendations.
 
 ## Validation
 
@@ -55,8 +70,9 @@ python scripts/check_release.py
 python -m build
 python scripts/check_release.py --dist
 git diff --check
+python scripts/benchmark_dashboard_routes.py --sizes 100000 --iterations 3 --skip-compression --enforce-thresholds --output-dir /tmp/dashboard-route-budget
 ```
 
 Dashboard UI changes should also be opened in a browser and checked at desktop and mobile widths for overflow, overlap, stale state, and shareable-output behavior.
 
-Run `python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds` after changing SQLite filters, dashboard payload loading, or indexes. Run `python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --json --enforce-thresholds` after changing source-log refresh, content indexing, explicit context loading, or source-log diagnostics. Run the 500k benchmark before release work when practical.
+Run the enforced dashboard route budget after changing focused query services, response caching, or frontend query orchestration. Run `python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds` after changing broader SQLite filters, dashboard payload loading, or indexes. Run `python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --json --enforce-thresholds` after changing source-log refresh, content indexing, explicit context loading, or source-log diagnostics. Run the 500k benchmark before release work when practical.

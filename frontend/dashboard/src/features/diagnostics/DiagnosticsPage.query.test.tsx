@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDashboardQueryClient } from '../../data/queryRuntime';
@@ -61,6 +61,39 @@ describe('DiagnosticsPage query lifecycle', () => {
     expect(requestCounts.get('/api/diagnostics/overview')).toBe(1);
     expect(requestCounts.get('/api/diagnostics/commands')).toBe(2);
     expect(requestCounts.get('/api/diagnostics/tool-output')).toBe(1);
+  });
+
+  it('loads only the selected diagnostic fact source', async () => {
+    const requestCounts = new Map<string, number>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = new URL(String(input), 'http://local.test').pathname;
+      requestCounts.set(path, (requestCounts.get(path) ?? 0) + 1);
+      if (path === '/api/diagnostics/facts' || path === '/api/diagnostics/tools') {
+        return Promise.resolve(jsonResponse({
+          rows: [{ fact_type: 'tool', fact_name: 'function_call', associated_calls: 1 }],
+          total_matched_rows: 1,
+        }));
+      }
+      if (path === '/api/diagnostics/fact-calls') {
+        return Promise.resolve(jsonResponse({ rows: [], total_matched_rows: 0 }));
+      }
+      return Promise.resolve(jsonResponse({
+        status: 'ready',
+        snapshot: { computed_at: '2026-07-14T02:00:00Z' },
+      }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderDiagnostics(createDashboardQueryClient());
+    await screen.findByText('Live facts: 1');
+
+    expect(requestCounts.get('/api/diagnostics/facts')).toBe(1);
+    expect(requestCounts.get('/api/diagnostics/tools')).toBeUndefined();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Tools/ }));
+    await screen.findByText('Live tools: 1');
+
+    expect(requestCounts.get('/api/diagnostics/tools')).toBe(1);
   });
 });
 

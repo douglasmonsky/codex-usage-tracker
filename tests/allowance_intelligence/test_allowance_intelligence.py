@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from unittest.mock import patch
 
 from codex_usage_tracker.allowance_intelligence import (
     build_allowance_analysis,
     build_allowance_export_report,
 )
+from codex_usage_tracker.allowance_intelligence import model as allowance_model
 from codex_usage_tracker.store.api import (
     query_allowance_observations,
     upsert_usage_events,
@@ -184,6 +186,32 @@ def test_larger_consistent_weekly_shift_is_public_claim_ready() -> None:
         "achieved_coverage": 0.96875,
     }
     assert analysis["summary"]["research_readiness"]["ready_for_public_claim"]
+
+
+def test_large_change_scan_computes_statistics_only_for_rank_relevant_splits() -> None:
+    rows = [_analysis_row("r0", 0.0, 0.0)]
+    rows.extend(
+        _analysis_row(f"r{index}", float(index), 100.0 if index <= 50 else 50.0)
+        for index in range(1, 101)
+    )
+
+    with (
+        patch.object(
+            allowance_model,
+            "_statistical_evidence",
+            wraps=allowance_model._statistical_evidence,
+        ) as statistical_evidence,
+        patch.object(
+            allowance_model,
+            "_median_credits_per_percent",
+            wraps=allowance_model._median_credits_per_percent,
+        ) as median_credits,
+    ):
+        analysis = allowance_model.build_allowance_analysis(rows)
+
+    assert analysis["change_candidates"]
+    assert statistical_evidence.call_count <= 2
+    assert median_credits.call_count <= 2
 
 
 def test_five_hour_shift_is_downgraded_as_counter_noise() -> None:

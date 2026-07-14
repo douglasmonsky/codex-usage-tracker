@@ -6,17 +6,9 @@ import threading
 import uuid
 from typing import Any
 
+from codex_usage_tracker.cli import mcp_allowance as _mcp_allowance
 from codex_usage_tracker.cli import mcp_compression as mcp_compression
 from codex_usage_tracker.cli import mcp_visualization as mcp_visualization
-from codex_usage_tracker.cli.mcp_allowance import (
-    usage_allowance_diagnostics as usage_allowance_diagnostics,
-)
-from codex_usage_tracker.cli.mcp_allowance import (
-    usage_allowance_export as usage_allowance_export,
-)
-from codex_usage_tracker.cli.mcp_allowance import (
-    usage_allowance_history as usage_allowance_history,
-)
 from codex_usage_tracker.cli.mcp_dashboard import (
     export_usage_csv as export_usage_csv,
 )
@@ -149,6 +141,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
     DEFAULT_RATE_CARD_PATH,
+    DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.core.projects import apply_project_privacy_to_rows
 from codex_usage_tracker.diagnostics.api import run_doctor
@@ -165,6 +158,9 @@ from codex_usage_tracker.store import api as store_api
 
 _REFRESH_JOB_REGISTRY = RefreshJobRegistry()
 _REFRESH_JOB_LOCK = threading.Lock()
+usage_allowance_diagnostics = _mcp_allowance.usage_allowance_diagnostics
+usage_allowance_export = _mcp_allowance.usage_allowance_export
+usage_allowance_history = _mcp_allowance.usage_allowance_history
 
 
 @mcp.tool()
@@ -179,6 +175,10 @@ def refresh_usage_index(
         db_path=DEFAULT_DB_PATH,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        pricing_path=DEFAULT_PRICING_PATH,
+        allowance_path=DEFAULT_ALLOWANCE_PATH,
+        rate_card_path=DEFAULT_RATE_CARD_PATH,
+        thresholds_path=DEFAULT_THRESHOLDS_PATH,
     )
     return refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1")
 

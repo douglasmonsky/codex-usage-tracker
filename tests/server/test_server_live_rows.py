@@ -115,6 +115,42 @@ def test_query_live_call_rows_filters_derived_rows_after_annotation(
     assert calls["rows"]["offset"] == 0
 
 
+def test_query_live_call_rows_sorts_cost_after_annotation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, Any] = {}
+
+    def query_rows(**kwargs: Any) -> list[dict[str, Any]]:
+        calls["rows"] = kwargs
+        return [
+            {"record_id": "low", "estimated_cost_usd": 0.25},
+            {"record_id": "high", "estimated_cost_usd": 4.5},
+            {"record_id": "mid", "estimated_cost_usd": 1.0},
+        ]
+
+    monkeypatch.setattr(server_live_rows, "query_usage_api_events", query_rows)
+    monkeypatch.setattr(
+        server_live_rows,
+        "annotate_live_rows",
+        lambda rows, **_kwargs: rows,
+    )
+
+    rows, total = server_live_rows.query_live_call_rows(
+        **_paths(tmp_path),
+        query_params=_query_params(limit=2, offset=0, sort="cost", direction="desc"),
+        pricing_status=None,
+        credit_confidence=None,
+        privacy_mode="normal",
+    )
+
+    assert [row["record_id"] for row in rows] == ["high", "mid"]
+    assert total == 3
+    assert calls["rows"]["limit"] is None
+    assert calls["rows"]["offset"] == 0
+    assert calls["rows"]["sort"] == "time"
+
+
 def test_annotate_live_rows_returns_empty_without_loading_configs(tmp_path: Path) -> None:
     paths = _paths(tmp_path)
     assert (

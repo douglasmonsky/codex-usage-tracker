@@ -1,3 +1,6 @@
+export const overviewSummarySchema = 'codex-usage-tracker-summary-v1' as const;
+export const overviewRecommendationsSchema = 'codex-usage-tracker-recommendations-v1' as const;
+
 type OverviewSummaryRow = {
   groupKey: string;
   modelCalls: number;
@@ -14,7 +17,7 @@ type OverviewSummaryRow = {
 };
 
 export type OverviewSummaryReport = {
-  schema: 'codex-usage-tracker-summary-v1';
+  schema: typeof overviewSummarySchema;
   groupBy: string;
   includeArchived: boolean;
   privacyMode: string;
@@ -46,7 +49,7 @@ export type OverviewRecommendationRow = {
 };
 
 export type OverviewRecommendationsReport = {
-  schema: 'codex-usage-tracker-recommendations-v1';
+  schema: typeof overviewRecommendationsSchema;
   includeArchived: boolean;
   rowCount: number;
   totalMatchedRows: number;
@@ -58,7 +61,7 @@ export class OverviewContractError extends Error {}
 
 export function decodeOverviewSummary(value: unknown): OverviewSummaryReport {
   const report = record(value, 'summary report');
-  if (report.schema !== 'codex-usage-tracker-summary-v1') {
+  if (report.schema !== overviewSummarySchema) {
     throw new OverviewContractError('Unsupported summary response schema.');
   }
   return {
@@ -72,7 +75,7 @@ export function decodeOverviewSummary(value: unknown): OverviewSummaryReport {
 
 export function decodeOverviewRecommendations(value: unknown): OverviewRecommendationsReport {
   const report = record(value, 'recommendations report');
-  if (report.schema !== 'codex-usage-tracker-recommendations-v1') {
+  if (report.schema !== overviewRecommendationsSchema) {
     throw new OverviewContractError('Unsupported recommendations response schema.');
   }
   const filters = record(report.filters, 'recommendation filters');

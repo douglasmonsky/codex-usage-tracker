@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from string import Template
 from typing import Any
 
 _ARCHIVED_SOURCE_PATTERNS = (
@@ -49,6 +51,12 @@ API_USAGE_SORTS = {
         )
     """,
 }
+
+
+def render_sql_template(template: str, fragments: Mapping[str, str]) -> str:
+    """Render SQL from fragments already validated by the query layer."""
+
+    return Template(template).substitute(fragments)
 
 
 def _group_expression(group_by: str) -> str:
@@ -201,6 +209,7 @@ def _usage_api_where_clause(
     min_tokens: int | None = None,
     include_archived: bool = True,
     table_alias: str | None = None,
+    thread_key_mode: str = "all",
 ) -> tuple[str, list[Any]]:
     prefix = f"{table_alias}." if table_alias else ""
     base_where, params = _usage_where_clause(
@@ -227,15 +236,33 @@ def _usage_api_where_clause(
         )
         params.extend([like, like, like, like, like])
     if thread_key:
-        clauses.append(
-            "("
-            f"{prefix}thread_key = ? OR "
-            f"'thread:' || {prefix}thread_name = ? OR "
-            f"'session:' || {prefix}session_id = ? OR "
-            f"{prefix}session_id = ?"
-            ")"
-        )
-        params.extend([thread_key, thread_key, thread_key, thread_key])
+        if thread_key_mode == "indexed":
+            clauses.append(f"{prefix}thread_key = ?")
+            params.append(thread_key)
+        elif thread_key_mode == "legacy":
+            clauses.append(
+                "("
+                f"({prefix}thread_key IS NULL OR {prefix}thread_key = '') AND "
+                "("
+                f"'thread:' || {prefix}thread_name = ? OR "
+                f"'session:' || {prefix}session_id = ? OR "
+                f"{prefix}session_id = ?"
+                ")"
+                ")"
+            )
+            params.extend([thread_key, thread_key, thread_key])
+        elif thread_key_mode == "all":
+            clauses.append(
+                "("
+                f"{prefix}thread_key = ? OR "
+                f"'thread:' || {prefix}thread_name = ? OR "
+                f"'session:' || {prefix}session_id = ? OR "
+                f"{prefix}session_id = ?"
+                ")"
+            )
+            params.extend([thread_key, thread_key, thread_key, thread_key])
+        else:
+            raise ValueError("thread_key_mode must be one of: all, indexed, legacy")
     if not clauses:
         return "", []
     return "WHERE " + " AND ".join(f"({clause})" for clause in clauses), params

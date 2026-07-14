@@ -11,7 +11,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
 
-from codex_usage_tracker.store.api import refresh_usage_index
+from codex_usage_tracker.recommendation_engine.api import refresh_usage_index
 from tests.store_dashboard_helpers import (
     _assert_contract,
     _http_error_json,
@@ -34,7 +34,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
-    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    refresh_usage_index(codex_home=codex_home, db_path=db_path, pricing_path=pricing_path)
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),

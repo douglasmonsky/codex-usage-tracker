@@ -14,6 +14,7 @@ from codex_usage_tracker.store.query_sql import (
     normalize_limit,
     normalize_offset,
     normalize_sort_direction,
+    render_sql_template,
     thread_key_expression,
     usage_where_clause,
 )
@@ -131,6 +132,44 @@ def _insert_thread_summary_scopes(
     )
 
 
+def _latest_record_id_expression(*, include_archived: bool) -> str:
+    active_usage_filter = _active_usage_filter(include_archived)
+    legacy_thread_key = thread_key_expression("u.")
+    return render_sql_template(
+        """
+        coalesce(
+            (
+                SELECT u.record_id
+                FROM usage_events AS u
+                WHERE u.thread_key = t.thread_key
+                $active_usage_filter
+                ORDER BY
+                    u.event_timestamp DESC,
+                    u.cumulative_total_tokens DESC,
+                    u.record_id DESC
+                LIMIT 1
+            ),
+            (
+                SELECT u.record_id
+                FROM usage_events AS u
+                WHERE (u.thread_key IS NULL OR u.thread_key = '')
+                    AND $legacy_thread_key = t.thread_key
+                $active_usage_filter
+                ORDER BY
+                    u.event_timestamp DESC,
+                    u.cumulative_total_tokens DESC,
+                    u.record_id DESC
+                LIMIT 1
+            )
+        )
+        """,
+        {
+            "active_usage_filter": active_usage_filter,
+            "legacy_thread_key": legacy_thread_key,
+        },
+    )
+
+
 def query_thread_summaries(
     db_path: Path = DEFAULT_DB_PATH,
     *,
@@ -156,32 +195,28 @@ def query_thread_summaries(
         normalized_offset,
         params,
     )
-    usage_thread_key = thread_key_expression("u.")
-    active_usage_filter = _active_usage_filter(include_archived)
+    latest_record_id = _latest_record_id_expression(include_archived=include_archived)
     with connect(db_path) as conn:
         init_db(conn)
-        rows = conn.execute(
-            f"""
+        query = render_sql_template(
+            """
             SELECT
                 t.*,
-                (
-                    SELECT u.record_id
-                    FROM usage_events AS u
-                    WHERE {usage_thread_key} = t.thread_key
-                    {active_usage_filter}
-                    ORDER BY
-                        u.event_timestamp DESC,
-                        u.cumulative_total_tokens DESC,
-                        u.record_id DESC
-                    LIMIT 1
-                ) AS latest_record_id
+                $latest_record_id AS latest_record_id
             FROM thread_summaries AS t
-            {where_clause}
-            ORDER BY {sort_column} {direction_sql}, latest_event_timestamp DESC
-            {limit_clause}
+            $where_clause
+            ORDER BY $sort_column $direction, latest_event_timestamp DESC
+            $limit_clause
             """,
-            query_params,
-        ).fetchall()
+            {
+                "latest_record_id": latest_record_id,
+                "where_clause": where_clause,
+                "sort_column": sort_column,
+                "direction": direction_sql,
+                "limit_clause": limit_clause,
+            },
+        )
+        rows = conn.execute(query, query_params).fetchall()
     return [row_to_dict(row) for row in rows]
 
 

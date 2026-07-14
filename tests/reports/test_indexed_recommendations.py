@@ -7,11 +7,11 @@ from typing import Any
 
 import pytest
 
-from codex_usage_tracker.recommendation_engine import query as recommendation_query
 from codex_usage_tracker.recommendation_engine.materialization import (
     backfill_recommendation_facts,
 )
 from codex_usage_tracker.recommendation_engine.query import (
+    RecommendationFactsUnavailableError,
     build_indexed_recommendations_report,
 )
 from codex_usage_tracker.recommendation_engine.query import (
@@ -126,7 +126,7 @@ def test_indexed_recommendations_match_legacy_payload(
     assert archived_indexed.payload == archived_legacy.payload
 
 
-def test_recommendations_fall_back_when_materialized_facts_are_missing(
+def test_recommendations_require_materialized_facts(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "usage.sqlite3"
@@ -153,27 +153,14 @@ def test_recommendations_fall_back_when_materialized_facts_are_missing(
         "projects_path": projects_path,
     }
 
-    expected = build_recommendations_report(**arguments)
-    actual = build_engine_recommendations_report(**arguments)
-
-    assert expected.payload["row_count"] > 0
-    assert actual.payload == expected.payload
+    with pytest.raises(RecommendationFactsUnavailableError, match="refresh"):
+        build_engine_recommendations_report(**arguments)
 
 
 def test_recommendations_use_current_materialized_facts(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     db_path, pricing_path, allowance_path, projects_path = _materialize_actionable_event(tmp_path)
-
-    def fail_legacy(**_kwargs: object) -> object:
-        raise AssertionError("current materialized facts should avoid the legacy path")
-
-    monkeypatch.setattr(
-        recommendation_query,
-        "build_legacy_recommendations_report",
-        fail_legacy,
-    )
 
     report = build_engine_recommendations_report(
         db_path=db_path,
@@ -185,35 +172,24 @@ def test_recommendations_use_current_materialized_facts(
     assert report.payload["row_count"] == 1
 
 
-def test_recommendations_fall_back_when_config_changes(
+def test_recommendations_require_refresh_when_config_changes(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     db_path, pricing_path, allowance_path, projects_path = _materialize_actionable_event(tmp_path)
     pricing = json.loads(pricing_path.read_text(encoding="utf-8"))
     pricing["models"]["gpt-5.5"]["input_per_million"] = 3.0
     pricing_path.write_text(json.dumps(pricing), encoding="utf-8")
 
-    def fail_indexed(**_kwargs: object) -> object:
-        raise AssertionError("stale materialized facts must not be queried")
-
-    monkeypatch.setattr(
-        recommendation_query,
-        "build_indexed_recommendations_report",
-        fail_indexed,
-    )
-
-    report = build_engine_recommendations_report(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        allowance_path=allowance_path,
-        projects_path=projects_path,
-    )
-
-    assert report.payload["row_count"] == 1
+    with pytest.raises(RecommendationFactsUnavailableError, match="refresh"):
+        build_engine_recommendations_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+        )
 
 
-def test_recommendations_fall_back_when_threshold_fingerprint_changes(
+def test_recommendations_require_refresh_when_threshold_fingerprint_changes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -254,45 +230,23 @@ def test_recommendations_fall_back_when_threshold_fingerprint_changes(
         "projects_path": projects_path,
     }
 
-    with monkeypatch.context() as context:
-        context.setattr(
-            recommendation_query,
-            "build_legacy_recommendations_report",
-            lambda **_kwargs: pytest.fail("current facts should use the indexed path"),
-        )
-        assert build_engine_recommendations_report(**arguments).payload["row_count"] == 1
+    assert build_engine_recommendations_report(**arguments).payload["row_count"] == 1
 
     thresholds_path.write_text('{"high_uncached_input_tokens": 300000}\n', encoding="utf-8")
-    with monkeypatch.context() as context:
-        context.setattr(
-            recommendation_query,
-            "build_indexed_recommendations_report",
-            lambda **_kwargs: pytest.fail("stale facts must use the legacy path"),
-        )
-        assert build_engine_recommendations_report(**arguments).payload["row_count"] == 1
+    with pytest.raises(RecommendationFactsUnavailableError, match="refresh"):
+        build_engine_recommendations_report(**arguments)
 
 
-def test_recommendations_preserve_source_limit_fallback(
+def test_recommendations_reject_retired_source_limit_fallback(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     db_path, pricing_path, allowance_path, projects_path = _materialize_actionable_event(tmp_path)
 
-    def fail_indexed(**_kwargs: object) -> object:
-        raise AssertionError("source-limited reports require legacy row selection")
-
-    monkeypatch.setattr(
-        recommendation_query,
-        "build_indexed_recommendations_report",
-        fail_indexed,
-    )
-
-    report = build_engine_recommendations_report(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        allowance_path=allowance_path,
-        projects_path=projects_path,
-        source_limit=1,
-    )
-
-    assert report.payload["filters"]["source_limit"] == 1
+    with pytest.raises(ValueError, match="source_limit is no longer supported"):
+        build_engine_recommendations_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            source_limit=1,
+        )

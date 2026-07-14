@@ -40,10 +40,11 @@ def query_live_call_rows(
 ) -> tuple[list[dict[str, Any]], int]:
     """Return annotated live API rows plus the total row count for pagination."""
     derived_filter = bool(pricing_status or credit_confidence)
+    derived_sort = query_params["sort"] == "cost"
     rows = _query_raw_live_rows(
         db_path=db_path,
         query_params=query_params,
-        derived_filter=derived_filter,
+        derived_filter=derived_filter or derived_sort,
     )
     rows = annotate_live_rows(
         rows,
@@ -54,7 +55,7 @@ def query_live_call_rows(
         projects_path=projects_path,
         privacy_mode=privacy_mode,
     )
-    if derived_filter:
+    if derived_filter or derived_sort:
         return _filter_derived_live_rows(
             rows,
             query_params=query_params,
@@ -82,7 +83,7 @@ def _query_raw_live_rows(
         thread=query_params["thread"],
         thread_key=query_params["thread_key"],
         include_archived=query_params["include_archived"],
-        sort=query_params["sort"],
+        sort="time" if query_params["sort"] == "cost" else query_params["sort"],
         direction=query_params["direction"],
     )
 
@@ -103,6 +104,13 @@ def _filter_derived_live_rows(
             credit_confidence=credit_confidence,
         )
     ]
+    if query_params["sort"] == "cost":
+        filtered_rows.sort(key=lambda row: str(row.get("record_id") or ""))
+        filtered_rows.sort(key=lambda row: str(row.get("event_timestamp") or ""), reverse=True)
+        filtered_rows.sort(
+            key=lambda row: float(row.get("estimated_cost_usd") or 0.0),
+            reverse=query_params["direction"] == "desc",
+        )
     total_matched = len(filtered_rows)
     limit = query_params["limit"]
     offset = query_params["offset"]

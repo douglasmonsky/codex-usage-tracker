@@ -69,6 +69,7 @@ export function DiagnosticsPage({
   const [factCallSort, setFactCallSort] = useState<FactCallSortState>({ key: 'tokens', direction: 'desc' });
   const canUseLiveFacts = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
   const factEvidence = useDiagnosticFactSources({
+    activeSourceKey: factSourceKey,
     canUseLive: canUseLiveFacts,
     contextRuntime,
     includeArchived,

@@ -317,6 +317,22 @@ Source-log benchmark JSON also reports `source_logs_generated`, `source_log_byte
 
 The normal CI smoke uses a tiny synthetic history with `--enforce-thresholds` and a small `--threshold-scale` allowance so coverage instrumentation and shared runner noise do not create false failures. The 10k/100k runs are a practical local gate for performance-sensitive changes; the source-log run is the local gate for context/evidence work; the 500k run is the release-sized gate and can take about a minute on a modern laptop because recommendations and project summary intentionally scan all aggregate rows.
 
+### Dashboard route budgets
+
+Focused dashboard query, cache, or orchestration changes must also run the
+deterministic 100,000-row route gate:
+
+```bash
+/Users/Monsky/.codex/bin/codex-task dashboard-route-budget --json
+```
+
+The task builds a synthetic SQLite history with recommendation and diagnostic
+facts, then measures summary, recommendations, diagnostic facts/tools, Threads,
+allowance history/diagnostics, and a bounded selected-thread page. Cached routes
+record independent cold samples and warm hits. Thresholds live in
+`config/dashboard-route-budgets.json`; change them only with repeatable synthetic
+evidence. The benchmark never reads local Codex logs.
+
 ## Release Checklist
 
 Use a release branch only for version/changelog/pinning/publish prep. It should include release-specific changes such as version bumps, `CHANGELOG.md`, install/version wording, runtime package pins, publish workflow tweaks, release notes, and final smoke-test fixes. It should not include unrelated features.

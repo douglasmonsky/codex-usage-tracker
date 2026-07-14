@@ -15,14 +15,9 @@ from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import (
     DEFAULT_RATE_CARD_PATH,
 )
-from codex_usage_tracker.server import compression_routes
+from codex_usage_tracker.server import allowance, compression_routes
 from codex_usage_tracker.server import context as server_context
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
-from codex_usage_tracker.server.allowance import (
-    handle_allowance_diagnostics_request,
-    handle_allowance_export_request,
-    handle_allowance_history_request,
-)
 from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
 from codex_usage_tracker.server.call_detail import (
     handle_call_detail_request,
@@ -99,6 +94,7 @@ class _UsageDashboardHandler(
         analysis_jobs: AnalysisJobRegistry | None = None,
         compression_jobs: compression_routes.CompressionJobRegistry | None = None,
         query_cache: AggregateQueryCache | None = None,
+        allowance_query_cache: AggregateQueryCache | None = None,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: ContextApiState | None = None,
@@ -133,6 +129,7 @@ class _UsageDashboardHandler(
         self._analysis_jobs = analysis_jobs or AnalysisJobRegistry()
         self._compression_jobs = compression_jobs or compression_routes.CompressionJobRegistry()
         self._query_cache = query_cache or AggregateQueryCache()
+        self._allowance_query_cache = allowance_query_cache or allowance.new_query_cache()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
@@ -300,33 +297,32 @@ class _UsageDashboardHandler(
         )
 
     def _handle_allowance_history(self, query: str) -> None:
-        handle_allowance_history_request(
-            query,
-            db_path=self._db_path,
-            allowance_path=self._allowance_path,
-            rate_card_path=self._rate_card_path,
-            include_archived_default=self._include_archived,
-            privacy_mode=self._privacy_mode,
-            send_error=self._send_error,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
+        self._handle_allowance_report(query, diagnostics=False)
 
     def _handle_allowance_diagnostics(self, query: str) -> None:
-        handle_allowance_diagnostics_request(
+        self._handle_allowance_report(query, diagnostics=True)
+
+    def _handle_allowance_report(self, query: str, *, diagnostics: bool) -> None:
+        handler = (
+            allowance.handle_allowance_diagnostics_request
+            if diagnostics
+            else allowance.handle_allowance_history_request
+        )
+        handler(
             query,
             db_path=self._db_path,
             allowance_path=self._allowance_path,
             rate_card_path=self._rate_card_path,
             include_archived_default=self._include_archived,
             privacy_mode=self._privacy_mode,
+            query_cache=self._allowance_query_cache,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,
         )
 
     def _handle_allowance_export(self, query: str) -> None:
-        handle_allowance_export_request(
+        allowance.handle_allowance_export_request(
             query,
             db_path=self._db_path,
             allowance_path=self._allowance_path,
@@ -425,6 +421,10 @@ class _UsageDashboardHandler(
             query,
             codex_home=self._codex_home,
             db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
             include_archived_default=self._include_archived,
             refresh_lock=self._refresh_lock,
             refresh_jobs=self._refresh_jobs,

@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from codex_usage_tracker.server import diagnostic_facts as server_diagnostic_facts
+from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
 
 @dataclass
@@ -91,6 +92,47 @@ def test_handle_diagnostics_facts_request_sends_bad_request(
     assert senders.json_payloads == []
 
 
+def test_handle_diagnostics_facts_request_reuses_generation_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+    builds = 0
+
+    def diagnostics_facts_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        nonlocal builds
+        builds += 1
+        return {"rows": [], "total_matched_rows": 0}
+
+    monkeypatch.setattr(
+        server_diagnostic_facts,
+        "diagnostics_facts_payload",
+        diagnostics_facts_payload,
+    )
+    cache = AggregateQueryCache()
+    request = {
+        "db_path": tmp_path / "usage.sqlite3",
+        "include_archived_default": True,
+        "request_path": "/api/diagnostics/facts",
+        "fact_type": None,
+        "fact_group": None,
+        "privacy_mode": "normal",
+        "query_cache": cache,
+        "send_error": senders.send_error,
+        "send_exception": senders.send_exception,
+        "send_json": senders.send_json,
+    }
+
+    server_diagnostic_facts.handle_diagnostics_facts_request("limit=50", **request)
+    server_diagnostic_facts.handle_diagnostics_facts_request("limit=50", **request)
+
+    assert builds == 1
+    assert [_query_cache_status(payload) for _status, payload in senders.json_payloads] == [
+        "miss",
+        "hit",
+    ]
+
+
 def test_handle_diagnostics_fact_calls_request_sends_sqlite_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -119,6 +161,12 @@ def test_handle_diagnostics_fact_calls_request_sends_sqlite_error(
     assert senders.json_payloads == []
     assert senders.exceptions[0][0] == "Database error while reading diagnostic calls"
     assert str(senders.exceptions[0][1]) == "database is locked"
+
+
+def _query_cache_status(payload: dict[str, object]) -> object:
+    metadata = payload["query_cache"]
+    assert isinstance(metadata, dict)
+    return metadata["status"]
 
 
 def test_diagnostics_summary_payload_normalizes_filters(

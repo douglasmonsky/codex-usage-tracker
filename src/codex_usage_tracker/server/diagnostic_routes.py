@@ -36,6 +36,7 @@ from codex_usage_tracker.server.diagnostic_snapshots import (
     handle_usage_drain_snapshot_request,
     usage_drain_snapshot_payload,
 )
+from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
 _DIAGNOSTIC_REFRESH_AUTH_ERROR = "Valid API token is required for diagnostic refresh"
 
@@ -77,6 +78,7 @@ class DiagnosticRouteMixin:
         _privacy_mode: str
         _refresh_lock: threading.Lock
         _analysis_jobs: AnalysisJobRegistry
+        _query_cache: AggregateQueryCache
 
         def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool: ...
 
@@ -122,6 +124,8 @@ class DiagnosticRouteMixin:
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,
+            privacy_mode=self._privacy_mode,
+            query_cache=self._query_cache,
         )
 
     def _handle_diagnostics_fact_calls(self, query: str) -> None:

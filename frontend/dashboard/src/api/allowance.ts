@@ -201,7 +201,6 @@ export async function loadAllowanceEvidenceExport(
 function requestParams(options: AllowanceRequest, includePrivacyMode: boolean): URLSearchParams {
   const params = new URLSearchParams({
     limit: options.limit === null ? 'None' : String(Math.max(0, Math.round(options.limit ?? 0))),
-    _: String(Date.now()),
   });
   if (options.includeArchived) params.set('include_archived', '1');
   if (options.windowKind) params.set('window_kind', options.windowKind);

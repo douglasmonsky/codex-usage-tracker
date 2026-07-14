@@ -2,6 +2,7 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 
 import type { ContextRuntime } from '../api/types';
 import {
+  dashboardQueryDefinition,
   dashboardQueryKey,
   dashboardQueryOptions,
   dashboardQuerySource,
@@ -29,7 +30,8 @@ export type CallsApiSort =
   | 'thread'
   | 'initiator'
   | 'duration'
-  | 'gap';
+  | 'gap'
+  | 'cost';
 
 export type ThreadsApiSort = 'tokens' | 'time' | 'calls' | 'cache' | 'thread';
 
@@ -67,14 +69,25 @@ export type ThreadCallsQueryRequest = ExploreBaseRequest & {
   threadKey: string;
   sort?: CallsApiSort;
   direction?: ExploreSortDirection;
+  since?: string;
+  until?: string;
+};
+
+export type ThreadCallContextQueryRequest = ThreadCallsQueryRequest & {
+  selectedRecordId: string;
+  selectedEventTimestamp: string;
 };
 
 const callsPageSize = 500;
 const threadsPageSize = 250;
+const threadCallsPageSize = 100;
+const callsQuery = dashboardQueryDefinition('calls');
+const threadsQuery = dashboardQueryDefinition('threads');
+const threadCallsQuery = dashboardQueryDefinition('thread-calls');
 
 const exploreQueryKeys = {
   calls: (request: CallsQueryRequest) => dashboardQueryKey(
-    'calls',
+    callsQuery,
     exploreQuerySource(request),
     exploreQueryScope(request, request.filters.since),
     request.filters,
@@ -83,7 +96,7 @@ const exploreQueryKeys = {
     request.pageSize ?? callsPageSize,
   ),
   threads: (request: ThreadsQueryRequest) => dashboardQueryKey(
-    'threads',
+    threadsQuery,
     exploreQuerySource(request),
     exploreQueryScope(request),
     request.query ?? '',
@@ -92,12 +105,25 @@ const exploreQueryKeys = {
     request.pageSize ?? threadsPageSize,
   ),
   threadCalls: (request: ThreadCallsQueryRequest) => dashboardQueryKey(
-    'thread-calls',
+    threadCallsQuery,
     exploreQuerySource(request),
     exploreQueryScope(request),
     request.threadKey,
     request.sort ?? 'time',
     request.direction ?? 'desc',
+    request.since ?? null,
+    request.until ?? null,
+    request.pageSize ?? threadCallsPageSize,
+  ),
+  threadCallContext: (request: ThreadCallContextQueryRequest) => dashboardQueryKey(
+    threadCallsQuery,
+    exploreQuerySource(request),
+    exploreQueryScope(request),
+    'context',
+    request.threadKey,
+    request.selectedRecordId,
+    request.selectedEventTimestamp,
+    request.pageSize ?? threadCallsPageSize,
   ),
 };
 
@@ -108,7 +134,7 @@ export function callsInfiniteQueryOptions(request: CallsQueryRequest) {
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => loadCallsPage(request, pageParam, pageSize, signal),
     getNextPageParam: (lastPage: ExploreCallsPage) => lastPage.nextOffset ?? undefined,
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(callsQuery.dataClass),
   });
 }
 
@@ -119,15 +145,34 @@ export function threadsInfiniteQueryOptions(request: ThreadsQueryRequest) {
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => loadThreadsPage(request, pageParam, pageSize, signal),
     getNextPageParam: (lastPage: ExploreThreadsPage) => lastPage.nextOffset ?? undefined,
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(threadsQuery.dataClass),
+  });
+}
+
+export function threadCallsInfiniteQueryOptions(request: ThreadCallsQueryRequest) {
+  const pageSize = request.pageSize ?? threadCallsPageSize;
+  return infiniteQueryOptions({
+    queryKey: exploreQueryKeys.threadCalls(request),
+    initialPageParam: 0,
+    queryFn: ({ pageParam, signal }) => loadThreadCalls(request, pageParam, pageSize, signal),
+    getNextPageParam: (lastPage: ExploreCallsPage) => lastPage.nextOffset ?? undefined,
+    ...dashboardQueryOptions(threadCallsQuery.dataClass),
   });
 }
 
 export function threadCallsQueryOptions(request: ThreadCallsQueryRequest) {
   return queryOptions({
     queryKey: exploreQueryKeys.threadCalls(request),
-    queryFn: ({ signal }) => loadThreadCalls(request, signal),
-    ...dashboardQueryOptions('detail'),
+    queryFn: ({ signal }) => loadThreadCalls(request, 0, request.pageSize, signal),
+    ...dashboardQueryOptions(threadCallsQuery.dataClass),
+  });
+}
+
+export function threadCallContextQueryOptions(request: ThreadCallContextQueryRequest) {
+  return queryOptions({
+    queryKey: exploreQueryKeys.threadCallContext(request),
+    queryFn: ({ signal }) => loadThreadCallContext(request, signal),
+    ...dashboardQueryOptions(threadCallsQuery.dataClass),
   });
 }
 
@@ -177,18 +222,68 @@ export async function loadThreadsPage(
 
 export async function loadThreadCalls(
   request: ThreadCallsQueryRequest,
+  offset = 0,
+  limit = request.pageSize ?? threadCallsPageSize,
   signal?: AbortSignal,
 ): Promise<ExploreCallsPage> {
   assertExploreApiAvailable(request.runtime);
   const params = commonParams(
     request.includeArchived,
-    0,
-    0,
+    limit,
+    offset,
     request.sort ?? 'time',
     request.direction ?? 'desc',
   );
   params.set('thread_key', request.threadKey);
+  append(params, 'since', request.since);
+  append(params, 'until', request.until);
   return decodeExploreCalls(await requestJson(`/api/thread-calls?${params}`, request.runtime, signal));
+}
+
+export async function loadThreadCallContext(
+  request: ThreadCallContextQueryRequest,
+  signal?: AbortSignal,
+): Promise<ExploreCallsPage> {
+  const pageSize = request.pageSize ?? threadCallsPageSize;
+  if (!request.selectedEventTimestamp) {
+    return loadThreadCalls(request, 0, pageSize, signal);
+  }
+  const sideLimit = Math.floor(pageSize / 2) + 1;
+  const [newer, older] = await Promise.all([
+    loadThreadCalls(
+      { ...request, since: request.selectedEventTimestamp, until: undefined, sort: 'time', direction: 'asc' },
+      0,
+      sideLimit,
+      signal,
+    ),
+    loadThreadCalls(
+      { ...request, since: undefined, until: request.selectedEventTimestamp, sort: 'time', direction: 'desc' },
+      0,
+      sideLimit,
+      signal,
+    ),
+  ]);
+  const rowsById = new Map([...newer.rows, ...older.rows].map(row => [row.id, row]));
+  const rows = [...rowsById.values()]
+    .sort((left, right) => callTimestamp(right.eventTimestamp) - callTimestamp(left.eventTimestamp) || left.id.localeCompare(right.id))
+    .slice(0, pageSize);
+  return {
+    schema: older.schema,
+    threadKey: request.threadKey,
+    rows,
+    rowCount: rows.length,
+    totalMatchedRows: Math.max(rows.length, newer.totalMatchedRows + older.totalMatchedRows - 1),
+    limit: pageSize,
+    offset: 0,
+    hasMore: false,
+    nextOffset: null,
+    rawContextIncluded: false,
+  };
+}
+
+function callTimestamp(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function commonParams(

@@ -1,10 +1,13 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import type { SortingState } from '@tanstack/react-table';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ContextRuntime, DashboardModel, ThreadRow } from '../../api/types';
-import { threadCallsQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
+import {
+  threadCallsInfiniteQueryOptions,
+  threadsInfiniteQueryOptions,
+} from '../../data/exploreQueries';
 import { exploreWorkspaceUrl, type ExploreWorkspaceId } from '../explore/ExploreWorkspaceSwitcher';
 import { useEvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
@@ -194,18 +197,21 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
     return model.calls.filter(call => threadLabelsMatch(call.thread, selected.name)).sort(compareCallTimeDescending);
   }, [model.calls, selected]);
   const selectedThreadKey = (selected as ExploreThreadRow | null)?.threadKey || localSelectedCalls[0]?.threadKey || selected?.name || '';
-  const selectedThreadCallsQuery = useQuery({
-    ...threadCallsQueryOptions({
+  const selectedThreadCallsQuery = useInfiniteQuery({
+    ...threadCallsInfiniteQueryOptions({
       runtime: contextRuntime,
       includeArchived,
       sourceKey,
       sourceRevision,
       threadKey: selectedThreadKey,
+      sort: threadCallSort === 'newest' ? 'time' : threadCallSort,
+      direction: threadCallSortDirection,
     }),
     enabled: focusedEndpointsEnabled && !contextRuntime.fileMode && Boolean(contextRuntime.apiToken) && Boolean(selectedThreadKey),
     placeholderData: previous => previous,
   });
-  const selectedCalls = selectedThreadCallsQuery.data?.rows ?? localSelectedCalls;
+  const selectedCalls = selectedThreadCallsQuery.data?.pages.flatMap(page => page.rows) ?? localSelectedCalls;
+  const selectedCallCount = selectedThreadCallsQuery.data?.pages[0]?.totalMatchedRows ?? selectedCalls.length;
   const selectedWithLatest = selected
     ? { ...selected, latestCallId: selected.latestCallId || selectedCalls[0]?.id || '' }
     : null;
@@ -349,6 +355,15 @@ setVisibleThreadCallCount(threadCallPageSize);
     setVisibleThreadRows(current => Math.min(current + threadsTablePageSize, sortedThreads.length));
   }
 
+  function loadMoreSelectedThreadCalls() {
+    if (!selectedThreadCallsQuery.hasNextPage) return;
+    void selectedThreadCallsQuery.fetchNextPage().then(result => {
+      if (!result.isError) {
+        setVisibleThreadCallCount(current => Math.min(current + threadCallPageSize, selectedCallCount));
+      }
+    });
+  }
+
   return (
     <ThreadsExplorerView
       globalFilters={globalFilters}
@@ -370,7 +385,7 @@ setVisibleThreadCallCount(threadCallPageSize);
       }}
       selectedCallsState={{
         isFetching: selectedThreadCallsQuery.isFetching,
-        count: selectedCalls.length,
+        count: selectedCallCount,
         hydrated: Boolean(selectedThreadCallsQuery.data),
         error: selectedThreadCallsQuery.error ? queryErrorMessage(selectedThreadCallsQuery.error) : null,
       }}
@@ -387,10 +402,14 @@ setVisibleThreadCallCount(threadCallPageSize);
         selected: selectedWithLatest,
         calls: selectedCalls,
         allCalls: model.calls,
+        totalCallCount: selectedCallCount,
+        hasMoreCalls: Boolean(selectedThreadCallsQuery.hasNextPage),
+        isFetchingMoreCalls: selectedThreadCallsQuery.isFetchingNextPage,
         callSort: threadCallSort,
         callSortDirection: threadCallSortDirection,
         visibleCallCount: visibleThreadCallCount,
         onVisibleCallCountChange: setVisibleThreadCallCount,
+        onLoadMoreCalls: loadMoreSelectedThreadCalls,
       }}
       onWorkspaceChange={selectExploreWorkspace}
       onExport={exportThreads}

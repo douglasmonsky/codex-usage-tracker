@@ -16,6 +16,7 @@ import {
   type LoadWindow,
 } from './dataScope';
 import {
+  dashboardQueryDefinition,
   dashboardQueryKey,
   dashboardQueryOptions,
   dashboardQueryPolicies,
@@ -71,12 +72,13 @@ type UsageQueryRequest = {
 
 const metadataStorageKey = 'codexUsageDashboardRuntimeMetadata';
 const metadataMaxBytes = 2_048;
+const usageSnapshotQuery = dashboardQueryDefinition('usage-snapshot');
 
 const usageQueryKeys = {
-  all: dashboardQueryPrefix('usage-snapshot'),
+  all: dashboardQueryPrefix(usageSnapshotQuery),
   snapshot: (sourceKey: string, sourceRevision: string, scope: DataScope) =>
     dashboardQueryKey(
-      'usage-snapshot',
+      usageSnapshotQuery,
       dashboardQuerySource({ sourceKey, sourceRevision }),
       scope,
     ),
@@ -120,7 +122,7 @@ export async function queryUsageSnapshot({
   const cacheIdentity = usageSnapshotIdentity(currentPayload, scope);
   const payload = await queryClient.fetchQuery({
     queryKey,
-    ...dashboardQueryOptions('snapshot'),
+    ...dashboardQueryOptions(usageSnapshotQuery.dataClass),
     queryFn: async ({ signal }) => {
       const cachedPayload = !refresh && cacheIdentity
         ? await snapshotStore.read(cacheIdentity)

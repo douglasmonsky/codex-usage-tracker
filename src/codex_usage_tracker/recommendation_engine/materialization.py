@@ -69,10 +69,19 @@ def sync_recommendation_facts(
     *,
     record_ids: Iterable[str],
     thread_keys: Iterable[str] | None = None,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
 ) -> int:
     """Replace facts only for changed normalized usage records."""
     targets = tuple(dict.fromkeys(str(record_id) for record_id in record_ids if record_id))
-    config = load_recommendation_fact_config()
+    config = load_recommendation_fact_config(
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
+    )
     generation = _generation(conn, config)
     _populate_targets(conn, targets)
     affected_thread_keys = {
@@ -114,14 +123,29 @@ def sync_refresh_recommendation_facts(
     record_ids: tuple[str, ...],
     thread_keys: frozenset[str],
     full_rebuild: bool,
+    *,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
 ) -> None:
     if full_rebuild:
-        backfill_recommendation_facts(conn)
+        backfill_recommendation_facts(
+            conn,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+        )
     else:
         sync_recommendation_facts(
             conn,
             record_ids=record_ids,
             thread_keys=thread_keys,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
         )
 
 

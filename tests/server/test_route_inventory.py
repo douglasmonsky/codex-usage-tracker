@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+from codex_usage_tracker.core.json_contracts import known_json_schemas
 from codex_usage_tracker.server.route_inventory import DASHBOARD_ROUTE_PROFILES
 from codex_usage_tracker.server.routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
     GET_ROUTE_METHODS,
     POST_ROUTE_METHODS,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+QUERY_CONTRACTS_PATH = (
+    REPO_ROOT / "frontend" / "dashboard" / "src" / "data" / "dashboardQueryContracts.json"
 )
 
 
@@ -56,3 +65,48 @@ def test_route_inventory_has_decision_ready_execution_metadata() -> None:
     assert compression["/api/compression/status"].workload == "interactive"
     assert compression["/api/compression/profile"].execution == "synchronous"
     assert compression["/api/compression/profile"].workload == "bounded_report"
+
+
+def test_frontend_query_contracts_match_registered_routes_and_schemas() -> None:
+    contracts = json.loads(QUERY_CONTRACTS_PATH.read_text(encoding="utf-8"))
+    ids = [contract["id"] for contract in contracts]
+    endpoints = [contract["endpoint"] for contract in contracts]
+    registered_paths = {profile.path for profile in DASHBOARD_ROUTE_PROFILES}
+    schemas = set(known_json_schemas())
+
+    assert len(ids) == len(set(ids))
+    assert len(endpoints) == len(set(endpoints))
+    assert {contract["dataClass"] for contract in contracts} <= {
+        "snapshot",
+        "aggregate",
+        "detail",
+        "heavyJob",
+        "userAction",
+    }
+    for contract in contracts:
+        endpoint = contract["endpoint"]
+        if endpoint == "/api/diagnostics/{snapshot}":
+            assert any(path.startswith("/api/diagnostics/") for path in registered_paths)
+        else:
+            assert endpoint in registered_paths
+        if contract["schema"] is not None:
+            assert contract["schema"] in schemas
+
+    assert {
+        contract["id"]: contract["schema"]
+        for contract in contracts
+        if contract["id"]
+        in {
+            "overview-summary",
+            "overview-recommendations",
+            "calls",
+            "threads",
+            "thread-calls",
+        }
+    } == {
+        "overview-summary": "codex-usage-tracker-summary-v1",
+        "overview-recommendations": "codex-usage-tracker-recommendations-v1",
+        "calls": "codex-usage-tracker-calls-v1",
+        "threads": "codex-usage-tracker-threads-v1",
+        "thread-calls": "codex-usage-tracker-thread-calls-v1",
+    }
