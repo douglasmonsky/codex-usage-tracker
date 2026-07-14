@@ -76,6 +76,7 @@ from codex_usage_tracker.store.diagnostic_queries import (
 )
 from codex_usage_tracker.store.exports import export_usage_csv as export_usage_csv
 from codex_usage_tracker.store.investigation_runs import insert_investigation_run
+from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
 from codex_usage_tracker.store.rows import (
     row_to_dict as _row_to_dict,
 )
@@ -146,6 +147,7 @@ def refresh_usage_index(
     include_archived: bool = False,
     aggregate_only: bool = False,
     progress_callback: RefreshProgressCallback | None = None,
+    derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
@@ -159,6 +161,7 @@ def refresh_usage_index(
         include_archived=include_archived,
         aggregate_only=aggregate_only,
         progress_callback=progress_callback,
+        derived_fact_sync=derived_fact_sync,
     )
 
 
@@ -167,6 +170,7 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Drop and rebuild the usage index from all selected Codex logs."""
 
@@ -179,6 +183,7 @@ def rebuild_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        derived_fact_sync=derived_fact_sync,
     )
 
 

@@ -29,6 +29,7 @@ from codex_usage_tracker.store.content_index_models import (
     ContentIndexPlan,
     _ExtractedContentRows,
 )
+from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
 from codex_usage_tracker.store.refresh_parse import (
     ParsedRefreshFile,
     RefreshProgressCallback,
@@ -82,6 +83,7 @@ class _RefreshStreamWriter:
         aggregate_only: bool,
         progress_callback: RefreshProgressCallback | None,
         force_serial: bool,
+        derived_fact_sync: DerivedFactSyncCallback | None,
     ) -> None:
         self.db_path = db_path
         self.parse_plans = parse_plans
@@ -89,6 +91,7 @@ class _RefreshStreamWriter:
         self.aggregate_only = aggregate_only
         self.progress_callback = progress_callback
         self.force_serial = force_serial
+        self.derived_fact_sync = derived_fact_sync
         self.stats: dict[str, int] = {}
         self.parsed_events = 0
         self.inserted = 0
@@ -376,6 +379,10 @@ class _RefreshStreamWriter:
                 affected_thread_keys=finalized.affected_thread_keys,
             )
         self.timings.add("compression_facts", started)
+        if self.derived_fact_sync is not None:
+            recommendation_started = perf_counter()
+            self.derived_fact_sync(conn, finalized.record_ids, full_rebuild)
+            self.timings.add("recommendation_facts", recommendation_started)
         emit_refresh_progress(
             self.progress_callback,
             phase="syncing_facts",
@@ -394,6 +401,7 @@ def write_refresh_stream(
     aggregate_only: bool,
     progress_callback: RefreshProgressCallback | None,
     force_serial: bool,
+    derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshStreamResult:
     return _RefreshStreamWriter(
         db_path=db_path,
@@ -402,6 +410,7 @@ def write_refresh_stream(
         aggregate_only=aggregate_only,
         progress_callback=progress_callback,
         force_serial=force_serial,
+        derived_fact_sync=derived_fact_sync,
     ).run()
 
 
