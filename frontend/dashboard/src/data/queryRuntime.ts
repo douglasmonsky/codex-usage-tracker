@@ -54,6 +54,8 @@ export type DashboardRuntimeMetadata = {
   updatedAt: number;
 };
 
+export type DashboardSourceIdentity = Pick<DashboardRuntimeMetadata, 'sourceKey' | 'sourceRevision'>;
+
 type UsageQueryRequest = {
   currentPayload: DashboardBootPayload | null;
   historyScope: HistoryScope;
@@ -105,8 +107,8 @@ export async function queryUsageSnapshot({
   transport = productionUsageTransport,
 }: UsageQueryRequest): Promise<DashboardBootPayload> {
   const scope = dataScopeFromCompatibilityLimit(loadLimit, historyScope, since, loadWindow);
-  const sourceKey = payloadSourceKey(currentPayload);
-  const queryKey = usageQueryKeys.snapshot(sourceKey, payloadSourceRevision(currentPayload), scope);
+  const sourceIdentity = dashboardSourceIdentityFromPayload(currentPayload);
+  const queryKey = usageQueryKeys.snapshot(sourceIdentity.sourceKey, sourceIdentity.sourceRevision, scope);
 
   if (!queryClient.getQueryData(queryKey) && payloadMatchesScope(currentPayload, scope)) {
     queryClient.setQueryData(queryKey, currentPayload);
@@ -177,12 +179,21 @@ export function isUsageQueryCancelled(error: unknown): boolean {
 }
 
 export function metadataFromPayload(payload: DashboardBootPayload, scope: DataScope): DashboardRuntimeMetadata {
+  const sourceIdentity = dashboardSourceIdentityFromPayload(payload);
   return {
     schema: 'codex-usage-dashboard-runtime-v1',
-    sourceKey: payloadSourceKey(payload),
-    sourceRevision: String(payload.latest_refresh_at ?? ''),
+    ...sourceIdentity,
     scope,
     updatedAt: Date.now(),
+  };
+}
+
+export function dashboardSourceIdentityFromPayload(
+  payload: DashboardBootPayload | null,
+): DashboardSourceIdentity {
+  return {
+    sourceKey: payloadSourceKey(payload),
+    sourceRevision: payloadSourceRevision(payload),
   };
 }
 

@@ -52,6 +52,7 @@ type ThreadsPageProps = {
   globalFilters?: ReactNode;
   contextRuntime: ContextRuntime;
   includeArchived?: boolean;
+  sourceKey?: string;
   sourceRevision?: string;
   focusedEndpointsEnabled?: boolean;
   onNavigateView: (view: 'calls' | 'threads') => void;
@@ -98,6 +99,7 @@ export function ThreadsPage({
   globalFilters,
   contextRuntime,
   includeArchived = false,
+  sourceKey,
   sourceRevision = '',
   focusedEndpointsEnabled = import.meta.env.MODE !== 'test',
   onNavigateView,
@@ -138,6 +140,7 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
     ...threadsInfiniteQueryOptions({
       runtime: contextRuntime,
       includeArchived,
+      sourceKey,
       sourceRevision,
       query: endpointState.query,
       sort: endpointState.sort,
@@ -195,6 +198,7 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
     ...threadCallsQueryOptions({
       runtime: contextRuntime,
       includeArchived,
+      sourceKey,
       sourceRevision,
       threadKey: selectedThreadKey,
     }),

@@ -36,6 +36,7 @@ type OverviewPageProps = {
   model: DashboardModel;
   contextRuntime: ContextRuntime;
   sourceRevision: string;
+  sourceKey?: string;
   onRefresh: () => void;
   globalQuery: string;
   runtime: OverviewRuntime;
@@ -57,6 +58,7 @@ export function OverviewPage(props: OverviewPageProps) {
     includeArchived: props.runtime.historyScope === 'all',
     since: props.runtime.scopeSince ?? undefined,
     sourceRevision: props.sourceRevision,
+    sourceKey: props.sourceKey,
   };
   const summaryQuery = useQuery({
     ...overviewSummaryQueryOptions(queryRequest),

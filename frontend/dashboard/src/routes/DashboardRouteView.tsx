@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from 'react';
 
 import type { ContextRuntime, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
 import type { HistoryScope, LoadWindow } from '../data/dataScope';
+import type { DashboardSourceIdentity } from '../data/queryRuntime';
 import type { DashboardViewId } from './dashboardSearch';
 
 const OverviewPage = lazyRouteComponent(() => import('../features/overview/OverviewPage'), 'OverviewPage');
@@ -66,6 +67,7 @@ type DashboardRouteViewProps = {
   refreshing: boolean;
   refreshState: string;
   setContextApiEnabled: (enabled: boolean) => void;
+  sourceIdentity: DashboardSourceIdentity;
   totalAvailableRows: number;
 };
 
@@ -108,6 +110,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     refreshing,
     refreshState,
     setContextApiEnabled,
+    sourceIdentity,
     totalAvailableRows,
   } = props;
 
@@ -117,7 +120,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         <OverviewPage
           model={model}
           contextRuntime={contextRuntime}
-          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          sourceKey={sourceIdentity.sourceKey}
+          sourceRevision={sourceIdentity.sourceRevision}
           onRefresh={onRefresh}
           globalQuery={globalQuery}
           runtime={{ historyScope, loadLimit, loadWindow, loadedRowCount, scopeSince, totalAvailableRows }}
@@ -136,7 +140,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           model={model}
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
-          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          sourceRevision={sourceIdentity.sourceRevision}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
           onNavigateView={navigateView}
@@ -152,7 +156,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
           scopeSince={scopeSince}
-          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          sourceKey={sourceIdentity.sourceKey}
+          sourceRevision={sourceIdentity.sourceRevision}
           onContextApiEnabledChange={setContextApiEnabled}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
@@ -182,7 +187,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           globalFilters={globalFilters}
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
-          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          sourceKey={sourceIdentity.sourceKey}
+          sourceRevision={sourceIdentity.sourceRevision}
           onNavigateView={navigateView}
         />
       );
@@ -192,7 +198,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           model={model}
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
-          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          sourceRevision={sourceIdentity.sourceRevision}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
         />
@@ -204,7 +210,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
           scopeSince={scopeSince}
-          sourceRevision={String(dashboardPayload?.latest_refresh_at ?? '')}
+          sourceRevision={sourceIdentity.sourceRevision}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
         />

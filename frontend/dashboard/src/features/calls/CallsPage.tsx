@@ -38,6 +38,7 @@ export type CallsPageProps = {
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
   includeArchived?: boolean;
+  sourceKey?: string;
   sourceRevision?: string;
   scopeSince?: string | null;
   focusedEndpointsEnabled?: boolean;
@@ -96,6 +97,7 @@ export function CallsPage({
   onOpenInvestigator,
   onCopyCallLink,
   includeArchived = false,
+  sourceKey,
   sourceRevision = '',
   scopeSince = null,
   focusedEndpointsEnabled = import.meta.env.MODE !== 'test',
@@ -154,6 +156,7 @@ export function CallsPage({
     ...callsInfiniteQueryOptions({
       runtime: contextRuntime,
       includeArchived,
+      sourceKey,
       sourceRevision,
       filters: endpointState.filters,
       sort: endpointState.sort,
