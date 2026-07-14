@@ -16,7 +16,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -108,6 +108,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (18, schema_source_index.migrate_source_file_line_index),
         (19, compression_schema.add_candidate_record_metadata),
         (20, recommendation_schema.create_recommendation_fact_tables),
+        (21, recommendation_schema.add_recommendation_thread_summaries),
     )
 
 
@@ -716,13 +717,8 @@ def _record_migration(conn: sqlite3.Connection, version: int) -> None:
 
 
 def _migration_record_exists(conn: sqlite3.Connection, version: int) -> bool:
-    return (
-        conn.execute(
-            "SELECT 1 FROM schema_migrations WHERE version = ?",
-            (version,),
-        ).fetchone()
-        is not None
-    )
+    row = conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone()
+    return row is not None
 
 
 def _ensure_columns(conn: sqlite3.Connection, columns: dict[str, str]) -> None:

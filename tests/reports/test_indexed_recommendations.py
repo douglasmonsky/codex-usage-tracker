@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -84,6 +85,19 @@ def test_indexed_recommendations_match_legacy_payload(
             reasoning_output_tokens=40_000,
             total_tokens=250_050,
         ),
+        replace(
+            _usage_event(
+                record_id="archived-call",
+                session_id="session-archived",
+                thread_key="thread:archived",
+                event_timestamp="2026-07-12T13:00:00Z",
+                cumulative_total_tokens=900_000,
+            ),
+            input_tokens=250_000,
+            cached_input_tokens=1_000,
+            total_tokens=250_050,
+            is_archived=1,
+        ),
     ]
     upsert_usage_events(events, db_path=db_path)
     with connect(db_path) as conn:
@@ -93,17 +107,23 @@ def test_indexed_recommendations_match_legacy_payload(
             allowance_path=allowance_path,
         )
 
-    arguments = {
+    arguments: dict[str, Any] = {
         "db_path": db_path,
         "pricing_path": pricing_path,
         "allowance_path": allowance_path,
         "projects_path": projects_path,
-        "limit": 1,
+        "limit": 10,
     }
     legacy = build_recommendations_report(**arguments)
     indexed = build_indexed_recommendations_report(**arguments)
 
     assert indexed.payload == legacy.payload
+
+    archived_arguments = {**arguments, "include_archived": True}
+    archived_legacy = build_recommendations_report(**archived_arguments)
+    archived_indexed = build_indexed_recommendations_report(**archived_arguments)
+
+    assert archived_indexed.payload == archived_legacy.payload
 
 
 def test_recommendations_fall_back_when_materialized_facts_are_missing(
@@ -126,7 +146,7 @@ def test_recommendations_fall_back_when_materialized_facts_are_missing(
         total_tokens=250_050,
     )
     upsert_usage_events([event], db_path=db_path)
-    arguments = {
+    arguments: dict[str, Any] = {
         "db_path": db_path,
         "pricing_path": pricing_path,
         "allowance_path": allowance_path,

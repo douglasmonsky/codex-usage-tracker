@@ -12,10 +12,15 @@ def test_refresh_derived_fact_callback_receives_full_and_append_targets(
 ) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
-    calls: list[tuple[tuple[str, ...], bool, bool]] = []
+    calls: list[tuple[tuple[str, ...], frozenset[str], bool, bool]] = []
 
-    def sync(conn, record_ids: tuple[str, ...], full_rebuild: bool) -> None:
-        calls.append((record_ids, full_rebuild, conn.in_transaction))
+    def sync(
+        conn,
+        record_ids: tuple[str, ...],
+        thread_keys: frozenset[str],
+        full_rebuild: bool,
+    ) -> None:
+        calls.append((record_ids, thread_keys, full_rebuild, conn.in_transaction))
 
     refresh_usage_index(
         codex_home=codex_home,
@@ -45,7 +50,9 @@ def test_refresh_derived_fact_callback_receives_full_and_append_targets(
     )
 
     assert len(calls) == 2
-    assert calls[0][1:] == (True, True)
-    assert calls[1][1:] == (False, True)
+    assert calls[0][2:] == (True, True)
+    assert calls[1][2:] == (False, True)
     assert len(calls[0][0]) > 0
     assert len(calls[1][0]) == 1
+    assert calls[0][1]
+    assert calls[1][1]
