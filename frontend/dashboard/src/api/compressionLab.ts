@@ -14,7 +14,7 @@ export type CompressionScopeRequest = {
   detectorFamilies?: string[];
 };
 
-export type CompressionProgress = {
+type CompressionProgress = {
   percent: number;
   stage: string;
   current_detector: string | null;
