@@ -68,8 +68,8 @@ reusable results.
 | PR 3B1: Shared module progress | Merged | #244 / #253 / `382d77f` | Updating-vs-loading state, Overview background-refresh coverage, and deterministic endpoint-cache tests |
 | PR 3B2: Shell source identity | Merged | #244 / #254 / `d8aa426` | Stable credential-free source propagation for Overview, Calls, and Threads; same-route navigation preserves local state |
 | PR 3B3: Cache and Reports migration | Merged | #244 / #255 / `bd1214c` | Shared source-aware policies, segmented module progress, request cancellation, and desktop return-navigation coverage |
-| PR 3B4: Investigator migration | In review | #244 / #256 / `27c3da6` | Credential-free keys, source-revision invalidation, request cancellation, eleven-module progress, and desktop return-navigation coverage |
-| PR 3C: Diagnostics query migration | Pending | #244 | Diagnostics lifecycle and rapid route-switching browser tests |
+| PR 3B4: Investigator migration | Merged | #244 / #256 / `4eb43a7` | Credential-free keys, source-revision invalidation, request cancellation, eleven-module progress, and desktop return-navigation coverage |
+| PR 3C: Diagnostics query migration | In review | #244 / #257 / `496afab` | Source-aware facts and snapshot queries, paginated evidence calls, thirteen-module progress, cancellation, and desktop interrupted-work retry coverage |
 | PR 4: Heavy-route job migration | Pending | #244 | Branch, PR, async progress/cache tests |
 | PR 5: Query and cache hardening | Pending | #244 | Branch, PR, query plans and warm/cold budgets |
 | PR 6: Cleanup and enforcement | Pending | #244 | Branch, PR, CI ratchets and final route audit |
