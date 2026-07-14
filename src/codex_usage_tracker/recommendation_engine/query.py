@@ -7,7 +7,11 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker.core.paths import DEFAULT_PROJECTS_PATH
+from codex_usage_tracker.core.paths import (
+    DEFAULT_PROJECTS_PATH,
+    DEFAULT_RATE_CARD_PATH,
+    DEFAULT_THRESHOLDS_PATH,
+)
 from codex_usage_tracker.core.projects import (
     annotate_rows_with_project_identity,
     apply_project_privacy_to_rows,
@@ -50,6 +54,8 @@ def build_recommendations_report(
     db_path: Path,
     pricing_path: Path,
     allowance_path: Path,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     since: str | None = None,
     until: str | None = None,
@@ -69,11 +75,15 @@ def build_recommendations_report(
         db_path=db_path,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
     ):
         return build_indexed_recommendations_report(
             db_path=db_path,
             pricing_path=pricing_path,
             allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
             projects_path=projects_path,
             since=since,
             until=until,
@@ -91,6 +101,8 @@ def build_recommendations_report(
         db_path=db_path,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
         projects_path=projects_path,
         since=since,
         until=until,
@@ -111,6 +123,8 @@ def build_indexed_recommendations_report(
     db_path: Path,
     pricing_path: Path,
     allowance_path: Path,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     since: str | None = None,
     until: str | None = None,
@@ -157,7 +171,7 @@ def build_indexed_recommendations_report(
     rows = annotate_thread_attachments(page.rows)
     rows = annotate_rows_with_allowance(
         annotate_rows_with_efficiency(rows, load_pricing_config(pricing_path)),
-        load_allowance_config(allowance_path),
+        load_allowance_config(allowance_path, rate_card_path=rate_card_path),
     )
     rows = [_restore_materialized_recommendations(row) for row in rows]
     rows = annotate_rows_with_project_identity(rows, load_project_config(projects_path))
@@ -249,10 +263,14 @@ def _recommendation_facts_are_current(
     db_path: Path,
     pricing_path: Path,
     allowance_path: Path,
+    rate_card_path: Path,
+    thresholds_path: Path,
 ) -> bool:
     config = load_recommendation_fact_config(
         pricing_path=pricing_path,
         allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
     )
     try:
         with connect(db_path) as conn:

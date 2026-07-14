@@ -71,8 +71,8 @@ reusable results.
 | PR 3B4: Investigator migration | Merged | #244 / #256 / `4eb43a7` | Credential-free keys, source-revision invalidation, request cancellation, eleven-module progress, and desktop return-navigation coverage |
 | PR 3C: Diagnostics query migration | Merged | #244 / #257 / `7d2306c` | Source-aware facts and snapshot queries, paginated evidence calls, thirteen-module progress, cancellation, and desktop interrupted-work retry coverage |
 | PR 4A: Diagnostic refresh jobs | Merged | #244 / #258 / `2eb19e2b` | Shared async analysis lifecycle, persisted-result reload, measurable 10-unit progress, and observer-safe polling |
-| PR 4B: Compression Lab dashboard jobs | In review | #244 / #261 / `feature/244-compression-dashboard-jobs` | Shared MCP/dashboard profile contract; 400k cold start 2.9 ms, active-poll p95 72 ms, warm status/profile p95 1.3 ms; agent-perf `20260714T094938Z-90e678ab` |
-| PR 5: Query and cache hardening | Pending | #244 | Branch, PR, query plans and warm/cold budgets |
+| PR 4B: Compression Lab dashboard jobs | Merged | #244 / #261 / `cbc8b511` | Shared MCP/dashboard profile contract; 400k cold start 2.9 ms, active-poll p95 72 ms, warm status/profile p95 1.3 ms; agent-perf `20260714T094938Z-90e678ab` |
+| PR 5: Query and cache hardening | In progress | #244 / `feature/244-query-cache-hardening` | Five 400k route-handler samples: summary 591 ms cold p95 / 1.64 ms warm p95; recommendations 150 ms cold p95 / 2.87 ms warm p95; query-plan-backed diagnostic covering index; agent-perf `20260714T114913Z-d4cd2a28` |
 | PR 6: Cleanup and enforcement | Pending | #244 | Branch, PR, CI ratchets and final route audit |
 
 Update this table in the same PR that completes each slice. A slice is complete
@@ -96,6 +96,20 @@ PR 2B's synthetic 400,000-row comparison reduced the same recommendation
 request from 29.96 seconds on the legacy fallback to a 134.6 ms median and
 151.1 ms p95 over 20 indexed runs. The request now reads materialized thread
 rollups, hydrates only the top 20 rows, and keeps ranking index-backed.
+
+PR 5's clean 400,000-row candidate run keeps those cold-path gains and adds a
+bounded immutable process cache. Five independent handler-level cold samples
+and five warm samples include request parsing, cache provenance, and final JSON
+serialization. Summary measured 581 ms cold median, 591 ms cold p95, and 1.64 ms
+warm p95. Recommendations measured 149 ms cold median, 150 ms cold p95, and
+2.87 ms warm p95. Stored payloads were 8.7 KiB and 151.4 KiB respectively,
+below the 256 KiB per-entry bound.
+
+The final 100,000-row `agent-perf` profile
+`20260714T114913Z-d4cd2a28` attributed CPU to ingestion and fact
+materialization rather than the cache or route adapters. Its leading
+application-owned functions were usage-row insertion, source-record sync,
+recommendation-fact insertion, and recommendation-summary aggregation.
 
 ## Architectural Principles
 

@@ -1,4 +1,5 @@
 import type { DashboardBootPayload } from '../api/types';
+import { isBrowserCacheSafe } from './browserCacheSafety';
 import type { DataScope } from './dataScope';
 
 export type UsageSnapshotIdentity = {
@@ -36,13 +37,17 @@ export const persistentUsageSnapshotStore: UsageSnapshotStore = {
       if (!record || record.sourceRevision !== identity.sourceRevision || Date.now() - record.storedAt > maxAgeMs) {
         return null;
       }
+      if (!isBrowserCacheSafe(record.payload)) {
+        await deleteSnapshot(database, record.cacheKey);
+        return null;
+      }
       return record.payload;
     } catch {
       return null;
     }
   },
   async write(identity, payload) {
-    if (!identity.sourceRevision) return;
+    if (!identity.sourceRevision || !isBrowserCacheSafe(payload)) return;
     try {
       const database = await openDatabase();
       if (!database) return;
@@ -60,6 +65,12 @@ export const persistentUsageSnapshotStore: UsageSnapshotStore = {
     }
   },
 };
+
+async function deleteSnapshot(database: IDBDatabase, key: string): Promise<void> {
+  const transaction = database.transaction(storeName, 'readwrite');
+  transaction.objectStore(storeName).delete(key);
+  await transactionComplete(transaction);
+}
 
 function cacheKey(identity: UsageSnapshotIdentity): string {
   const { historyScope, loadWindow, limit, since } = identity.scope;

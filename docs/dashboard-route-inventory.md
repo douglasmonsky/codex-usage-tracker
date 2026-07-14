@@ -36,8 +36,8 @@ three status routes are read-only polls.
 | `GET /api/call` | Interactive | One call and bounded adjacent context | Live SQLite query |
 | `GET /api/threads` | Bounded report | Default 100 aggregate rows; all-scope aggregation | Live SQLite query |
 | `GET /api/thread-calls` | Bounded report | Default 100; derived filters may load a complete thread | Live SQLite query |
-| `GET /api/summary` | Bounded report | Default 20 groups over all matching rows | Live report query |
-| `GET /api/recommendations` | Bounded report | Ranks persisted facts before hydrating default 20 rows | Source-generation keyed SQLite facts |
+| `GET /api/summary` | Bounded report | Default 20 groups over all matching rows | Generation/config-keyed server response cache over a live report query |
+| `GET /api/recommendations` | Bounded report | Ranks persisted facts before hydrating default 20 rows | Generation/config-keyed server response cache over persisted SQLite facts |
 | `GET /api/allowance/history` | Bounded report | Default 1,000 normalized observations | SQLite plus local config |
 | `GET /api/allowance/diagnostics` | Bounded report | Evaluates at most the configured 10,000-observation window | Recomputed per request |
 | `GET /api/allowance/export` | Bounded report | Schema-bounded strict aggregate export | SQLite plus local config |
@@ -83,6 +83,23 @@ Compression Lab uses the same observer-safe lifecycle. `POST
 the dashboard aborts only its local polling request; the shared worker continues
 and publishes its profile to SQLite.
 
+## Aggregate Response Cache
+
+Summary and recommendation responses use one server-process LRU with at most 64
+serialized entries and 256 KiB per stored payload. Keys contain the canonical
+query, source generation, privacy mode, and SHA-256 revisions of every local
+configuration file used by the route. A source write or relevant configuration
+change therefore produces a new key without manual cache clearing. Identical
+in-flight requests share one builder; every caller receives a detached decoded
+copy. Explicit responses larger than the storage bound are still returned but
+are marked `bypass` and are never retained.
+
+The response `query_cache` block reports hit, miss, coalesced, or bypass status,
+the source revision, serialized size, and whether the entry was retained. Raw
+context and indexed-content endpoints do not use this cache. Browser persistence
+also rejects any payload containing raw/indexed content keys or affirmative
+content-inclusion markers.
+
 ## Timing Evidence
 
 JSON API responses include a privacy-safe `Server-Timing` header such as
@@ -100,8 +117,10 @@ python scripts/benchmark_dashboard_routes.py \
   --output-dir /tmp/codex-dashboard-route-benchmark
 ```
 
-The command emits compact JSON and enforces no threshold in this measurement
-phase. The checked-in baseline is
+The command emits compact JSON with repeated route-handler cold and warm
+samples. Every cold sample uses a fresh process cache; warm samples reuse one
+seeded cache. Timings include request parsing, cache provenance, and final JSON
+serialization. PR 6 owns the deterministic CI thresholds. The checked-in pre-refactor baseline is
 [`benchmarks/dashboard-route-baseline.json`](benchmarks/dashboard-route-baseline.json).
 
 | Synthetic calls | Summary median | Recommendations median |
@@ -113,3 +132,17 @@ phase. The checked-in baseline is
 The near-linear recommendation cost validates the first migration target in
 the refactor roadmap. These numbers establish evidence only; PR0 does not add
 or relax a CI performance threshold.
+
+PR 5's clean 400,000-call candidate run measured the current indexed and cached
+paths:
+
+| Route | Cold median | Cold p95 | Warm median | Warm p95 | Payload |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Summary | 0.581 s | 0.591 s | 1.13 ms | 1.64 ms | 8.7 KiB |
+| Recommendations | 0.149 s | 0.150 s | 2.66 ms | 2.87 ms | 151.4 KiB |
+
+The summary date-expression index considered during this work was rejected: it
+removed one temporary grouping B-tree but regressed the representative warm SQL
+query from roughly 0.56 seconds to 0.81-0.92 seconds. Schema version 22 instead
+adds `idx_call_diagnostic_facts_lookup(fact_type, fact_name, record_id)`, which
+SQLite selects as a covering index for the correlated diagnostic-fact lookup.

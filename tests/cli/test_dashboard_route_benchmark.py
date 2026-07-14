@@ -33,7 +33,18 @@ def test_dashboard_route_benchmark_emits_compact_synthetic_measurements(tmp_path
     assert payload["fixtures"][0]["rows"] == 40
     routes = {row["path"]: row for row in payload["fixtures"][0]["routes"]}
     assert set(routes) == {"/api/summary", "/api/recommendations"}
-    assert routes["/api/summary"]["samples_seconds"]
+    assert routes["/api/summary"]["cold_seconds"] >= 0
+    assert routes["/api/summary"]["cold_samples_seconds"]
+    assert routes["/api/summary"]["cold_p95_seconds"] >= 0
+    assert (
+        routes["/api/summary"]["samples_seconds"] == routes["/api/summary"]["cold_samples_seconds"]
+    )
+    assert routes["/api/summary"]["median_seconds"] == routes["/api/summary"]["cold_median_seconds"]
+    assert routes["/api/summary"]["p95_seconds"] == routes["/api/summary"]["cold_p95_seconds"]
+    assert routes["/api/summary"]["warm_samples_seconds"]
+    assert routes["/api/summary"]["warm_p95_seconds"] >= 0
+    assert routes["/api/summary"]["cache_statuses"] == ["miss", "hit"]
+    assert routes["/api/summary"]["payload_bytes"] > 0
     assert routes["/api/recommendations"]["result_rows"] <= 20
     compression = payload["fixtures"][0]["compression_job"]
     assert compression["run_status"] in {"completed", "completed_with_warnings"}

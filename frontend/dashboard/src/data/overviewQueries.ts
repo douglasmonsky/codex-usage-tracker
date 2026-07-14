@@ -84,12 +84,18 @@ async function loadOverviewSummaryEndpoint({
   runtime,
   includeArchived,
   since,
+  sourceKey,
   sourceRevision,
   cache = persistentOverviewEndpointCache,
   signal,
 }: OverviewEndpointRequest): Promise<OverviewSummaryReport> {
   assertOverviewApiAvailable(runtime);
-  const cacheIdentity = overviewCacheIdentity(includeArchived, since, sourceRevision);
+  const cacheIdentity = overviewCacheIdentity(
+    includeArchived,
+    since,
+    resolvedOverviewSourceKey(runtime, sourceKey),
+    sourceRevision,
+  );
   const cached = cacheIdentity ? cache.read(cacheIdentity) : null;
   if (cached?.summary.data && !cached.summary.error) return cached.summary.data;
   const data = await loadSummary(runtime, includeArchived, since, signal);
@@ -106,12 +112,18 @@ async function loadOverviewRecommendationsEndpoint({
   runtime,
   includeArchived,
   since,
+  sourceKey,
   sourceRevision,
   cache = persistentOverviewEndpointCache,
   signal,
 }: OverviewEndpointRequest): Promise<OverviewRecommendationsReport> {
   assertOverviewApiAvailable(runtime);
-  const cacheIdentity = overviewCacheIdentity(includeArchived, since, sourceRevision);
+  const cacheIdentity = overviewCacheIdentity(
+    includeArchived,
+    since,
+    resolvedOverviewSourceKey(runtime, sourceKey),
+    sourceRevision,
+  );
   const cached = cacheIdentity ? cache.read(cacheIdentity) : null;
   if (cached?.recommendations.data && !cached.recommendations.error) {
     return cached.recommendations.data;
@@ -130,12 +142,18 @@ export async function loadOverviewEndpoints({
   runtime,
   includeArchived,
   since,
+  sourceKey,
   sourceRevision,
   cache = persistentOverviewEndpointCache,
   signal,
 }: OverviewEndpointRequest): Promise<OverviewEndpointBundle> {
   assertOverviewApiAvailable(runtime);
-  const cacheIdentity = overviewCacheIdentity(includeArchived, since, sourceRevision);
+  const cacheIdentity = overviewCacheIdentity(
+    includeArchived,
+    since,
+    resolvedOverviewSourceKey(runtime, sourceKey),
+    sourceRevision,
+  );
   const cachedBundle = cacheIdentity ? cache.read(cacheIdentity) : null;
   if (cachedBundle) return cachedBundle;
   const [summary, recommendations] = await Promise.allSettled([
@@ -161,10 +179,15 @@ export async function loadOverviewEndpoints({
 function overviewCacheIdentity(
   includeArchived: boolean,
   since: string | undefined,
+  sourceKey: string,
   sourceRevision: string | undefined,
 ): OverviewEndpointCacheIdentity | null {
   if (!sourceRevision) return null;
-  return { includeArchived, since: since ?? '', sourceRevision };
+  return { includeArchived, since: since ?? '', sourceKey, sourceRevision };
+}
+
+function resolvedOverviewSourceKey(runtime: ContextRuntime, sourceKey: string | undefined): string {
+  return sourceKey ?? (runtime.fileMode ? 'static-file' : 'local-api');
 }
 
 async function loadSummary(

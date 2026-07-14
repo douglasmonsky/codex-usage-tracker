@@ -30,6 +30,7 @@ from codex_usage_tracker.server.context_settings import (
     ContextApiState,
 )
 from codex_usage_tracker.server.handler import _UsageDashboardHandler
+from codex_usage_tracker.server.query_cache import AggregateQueryCache
 from codex_usage_tracker.server.usage_refresh import RefreshJobRegistry
 
 _first = server_utils.first_query_value
@@ -96,6 +97,7 @@ def serve_dashboard(
     refresh_jobs = RefreshJobRegistry()
     analysis_jobs = AnalysisJobRegistry()
     compression_jobs = compression_routes.CompressionJobRegistry()
+    query_cache = AggregateQueryCache()
     handler = partial(
         _UsageDashboardHandler,
         directory=str(output.parent),
@@ -120,6 +122,7 @@ def serve_dashboard(
         refresh_jobs=refresh_jobs,
         analysis_jobs=analysis_jobs,
         compression_jobs=compression_jobs,
+        query_cache=query_cache,
     )
     server = ThreadingHTTPServer((host, port), handler)
     legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"

@@ -137,6 +137,7 @@ describe('overview focused endpoint query', () => {
     expect(cache.read).toHaveBeenCalledWith({
       includeArchived: false,
       since: '',
+      sourceKey: 'local-api',
       sourceRevision: 'refresh-2',
     });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -177,6 +178,7 @@ describe('overview focused endpoint query', () => {
     expect(cache.write).toHaveBeenCalledWith({
       includeArchived: false,
       since: '2026-07-04',
+      sourceKey: 'local-api',
       sourceRevision: 'refresh-3',
     }, bundle);
   });

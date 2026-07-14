@@ -29,6 +29,7 @@ def _as_json_object(payload: dict[str, object]) -> JsonObject:
 
 def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path) -> None:
     from codex_usage_tracker.server.api import _UsageDashboardHandler
+    from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -51,6 +52,7 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         api_token="test-token",
         context_api_enabled=True,
         refresh_lock=threading.Lock(),
+        query_cache=AggregateQueryCache(),
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -77,7 +79,13 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
         summary_payload = _as_json_object(
             _read_json(f"{base_url}/api/summary?group_by=model&limit=5")
         )
+        cached_summary_payload = _as_json_object(
+            _read_json(f"{base_url}/api/summary?limit=5&group_by=model")
+        )
         recommendations_payload = _as_json_object(
+            _read_json(f"{base_url}/api/recommendations?limit=5")
+        )
+        cached_recommendations_payload = _as_json_object(
             _read_json(f"{base_url}/api/recommendations?limit=5")
         )
         reports_pack_payload = _as_json_object(
@@ -148,8 +156,12 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     assert summary_payload["schema"] == "codex-usage-tracker-summary-v1"
     _assert_contract(summary_payload)
     assert summary_payload["group_by"] == "model"
+    assert summary_payload["query_cache"]["status"] == "miss"
+    assert cached_summary_payload["query_cache"]["status"] == "hit"
     assert recommendations_payload["schema"] == "codex-usage-tracker-recommendations-v1"
     _assert_contract(recommendations_payload)
+    assert recommendations_payload["query_cache"]["status"] == "miss"
+    assert cached_recommendations_payload["query_cache"]["status"] == "hit"
     assert reports_pack_payload["schema"] == "codex-usage-tracker-reports-pack-v1"
     assert datetime.fromisoformat(reports_pack_payload["generated_at"]).tzinfo is not None
     _assert_contract(reports_pack_payload)

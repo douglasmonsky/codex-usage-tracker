@@ -36,6 +36,7 @@ from codex_usage_tracker.dashboard.assets import (
     render_dashboard_template,
     versioned_asset_href,
 )
+from codex_usage_tracker.dashboard.cache_identity import dashboard_payload_cache_key
 from codex_usage_tracker.dashboard.load_window import dashboard_load_window_payload
 from codex_usage_tracker.dashboard.pricing_snapshot import pricing_snapshot_warning
 from codex_usage_tracker.pricing.allowance import (
@@ -154,12 +155,17 @@ def dashboard_payload(
         "parser_diagnostics": parser_diagnostics,
         "parser_adapter": metadata.get("parser_adapter"),
         "latest_refresh_at": metadata.get("latest_refresh_at"),
-        "payload_cache_key": _payload_cache_key(
+        "payload_cache_key": dashboard_payload_cache_key(
             db_path=db_path,
             api_token=api_token,
             privacy_mode=privacy_mode,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+            projects_path=projects_path,
         ),
-        "payload_cache_version": 2,
+        "payload_cache_version": 3,
         "api_token": api_token or "",
         "context_api_enabled": context_api_enabled,
         "refresh_jobs_available": bool(api_token),
@@ -498,23 +504,6 @@ def _pricing_snapshot(
         "rates_fingerprint": rates_fingerprint,
         **public_source,
     }
-
-
-def _payload_cache_key(
-    *,
-    db_path: Path,
-    api_token: str | None,
-    privacy_mode: str,
-) -> str:
-    source = "|".join(
-        [
-            str(db_path),
-            api_token or "static",
-            privacy_mode,
-            "dashboard-payload-v2",
-        ]
-    )
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:24]
 
 
 def _previous_dashboard_payload(output_path: Path) -> dict[str, Any] | None:
