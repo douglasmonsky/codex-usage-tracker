@@ -3,13 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import {
-  cachedDiagnosticFactCalls,
-  cachedMergedDiagnosticFactCalls,
-  cachedDiagnosticFactSource,
   diagnosticFactSourceDefinitions,
-  loadDiagnosticFactCalls,
-  loadDiagnosticFactSource,
-  rememberMergedDiagnosticFactCalls,
   type DiagnosticFactRow,
   type DiagnosticFactSourceKey,
 } from '../../api/diagnostics';
@@ -23,19 +17,22 @@ import {
   FactCallsPanel,
   factCallsResult,
   type DashboardRowLoadControls,
-  type FactCallsState,
   type FactLoadState,
   type FactSourcePanelState,
   StructuredFactsPanel,
 } from './DiagnosticFactsPanels';
 import { DiagnosticSnapshotMatrix } from './DiagnosticSnapshotMatrix';
-import { FACT_CALL_PAGE_SIZE, diagnosticFactKey, factCallsHasMore, mergeFactCallResults } from './diagnosticFactCalls';
+import { FACT_CALL_PAGE_SIZE, diagnosticFactKey } from './diagnosticFactCalls';
 import { factFromCalls, numericFactField } from './diagnosticFallbackFacts';
 import type { FactCallSortState, FactSortState } from './diagnosticFactSorting';
 import { stopRowActionKeyDown } from '../shared/rowActionEvents';
+import {
+  useDiagnosticFactCalls,
+  useDiagnosticFactSources,
+  type DiagnosticFactLimitMap,
+  type DiagnosticFactSortStateMap,
+} from './useDiagnosticFactEvidence';
 
-type FactSourceStateMap = Partial<Record<DiagnosticFactSourceKey, FactLoadState>>;
-type FactSortStateMap = Partial<Record<DiagnosticFactSourceKey, FactSortState>>;
 const DEFAULT_FACT_SORT_STATE: FactSortState = { key: 'uncached', direction: 'desc' };
 
 export function diagnosticsCallsForCurrentUrl(model: DashboardModel): CallRow[] {
@@ -47,6 +44,9 @@ export function diagnosticsCallsForCurrentUrl(model: DashboardModel): CallRow[] 
 export function DiagnosticsPage({
   model,
   contextRuntime,
+  includeArchived,
+  sourceKey,
+  sourceRevision,
   rowLoadControls,
   onOpenInvestigator,
   onCopyCallLink,
@@ -54,21 +54,30 @@ export function DiagnosticsPage({
 }: {
   model: DashboardModel;
   contextRuntime: ContextRuntime;
+  includeArchived: boolean;
+  sourceKey?: string;
+  sourceRevision: string;
   rowLoadControls: DashboardRowLoadControls;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
   globalFilters?: ReactNode;
 }) {
   const [factSourceKey, setFactSourceKey] = useState<DiagnosticFactSourceKey>(() => diagnosticFactSourceFromUrl());
-  const [factStates, setFactStates] = useState<FactSourceStateMap>(() => cachedFactStates(contextRuntime, {}));
-  const [factSortStates, setFactSortStates] = useState<FactSortStateMap>({});
+  const [factSortStates, setFactSortStates] = useState<DiagnosticFactSortStateMap>({});
+  const [factLimits, setFactLimits] = useState<DiagnosticFactLimitMap>({});
   const [selectedFactKey, setSelectedFactKey] = useState('');
-  const [loadingMoreFactSourceKey, setLoadingMoreFactSourceKey] = useState<DiagnosticFactSourceKey | null>(null);
   const [factCallSort, setFactCallSort] = useState<FactCallSortState>({ key: 'tokens', direction: 'desc' });
-  const [factCallsState, setFactCallsState] = useState<FactCallsState>({
-    status: 'idle',
-    message: 'Select a diagnostic fact',
+  const canUseLiveFacts = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
+  const factEvidence = useDiagnosticFactSources({
+    canUseLive: canUseLiveFacts,
+    contextRuntime,
+    includeArchived,
+    sourceKey,
+    sourceRevision,
+    limits: factLimits,
+    sorts: factSortStates,
   });
+  const factStates = factEvidence.states;
   const factState = factStates[factSourceKey] ?? staticFactState();
   const factSort = factSortStates[factSourceKey] ?? defaultFactSortState();
   const factSources = useMemo<FactSourcePanelState[]>(
@@ -86,6 +95,18 @@ export function DiagnosticsPage({
   const usingLiveFacts = liveFacts.length > 0;
   const facts = usingLiveFacts ? liveFacts : fallbackFacts;
   const selectedFact = facts.find(fact => diagnosticFactKey(fact) === selectedFactKey) ?? facts[0] ?? null;
+  const factCallEvidence = useDiagnosticFactCalls({
+    canUseLive: canUseLiveFacts,
+    contextRuntime,
+    includeArchived,
+    sourceKey,
+    sourceRevision,
+    fact: selectedFact,
+    factCallSort,
+    pageSize: FACT_CALL_PAGE_SIZE,
+    usingLiveFacts,
+  });
+  const factCallsState = factCallEvidence.state;
   const fallbackFactCalls = useMemo(
     () => (selectedFact ? fallbackDiagnosticFactCalls(selectedFact, model.calls) : []),
     [model.calls, selectedFact],
@@ -107,16 +128,9 @@ export function DiagnosticsPage({
         : contextRuntime.apiToken
           ? factState.message
           : 'Static fallback facts';
-  const canUseLiveFacts = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
-  const completedFactModules = diagnosticFactSourceDefinitions.filter(
-    source => factStates[source.key]?.status === 'loaded',
-  ).length;
-  const loadingFactModules = diagnosticFactSourceDefinitions.some(
-    source => factStates[source.key]?.status === 'loading',
+  const loadingFactModules = factEvidence.modules.some(
+    module => module.status === 'loading' || module.status === 'updating',
   );
-  const factProgressError = diagnosticFactSourceDefinitions
-    .map(source => factStates[source.key])
-    .find((state): state is Extract<FactLoadState, { status: 'error' }> => state?.status === 'error');
 
   useEffect(() => {
     if (!facts.length) {
@@ -136,144 +150,13 @@ export function DiagnosticsPage({
     }
   }, [facts, factSourceKey, selectedFactKey]);
 
-  useEffect(() => {
-    if (!contextRuntime.apiToken || contextRuntime.fileMode) {
-      setFactStates({});
-      return;
-    }
-
-    let cancelled = false;
-    const cachedStates = cachedFactStates(contextRuntime, factSortStates);
-    if (allFactSourcesLoaded(cachedStates)) {
-      setFactStates(cachedStates);
-      return;
-    }
-
-    setFactStates({ ...loadingFactStateMap(), ...cachedStates });
-    void Promise.all(
-      diagnosticFactSourceDefinitions.map(async source => {
-        const cachedState = cachedStates[source.key];
-        if (cachedState?.status === 'loaded') {
-          return [source.key, cachedState] as const;
-        }
-        try {
-          const sourceSort = factSortStates[source.key] ?? defaultFactSortState();
-          const payload = await loadDiagnosticFactSource(source.key, contextRuntime, {
-            sort: sourceSort.key,
-            direction: sourceSort.direction,
-          });
-          return [source.key, { status: 'loaded', payload } satisfies FactLoadState] as const;
-        } catch (error) {
-          return [source.key, { status: 'error', message: errorMessage(error) } satisfies FactLoadState] as const;
-        }
-      }),
-    ).then(entries => {
-      if (!cancelled) {
-        setFactStates(Object.fromEntries(entries) as FactSourceStateMap);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [contextRuntime, factSortStates]);
-
-  useEffect(() => {
-    if (!selectedFact || !usingLiveFacts || !contextRuntime.apiToken || contextRuntime.fileMode) {
-      setFactCallsState({ status: 'idle', message: 'Static aggregate fact calls' });
-      return;
-    }
-
-    let cancelled = false;
-    const cacheOptions = {
-      limit: FACT_CALL_PAGE_SIZE,
-      sort: factCallSort.key,
-      direction: factCallSort.direction,
-    };
-    const cachedMergedResult = cachedMergedDiagnosticFactCalls(selectedFact, contextRuntime, cacheOptions);
-    if (cachedMergedResult) {
-      setFactCallsState({ status: 'loaded', result: cachedMergedResult });
-      return;
-    }
-    const cachedResult = cachedDiagnosticFactCalls(selectedFact, contextRuntime, {
-      limit: FACT_CALL_PAGE_SIZE,
-      sort: factCallSort.key,
-      direction: factCallSort.direction,
-    });
-    if (cachedResult) {
-      rememberMergedDiagnosticFactCalls(selectedFact, contextRuntime, cachedResult, cacheOptions);
-      setFactCallsState({ status: 'loaded', result: cachedResult });
-      return;
-    }
-
-    setFactCallsState({ status: 'loading', message: 'Loading calls for selected fact...' });
-    loadDiagnosticFactCalls(selectedFact, contextRuntime, cacheOptions)
-      .then(result => {
-        if (!cancelled) {
-          rememberMergedDiagnosticFactCalls(selectedFact, contextRuntime, result, cacheOptions);
-          setFactCallsState({ status: 'loaded', result });
-        }
-      })
-      .catch(error => {
-        if (!cancelled) {
-          setFactCallsState({ status: 'error', message: errorMessage(error) });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [contextRuntime, factCallSort, selectedFact, usingLiveFacts]);
-
-  async function loadMoreFactCalls() {
-    if (!selectedFact || !usingLiveFacts || !contextRuntime.apiToken || contextRuntime.fileMode) return;
-    const current = factCallsResult(factCallsState);
-    if (!current || !factCallsHasMore(current) || factCallsState.status === 'appending') return;
-    setFactCallsState({ status: 'appending', result: current });
-    try {
-      const next = await loadDiagnosticFactCalls(selectedFact, contextRuntime, {
-        limit: FACT_CALL_PAGE_SIZE,
-        offset: current.calls.length,
-        sort: factCallSort.key,
-        direction: factCallSort.direction,
-      });
-      const merged = mergeFactCallResults(current, next);
-      rememberMergedDiagnosticFactCalls(selectedFact, contextRuntime, merged, {
-        limit: FACT_CALL_PAGE_SIZE,
-        sort: factCallSort.key,
-        direction: factCallSort.direction,
-      });
-      setFactCallsState({ status: 'loaded', result: merged });
-    } catch (error) {
-      setFactCallsState({ status: 'error', message: errorMessage(error), result: current });
-    }
-  }
-
-  async function loadMoreFacts() {
-    if (!contextRuntime.apiToken || contextRuntime.fileMode || factState.status !== 'loaded' || loadingMoreFactSourceKey) return;
+  function loadMoreFacts() {
+    if (!canUseLiveFacts || factState.status !== 'loaded' || factEvidence.sourceIsUpdating(factSourceKey)) return;
     const currentRows = factState.payload.rows ?? [];
     const totalMatched = Math.max(Number(factState.payload.total_matched_rows ?? currentRows.length), currentRows.length);
     const nextLimit = Math.min(Math.max(currentRows.length + activeFactSource.limit, activeFactSource.limit), totalMatched);
     if (nextLimit <= currentRows.length) return;
-    setLoadingMoreFactSourceKey(factSourceKey);
-    try {
-      const payload = await loadDiagnosticFactSource(factSourceKey, contextRuntime, {
-        limit: nextLimit,
-        sort: factSort.key,
-        direction: factSort.direction,
-      });
-      setFactStates(current => ({
-        ...current,
-        [factSourceKey]: { status: 'loaded', payload },
-      }));
-    } catch (error) {
-      setFactStates(current => ({
-        ...current,
-        [factSourceKey]: { status: 'error', message: errorMessage(error) },
-      }));
-    } finally {
-      setLoadingMoreFactSourceKey(null);
-    }
+    setFactLimits(current => ({ ...current, [factSourceKey]: nextLimit }));
   }
 
   function selectFactSource(sourceKey: DiagnosticFactSourceKey) {
@@ -302,11 +185,12 @@ export function DiagnosticsPage({
 
       <PageLoadProgress
         active={canUseLiveFacts && loadingFactModules}
-        completed={completedFactModules}
-        total={diagnosticFactSourceDefinitions.length}
+        completed={factEvidence.progress.ready}
+        total={factEvidence.progress.total}
         label="Loading diagnostic fact sources"
-        error={canUseLiveFacts ? factProgressError?.message : null}
-        updating={completedFactModules > 0}
+        error={canUseLiveFacts ? factEvidence.progressError : null}
+        modules={factEvidence.modules}
+        updating={factEvidence.modules.some(module => module.status === 'updating')}
       />
 
       {globalFilters}
@@ -326,6 +210,9 @@ export function DiagnosticsPage({
       <DiagnosticSnapshotMatrix
         model={model}
         contextRuntime={contextRuntime}
+        includeArchived={includeArchived}
+        sourceKey={sourceKey}
+        sourceRevision={sourceRevision}
         onOpenInvestigator={onOpenInvestigator}
         onCopyCallLink={onCopyCallLink}
       />
@@ -366,7 +253,7 @@ export function DiagnosticsPage({
         onSelectSource={selectFactSource}
         onSelectFact={selectFact}
         canLoadMoreFacts={canLoadMoreFacts}
-        loadingMoreFacts={loadingMoreFactSourceKey === factSourceKey}
+        loadingMoreFacts={factEvidence.sourceIsUpdating(factSourceKey)}
         onLoadMoreFacts={loadMoreFacts}
         onOpenInvestigator={onOpenInvestigator}
         onCopyCallLink={onCopyCallLink}
@@ -381,7 +268,7 @@ export function DiagnosticsPage({
           factCallSort={factCallSort}
           rowLoadControls={rowLoadControls}
           onFactCallSortChange={setFactCallSort}
-          onLoadMore={loadMoreFactCalls}
+          onLoadMore={factCallEvidence.loadMore}
           onOpenInvestigator={onOpenInvestigator}
           onCopyCallLink={onCopyCallLink}
         />
@@ -610,37 +497,6 @@ function staticFactState(): FactLoadState {
   return { status: 'idle', message: 'Static aggregate fallback' };
 }
 
-function cachedFactStates(contextRuntime: ContextRuntime, factSortStates: FactSortStateMap): FactSourceStateMap {
-  if (!contextRuntime.apiToken || contextRuntime.fileMode) return {};
-  return Object.fromEntries(
-    diagnosticFactSourceDefinitions.flatMap(source => {
-      const sourceSort = factSortStates[source.key] ?? defaultFactSortState();
-      const payload = cachedDiagnosticFactSource(source.key, contextRuntime, {
-        sort: sourceSort.key,
-        direction: sourceSort.direction,
-      });
-      return payload ? [[source.key, { status: 'loaded', payload } satisfies FactLoadState] as const] : [];
-    }),
-  ) as FactSourceStateMap;
-}
-
-function allFactSourcesLoaded(factStates: FactSourceStateMap): boolean {
-  return diagnosticFactSourceDefinitions.every(source => factStates[source.key]?.status === 'loaded');
-}
-
 function defaultFactSortState(): FactSortState {
   return DEFAULT_FACT_SORT_STATE;
-}
-
-function loadingFactStateMap(): FactSourceStateMap {
-  return Object.fromEntries(
-    diagnosticFactSourceDefinitions.map(source => [
-      source.key,
-      { status: 'loading', message: `Loading ${source.title.toLowerCase()}...` } satisfies FactLoadState,
-    ]),
-  ) as FactSourceStateMap;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

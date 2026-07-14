@@ -27,13 +27,13 @@
     },
     "frontend/dashboard/src/features/diagnostics/DiagnosticFactsPanels.tsx": {
       "group": "source",
-      "nonblank": 534,
-      "physical": 555
+      "nonblank": 518,
+      "physical": 537
     },
     "frontend/dashboard/src/features/diagnostics/DiagnosticsPage.tsx": {
       "group": "source",
-      "nonblank": 604,
-      "physical": 646
+      "nonblank": 473,
+      "physical": 502
     },
     "frontend/dashboard/src/features/diagnostics/diagnosticSnapshotCards.ts": {
       "group": "source",

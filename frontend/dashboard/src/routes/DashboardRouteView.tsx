@@ -222,6 +222,9 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         <DiagnosticsPage
           model={model}
           contextRuntime={contextRuntime}
+          includeArchived={historyScope === 'all'}
+          sourceKey={sourceIdentity.sourceKey}
+          sourceRevision={sourceIdentity.sourceRevision}
           rowLoadControls={{
             loadedRowCount,
             totalAvailableRows,
