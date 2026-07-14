@@ -3,6 +3,10 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDashboardQueryClient } from '../../data/queryRuntime';
+import {
+  overviewRecommendationsQueryOptions,
+  overviewSummaryQueryOptions,
+} from '../../data/overviewQueries';
 import { fixtureModel } from '../../test-fixtures/dashboardFixture';
 import { OverviewPage } from './OverviewPage';
 
@@ -86,8 +90,17 @@ describe('Overview focused evidence flow', () => {
       return summaryRefresh;
     }));
     const queryClient = createDashboardQueryClient();
+    const queryRequest = {
+      runtime: { apiToken: 'local-token', contextApiEnabled: false, fileMode: false },
+      includeArchived: true,
+      sourceRevision: 'progress-revision',
+    };
+    await Promise.all([
+      queryClient.prefetchQuery(overviewSummaryQueryOptions(queryRequest)),
+      queryClient.prefetchQuery(overviewRecommendationsQueryOptions(queryRequest)),
+    ]);
     renderOverview(queryClient);
-    await waitFor(() => expect(screen.getByText('Focused endpoints')).toBeInTheDocument());
+    expect(screen.getByText('Focused endpoints')).toBeInTheDocument();
 
     let refresh = Promise.resolve();
     await act(async () => {
@@ -97,10 +110,7 @@ describe('Overview focused evidence flow', () => {
       await summaryRefreshStarted;
     });
     expect(queryClient.isFetching({ queryKey: ['dashboard', 'overview-summary'] })).toBe(1);
-    await waitFor(
-      () => expect(screen.getByText('Usage summary updating')).toBeInTheDocument(),
-      { timeout: 5_000 },
-    );
+    await waitFor(() => expect(screen.getByText('Usage summary updating')).toBeInTheDocument());
 
     await act(async () => {
       resolveSummaryRefresh?.(summaryResponse());
