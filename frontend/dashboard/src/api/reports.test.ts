@@ -34,6 +34,23 @@ describe('reports API', () => {
 
     await expect(loadReportsPack(runtime)).rejects.toThrow('unsupported schema');
   });
+
+  it('forwards cancellation to the reports request', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      schema: 'codex-usage-tracker-reports-pack-v1',
+      reports: [],
+      evidence: {},
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await loadReportsPack(runtime, { signal: controller.signal });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/reports/pack?'),
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
 });
 
 const runtime = { apiToken: 'local-token', contextApiEnabled: false, fileMode: false };

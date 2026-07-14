@@ -1,4 +1,4 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,6 +44,7 @@ describe('Reports selected-report workspace', () => {
   it('loads live report metadata and reports an honest cached state after a refresh error', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse(livePayload()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'report service unavailable' }, 503))
       .mockResolvedValueOnce(jsonResponse({ error: 'report service unavailable' }, 503));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -52,6 +53,7 @@ describe('Reports selected-report workspace', () => {
     });
 
     expect(screen.getByRole('progressbar', { name: 'Loading full-scope report pack' })).toBeInTheDocument();
+    expect(screen.getByText('Report pack loading')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Server Cost Review' })).toBeInTheDocument());
     expect(screen.queryByRole('progressbar', { name: 'Loading full-scope report pack' })).not.toBeInTheDocument();
     expect(screen.getByText('Live localhost report pack')).toBeInTheDocument();
@@ -73,28 +75,60 @@ describe('Reports selected-report workspace', () => {
       model: { ...fixtureModel, contextRuntime: { ...fixtureModel.contextRuntime, apiToken: 'local-token', fileMode: false } },
     });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Incomplete page evidence: report service unavailable');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Incomplete page evidence: Report pack unavailable: report service unavailable',
+    );
+  });
+
+  it('reuses a completed same-source report pack and invalidates it for a new source revision', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(livePayload()));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createDashboardQueryClient();
+    const model = { ...fixtureModel, contextRuntime: { ...fixtureModel.contextRuntime, apiToken: 'local-token', fileMode: false } };
+
+    const first = renderReports({ client, model, sourceRevision: 'revision-1' });
+    await screen.findByRole('heading', { name: 'Server Cost Review' });
+    first.unmount();
+
+    const sameSource = renderReports({ client, model, sourceRevision: 'revision-1' });
+    await screen.findByRole('heading', { name: 'Server Cost Review' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    sameSource.unmount();
+
+    renderReports({ client, model, sourceRevision: 'revision-2' });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 });
 
 function renderReports(overrides: {
+  client?: QueryClient;
   model?: DashboardModel;
+  sourceKey?: string;
+  sourceRevision?: string;
   onOpenInvestigator?: (recordId: string) => void;
   onCopyCallLink?: (recordId: string) => void;
 } = {}) {
-  render(
-    <QueryClientProvider client={createDashboardQueryClient()}>
+  return render(
+    <QueryClientProvider client={overrides.client ?? createTestQueryClient()}>
       <ReportsPage
         model={overrides.model ?? fixtureModel}
         refreshState="Loaded snapshot ready"
         includeArchived={false}
         loadWindow="all"
         loadLimit={500}
+        sourceKey={overrides.sourceKey ?? 'fixture-source'}
+        sourceRevision={overrides.sourceRevision ?? 'revision-1'}
         onOpenInvestigator={overrides.onOpenInvestigator ?? vi.fn()}
         onCopyCallLink={overrides.onCopyCallLink ?? vi.fn()}
       />
     </QueryClientProvider>,
   );
+}
+
+function createTestQueryClient() {
+  const client = createDashboardQueryClient();
+  client.setDefaultOptions({ queries: { retryDelay: 0 } });
+  return client;
 }
 
 function livePayload() {

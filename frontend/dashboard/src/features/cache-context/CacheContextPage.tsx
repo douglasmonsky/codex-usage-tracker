@@ -18,6 +18,7 @@ type CacheContextPageProps = {
   contextRuntime: ContextRuntime;
   includeArchived?: boolean;
   scopeSince?: string | null;
+  sourceKey?: string;
   sourceRevision?: string;
   focusedEndpointsEnabled?: boolean;
   onOpenInvestigator: (recordId: string) => void;
@@ -34,6 +35,7 @@ export function CacheContextPage({
   contextRuntime,
   includeArchived = false,
   scopeSince = null,
+  sourceKey,
   sourceRevision = '',
   focusedEndpointsEnabled = import.meta.env.MODE !== 'test',
   onOpenInvestigator,
@@ -46,6 +48,7 @@ export function CacheContextPage({
     includeArchived,
     scopeSince,
     selectedThreadName,
+    sourceKey,
     sourceRevision,
     enabled: focusedEndpointsEnabled,
   });
@@ -79,6 +82,7 @@ return (
         total={evidence.progress.total}
         label="Loading cache and context evidence"
         error={evidence.progress.error}
+        modules={evidence.progress.modules}
         updating={evidence.progress.updating}
       />
 

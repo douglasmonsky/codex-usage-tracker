@@ -210,6 +210,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
           scopeSince={scopeSince}
+          sourceKey={sourceIdentity.sourceKey}
           sourceRevision={sourceIdentity.sourceRevision}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
@@ -242,6 +243,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           includeArchived={historyScope === 'all'}
           loadWindow={loadWindow}
           loadLimit={loadLimit}
+          sourceKey={sourceIdentity.sourceKey}
+          sourceRevision={sourceIdentity.sourceRevision}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
         />

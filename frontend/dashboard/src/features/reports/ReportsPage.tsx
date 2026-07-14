@@ -2,9 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { loadReportsPack } from '../../api/reports';
 import type { CallRow, DashboardModel } from '../../api/types';
 import type { LoadWindow } from '../../data/dataScope';
+import {
+  dashboardModuleProgress,
+  deriveDashboardModuleState,
+} from '../../data/dashboardQueryRegistry';
+import { reportsQueryOptions } from '../../data/reportsQueries';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PageLoadProgress } from '../../design';
@@ -28,6 +32,8 @@ type ReportsPageProps = {
   includeArchived: boolean;
   loadWindow: LoadWindow;
   loadLimit: number;
+  sourceKey?: string;
+  sourceRevision: string;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 };
@@ -42,6 +48,8 @@ export function ReportsPage({
   includeArchived,
   loadWindow,
   loadLimit,
+  sourceKey,
+  sourceRevision,
   onOpenInvestigator,
   onCopyCallLink,
 }: ReportsPageProps) {
@@ -50,16 +58,17 @@ export function ReportsPage({
   const canUseLive = Boolean(model.contextRuntime.apiToken) && !model.contextRuntime.fileMode;
   const reportLimit = loadWindow === 'rows' ? loadLimit : 0;
   const reportQuery = useQuery({
-    queryKey: ['reports', 'pack', canUseLive, includeArchived, reportLimit],
-    queryFn: () => loadReportsPack(model.contextRuntime, {
+    ...reportsQueryOptions({
+      runtime: model.contextRuntime,
+      includeArchived,
+      loadWindow,
       limit: reportLimit,
       evidenceLimit: 8,
-      includeArchived,
+      sourceKey,
+      sourceRevision,
     }),
     enabled: canUseLive,
-    staleTime: 5 * 60_000,
     placeholderData: previous => previous,
-    retry: false,
   });
   const pack = canUseLive ? reportQuery.data : undefined;
   const reports: ReportView[] = pack?.reports.length ? pack.reports : model.reports;
@@ -76,8 +85,19 @@ export function ReportsPage({
     generatedAt: generated,
     historyScope: includeArchived ? 'all' : 'active',
     source,
-    sourceRevision: pack?.schema || 'dashboard aggregate model',
-  }), [active, evidenceCalls, generated, includeArchived, model, pack?.schema, source]);
+    sourceRevision,
+  }), [active, evidenceCalls, generated, includeArchived, model, source, sourceRevision]);
+  const reportModule = {
+    label: 'Report pack',
+    status: deriveDashboardModuleState({
+      enabled: canUseLive,
+      hasData: Boolean(reportQuery.data),
+      isError: reportQuery.isError,
+      isFetching: reportQuery.isFetching,
+      isPending: reportQuery.isPending,
+    }),
+  };
+  const progress = dashboardModuleProgress([reportModule.status]);
 
   async function refreshReport() {
     if (!canUseLive) return;
@@ -135,9 +155,14 @@ export function ReportsPage({
 
       <PageLoadProgress
         active={canUseLive && reportQuery.isFetching}
+        completed={progress.ready}
+        total={progress.total}
         label="Loading full-scope report pack"
-        error={canUseLive && reportQuery.error && !reportQuery.data ? errorMessage(reportQuery.error) : null}
-        updating={Boolean(reportQuery.data)}
+        error={canUseLive && reportQuery.error && !reportQuery.data
+          ? `Report pack unavailable: ${errorMessage(reportQuery.error)}`
+          : null}
+        modules={[reportModule]}
+        updating={reportModule.status === 'updating'}
       />
 
       <div className={styles.status} role="status" aria-live="polite">
