@@ -398,8 +398,131 @@ await page.getByRole('button', { name: 'Columns', exact: true }).click();
     expect(callRequests[0].token).toBe('playwright-token');
     expect(callRequests[0].url).toContain('record_id=record-hydrated');
   });
+
+  test('runs Compression Lab analysis without leaking or overflowing aggregate evidence', async ({ page }) => {
+    const requestTokens = [];
+    const consoleErrors = [];
+    const pageErrors = [];
+    page.on('console', message => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('pageerror', error => pageErrors.push(error.message));
+    await page.addInitScript(() => {
+      window.__CODEX_USAGE_BOOT__ = {
+        api_token: 'playwright-token',
+        context_api_enabled: false,
+        latest_refresh_at: '2026-07-14T08:00:00Z',
+        loaded_row_count: 500,
+        total_available_rows: 500,
+        rows: [],
+      };
+    });
+    let analysisStarted = false;
+    await page.route('**/api/compression/profile?**', async route => {
+      requestTokens.push(route.request().headers()['x-codex-usage-token']);
+      const payload = analysisStarted ? compressionProfilePayload() : compressionMissingPayload();
+      await route.fulfill({
+        status: analysisStarted ? 200 : 404,
+        contentType: 'application/json',
+        body: JSON.stringify(payload),
+      });
+    });
+    await page.route('**/api/compression/start?**', async route => {
+      requestTokens.push(route.request().headers()['x-codex-usage-token']);
+      analysisStarted = true;
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify(compressionStatusPayload('running', 25)),
+      });
+    });
+    await page.route('**/api/compression/status?**', async route => {
+      requestTokens.push(route.request().headers()['x-codex-usage-token']);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(compressionStatusPayload('completed', 100)),
+      });
+    });
+
+    await page.goto('/?view=compression-lab');
+    await expect(page.getByRole('heading', { name: 'Compression Lab' })).toBeVisible();
+    await expect(page.getByText('No analysis for this scope yet')).toBeVisible();
+    await page.getByRole('button', { name: 'Analyze usage' }).click();
+    await expect(page.getByRole('progressbar', { name: 'Compression analysis progress' })).toBeVisible();
+    await expect(page.getByText('240K', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Compression opportunity families' })).toBeVisible();
+    await expect(page.getByText('Not included')).toBeVisible();
+    await expect(page.getByRole('progressbar', { name: 'Compression analysis progress' })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    expect(requestTokens).not.toContain(undefined);
+    expect(new Set(requestTokens)).toEqual(new Set(['playwright-token']));
+    expect(consoleErrors.filter(message => !message.includes('404 (Not Found)'))).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
 });
 
 function countRequest(counts, key) {
   counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+function compressionStatusPayload(status, percent) {
+  return {
+    schema: 'codex-usage-tracker-compression-api-v1',
+    kind: 'status',
+    run_id: 'compression-playwright',
+    status,
+    source_revision: 'generation:9',
+    scope: { include_archived: false },
+    coverage: {},
+    cache: { reused: false, mode: null, request_reused: 'none' },
+    progress: {
+      percent,
+      stage: status === 'completed' ? 'completed' : 'detectors',
+      current_detector: status === 'completed' ? null : 'stale_context',
+      completed_detectors: status === 'completed' ? 6 : 1,
+      total_detectors: 6,
+      records_examined: 500,
+    },
+    error: null,
+    caveats: [],
+    next: { poll_after_ms: 50 },
+    profile: null,
+  };
+}
+
+function compressionMissingPayload() {
+  return {
+    ...compressionStatusPayload('error', 0),
+    kind: 'profile',
+    run_id: null,
+    error: { code: 'compression_run_not_found', message: 'No profile.' },
+  };
+}
+
+function compressionProfilePayload() {
+  return {
+    ...compressionStatusPayload('completed', 100),
+    kind: 'profile',
+    cache: { reused: true, mode: 'exact', request_reused: 'completed' },
+    profile: {
+      candidate_count: 7,
+      observed_exposure: { total: 1_200_000 },
+      portfolio_estimate: { low: 120_000, likely: 240_000, high: 360_000 },
+      families: [{
+        family: 'stale_context',
+        candidate_count: 4,
+        adjusted_estimate: { low: 80_000, likely: 160_000, high: 240_000 },
+      }],
+      coverage: { call_count: 500, content_index_enabled: false },
+      cache: { mode: 'exact', reused: true },
+      duration_ms: 3,
+      content_mode: 'aggregate',
+      includes_indexed_content: false,
+      includes_raw_fragments: false,
+      warnings: [],
+      caveats: ['Savings are heuristic ranges, not an OpenAI usage ledger.'],
+    },
+  };
 }

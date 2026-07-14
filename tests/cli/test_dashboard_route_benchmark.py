@@ -35,4 +35,17 @@ def test_dashboard_route_benchmark_emits_compact_synthetic_measurements(tmp_path
     assert set(routes) == {"/api/summary", "/api/recommendations"}
     assert routes["/api/summary"]["samples_seconds"]
     assert routes["/api/recommendations"]["result_rows"] <= 20
+    compression = payload["fixtures"][0]["compression_job"]
+    assert compression["run_status"] in {"completed", "completed_with_warnings"}
+    assert compression["cold_start_seconds"] >= 0
+    assert compression["poll_samples_seconds"]
+    assert compression["poll_p95_seconds"] <= compression["poll_max_seconds"]
+    compression_routes = {row["path"]: row for row in compression["routes"]}
+    assert set(compression_routes) == {
+        "/api/compression/start",
+        "/api/compression/status",
+        "/api/compression/profile",
+    }
+    assert compression_routes["/api/compression/status"]["payload_bytes"] > 0
+    assert compression_routes["/api/compression/status"]["p95_seconds"] >= 0
     assert str(tmp_path) not in result.stdout

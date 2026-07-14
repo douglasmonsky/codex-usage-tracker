@@ -53,7 +53,7 @@ Tracked schema ids:
 | `codex-usage-tracker-allowance-history-v1` | CLI `allowance-history --json`, MCP `usage_allowance_history(...)`, dashboard server `/api/allowance/history` |
 | `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
 | `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
-| `codex-usage-tracker-compression-api-v1` | MCP `usage_compression_start/status/profile/candidates/candidate_detail`; compact Compression Lab lifecycle and query envelope |
+| `codex-usage-tracker-compression-api-v1` | MCP `usage_compression_start/status/profile/candidates/candidate_detail`; dashboard `/api/compression/start/status/profile`; compact shared Compression Lab lifecycle and query envelope |
 | `codex-usage-tracker-reports-pack-v1` | Dashboard server `/api/reports/pack` response, MCP `usage_report_pack(...)` |
 | | Includes the UTC `generated_at` timestamp, aggregate report definitions, aggregate linked-call evidence, and `raw_context_included: false`. |
 | `codex-usage-tracker-visualization-suggestions-v1` | MCP `usage_visualization_suggest(...)`; ranked semantic visualization intents |
@@ -366,6 +366,11 @@ Status progress is persistent and monotonic. `usage_compression_start` returns a
 reserved run ID before evidence loading; duplicate active requests reuse that ID.
 Completed exact requests return the cached run. Profile lookup never launches a
 worker.
+
+The dashboard start, status, and profile adapters return this same envelope.
+The dashboard does not translate or recalculate portfolio fields in the browser;
+it renders the shared compact profile and abandons only local polling when its
+observer unmounts.
 
 Candidate pages contain compact ranked rows only. `limit=0` and `limit=null`
 retain unbounded local query semantics, but MCP serializes only rows that fit the

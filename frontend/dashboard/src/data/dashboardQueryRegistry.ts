@@ -12,6 +12,7 @@ export type DashboardQueryModule =
   | 'diagnostics-facts'
   | 'diagnostics-fact-calls'
   | 'diagnostics-snapshot'
+  | 'compression-profile'
   | 'reports';
 
 export type DashboardQuerySource = {

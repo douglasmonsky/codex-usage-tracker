@@ -81,7 +81,7 @@ class CompressionJobRegistry:
     def status(self, db_path: Path, run_id: str) -> dict[str, Any] | None:
         """Read persistent status and identify active rows not owned by this process."""
         normalized_path = Path(db_path)
-        row = get_compression_run(normalized_path, run_id=run_id)
+        row = get_compression_run(normalized_path, run_id=run_id, touch=False)
         if row is None:
             return None
         path_key = str(normalized_path.expanduser().resolve())

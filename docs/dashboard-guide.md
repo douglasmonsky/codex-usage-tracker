@@ -197,6 +197,29 @@ usage may be coming from.
   optional local trace to a local JSON bundle marked
   `includes_raw_fragments: false`.
 
+## Compression Lab View
+
+Use `Compression Lab` when you want an overlap-aware portfolio of likely context
+and token savings rather than a long detector dump.
+
+- Opening the workspace reads only the newest exact-scope completed profile. It
+  never launches a detector walk during normal navigation.
+- `Analyze usage` starts a persistent localhost job when that scope has no
+  profile. `Refresh analysis` explicitly requests a new run. The progress panel
+  reports the active detector, completed detector count, records examined, and
+  defensible percent.
+- The answer band separates measured exposure from the overlap-adjusted
+  low/likely/high savings estimate. Opportunity families rank the same compact
+  portfolio returned by MCP `usage_compression_profile(...)`.
+- The integrity panel discloses call coverage, cache mode, build time, content
+  mode, warnings, and whether raw fragments are present. The dashboard profile
+  omits raw fragments and does not load candidate excerpts.
+- Navigating away aborts only browser polling. The worker continues, persists
+  its result in SQLite, and is reused when the exact scope and source revision
+  are opened again.
+- Static generated dashboards show a local-server-required state because they
+  cannot start or observe persistent jobs.
+
 ## Limits View
 
 Use `Limits` when the question is whether observed allowance behavior changed,

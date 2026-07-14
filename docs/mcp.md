@@ -224,6 +224,12 @@ usage_compression_simulate(run_id="compression_...", candidate_ids=["cmp_..."])
   fail as one structured selection error. Stale runs return a structured error
   with refresh arguments that preserve the original scope and detector set.
 
+The localhost dashboard routes `/api/compression/start`,
+`/api/compression/status`, and `/api/compression/profile` use the same
+application services and exact `codex-usage-tracker-compression-api-v1`
+payloads. Browser navigation may stop polling, but it does not cancel the
+persistent server worker.
+
 All six tools use `codex-usage-tracker-compression-api-v1`. Common fields disclose run,
 scope, versions, coverage, cache/timing state, warnings/caveats, pagination,
 recommended next-tool arguments, `content_mode`, `includes_indexed_content`, and

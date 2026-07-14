@@ -8,6 +8,7 @@ import type { DashboardViewId } from './dashboardSearch';
 
 const OverviewPage = lazyRouteComponent(() => import('../features/overview/OverviewPage'), 'OverviewPage');
 const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
+const CompressionLabPage = lazyRouteComponent(() => import('../features/compression-lab/CompressionLabPage'), 'CompressionLabPage');
 const ExploreRoutePage = lazyRouteComponent(() => import('../features/explore/ExploreRoutePage'), 'ExploreRoutePage');
 const CallInvestigatorPage = lazyRouteComponent(
   () => import('../features/call-investigator/CallInvestigatorPage'),
@@ -23,6 +24,7 @@ const SettingsPage = lazyRouteComponent(() => import('../features/settings/Setti
 const dashboardRouteComponents = [
   OverviewPage,
   InvestigatorPage,
+  CompressionLabPage,
   ExploreRoutePage,
   CallInvestigatorPage,
   ThreadsPage,
@@ -145,6 +147,16 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
           onNavigateView={navigateView}
+        />
+      );
+    case 'compression-lab':
+      return (
+        <CompressionLabPage
+          contextRuntime={contextRuntime}
+          includeArchived={historyScope === 'all'}
+          since={scopeSince}
+          sourceKey={sourceIdentity.sourceKey}
+          sourceRevision={sourceIdentity.sourceRevision}
         />
       );
     case 'calls':

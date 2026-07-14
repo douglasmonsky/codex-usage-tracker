@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import threading
 import time
 from dataclasses import replace
@@ -139,6 +140,46 @@ def test_status_reports_unowned_active_run_as_interrupted(tmp_path: Path) -> Non
     persisted = get_compression_run(db_path, run_id="orphaned-run")
     assert persisted is not None
     assert persisted["status"] == "running"
+
+
+def test_owned_status_poll_does_not_wait_for_an_active_writer(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_builder(
+        _path: Path,
+        _scope: CompressionScope,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        run_id = str(kwargs["reserved_run_id"])
+        started.set()
+        assert release.wait(timeout=5)
+        return {"run_id": run_id, "status": "completed"}
+
+    registry = CompressionJobRegistry(builder=blocking_builder)
+    handle = registry.start(db_path, CompressionScope())
+    assert started.wait(timeout=1)
+    writer = sqlite3.connect(db_path, timeout=0.1)
+    try:
+        writer.execute("PRAGMA journal_mode = WAL")
+        writer.execute("BEGIN IMMEDIATE")
+        writer.execute(
+            "UPDATE compression_runs SET stage = stage WHERE run_id = ?",
+            (handle["run_id"],),
+        )
+        began = time.perf_counter()
+
+        status = registry.status(db_path, str(handle["run_id"]))
+
+        assert time.perf_counter() - began < 0.25
+        assert status is not None
+        assert status["status"] in {"pending", "running"}
+    finally:
+        writer.rollback()
+        writer.close()
+        release.set()
+    _wait_for_terminal(registry, db_path, str(handle["run_id"]))
 
 
 def test_worker_failure_is_terminal_and_omits_exception_message(tmp_path: Path) -> None:

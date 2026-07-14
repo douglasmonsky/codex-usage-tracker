@@ -70,8 +70,8 @@ reusable results.
 | PR 3B3: Cache and Reports migration | Merged | #244 / #255 / `bd1214c` | Shared source-aware policies, segmented module progress, request cancellation, and desktop return-navigation coverage |
 | PR 3B4: Investigator migration | Merged | #244 / #256 / `4eb43a7` | Credential-free keys, source-revision invalidation, request cancellation, eleven-module progress, and desktop return-navigation coverage |
 | PR 3C: Diagnostics query migration | Merged | #244 / #257 / `7d2306c` | Source-aware facts and snapshot queries, paginated evidence calls, thirteen-module progress, cancellation, and desktop interrupted-work retry coverage |
-| PR 4A: Diagnostic refresh jobs | In review | #244 / #258 / `22ddfe8c` | Shared async analysis lifecycle, persisted-result reload, measurable 10-unit progress, and observer-safe polling |
-| PR 4: Heavy-route job migration | Pending | #244 | Branch, PR, async progress/cache tests |
+| PR 4A: Diagnostic refresh jobs | Merged | #244 / #258 / `2eb19e2b` | Shared async analysis lifecycle, persisted-result reload, measurable 10-unit progress, and observer-safe polling |
+| PR 4B: Compression Lab dashboard jobs | In progress | #244 / `feature/244-compression-dashboard-jobs` | Shared MCP/dashboard profile contract; 400k cold start 2.9 ms, active-poll p95 72 ms, warm status/profile p95 1.3 ms; agent-perf `20260714T094938Z-90e678ab` |
 | PR 5: Query and cache hardening | Pending | #244 | Branch, PR, query plans and warm/cold budgets |
 | PR 6: Cleanup and enforcement | Pending | #244 | Branch, PR, CI ratchets and final route audit |
 

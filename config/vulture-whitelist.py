@@ -62,6 +62,9 @@ _._handle_diagnostics_guided_summary
 _._handle_diagnostics_guided_summary_refresh
 _._handle_diagnostics_usage_drain
 _._handle_diagnostics_usage_drain_refresh
+_._handle_compression_start
+_._handle_compression_status
+_._handle_compression_profile
 _._handle_context
 _._handle_context_settings
 _._handle_open_investigator

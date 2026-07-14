@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  BrainCircuit,
   Boxes,
   Database,
   FileText,
@@ -27,6 +28,7 @@ export type NavItem = {
 export const navItems: NavItem[] = [
   { id: 'overview', label: 'Overview', description: 'High-level telemetry', icon: Home },
   { id: 'investigator', label: 'Investigate', description: 'Root-cause evidence', icon: FlaskConical },
+  { id: 'compression-lab', label: 'Compression Lab', description: 'Context savings', icon: BrainCircuit },
   { id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2 },
   { id: 'threads', label: 'Threads', description: 'Thread efficiency', icon: Workflow },
   { id: 'usage-drain', label: 'Limits', description: 'Allowance intelligence', icon: TimerReset },

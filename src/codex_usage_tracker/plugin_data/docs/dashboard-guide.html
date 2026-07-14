@@ -120,6 +120,16 @@ codex-usage-tracker serve-dashboard --open</code></pre>
     <img src="assets/dashboard-threads.png" alt="Threads view with one expanded thread and chronological child calls.">
     <p>Use <code>Threads</code> view to understand a work session as a group. Expand a thread to see calls newest first by default, then click an expanded-call header to change the per-thread sort. Subagents with logged parent session ids are shown under their parent thread; inferred auto-review attachments are marked in the details panel. Selected threads also show lifecycle signals such as first expensive turn, largest cumulative jump, cache trend, context trend, and whether subagent or auto-review work appeared before a usage spike.</p>
 
+    <h2>Compression Lab View</h2>
+    <p>Use <code>Compression Lab</code> to build an overlap-aware portfolio of likely context and token savings. Opening the workspace reads only the newest exact-scope completed profile; it never starts detector work during ordinary navigation.</p>
+    <ul>
+      <li><code>Analyze usage</code> starts a persistent localhost job when no profile exists, while <code>Refresh analysis</code> explicitly requests a new run.</li>
+      <li>Progress reports the active detector, completed detector count, records examined, and defensible percent.</li>
+      <li>The answer and opportunity-family table render the same compact <code>codex-usage-tracker-compression-api-v1</code> profile exposed by MCP.</li>
+      <li>The integrity panel discloses coverage, cache mode, content mode, warnings, and raw-fragment state. Candidate excerpts are not loaded into this view.</li>
+      <li>Leaving the view stops browser polling but does not cancel the persistent worker. Static dashboards show a local-server-required state.</li>
+    </ul>
+
     <h2>Diagnostics View</h2>
     <img src="assets/dashboard-diagnostics.png" alt="Diagnostics view showing on-demand usage-drain charts for weekly usage remaining and projected weekly credits.">
     <p>Use <code>Diagnostics</code> view to inspect structured event patterns and the token totals associated with those patterns. The first table ranks top diagnostic facts by associated uncached input tokens. Tool/function/MCP/command-family and compaction sections expose narrower slices of the same fact data.</p>

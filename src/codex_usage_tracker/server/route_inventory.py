@@ -2,56 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal
-
-RouteMethod = Literal["GET", "POST"]
-RouteWorkload = Literal["interactive", "bounded_report", "heavy_analysis"]
-RouteExecution = Literal["synchronous", "async_start", "poll"]
-
-
-@dataclass(frozen=True)
-class DashboardRouteProfile:
-    """Describe the execution and persistence behavior of one API route."""
-
-    method: RouteMethod
-    path: str
-    handler: str
-    owner: str
-    workload: RouteWorkload
-    scope_behavior: str
-    result_bound: str
-    cache_behavior: str
-    may_scan_all_history: bool
-    execution: RouteExecution
-
-
-def _profile(
-    method: RouteMethod,
-    path: str,
-    handler: str,
-    owner: str,
-    workload: RouteWorkload,
-    scope_behavior: str,
-    result_bound: str,
-    cache_behavior: str,
-    *,
-    may_scan_all_history: bool = False,
-    execution: RouteExecution = "synchronous",
-) -> DashboardRouteProfile:
-    return DashboardRouteProfile(
-        method=method,
-        path=path,
-        handler=handler,
-        owner=owner,
-        workload=workload,
-        scope_behavior=scope_behavior,
-        result_bound=result_bound,
-        cache_behavior=cache_behavior,
-        may_scan_all_history=may_scan_all_history,
-        execution=execution,
-    )
-
+from codex_usage_tracker.server.route_profile import DashboardRouteProfile
+from codex_usage_tracker.server.route_profile import profile as _profile
 
 _PERSISTED_SNAPSHOT_ROUTES = (
     "overview",
@@ -366,6 +318,39 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "Reads the persisted usage-drain snapshot.",
         "One fixed snapshot payload.",
         "Persisted in SQLite and reused until explicitly refreshed.",
+    ),
+    _profile(
+        "GET",
+        "/api/compression/status",
+        "_handle_compression_status",
+        "server.compression_routes",
+        "interactive",
+        "Reads one persistent Compression Lab run status by ID.",
+        "One compact status payload capped by the shared 4 KiB contract.",
+        "Read-only SQLite run lookup; does not start or block worker persistence.",
+        execution="poll",
+    ),
+    _profile(
+        "GET",
+        "/api/compression/profile",
+        "_handle_compression_profile",
+        "server.compression_routes",
+        "bounded_report",
+        "Reads one exact completed run or newest valid profile for the requested scope.",
+        "One compact profile payload capped by the shared 8 KiB contract.",
+        "Persisted in SQLite and shared with MCP consumers.",
+    ),
+    _profile(
+        "POST",
+        "/api/compression/start",
+        "_handle_compression_start",
+        "server.compression_routes",
+        "heavy_analysis",
+        "Starts or reuses an asynchronous Compression Lab run for the requested scope.",
+        "One compact job handle.",
+        "Persistent completed-run cache plus process-owned background worker.",
+        may_scan_all_history=True,
+        execution="async_start",
     ),
     _profile(
         "GET",

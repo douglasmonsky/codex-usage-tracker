@@ -19,10 +19,10 @@ The classifications are:
 - **Heavy analysis:** detector, ranking, refresh, or investigation work that
   may walk the complete selected history.
 
-Current count: 49 routes: 17 interactive, 20 bounded reports, and 12 heavy
-analyses. All 12 heavy-analysis routes start background work and return a job
+Current count: 52 routes: 18 interactive, 21 bounded reports, and 13 heavy
+analyses. All 13 heavy-analysis routes start background work and return a job
 handle; none performs the detector or refresh walk on the request thread. The
-two status routes are read-only polls.
+three status routes are read-only polls.
 
 ## Route Matrix
 
@@ -58,6 +58,9 @@ two status routes are read-only polls.
 | `GET /api/refresh/start` | Heavy analysis | Starts an all-scope refresh and returns immediately | Background worker plus in-process job state |
 | `GET /api/refresh/status` | Interactive | Read-only compact refresh status | In-process job registry |
 | `GET /api/diagnostics/refresh/status` | Interactive | Read-only compact diagnostic job status | Shared in-process analysis registry |
+| `GET /api/compression/status` | Interactive | Read-only compact status for one persistent Compression Lab run | Shared process registry plus SQLite run state |
+| `GET /api/compression/profile` | Bounded report | One exact-scope compact aggregate profile; never starts analysis | Persisted Compression Lab run in SQLite |
+| `POST /api/compression/start` | Heavy analysis | Starts or reuses one exact-scope detector run and returns HTTP 202 | Background worker persists the shared MCP/dashboard profile |
 | `POST /api/diagnostics/refresh` | Heavy analysis | Starts a 10-unit snapshot rebuild and returns HTTP 202 | Background worker persists snapshots in SQLite |
 | `POST /api/diagnostics/{overview,tool-output,commands,git-interactions,file-reads,file-modifications,read-productivity,concentration,guided-summary}/refresh` | Heavy analysis | Starts a one-unit named snapshot rebuild | Background worker persists the snapshot in SQLite |
 | `POST /api/diagnostics/usage-drain/refresh` | Heavy analysis | Starts a one-unit usage-drain rebuild | Background worker persists the snapshot in SQLite |
@@ -71,6 +74,14 @@ active requests reuse one worker. Polling never performs analysis or writes
 results; completed jobs direct consumers to reload the normal persisted GET
 route. Browser navigation can stop observing a job without cancelling its
 server worker.
+
+Compression Lab uses the same observer-safe lifecycle. `POST
+/api/compression/start` reserves or reuses a persistent run,
+`GET /api/compression/status` reads measurable detector progress, and
+`GET /api/compression/profile` returns the exact compact
+`codex-usage-tracker-compression-api-v1` profile also exposed by MCP. Leaving
+the dashboard aborts only its local polling request; the shared worker continues
+and publishes its profile to SQLite.
 
 ## Timing Evidence
 

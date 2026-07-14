@@ -45,6 +45,12 @@ def test_server_route_tables_cover_diagnostic_refresh_paths() -> None:
     )
 
 
+def test_server_route_tables_cover_compression_lab_paths() -> None:
+    assert GET_ROUTE_METHODS["/api/compression/status"] == "_handle_compression_status"
+    assert GET_ROUTE_METHODS["/api/compression/profile"] == "_handle_compression_profile"
+    assert POST_ROUTE_METHODS["/api/compression/start"] == "_handle_compression_start"
+
+
 def test_dashboard_shell_path_matches_root_and_generated_dashboard_name() -> None:
     assert is_dashboard_shell_path("/", "dashboard.html")
     assert is_dashboard_shell_path("/dashboard.html", "dashboard.html")
