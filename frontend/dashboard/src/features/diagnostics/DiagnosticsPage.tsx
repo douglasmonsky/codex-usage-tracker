@@ -1,6 +1,5 @@
 import { Copy, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
   diagnosticFactSourceDefinitions,

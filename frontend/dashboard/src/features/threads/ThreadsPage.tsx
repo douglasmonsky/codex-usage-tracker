@@ -1,21 +1,13 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import type { SortingState } from '@tanstack/react-table';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ContextRuntime, DashboardModel, ThreadRow } from '../../api/types';
-import {
-  threadCallsInfiniteQueryOptions,
-  threadsInfiniteQueryOptions,
-} from '../../data/exploreQueries';
+import { threadCallsInfiniteQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
 import { exploreWorkspaceUrl, type ExploreWorkspaceId } from '../explore/ExploreWorkspaceSwitcher';
 import { useEvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
-import {
-  callCsvColumns,
-  threadActionColumn,
-  threadColumns,
-} from '../shared/tables';
+import { callCsvColumns, threadActionColumn, threadColumns } from '../shared/tables';
 import {
   buildThreadsFilterSummary,
   normalizeThreadRiskFilter,

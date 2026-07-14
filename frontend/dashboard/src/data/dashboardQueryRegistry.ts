@@ -16,8 +16,6 @@ export type DashboardQueryId =
   | 'compression-profile'
   | 'reports';
 
-export type DashboardQueryModule = DashboardQueryId;
-
 export type DashboardQuerySource = {
   sourceKey: string;
   sourceRevision: string;

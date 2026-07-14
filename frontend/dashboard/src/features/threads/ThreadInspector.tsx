@@ -21,11 +21,7 @@ import {
   timelineSeverityClass,
   timelineWidth,
 } from './threadAnalysis';
-import {
-  threadCallPageSize,
-  type ThreadCallSortDirection,
-  type ThreadCallSortKey,
-} from './threadsUrlState';
+import { threadCallPageSize, type ThreadCallSortDirection, type ThreadCallSortKey } from './threadsUrlState';
 
 type ThreadInspectorProps = {
   selected: ThreadRow | null;
@@ -64,17 +60,12 @@ export function ThreadInspector({
 }: ThreadInspectorProps) {
   const shellI18n = useShellI18n();
   const sortedCalls = useMemo(
-    () => sortThreadCalls(calls, callSort, callSortDirection),
-    [calls, callSort, callSortDirection],
+    () => sortThreadCalls(calls, callSort, callSortDirection), [calls, callSort, callSortDirection],
   );
   const lifecycle = useMemo(
-    () => computeThreadLifecycle(calls, selected?.name ?? ''),
-    [calls, selected?.name],
+    () => computeThreadLifecycle(calls, selected?.name ?? ''), [calls, selected?.name],
   );
-  const status = useMemo(
-    () => computeThreadStatus(calls, selected, lifecycle),
-    [calls, lifecycle, selected],
-  );
+  const status = useMemo(() => computeThreadStatus(calls, selected, lifecycle), [calls, lifecycle, selected]);
   const relationships = useMemo(
     () => computeThreadRelationships(calls, allCalls, selected?.name ?? ''),
     [allCalls, calls, selected?.name],
