@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from codex_usage_tracker.recommendation_engine import query as recommendation_query
 from codex_usage_tracker.server import recommendations as server_recommendations
 
 
@@ -30,6 +31,13 @@ class _RouteSenders:
 
     def send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
         self.json_payloads.append((status, payload))
+
+
+def test_server_uses_recommendation_query_orchestrator() -> None:
+    assert (
+        server_recommendations.build_recommendations_report
+        is recommendation_query.build_recommendations_report
+    )
 
 
 def test_handle_recommendations_request_sends_payload(

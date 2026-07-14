@@ -61,8 +61,9 @@ reusable results.
 | PR 0: Measurement and route inventory | Merged | #244 / #246 / `1c4685b` | Route inventory, benchmark artifact, and agent-perf run `20260713T231301Z-4a032512` |
 | PR 1A: Derived-fact refresh hook | Merged | #244 / #247 / `a5681ba` | Transactional full/append callback coverage and 807-test CI matrix |
 | PR 1B: Recommendation fact materialization | Merged | #244 / #248 / `f1dfc22` | Schema v20, parity/incremental/backfill tests, and agent-perf run `20260713T234304Z-bade89ff` |
-| PR 1C: Product refresh wiring | Ready for PR | #244 | CLI/server wiring, architecture decision, and 38 focused refresh-path tests |
-| PR 2: Indexed recommendations API | Pending | #244 | Branch, PR, parity and latency results |
+| PR 1C: Product refresh wiring | Merged | #244 / #249 / `3e569c6` | CLI/server wiring, architecture decision, and 38 focused refresh-path tests |
+| PR 2A: Indexed recommendations compatibility | In progress | #244 | Exact payload parity, freshness fallback, and public route/CLI/MCP wiring |
+| PR 2B: Bounded recommendation hydration | Pending | #244 | Agent-perf attribution plus 10k/100k/400k warm and cold latency results |
 | PR 3: Frontend module query registry | Pending | #244 | Branch, PR, lifecycle/browser tests |
 | PR 4: Heavy-route job migration | Pending | #244 | Branch, PR, async progress/cache tests |
 | PR 5: Query and cache hardening | Pending | #244 | Branch, PR, query plans and warm/cold budgets |

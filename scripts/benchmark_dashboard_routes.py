@@ -21,12 +21,16 @@ from benchmark_synthetic_history import (  # noqa: E402
     _write_benchmark_config,
 )
 
+from codex_usage_tracker.recommendation_engine.materialization import (  # noqa: E402
+    backfill_recommendation_facts,
+)
 from codex_usage_tracker.server.recommendations import recommendations_payload  # noqa: E402
 from codex_usage_tracker.server.summary import summary_payload  # noqa: E402
 from codex_usage_tracker.store.api import (  # noqa: E402
     refresh_usage_event_links,
     upsert_usage_events,
 )
+from codex_usage_tracker.store.connection import connect  # noqa: E402
 
 DEFAULT_SIZES = (10_000, 100_000, 400_000)
 
@@ -88,6 +92,15 @@ def benchmark_fixture(
     refresh_usage_event_links(db_path=db_path)
     populate_seconds = round(time.perf_counter() - populate_started, 6)
 
+    materialize_started = time.perf_counter()
+    with connect(db_path) as conn:
+        materialized_rows = backfill_recommendation_facts(
+            conn,
+            pricing_path=config["pricing_path"],
+            allowance_path=config["allowance_path"],
+        )
+    materialize_seconds = round(time.perf_counter() - materialize_started, 6)
+
     route_actions: tuple[tuple[str, Callable[[], dict[str, object]]], ...] = (
         (
             "/api/summary",
@@ -114,6 +127,10 @@ def benchmark_fixture(
     return {
         "rows": rows,
         "populate_seconds": populate_seconds,
+        "recommendation_materialization": {
+            "rows": materialized_rows,
+            "seconds": materialize_seconds,
+        },
         "routes": [
             _benchmark_route(path, action, iterations=iterations) for path, action in route_actions
         ],

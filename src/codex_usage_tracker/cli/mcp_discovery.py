@@ -11,13 +11,13 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
 )
+from codex_usage_tracker.recommendation_engine.query import build_recommendations_report
 from codex_usage_tracker.reports.api import (
     build_content_search_report,
     build_large_low_output_report,
     build_pattern_scan_report,
     build_pricing_coverage_report,
     build_query_report,
-    build_recommendations_report,
     build_repeated_file_rediscovery_report,
     build_shell_churn_report,
     build_source_coverage_report,
