@@ -90,23 +90,27 @@ describe('Overview focused evidence flow', () => {
       return summaryRefresh;
     }));
     const queryClient = createDashboardQueryClient();
+    const endpointCache = {
+      read: () => null,
+      write: () => undefined,
+    };
     const queryRequest = {
       runtime: { apiToken: 'local-token', contextApiEnabled: false, fileMode: false },
       includeArchived: true,
       sourceRevision: 'progress-revision',
+      cache: endpointCache,
     };
+    const summaryOptions = overviewSummaryQueryOptions(queryRequest);
     await Promise.all([
-      queryClient.prefetchQuery(overviewSummaryQueryOptions(queryRequest)),
+      queryClient.prefetchQuery(summaryOptions),
       queryClient.prefetchQuery(overviewRecommendationsQueryOptions(queryRequest)),
     ]);
     renderOverview(queryClient);
     expect(screen.getByText('Focused endpoints')).toBeInTheDocument();
 
-    let refresh = Promise.resolve();
+    let refresh: Promise<unknown> = Promise.resolve();
     await act(async () => {
-      refresh = queryClient.invalidateQueries({
-        queryKey: ['dashboard', 'overview-summary'],
-      });
+      refresh = queryClient.fetchQuery({ ...summaryOptions, staleTime: 0 });
       await summaryRefreshStarted;
     });
     expect(queryClient.isFetching({ queryKey: ['dashboard', 'overview-summary'] })).toBe(1);
