@@ -170,6 +170,7 @@ def rebuild_usage_index(
             "allowance_observations",
             "call_diagnostic_facts",
             "diagnostic_snapshots",
+            "recommendation_fact_state",
             "source_records",
             "usage_events",
             "thread_summaries",

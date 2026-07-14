@@ -84,6 +84,7 @@ def _delete_source_batch(conn: sqlite3.Connection, source_batch: list[str]) -> N
         "allowance_observations",
         "source_records",
         "call_diagnostic_facts",
+        "recommendation_facts",
     ):
         conn.execute(
             f"""
