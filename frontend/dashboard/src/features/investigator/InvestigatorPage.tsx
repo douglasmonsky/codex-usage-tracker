@@ -1,4 +1,4 @@
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
   Download,
@@ -12,16 +12,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   diagnosticSnapshotDefinitions,
-  loadDiagnosticSnapshot,
-  refreshDiagnosticSnapshots,
-  type DiagnosticSnapshotMap,
 } from '../../api/diagnostics';
 import {
-  loadAgenticInvestigation,
-  loadInvestigationWalk,
   type InvestigationWalkBranch,
 } from '../../api/investigations';
 import type { CallRow, ContextRuntime, DashboardModel } from '../../api/types';
+import {
+  investigatorWalkQueryOptions,
+} from '../../data/investigatorQueries';
 import { Button, MetricReadout, PageLoadProgress, StatusBadge, Surface } from '../../design';
 import type { DashboardViewId } from '../../routes/dashboardSearch';
 import { Visualization } from '../../visualization';
@@ -39,11 +37,13 @@ import {
   type InvestigationTone,
 } from './investigationModel';
 import styles from './InvestigatorPage.module.css';
+import { useInvestigatorEvidence } from './useInvestigatorEvidence';
 
 type InvestigatorPageProps = {
   model: DashboardModel;
   contextRuntime: ContextRuntime;
   includeArchived?: boolean;
+  sourceKey?: string;
   sourceRevision?: string;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
@@ -62,41 +62,27 @@ export function InvestigatorPage({
   model,
   contextRuntime,
   includeArchived = false,
+  sourceKey,
   sourceRevision = '',
   onOpenInvestigator,
   onCopyCallLink,
   onNavigateView,
 }: InvestigatorPageProps) {
-  const queryClient = useQueryClient();
   const canUseLive = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
   const fallbackSnapshots = useMemo(() => fallbackDiagnosticSnapshots(model), [model]);
-  const agenticQueryKey = ['investigations', 'agentic', contextRuntime.apiToken, includeArchived, sourceRevision] as const;
-  const agenticQuery = useQuery({
-    queryKey: agenticQueryKey,
-    queryFn: () => loadAgenticInvestigation(contextRuntime, { includeArchived, evidenceLimit: 8 }),
-    enabled: canUseLive,
-    staleTime: 10 * 60_000,
-    placeholderData: previous => previous,
+  const evidence = useInvestigatorEvidence({
+    canUseLive,
+    contextRuntime,
+    includeArchived,
+    sourceKey,
+    sourceRevision,
   });
-  const snapshotQueries = useQueries({
-    queries: diagnosticSnapshotDefinitions.map(definition => ({
-      queryKey: snapshotQueryKey(definition.key, contextRuntime, sourceRevision),
-      queryFn: () => loadDiagnosticSnapshot(definition.key, contextRuntime),
-      enabled: canUseLive,
-      staleTime: 10 * 60_000,
-    })),
-  });
-  const liveSnapshots = useMemo<DiagnosticSnapshotMap>(() => Object.fromEntries(
-    snapshotQueries.flatMap((query, index) => query.data
-      ? [[diagnosticSnapshotDefinitions[index].key, query.data] as const]
-      : []),
-  ), [snapshotQueries]);
   const effectiveSnapshots = canUseLive
-    ? { ...fallbackSnapshots, ...liveSnapshots }
+    ? { ...fallbackSnapshots, ...evidence.liveSnapshots }
     : fallbackSnapshots;
   const workspace = useMemo(
-    () => buildInvestigationWorkspace(model, agenticQuery.data, effectiveSnapshots),
-    [agenticQuery.data, effectiveSnapshots, model],
+    () => buildInvestigationWorkspace(model, evidence.agenticQuery.data, effectiveSnapshots),
+    [evidence.agenticQuery.data, effectiveSnapshots, model],
   );
   const requestedFinding = readFindingParam();
   const [selectedId, setSelectedId] = useState(requestedFinding);
@@ -105,22 +91,20 @@ export function InvestigatorPage({
   const [refreshing, setRefreshing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Stored diagnostics ready');
   const walkQuery = useQuery({
-    queryKey: ['investigations', 'walk', contextRuntime.apiToken, includeArchived, question],
-    queryFn: () => loadInvestigationWalk(contextRuntime, question, { includeArchived, evidenceLimit: 6 }),
+    ...investigatorWalkQueryOptions({
+      runtime: contextRuntime,
+      includeArchived,
+      sourceKey,
+      sourceRevision,
+      question,
+      evidenceLimit: 6,
+    }),
     enabled: false,
-    retry: false,
   });
   const fingerprintSpec = useMemo(
     () => buildWasteFingerprintSpec(workspace.findings, includeArchived ? 'all' : 'active', sourceRevision),
     [includeArchived, sourceRevision, workspace.findings],
   );
-  const loadedSnapshotCount = snapshotQueries.filter(query => query.data).length;
-  const loadingSnapshots = snapshotQueries.some(query => query.isFetching);
-  const completedModules = loadedSnapshotCount + Number(Boolean(agenticQuery.data));
-  const progressError = agenticQuery.error
-    ?? snapshotQueries.find(query => query.error)?.error
-    ?? null;
-
   useEffect(() => {
     if (!selected && workspace.findings[0]) setSelectedId(workspace.findings[0].id);
   }, [selected, workspace.findings]);
@@ -146,13 +130,8 @@ export function InvestigatorPage({
     setRefreshing(true);
     setStatusMessage('Refreshing investigation evidence...');
     try {
-      const snapshots = await refreshDiagnosticSnapshots(contextRuntime);
-      for (const definition of diagnosticSnapshotDefinitions) {
-        const payload = snapshots[definition.key];
-        if (payload) queryClient.setQueryData(snapshotQueryKey(definition.key, contextRuntime, sourceRevision), payload);
-      }
-      await agenticQuery.refetch();
-      setStatusMessage(`Live evidence refreshed · ${Object.keys(snapshots).length} diagnostic modules`);
+      const refreshedCount = await evidence.refresh();
+      setStatusMessage(`Live evidence refreshed · ${refreshedCount} diagnostic modules`);
     } catch (error) {
       setStatusMessage(`Refresh failed: ${errorMessage(error)}`);
     } finally {
@@ -202,20 +181,21 @@ export function InvestigatorPage({
       </header>
 
       <PageLoadProgress
-        active={canUseLive && (agenticQuery.isFetching || loadingSnapshots)}
-        completed={completedModules}
-        total={diagnosticSnapshotDefinitions.length + 1}
+        active={canUseLive && evidence.modules.some(module => module.status === 'loading' || module.status === 'updating')}
+        completed={evidence.progress.ready}
+        total={evidence.progress.total}
         label="Loading investigation evidence"
-        error={canUseLive && progressError ? errorMessage(progressError) : null}
-        updating={completedModules > 0}
+        error={canUseLive ? evidence.progressError : null}
+        modules={evidence.modules}
+        updating={evidence.modules.some(module => module.status === 'updating')}
       />
 
       <div className={styles.statusRow} role="status" aria-live="polite">
         <StatusBadge tone={workspace.live ? 'positive' : 'neutral'}>{workspace.live ? 'Live report services' : 'Loaded aggregate fallback'}</StatusBadge>
-        <StatusBadge tone={loadingSnapshots ? 'caution' : 'context'}>
-          {loadingSnapshots ? `Loading diagnostics ${loadedSnapshotCount}/${diagnosticSnapshotDefinitions.length}` : `${loadedSnapshotCount || diagnosticSnapshotDefinitions.length} diagnostic modules`}
+        <StatusBadge tone={evidence.loadingSnapshots ? 'caution' : 'context'}>
+          {evidence.loadingSnapshots ? `Loading diagnostics ${evidence.loadedSnapshotCount}/${diagnosticSnapshotDefinitions.length}` : `${evidence.loadedSnapshotCount || diagnosticSnapshotDefinitions.length} diagnostic modules`}
         </StatusBadge>
-        <span>{agenticQuery.isError ? `Live report unavailable: ${errorMessage(agenticQuery.error)}` : statusMessage}</span>
+        <span>{evidence.agenticQuery.isError ? `Live report unavailable: ${errorMessage(evidence.agenticQuery.error)}` : statusMessage}</span>
       </div>
 
       <section className={answerStyles.answerBand} data-tone={selected.tone} aria-labelledby="investigation-answer-title">
@@ -341,10 +321,6 @@ function TraceResults({ branches }: { branches: InvestigationWalkBranch[] }) {
       ))}
     </div>
   ) : <p className={traceStyles.emptyState}>No supported local pattern met the current threshold.</p>;
-}
-
-function snapshotQueryKey(key: string, runtime: ContextRuntime, revision: string) {
-  return ['investigations', 'snapshot', key, runtime.apiToken, revision] as const;
 }
 
 function resolveSelectedFinding(findings: InvestigationFinding[], requested: string): InvestigationFinding | undefined {

@@ -51,6 +51,11 @@ export type DiagnosticSnapshotPayload = Record<string, unknown> & {
 };
 export type DiagnosticSnapshotMap = Partial<Record<DiagnosticSnapshotKey, DiagnosticSnapshotPayload>>;
 
+export type DiagnosticSnapshotRequest = {
+  cacheKey?: string;
+  signal?: AbortSignal;
+};
+
 const snapshotCache = new Map<string, Promise<DiagnosticSnapshotMap> | DiagnosticSnapshotMap>();
 const sectionCache = new Map<string, Promise<DiagnosticSnapshotPayload> | DiagnosticSnapshotPayload>();
 
@@ -66,10 +71,18 @@ export function cachedDiagnosticSnapshots(runtime: ContextRuntime): DiagnosticSn
 export async function loadDiagnosticSnapshot(
   key: DiagnosticSnapshotKey,
   runtime: ContextRuntime,
+  options: DiagnosticSnapshotRequest = {},
 ): Promise<DiagnosticSnapshotPayload> {
   ensureDiagnosticsRuntime(runtime);
   const definition = snapshotDefinition(key);
-  return cachedRequest(sectionCache, sectionCacheKey(key, runtime), () => readDiagnosticSnapshot(definition, runtime));
+  if (options.signal) {
+    return readDiagnosticSnapshot(definition, runtime, options.signal);
+  }
+  return cachedRequest(
+    sectionCache,
+    sectionCacheKey(key, runtime, options.cacheKey),
+    () => readDiagnosticSnapshot(definition, runtime),
+  );
 }
 
 export async function loadDiagnosticSnapshots(runtime: ContextRuntime): Promise<DiagnosticSnapshotMap> {
@@ -162,8 +175,12 @@ function runtimeCacheKey(runtime: ContextRuntime): string {
   return `${runtime.fileMode ? 'file' : 'live'}:${runtime.apiToken}`;
 }
 
-function sectionCacheKey(key: DiagnosticSnapshotKey, runtime: ContextRuntime): string {
-  return `snapshot:${runtimeCacheKey(runtime)}:${key}`;
+function sectionCacheKey(
+  key: DiagnosticSnapshotKey,
+  runtime: ContextRuntime,
+  sourceRevision = '',
+): string {
+  return `snapshot:${runtimeCacheKey(runtime)}:${sourceRevision}:${key}`;
 }
 
 function snapshotDefinition(key: DiagnosticSnapshotKey): DiagnosticSnapshotDefinition {
@@ -175,6 +192,7 @@ function snapshotDefinition(key: DiagnosticSnapshotKey): DiagnosticSnapshotDefin
 async function readDiagnosticSnapshot(
   definition: DiagnosticSnapshotDefinition,
   runtime: ContextRuntime,
+  signal?: AbortSignal,
 ): Promise<DiagnosticSnapshotPayload> {
   const response = await fetch(`${definition.path}?_=${Date.now()}`, {
     headers: {
@@ -182,6 +200,7 @@ async function readDiagnosticSnapshot(
       'X-Codex-Usage-Token': runtime.apiToken,
     },
     cache: 'no-store',
+    signal,
   });
   return (await readJsonResponse(response, definition.title)) as DiagnosticSnapshotPayload;
 }

@@ -1,4 +1,4 @@
-import{j as c}from"./dashboard-react.js";import{G as $}from"./gauge.js";import{c as b,Q as x,T as f,J as A,K as R,L as B}from"./App.js";import{q as S}from"./queryOptions.js";/**
+import{j as c}from"./dashboard-react.js";import{G as $}from"./gauge.js";import{c as b,Q as x,T as f,J as A,K as R,L as B}from"./App.js";import{q as S}from"./index2.js";/**
  * @license lucide-react v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.

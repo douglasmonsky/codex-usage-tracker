@@ -41,6 +41,17 @@ describe('investigation API', () => {
     expect(new Headers(init?.headers).get('X-Codex-Usage-Token')).toBe(runtime.apiToken);
   });
 
+  it('forwards cancellation to the agentic investigation request', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}));
+
+    await loadAgenticInvestigation(runtime, {
+      signal: controller.signal,
+    } as Parameters<typeof loadAgenticInvestigation>[1] & { signal: AbortSignal });
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBe(controller.signal);
+  });
+
   it('loads a bounded local investigation walk without raw-fragment flags', async () => {
     const payload = {
       schema: 'codex-usage-tracker-investigation-walk-v1',
@@ -66,6 +77,17 @@ describe('investigation API', () => {
     expect(url.pathname).toBe('/api/investigations/walk');
     expect(url.searchParams.get('question')).toBe('Why are files reopened?');
     expect(url.searchParams.get('min_occurrences')).toBe('3');
+  });
+
+  it('forwards cancellation to a local investigation walk', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}));
+
+    await loadInvestigationWalk(runtime, 'Where is waste concentrated?', {
+      signal: controller.signal,
+    } as Parameters<typeof loadInvestigationWalk>[2] & { signal: AbortSignal });
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBe(controller.signal);
   });
 
   it('rejects file-mode access before issuing a request', async () => {

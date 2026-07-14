@@ -156,6 +156,78 @@ await page.getByRole('button', { name: 'Columns', exact: true }).click();
     expect(reportRequests).toBe(initialReportRequests);
   });
 
+  test('reuses live Investigator modules after return navigation', async ({ page }) => {
+    const requestCounts = new Map();
+    await page.addInitScript(() => {
+      window.__CODEX_USAGE_BOOT__ = {
+        api_token: 'playwright-token',
+        context_api_enabled: true,
+        latest_refresh_at: '2026-07-14T06:00:00Z',
+        loaded_row_count: 1,
+        total_available_rows: 1,
+        rows: [{
+          record_id: 'investigator-return-call',
+          call_started_at: '2026-07-14T05:00:00Z',
+          thread_name: 'investigator-return-thread',
+          model: 'o5',
+          effort: 'high',
+          input_tokens: 1000,
+          cached_input_tokens: 800,
+          output_tokens: 100,
+          total_tokens: 1100,
+        }],
+      };
+    });
+    await page.route('**/api/investigations/agentic?**', route => {
+      countRequest(requestCounts, 'agentic');
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          schema: 'codex-usage-tracker-agentic-investigation-v1',
+          content_mode: 'aggregate_investigation',
+          includes_indexed_content: false,
+          includes_raw_fragments: false,
+          privacy_mode: 'normal',
+          goal: 'token_waste',
+          filters: {},
+          summary: {
+            finding_count: 0,
+            top_finding: null,
+            confidence: 'low',
+            source_reports: [],
+          },
+          findings: [],
+          recommended_next_tools: [],
+          caveats: [],
+        }),
+      });
+    });
+    await page.route('**/api/diagnostics/**', route => {
+      const path = new URL(route.request().url()).pathname;
+      countRequest(requestCounts, path);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ready', section: path.split('/').at(-1) }),
+      });
+    });
+
+    await page.goto('/?view=investigator');
+    await expect(page.getByRole('heading', { name: 'Investigate' })).toBeVisible();
+    await expect(page.getByRole('progressbar', { name: 'Loading investigation evidence' }))
+      .toHaveCount(0);
+    await expect.poll(() => requestCounts.size).toBe(11);
+    const initialCounts = Object.fromEntries(requestCounts);
+
+    await page.getByRole('button', { name: /^Settings$/i }).click();
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await page.getByRole('button', { name: /^Investigate$/i }).click();
+    await expect(page.getByRole('heading', { name: 'Investigate' })).toBeVisible();
+    await page.waitForTimeout(250);
+    expect(Object.fromEntries(requestCounts)).toEqual(initialCounts);
+  });
+
   test('opens direct call investigator URLs', async ({ page }) => {
     await page.goto('/?view=call&record=fixture-call-2');
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
@@ -247,3 +319,7 @@ await page.getByRole('button', { name: 'Columns', exact: true }).click();
     expect(callRequests[0].url).toContain('record_id=record-hydrated');
   });
 });
+
+function countRequest(counts, key) {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
