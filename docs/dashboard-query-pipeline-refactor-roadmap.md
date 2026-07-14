@@ -1,6 +1,6 @@
 # Dashboard Query Pipeline Refactor Roadmap
 
-Status: In progress - final enforcement slice
+Status: Complete - merged through PR #263 on July 14, 2026
 Tracking issue: [#244](https://github.com/douglasmonsky/codex-usage-tracker/issues/244)  
 Scope: Local dashboard API, persisted analytical facts, async report jobs, and frontend query orchestration
 
@@ -73,7 +73,7 @@ reusable results.
 | PR 4A: Diagnostic refresh jobs | Merged | #244 / #258 / `2eb19e2b` | Shared async analysis lifecycle, persisted-result reload, measurable 10-unit progress, and observer-safe polling |
 | PR 4B: Compression Lab dashboard jobs | Merged | #244 / #261 / `cbc8b511` | Shared MCP/dashboard profile contract; 400k cold start 2.9 ms, active-poll p95 72 ms, warm status/profile p95 1.3 ms; agent-perf `20260714T094938Z-90e678ab` |
 | PR 5: Query and cache hardening | Merged | #244 / #262 / `03b6900` | Five 400k route-handler samples: summary 591 ms cold p95 / 1.64 ms warm p95; recommendations 150 ms cold p95 / 2.87 ms warm p95; agent-perf `20260714T114913Z-d4cd2a28` |
-| PR 6: Cleanup and enforcement | In progress | #244 / `feature/244-query-pipeline-enforcement` | Retired recommendation fallback; query/schema registry ratchets; bounded Threads hydration; diagnostic fact covering index, lazy tabs, and cache; allowance running-median detector and large-payload cache; deterministic 100k CI budgets; agent-perf `20260714T154221Z-1ed23e7c` |
+| PR 6: Cleanup and enforcement | Merged | #244 / #263 / `a962f517` | Retired recommendation fallback; self-healing fact gaps; incremental summary refresh; bounded and cached investigation queries; Compression Lab rejoin/retry; query/schema and deterministic 100k CI ratchets; agent-perf `20260714T154221Z-1ed23e7c` and `20260714T171230Z-bf5db638` |
 
 Update this table in the same PR that completes each slice. A slice is complete
 only after its acceptance checks pass and the PR is merged to `main`.
@@ -124,6 +124,18 @@ median sorting with exact running prefix/suffix medians reduced allowance
 diagnostics cold p95 to 0.377 seconds while preserving the detector payload and
 small-sample exact tests. Allowance history measured 0.417 seconds cold p95;
 their dedicated 8-MiB cache measured 50-63 ms warm p95 for 4.8-5.4 MiB payloads.
+
+Final live all-history verification used 415,000-plus local calls. A missing
+recommendation-fact gap now repairs incrementally, incomplete noncanonical
+thread coverage no longer triggers a full summary rebuild, and a small append
+refresh fell from roughly 100 seconds to 20.5 seconds. Large low-output
+investigation cold time fell from roughly 37 seconds to about 0.61 seconds;
+generation-stable repeat requests complete in milliseconds. Repeated-file and
+shell-churn reports remain the slowest first-run bounded reports at roughly
+7-10 seconds and 18-25 seconds on that dataset, but their output is bounded,
+their work is generation-cached, and the route inventory owns the all-history
+scan explicitly. A completed all-history Compression Lab profile reloads in
+single-digit milliseconds after the initial persisted analysis.
 
 ## Architectural Principles
 
@@ -487,19 +499,24 @@ replacement. Removal follows parity, benchmark, and release soak evidence.
 
 ## Definition of Done
 
-The refactor is complete when:
+The merged-main audit completed after PR #263:
 
-- all interactive dashboard routes are indexed and bounded;
-- all heavy routes use reusable async jobs with meaningful progress;
-- no normal page load rebuilds a full Python call object graph;
-- frontend modules cache and cancel independently;
-- repeated identical requests are coalesced;
-- route-level performance budgets run in CI where deterministic;
-- existing API/MCP schemas remain compatible or have documented versioned
-  successors;
-- dashboard, MCP, and CLI consumers share the same query/report services;
-- privacy tests prove aggregate defaults remain aggregate-only;
-- the route inventory has no unowned legacy full-scan path.
+| Requirement | Result | Completion evidence |
+| --- | --- | --- |
+| Interactive routes are indexed and bounded | Complete | Summary, recommendations, calls, threads, allowance, diagnostic facts, and investigation evidence use registered SQL-backed routes with finite default payloads. |
+| Heavy analyses use reusable jobs with progress | Complete | Diagnostic refresh and Compression Lab use shared start/status/profile lifecycles, persisted results, resumable observers, and measurable stages. |
+| Normal page loads avoid full Python call graphs | Complete | Recommendation requests require materialized facts; thread and diagnostic hydration are paged or selected; Agentic reports inject the indexed recommendation builder. |
+| Frontend modules cache and cancel independently | Complete | Source-aware query keys, per-module state, abort signals, interrupted-work retry, and navigation-return coverage are present across the migrated views. |
+| Identical requests coalesce or reuse results | Complete | Frontend query coalescing, generation-keyed aggregate caches, persisted diagnostic snapshots, and persisted Compression Lab profiles cover the registered route classes. |
+| Deterministic performance budgets run in CI | Complete | The 100,000-row route matrix enforces cold/warm latency and payload budgets; the Compression persistence ratchet retains its 40 percent requirement with a stable five-round sample. |
+| API and MCP contracts remain compatible | Complete | Contract/parity tests cover public payloads, `limit=0`, active/archived scope, and shared Compression API/MCP schemas. |
+| Dashboard, MCP, and CLI share services | Complete | Public consumers use the indexed recommendation engine and shared report/job payload builders; dependency injection preserves the one-way Tach architecture. |
+| Aggregate defaults remain private | Complete | Privacy tests and cache policy exclude prompts, raw output, file paths, command text, and indexed fragments from aggregate dashboard persistence. |
+| No unowned legacy full scan remains | Complete | The route inventory classifies every dashboard endpoint; the request-time recommendation fallback is retired, while bounded reports that may scan history are explicit and generation-cached. |
+
+The final local gate was Agent Maintainer CI profile
+`20260714T193128316591Z-ci-9791b2acd6e2`; the final GitHub matrix passed on
+commit `173f7212` before squash merge `a962f517`.
 
 ## Resolved Decisions
 
