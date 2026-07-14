@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDashboardQueryClient } from '../../data/queryRuntime';
@@ -69,27 +69,43 @@ describe('Overview focused evidence flow', () => {
   it('reports cached modules as updating during a background refetch', async () => {
     let summaryCalls = 0;
     let resolveSummaryRefresh: ((response: Response) => void) | undefined;
+    let markSummaryRefreshStarted: (() => void) | undefined;
     const summaryRefresh = new Promise<Response>((resolve) => {
       resolveSummaryRefresh = resolve;
+    });
+    const summaryRefreshStarted = new Promise<void>((resolve) => {
+      markSummaryRefreshStarted = resolve;
     });
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       if (!String(input).startsWith('/api/summary')) {
         return Promise.resolve(recommendationsResponse());
       }
       summaryCalls += 1;
-      return summaryCalls === 1 ? Promise.resolve(summaryResponse()) : summaryRefresh;
+      if (summaryCalls === 1) return Promise.resolve(summaryResponse());
+      markSummaryRefreshStarted?.();
+      return summaryRefresh;
     }));
     const queryClient = createDashboardQueryClient();
     renderOverview(queryClient);
     await waitFor(() => expect(screen.getByText('Focused endpoints')).toBeInTheDocument());
 
-    const refresh = queryClient.invalidateQueries({
-      queryKey: ['dashboard', 'overview-summary'],
+    let refresh = Promise.resolve();
+    await act(async () => {
+      refresh = queryClient.invalidateQueries({
+        queryKey: ['dashboard', 'overview-summary'],
+      });
+      await summaryRefreshStarted;
     });
-    await waitFor(() => expect(screen.getByText('Usage summary updating')).toBeInTheDocument());
+    expect(queryClient.isFetching({ queryKey: ['dashboard', 'overview-summary'] })).toBe(1);
+    await waitFor(
+      () => expect(screen.getByText('Usage summary updating')).toBeInTheDocument(),
+      { timeout: 5_000 },
+    );
 
-    resolveSummaryRefresh?.(summaryResponse());
-    await refresh;
+    await act(async () => {
+      resolveSummaryRefresh?.(summaryResponse());
+      await refresh;
+    });
   });
 
   it('keeps endpoint-backed summaries without duplicating investigation surfaces', async () => {
