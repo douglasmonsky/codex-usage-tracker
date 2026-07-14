@@ -53,38 +53,32 @@ def query_recommendation_fact_page(
     limit_clause = "" if normalized_limit is None else " LIMIT ?"
     row_params = [*params] if normalized_limit is None else [*params, normalized_limit]
     from_clause = "recommendation_facts rf JOIN usage_events USING (record_id)"
+    count_query = f"SELECT COUNT(*) FROM {from_clause} {where_clause}"  # nosec B608 - internal SQL templates; values remain bound
+    row_query = f"""
+        SELECT
+            usage_events.*,
+            {USAGE_TIMING_SELECT_SQL},
+            {usage_parent_select_sql(include_archived=include_archived)},
+            rf.recommendation_score AS fact_recommendation_score,
+            rf.primary_recommendation_key AS fact_primary_recommendation_key,
+            rf.secondary_recommendation_keys_json
+                AS fact_secondary_recommendation_keys_json,
+            rf.recommended_action_key AS fact_recommended_action_key,
+            rf.recommendations_json AS fact_recommendations_json
+        FROM {from_clause}
+        {USAGE_TIMING_JOIN_SQL}
+        {where_clause}
+        ORDER BY
+            rf.recommendation_score DESC,
+            rf.total_tokens DESC,
+            rf.event_timestamp ASC,
+            rf.record_id ASC
+        {limit_clause}
+    """  # nosec B608 - clauses are internal templates and values remain bound
 
     with connect(db_path) as conn:
-        total_count = int(
-            conn.execute(
-                f"SELECT COUNT(*) FROM {from_clause} {where_clause}",
-                params,
-            ).fetchone()[0]
-        )
-        rows = conn.execute(
-            f"""
-            SELECT
-                usage_events.*,
-                {USAGE_TIMING_SELECT_SQL},
-                {usage_parent_select_sql(include_archived=include_archived)},
-                rf.recommendation_score AS fact_recommendation_score,
-                rf.primary_recommendation_key AS fact_primary_recommendation_key,
-                rf.secondary_recommendation_keys_json
-                    AS fact_secondary_recommendation_keys_json,
-                rf.recommended_action_key AS fact_recommended_action_key,
-                rf.recommendations_json AS fact_recommendations_json
-            FROM {from_clause}
-            {USAGE_TIMING_JOIN_SQL}
-            {where_clause}
-            ORDER BY
-                rf.recommendation_score DESC,
-                rf.total_tokens DESC,
-                rf.event_timestamp ASC,
-                rf.record_id ASC
-            {limit_clause}
-            """,
-            row_params,
-        ).fetchall()
+        total_count = int(conn.execute(count_query, params).fetchone()[0])
+        rows = conn.execute(row_query, row_params).fetchall()
     return RecommendationFactPage(
         rows=[usage_row_to_dict(row) for row in rows],
         total_count=total_count,
