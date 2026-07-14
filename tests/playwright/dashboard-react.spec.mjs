@@ -74,6 +74,88 @@ await page.getByRole('button', { name: 'Columns', exact: true }).click();
     expect(download.suggestedFilename()).toContain('codex-calls-');
   });
 
+  test('reuses live report evidence after returning from Cache and Context', async ({ page }) => {
+    let reportRequests = 0;
+    await page.addInitScript(() => {
+      window.__CODEX_USAGE_BOOT__ = {
+        api_token: 'playwright-token',
+        context_api_enabled: false,
+        latest_refresh_at: '2026-07-14T05:00:00Z',
+        loaded_row_count: 1,
+        total_available_rows: 1,
+        rows: [{
+          record_id: 'return-call',
+          call_started_at: '2026-07-14T04:00:00Z',
+          thread_name: 'return-thread',
+          model: 'o5',
+          effort: 'high',
+          input_tokens: 1000,
+          cached_input_tokens: 800,
+          output_tokens: 100,
+          total_tokens: 1100,
+        }],
+      };
+    });
+    await page.route('**/api/reports/pack?**', async route => {
+      reportRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          schema: 'codex-usage-tracker-reports-pack-v1',
+          generated_at: '2026-07-14T05:00:00Z',
+          reports: [{
+            key: 'return-report',
+            title: 'Return Navigation Report',
+            status: 'Ready',
+            owner: 'Playwright',
+            description: 'Synthetic report evidence.',
+          }],
+          evidence: { 'return-report': { rows: [] } },
+          row_count: 0,
+          total_matched_rows: 1,
+          raw_context_included: false,
+        }),
+      });
+    });
+    await page.route('**/api/summary?**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        schema: 'codex-usage-tracker-summary-v1',
+        group_by: 'date',
+        include_archived: false,
+        privacy_mode: 'normal',
+        rows: [],
+      }),
+    }));
+    await page.route('**/api/threads?**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        schema: 'codex-usage-tracker-threads-v1',
+        include_archived: false,
+        row_count: 0,
+        total_matched_rows: 0,
+        limit: 250,
+        offset: 0,
+        has_more: false,
+        rows: [],
+      }),
+    }));
+
+    await page.goto('/?view=reports');
+    await expect(page.getByRole('heading', { name: 'Return Navigation Report' })).toBeVisible();
+    await expect.poll(() => reportRequests).toBeGreaterThan(0);
+    const initialReportRequests = reportRequests;
+    await page.getByRole('button', { name: /Cache And Context/i }).click();
+    await expect(page.getByRole('heading', { name: 'Cache And Context Lab' })).toBeVisible();
+    await page.getByRole('button', { name: /^Reports$/i }).click();
+    await expect(page.getByRole('heading', { name: 'Return Navigation Report' })).toBeVisible();
+    await page.waitForTimeout(250);
+    expect(reportRequests).toBe(initialReportRequests);
+  });
+
   test('opens direct call investigator URLs', async ({ page }) => {
     await page.goto('/?view=call&record=fixture-call-2');
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
