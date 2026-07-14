@@ -243,11 +243,12 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         "allowance_change",
     ]
     assert agentic_investigation_json["schema"] == "codex-usage-tracker-agentic-investigation-v1"
-    assert agentic_investigation_json["content_mode"] == "aggregate_investigation"
+    assert agentic_investigation_json["content_mode"] == "compression_lab_router"
     assert agentic_investigation_json["includes_indexed_content"] is False
     assert agentic_investigation_json["includes_raw_fragments"] is False
     assert agentic_investigation_json["filters"]["detail_mode"] == "compact"
     assert agentic_investigation_json["findings"]
+    assert agentic_investigation_json["compression_lab"]["run_id"]
     first_finding = agentic_investigation_json["findings"][0]
     assert first_finding["evidence_summary"]["row_count"] == first_finding["evidence_count"]
     assert first_finding["missing_access"]

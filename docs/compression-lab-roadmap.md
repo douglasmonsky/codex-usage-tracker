@@ -117,7 +117,11 @@ Exit gates:
 
 ### PR 5: Skill, Plugin, Documentation, And Dogfood
 
-Status: pending
+Status: in progress
+
+Issue: [#242](https://github.com/douglasmonsky/codex-usage-tracker/issues/242)
+
+Branch: `feature/242-compression-lab-dogfood`
 
 Deliverables:
 
@@ -134,6 +138,19 @@ Exit gates:
 - Recommendations include evidence, estimate, assumptions, intervention, and verification.
 - Existing tools remain callable and compatible.
 - Full local and GitHub CI gates pass.
+
+Estimator limitations:
+
+- Compression Lab estimates likely avoidable local exposure, not exact future savings.
+- `observed_exposure_tokens` is not automatically waste; it needs a candidate family, assumptions, and a user-visible intervention.
+- Low/likely/high ranges are heuristic and should be compared across repeat runs after workflow changes.
+- Simulations avoid double-counting selected candidates, but they still cannot prove semantic task value.
+
+Future experiment tracking:
+
+- Persist before/after intervention runs after the router and skill behavior stabilizes.
+- Track selected candidate IDs, user-applied intervention labels, verification query, and post-change profile deltas.
+- Keep shared evidence aggregate-only unless the user explicitly exports local raw context.
 
 ## Cross-Cutting Acceptance Criteria
 
