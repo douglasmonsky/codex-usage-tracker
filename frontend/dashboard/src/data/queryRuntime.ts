@@ -15,6 +15,13 @@ import {
   type HistoryScope,
   type LoadWindow,
 } from './dataScope';
+import {
+  dashboardQueryKey,
+  dashboardQueryOptions,
+  dashboardQueryPolicies,
+  dashboardQueryPrefix,
+  dashboardQuerySource,
+} from './dashboardQueryRegistry';
 import { isAbortError } from './httpTransportSupport';
 import {
   persistentUsageSnapshotStore,
@@ -62,23 +69,22 @@ type UsageQueryRequest = {
 
 const metadataStorageKey = 'codexUsageDashboardRuntimeMetadata';
 const metadataMaxBytes = 2_048;
-const usageStaleTimeMs = 30_000;
 
 const usageQueryKeys = {
-  all: ['usage'] as const,
+  all: dashboardQueryPrefix('usage-snapshot'),
   snapshot: (sourceKey: string, sourceRevision: string, scope: DataScope) =>
-    [...usageQueryKeys.all, 'snapshot', sourceKey, sourceRevision, scope.historyScope, scope.loadWindow, scope.limit, scope.since] as const,
+    dashboardQueryKey(
+      'usage-snapshot',
+      dashboardQuerySource({ sourceKey, sourceRevision }),
+      scope,
+    ),
 };
 
 export function createDashboardQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        gcTime: 15 * 60_000,
-        refetchOnReconnect: false,
-        refetchOnWindowFocus: false,
-        retry: 1,
-        staleTime: usageStaleTimeMs,
+        ...dashboardQueryOptions('aggregate'),
       },
     },
   });
@@ -112,6 +118,7 @@ export async function queryUsageSnapshot({
   const cacheIdentity = usageSnapshotIdentity(currentPayload, scope);
   const payload = await queryClient.fetchQuery({
     queryKey,
+    ...dashboardQueryOptions('snapshot'),
     queryFn: async ({ signal }) => {
       const cachedPayload = !refresh && cacheIdentity
         ? await snapshotStore.read(cacheIdentity)
@@ -145,7 +152,7 @@ export async function queryUsageSnapshot({
       if (loadedIdentity) await snapshotStore.write(loadedIdentity, loadedPayload);
       return loadedPayload;
     },
-    staleTime: refresh ? 0 : usageStaleTimeMs,
+    staleTime: refresh ? 0 : dashboardQueryPolicies.snapshot.staleTime,
   });
   writeDashboardRuntimeMetadata(metadataFromPayload(payload, scope));
   return payload;

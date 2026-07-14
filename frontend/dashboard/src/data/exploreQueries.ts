@@ -2,6 +2,11 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 
 import type { ContextRuntime } from '../api/types';
 import {
+  dashboardQueryKey,
+  dashboardQueryOptions,
+  dashboardQuerySource,
+} from './dashboardQueryRegistry';
+import {
   decodeExploreCalls,
   decodeExploreThreads,
   type ExploreCallsPage,
@@ -41,6 +46,7 @@ export type CallsQueryFilters = {
 type ExploreBaseRequest = {
   runtime: ContextRuntime;
   includeArchived: boolean;
+  sourceKey?: string;
   sourceRevision: string;
   pageSize?: number;
 };
@@ -67,35 +73,32 @@ const callsPageSize = 500;
 const threadsPageSize = 250;
 
 const exploreQueryKeys = {
-  calls: (request: CallsQueryRequest) => [
-    'explore',
+  calls: (request: CallsQueryRequest) => dashboardQueryKey(
     'calls',
-    request.includeArchived ? 'all' : 'active',
+    exploreQuerySource(request),
+    exploreQueryScope(request, request.filters.since),
     request.filters,
     request.sort,
     request.direction,
     request.pageSize ?? callsPageSize,
-    request.sourceRevision,
-  ] as const,
-  threads: (request: ThreadsQueryRequest) => [
-    'explore',
+  ),
+  threads: (request: ThreadsQueryRequest) => dashboardQueryKey(
     'threads',
-    request.includeArchived ? 'all' : 'active',
+    exploreQuerySource(request),
+    exploreQueryScope(request),
     request.query ?? '',
     request.sort,
     request.direction,
     request.pageSize ?? threadsPageSize,
-    request.sourceRevision,
-  ] as const,
-  threadCalls: (request: ThreadCallsQueryRequest) => [
-    'explore',
+  ),
+  threadCalls: (request: ThreadCallsQueryRequest) => dashboardQueryKey(
     'thread-calls',
-    request.includeArchived ? 'all' : 'active',
+    exploreQuerySource(request),
+    exploreQueryScope(request),
     request.threadKey,
     request.sort ?? 'time',
     request.direction ?? 'desc',
-    request.sourceRevision,
-  ] as const,
+  ),
 };
 
 export function callsInfiniteQueryOptions(request: CallsQueryRequest) {
@@ -105,7 +108,7 @@ export function callsInfiniteQueryOptions(request: CallsQueryRequest) {
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => loadCallsPage(request, pageParam, pageSize, signal),
     getNextPageParam: (lastPage: ExploreCallsPage) => lastPage.nextOffset ?? undefined,
-    staleTime: 30_000,
+    ...dashboardQueryOptions('aggregate'),
   });
 }
 
@@ -116,7 +119,7 @@ export function threadsInfiniteQueryOptions(request: ThreadsQueryRequest) {
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => loadThreadsPage(request, pageParam, pageSize, signal),
     getNextPageParam: (lastPage: ExploreThreadsPage) => lastPage.nextOffset ?? undefined,
-    staleTime: 30_000,
+    ...dashboardQueryOptions('aggregate'),
   });
 }
 
@@ -124,8 +127,22 @@ export function threadCallsQueryOptions(request: ThreadCallsQueryRequest) {
   return queryOptions({
     queryKey: exploreQueryKeys.threadCalls(request),
     queryFn: ({ signal }) => loadThreadCalls(request, signal),
-    staleTime: 30_000,
+    ...dashboardQueryOptions('detail'),
   });
+}
+
+function exploreQuerySource(request: ExploreBaseRequest) {
+  return dashboardQuerySource({
+    sourceKey: request.sourceKey ?? (request.runtime.fileMode ? 'static-file' : 'local-api'),
+    sourceRevision: request.sourceRevision,
+  });
+}
+
+function exploreQueryScope(request: ExploreBaseRequest, since?: string) {
+  return {
+    historyScope: request.includeArchived ? 'all' as const : 'active' as const,
+    since: since ?? null,
+  };
 }
 
 export async function loadCallsPage(

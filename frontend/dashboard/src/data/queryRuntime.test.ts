@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { DashboardBootPayload } from '../api/types';
 import {
+  cancelUsageQueries,
   createDashboardQueryClient,
   createSyntheticUsageTransport,
   metadataFromPayload,
@@ -143,7 +144,7 @@ describe('dashboard query runtime', () => {
     };
     const pending = queryUsageSnapshot({ currentPayload: shellPayload, historyScope: 'all', loadLimit: 0, queryClient, transport });
     await vi.waitFor(() => expect(requestSignal).toBeDefined());
-    await queryClient.cancelQueries({ queryKey: ['usage'] });
+    await cancelUsageQueries(queryClient);
     await expect(pending).rejects.toBeDefined();
     expect(requestSignal?.aborted).toBe(true);
   });

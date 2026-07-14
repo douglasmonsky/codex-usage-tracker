@@ -1,4 +1,4 @@
-import{r as x,j as t}from"./dashboard-react.js";import{S as v,P as A}from"./Panel.js";import{c as M,M as f,L as W,ai as B,R as L}from"./App.js";import{G as d}from"./gauge.js";import{S as m}from"./shield-check.js";import{L as T}from"./lock-keyhole.js";import{T as H}from"./triangle-alert.js";import"./dashboardRouter.js";import"./router.js";/**
+import{r as x,j as t}from"./dashboard-react.js";import{S as v,P as A}from"./Panel.js";import{c as M,M as f,L as W,al as B,R as L}from"./App.js";import{G as d}from"./gauge.js";import{S as m}from"./shield-check.js";import{L as T}from"./lock-keyhole.js";import{T as H}from"./triangle-alert.js";import"./dashboardRouter.js";import"./router.js";/**
  * @license lucide-react v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.

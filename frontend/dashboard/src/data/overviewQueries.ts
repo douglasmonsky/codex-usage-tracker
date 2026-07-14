@@ -2,6 +2,11 @@ import { queryOptions } from '@tanstack/react-query';
 
 import type { ContextRuntime } from '../api/types';
 import {
+  dashboardQueryKey,
+  dashboardQueryOptions,
+  dashboardQuerySource,
+} from './dashboardQueryRegistry';
+import {
   persistentOverviewEndpointCache,
   type OverviewEndpointCache,
   type OverviewEndpointCacheIdentity,
@@ -27,6 +32,7 @@ type OverviewEndpointRequest = {
   runtime: ContextRuntime;
   includeArchived: boolean;
   since?: string;
+  sourceKey?: string;
   sourceRevision?: string;
   cache?: OverviewEndpointCache;
   signal?: AbortSignal;
@@ -36,35 +42,42 @@ type OverviewQueryRequest = OverviewEndpointRequest & {
   sourceRevision: string;
 };
 
-const overviewQueryKeys = {
-  recommendations: (includeArchived: boolean, since: string, sourceRevision: string) =>
-    ['overview', 'recommendations', includeArchived ? 'all' : 'active', since, sourceRevision] as const,
-  summary: (includeArchived: boolean, since: string, sourceRevision: string) =>
-    ['overview', 'summary', includeArchived ? 'all' : 'active', since, sourceRevision] as const,
-};
-
 export function overviewSummaryQueryOptions(request: OverviewQueryRequest) {
   return queryOptions({
-    queryKey: overviewQueryKeys.summary(
-      request.includeArchived,
-      request.since ?? '',
-      request.sourceRevision,
+    queryKey: dashboardQueryKey(
+      'overview-summary',
+      overviewQuerySource(request),
+      overviewQueryScope(request),
     ),
     queryFn: ({ signal }) => loadOverviewSummaryEndpoint({ ...request, signal }),
-    staleTime: 30_000,
+    ...dashboardQueryOptions('aggregate'),
   });
 }
 
 export function overviewRecommendationsQueryOptions(request: OverviewQueryRequest) {
   return queryOptions({
-    queryKey: overviewQueryKeys.recommendations(
-      request.includeArchived,
-      request.since ?? '',
-      request.sourceRevision,
+    queryKey: dashboardQueryKey(
+      'overview-recommendations',
+      overviewQuerySource(request),
+      overviewQueryScope(request),
     ),
     queryFn: ({ signal }) => loadOverviewRecommendationsEndpoint({ ...request, signal }),
-    staleTime: 30_000,
+    ...dashboardQueryOptions('aggregate'),
   });
+}
+
+function overviewQuerySource(request: OverviewQueryRequest) {
+  return dashboardQuerySource({
+    sourceKey: request.sourceKey ?? (request.runtime.fileMode ? 'static-file' : 'local-api'),
+    sourceRevision: request.sourceRevision,
+  });
+}
+
+function overviewQueryScope(request: OverviewQueryRequest) {
+  return {
+    historyScope: request.includeArchived ? 'all' as const : 'active' as const,
+    since: request.since ?? null,
+  };
 }
 
 async function loadOverviewSummaryEndpoint({

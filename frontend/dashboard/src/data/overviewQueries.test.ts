@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ContextRuntime } from '../api/types';
 import type { OverviewEndpointCache } from './overviewEndpointCache';
-import { loadOverviewEndpoints, type OverviewEndpointBundle } from './overviewQueries';
+import { createDashboardQueryClient } from './queryRuntime';
+import {
+  loadOverviewEndpoints,
+  overviewSummaryQueryOptions,
+  type OverviewEndpointBundle,
+} from './overviewQueries';
 
 const runtime: ContextRuntime = {
   apiToken: 'local-token',
@@ -13,6 +18,51 @@ const runtime: ContextRuntime = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('overview focused endpoint query', () => {
+  it('keys aggregate queries by source without exposing the API token', () => {
+    const sourceA = overviewSummaryQueryOptions({
+      runtime,
+      includeArchived: false,
+      sourceKey: 'source-a',
+      sourceRevision: 'revision-1',
+    });
+    const sourceB = overviewSummaryQueryOptions({
+      runtime,
+      includeArchived: false,
+      sourceKey: 'source-b',
+      sourceRevision: 'revision-1',
+    });
+
+    expect(sourceA.queryKey).not.toEqual(sourceB.queryKey);
+    expect(JSON.stringify(sourceA.queryKey)).not.toContain(runtime.apiToken);
+    expect(sourceA.staleTime).toBe(30_000);
+  });
+
+  it('coalesces identical in-flight aggregate requests', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      schema: 'codex-usage-tracker-summary-v1',
+      group_by: 'date',
+      include_archived: false,
+      privacy_mode: 'normal',
+      rows: [],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const request = {
+      runtime,
+      includeArchived: false,
+      sourceKey: 'source-coalesced',
+      sourceRevision: 'revision-coalesced',
+      cache: { read: vi.fn(() => null), write: vi.fn() },
+    };
+    const queryClient = createDashboardQueryClient();
+
+    await Promise.all([
+      queryClient.fetchQuery(overviewSummaryQueryOptions(request)),
+      queryClient.fetchQuery(overviewSummaryQueryOptions(request)),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it('loads summary and recommendations with the same history scope', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
