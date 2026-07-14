@@ -57,8 +57,17 @@ export function DiagnosticSnapshotMatrix({
     progressError: evidence.progressError,
     refreshingAll,
   });
-  const progressModules = refreshingAll
-    ? evidence.modules.map(module => ({ ...module, status: 'updating' as const }))
+  const refreshProgress = refreshingAll && evidence.refreshJob
+    ? evidence.refreshJob.progress
+    : null;
+  const progressCompleted = refreshProgress?.completed_units ?? evidence.progress.ready;
+  const progressTotal = refreshProgress?.total_units ?? evidence.progress.total;
+  const progressLabel = refreshingAll ? 'Refreshing diagnostic snapshots' : 'Loading diagnostic snapshots';
+  const progressModules = refreshProgress
+    ? evidence.modules.map((module, index) => ({
+        ...module,
+        status: index < refreshProgress.completed_units ? 'ready' as const : 'updating' as const,
+      }))
     : evidence.modules;
 
   async function refreshSnapshots() {
@@ -108,9 +117,9 @@ export function DiagnosticSnapshotMatrix({
     >
       <PageLoadProgress
         active={canUseLiveDiagnostics && (evidence.loading || refreshingAll)}
-        completed={evidence.progress.ready}
-        total={evidence.progress.total}
-        label="Loading diagnostic snapshots"
+        completed={progressCompleted}
+        total={progressTotal}
+        label={progressLabel}
         error={canUseLiveDiagnostics ? refreshError || evidence.progressError : null}
         modules={progressModules}
         updating={refreshingAll || evidence.modules.some(module => module.status === 'updating')}

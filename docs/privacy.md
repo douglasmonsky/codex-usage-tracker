@@ -47,7 +47,7 @@ Diagnostic facts do not store raw tool arguments, command output, patch text, fi
 
 On-demand diagnostic snapshots follow the same shareable-output boundary. Tool-output snapshots use terminal wrapper metadata such as `Original token count` when present and persist counts, coverage gaps, and safe function/command labels. Command snapshots keep command roots plus conservative one-level child labels. Git interaction snapshots keep only `git`/`gh` roots, safe operation labels, coarse categories, counts, and token coverage. File-read and file-modification snapshots persist counters, reader/event families, basename-only path labels, and short irreversible path hashes.
 
-Diagnostic snapshots are not recomputed during ordinary dashboard or usage refresh. Stored snapshots can be displayed without rescanning source logs. Recalculation requires an explicit diagnostics `--refresh` command, batched localhost `/api/diagnostics/refresh` request, or targeted `/api/diagnostics/<section>/refresh` request.
+Diagnostic snapshots are not recomputed during ordinary dashboard or usage refresh. Stored snapshots can be displayed without rescanning source logs. Recalculation requires an explicit diagnostics `--refresh` command, batched localhost `/api/diagnostics/refresh` request, or targeted `/api/diagnostics/<section>/refresh` request. Localhost refresh requests run in a background worker and expose only aggregate progress metadata through the token-protected status endpoint.
 
 ## On-Demand Context
 

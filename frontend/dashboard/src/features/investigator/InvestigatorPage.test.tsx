@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { diagnosticSnapshotDefinitions } from '../../api/diagnostics';
@@ -71,6 +71,35 @@ describe('Investigator query lifecycle', () => {
     );
     expect(screen.getByRole('heading', { name: 'Ranked findings' })).toBeInTheDocument();
   });
+
+  it('shows granular diagnostic progress while refreshing evidence', async () => {
+    const client = createDashboardQueryClient();
+    let resolveRefreshStatus!: (response: Response) => void;
+    const refreshStatus = new Promise<Response>(resolve => {
+      resolveRefreshStatus = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/diagnostics/refresh?')) {
+        return jsonResponse(refreshJob('running', 3));
+      }
+      if (url.startsWith('/api/diagnostics/refresh/status?')) {
+        return refreshStatus;
+      }
+      return responseFor(url);
+    }));
+
+    renderInvestigator(client);
+    await screen.findByText('10 diagnostic modules');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh evidence' }));
+
+    const progress = await screen.findByRole('progressbar', { name: 'Refreshing investigation evidence' });
+    expect(progress).toHaveAttribute('aria-valuenow', '3');
+    expect(progress).toHaveAttribute('aria-valuemax', '10');
+
+    resolveRefreshStatus(jsonResponse(refreshJob('completed', 10)));
+    expect(await screen.findByText(/Live evidence refreshed/)).toBeInTheDocument();
+  });
 });
 
 function renderInvestigator(client: ReturnType<typeof createDashboardQueryClient>) {
@@ -120,4 +149,24 @@ function responseFor(url: string): Response {
 
 function jsonResponse(payload: unknown): Response {
   return { ok: true, json: async () => payload } as Response;
+}
+
+function refreshJob(status: 'running' | 'completed', completed: number) {
+  return {
+    schema: 'codex-usage-tracker-analysis-job-v1',
+    job_id: 'investigator-refresh-test',
+    job_kind: 'diagnostic-refresh',
+    status,
+    stage: status === 'completed' ? 'complete' : 'persisting_snapshots',
+    progress: {
+      completed_units: completed,
+      total_units: 10,
+      percent: completed * 10,
+      current_unit: status === 'completed' ? null : 'commands',
+    },
+    error: null,
+    next: status === 'completed'
+      ? { action: 'reload_persisted_results' }
+      : { action: 'poll', job_id: 'investigator-refresh-test', poll_after_ms: 0 },
+  };
 }

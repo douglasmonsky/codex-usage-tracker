@@ -139,6 +139,16 @@ export function InvestigatorPage({
     }
   }
 
+  const refreshProgress = refreshing && evidence.refreshJob
+    ? evidence.refreshJob.progress
+    : null;
+  const progressModules = refreshProgress
+    ? evidence.modules.slice(1).map((module, index) => ({
+        ...module,
+        status: index < refreshProgress.completed_units ? 'ready' as const : 'updating' as const,
+      }))
+    : evidence.modules;
+
   function runLocalTrace() {
     if (!contextRuntime.contextApiEnabled) {
       onNavigateView('settings');
@@ -181,13 +191,13 @@ export function InvestigatorPage({
       </header>
 
       <PageLoadProgress
-        active={canUseLive && evidence.modules.some(module => module.status === 'loading' || module.status === 'updating')}
-        completed={evidence.progress.ready}
-        total={evidence.progress.total}
-        label="Loading investigation evidence"
+        active={canUseLive && (refreshing || evidence.modules.some(module => module.status === 'loading' || module.status === 'updating'))}
+        completed={refreshProgress?.completed_units ?? evidence.progress.ready}
+        total={refreshProgress?.total_units ?? evidence.progress.total}
+        label={refreshing ? 'Refreshing investigation evidence' : 'Loading investigation evidence'}
         error={canUseLive ? evidence.progressError : null}
-        modules={evidence.modules}
-        updating={evidence.modules.some(module => module.status === 'updating')}
+        modules={progressModules}
+        updating={refreshing || evidence.modules.some(module => module.status === 'updating')}
       />
 
       <div className={styles.statusRow} role="status" aria-live="polite">

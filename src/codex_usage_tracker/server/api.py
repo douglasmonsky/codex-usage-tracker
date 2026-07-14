@@ -24,6 +24,7 @@ from codex_usage_tracker.dashboard.api import (
     generate_dashboard,
 )
 from codex_usage_tracker.server import utils as server_utils
+from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
 from codex_usage_tracker.server.context_settings import (
     ContextApiState,
 )
@@ -92,6 +93,7 @@ def serve_dashboard(
         include_rows=False,
     )
     refresh_jobs = RefreshJobRegistry()
+    analysis_jobs = AnalysisJobRegistry()
     handler = partial(
         _UsageDashboardHandler,
         directory=str(output.parent),
@@ -114,6 +116,7 @@ def serve_dashboard(
         language=selected_language,
         refresh_lock=threading.Lock(),
         refresh_jobs=refresh_jobs,
+        analysis_jobs=analysis_jobs,
     )
     server = ThreadingHTTPServer((host, port), handler)
     legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"

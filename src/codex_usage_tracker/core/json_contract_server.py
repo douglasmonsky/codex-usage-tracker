@@ -57,6 +57,24 @@ SERVER_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "percent_complete": int,
         }
     },
+    "codex-usage-tracker-analysis-job-v1": {
+        "required": {
+            "job_id": str,
+            "status": str,
+            "stage": str,
+            "error": (dict, NoneType),
+            "next": dict,
+        },
+        "nested": {
+            "progress": {
+                "completed_units": int,
+                "total_units": (int, NoneType),
+                "percent": (float, NoneType),
+                "current_unit": (str, NoneType),
+            },
+            "cache": {"request_reused": str},
+        },
+    },
     "codex-usage-tracker-compression-api-v1": {
         "required": {
             "kind": str,

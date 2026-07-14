@@ -19,15 +19,22 @@ from codex_usage_tracker.diagnostics.snapshots import (
     build_diagnostic_read_productivity_report,
     build_diagnostic_tool_output_report,
 )
+from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
 from codex_usage_tracker.server.diagnostic_facts import (
     handle_diagnostics_fact_calls_request,
     handle_diagnostics_facts_request,
     handle_diagnostics_summary_request,
 )
+from codex_usage_tracker.server.diagnostic_jobs import (
+    handle_diagnostic_job_start_request,
+    handle_diagnostic_job_status_request,
+)
 from codex_usage_tracker.server.diagnostic_snapshots import (
-    handle_diagnostic_refresh_request,
+    diagnostic_refresh_payload,
+    diagnostic_snapshot_payload,
     handle_diagnostic_snapshot_request,
     handle_usage_drain_snapshot_request,
+    usage_drain_snapshot_payload,
 )
 
 _DIAGNOSTIC_REFRESH_AUTH_ERROR = "Valid API token is required for diagnostic refresh"
@@ -69,6 +76,7 @@ class DiagnosticRouteMixin:
         _include_archived: bool
         _privacy_mode: str
         _refresh_lock: threading.Lock
+        _analysis_jobs: AnalysisJobRegistry
 
         def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool: ...
 
@@ -131,16 +139,29 @@ class DiagnosticRouteMixin:
         self._handle_named_diagnostic_snapshot(query, "overview", refresh=False)
 
     def _handle_diagnostics_refresh(self, query: str) -> None:
-        handle_diagnostic_refresh_request(
+        def refresh_all(include_archived: bool, progress: Any) -> dict[str, object]:
+            payload = diagnostic_refresh_payload(
+                "",
+                db_path=self._db_path,
+                pricing_path=self._pricing_path,
+                allowance_path=self._allowance_path,
+                rate_card_path=self._rate_card_path,
+                include_archived_default=include_archived,
+                refresh_lock=self._refresh_lock,
+                progress_callback=progress,
+            )
+            sections = payload.get("sections")
+            refreshed = list(sections) if isinstance(sections, dict) else []
+            return {"refreshed_sections": refreshed}
+
+        self._start_diagnostic_job(query, "all", 10, refresh_all)
+
+    def _handle_diagnostics_refresh_status(self, query: str) -> None:
+        handle_diagnostic_job_status_request(
             query,
-            db_path=self._db_path,
-            pricing_path=self._pricing_path,
-            allowance_path=self._allowance_path,
-            rate_card_path=self._rate_card_path,
-            include_archived_default=self._include_archived,
-            refresh_lock=self._refresh_lock,
-            reject_missing_refresh_token=self._reject_missing_diagnostic_refresh_token,
-            send_exception=self._send_exception,
+            registry=self._analysis_jobs,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
             send_json=self._send_json,
         )
 
@@ -207,6 +228,9 @@ class DiagnosticRouteMixin:
         *,
         refresh: bool,
     ) -> None:
+        if refresh:
+            self._start_usage_drain_refresh(query)
+            return
         handle_usage_drain_snapshot_request(
             query,
             db_path=self._db_path,
@@ -229,11 +253,79 @@ class DiagnosticRouteMixin:
         refresh: bool,
     ) -> None:
         build_report, label = _DIAGNOSTIC_SNAPSHOT_REPORTS[key]
+        if refresh:
+            self._start_named_diagnostic_refresh(query, key, build_report)
+            return
         self._handle_diagnostic_snapshot(
             query,
             build_report=build_report,
             refresh=refresh,
             label=label,
+        )
+
+    def _start_named_diagnostic_refresh(
+        self,
+        query: str,
+        key: str,
+        build_report: Any,
+    ) -> None:
+        def refresh_one(include_archived: bool, progress: Any) -> dict[str, object]:
+            progress(
+                stage="refreshing_snapshot",
+                completed_units=0,
+                total_units=1,
+                current_unit=key,
+            )
+            diagnostic_snapshot_payload(
+                db_path=self._db_path,
+                include_archived=include_archived,
+                refresh=True,
+                refresh_lock=self._refresh_lock,
+                build_report=build_report,
+            )
+            return {"refreshed_sections": [key]}
+
+        self._start_diagnostic_job(query, key, 1, refresh_one)
+
+    def _start_usage_drain_refresh(self, query: str) -> None:
+        def refresh_one(include_archived: bool, progress: Any) -> dict[str, object]:
+            progress(
+                stage="refreshing_snapshot",
+                completed_units=0,
+                total_units=1,
+                current_unit="usage-drain",
+            )
+            usage_drain_snapshot_payload(
+                db_path=self._db_path,
+                pricing_path=self._pricing_path,
+                allowance_path=self._allowance_path,
+                rate_card_path=self._rate_card_path,
+                include_archived=include_archived,
+                refresh=True,
+                refresh_lock=self._refresh_lock,
+            )
+            return {"refreshed_sections": ["usage-drain"]}
+
+        self._start_diagnostic_job(query, "usage-drain", 1, refresh_one)
+
+    def _start_diagnostic_job(
+        self,
+        query: str,
+        job_name: str,
+        total_units: int,
+        work: Any,
+    ) -> None:
+        handle_diagnostic_job_start_request(
+            query,
+            db_path=self._db_path,
+            job_name=job_name,
+            total_units=total_units,
+            work=work,
+            registry=self._analysis_jobs,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_json=self._send_json,
+            include_archived_default=self._include_archived,
         )
 
     def _handle_diagnostic_snapshot(

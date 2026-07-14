@@ -51,6 +51,10 @@ from codex_usage_tracker.diagnostics.snapshot_payloads import (
     snapshot_metadata,
     utc_now,
 )
+from codex_usage_tracker.diagnostics.snapshot_progress import (
+    DiagnosticProgressCallback,
+    emit_refresh_progress,
+)
 from codex_usage_tracker.diagnostics.snapshot_report import DiagnosticSnapshotReport
 from codex_usage_tracker.diagnostics.snapshot_source_logs import (
     build_source_log_snapshot_report,
@@ -316,6 +320,7 @@ def refresh_diagnostic_snapshots(
     allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
     rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
     include_archived: bool = False,
+    progress_callback: DiagnosticProgressCallback | None = None,
 ) -> dict[str, Any]:
     """Recompute and persist all dashboard diagnostic snapshots.
 
@@ -328,6 +333,7 @@ def refresh_diagnostic_snapshots(
         db_path=db_path,
         include_archived=include_archived,
     )
+    emit_refresh_progress(progress_callback, 1, "overview")
     computed_at = utc_now()
     analysis = analyze_indexed_source_logs(db_path=db_path, include_archived=include_archived)
     sections = {
@@ -338,8 +344,9 @@ def refresh_diagnostic_snapshots(
         DIAGNOSTIC_FILE_MODIFICATIONS_SECTION: DIAGNOSTIC_FILE_MODIFICATIONS_SCHEMA,
         DIAGNOSTIC_READ_PRODUCTIVITY_SECTION: DIAGNOSTIC_READ_PRODUCTIVITY_SCHEMA,
     }
-    source_payloads = {
-        section: persist_source_log_snapshot(
+    source_payloads = {}
+    for completed_units, (section, schema) in enumerate(sections.items(), start=2):
+        source_payloads[section] = persist_source_log_snapshot(
             db_path=db_path,
             section=section,
             schema=schema,
@@ -347,12 +354,17 @@ def refresh_diagnostic_snapshots(
             computed_at=computed_at,
             analysis=analysis,
         )
-        for section, schema in sections.items()
-    }
+        emit_refresh_progress(progress_callback, completed_units, section)
     concentration_payload = _refresh_concentration_snapshot(
         db_path=db_path,
         include_archived=include_archived,
     )
+    emit_refresh_progress(progress_callback, 8, "concentration")
+    guided_summary_payload = refresh_guided_summary_snapshot(
+        db_path=db_path,
+        include_archived=include_archived,
+    )
+    emit_refresh_progress(progress_callback, 9, "guided-summary")
     usage_drain_payload = _refresh_usage_drain_snapshot(
         db_path=db_path,
         pricing_path=pricing_path,
@@ -360,10 +372,7 @@ def refresh_diagnostic_snapshots(
         rate_card_path=rate_card_path,
         include_archived=include_archived,
     )
-    guided_summary_payload = refresh_guided_summary_snapshot(
-        db_path=db_path,
-        include_archived=include_archived,
-    )
+    emit_refresh_progress(progress_callback, 10, "usage-drain")
     return {
         "schema": DIAGNOSTIC_BATCH_REFRESH_SCHEMA,
         "status": "ready",

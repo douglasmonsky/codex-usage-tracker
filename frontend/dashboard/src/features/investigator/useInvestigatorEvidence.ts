@@ -1,9 +1,10 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   diagnosticSnapshotDefinitions,
   refreshDiagnosticSnapshots,
+  type DiagnosticRefreshJob,
   type DiagnosticSnapshotMap,
 } from '../../api/diagnostics';
 import type { ContextRuntime } from '../../api/types';
@@ -26,6 +27,7 @@ type InvestigatorEvidenceRequest = {
 
 export function useInvestigatorEvidence(request: InvestigatorEvidenceRequest) {
   const queryClient = useQueryClient();
+  const [refreshJob, setRefreshJob] = useState<DiagnosticRefreshJob | null>(null);
   const agenticQuery = useQuery({
     ...investigatorAgenticQueryOptions({
       runtime: request.contextRuntime,
@@ -81,7 +83,10 @@ export function useInvestigatorEvidence(request: InvestigatorEvidenceRequest) {
   ];
 
   async function refresh(): Promise<number> {
-    const snapshots = await refreshDiagnosticSnapshots(request.contextRuntime);
+    setRefreshJob(null);
+    const snapshots = await refreshDiagnosticSnapshots(request.contextRuntime, {
+      onProgress: setRefreshJob,
+    });
     for (const definition of diagnosticSnapshotDefinitions) {
       const payload = snapshots[definition.key];
       if (!payload) continue;
@@ -105,6 +110,7 @@ export function useInvestigatorEvidence(request: InvestigatorEvidenceRequest) {
     modules,
     progress: dashboardModuleProgress(modules.map(module => module.status)),
     progressError: terminalModuleError(agenticQuery, snapshotQueries),
+    refreshJob,
     refresh,
   };
 }

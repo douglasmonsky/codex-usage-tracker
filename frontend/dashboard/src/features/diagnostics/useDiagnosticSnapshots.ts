@@ -1,10 +1,11 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   diagnosticSnapshotDefinitions,
   refreshDiagnosticSnapshot,
   refreshDiagnosticSnapshots,
+  type DiagnosticRefreshJob,
   type DiagnosticSnapshotDefinition,
   type DiagnosticSnapshotMap,
 } from '../../api/diagnostics';
@@ -25,6 +26,7 @@ type DiagnosticSnapshotsRequest = {
 
 export function useDiagnosticSnapshots(request: DiagnosticSnapshotsRequest) {
   const queryClient = useQueryClient();
+  const [refreshJob, setRefreshJob] = useState<DiagnosticRefreshJob | null>(null);
   const queries = useQueries({
     queries: diagnosticSnapshotDefinitions.map(definition => ({
       ...diagnosticSnapshotQueryOptions({
@@ -54,7 +56,10 @@ export function useDiagnosticSnapshots(request: DiagnosticSnapshotsRequest) {
   }));
 
   async function refreshAll(): Promise<DiagnosticSnapshotMap> {
-    const refreshed = await refreshDiagnosticSnapshots(request.contextRuntime);
+    setRefreshJob(null);
+    const refreshed = await refreshDiagnosticSnapshots(request.contextRuntime, {
+      onProgress: setRefreshJob,
+    });
     for (const definition of diagnosticSnapshotDefinitions) {
       const payload = refreshed[definition.key];
       if (payload) queryClient.setQueryData(snapshotQueryKey(request, definition), payload);
@@ -63,7 +68,10 @@ export function useDiagnosticSnapshots(request: DiagnosticSnapshotsRequest) {
   }
 
   async function refreshOne(definition: DiagnosticSnapshotDefinition) {
-    const payload = await refreshDiagnosticSnapshot(definition, request.contextRuntime);
+    setRefreshJob(null);
+    const payload = await refreshDiagnosticSnapshot(definition, request.contextRuntime, {
+      onProgress: setRefreshJob,
+    });
     queryClient.setQueryData(snapshotQueryKey(request, definition), payload);
     return payload;
   }
@@ -74,6 +82,7 @@ export function useDiagnosticSnapshots(request: DiagnosticSnapshotsRequest) {
     progress: dashboardModuleProgress(modules.map(module => module.status)),
     progressError: terminalSnapshotError(queries),
     loading: queries.some(query => query.isFetching),
+    refreshJob,
     refreshAll,
     refreshOne,
   };

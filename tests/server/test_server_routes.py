@@ -33,6 +33,9 @@ def test_server_route_tables_cover_dashboard_api_paths() -> None:
 
 
 def test_server_route_tables_cover_diagnostic_refresh_paths() -> None:
+    assert GET_ROUTE_METHODS["/api/diagnostics/refresh/status"] == (
+        "_handle_diagnostics_refresh_status"
+    )
     assert POST_ROUTE_METHODS["/api/diagnostics/refresh"] == "_handle_diagnostics_refresh"
     assert POST_ROUTE_METHODS["/api/diagnostics/commands/refresh"] == (
         "_handle_diagnostics_commands_refresh"

@@ -32,5 +32,15 @@ def test_route_inventory_has_decision_ready_execution_metadata() -> None:
     recommendations = next(
         profile for profile in DASHBOARD_ROUTE_PROFILES if profile.path == "/api/recommendations"
     )
-    assert recommendations.workload == "heavy_analysis"
+    assert recommendations.workload == "bounded_report"
     assert recommendations.may_scan_all_history is True
+
+    heavy_routes = [
+        profile for profile in DASHBOARD_ROUTE_PROFILES if profile.workload == "heavy_analysis"
+    ]
+    assert heavy_routes
+    assert all(profile.execution == "async_start" for profile in heavy_routes)
+    assert not any(
+        profile.execution == "synchronous" and profile.workload == "heavy_analysis"
+        for profile in DASHBOARD_ROUTE_PROFILES
+    )

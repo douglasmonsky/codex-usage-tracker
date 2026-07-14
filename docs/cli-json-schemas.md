@@ -49,6 +49,7 @@ Tracked schema ids:
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
 | `codex-usage-tracker-action-brief-v1` | CLI `action-brief --json`, MCP `usage_action_brief(...)`; compact aggregate remediation brief |
 | `codex-usage-tracker-async-job-status-v1` | MCP `usage_dogfood_start(...)`, `usage_dogfood_status(...)`; async in-process job progress/status payload |
+| `codex-usage-tracker-analysis-job-v1` | Dashboard diagnostic refresh start/status lifecycle; shared aggregate progress envelope |
 | `codex-usage-tracker-allowance-history-v1` | CLI `allowance-history --json`, MCP `usage_allowance_history(...)`, dashboard server `/api/allowance/history` |
 | `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
 | `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
@@ -524,7 +525,44 @@ Schema: `codex-usage-tracker-diagnostics-v1`
 
 Diagnostics payloads report aggregate structured facts such as compaction, tool/function/MCP activity, command families, structured skill labels, search/read loops, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, command arguments, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
 
-Diagnostic snapshots use separate section endpoints instead of one large read payload. `GET` returns the latest stored section snapshot or `status: "missing"`; `POST /api/diagnostics/<section>/refresh` recomputes and replaces only that section. The dashboard button calls `POST /api/diagnostics/refresh`, which returns a small wrapper with `sections` and recomputes source-log-derived sections with one shared analyzer pass. This keeps ordinary dashboard refresh fast and prevents source-log rescans unless a diagnostics refresh is explicit.
+Diagnostic snapshots use separate section endpoints instead of one large read
+payload. `GET` returns the latest stored section snapshot or `status:
+"missing"`. `POST /api/diagnostics/<section>/refresh` starts a one-unit
+background refresh, while `POST /api/diagnostics/refresh` starts a 10-unit
+batch that reuses one source-log analyzer pass. Both return HTTP 202 with a
+`codex-usage-tracker-analysis-job-v1` handle. Consumers poll the read-only
+`GET /api/diagnostics/refresh/status?job_id=...` endpoint and reload the normal
+section GET endpoints when `next.action` is `reload_persisted_results`.
+Identical active refresh requests share one server worker, and abandoning a
+browser poll does not cancel that worker.
+
+```json
+{
+  "schema": "codex-usage-tracker-analysis-job-v1",
+  "job_id": "analysis_example",
+  "job_kind": "diagnostic-refresh",
+  "status": "running",
+  "stage": "persisting_snapshots",
+  "source_revision": "generation:42",
+  "updated_at": "2026-07-14T08:00:00Z",
+  "progress": {
+    "completed_units": 4,
+    "total_units": 10,
+    "percent": 40.0,
+    "current_unit": "file-reads"
+  },
+  "cache": {"request_reused": "none"},
+  "error": null,
+  "next": {
+    "action": "poll",
+    "job_id": "analysis_example",
+    "poll_after_ms": 250
+  }
+}
+```
+
+This keeps ordinary dashboard refresh fast and prevents source-log rescans
+unless a diagnostics refresh is explicit.
 
 ## Diagnostic Overview Snapshot
 

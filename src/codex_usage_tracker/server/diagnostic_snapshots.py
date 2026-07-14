@@ -31,6 +31,7 @@ class SnapshotReportBuilder(Protocol):
 
 
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+ProgressCallback = Callable[..., None]
 ExceptionSender = Callable[[str, BaseException], None]
 RefreshAuthRejector = Callable[[dict[str, list[str]]], bool]
 
@@ -149,6 +150,7 @@ def refresh_all_diagnostic_snapshots_payload(
     rate_card_path: Path,
     include_archived: bool,
     refresh_lock: Any,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, object]:
     """Refresh every diagnostic snapshot and return the aggregate payload."""
     with refresh_lock:
@@ -158,6 +160,7 @@ def refresh_all_diagnostic_snapshots_payload(
             allowance_path=allowance_path,
             rate_card_path=rate_card_path,
             include_archived=include_archived,
+            progress_callback=progress_callback,
         )
 
 
@@ -170,6 +173,7 @@ def diagnostic_refresh_payload(
     rate_card_path: Path,
     include_archived_default: bool,
     refresh_lock: Any,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, object]:
     """Refresh all diagnostic snapshots using dashboard query defaults."""
     params = parse_qs(query)
@@ -184,6 +188,7 @@ def diagnostic_refresh_payload(
         rate_card_path=rate_card_path,
         include_archived=include_archived,
         refresh_lock=refresh_lock,
+        progress_callback=progress_callback,
     )
 
 
