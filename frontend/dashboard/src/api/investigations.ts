@@ -71,6 +71,7 @@ export type InvestigationWalkPayload = {
 type InvestigationRequest = {
   evidenceLimit?: number;
   includeArchived?: boolean;
+  signal?: AbortSignal;
 };
 
 export async function loadAgenticInvestigation(
@@ -80,7 +81,13 @@ export async function loadAgenticInvestigation(
   const params = investigationParams(options);
   params.set('goal', options.goal ?? 'token_waste');
   params.set('detail_mode', 'compact');
-  return loadInvestigationPayload(runtime, '/api/investigations/agentic', params, 'Investigation');
+  return loadInvestigationPayload(
+    runtime,
+    '/api/investigations/agentic',
+    params,
+    'Investigation',
+    options.signal,
+  );
 }
 
 export async function loadInvestigationWalk(
@@ -91,13 +98,18 @@ export async function loadInvestigationWalk(
   const params = investigationParams(options);
   params.set('question', question.trim() || 'Where is avoidable token waste concentrated?');
   params.set('min_occurrences', String(Math.max(1, options.minOccurrences ?? 2)));
-  return loadInvestigationPayload(runtime, '/api/investigations/walk', params, 'Local investigation trace');
+  return loadInvestigationPayload(
+    runtime,
+    '/api/investigations/walk',
+    params,
+    'Local investigation trace',
+    options.signal,
+  );
 }
 
 function investigationParams(options: InvestigationRequest): URLSearchParams {
   const params = new URLSearchParams({
     evidence_limit: String(Math.max(1, options.evidenceLimit ?? 8)),
-    _: String(Date.now()),
   });
   if (options.includeArchived) params.set('include_archived', '1');
   return params;
@@ -108,6 +120,7 @@ async function loadInvestigationPayload<T>(
   path: string,
   params: URLSearchParams,
   label: string,
+  signal?: AbortSignal,
 ): Promise<T> {
   ensureInvestigationRuntime(runtime);
   const response = await fetch(`${path}?${params.toString()}`, {
@@ -116,6 +129,7 @@ async function loadInvestigationPayload<T>(
       'X-Codex-Usage-Token': runtime.apiToken,
     },
     cache: 'no-store',
+    signal,
   });
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {

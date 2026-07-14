@@ -140,6 +140,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           model={model}
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
+          sourceKey={sourceIdentity.sourceKey}
           sourceRevision={sourceIdentity.sourceRevision}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
