@@ -15,6 +15,7 @@ from codex_usage_tracker.store.api import (
     record_refresh_metadata,
 )
 from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
 from codex_usage_tracker.store.refresh_parse import (
     RefreshProgressCallback,
     emit_refresh_progress,
@@ -29,6 +30,7 @@ def refresh_usage_index(
     include_archived: bool = False,
     aggregate_only: bool = False,
     progress_callback: RefreshProgressCallback | None = None,
+    derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
 
@@ -64,6 +66,7 @@ def refresh_usage_index(
             aggregate_only=aggregate_only,
             progress_callback=progress_callback,
             force_serial=False,
+            derived_fact_sync=derived_fact_sync,
         )
     except BrokenProcessPool:
         emit_refresh_progress(
@@ -82,6 +85,7 @@ def refresh_usage_index(
             aggregate_only=aggregate_only,
             progress_callback=progress_callback,
             force_serial=True,
+            derived_fact_sync=derived_fact_sync,
         )
     emit_refresh_progress(
         progress_callback,
@@ -155,6 +159,7 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Clear aggregate rows and rescan local Codex logs."""
 
@@ -177,4 +182,5 @@ def rebuild_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        derived_fact_sync=derived_fact_sync,
     )
