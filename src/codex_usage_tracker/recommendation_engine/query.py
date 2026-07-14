@@ -39,7 +39,10 @@ from codex_usage_tracker.reports.recommendation_builder import (
 )
 from codex_usage_tracker.store.compression_schema import read_compression_source_generation
 from codex_usage_tracker.store.connection import connect
-from codex_usage_tracker.store.recommendation_queries import query_recommendation_fact_page
+from codex_usage_tracker.store.recommendation_queries import (
+    query_recommendation_fact_page,
+    query_recommendation_thread_summaries,
+)
 
 
 def build_recommendations_report(
@@ -124,6 +127,22 @@ def build_indexed_recommendations_report(
     """Build the legacy report contract from indexed actionable facts."""
 
     privacy_mode = validate_privacy_mode(privacy_mode)
+    normalized_limit = _normalize_report_limit(limit)
+    thread_summaries = (
+        query_recommendation_thread_summaries(
+            db_path=db_path,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            include_archived=include_archived,
+            min_score=min_score,
+            limit=normalized_limit,
+        )
+        if project is None and normalized_limit is not None
+        else None
+    )
     page = query_recommendation_fact_page(
         db_path=db_path,
         since=since,
@@ -133,7 +152,7 @@ def build_indexed_recommendations_report(
         thread=thread,
         include_archived=include_archived,
         min_score=min_score,
-        limit=0,
+        limit=normalized_limit if thread_summaries is not None else 0,
     )
     rows = annotate_thread_attachments(page.rows)
     rows = annotate_rows_with_allowance(
@@ -144,8 +163,8 @@ def build_indexed_recommendations_report(
     rows = annotate_rows_with_project_identity(rows, load_project_config(projects_path))
     scored_rows = [row for row in rows if _matches_project(row, project)]
     scored_rows.sort(key=recommendation_sort_key)
-    normalized_limit = None if limit <= 0 else limit
-    limited_rows = scored_rows if normalized_limit is None else scored_rows[:normalized_limit]
+    limited_rows = scored_rows[:normalized_limit]
+    total_matched_rows = page.total_count if thread_summaries is not None else len(scored_rows)
     private_rows = apply_project_privacy_to_rows(limited_rows, privacy_mode=privacy_mode)
     return RecommendationsReport(
         {
@@ -164,15 +183,28 @@ def build_indexed_recommendations_report(
                 "privacy_mode": privacy_mode,
             },
             "row_count": len(private_rows),
-            "total_matched_rows": len(scored_rows),
-            "truncated": normalized_limit is not None and len(scored_rows) > normalized_limit,
-            "threads": thread_recommendation_rows(
-                scored_rows,
-                limit=normalized_limit or 20,
+            "total_matched_rows": total_matched_rows,
+            "truncated": normalized_limit is not None and total_matched_rows > normalized_limit,
+            "threads": _recommendation_thread_payload(
+                thread_summaries, scored_rows, normalized_limit
             ),
             "rows": private_rows,
         }
     )
+
+
+def _recommendation_thread_payload(
+    summaries: list[dict[str, Any]] | None,
+    rows: list[dict[str, Any]],
+    limit: int | None,
+) -> list[dict[str, Any]]:
+    if summaries is not None:
+        return summaries
+    return thread_recommendation_rows(rows, limit=limit or 20)
+
+
+def _normalize_report_limit(limit: int) -> int | None:
+    return None if limit <= 0 else limit
 
 
 def _restore_materialized_recommendations(row: dict[str, Any]) -> dict[str, Any]:

@@ -62,8 +62,8 @@ reusable results.
 | PR 1A: Derived-fact refresh hook | Merged | #244 / #247 / `a5681ba` | Transactional full/append callback coverage and 807-test CI matrix |
 | PR 1B: Recommendation fact materialization | Merged | #244 / #248 / `f1dfc22` | Schema v20, parity/incremental/backfill tests, and agent-perf run `20260713T234304Z-bade89ff` |
 | PR 1C: Product refresh wiring | Merged | #244 / #249 / `3e569c6` | CLI/server wiring, architecture decision, and 38 focused refresh-path tests |
-| PR 2A: Indexed recommendations compatibility | In progress | #244 | Exact payload parity, freshness fallback, and public route/CLI/MCP wiring |
-| PR 2B: Bounded recommendation hydration | Pending | #244 | Agent-perf attribution plus 10k/100k/400k warm and cold latency results |
+| PR 2A: Indexed recommendations compatibility | Merged | #244 / #250 / `378a2d1` | Exact payload parity, freshness fallback, and public route/CLI/MCP wiring |
+| PR 2B: Bounded recommendation hydration | In progress | #244 | 400k legacy 29.96 s; indexed median 135 ms / p95 151 ms; baseline agent-perf `20260714T011721Z-58ac3b4a` |
 | PR 3: Frontend module query registry | Pending | #244 | Branch, PR, lifecycle/browser tests |
 | PR 4: Heavy-route job migration | Pending | #244 | Branch, PR, async progress/cache tests |
 | PR 5: Query and cache hardening | Pending | #244 | Branch, PR, query plans and warm/cold budgets |
@@ -85,6 +85,11 @@ The initial real-data trace used a local all-history scope with 404,176 calls:
 
 These values are diagnostic baselines, not universal benchmarks. Automated
 performance gates will use synthetic databases with stable sizes and shapes.
+
+PR 2B's synthetic 400,000-row comparison reduced the same recommendation
+request from 29.96 seconds on the legacy fallback to a 134.6 ms median and
+151.1 ms p95 over 20 indexed runs. The request now reads materialized thread
+rollups, hydrates only the top 20 rows, and keeps ranking index-backed.
 
 ## Architectural Principles
 

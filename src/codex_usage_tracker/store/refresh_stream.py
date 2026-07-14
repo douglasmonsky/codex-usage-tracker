@@ -381,7 +381,12 @@ class _RefreshStreamWriter:
         self.timings.add("compression_facts", started)
         if self.derived_fact_sync is not None:
             recommendation_started = perf_counter()
-            self.derived_fact_sync(conn, finalized.record_ids, full_rebuild)
+            self.derived_fact_sync(
+                conn,
+                finalized.record_ids,
+                finalized.affected_thread_keys,
+                full_rebuild,
+            )
             self.timings.add("recommendation_facts", recommendation_started)
         emit_refresh_progress(
             self.progress_callback,

@@ -86,11 +86,7 @@ def recommendation_generation_fingerprint(
 
 def _canonical_config(value: Any) -> Any:
     if is_dataclass(value) and not isinstance(value, type):
-        return {
-            item.name: _canonical_config(getattr(value, item.name))
-            for item in fields(value)
-            if item.name not in _IGNORED_CONFIG_FIELDS
-        }
+        return _canonical_dataclass(value)
     if isinstance(value, dict):
         return {str(key): _canonical_config(item) for key, item in sorted(value.items())}
     if isinstance(value, (list, tuple)):
@@ -100,6 +96,14 @@ def _canonical_config(value: Any) -> Any:
     if isinstance(value, Path):
         return value.name
     return value
+
+
+def _canonical_dataclass(value: Any) -> dict[str, Any]:
+    return {
+        item.name: _canonical_config(getattr(value, item.name))
+        for item in fields(value)
+        if item.name not in _IGNORED_CONFIG_FIELDS
+    }
 
 
 def _canonical_json(value: Any) -> str:

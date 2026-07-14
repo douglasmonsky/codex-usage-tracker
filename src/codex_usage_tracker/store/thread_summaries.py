@@ -32,9 +32,14 @@ def rebuild_thread_summaries(
 
     before = conn.total_changes
     normalized_thread_keys = sorted({key for key in thread_keys or [] if key})
+    recommendation_rows = _saved_recommendation_summaries(
+        conn,
+        thread_keys=normalized_thread_keys or None,
+    )
     if not normalized_thread_keys:
         conn.execute("DELETE FROM thread_summaries")
         _insert_thread_summary_scopes(conn, updated_at=_summary_timestamp())
+        _restore_recommendation_summaries(conn, recommendation_rows)
         return conn.total_changes - before
     updated_at = _summary_timestamp()
     for start in range(0, len(normalized_thread_keys), _THREAD_KEY_BATCH_SIZE):
@@ -45,7 +50,59 @@ def rebuild_thread_summaries(
             chunk,
         )
         _insert_thread_summary_scopes(conn, updated_at=updated_at, thread_keys=chunk)
+    _restore_recommendation_summaries(conn, recommendation_rows)
     return conn.total_changes - before
+
+
+def _saved_recommendation_summaries(
+    conn: sqlite3.Connection,
+    *,
+    thread_keys: list[str] | None,
+) -> list[sqlite3.Row]:
+    conditions = ["recommendation_summary_json IS NOT NULL"]
+    params: list[str] = []
+    if thread_keys:
+        placeholders = ", ".join("?" for _ in thread_keys)
+        conditions.append(f"thread_key IN ({placeholders})")
+        params.extend(thread_keys)
+    where_clause = f"WHERE {' AND '.join(conditions)}"
+    return conn.execute(
+        f"""
+        SELECT thread_key, is_archived_scope, recommendation_score,
+            recommendation_total_tokens, recommendation_summary_json,
+            max_recommendation_score, primary_recommendation
+        FROM thread_summaries
+        {where_clause}
+        """,  # nosec B608 - only generated placeholders; values remain bound
+        params,
+    ).fetchall()
+
+
+def _restore_recommendation_summaries(
+    conn: sqlite3.Connection,
+    rows: list[sqlite3.Row],
+) -> None:
+    conn.executemany(
+        """
+        UPDATE thread_summaries
+        SET recommendation_score = ?, recommendation_total_tokens = ?,
+            recommendation_summary_json = ?, max_recommendation_score = ?,
+            primary_recommendation = ?
+        WHERE thread_key = ? AND is_archived_scope = ?
+        """,
+        [
+            (
+                row["recommendation_score"],
+                row["recommendation_total_tokens"],
+                row["recommendation_summary_json"],
+                row["max_recommendation_score"],
+                row["primary_recommendation"],
+                row["thread_key"],
+                row["is_archived_scope"],
+            )
+            for row in rows
+        ],
+    )
 
 
 def _summary_timestamp() -> str:

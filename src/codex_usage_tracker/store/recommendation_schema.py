@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import sqlite3
 
-MIGRATION_NAMES = {20: "persist versioned recommendation facts"}
+MIGRATION_NAMES = {
+    20: "persist versioned recommendation facts",
+    21: "materialize recommendation thread summaries",
+}
 
 _INDEX_STATEMENTS = (
     "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_scope "
@@ -16,6 +19,14 @@ _INDEX_STATEMENTS = (
     "ON recommendation_facts(thread_key, recommendation_score DESC, event_timestamp DESC)",
     "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_primary "
     "ON recommendation_facts(primary_recommendation_key, recommendation_score DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_rank_all "
+    "ON recommendation_facts(recommendation_score DESC, total_tokens DESC, "
+    "event_timestamp, record_id) "
+    "WHERE json_array_length(recommendations_json) > 0",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_rank_active "
+    "ON recommendation_facts(recommendation_score DESC, total_tokens DESC, "
+    "event_timestamp, record_id) "
+    "WHERE is_archived = 0 AND json_array_length(recommendations_json) > 0",
 )
 _INDEX_DROP_STATEMENTS = tuple(
     statement.replace("CREATE INDEX IF NOT EXISTS ", "DROP INDEX IF EXISTS ").split(" ON ", 1)[0]
@@ -72,6 +83,44 @@ def create_recommendation_fact_tables(conn: sqlite3.Connection) -> None:
             record_count INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
         );
+        """
+    )
+    create_recommendation_fact_indexes(conn)
+
+
+def add_recommendation_thread_summaries(conn: sqlite3.Connection) -> None:
+    """Extend existing summary/state tables with exact recommendation rollups."""
+    summary_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(thread_summaries)").fetchall()
+    }
+    for name, definition in (
+        ("recommendation_score", "REAL NOT NULL DEFAULT 0"),
+        ("recommendation_total_tokens", "INTEGER NOT NULL DEFAULT 0"),
+        ("recommendation_summary_json", "TEXT"),
+    ):
+        if name not in summary_columns:
+            conn.execute(f"ALTER TABLE thread_summaries ADD COLUMN {name} {definition}")
+
+    state_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(recommendation_fact_state)").fetchall()
+    }
+    if "thread_summaries_complete" not in state_columns:
+        conn.execute(
+            """
+            ALTER TABLE recommendation_fact_state
+            ADD COLUMN thread_summaries_complete INTEGER NOT NULL DEFAULT 0
+            """
+        )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_thread_summaries_scope_recommendations
+        ON thread_summaries(
+            is_archived_scope,
+            recommendation_score DESC,
+            recommendation_total_tokens DESC,
+            thread_key
+        )
         """
     )
     create_recommendation_fact_indexes(conn)

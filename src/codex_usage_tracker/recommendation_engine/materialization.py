@@ -23,6 +23,9 @@ from codex_usage_tracker.recommendation_engine.fact_config import (
     load_recommendation_fact_config,
     recommendation_generation_fingerprint,
 )
+from codex_usage_tracker.recommendation_engine.summary_materialization import (
+    sync_thread_recommendation_summaries,
+)
 from codex_usage_tracker.store.compression_schema import read_compression_source_generation
 from codex_usage_tracker.store.recommendation_schema import (
     create_recommendation_fact_indexes,
@@ -57,6 +60,7 @@ def backfill_recommendation_facts(
     finally:
         create_recommendation_fact_indexes(conn)
     _stamp_state(conn, config=config, generation=generation)
+    sync_thread_recommendation_summaries(conn)
     return count
 
 
@@ -64,12 +68,27 @@ def sync_recommendation_facts(
     conn: sqlite3.Connection,
     *,
     record_ids: Iterable[str],
+    thread_keys: Iterable[str] | None = None,
 ) -> int:
     """Replace facts only for changed normalized usage records."""
     targets = tuple(dict.fromkeys(str(record_id) for record_id in record_ids if record_id))
     config = load_recommendation_fact_config()
     generation = _generation(conn, config)
     _populate_targets(conn, targets)
+    affected_thread_keys = {
+        str(row[0])
+        for row in conn.execute(
+            """
+            SELECT thread_key FROM recommendation_facts
+            WHERE record_id IN (SELECT record_id FROM recommendation_fact_targets)
+            UNION
+            SELECT thread_key FROM usage_events
+            WHERE record_id IN (SELECT record_id FROM recommendation_fact_targets)
+            """
+        ).fetchall()
+        if row[0]
+    }
+    affected_thread_keys.update(str(key) for key in thread_keys or () if key)
     conn.execute(
         """
         DELETE FROM recommendation_facts
@@ -86,18 +105,24 @@ def sync_recommendation_facts(
     )
     count = _insert_cursor_facts(conn, cursor, config=config, generation=generation)
     _stamp_state(conn, config=config, generation=generation)
+    sync_thread_recommendation_summaries(conn, thread_keys=affected_thread_keys)
     return count
 
 
 def sync_refresh_recommendation_facts(
     conn: sqlite3.Connection,
     record_ids: tuple[str, ...],
+    thread_keys: frozenset[str],
     full_rebuild: bool,
 ) -> None:
     if full_rebuild:
         backfill_recommendation_facts(conn)
     else:
-        sync_recommendation_facts(conn, record_ids=record_ids)
+        sync_recommendation_facts(
+            conn,
+            record_ids=record_ids,
+            thread_keys=thread_keys,
+        )
 
 
 def _generation(

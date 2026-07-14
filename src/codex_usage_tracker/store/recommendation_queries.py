@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -48,7 +49,12 @@ def query_recommendation_fact_page(
         table_alias="usage_events",
         include_archived=include_archived,
     )
-    where_clause = _extend_fact_filters(where_clause, params, min_score=min_score)
+    where_clause = _extend_fact_filters(
+        where_clause,
+        params,
+        include_archived=include_archived,
+        min_score=min_score,
+    )
     normalized_limit = normalize_limit(limit)
     limit_clause = "" if normalized_limit is None else " LIMIT ?"
     row_params = [*params] if normalized_limit is None else [*params, normalized_limit]
@@ -85,13 +91,62 @@ def query_recommendation_fact_page(
     )
 
 
+def query_recommendation_thread_summaries(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    include_archived: bool = False,
+    min_score: float | None = None,
+    limit: int | None = 20,
+) -> list[dict[str, Any]] | None:
+    """Read exact materialized summaries for the unfiltered common path."""
+
+    if any(value is not None for value in (since, until, model, effort, thread, min_score)):
+        return None
+    normalized_limit = normalize_limit(limit)
+    limit_clause = "" if normalized_limit is None else " LIMIT ?"
+    params = [] if normalized_limit is None else [normalized_limit]
+    with connect(db_path) as conn:
+        state = conn.execute(
+            """
+            SELECT thread_summaries_complete
+            FROM recommendation_fact_state
+            WHERE singleton = 1
+            """
+        ).fetchone()
+        if state is None or not bool(state[0]):
+            return None
+        rows = conn.execute(
+            f"""
+            SELECT recommendation_summary_json
+            FROM thread_summaries
+            WHERE is_archived_scope = ?
+                AND recommendation_summary_json IS NOT NULL
+            ORDER BY
+                recommendation_score DESC,
+                recommendation_total_tokens DESC,
+                thread_key ASC
+            {limit_clause}
+            """,  # nosec B608 - fixed LIMIT fragment; values remain bound
+            ["all-history" if include_archived else "active", *params],
+        ).fetchall()
+    return [json.loads(str(row[0])) for row in rows]
+
+
 def _extend_fact_filters(
     where_clause: str,
     params: list[Any],
     *,
+    include_archived: bool,
     min_score: float | None,
 ) -> str:
     clauses = ["json_array_length(rf.recommendations_json) > 0"]
+    if not include_archived:
+        clauses.append("rf.is_archived = 0")
     if min_score is not None:
         clauses.append("rf.recommendation_score >= ?")
         params.append(min_score)
