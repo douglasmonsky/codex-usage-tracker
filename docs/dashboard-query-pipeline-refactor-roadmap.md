@@ -66,7 +66,7 @@ reusable results.
 | PR 2B: Bounded recommendation hydration | Merged | #244 / #251 / `d9085e6` | 400k legacy 29.96 s; indexed median 135 ms / p95 151 ms; baseline agent-perf `20260714T011721Z-58ac3b4a` |
 | PR 3A: Core frontend query registry | Merged | #244 / #252 / `3da6b29` | Central source/scope identity, data-class policy, module-state, coalescing, and focused lifecycle tests |
 | PR 3B1: Shared module progress | Merged | #244 / #253 / `382d77f` | Updating-vs-loading state, Overview background-refresh coverage, and deterministic endpoint-cache tests |
-| PR 3B2: Shell source identity | In progress | #244 | Stable credential-free source propagation for Overview, Calls, and Threads; same-route navigation preserves local state |
+| PR 3B2: Shell source identity | In review | #244 / #254 / `f62c0d1` | Stable credential-free source propagation for Overview, Calls, and Threads; same-route navigation preserves local state |
 | PR 3B3: Cache and Reports migration | Pending | #244 | Shared policies, module progress, cancellation, and browser tests |
 | PR 3B4: Investigator migration | Pending | #244 | Credential-free keys, request cancellation, module progress, and browser tests |
 | PR 3C: Diagnostics query migration | Pending | #244 | Diagnostics lifecycle and rapid route-switching browser tests |
