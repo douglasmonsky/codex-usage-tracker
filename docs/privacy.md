@@ -87,6 +87,10 @@ The localhost server:
   `/api/investigations/*` with the same safe fields and raw-fragment flags as the
   corresponding MCP reports; the explicit investigation-walk route can use the
   local content/event index but still omits raw fragments
+- exposes token-protected Compression Lab start, status, and profile routes
+  using the same compact payload as MCP. The dashboard keeps only the
+  aggregate profile in its in-memory query cache; candidate evidence, indexed
+  excerpts, and raw fragments are not written to browser storage
 
 The report pack contains aggregate report definitions, linked aggregate call
 rows, a schema marker, and a server generation timestamp. It does not include

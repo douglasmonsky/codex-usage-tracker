@@ -1,6 +1,7 @@
 const dashboardViewIds = [
   'overview',
   'investigator',
+  'compression-lab',
   'calls',
   'call',
   'threads',

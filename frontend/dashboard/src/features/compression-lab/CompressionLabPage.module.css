@@ -1,0 +1,273 @@
+.page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pageHeader,
+.headerActions,
+.panelHeader,
+.progressMeta {
+  display: flex;
+  align-items: center;
+}
+
+.pageHeader {
+  gap: 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pageHeader h1,
+.answerBand h2,
+.panelHeader h2,
+.caveats h2,
+.emptyState h2 {
+  margin: 0;
+  color: var(--ink-strong);
+  letter-spacing: 0;
+}
+
+.pageHeader h1 {
+  font-size: 28px;
+  line-height: 1.12;
+}
+
+.pageHeader p:not(.eyebrow),
+.panelHeader p,
+.emptyState p {
+  margin: 5px 0 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pageHeader p:not(.eyebrow) {
+  max-width: 82ch;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--signal-context);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.headerActions {
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.progressPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.progressMeta {
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.progressMeta strong {
+  color: var(--ink-strong);
+}
+
+.loadingState,
+.error {
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.error {
+  color: var(--signal-risk);
+  background: var(--signal-risk-subtle);
+  border-left: 3px solid var(--signal-risk);
+}
+
+.answerBand {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  padding: 18px 20px;
+  background: var(--signal-positive-subtle);
+  border-left: 4px solid var(--signal-positive);
+}
+
+.answerBand > div > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.answerBand h2 {
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.answerBand p {
+  margin: 7px 0 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.analysisGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(310px, 0.65fr);
+  gap: 14px;
+  min-width: 0;
+}
+
+.familyPanel,
+.methodPanel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+
+.panelHeader {
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.panelHeader h2,
+.caveats h2,
+.emptyState h2 {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.panelHeader > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--signal-context);
+}
+
+.tableWrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.tableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tableWrap th,
+.tableWrap td {
+  padding: 10px 8px;
+  border-top: 1px solid var(--line-subtle);
+  color: var(--ink-muted);
+  font-size: 12px;
+  text-align: left;
+}
+
+.tableWrap th {
+  color: var(--ink-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.tableWrap td strong {
+  color: var(--ink-strong);
+}
+
+.tableWrap .numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.methodList {
+  display: grid;
+  margin: 0;
+}
+
+.methodList > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.methodList dt {
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.methodList dd {
+  margin: 0;
+  color: var(--ink-strong);
+  font-size: 12px;
+}
+
+.warning {
+  display: flex;
+  gap: 8px;
+  color: var(--signal-caution);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.warning svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+.caveats {
+  display: grid;
+  gap: 8px;
+}
+
+.caveats ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.emptyState {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+.emptyState > svg {
+  width: 24px;
+  height: 24px;
+  color: var(--signal-context);
+}
+
+@media (max-width: 1100px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysisGrid {
+    grid-template-columns: 1fr;
+  }
+}

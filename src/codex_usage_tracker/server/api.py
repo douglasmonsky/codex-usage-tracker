@@ -23,6 +23,7 @@ from codex_usage_tracker.core.paths import (
 from codex_usage_tracker.dashboard.api import (
     generate_dashboard,
 )
+from codex_usage_tracker.server import compression_routes
 from codex_usage_tracker.server import utils as server_utils
 from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
 from codex_usage_tracker.server.context_settings import (
@@ -94,6 +95,7 @@ def serve_dashboard(
     )
     refresh_jobs = RefreshJobRegistry()
     analysis_jobs = AnalysisJobRegistry()
+    compression_jobs = compression_routes.CompressionJobRegistry()
     handler = partial(
         _UsageDashboardHandler,
         directory=str(output.parent),
@@ -117,6 +119,7 @@ def serve_dashboard(
         refresh_lock=threading.Lock(),
         refresh_jobs=refresh_jobs,
         analysis_jobs=analysis_jobs,
+        compression_jobs=compression_jobs,
     )
     server = ThreadingHTTPServer((host, port), handler)
     legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"

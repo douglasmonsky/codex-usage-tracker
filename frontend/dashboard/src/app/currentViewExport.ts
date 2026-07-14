@@ -70,6 +70,8 @@ export async function currentViewCsvExport(
       const { investigatorCallsForCurrentUrl } = await import('../features/investigator/InvestigatorPage');
       return csvExport(`codex-investigator-calls-${stamp}.csv`, investigatorCallsForCurrentUrl(model), callCsvColumns, 'call rows');
     }
+    case 'compression-lab':
+      return csvExport(`codex-compression-lab-scope-${stamp}.csv`, model.calls, callCsvColumns, 'call rows');
     case 'call':
       return csvExport(`codex-call-calls-${stamp}.csv`, callInvestigatorCallForCurrentUrl(model), callCsvColumns, 'call rows');
   }

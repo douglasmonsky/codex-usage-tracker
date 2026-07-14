@@ -15,9 +15,9 @@ from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import (
     DEFAULT_RATE_CARD_PATH,
 )
+from codex_usage_tracker.server import compression_routes
 from codex_usage_tracker.server import context as server_context
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
-from codex_usage_tracker.server import utils as server_utils
 from codex_usage_tracker.server.allowance import (
     handle_allowance_diagnostics_request,
     handle_allowance_export_request,
@@ -72,23 +72,12 @@ from codex_usage_tracker.server.status import handle_status_request
 from codex_usage_tracker.server.summary import handle_summary_request
 from codex_usage_tracker.server.threads import handle_threads_request
 
-_first = server_utils.first_query_value
-_matches_live_derived_filters = server_utils.matches_live_derived_filters
-_parse_api_limit = server_utils.parse_api_limit
-_parse_api_offset = server_utils.parse_api_offset
-_parse_bool = server_utils.parse_bool_query_value
-_parse_limit = server_utils.parse_dashboard_limit
-_parse_offset = server_utils.parse_dashboard_offset
-_parse_optional_float = server_utils.parse_optional_float
-_parse_report_limit = server_utils.parse_report_limit
-_safe_int = server_utils.safe_int
-_truthy = server_utils.truthy_query_value
-_url_host = server_utils.url_host
-_validate_context_api_mode = server_utils.validate_context_api_mode
-_validate_loopback_host = server_utils.validate_loopback_host
 
-
-class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
+class _UsageDashboardHandler(
+    compression_routes.CompressionRouteMixin,
+    DiagnosticRouteMixin,
+    DashboardPageMixin,
+):
     def __init__(
         self,
         *args: Any,
@@ -107,6 +96,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
         refresh_lock: threading.Lock,
         refresh_jobs: server_usage_refresh.RefreshJobRegistry | None = None,
         analysis_jobs: AnalysisJobRegistry | None = None,
+        compression_jobs: compression_routes.CompressionJobRegistry | None = None,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: ContextApiState | None = None,
@@ -139,6 +129,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
         self._refresh_lock = refresh_lock
         self._refresh_jobs = refresh_jobs or server_usage_refresh.RefreshJobRegistry()
         self._analysis_jobs = analysis_jobs or AnalysisJobRegistry()
+        self._compression_jobs = compression_jobs or compression_routes.CompressionJobRegistry()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name

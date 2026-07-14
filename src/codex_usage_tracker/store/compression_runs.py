@@ -259,12 +259,13 @@ def get_compression_run(
     db_path: Path = DEFAULT_DB_PATH,
     *,
     run_id: str,
+    touch: bool = True,
 ) -> dict[str, Any] | None:
-    """Return one decoded run and mark it recently accessed."""
+    """Return one decoded run, optionally marking it recently accessed."""
     with connect(db_path) as conn:
         init_db(conn)
         row = _select_run(conn, run_id)
-        if row is not None:
+        if row is not None and touch:
             conn.execute(
                 "UPDATE compression_runs SET last_accessed_at = ? WHERE run_id = ?",
                 (_utc_now(), run_id),

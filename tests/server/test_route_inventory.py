@@ -44,3 +44,15 @@ def test_route_inventory_has_decision_ready_execution_metadata() -> None:
         profile.execution == "synchronous" and profile.workload == "heavy_analysis"
         for profile in DASHBOARD_ROUTE_PROFILES
     )
+
+    compression = {
+        profile.path: profile
+        for profile in DASHBOARD_ROUTE_PROFILES
+        if profile.path.startswith("/api/compression/")
+    }
+    assert compression["/api/compression/start"].execution == "async_start"
+    assert compression["/api/compression/start"].workload == "heavy_analysis"
+    assert compression["/api/compression/status"].execution == "poll"
+    assert compression["/api/compression/status"].workload == "interactive"
+    assert compression["/api/compression/profile"].execution == "synchronous"
+    assert compression["/api/compression/profile"].workload == "bounded_report"

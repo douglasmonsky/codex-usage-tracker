@@ -40,6 +40,8 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
         "/api/diagnostics/guided-summary": "_handle_diagnostics_guided_summary",
         "/api/diagnostics/usage-drain": "_handle_diagnostics_usage_drain",
         "/api/diagnostics/refresh/status": "_handle_diagnostics_refresh_status",
+        "/api/compression/status": "_handle_compression_status",
+        "/api/compression/profile": "_handle_compression_profile",
         "/api/usage": "_handle_usage",
         "/api/refresh/start": "_handle_refresh_start",
         "/api/refresh/status": "_handle_refresh_status",
@@ -55,6 +57,7 @@ GET_DIAGNOSTIC_FACT_ROUTES: Mapping[str, Mapping[str, str]] = MappingProxyType(
 
 POST_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
     {
+        "/api/compression/start": "_handle_compression_start",
         "/api/diagnostics/refresh": "_handle_diagnostics_refresh",
         "/api/diagnostics/overview/refresh": "_handle_diagnostics_overview_refresh",
         "/api/diagnostics/tool-output/refresh": "_handle_diagnostics_tool_output_refresh",

@@ -1,4 +1,4 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi } from './test-utils/appTestHarness';
 
 describe('React dashboard shell overview', () => {
   installAppTestHooks();
@@ -23,6 +23,34 @@ render(<App />);
 fireEvent.click(screen.getByRole('button', { name: 'Investigate' }));
 expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=investigator');
+});
+
+it('opens Compression Lab from primary navigation and reads the cached profile state', async () => {
+  window.__CODEX_USAGE_BOOT__ = {
+    api_token: 'test-token',
+    rows: [],
+    loaded_row_count: 0,
+    total_available_rows: 0,
+    history_scope: 'all',
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: false,
+    status: 404,
+    json: async () => ({
+      schema: 'codex-usage-tracker-compression-api-v1',
+      kind: 'profile',
+      run_id: null,
+      status: 'error',
+      error: { code: 'compression_run_not_found', message: 'No profile.' },
+    }),
+  }));
+
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Compression Lab' }));
+
+  expect(await screen.findByRole('heading', { name: 'Compression Lab' })).toBeInTheDocument();
+  expect(await screen.findByText('No analysis for this scope yet')).toBeInTheDocument();
+  expect(window.location.search).toContain('view=compression-lab');
 });
 
 });

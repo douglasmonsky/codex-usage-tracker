@@ -24,6 +24,7 @@ describe('dashboard search contract', () => {
       custom_future_filter: 'preserved',
     });
     expect(normalizeDashboardView('not-a-view')).toBe('overview');
+    expect(isDashboardViewId('compression-lab')).toBe(true);
   });
 
   it('types shared parameters and removes invalid values', () => {

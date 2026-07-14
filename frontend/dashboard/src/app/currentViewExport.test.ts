@@ -52,9 +52,10 @@ describe('current view export helpers', () => {
   });
 
  it('keeps current-view export routing scoped active call data', async () => {
-    const [threadsExport, callsExport] = await Promise.all([
+    const [threadsExport, callsExport, compressionExport] = await Promise.all([
       currentViewCsvExport('threads', fixtureModel, runtime, 'thread-9f3a'),
       currentViewCsvExport('calls', fixtureModel, runtime, 'thread-9f3a'),
+      currentViewCsvExport('compression-lab', fixtureModel, runtime),
     ]);
 
  expect(threadsExport.filename).toMatch(/^codex-thread-filtered-calls-\d{4}-\d{2}-\d{2}\.csv$/);
@@ -65,5 +66,8 @@ describe('current view export helpers', () => {
     );
     expect(callsExport.label).toBe('call rows');
     expect(callsExport.rowCount).toBe(1);
+    expect(compressionExport.filename).toMatch(/^codex-compression-lab-scope-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(compressionExport.label).toBe('call rows');
+    expect(compressionExport.rowCount).toBe(fixtureModel.calls.length);
   });
 });
