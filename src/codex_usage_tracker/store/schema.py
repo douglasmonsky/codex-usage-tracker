@@ -16,7 +16,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -110,6 +110,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (20, recommendation_schema.create_recommendation_fact_tables),
         (21, recommendation_schema.add_recommendation_thread_summaries),
         (22, schema_query_indexes.add_diagnostic_lookup_index),
+        (23, schema_query_indexes.add_diagnostic_aggregate_index),
     )
 
 
@@ -120,7 +121,10 @@ def _apply_schema_migration(
     version: int,
     migrate: Callable[[sqlite3.Connection], None],
 ) -> None:
-    if user_version < version or not _migration_record_exists(conn, version):
+    recorded = conn.execute(
+        "SELECT 1 FROM schema_migrations WHERE version = ?", (version,)
+    ).fetchone()
+    if user_version < version or recorded is None:
         migrate(conn)
         _record_migration(conn, version)
         return
@@ -717,11 +721,6 @@ def _record_migration(conn: sqlite3.Connection, version: int) -> None:
     )
 
 
-def _migration_record_exists(conn: sqlite3.Connection, version: int) -> bool:
-    row = conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone()
-    return row is not None
-
-
 def _ensure_columns(conn: sqlite3.Connection, columns: dict[str, str]) -> None:
     _ensure_table_columns(conn, "usage_events", columns)
 
@@ -742,9 +741,8 @@ def _ensure_table_columns(
 
 
 def _validate_usage_events_schema(conn: sqlite3.Connection) -> None:
-    existing = {
-        str(row["name"]) for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
-    }
+    rows = conn.execute("PRAGMA table_info(usage_events)").fetchall()
+    existing = {str(row["name"]) for row in rows}
     missing = [column for column in REQUIRED_USAGE_EVENT_COLUMNS if column not in existing]
     if missing:
         missing_text = ", ".join(missing)

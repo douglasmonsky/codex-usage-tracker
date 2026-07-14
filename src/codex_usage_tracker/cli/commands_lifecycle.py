@@ -71,6 +71,10 @@ def _run_setup(args: argparse.Namespace) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         include_archived=args.include_archived,
+        pricing_path=args.pricing,
+        allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        thresholds_path=args.thresholds,
     )
     lines.append(
         f"Refresh: scanned {refresh_result.scanned_files} files, parsed "
@@ -185,6 +189,10 @@ def _run_refresh(args: argparse.Namespace) -> int:
         db_path=args.db,
         include_archived=args.include_archived,
         aggregate_only=args.aggregate_only,
+        pricing_path=args.pricing,
+        allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        thresholds_path=args.thresholds,
     )
     if args.as_json:
         print_json(refresh_result_payload(result, schema="codex-usage-tracker-refresh-v1"))
@@ -209,6 +217,10 @@ def _run_rebuild_index(args: argparse.Namespace) -> int:
         db_path=args.db,
         include_archived=args.include_archived,
         aggregate_only=args.aggregate_only,
+        pricing_path=args.pricing,
+        allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        thresholds_path=args.thresholds,
     )
     if args.as_json:
         print_json(refresh_result_payload(result, schema="codex-usage-tracker-rebuild-index-v1"))

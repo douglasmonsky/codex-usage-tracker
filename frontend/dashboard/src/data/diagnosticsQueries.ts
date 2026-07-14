@@ -16,6 +16,7 @@ import {
 } from '../api/diagnostics';
 import type { ContextRuntime } from '../api/types';
 import {
+  dashboardQueryDefinition,
   dashboardQueryKey,
   dashboardQueryOptions,
   dashboardQuerySource,
@@ -48,6 +49,9 @@ export type DiagnosticSnapshotQueryRequest = DiagnosticQueryRequest & {
 };
 
 const defaultFactCallPageSize = 8;
+const diagnosticFactsQuery = dashboardQueryDefinition('diagnostics-facts');
+const diagnosticFactCallsQuery = dashboardQueryDefinition('diagnostics-fact-calls');
+const diagnosticSnapshotQuery = dashboardQueryDefinition('diagnostics-snapshot');
 
 export function diagnosticFactSourceQueryOptions(request: DiagnosticFactSourceQueryRequest) {
   const definition = diagnosticFactSourceDefinitions.find(source => source.key === request.factSourceKey)
@@ -58,7 +62,7 @@ export function diagnosticFactSourceQueryOptions(request: DiagnosticFactSourceQu
   const direction = request.direction ?? 'desc';
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'diagnostics-facts',
+      diagnosticFactsQuery,
       diagnosticQuerySource(request),
       diagnosticQueryScope(request),
       request.factSourceKey,
@@ -76,7 +80,7 @@ export function diagnosticFactSourceQueryOptions(request: DiagnosticFactSourceQu
       signal,
       sort,
     }),
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(diagnosticFactsQuery.dataClass),
   });
 }
 
@@ -86,7 +90,7 @@ export function diagnosticFactCallsQueryOptions(request: DiagnosticFactCallsQuer
   const direction = request.direction ?? 'desc';
   return infiniteQueryOptions({
     queryKey: dashboardQueryKey(
-      'diagnostics-fact-calls',
+      diagnosticFactCallsQuery,
       diagnosticQuerySource(request),
       diagnosticQueryScope(request),
       String(request.fact.fact_type ?? ''),
@@ -106,14 +110,14 @@ export function diagnosticFactCallsQueryOptions(request: DiagnosticFactCallsQuer
       sort,
     }),
     getNextPageParam: (_lastPage, pages) => nextFactCallOffset(pages),
-    ...dashboardQueryOptions('detail'),
+    ...dashboardQueryOptions(diagnosticFactCallsQuery.dataClass),
   });
 }
 
 export function diagnosticSnapshotQueryOptions(request: DiagnosticSnapshotQueryRequest) {
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'diagnostics-snapshot',
+      diagnosticSnapshotQuery,
       diagnosticQuerySource(request),
       diagnosticQueryScope(request),
       request.snapshotKey,
@@ -122,7 +126,7 @@ export function diagnosticSnapshotQueryOptions(request: DiagnosticSnapshotQueryR
       cacheKey: request.sourceRevision,
       signal,
     }),
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(diagnosticSnapshotQuery.dataClass),
   });
 }
 

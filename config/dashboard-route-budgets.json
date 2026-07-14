@@ -1,0 +1,36 @@
+{
+  "schema": "codex-usage-tracker-dashboard-route-budgets-v1",
+  "fixture_rows": 100000,
+  "routes": {
+    "/api/summary": {
+      "cold_p95_seconds": 0.75,
+      "warm_p95_seconds": 0.05
+    },
+    "/api/recommendations": {
+      "cold_p95_seconds": 0.5,
+      "warm_p95_seconds": 0.05
+    },
+    "/api/threads": {
+      "p95_seconds": 0.1
+    },
+    "/api/thread-calls": {
+      "p95_seconds": 0.15
+    },
+    "/api/diagnostics/facts": {
+      "cold_p95_seconds": 0.75,
+      "warm_p95_seconds": 0.05
+    },
+    "/api/diagnostics/tools": {
+      "cold_p95_seconds": 0.75,
+      "warm_p95_seconds": 0.05
+    },
+    "/api/allowance/history": {
+      "cold_p95_seconds": 0.75,
+      "warm_p95_seconds": 0.15
+    },
+    "/api/allowance/diagnostics": {
+      "cold_p95_seconds": 0.75,
+      "warm_p95_seconds": 0.15
+    }
+  }
+}

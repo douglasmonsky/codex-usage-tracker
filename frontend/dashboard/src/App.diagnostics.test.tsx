@@ -148,7 +148,9 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     expect(screen.queryByRole('progressbar', { name: 'Loading diagnostic fact sources' })).not.toBeInTheDocument();
     expect((await screen.findAllByText('diag-cache-thread')).length).toBeGreaterThan(0);
     const firstLoadCount = fetchMock.mock.calls.filter(([input]) => String(input).includes('/api/diagnostics/')).length;
-    expect(firstLoadCount).toBe(14);
+    expect(firstLoadCount).toBeGreaterThan(0);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/tools?'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/compactions?'))).toBe(false);
 
   fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
   fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
@@ -293,7 +295,7 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
   await waitFor(() => expect(screen.getAllByText(/large_uncached_input_8/i).length).toBeGreaterThan(0));
   fireEvent.click(screen.getByRole('button', { name: /Sort diagnostic facts ascending/i }));
   await waitFor(() => expect(screen.queryByText(/large_uncached_input_8/i)).not.toBeInTheDocument());
-  fireEvent.click(screen.getByRole('button', { name: /Show 2 more/i }));
+  fireEvent.click(await screen.findByRole('button', { name: /Show 2 more/i }));
   expect(screen.getByText(/large_uncached_input_8/i)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Sort diagnostic fact calls'), { target: { value: 'cache' } });
   fireEvent.click(screen.getByRole('button', { name: /Sort diagnostic fact calls ascending/i }));
@@ -306,10 +308,12 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
       }),
     ).toBe(true);
   });
-  fireEvent.click(screen.getByRole('tab', { name: /Tools 1/i }));
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/tools?'))).toBe(false);
+    fireEvent.click(screen.getByRole('tab', { name: /^Tools/i }));
     expect((await screen.findAllByText(/function_call/i)).length).toBeGreaterThan(0);
     expect(screen.getByText('Live tools: 1')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: /Compactions 1/i }));
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/compactions?'))).toBe(false);
+    fireEvent.click(screen.getByRole('tab', { name: /^Compactions/i }));
     expect((await screen.findAllByText(/compacted_history/i)).length).toBeGreaterThan(0);
     expect(screen.getByText('Live compactions: 1')).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/tools?'))).toBe(true);

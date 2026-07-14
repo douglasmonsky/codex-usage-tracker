@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react';
 import type { CallRow, ContextRuntime } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
-import { threadCallsQueryOptions } from '../../data/exploreQueries';
+import { threadCallContextQueryOptions } from '../../data/exploreQueries';
 import { CallCacheDelta } from '../shared/CallCacheDelta';
 import { CallDecisionCard } from '../shared/CallDecisionCard';
 import { CallSourceMetadata } from '../shared/CallSourceMetadata';
@@ -66,16 +66,22 @@ export function CallInspector({
     return calls.filter(candidate => candidate.thread === call.thread).sort(compareCallTimeDescending);
   }, [call, calls]);
   const threadCallsQuery = useQuery({
-    ...threadCallsQueryOptions({
+    ...threadCallContextQueryOptions({
       runtime: contextRuntime,
       includeArchived,
       sourceRevision,
       threadKey: call?.threadKey || call?.thread || '',
+      selectedRecordId: call?.id ?? '',
+      selectedEventTimestamp: call?.eventTimestamp ?? '',
     }),
     enabled: hydrateThreadCalls && !contextRuntime.fileMode && Boolean(contextRuntime.apiToken) && Boolean(call),
     placeholderData: previous => previous,
   });
-  const threadCalls = threadCallsQuery.data?.rows ?? localThreadCalls;
+  const threadCalls = useMemo(() => {
+    const loaded = threadCallsQuery.data?.rows ?? localThreadCalls;
+    if (!call || loaded.some(candidate => candidate.id === call.id)) return loaded;
+    return [...loaded, call].sort(compareCallTimeDescending);
+  }, [call, localThreadCalls, threadCallsQuery.data]);
 
   if (!call) {
     return (

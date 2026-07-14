@@ -39,6 +39,7 @@ describe('allowance API', () => {
     expect(url.searchParams.get('limit')).toBe('0');
     expect(url.searchParams.get('include_archived')).toBe('1');
     expect(url.searchParams.get('privacy_mode')).toBe('normal');
+    expect(url.searchParams.has('_')).toBe(false);
     expect(new Headers(init?.headers).get('X-Codex-Usage-Token')).toBe(runtime.apiToken);
   });
 

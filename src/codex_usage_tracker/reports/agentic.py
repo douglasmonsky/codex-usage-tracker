@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -227,8 +228,9 @@ def _append_recommendations_finding(
     until: str | None,
     thread: str | None,
     include_archived: bool,
+    recommendation_report_builder: Callable[..., Any],
 ) -> None:
-    report = build_recommendations_report(
+    report = recommendation_report_builder(
         db_path=db_path,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
@@ -317,6 +319,7 @@ def build_agentic_investigation_report(
     evidence_limit: int = 5,
     detail_mode: str = "compact",
     privacy_mode: str = "normal",
+    recommendation_report_builder: Callable[..., Any] = build_recommendations_report,
 ) -> AgenticInvestigationReport:
     """Build a compact goal-led investigation using existing reports."""
 
@@ -387,6 +390,7 @@ def build_agentic_investigation_report(
             until=until,
             thread=thread,
             include_archived=include_archived,
+            recommendation_report_builder=recommendation_report_builder,
         )
 
     if normalized_goal == "allowance_change":

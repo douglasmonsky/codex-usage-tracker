@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueries } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import {
@@ -6,7 +6,6 @@ import {
   type DiagnosticFactCallsResult,
   type DiagnosticFactRow,
   type DiagnosticFactSourceKey,
-  type DiagnosticFactsPayload,
 } from '../../api/diagnostics';
 import type { ContextRuntime } from '../../api/types';
 import {
@@ -34,6 +33,7 @@ type DiagnosticFactEvidenceRequest = {
 };
 
 type DiagnosticFactSourcesRequest = DiagnosticFactEvidenceRequest & {
+  activeSourceKey: DiagnosticFactSourceKey;
   limits: DiagnosticFactLimitMap;
   sorts: DiagnosticFactSortStateMap;
 };
@@ -48,49 +48,45 @@ type DiagnosticFactCallsRequest = DiagnosticFactEvidenceRequest & {
 const defaultFactSort: FactSortState = { key: 'uncached', direction: 'desc' };
 
 export function useDiagnosticFactSources(request: DiagnosticFactSourcesRequest) {
-  const queries = useQueries({
-    queries: diagnosticFactSourceDefinitions.map(definition => {
-      const sort = request.sorts[definition.key] ?? defaultFactSort;
-      return {
-        ...diagnosticFactSourceQueryOptions({
-          runtime: request.contextRuntime,
-          includeArchived: request.includeArchived,
-          sourceKey: request.sourceKey,
-          sourceRevision: request.sourceRevision,
-          factSourceKey: definition.key,
-          limit: request.limits[definition.key],
-          sort: sort.key,
-          direction: sort.direction,
-        }),
-        enabled: request.canUseLive,
-        placeholderData: (previous: DiagnosticFactsPayload | undefined) => previous,
-      };
+  const definition = diagnosticFactSourceDefinitions.find(
+    candidate => candidate.key === request.activeSourceKey,
+  ) ?? diagnosticFactSourceDefinitions[0];
+  const sort = request.sorts[definition.key] ?? defaultFactSort;
+  const query = useQuery({
+    ...diagnosticFactSourceQueryOptions({
+      runtime: request.contextRuntime,
+      includeArchived: request.includeArchived,
+      sourceKey: request.sourceKey,
+      sourceRevision: request.sourceRevision,
+      factSourceKey: definition.key,
+      limit: request.limits[definition.key],
+      sort: sort.key,
+      direction: sort.direction,
     }),
+    enabled: request.canUseLive,
   });
-  const states = Object.fromEntries(diagnosticFactSourceDefinitions.map((definition, index) => [
-    definition.key,
-    factLoadState(queries[index], definition.title, request.canUseLive),
-  ])) as DiagnosticFactSourceStateMap;
-  const modules = diagnosticFactSourceDefinitions.map((definition, index) => ({
+  const state = factLoadState(query, definition.title, request.canUseLive);
+  const states: DiagnosticFactSourceStateMap = { [definition.key]: state };
+  const modules = [{
     label: definition.title,
     status: deriveDashboardModuleState({
       enabled: request.canUseLive,
-      hasData: Boolean(queries[index].data),
-      isError: queries[index].isError,
-      isFetching: queries[index].isFetching,
-      isPending: queries[index].isPending,
+      hasData: Boolean(query.data),
+      isError: query.isError,
+      isFetching: query.isFetching,
+      isPending: query.isPending,
     }),
-  }));
+  }];
 
   return {
     states,
     modules,
     progress: dashboardModuleProgress(modules.map(module => module.status)),
-    progressError: terminalFactSourceError(queries),
-    sourceIsUpdating: (sourceKey: DiagnosticFactSourceKey) => {
-      const index = diagnosticFactSourceDefinitions.findIndex(definition => definition.key === sourceKey);
-      return index >= 0 && queries[index].isFetching && Boolean(queries[index].data);
-    },
+    progressError: query.isError && !query.data
+      ? `${definition.title} unavailable: ${errorMessage(query.error)}`
+      : null,
+    sourceIsUpdating: (sourceKey: DiagnosticFactSourceKey) =>
+      sourceKey === definition.key && query.isFetching && Boolean(query.data),
   };
 }
 
@@ -149,14 +145,6 @@ function factCallsState(
   if (result) return { status: 'loaded', result };
   if (query.isPending) return { status: 'loading', message: 'Loading calls for selected fact...' };
   return { status: 'idle', message: 'Select a diagnostic fact' };
-}
-
-function terminalFactSourceError(
-  queries: Array<{ data?: unknown; error: unknown; isError: boolean }>,
-): string | null {
-  const index = queries.findIndex(query => query.isError && !query.data);
-  if (index < 0) return null;
-  return `${diagnosticFactSourceDefinitions[index].title} unavailable: ${errorMessage(queries[index].error)}`;
 }
 
 function errorMessage(error: unknown): string {

@@ -3,6 +3,7 @@ import { AlertTriangle, FlaskConical, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  observeCompressionAnalysis,
   runCompressionAnalysis,
   type CompressionApiPayload,
   type CompressionProfile,
@@ -46,11 +47,56 @@ export function CompressionLabPage({
   const payload = profileQuery.data;
   const profile = payload?.profile;
   const missing = payload?.error?.code === 'compression_run_not_found';
+  const incompleteRunId = payload?.error?.code === 'compression_run_not_complete'
+    ? payload.run_id
+    : null;
 
   useEffect(() => () => {
     runControllerRef.current?.abort();
     runControllerRef.current = null;
   }, []);
+
+  useEffect(() => {
+    if (!canUseLive || !incompleteRunId || !payload) return undefined;
+    const controller = new AbortController();
+    runControllerRef.current?.abort();
+    runControllerRef.current = controller;
+    setRunning(true);
+    setRunError(null);
+    setRunProgress(payload);
+    void observeCompressionAnalysis(
+      contextRuntime,
+      { includeArchived, since },
+      payload,
+      {
+        signal: controller.signal,
+        onProgress: setRunProgress,
+      },
+    ).then(completed => {
+      queryClient.setQueryData(profileOptions.queryKey, completed);
+    }).catch(error => {
+      if (!controller.signal.aborted) setRunError(errorMessage(error));
+    }).finally(() => {
+      if (runControllerRef.current === controller) {
+        runControllerRef.current = null;
+        if (!controller.signal.aborted) setRunning(false);
+      }
+    });
+    return () => {
+      controller.abort();
+      if (runControllerRef.current === controller) runControllerRef.current = null;
+    };
+  }, [
+    canUseLive,
+    contextRuntime.apiToken,
+    contextRuntime.fileMode,
+    includeArchived,
+    incompleteRunId,
+    queryClient,
+    since,
+    sourceKey,
+    sourceRevision,
+  ]);
 
   async function analyze(refresh: boolean) {
     const controller = new AbortController();
@@ -112,6 +158,12 @@ export function CompressionLabPage({
               {' / '}{formatNumber(runProgress.progress.records_examined)} records examined
             </span>
           </div>
+        </Surface>
+      ) : null}
+
+      {running && runProgress?.error?.code === 'compression_database_busy' ? (
+        <Surface tone="subtle" className={styles.loadingState} role="status">
+          Waiting for the usage refresh to finish before starting analysis...
         </Surface>
       ) : null}
 

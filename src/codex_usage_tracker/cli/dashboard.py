@@ -84,6 +84,10 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
             codex_home=args.codex_home,
             db_path=args.db,
             include_archived=args.include_archived,
+            pricing_path=args.pricing,
+            allowance_path=args.allowance,
+            rate_card_path=args.rate_card,
+            thresholds_path=args.thresholds,
         )
     serve_dashboard(
         db_path=args.db,
@@ -159,6 +163,10 @@ def _refresh_payload(args: argparse.Namespace) -> dict[str, Any]:
             codex_home=args.codex_home,
             db_path=args.db,
             include_archived=args.include_archived,
+            pricing_path=args.pricing,
+            allowance_path=args.allowance,
+            rate_card_path=args.rate_card,
+            thresholds_path=args.thresholds,
         ),
         schema="codex-usage-tracker-refresh-v1",
     )

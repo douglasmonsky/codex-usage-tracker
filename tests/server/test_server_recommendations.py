@@ -100,6 +100,38 @@ def test_handle_recommendations_request_sends_sqlite_error(
     assert str(senders.exceptions[0][1]) == "database is locked"
 
 
+def test_handle_recommendations_request_requires_refresh_for_stale_facts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    senders = _RouteSenders()
+
+    def recommendations_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise recommendation_query.RecommendationFactsUnavailableError("refresh required")
+
+    monkeypatch.setattr(
+        server_recommendations,
+        "recommendations_payload",
+        recommendations_payload,
+    )
+
+    server_recommendations.handle_recommendations_request(
+        "",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        allowance_path=tmp_path / "allowance.json",
+        projects_path=tmp_path / "projects.json",
+        privacy_mode="normal",
+        send_error=senders.send_error,
+        send_exception=senders.send_exception,
+        send_json=senders.send_json,
+    )
+
+    assert senders.errors == [(HTTPStatus.SERVICE_UNAVAILABLE, "refresh required")]
+    assert senders.exceptions == []
+    assert senders.json_payloads == []
+
+
 def test_handle_recommendations_request_reuses_generation_keyed_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

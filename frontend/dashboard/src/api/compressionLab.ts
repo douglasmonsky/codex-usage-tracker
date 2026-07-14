@@ -96,10 +96,33 @@ export async function runCompressionAnalysis(
   ensureCompressionRuntime(runtime);
   const params = compressionScopeParams(scope);
   if (options.refresh) params.set('refresh', '1');
-  let status = await fetchCompressionPayload(`/api/compression/start?${params.toString()}`, runtime, {
-    method: 'POST',
-    signal: options.signal,
-  });
+  const startUrl = `/api/compression/start?${params.toString()}`;
+  let status: CompressionApiPayload;
+  let databaseBusy = true;
+  do {
+    status = await fetchCompressionPayload(startUrl, runtime, {
+      method: 'POST',
+      signal: options.signal,
+    });
+    databaseBusy = status.error?.code === 'compression_database_busy';
+    if (!databaseBusy) break;
+    options.onProgress?.(status);
+    await waitForPoll(
+      options.pollIntervalMs ?? status.next?.poll_after_ms ?? 1_000,
+      options.signal,
+    );
+  } while (databaseBusy);
+  return observeCompressionAnalysis(runtime, scope, status, options);
+}
+
+export async function observeCompressionAnalysis(
+  runtime: ContextRuntime,
+  scope: CompressionScopeRequest,
+  initialStatus: CompressionApiPayload,
+  options: CompressionRunOptions = {},
+): Promise<CompressionApiPayload> {
+  ensureCompressionRuntime(runtime);
+  let status = initialStatus;
   options.onProgress?.(status);
   while (activeStatuses.has(status.status)) {
     const delay = options.pollIntervalMs ?? status.next?.poll_after_ms ?? 250;

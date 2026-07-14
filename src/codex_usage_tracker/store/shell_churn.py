@@ -47,12 +47,29 @@ def query_shell_churn(
     normalized_min = max(1, min_occurrences)
     normalized_limit = _normalize_limit(limit)
     normalized_sample_limit = max(1, sample_limit)
+    limit_sql = "" if normalized_limit is None else "LIMIT ?"
     where_sql, params = _usage_filters(
         "u",
         since=since,
         until=until,
         thread=thread,
         include_archived=include_archived,
+    )
+    total_candidates = int(
+        conn.execute(
+            f"""
+            SELECT COUNT(*)
+            FROM (
+                SELECT cr.command_root
+                FROM command_runs cr
+                JOIN usage_events u ON u.record_id = cr.record_id
+                {where_sql}
+                GROUP BY cr.command_root
+                HAVING COUNT(*) >= ?
+            )
+            """,
+            [*params, normalized_min],
+        ).fetchone()[0]
     )
     rows = conn.execute(
         f"""
@@ -118,8 +135,11 @@ def query_shell_churn(
             occurrences DESC,
             total_tokens DESC,
             last_seen_at DESC
+        {limit_sql}
         """,
-        [*params, normalized_min],
+        [*params, normalized_min]
+        if normalized_limit is None
+        else [*params, normalized_min, normalized_limit],
     ).fetchall()
     candidates = [
         _shell_churn_candidate(
@@ -146,10 +166,9 @@ def query_shell_churn(
         for row in rows
     ]
     candidates.sort(key=_candidate_sort_key, reverse=True)
-    sliced = candidates if normalized_limit is None else candidates[:normalized_limit]
     return {
-        "rows": sliced,
-        "total_candidates": len(candidates),
+        "rows": candidates,
+        "total_candidates": total_candidates,
     }
 
 

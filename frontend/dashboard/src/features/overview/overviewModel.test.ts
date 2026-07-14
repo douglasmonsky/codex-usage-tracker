@@ -81,6 +81,7 @@ describe('Overview view model', () => {
       calls: 12_500,
       totalTokens: 1_100_000,
       cachePercent: 80,
+      estimatedCostUsd: 890,
       estimatedCredits: 456.7,
     });
     expect(result.tokenFlowSpec.title).toBe('Token accounting in scope');

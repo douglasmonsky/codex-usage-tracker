@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  exploreCallsSchema,
+  exploreThreadCallsSchema,
+  exploreThreadsSchema,
+} from './contracts/explore';
+import {
+  overviewRecommendationsSchema,
+  overviewSummarySchema,
+} from './contracts/overview';
+import {
   dashboardModuleProgress,
+  dashboardQueryDefinition,
+  dashboardQueryDefinitions,
   dashboardQueryKey,
   dashboardQueryPolicies,
   dashboardQuerySource,
@@ -10,6 +21,7 @@ import {
 
 describe('dashboard query registry', () => {
   it('builds stable keys from non-secret source, scope, and module inputs', () => {
+    const callsQuery = dashboardQueryDefinition('calls');
     const source = dashboardQuerySource({
       sourceKey: 'fixture-db',
       sourceRevision: 'revision-7',
@@ -21,16 +33,45 @@ describe('dashboard query registry', () => {
       since: '2026-07-06T00:00:00Z',
     };
 
-    expect(dashboardQueryKey('calls', source, scope, 'tokens', 'desc')).toEqual(
-      dashboardQueryKey('calls', source, { ...scope }, 'tokens', 'desc'),
+    expect(dashboardQueryKey(callsQuery, source, scope, 'tokens', 'desc')).toEqual(
+      dashboardQueryKey(callsQuery, source, { ...scope }, 'tokens', 'desc'),
     );
-    expect(dashboardQueryKey('calls', source, scope)).not.toEqual(
-      dashboardQueryKey('calls', { ...source, sourceRevision: 'revision-8' }, scope),
+    expect(dashboardQueryKey(callsQuery, source, scope)).not.toEqual(
+      dashboardQueryKey(callsQuery, { ...source, sourceRevision: 'revision-8' }, scope),
     );
-    expect(dashboardQueryKey('calls', source, scope)).not.toEqual(
-      dashboardQueryKey('calls', source, { ...scope, historyScope: 'active' }),
+    expect(dashboardQueryKey(callsQuery, source, scope)).not.toEqual(
+      dashboardQueryKey(callsQuery, source, { ...scope, historyScope: 'active' }),
     );
-    expect(JSON.stringify(dashboardQueryKey('calls', source, scope))).not.toContain('token');
+    expect(JSON.stringify(dashboardQueryKey(callsQuery, source, scope))).not.toContain('token');
+  });
+
+  it('keeps registered query identities and representative keys collision-free', () => {
+    const ids = dashboardQueryDefinitions.map(definition => definition.id);
+    const endpoints = dashboardQueryDefinitions.map(definition => definition.endpoint);
+    const source = dashboardQuerySource({ sourceKey: 'fixture-db', sourceRevision: 'revision-1' });
+    const keys = dashboardQueryDefinitions.map(definition => JSON.stringify(
+      dashboardQueryKey(definition, source, { historyScope: 'all', loadWindow: 'all' }),
+    ));
+
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(endpoints).size).toBe(endpoints.length);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(dashboardQueryDefinitions.every(definition => definition.endpoint.startsWith('/api/')))
+      .toBe(true);
+  });
+
+  it('matches the response schemas enforced by focused dashboard decoders', () => {
+    const schemas = Object.fromEntries(
+      dashboardQueryDefinitions.map(definition => [definition.id, definition.schema]),
+    );
+
+    expect(schemas).toMatchObject({
+      'overview-summary': overviewSummarySchema,
+      'overview-recommendations': overviewRecommendationsSchema,
+      calls: exploreCallsSchema,
+      threads: exploreThreadsSchema,
+      'thread-calls': exploreThreadCallsSchema,
+    });
   });
 
   it('defines query lifecycle and browser persistence by data class', () => {

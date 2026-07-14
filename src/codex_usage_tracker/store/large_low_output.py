@@ -36,34 +36,56 @@ def query_large_low_output_calls(
         ],
         extra_params=[normalized_min_total, normalized_max_output],
     )
+    limit_sql = "" if normalized_limit is None else "LIMIT ?"
+    query_params = params if normalized_limit is None else [*params, normalized_limit]
+    total_candidates = int(
+        conn.execute(
+            f"SELECT COUNT(*) FROM usage_events u {where_sql}",
+            params,
+        ).fetchone()[0]
+    )
 
     rows = conn.execute(
         f"""
-        WITH tool_counts AS (
+        WITH candidate_usage AS (
+            SELECT u.*
+            FROM usage_events u
+            {where_sql}
+            ORDER BY
+                u.total_tokens DESC,
+                u.uncached_input_tokens DESC,
+                u.event_timestamp DESC,
+                u.record_id ASC
+            {limit_sql}
+        ),
+        tool_counts AS (
             SELECT
-                record_id,
+                tool_calls.record_id,
                 COUNT(*) AS tool_call_count,
                 COALESCE(SUM(output_size_bytes), 0) AS tool_output_size_bytes
-            FROM tool_calls
-            GROUP BY record_id
+            FROM candidate_usage
+            CROSS JOIN tool_calls ON tool_calls.record_id = candidate_usage.record_id
+            GROUP BY tool_calls.record_id
         ),
         command_counts AS (
             SELECT
-                record_id,
+                command_runs.record_id,
                 COUNT(*) AS command_run_count,
                 COALESCE(SUM(output_size_bytes), 0) AS command_output_size_bytes,
                 SUM(CASE WHEN status != 'completed' THEN 1 ELSE 0 END) AS failed_command_count
-            FROM command_runs
-            GROUP BY record_id
+            FROM candidate_usage
+            CROSS JOIN command_runs ON command_runs.record_id = candidate_usage.record_id
+            GROUP BY command_runs.record_id
         ),
         file_counts AS (
             SELECT
-                record_id,
+                file_events.record_id,
                 COUNT(*) AS file_event_count,
                 SUM(CASE WHEN operation = 'read' THEN 1 ELSE 0 END) AS file_read_count,
                 SUM(CASE WHEN operation IN ('modify', 'edit', 'write') THEN 1 ELSE 0 END) AS file_write_count
-            FROM file_events
-            GROUP BY record_id
+            FROM candidate_usage
+            CROSS JOIN file_events ON file_events.record_id = candidate_usage.record_id
+            GROUP BY file_events.record_id
         )
         SELECT
             u.record_id,
@@ -92,21 +114,19 @@ def query_large_low_output_calls(
             COALESCE(fc.file_event_count, 0) AS file_event_count,
             COALESCE(fc.file_read_count, 0) AS file_read_count,
             COALESCE(fc.file_write_count, 0) AS file_write_count
-        FROM usage_events u
+        FROM candidate_usage u
         LEFT JOIN tool_counts tc ON tc.record_id = u.record_id
         LEFT JOIN command_counts cc ON cc.record_id = u.record_id
         LEFT JOIN file_counts fc ON fc.record_id = u.record_id
-        {where_sql}
         ORDER BY u.total_tokens DESC, u.uncached_input_tokens DESC, u.event_timestamp DESC, u.record_id ASC
         """,
-        params,
+        query_params,
     ).fetchall()
 
     candidates = [_candidate(row) for row in rows]
-    sliced = candidates if normalized_limit is None else candidates[:normalized_limit]
     return {
-        "rows": sliced,
-        "total_candidates": len(candidates),
+        "rows": candidates,
+        "total_candidates": total_candidates,
     }
 
 

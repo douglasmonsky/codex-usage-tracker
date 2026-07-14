@@ -7,6 +7,7 @@ import sqlite3
 MIGRATION_NAMES = {
     18: "index usage events by source file and line",
     22: "cover diagnostic fact lookups",
+    23: "cover diagnostic fact aggregation",
 }
 
 
@@ -29,5 +30,25 @@ def add_diagnostic_lookup_index(conn: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_call_diagnostic_facts_lookup
         ON call_diagnostic_facts(fact_type, fact_name, record_id)
+        """
+    )
+
+
+def add_diagnostic_aggregate_index(conn: sqlite3.Connection) -> None:
+    """Cover fact rows consumed by the dashboard diagnostic aggregation."""
+
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_call_diagnostic_facts_aggregate
+        ON call_diagnostic_facts(
+            record_id,
+            fact_type,
+            fact_name,
+            fact_category,
+            event_count,
+            first_source_line,
+            last_source_line,
+            raw_content_included
+        )
         """
     )

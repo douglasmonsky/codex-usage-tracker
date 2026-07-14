@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -69,34 +70,9 @@ def query_diagnostic_facts(
         fact_category=fact_category,
         table_alias="f",
     )
-    sub_where_clause, sub_params = usage_where_clause(
-        since=since,
-        until=until,
-        model=model,
-        effort=effort,
-        thread=thread,
-        min_tokens=min_tokens,
-        table_alias="u2",
-        include_archived=include_archived,
-    )
-    sub_where_clause, sub_params = append_diagnostic_fact_filters(
-        sub_where_clause,
-        sub_params,
-        fact_type=fact_type,
-        fact_name=fact_name,
-        fact_category=fact_category,
-        table_alias="f2",
-    )
-    sub_conditions = [
-        "f2.fact_type = f.fact_type",
-        "f2.fact_name = f.fact_name",
-    ]
-    if sub_where_clause:
-        sub_conditions.append(sub_where_clause.removeprefix("WHERE "))
-    sub_where_sql = "WHERE " + " AND ".join(f"({condition})" for condition in sub_conditions)
     normalized_limit = normalize_limit(limit)
     limit_clause = ""
-    query_params: list[Any] = [*sub_params, *params]
+    query_params: list[Any] = list(params)
     if normalized_limit is not None:
         limit_clause = "LIMIT ?"
         query_params.append(normalized_limit)
@@ -109,7 +85,7 @@ def query_diagnostic_facts(
                 f.fact_name,
                 f.fact_category,
                 coalesce(SUM(f.event_count), 0) AS occurrences,
-                COUNT(DISTINCT usage_events.record_id) AS associated_calls,
+                COUNT(*) AS associated_calls,
                 coalesce(SUM(usage_events.input_tokens), 0) AS associated_input_tokens,
                 coalesce(SUM(usage_events.cached_input_tokens), 0)
                     AS associated_cached_input_tokens,
@@ -125,16 +101,9 @@ def query_diagnostic_facts(
                 MIN(f.first_source_line) AS first_source_line,
                 MAX(f.last_source_line) AS last_source_line,
                 MAX(f.raw_content_included) AS raw_content_included,
-                (
-                    SELECT u2.record_id
-                    FROM call_diagnostic_facts AS f2
-                    JOIN usage_events AS u2 ON u2.record_id = f2.record_id
-                    {sub_where_sql}
-                    ORDER BY u2.total_tokens DESC, u2.event_timestamp DESC, u2.record_id
-                    LIMIT 1
-                ) AS largest_record_id
-            FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
+                NULL AS largest_record_id
+            FROM usage_events
+            CROSS JOIN call_diagnostic_facts AS f ON f.record_id = usage_events.record_id
             {where_clause}
             GROUP BY f.fact_type, f.fact_name, f.fact_category
             ORDER BY {sort_map[sort]} {direction_sql},
@@ -145,7 +114,102 @@ def query_diagnostic_facts(
             """,
             query_params,
         )
-        return [row_to_dict(row) for row in rows]
+        result = [row_to_dict(row) for row in rows]
+        _resolve_largest_record_ids(
+            conn,
+            result,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            min_tokens=min_tokens,
+            include_archived=include_archived,
+        )
+        return result
+
+
+def _resolve_largest_record_ids(
+    conn: sqlite3.Connection,
+    rows: list[dict[str, Any]],
+    *,
+    since: str | None,
+    until: str | None,
+    model: str | None,
+    effort: str | None,
+    thread: str | None,
+    min_tokens: int | None,
+    include_archived: bool,
+) -> None:
+    if not rows:
+        return
+    where_clause, scope_params = usage_where_clause(
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        min_tokens=min_tokens,
+        table_alias="u",
+        include_archived=include_archived,
+    )
+    conn.execute(
+        """
+        CREATE TEMP TABLE diagnostic_fact_maxima (
+            fact_type TEXT NOT NULL,
+            fact_name TEXT NOT NULL,
+            fact_category TEXT,
+            largest_call_tokens INTEGER NOT NULL
+        )
+        """
+    )
+    conn.executemany(
+        "INSERT INTO diagnostic_fact_maxima VALUES (?, ?, ?, ?)",
+        [
+            (
+                row.get("fact_type"),
+                row.get("fact_name"),
+                row.get("fact_category"),
+                int(row.get("largest_call_tokens") or 0),
+            )
+            for row in rows
+        ],
+    )
+    matches = conn.execute(
+        f"""
+        WITH ranked AS (
+            SELECT
+                maxima.fact_type,
+                maxima.fact_name,
+                maxima.fact_category,
+                u.record_id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY maxima.fact_type, maxima.fact_name, maxima.fact_category
+                    ORDER BY u.event_timestamp DESC, u.record_id
+                ) AS position
+            FROM diagnostic_fact_maxima AS maxima
+            CROSS JOIN usage_events AS u INDEXED BY idx_usage_total_tokens
+                ON u.total_tokens = maxima.largest_call_tokens
+            JOIN call_diagnostic_facts AS f INDEXED BY idx_call_diagnostic_facts_lookup
+                ON f.record_id = u.record_id
+                AND f.fact_type = maxima.fact_type
+                AND f.fact_name = maxima.fact_name
+                AND f.fact_category IS maxima.fact_category
+            {where_clause}
+        )
+        SELECT fact_type, fact_name, fact_category, record_id
+        FROM ranked
+        WHERE position = 1
+        """,
+        scope_params,
+    ).fetchall()
+    largest_ids = {
+        (match["fact_type"], match["fact_name"], match["fact_category"]): match["record_id"]
+        for match in matches
+    }
+    for row in rows:
+        key = (row.get("fact_type"), row.get("fact_name"), row.get("fact_category"))
+        row["largest_record_id"] = largest_ids.get(key)
 
 
 def query_diagnostic_summary(

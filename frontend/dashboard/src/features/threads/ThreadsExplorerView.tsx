@@ -49,10 +49,14 @@ type ThreadsExplorerViewProps = {
     selected: ThreadRow | null;
     calls: CallRow[];
     allCalls: CallRow[];
+    totalCallCount: number;
+    hasMoreCalls: boolean;
+    isFetchingMoreCalls: boolean;
     callSort: ThreadCallSortKey;
     callSortDirection: ThreadCallSortDirection;
     visibleCallCount: number;
     onVisibleCallCountChange: Dispatch<SetStateAction<number>>;
+    onLoadMoreCalls(): void;
   };
   onWorkspaceChange(workspace: 'calls' | 'tools' | 'files'): void;
   onExport(): void;

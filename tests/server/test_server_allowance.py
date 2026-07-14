@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from codex_usage_tracker.server import allowance as server_allowance
+from codex_usage_tracker.server.query_cache import AggregateQueryCache
 from codex_usage_tracker.store.api import upsert_usage_events
 from tests.store_dashboard_helpers import _usage_event
 
@@ -93,6 +95,47 @@ def test_allowance_export_payload_is_strict_privacy(tmp_path: Path) -> None:
     assert payload["schema"] == "codex-usage-tracker-allowance-evidence-export-v1"
     assert payload["privacy_mode"] == "strict"
     assert "summary" in payload
+
+
+def test_allowance_diagnostics_handler_reuses_generation_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    builds = 0
+    payloads: list[dict[str, object]] = []
+
+    def diagnostics_payload(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        nonlocal builds
+        builds += 1
+        return {"schema": "codex-usage-tracker-allowance-diagnostics-v1"}
+
+    monkeypatch.setattr(server_allowance, "allowance_diagnostics_payload", diagnostics_payload)
+    request = {
+        "db_path": tmp_path / "usage.sqlite3",
+        "allowance_path": tmp_path / "allowance.json",
+        "rate_card_path": tmp_path / "rate-card.json",
+        "include_archived_default": True,
+        "privacy_mode": "normal",
+        "query_cache": AggregateQueryCache(max_entries=2, max_payload_bytes=1_024),
+        "send_error": lambda *_args: None,
+        "send_exception": lambda *_args: None,
+        "send_json": lambda _status, payload: payloads.append(payload),
+    }
+
+    server_allowance.handle_allowance_diagnostics_request("limit=0", **request)
+    server_allowance.handle_allowance_diagnostics_request("limit=0", **request)
+
+    assert builds == 1
+    assert [_query_cache_status(payload) for payload in payloads] == ["miss", "hit"]
+    assert all(
+        payload["schema"] == "codex-usage-tracker-allowance-diagnostics-v1" for payload in payloads
+    )
+
+
+def _query_cache_status(payload: dict[str, object]) -> object:
+    metadata = payload["query_cache"]
+    assert isinstance(metadata, dict)
+    return metadata["status"]
 
 
 def _allowance_db(tmp_path: Path) -> Path:

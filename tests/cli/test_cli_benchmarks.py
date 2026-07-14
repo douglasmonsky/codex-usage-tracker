@@ -180,6 +180,8 @@ def test_compression_lab_benchmark_with_normalized_evidence(tmp_path: Path) -> N
     assert payload["cold_build"]["candidate_count"] > 10
     assert payload["cold_build"]["peak_rss_mb"] <= 512
     assert payload["max_evidence_detector_seconds"] > 0
+    assert payload["candidate_persistence"]["candidate_count"] == 10_000
+    assert payload["candidate_persistence"]["rounds"] == 5
     assert (
         payload["cold_build"]["stage_timings_seconds"]["detectors"]
         <= payload["max_evidence_detector_seconds"]

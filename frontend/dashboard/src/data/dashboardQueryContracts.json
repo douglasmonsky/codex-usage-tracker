@@ -1,0 +1,80 @@
+[
+  {
+    "id": "usage-snapshot",
+    "endpoint": "/api/usage",
+    "dataClass": "snapshot",
+    "schema": "codex-usage-tracker-dashboard-v1"
+  },
+  {
+    "id": "overview-summary",
+    "endpoint": "/api/summary",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-summary-v1"
+  },
+  {
+    "id": "overview-recommendations",
+    "endpoint": "/api/recommendations",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-recommendations-v1"
+  },
+  {
+    "id": "calls",
+    "endpoint": "/api/calls",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-calls-v1"
+  },
+  {
+    "id": "threads",
+    "endpoint": "/api/threads",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-threads-v1"
+  },
+  {
+    "id": "thread-calls",
+    "endpoint": "/api/thread-calls",
+    "dataClass": "detail",
+    "schema": "codex-usage-tracker-thread-calls-v1"
+  },
+  {
+    "id": "investigator-agentic",
+    "endpoint": "/api/investigations/agentic",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-agentic-investigation-v1"
+  },
+  {
+    "id": "investigator-walk",
+    "endpoint": "/api/investigations/walk",
+    "dataClass": "userAction",
+    "schema": "codex-usage-tracker-investigation-walk-v1"
+  },
+  {
+    "id": "diagnostics-facts",
+    "endpoint": "/api/diagnostics/facts",
+    "dataClass": "aggregate",
+    "schema": null
+  },
+  {
+    "id": "diagnostics-fact-calls",
+    "endpoint": "/api/diagnostics/fact-calls",
+    "dataClass": "detail",
+    "schema": null
+  },
+  {
+    "id": "diagnostics-snapshot",
+    "endpoint": "/api/diagnostics/{snapshot}",
+    "dataClass": "aggregate",
+    "schema": null
+  },
+  {
+    "id": "compression-profile",
+    "endpoint": "/api/compression/profile",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-compression-api-v1"
+  },
+  {
+    "id": "reports",
+    "endpoint": "/api/reports/pack",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-reports-pack-v1"
+  }
+]

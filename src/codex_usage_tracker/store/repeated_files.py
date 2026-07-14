@@ -24,12 +24,29 @@ def query_repeated_file_rediscovery(
     normalized_min = max(1, min_occurrences)
     normalized_limit = _normalize_limit(limit)
     normalized_sample_limit = max(1, sample_limit)
+    limit_sql = "" if normalized_limit is None else "LIMIT ?"
     where_sql, params = _usage_filters(
         "u",
         since=since,
         until=until,
         thread=thread,
         include_archived=include_archived,
+    )
+    total_candidates = int(
+        conn.execute(
+            f"""
+            SELECT COUNT(*)
+            FROM (
+                SELECT fe.path_hash
+                FROM file_events fe
+                JOIN usage_events u ON u.record_id = fe.record_id
+                {where_sql}
+                GROUP BY fe.path_hash
+                HAVING COUNT(*) >= ?
+            )
+            """,
+            [*params, normalized_min],
+        ).fetchone()[0]
     )
     rows = conn.execute(
         f"""
@@ -88,12 +105,13 @@ def query_repeated_file_rediscovery(
             occurrences DESC,
             total_tokens DESC,
             last_seen_at DESC
+        {limit_sql}
         """,
-        [*params, normalized_min],
+        [*params, normalized_min]
+        if normalized_limit is None
+        else [*params, normalized_min, normalized_limit],
     ).fetchall()
 
-    sorted_rows = sorted(rows, key=_candidate_row_sort_key, reverse=True)
-    sliced_rows = sorted_rows if normalized_limit is None else sorted_rows[:normalized_limit]
     candidates = [
         _file_candidate(
             row,
@@ -107,11 +125,11 @@ def query_repeated_file_rediscovery(
                 limit=normalized_sample_limit,
             ),
         )
-        for row in sliced_rows
+        for row in rows
     ]
     return {
         "rows": candidates,
-        "total_candidates": len(sorted_rows),
+        "total_candidates": total_candidates,
     }
 
 
@@ -258,15 +276,6 @@ def _usage_filters(
     if not clauses:
         return "", params
     return "WHERE " + " AND ".join(clauses), params
-
-
-def _candidate_row_sort_key(row: sqlite3.Row) -> tuple[int, int, int, int]:
-    return (
-        int(row["read_count"] or 0),
-        int(row["adjacent_retouch_count"] or 0),
-        int(row["occurrences"] or 0),
-        int(row["total_tokens"] or 0),
-    )
 
 
 def _recommendation(

@@ -12,6 +12,9 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
 )
+from codex_usage_tracker.recommendation_engine.query import (
+    build_recommendations_report as build_indexed_recommendations_report,
+)
 from codex_usage_tracker.reports.api import (
     build_action_brief_report,
     build_agentic_investigation_report,
@@ -69,6 +72,7 @@ def usage_investigate(
         evidence_limit=evidence_limit,
         detail_mode=detail_mode,
         privacy_mode=privacy_mode,
+        recommendation_report_builder=build_indexed_recommendations_report,
     ).payload
 
 

@@ -302,6 +302,12 @@ Schemas:
 
 Allowance intelligence normalizes observed 5-hour and weekly usage snapshots from aggregate token-count rows. Diagnostics compare visible usage movement with locally estimated Codex credits and grade the evidence. Weekly windows are the primary signal; 5-hour windows are treated as noisy rolling counters. Weekly change candidates include `nonparametric-v1` statistical evidence and a stricter `summary.research_readiness.ready_for_public_claim` flag. Strict export omits prompts, assistant text, tool output, file paths, thread names, session IDs, and record IDs.
 
+The localhost history and diagnostics routes may append the same `query_cache`
+transport metadata documented for diagnostic fact routes. They use a dedicated
+four-entry, 8-MiB aggregate cache because full allowance payloads are larger than
+normal dashboard summaries. Cache identity includes source revision, canonical
+query, privacy mode, allowance configuration, and rate-card configuration.
+
 HTTP report endpoints accept `limit=all`, `limit=0`, `limit=none`, and `limit=null` as all rows up to the endpoint safety cap.
 
 ```json
@@ -529,6 +535,13 @@ Schema: `codex-usage-tracker-diagnostics-v1`
 ```
 
 Diagnostics payloads report aggregate structured facts such as compaction, tool/function/MCP activity, command families, structured skill labels, search/read loops, and outcome events. They do not include prompts, assistant messages, tool arguments, tool output, patch text, raw commands, command arguments, file contents, or JSONL fragments. Token totals are associated with facts observed before a token-count row; they are not causal allocations.
+
+The localhost facts, compactions, and tools routes may append a `query_cache`
+object with `status` (`hit`, `miss`, `coalesced`, or `bypass`),
+`source_revision`, `freshness`, `payload_bytes`, and `stored`. This is transport
+metadata, not a new diagnostics schema version. Cache keys include the exact
+route and canonical query, so fact groups never collide. A source-generation
+change naturally invalidates prior entries.
 
 Diagnostic snapshots use separate section endpoints instead of one large read
 payload. `GET` returns the latest stored section snapshot or `status:

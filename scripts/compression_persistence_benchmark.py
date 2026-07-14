@@ -25,12 +25,13 @@ from codex_usage_tracker.store.compression_runs import (
 )
 
 DEFAULT_MIN_IMPROVEMENT_PERCENT = 40.0
-_BENCHMARK_ROUNDS = 3
+_BENCHMARK_ROUNDS = 5
+_MIN_CANDIDATE_COUNT = 10_000
 
 
 def benchmark_persistence(db_path: Path, *, rows: int) -> dict[str, Any]:
     """Compare CP1-compatible mapping writes with typed atomic publication."""
-    candidate_count = min(10_000, max(5_000, rows // 20))
+    candidate_count = min(20_000, max(_MIN_CANDIDATE_COUNT, rows // 20))
     candidates = tuple(_candidate(index) for index in range(candidate_count))
     mapping_db = _copy_database(db_path, "mapping")
     typed_db = _copy_database(db_path, "typed")

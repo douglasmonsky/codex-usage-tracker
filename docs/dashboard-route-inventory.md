@@ -38,8 +38,8 @@ three status routes are read-only polls.
 | `GET /api/thread-calls` | Bounded report | Default 100; derived filters may load a complete thread | Live SQLite query |
 | `GET /api/summary` | Bounded report | Default 20 groups over all matching rows | Generation/config-keyed server response cache over a live report query |
 | `GET /api/recommendations` | Bounded report | Ranks persisted facts before hydrating default 20 rows | Generation/config-keyed server response cache over persisted SQLite facts |
-| `GET /api/allowance/history` | Bounded report | Default 1,000 normalized observations | SQLite plus local config |
-| `GET /api/allowance/diagnostics` | Bounded report | Evaluates at most the configured 10,000-observation window | Recomputed per request |
+| `GET /api/allowance/history` | Bounded report | Default 1,000 normalized observations | Generation/config-keyed large-payload cache over SQLite plus local config |
+| `GET /api/allowance/diagnostics` | Bounded report | Evaluates at most the configured 10,000-observation window | Generation/config-keyed large-payload cache over SQLite plus local config |
 | `GET /api/allowance/export` | Bounded report | Schema-bounded strict aggregate export | SQLite plus local config |
 | `GET /api/reports/pack` | Bounded report | Default 100 rows and 8 evidence rows | Recomputed per request |
 | `GET /api/investigations/agentic` | Bounded report | Composes bounded indexed reports; default 5 evidence rows | Recomputed from persisted facts |
@@ -48,10 +48,10 @@ three status routes are read-only polls.
 | `GET /api/investigations/large-low-output` | Bounded report | Uses indexed token predicates; default 20 calls | Live bounded SQLite query |
 | `GET /api/investigations/walk` | Bounded report | Composes bounded indexed hypotheses; default 5 evidence rows | Recomputed from persisted facts |
 | `GET /api/diagnostics/summary` | Bounded report | Default 20 groups over persisted facts | Live SQLite query |
-| `GET /api/diagnostics/facts` | Bounded report | Default 50 persisted facts | Live SQLite query |
+| `GET /api/diagnostics/facts` | Bounded report | Default 50 persisted facts | Generation-keyed response cache over indexed SQLite facts |
 | `GET /api/diagnostics/fact-calls` | Bounded report | Resolves one request-bounded page of supporting calls | Live SQLite query |
-| `GET /api/diagnostics/compactions` | Bounded report | Default 50 persisted compaction facts | Live SQLite query |
-| `GET /api/diagnostics/tools` | Bounded report | Default 50 persisted tool facts | Live SQLite query |
+| `GET /api/diagnostics/compactions` | Bounded report | Default 50 persisted compaction facts | Generation-keyed response cache over indexed SQLite facts |
+| `GET /api/diagnostics/tools` | Bounded report | Default 50 persisted tool facts | Generation-keyed response cache over indexed SQLite facts |
 | `GET /api/diagnostics/{overview,tool-output,commands,git-interactions,file-reads,file-modifications,read-productivity,concentration,guided-summary}` | Interactive | One fixed named diagnostic snapshot | Persisted until refresh |
 | `GET /api/diagnostics/usage-drain` | Interactive | One fixed diagnostic snapshot | Persisted until refresh |
 | `GET /api/usage` | Bounded report | Configured row window; optional refresh may scan all logs | SQLite index; optional refresh |
@@ -85,14 +85,14 @@ and publishes its profile to SQLite.
 
 ## Aggregate Response Cache
 
-Summary and recommendation responses use one server-process LRU with at most 64
-serialized entries and 256 KiB per stored payload. Keys contain the canonical
-query, source generation, privacy mode, and SHA-256 revisions of every local
-configuration file used by the route. A source write or relevant configuration
-change therefore produces a new key without manual cache clearing. Identical
-in-flight requests share one builder; every caller receives a detached decoded
-copy. Explicit responses larger than the storage bound are still returned but
-are marked `bypass` and are never retained.
+Summary, recommendation, and bounded diagnostic fact-list responses use one
+server-process LRU with at most 64 serialized entries and 256 KiB per stored
+payload. Keys contain the route, canonical query, source generation, privacy
+mode, and SHA-256 revisions of every local configuration file used by the route.
+A source write or relevant configuration change therefore produces a new key
+without manual cache clearing. Identical in-flight requests share one builder;
+every caller receives a detached decoded copy. Explicit responses larger than
+the storage bound are still returned but are marked `bypass` and never retained.
 
 The response `query_cache` block reports hit, miss, coalesced, or bypass status,
 the source revision, serialized size, and whether the entry was retained. Raw
@@ -112,15 +112,18 @@ adapters with synthetic SQLite histories:
 
 ```bash
 python scripts/benchmark_dashboard_routes.py \
-  --sizes 10000 100000 400000 \
+  --sizes 100000 \
   --iterations 3 \
+  --skip-compression \
+  --enforce-thresholds \
   --output-dir /tmp/codex-dashboard-route-benchmark
 ```
 
 The command emits compact JSON with repeated route-handler cold and warm
 samples. Every cold sample uses a fresh process cache; warm samples reuse one
 seeded cache. Timings include request parsing, cache provenance, and final JSON
-serialization. PR 6 owns the deterministic CI thresholds. The checked-in pre-refactor baseline is
+serialization. CI reads the checked-in thresholds from
+`config/dashboard-route-budgets.json`. The pre-refactor baseline is
 [`benchmarks/dashboard-route-baseline.json`](benchmarks/dashboard-route-baseline.json).
 
 | Synthetic calls | Summary median | Recommendations median |
@@ -146,3 +149,31 @@ removed one temporary grouping B-tree but regressed the representative warm SQL
 query from roughly 0.56 seconds to 0.81-0.92 seconds. Schema version 22 instead
 adds `idx_call_diagnostic_facts_lookup(fact_type, fact_name, record_id)`, which
 SQLite selects as a covering index for the correlated diagnostic-fact lookup.
+
+PR 6 removes that correlated representative-call scan and schema version 23 adds
+`idx_call_diagnostic_facts_aggregate`, which covers every persisted fact field
+consumed by the grouped query. The enforced 100,000-call fixture measured:
+
+| Route | Cold p95 | Warm p95 |
+| --- | ---: | ---: |
+| Summary | 0.141 s | 1.60 ms |
+| Recommendations | 0.041 s | 2.97 ms |
+| Diagnostic facts | 0.411 s | 1.29 ms |
+| Diagnostic tools | 0.285 s | 1.18 ms |
+| Allowance history | 0.411 s | 52.0 ms |
+| Allowance diagnostics | 0.392 s | 62.1 ms |
+| Threads | 3.51 ms | Not cached |
+| Bounded thread calls | 6.90 ms | Not cached |
+
+On the maintainer's 404,176-call local database, the diagnostic fact route
+measured 5.5 seconds on its first generation-keyed request and 4 ms on repeat;
+the tools route measured 3.3 seconds cold and 2 ms warm. These are diagnostic
+observations, not universal performance guarantees.
+
+The allowance change-point scan uses exact running prefix/suffix medians instead
+of rebuilding every candidate slice. On the 100,000-call fixture this reduced
+allowance diagnostics cold p95 from 8.32 seconds to 0.377 seconds. On the same
+local database, all-scope diagnostics measured 1.43 seconds after server
+initialization and 17 ms on repeat; history measured 0.35 seconds cold and 59 ms
+warm. The dedicated four-entry cache permits payloads up to 8 MiB without
+loosening the 256-KiB cache bound for normal dashboard aggregates.

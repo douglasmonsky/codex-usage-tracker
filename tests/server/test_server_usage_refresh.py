@@ -79,6 +79,10 @@ def test_refresh_usage_payload_returns_aggregate_refresh_metadata(
         "codex_home": tmp_path / "codex-home",
         "db_path": db_path,
         "include_archived": True,
+        "pricing_path": server_usage_refresh.DEFAULT_PRICING_PATH,
+        "allowance_path": server_usage_refresh.DEFAULT_ALLOWANCE_PATH,
+        "rate_card_path": server_usage_refresh.DEFAULT_RATE_CARD_PATH,
+        "thresholds_path": server_usage_refresh.DEFAULT_THRESHOLDS_PATH,
     }
     assert lock.entered == 1
     assert lock.exited == 1

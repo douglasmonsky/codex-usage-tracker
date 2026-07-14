@@ -4,10 +4,13 @@ import { loadReportsPack } from '../api/reports';
 import type { ContextRuntime } from '../api/types';
 import type { LoadWindow } from './dataScope';
 import {
+  dashboardQueryDefinition,
   dashboardQueryKey,
   dashboardQueryOptions,
   dashboardQuerySource,
 } from './dashboardQueryRegistry';
+
+const reportsQuery = dashboardQueryDefinition('reports');
 
 export type ReportsQueryRequest = {
   runtime: ContextRuntime;
@@ -22,7 +25,7 @@ export type ReportsQueryRequest = {
 export function reportsQueryOptions(request: ReportsQueryRequest) {
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'reports',
+      reportsQuery,
       dashboardQuerySource({
         sourceKey: request.sourceKey ?? (request.runtime.fileMode ? 'static-file' : 'local-api'),
         sourceRevision: request.sourceRevision,
@@ -40,6 +43,6 @@ export function reportsQueryOptions(request: ReportsQueryRequest) {
       includeArchived: request.includeArchived,
       signal,
     }),
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(reportsQuery.dataClass),
   });
 }

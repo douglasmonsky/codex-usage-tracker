@@ -13,6 +13,10 @@ from codex_usage_tracker.diagnostics.reports import (
     build_diagnostics_facts_report,
     build_diagnostics_summary_report,
 )
+from codex_usage_tracker.server.query_cache import (
+    AggregateQueryCache,
+    cached_aggregate_payload,
+)
 from codex_usage_tracker.server.utils import (
     first_query_value,
     parse_api_offset,
@@ -62,16 +66,26 @@ def handle_diagnostics_facts_request(
     send_error: ErrorSender,
     send_exception: ExceptionSender,
     send_json: JsonSender,
+    privacy_mode: str = "normal",
+    query_cache: AggregateQueryCache | None = None,
 ) -> None:
     """Handle diagnostic fact-list route errors and response writing."""
     try:
-        payload = diagnostics_facts_payload(
-            query,
+        payload = cached_aggregate_payload(
+            query_cache,
+            route=request_path,
+            query=query,
             db_path=db_path,
-            include_archived_default=include_archived_default,
-            request_path=request_path,
-            fact_type=fact_type,
-            fact_group=fact_group,
+            privacy_mode=privacy_mode,
+            dependencies=(),
+            build=lambda: diagnostics_facts_payload(
+                query,
+                db_path=db_path,
+                include_archived_default=include_archived_default,
+                request_path=request_path,
+                fact_type=fact_type,
+                fact_group=fact_group,
+            ),
         )
     except ValueError as exc:
         send_error(HTTPStatus.BAD_REQUEST, str(exc))

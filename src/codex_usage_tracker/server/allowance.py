@@ -13,6 +13,10 @@ from codex_usage_tracker.allowance_intelligence import (
     build_allowance_export_report,
     build_allowance_history_report,
 )
+from codex_usage_tracker.server.query_cache import (
+    AggregateQueryCache,
+    cached_aggregate_payload,
+)
 from codex_usage_tracker.server.utils import (
     first_query_value,
     parse_bool_query_value,
@@ -24,6 +28,10 @@ ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
 
 
+def new_query_cache() -> AggregateQueryCache:
+    return AggregateQueryCache(max_entries=4, max_payload_bytes=8 * 1_024 * 1_024)
+
+
 def handle_allowance_history_request(
     query: str,
     *,
@@ -32,6 +40,7 @@ def handle_allowance_history_request(
     rate_card_path: Path,
     include_archived_default: bool,
     privacy_mode: str,
+    query_cache: AggregateQueryCache | None = None,
     send_error: ErrorSender,
     send_exception: ExceptionSender,
     send_json: JsonSender,
@@ -39,13 +48,21 @@ def handle_allowance_history_request(
     """Handle normalized allowance history route."""
 
     try:
-        payload = allowance_history_payload(
-            query,
+        payload = cached_aggregate_payload(
+            query_cache,
+            route="/api/allowance/history",
+            query=query,
             db_path=db_path,
-            allowance_path=allowance_path,
-            rate_card_path=rate_card_path,
-            include_archived_default=include_archived_default,
             privacy_mode=privacy_mode,
+            dependencies=(allowance_path, rate_card_path),
+            build=lambda: allowance_history_payload(
+                query,
+                db_path=db_path,
+                allowance_path=allowance_path,
+                rate_card_path=rate_card_path,
+                include_archived_default=include_archived_default,
+                privacy_mode=privacy_mode,
+            ),
         )
     except ValueError as exc:
         send_error(HTTPStatus.BAD_REQUEST, str(exc))
@@ -64,6 +81,7 @@ def handle_allowance_diagnostics_request(
     rate_card_path: Path,
     include_archived_default: bool,
     privacy_mode: str,
+    query_cache: AggregateQueryCache | None = None,
     send_error: ErrorSender,
     send_exception: ExceptionSender,
     send_json: JsonSender,
@@ -71,13 +89,21 @@ def handle_allowance_diagnostics_request(
     """Handle evidence-graded allowance diagnostics route."""
 
     try:
-        payload = allowance_diagnostics_payload(
-            query,
+        payload = cached_aggregate_payload(
+            query_cache,
+            route="/api/allowance/diagnostics",
+            query=query,
             db_path=db_path,
-            allowance_path=allowance_path,
-            rate_card_path=rate_card_path,
-            include_archived_default=include_archived_default,
             privacy_mode=privacy_mode,
+            dependencies=(allowance_path, rate_card_path),
+            build=lambda: allowance_diagnostics_payload(
+                query,
+                db_path=db_path,
+                allowance_path=allowance_path,
+                rate_card_path=rate_card_path,
+                include_archived_default=include_archived_default,
+                privacy_mode=privacy_mode,
+            ),
         )
     except ValueError as exc:
         send_error(HTTPStatus.BAD_REQUEST, str(exc))

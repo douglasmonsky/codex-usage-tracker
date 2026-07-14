@@ -6,10 +6,7 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
-from codex_usage_tracker.store.api import (
-    query_session_usage,
-    refresh_usage_index,
-)
+from codex_usage_tracker.store.api import query_session_usage
 from tests.store_dashboard_helpers import (
     ARCHIVED_SESSION_ID,
     SESSION_ID,
@@ -256,6 +253,7 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert first_finding["missing_access"]
     if first_finding["evidence"]:
         assert "source_file" not in first_finding["evidence"][0]
+    mcp_server.refresh_usage_index()
     full_investigation_json = mcp_server.usage_investigate(
         goal="token_waste",
         evidence_limit=1,
@@ -400,8 +398,9 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
         monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
         monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
+    monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
 
-    refresh_usage_index(codex_home=codex_home, db_path=db_path, include_archived=True)
+    mcp_server.refresh_usage_index(include_archived=True)
 
     active_large = mcp_server.usage_large_low_output_calls(
         min_total_tokens=0,

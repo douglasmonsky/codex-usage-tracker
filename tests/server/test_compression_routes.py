@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -89,6 +90,41 @@ def test_compression_start_delegates_to_shared_application_api(
         }
     ]
     assert responses == [(HTTPStatus.ACCEPTED, expected)]
+
+
+def test_compression_start_reports_refresh_lock_as_retryable_busy_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    responses: list[tuple[HTTPStatus, dict[str, object]]] = []
+    exceptions: list[BaseException] = []
+
+    def locked(*_args, **_kwargs):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(compression_routes, "start_compression_analysis", locked)
+    compression_routes.handle_compression_start_request(
+        "include_archived=1",
+        db_path=tmp_path / "usage.sqlite3",
+        registry=CompressionJobRegistry(),
+        include_archived_default=False,
+        has_valid_api_token=lambda _params: True,
+        send_error=lambda _status, _message: None,
+        send_exception=lambda _prefix, exc: exceptions.append(exc),
+        send_json=lambda status, payload: responses.append((status, payload)),
+    )
+
+    assert exceptions == []
+    assert responses[0][0] == HTTPStatus.SERVICE_UNAVAILABLE
+    assert responses[0][1]["error"] == {
+        "code": "compression_database_busy",
+        "message": "Usage data is refreshing; Compression Lab will retry when the index is ready.",
+    }
+    assert responses[0][1]["next"] == {
+        "tool": "usage_compression_start",
+        "arguments": {},
+        "poll_after_ms": 1_000,
+    }
 
 
 def test_compression_status_and_profile_preserve_shared_payloads(

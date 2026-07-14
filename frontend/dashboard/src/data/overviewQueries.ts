@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import type { ContextRuntime } from '../api/types';
 import {
+  dashboardQueryDefinition,
   dashboardQueryKey,
   dashboardQueryOptions,
   dashboardQuerySource,
@@ -17,6 +18,9 @@ import {
   type OverviewRecommendationsReport,
   type OverviewSummaryReport,
 } from './contracts/overview';
+
+const summaryQuery = dashboardQueryDefinition('overview-summary');
+const recommendationsQuery = dashboardQueryDefinition('overview-recommendations');
 
 type OverviewEndpointResource<T> = {
   data: T | null;
@@ -45,24 +49,24 @@ type OverviewQueryRequest = OverviewEndpointRequest & {
 export function overviewSummaryQueryOptions(request: OverviewQueryRequest) {
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'overview-summary',
+      summaryQuery,
       overviewQuerySource(request),
       overviewQueryScope(request),
     ),
     queryFn: ({ signal }) => loadOverviewSummaryEndpoint({ ...request, signal }),
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(summaryQuery.dataClass),
   });
 }
 
 export function overviewRecommendationsQueryOptions(request: OverviewQueryRequest) {
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'overview-recommendations',
+      recommendationsQuery,
       overviewQuerySource(request),
       overviewQueryScope(request),
     ),
     queryFn: ({ signal }) => loadOverviewRecommendationsEndpoint({ ...request, signal }),
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(recommendationsQuery.dataClass),
   });
 }
 

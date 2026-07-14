@@ -211,6 +211,10 @@ describe('Overview focused evidence flow', () => {
     expect(screen.getByText('Total Calls')).toBeInTheDocument();
     expect(screen.getByText('1,250')).toBeInTheDocument();
     expect(screen.getByText('8 detailed rows available')).toBeInTheDocument();
+    expect(screen.getByText('Estimated Cost')).toBeInTheDocument();
+    expect(screen.getByText('$890.00')).toBeInTheDocument();
+    expect(screen.getByText('Estimated credits')).toBeInTheDocument();
+    expect(screen.getByText('456.7')).toBeInTheDocument();
     expect(screen.queryByText('Highest-priority answer')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Needs attention' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Usage constellation' })).not.toBeInTheDocument();

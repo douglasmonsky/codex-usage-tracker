@@ -34,9 +34,6 @@ from codex_usage_tracker.reports.filters import query_row_matches
 from codex_usage_tracker.reports.query import (
     RecommendationsReport,
 )
-from codex_usage_tracker.reports.query import (
-    build_recommendations_report as build_legacy_recommendations_report,
-)
 from codex_usage_tracker.reports.recommendation_builder import (
     recommendation_sort_key,
     thread_recommendation_rows,
@@ -47,6 +44,10 @@ from codex_usage_tracker.store.recommendation_queries import (
     query_recommendation_fact_page,
     query_recommendation_thread_summaries,
 )
+
+
+class RecommendationFactsUnavailableError(RuntimeError):
+    """Raised when indexed recommendations require a usage-index refresh."""
 
 
 def build_recommendations_report(
@@ -69,35 +70,24 @@ def build_recommendations_report(
     source_limit: int | None = None,
     privacy_mode: str = "normal",
 ) -> RecommendationsReport:
-    """Use current indexed facts, falling back to the legacy report safely."""
+    """Build recommendations from current indexed facts only."""
 
-    if source_limit is None and _recommendation_facts_are_current(
+    if source_limit is not None:
+        raise ValueError(
+            "source_limit is no longer supported by indexed recommendations; "
+            "use since, until, and limit instead"
+        )
+    if not _recommendation_facts_are_current(
         db_path=db_path,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
         rate_card_path=rate_card_path,
         thresholds_path=thresholds_path,
     ):
-        return build_indexed_recommendations_report(
-            db_path=db_path,
-            pricing_path=pricing_path,
-            allowance_path=allowance_path,
-            rate_card_path=rate_card_path,
-            thresholds_path=thresholds_path,
-            projects_path=projects_path,
-            since=since,
-            until=until,
-            model=model,
-            effort=effort,
-            thread=thread,
-            project=project,
-            include_archived=include_archived,
-            min_score=min_score,
-            limit=limit,
-            source_limit=source_limit,
-            privacy_mode=privacy_mode,
+        raise RecommendationFactsUnavailableError(
+            "Recommendation facts are missing or stale; refresh the usage index and retry"
         )
-    return build_legacy_recommendations_report(
+    return build_indexed_recommendations_report(
         db_path=db_path,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
@@ -166,7 +156,7 @@ def build_indexed_recommendations_report(
         thread=thread,
         include_archived=include_archived,
         min_score=min_score,
-        limit=normalized_limit if thread_summaries is not None else 0,
+        limit=normalized_limit if project is None else 0,
     )
     rows = annotate_thread_attachments(page.rows)
     rows = annotate_rows_with_allowance(

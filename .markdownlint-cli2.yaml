@@ -15,4 +15,5 @@ ignores:
   - "node_modules/**"
   - "**/node_modules/**"
   - "tmp/**"
+  - "test-results/**"
   - ".serena/**"

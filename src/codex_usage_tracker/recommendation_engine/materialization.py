@@ -34,6 +34,7 @@ from codex_usage_tracker.store.recommendation_schema import (
 from codex_usage_tracker.store.rows import row_to_dict
 
 _FACT_BATCH_SIZE = 1_000
+_TARGETED_FACT_REPAIR_LIMIT = 10_000
 
 
 def backfill_recommendation_facts(
@@ -69,10 +70,19 @@ def sync_recommendation_facts(
     *,
     record_ids: Iterable[str],
     thread_keys: Iterable[str] | None = None,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
 ) -> int:
     """Replace facts only for changed normalized usage records."""
     targets = tuple(dict.fromkeys(str(record_id) for record_id in record_ids if record_id))
-    config = load_recommendation_fact_config()
+    config = load_recommendation_fact_config(
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
+    )
     generation = _generation(conn, config)
     _populate_targets(conn, targets)
     affected_thread_keys = {
@@ -114,15 +124,94 @@ def sync_refresh_recommendation_facts(
     record_ids: tuple[str, ...],
     thread_keys: frozenset[str],
     full_rebuild: bool,
+    *,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
 ) -> None:
-    if full_rebuild:
-        backfill_recommendation_facts(conn)
+    config = load_recommendation_fact_config(
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
+    )
+    refresh_record_ids = (
+        None
+        if full_rebuild
+        else _incremental_refresh_targets(
+            conn,
+            record_ids=record_ids,
+            config=config,
+        )
+    )
+    if refresh_record_ids is None:
+        backfill_recommendation_facts(
+            conn,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+        )
     else:
         sync_recommendation_facts(
             conn,
-            record_ids=record_ids,
+            record_ids=refresh_record_ids,
             thread_keys=thread_keys,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
         )
+
+
+def _incremental_refresh_targets(
+    conn: sqlite3.Connection,
+    *,
+    record_ids: tuple[str, ...],
+    config: RecommendationFactConfig,
+) -> tuple[str, ...] | None:
+    state = conn.execute(
+        """
+        SELECT facts_version, algorithm_version, config_fingerprint
+        FROM recommendation_fact_state
+        WHERE singleton = 1
+        """
+    ).fetchone()
+    if state is None:
+        return None
+    if (
+        int(state["facts_version"]) != RECOMMENDATION_FACTS_VERSION
+        or int(state["algorithm_version"]) != RECOMMENDATION_ALGORITHM_VERSION
+        or str(state["config_fingerprint"]) != config.fingerprint
+    ):
+        return None
+
+    fact_count = int(conn.execute("SELECT COUNT(*) FROM recommendation_facts").fetchone()[0])
+    usage_count = int(conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0])
+    missing_count = usage_count - fact_count
+    if missing_count < 0 or missing_count > _TARGETED_FACT_REPAIR_LIMIT:
+        return None
+    if missing_count == 0:
+        return record_ids
+
+    missing_record_ids = tuple(
+        str(row[0])
+        for row in conn.execute(
+            """
+            SELECT usage_events.record_id
+            FROM usage_events
+            LEFT JOIN recommendation_facts USING(record_id)
+            WHERE recommendation_facts.record_id IS NULL
+            ORDER BY usage_events.record_id
+            LIMIT ?
+            """,
+            (_TARGETED_FACT_REPAIR_LIMIT + 1,),
+        ).fetchall()
+    )
+    if len(missing_record_ids) != missing_count:
+        return None
+    return tuple(dict.fromkeys((*record_ids, *missing_record_ids)))
 
 
 def _generation(

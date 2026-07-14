@@ -7,11 +7,15 @@ import {
 } from '../api/investigations';
 import type { ContextRuntime } from '../api/types';
 import {
+  dashboardQueryDefinition,
   dashboardQueryKey,
   dashboardQueryOptions,
   dashboardQuerySource,
 } from './dashboardQueryRegistry';
 import { diagnosticSnapshotQueryOptions } from './diagnosticsQueries';
+
+const agenticQuery = dashboardQueryDefinition('investigator-agentic');
+const walkQuery = dashboardQueryDefinition('investigator-walk');
 
 type InvestigatorQueryRequest = {
   runtime: ContextRuntime;
@@ -40,7 +44,7 @@ export function investigatorAgenticQueryOptions(request: InvestigatorAgenticQuer
   const goal = request.goal?.trim() || 'token_waste';
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'investigator-agentic',
+      agenticQuery,
       investigatorQuerySource(request),
       investigatorQueryScope(request),
       goal,
@@ -52,7 +56,7 @@ export function investigatorAgenticQueryOptions(request: InvestigatorAgenticQuer
       includeArchived: request.includeArchived,
       signal,
     }),
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(agenticQuery.dataClass),
   });
 }
 
@@ -66,7 +70,7 @@ export function investigatorWalkQueryOptions(request: InvestigatorWalkQueryReque
   const question = normalizedQuestion(request.question);
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'investigator-walk',
+      walkQuery,
       investigatorQuerySource(request),
       investigatorQueryScope(request),
       question,
@@ -79,7 +83,7 @@ export function investigatorWalkQueryOptions(request: InvestigatorWalkQueryReque
       minOccurrences,
       signal,
     }),
-    ...dashboardQueryOptions('userAction'),
+    ...dashboardQueryOptions(walkQuery.dataClass),
   });
 }
 

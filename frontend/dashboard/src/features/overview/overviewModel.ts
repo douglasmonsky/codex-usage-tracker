@@ -37,6 +37,7 @@ export type OverviewLoadedMetrics = {
   outputTokens: number;
   reasoningOutputTokens: number;
   cachePercent: number;
+  estimatedCostUsd: number;
   estimatedCredits: number;
 };
 
@@ -144,9 +145,18 @@ function loadedMetrics(calls: CallRow[]): OverviewLoadedMetrics {
       uncachedInputTokens: sum.uncachedInputTokens + call.uncachedInput,
       outputTokens: sum.outputTokens + call.output,
       reasoningOutputTokens: sum.reasoningOutputTokens + call.reasoningOutput,
+      estimatedCostUsd: sum.estimatedCostUsd + call.cost,
       estimatedCredits: sum.estimatedCredits + call.credits,
     }),
-    { totalTokens: 0, cachedInputTokens: 0, uncachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0, estimatedCredits: 0 },
+    {
+      totalTokens: 0,
+      cachedInputTokens: 0,
+      uncachedInputTokens: 0,
+      outputTokens: 0,
+      reasoningOutputTokens: 0,
+      estimatedCostUsd: 0,
+      estimatedCredits: 0,
+    },
   );
   const inputTokens = totals.cachedInputTokens + totals.uncachedInputTokens;
   return {
@@ -168,6 +178,7 @@ function scopeMetrics(summary: DashboardScopeSummary | undefined): OverviewLoade
     outputTokens: summary.outputTokens,
     reasoningOutputTokens: summary.reasoningOutputTokens,
     cachePercent: summary.inputTokens > 0 ? (summary.cachedInputTokens / summary.inputTokens) * 100 : 0,
+    estimatedCostUsd: summary.estimatedCostUsd,
     estimatedCredits: summary.usageCredits,
   };
 }

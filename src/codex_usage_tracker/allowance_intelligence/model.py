@@ -9,6 +9,7 @@ from typing import Any
 from codex_usage_tracker.allowance_intelligence.statistics import (
     _PUBLIC_CLAIM_MIN_SPLIT_SPANS,
     _PUBLIC_CLAIM_P_VALUE_THRESHOLD,
+    _candidate_split_specs,
     _number,
     _rounded,
     _statistical_evidence,
@@ -221,20 +222,18 @@ def _change_candidate(window_kind: str, spans: list[dict[str, Any]]) -> dict[str
     if window_kind != "weekly" or len(spans) < _MIN_CHANGE_SPANS:
         return None
 
+    exact, deferred = _candidate_split_specs(
+        spans,
+        min_baseline_spans=_MIN_BASELINE_CHANGE_SPANS,
+        min_recent_spans=_MIN_RECENT_CHANGE_SPANS,
+        ratio_threshold=_CHANGE_RATIO_THRESHOLD,
+    )
     best: dict[str, Any] | None = None
-    for split in range(_MIN_BASELINE_CHANGE_SPANS, len(spans) - _MIN_RECENT_CHANGE_SPANS + 1):
-        previous = spans[:split]
-        recent = spans[split:]
-        previous_median = _median_credits_per_percent(previous)
-        recent_median = _median_credits_per_percent(recent)
-        if not previous_median or not recent_median:
-            continue
-        ratio = recent_median / previous_median
-        if ratio >= _CHANGE_RATIO_THRESHOLD:
-            continue
+    specs = exact if deferred is None else [*exact, deferred]
+    for split, previous_median, recent_median, ratio in specs:
         candidate = _candidate_payload(
-            previous=previous,
-            recent=recent,
+            previous=spans[:split],
+            recent=spans[split:],
             split_index=split,
             previous_median=previous_median,
             recent_median=recent_median,

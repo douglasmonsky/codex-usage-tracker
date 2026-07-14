@@ -4,11 +4,13 @@ import { shouldAutoRefreshUsageView } from './App';
 describe('React dashboard live refresh and row loading', () => {
   installAppTestHooks();
 
-it('matches legacy automatic refresh view exclusions', () => {
+it('pauses automatic index refresh on evidence-heavy views', () => {
   expect(shouldAutoRefreshUsageView('overview')).toBe(true);
   expect(shouldAutoRefreshUsageView('calls')).toBe(true);
   expect(shouldAutoRefreshUsageView('call')).toBe(false);
+  expect(shouldAutoRefreshUsageView('compression-lab')).toBe(false);
   expect(shouldAutoRefreshUsageView('diagnostics')).toBe(false);
+  expect(shouldAutoRefreshUsageView('investigator')).toBe(false);
 });
 
 it('auto refreshes live dashboards immediately and on interval', async () => {
@@ -72,11 +74,10 @@ it('auto refreshes live dashboards immediately and on interval', async () => {
 
   render(<App />);
   expect(screen.getByText('auto-before-thread')).toBeInTheDocument();
+  expect(screen.getByLabelText('Auto refresh')).toBeChecked();
 
   await act(async () => {
-    fireEvent.click(screen.getByLabelText('Auto refresh'));
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(10_000);
   });
 
   expect(screen.getByText('auto-first-thread')).toBeInTheDocument();
@@ -150,15 +151,13 @@ vi.stubGlobal('fetch', fetchMock);
 
 render(<App />);
 expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
+expect(screen.getByLabelText('Auto refresh')).toBeChecked();
 
 await act(async () => {
-fireEvent.click(screen.getByLabelText('Auto refresh'));
-await Promise.resolve();
 await vi.advanceTimersByTimeAsync(20_000);
 });
 
 expect(fetchMock).not.toHaveBeenCalled();
-expect(screen.getAllByText('Auto refresh pauses on Call Investigator and Diagnostics').length).toBeGreaterThan(0);
 
 await act(async () => {
 fireEvent.click(screen.getByRole('button', { name: /^Refresh$/i }));

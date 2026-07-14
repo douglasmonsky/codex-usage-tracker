@@ -1,6 +1,10 @@
 import { usageRowToCall } from '../../api/client';
 import type { CallRow, UsageRow } from '../../api/types';
 
+export const exploreCallsSchema = 'codex-usage-tracker-calls-v1' as const;
+export const exploreThreadCallsSchema = 'codex-usage-tracker-thread-calls-v1' as const;
+export const exploreThreadsSchema = 'codex-usage-tracker-threads-v1' as const;
+
 type ExplorePage<T> = {
   rows: T[];
   rowCount: number;
@@ -13,7 +17,7 @@ type ExplorePage<T> = {
 };
 
 export type ExploreCallsPage = ExplorePage<CallRow> & {
-  schema: 'codex-usage-tracker-calls-v1' | 'codex-usage-tracker-thread-calls-v1';
+  schema: typeof exploreCallsSchema | typeof exploreThreadCallsSchema;
   threadKey: string;
 };
 
@@ -43,7 +47,7 @@ export type ThreadSummaryRecord = {
 };
 
 export type ExploreThreadsPage = ExplorePage<ThreadSummaryRecord> & {
-  schema: 'codex-usage-tracker-threads-v1';
+  schema: typeof exploreThreadsSchema;
   includeArchived: boolean;
 };
 
@@ -52,7 +56,7 @@ export class ExploreContractError extends Error {}
 export function decodeExploreCalls(value: unknown): ExploreCallsPage {
   const payload = record(value, 'calls response');
   const schema = payload.schema;
-  if (schema !== 'codex-usage-tracker-calls-v1' && schema !== 'codex-usage-tracker-thread-calls-v1') {
+  if (schema !== exploreCallsSchema && schema !== exploreThreadCallsSchema) {
     throw new ExploreContractError('Unsupported calls response schema.');
   }
   const page = pageMetadata(payload);
@@ -68,7 +72,7 @@ export function decodeExploreCalls(value: unknown): ExploreCallsPage {
 
 export function decodeExploreThreads(value: unknown): ExploreThreadsPage {
   const payload = record(value, 'threads response');
-  if (payload.schema !== 'codex-usage-tracker-threads-v1') {
+  if (payload.schema !== exploreThreadsSchema) {
     throw new ExploreContractError('Unsupported threads response schema.');
   }
   return {

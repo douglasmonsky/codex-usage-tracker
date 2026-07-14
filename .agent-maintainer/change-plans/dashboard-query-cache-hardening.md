@@ -1,7 +1,7 @@
 +++
 id = "dashboard-query-cache-hardening"
 kind = "cohesive-migration"
-status = "active"
+status = "complete"
 base_ref = "origin/main"
 expires = 2026-07-29
 allowed_paths = [

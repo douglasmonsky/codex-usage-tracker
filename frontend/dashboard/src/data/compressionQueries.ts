@@ -6,10 +6,13 @@ import {
 } from '../api/compressionLab';
 import type { ContextRuntime } from '../api/types';
 import {
+  dashboardQueryDefinition,
   dashboardQueryKey,
   dashboardQueryOptions,
   dashboardQuerySource,
 } from './dashboardQueryRegistry';
+
+const compressionProfileQuery = dashboardQueryDefinition('compression-profile');
 
 export type CompressionQueryRequest = CompressionScopeRequest & {
   runtime: ContextRuntime;
@@ -28,7 +31,7 @@ export function compressionProfileQueryOptions(request: CompressionQueryRequest)
   };
   return queryOptions({
     queryKey: dashboardQueryKey(
-      'compression-profile',
+      compressionProfileQuery,
       source,
       scope,
       request.until ?? null,
@@ -38,6 +41,6 @@ export function compressionProfileQueryOptions(request: CompressionQueryRequest)
       request.detectorFamilies ?? [],
     ),
     queryFn: ({ signal }) => loadCompressionProfile(request.runtime, request, { signal }),
-    ...dashboardQueryOptions('aggregate'),
+    ...dashboardQueryOptions(compressionProfileQuery.dataClass),
   });
 }

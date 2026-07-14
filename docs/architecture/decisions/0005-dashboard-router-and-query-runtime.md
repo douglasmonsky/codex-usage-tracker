@@ -1,6 +1,6 @@
 # Dashboard Router And Query Runtime
 
-Status: Accepted for the dashboard redesign experiment
+Status: Accepted
 
 ## Context
 
@@ -34,6 +34,12 @@ frontend needs to use those contracts without creating a second source of truth.
   test.
 - Keep stale aggregate content visible while a refresh runs or a replacement
   request retries.
+- Register query identities and response schemas in the checked-in dashboard
+  query contract manifest. Duplicate identities and contract drift fail tests.
+- Load tabbed analytical modules on selection unless they are simultaneously
+  visible. Returning to a tab reuses its source-revision-keyed query result.
+- Keep bounded interactive reads on indexed query services. Full-scope detector
+  work uses the shared start/status/profile job lifecycle.
 
 ## Consequences
 
@@ -44,3 +50,5 @@ frontend needs to use those contracts without creating a second source of truth.
   from the boot payload.
 - TanStack Router and Query add bundle cost, so the shell and route chunks have
   explicit gzip budgets and lazy-loading gates.
+- Deterministic synthetic route budgets cover cold and warm behavior in CI.
+  Budget changes require measured evidence rather than threshold relaxation.

@@ -13,6 +13,12 @@ from typing import Any
 from urllib.parse import parse_qs
 
 from codex_usage_tracker.core.i18n import normalize_language
+from codex_usage_tracker.core.paths import (
+    DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_PRICING_PATH,
+    DEFAULT_RATE_CARD_PATH,
+    DEFAULT_THRESHOLDS_PATH,
+)
 from codex_usage_tracker.dashboard.api import dashboard_payload
 from codex_usage_tracker.recommendation_engine.api import refresh_usage_index
 from codex_usage_tracker.server.utils import (
@@ -48,6 +54,10 @@ class RefreshJobRegistry:
         *,
         codex_home: Path,
         db_path: Path,
+        pricing_path: Path = DEFAULT_PRICING_PATH,
+        allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+        rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+        thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
         include_archived: bool,
         aggregate_only: bool,
         refresh_lock: Any,
@@ -80,6 +90,10 @@ class RefreshJobRegistry:
                 "job_id": job_id,
                 "codex_home": codex_home,
                 "db_path": db_path,
+                "pricing_path": pricing_path,
+                "allowance_path": allowance_path,
+                "rate_card_path": rate_card_path,
+                "thresholds_path": thresholds_path,
                 "include_archived": include_archived,
                 "aggregate_only": aggregate_only,
                 "refresh_lock": refresh_lock,
@@ -107,6 +121,10 @@ class RefreshJobRegistry:
         job_id: str,
         codex_home: Path,
         db_path: Path,
+        pricing_path: Path,
+        allowance_path: Path,
+        rate_card_path: Path,
+        thresholds_path: Path,
         include_archived: bool,
         aggregate_only: bool,
         refresh_lock: Any,
@@ -124,6 +142,10 @@ class RefreshJobRegistry:
                     include_archived=include_archived,
                     aggregate_only=aggregate_only,
                     progress_callback=on_progress,
+                    pricing_path=pricing_path,
+                    allowance_path=allowance_path,
+                    rate_card_path=rate_card_path,
+                    thresholds_path=thresholds_path,
                 )
             self._update_job(
                 job_id,
@@ -164,6 +186,10 @@ def handle_refresh_job_start_request(
     *,
     codex_home: Path,
     db_path: Path,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     include_archived_default: bool,
     refresh_lock: Any,
     refresh_jobs: RefreshJobRegistry,
@@ -183,6 +209,10 @@ def handle_refresh_job_start_request(
     payload = refresh_jobs.start_refresh(
         codex_home=codex_home,
         db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
         refresh_lock=refresh_lock,
@@ -274,6 +304,10 @@ def refresh_usage_payload(
     *,
     codex_home: Path,
     db_path: Path,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     include_archived: bool,
     refresh_lock: Any,
 ) -> tuple[dict[str, object], float]:
@@ -284,6 +318,10 @@ def refresh_usage_payload(
             codex_home=codex_home,
             db_path=db_path,
             include_archived=include_archived,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
         )
     return (
         {
@@ -346,6 +384,10 @@ def usage_payload(
         refresh_result, refresh_ms = refresh_usage_payload(
             codex_home=codex_home,
             db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
             include_archived=include_archived,
             refresh_lock=refresh_lock,
         )
