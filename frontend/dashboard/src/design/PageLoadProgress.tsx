@@ -1,3 +1,4 @@
+import type { DashboardModuleState } from '../data/dashboardQueryRegistry';
 import styles from './PageLoadProgress.module.css';
 
 export type PageLoadProgressProps = {
@@ -12,7 +13,7 @@ export type PageLoadProgressProps = {
 
 export type PageLoadProgressModule = {
   label: string;
-  status: 'error' | 'loading' | 'ready' | 'waiting';
+  status: DashboardModuleState;
 };
 
 export function PageLoadProgress({
@@ -75,6 +76,7 @@ export function PageLoadProgress({
 
 function moduleClassName(status: PageLoadProgressModule['status']): string {
   if (status === 'ready') return styles.segmentReady;
+  if (status === 'updating') return styles.segmentUpdating;
   if (status === 'loading') return styles.segmentLoading;
   if (status === 'error') return styles.segmentError;
   return styles.segmentWaiting;
@@ -82,6 +84,7 @@ function moduleClassName(status: PageLoadProgressModule['status']): string {
 
 function moduleStatusLabel(status: PageLoadProgressModule['status']): string {
   if (status === 'ready') return 'ready';
+  if (status === 'updating') return 'updating';
   if (status === 'loading') return 'loading';
   if (status === 'error') return 'unavailable';
   return 'waiting';

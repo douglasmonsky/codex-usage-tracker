@@ -1,8 +1,12 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDashboardQueryClient } from '../../data/queryRuntime';
+import {
+  overviewRecommendationsQueryOptions,
+  overviewSummaryQueryOptions,
+} from '../../data/overviewQueries';
 import { fixtureModel } from '../../test-fixtures/dashboardFixture';
 import { OverviewPage } from './OverviewPage';
 
@@ -64,6 +68,58 @@ describe('Overview focused evidence flow', () => {
     await waitFor(() => expect(screen.getByText('Focused endpoints')).toBeInTheDocument());
     expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/summary'))).toHaveLength(1);
     expect(recommendationCalls).toBe(2);
+  });
+
+  it('reports cached modules as updating during a background refetch', async () => {
+    let summaryCalls = 0;
+    let resolveSummaryRefresh: ((response: Response) => void) | undefined;
+    let markSummaryRefreshStarted: (() => void) | undefined;
+    const summaryRefresh = new Promise<Response>((resolve) => {
+      resolveSummaryRefresh = resolve;
+    });
+    const summaryRefreshStarted = new Promise<void>((resolve) => {
+      markSummaryRefreshStarted = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (!String(input).startsWith('/api/summary')) {
+        return Promise.resolve(recommendationsResponse());
+      }
+      summaryCalls += 1;
+      if (summaryCalls === 1) return Promise.resolve(summaryResponse());
+      markSummaryRefreshStarted?.();
+      return summaryRefresh;
+    }));
+    const queryClient = createDashboardQueryClient();
+    const endpointCache = {
+      read: () => null,
+      write: () => undefined,
+    };
+    const queryRequest = {
+      runtime: { apiToken: 'local-token', contextApiEnabled: false, fileMode: false },
+      includeArchived: true,
+      sourceRevision: 'progress-revision',
+      cache: endpointCache,
+    };
+    const summaryOptions = overviewSummaryQueryOptions(queryRequest);
+    await Promise.all([
+      queryClient.prefetchQuery(summaryOptions),
+      queryClient.prefetchQuery(overviewRecommendationsQueryOptions(queryRequest)),
+    ]);
+    renderOverview(queryClient);
+    expect(screen.getByText('Focused endpoints')).toBeInTheDocument();
+
+    let refresh: Promise<unknown> = Promise.resolve();
+    await act(async () => {
+      refresh = queryClient.fetchQuery({ ...summaryOptions, staleTime: 0 });
+      await summaryRefreshStarted;
+    });
+    expect(queryClient.isFetching({ queryKey: ['dashboard', 'overview-summary'] })).toBe(1);
+    await waitFor(() => expect(screen.getByText('Usage summary updating')).toBeInTheDocument());
+
+    await act(async () => {
+      resolveSummaryRefresh?.(summaryResponse());
+      await refresh;
+    });
   });
 
   it('keeps endpoint-backed summaries without duplicating investigation surfaces', async () => {

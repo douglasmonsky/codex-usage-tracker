@@ -25,6 +25,20 @@ describe('PageLoadProgress', () => {
     expect(screen.getByText('Change detector loading')).toBeInTheDocument();
   });
 
+  it('distinguishes cached modules updating in the background', () => {
+    render(<PageLoadProgress
+      active
+      completed={1}
+      total={1}
+      label="Loading overview evidence"
+      modules={[{ label: 'Usage summary', status: 'updating' }]}
+      updating
+    />);
+
+    expect(screen.getByText('Updating page evidence')).toBeInTheDocument();
+    expect(screen.getByText('Usage summary updating')).toBeInTheDocument();
+  });
+
   it('renders indeterminate progress without a fabricated value', () => {
     render(<PageLoadProgress active label="Loading report pack" />);
 

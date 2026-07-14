@@ -4,6 +4,10 @@ import { useMemo, type ReactNode } from 'react';
 
 import type { ContextRuntime, DashboardModel } from '../../api/types';
 import type { LoadWindow } from '../../data/dataScope';
+import {
+  dashboardModuleProgress,
+  deriveDashboardModuleState,
+} from '../../data/dashboardQueryRegistry';
 import { Button, PageLoadProgress, StatusBadge } from '../../design';
 import {
   overviewRecommendationsQueryOptions,
@@ -88,8 +92,6 @@ export function OverviewPage(props: OverviewPageProps) {
     () => buildOverviewViewModel(props.model, focusedData, props.runtime.historyScope),
     [focusedData, props.model, props.runtime.historyScope],
   );
-  const completedModules = Number(Boolean(summaryQuery.data))
-    + Number(Boolean(recommendationsQuery.data));
   const queryError = summaryQuery.error ?? recommendationsQuery.error;
   const endpointError = queryError
     ? queryErrorMessage(queryError)
@@ -98,17 +100,26 @@ export function OverviewPage(props: OverviewPageProps) {
   const modules = [
     {
       label: 'Usage summary',
-      status: moduleStatus(summaryQuery.data, summaryQuery.error, summaryQuery.isFetching),
+      status: deriveDashboardModuleState({
+        enabled: canUseFocusedEndpoints,
+        hasData: Boolean(summaryQuery.data),
+        isError: summaryQuery.isError,
+        isFetching: summaryQuery.isFetching,
+        isPending: summaryQuery.isPending,
+      }),
     },
     {
       label: 'Recommendations',
-      status: moduleStatus(
-        recommendationsQuery.data,
-        recommendationsQuery.error,
-        recommendationsQuery.isFetching,
-      ),
+      status: deriveDashboardModuleState({
+        enabled: canUseFocusedEndpoints,
+        hasData: Boolean(recommendationsQuery.data),
+        isError: recommendationsQuery.isError,
+        isFetching: recommendationsQuery.isFetching,
+        isPending: recommendationsQuery.isPending,
+      }),
     },
   ];
+  const progress = dashboardModuleProgress(modules.map(module => module.status));
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
@@ -121,12 +132,12 @@ export function OverviewPage(props: OverviewPageProps) {
 
       <PageLoadProgress
         active={canUseFocusedEndpoints && isFetching}
-        completed={completedModules}
-        total={2}
+        completed={progress.ready}
+        total={progress.total}
         label="Loading overview evidence"
         error={canUseFocusedEndpoints ? endpointError : null}
         modules={modules}
-        updating={completedModules > 0}
+        updating={modules.some(module => module.status === 'updating')}
       />
 
       <OverviewMetrics
@@ -159,16 +170,6 @@ export function OverviewPage(props: OverviewPageProps) {
 
 function queryErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function moduleStatus(
-  data: unknown,
-  error: unknown,
-  isFetching: boolean,
-): 'error' | 'loading' | 'ready' | 'waiting' {
-  if (data) return 'ready';
-  if (error) return 'error';
-  return isFetching ? 'loading' : 'waiting';
 }
 
 function endpointLabel(isFetching: boolean, data: OverviewEndpointBundle | undefined, error: Error | null, enabled: boolean): string {
