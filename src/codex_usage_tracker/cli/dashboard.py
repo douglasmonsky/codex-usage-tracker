@@ -11,9 +11,9 @@ from codex_usage_tracker.cli.output import print_json
 from codex_usage_tracker.core.api_payloads import path_payload, refresh_result_payload
 from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.dashboard.api import generate_dashboard
+from codex_usage_tracker.recommendation_engine.api import refresh_usage_index
 from codex_usage_tracker.server.api import serve_dashboard
 from codex_usage_tracker.server.utils import url_host
-from codex_usage_tracker.store.api import refresh_usage_index
 
 
 def run_dashboard(args: argparse.Namespace) -> int:

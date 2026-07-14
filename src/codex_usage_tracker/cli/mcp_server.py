@@ -152,6 +152,7 @@ from codex_usage_tracker.core.paths import (
 )
 from codex_usage_tracker.core.projects import apply_project_privacy_to_rows
 from codex_usage_tracker.diagnostics.api import run_doctor
+from codex_usage_tracker.recommendation_engine import api as recommendation_api
 from codex_usage_tracker.reports.agentic_dogfood import (
     DEFAULT_AGENTIC_DOGFOOD_DIR,
 )
@@ -173,7 +174,7 @@ def refresh_usage_index(
 ) -> dict[str, Any]:
     """Scan local Codex logs into SQLite usage and content indexes."""
 
-    result = store_api.refresh_usage_index(
+    result = recommendation_api.refresh_usage_index(
         codex_home=DEFAULT_CODEX_HOME,
         db_path=DEFAULT_DB_PATH,
         include_archived=include_archived,
