@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 
 from codex_usage_tracker.server import api as server_api
+from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
 
 def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
@@ -11,11 +13,13 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     capsys,
 ) -> None:
     opened: list[str] = []
+    handlers: list[object] = []
 
     class FakeServer:
         def __init__(self, address: tuple[str, int], handler: object) -> None:
             self.address = address
             self.handler = handler
+            handlers.append(handler)
             self.closed = False
 
         def serve_forever(self) -> None:
@@ -51,3 +55,9 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
         "Legacy dashboard fallback remains available at http://127.0.0.1:8765/dashboard.html"
         in output
     )
+    assert handlers
+    handler = handlers[0]
+    assert isinstance(handler, partial)
+    query_cache = handler.keywords["query_cache"]
+    assert isinstance(query_cache, AggregateQueryCache)
+    assert query_cache.max_entries == 64

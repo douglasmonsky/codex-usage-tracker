@@ -7,7 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.formatting import format_recommendations
-from codex_usage_tracker.core.paths import DEFAULT_PROJECTS_PATH
+from codex_usage_tracker.core.paths import (
+    DEFAULT_PROJECTS_PATH,
+    DEFAULT_RATE_CARD_PATH,
+    DEFAULT_THRESHOLDS_PATH,
+)
 from codex_usage_tracker.core.projects import (
     annotate_rows_with_project_identity,
     apply_project_privacy_to_rows,
@@ -25,7 +29,10 @@ from codex_usage_tracker.reports.recommendation_builder import (
     recommendation_sort_key,
     thread_recommendation_rows,
 )
-from codex_usage_tracker.reports.recommendations import annotate_rows_with_recommendations
+from codex_usage_tracker.reports.recommendations import (
+    annotate_rows_with_recommendations,
+    load_threshold_config,
+)
 from codex_usage_tracker.store.api import query_dashboard_events
 
 QUERY_PRICING_STATUS_CHOICES = ("priced", "estimated", "unpriced")
@@ -144,6 +151,8 @@ def build_recommendations_report(
     db_path: Path,
     pricing_path: Path,
     allowance_path: Path,
+    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     since: str | None = None,
     until: str | None = None,
@@ -173,6 +182,8 @@ def build_recommendations_report(
         rows,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
         projects_path=projects_path,
     )
     scored_rows = _recommendation_filtered_rows(
@@ -243,12 +254,14 @@ def _annotated_recommendation_rows(
     *,
     pricing_path: Path,
     allowance_path: Path,
+    rate_card_path: Path,
+    thresholds_path: Path,
     projects_path: Path,
 ) -> list[dict[str, Any]]:
     pricing = load_pricing_config(pricing_path)
-    allowance = load_allowance_config(allowance_path)
+    allowance = load_allowance_config(allowance_path, rate_card_path=rate_card_path)
     rows = annotate_rows_with_allowance(annotate_rows_with_efficiency(rows, pricing), allowance)
-    rows = annotate_rows_with_recommendations(rows)
+    rows = annotate_rows_with_recommendations(rows, load_threshold_config(thresholds_path))
     return annotate_rows_with_project_identity(rows, load_project_config(projects_path))
 
 

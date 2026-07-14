@@ -1,8 +1,10 @@
 import type { OverviewEndpointBundle } from './overviewQueries';
+import { isBrowserCacheSafe } from './browserCacheSafety';
 
 export type OverviewEndpointCacheIdentity = {
   includeArchived: boolean;
   since: string;
+  sourceKey: string;
   sourceRevision: string;
 };
 
@@ -34,7 +36,12 @@ export function createOverviewEndpointCache(
       try {
         const raw = storage.getItem(storageKey);
         if (!raw || raw.length > maxStorageBytes) return null;
-        const record = parseRecords(raw).find(candidate => (
+        const records = parseRecords(raw);
+        const safeRecords = records.filter(candidate => isBrowserCacheSafe(candidate.bundle));
+        if (safeRecords.length !== records.length) {
+          storage.setItem(storageKey, JSON.stringify(safeRecords.slice(0, maxRecords)));
+        }
+        const record = safeRecords.find(candidate => (
           sameIdentity(candidate.identity, identity)
           && Date.now() - candidate.storedAt <= maxAgeMs
         ));
@@ -44,6 +51,7 @@ export function createOverviewEndpointCache(
       }
     },
     write(identity, bundle) {
+      if (!isBrowserCacheSafe(bundle)) return;
       const storage = storageProvider();
       if (!storage) return;
       try {
@@ -89,6 +97,7 @@ function sameIdentity(
     left
     && left.includeArchived === right.includeArchived
     && left.since === right.since
+    && left.sourceKey === right.sourceKey
     && left.sourceRevision === right.sourceRevision,
   );
 }

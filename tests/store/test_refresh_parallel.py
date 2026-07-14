@@ -165,6 +165,7 @@ def test_full_refresh_defers_and_restores_bulk_load_indexes(
         }
     assert restored == {
         "idx_call_diagnostic_facts_record",
+        "idx_call_diagnostic_facts_lookup",
         "idx_call_diagnostic_facts_type_name",
         "idx_source_records_event_timestamp",
         "idx_source_records_shape_adapter",

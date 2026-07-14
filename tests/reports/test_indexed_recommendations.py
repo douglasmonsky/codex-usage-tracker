@@ -213,6 +213,65 @@ def test_recommendations_fall_back_when_config_changes(
     assert report.payload["row_count"] == 1
 
 
+def test_recommendations_fall_back_when_threshold_fingerprint_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    pricing_path = _write_pricing(tmp_path / "pricing.json")
+    allowance_path = tmp_path / "allowance.json"
+    rate_card_path = tmp_path / "rate-card.json"
+    thresholds_path = tmp_path / "thresholds.json"
+    projects_path = tmp_path / "projects.json"
+    thresholds_path.write_text('{"high_uncached_input_tokens": 10000}\n', encoding="utf-8")
+    event = replace(
+        _usage_event(
+            record_id="threshold-indexed",
+            session_id="session-threshold",
+            thread_key="thread:threshold",
+            event_timestamp="2026-07-13T12:00:00Z",
+            cumulative_total_tokens=900_000,
+        ),
+        input_tokens=250_000,
+        cached_input_tokens=1_000,
+        total_tokens=250_050,
+    )
+    upsert_usage_events([event], db_path=db_path)
+    with connect(db_path) as conn:
+        backfill_recommendation_facts(
+            conn,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+        )
+    arguments: dict[str, Any] = {
+        "db_path": db_path,
+        "pricing_path": pricing_path,
+        "allowance_path": allowance_path,
+        "rate_card_path": rate_card_path,
+        "thresholds_path": thresholds_path,
+        "projects_path": projects_path,
+    }
+
+    with monkeypatch.context() as context:
+        context.setattr(
+            recommendation_query,
+            "build_legacy_recommendations_report",
+            lambda **_kwargs: pytest.fail("current facts should use the indexed path"),
+        )
+        assert build_engine_recommendations_report(**arguments).payload["row_count"] == 1
+
+    thresholds_path.write_text('{"high_uncached_input_tokens": 300000}\n', encoding="utf-8")
+    with monkeypatch.context() as context:
+        context.setattr(
+            recommendation_query,
+            "build_indexed_recommendations_report",
+            lambda **_kwargs: pytest.fail("stale facts must use the legacy path"),
+        )
+        assert build_engine_recommendations_report(**arguments).payload["row_count"] == 1
+
+
 def test_recommendations_preserve_source_limit_fallback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

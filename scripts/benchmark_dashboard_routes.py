@@ -10,6 +10,7 @@ import statistics
 import sys
 import time
 from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -32,8 +33,13 @@ from codex_usage_tracker.compression.models import CompressionScope  # noqa: E40
 from codex_usage_tracker.recommendation_engine.materialization import (  # noqa: E402
     backfill_recommendation_facts,
 )
-from codex_usage_tracker.server.recommendations import recommendations_payload  # noqa: E402
-from codex_usage_tracker.server.summary import summary_payload  # noqa: E402
+from codex_usage_tracker.server.query_cache import (  # noqa: E402
+    AggregateQueryCache,
+)
+from codex_usage_tracker.server.recommendations import (  # noqa: E402
+    handle_recommendations_request,
+)
+from codex_usage_tracker.server.summary import handle_summary_request  # noqa: E402
 from codex_usage_tracker.store.api import (  # noqa: E402
     refresh_usage_event_links,
     upsert_usage_events,
@@ -41,6 +47,9 @@ from codex_usage_tracker.store.api import (  # noqa: E402
 from codex_usage_tracker.store.connection import connect  # noqa: E402
 
 DEFAULT_SIZES = (10_000, 100_000, 400_000)
+
+JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+RouteAction = Callable[[AggregateQueryCache, JsonSender], None]
 
 
 def main() -> int:
@@ -89,6 +98,7 @@ def benchmark_fixture(
     if db_path.exists():
         db_path.unlink()
     config = _write_benchmark_config(fixture_dir)
+    rate_card_path = fixture_dir / "synthetic-rate-card.json"
 
     populate_started = time.perf_counter()
     for start in range(0, rows, batch_size):
@@ -106,31 +116,43 @@ def benchmark_fixture(
             conn,
             pricing_path=config["pricing_path"],
             allowance_path=config["allowance_path"],
+            rate_card_path=rate_card_path,
+            thresholds_path=config["thresholds_path"],
         )
     materialize_seconds = round(time.perf_counter() - materialize_started, 6)
 
-    route_actions: tuple[tuple[str, Callable[[], dict[str, object]]], ...] = (
-        (
-            "/api/summary",
-            lambda: summary_payload(
-                "group_by=date&limit=20&include_archived=true",
-                db_path=db_path,
-                pricing_path=config["pricing_path"],
-                projects_path=config["projects_path"],
-                privacy_mode="normal",
-            ),
-        ),
-        (
-            "/api/recommendations",
-            lambda: recommendations_payload(
-                "limit=20&include_archived=true",
-                db_path=db_path,
-                pricing_path=config["pricing_path"],
-                allowance_path=config["allowance_path"],
-                projects_path=config["projects_path"],
-                privacy_mode="normal",
-            ),
-        ),
+    def benchmark_summary(cache: AggregateQueryCache, send_json: JsonSender) -> None:
+        handle_summary_request(
+            "group_by=date&limit=20&include_archived=true",
+            db_path=db_path,
+            pricing_path=config["pricing_path"],
+            projects_path=config["projects_path"],
+            privacy_mode="normal",
+            query_cache=cache,
+            send_error=_raise_route_error,
+            send_exception=_raise_route_exception,
+            send_json=send_json,
+        )
+
+    def benchmark_recommendations(cache: AggregateQueryCache, send_json: JsonSender) -> None:
+        handle_recommendations_request(
+            "limit=20&include_archived=true",
+            db_path=db_path,
+            pricing_path=config["pricing_path"],
+            allowance_path=config["allowance_path"],
+            rate_card_path=rate_card_path,
+            thresholds_path=config["thresholds_path"],
+            projects_path=config["projects_path"],
+            privacy_mode="normal",
+            query_cache=cache,
+            send_error=_raise_route_error,
+            send_exception=_raise_route_exception,
+            send_json=send_json,
+        )
+
+    route_actions: tuple[tuple[str, RouteAction], ...] = (
+        ("/api/summary", benchmark_summary),
+        ("/api/recommendations", benchmark_recommendations),
     )
     return {
         "rows": rows,
@@ -140,13 +162,92 @@ def benchmark_fixture(
             "seconds": materialize_seconds,
         },
         "routes": [
-            _benchmark_route(path, action, iterations=iterations) for path, action in route_actions
+            _benchmark_cached_route(
+                path,
+                action=action,
+                iterations=iterations,
+            )
+            for path, action in route_actions
         ],
         "compression_job": _benchmark_compression_job(
             db_path,
             iterations=iterations,
         ),
     }
+
+
+def _benchmark_cached_route(
+    path: str,
+    *,
+    action: RouteAction,
+    iterations: int,
+) -> dict[str, object]:
+    cold_samples: list[float] = []
+    cold_statuses: list[str] = []
+    payload: dict[str, object] = {}
+    body = b""
+    for _ in range(iterations):
+        started = time.perf_counter()
+        payload, body, status = _invoke_route(action, AggregateQueryCache())
+        cold_samples.append(round(time.perf_counter() - started, 6))
+        cold_statuses.append(status)
+
+    warm_cache = AggregateQueryCache()
+    _invoke_route(action, warm_cache)
+    warm_samples: list[float] = []
+    warm_statuses: list[str] = []
+    for _ in range(iterations):
+        started = time.perf_counter()
+        payload, body, status = _invoke_route(action, warm_cache)
+        warm_samples.append(round(time.perf_counter() - started, 6))
+        warm_statuses.append(status)
+
+    cold_median = round(statistics.median(cold_samples), 6)
+    cold_p95 = _percentile(cold_samples, 0.95)
+    return {
+        "path": path,
+        "cold_seconds": cold_median,
+        "cold_samples_seconds": cold_samples,
+        "cold_median_seconds": cold_median,
+        "cold_p95_seconds": cold_p95,
+        "warm_samples_seconds": warm_samples,
+        "warm_median_seconds": round(statistics.median(warm_samples), 6),
+        "warm_p95_seconds": _percentile(warm_samples, 0.95),
+        "samples_seconds": cold_samples,
+        "median_seconds": cold_median,
+        "p95_seconds": cold_p95,
+        "cache_statuses": [*cold_statuses, *warm_statuses],
+        "result_rows": _result_rows(payload),
+        "payload_bytes": len(body),
+    }
+
+
+def _invoke_route(
+    action: RouteAction,
+    cache: AggregateQueryCache,
+) -> tuple[dict[str, object], bytes, str]:
+    response: dict[str, object] = {}
+    body = b""
+
+    def capture(status: HTTPStatus, payload: dict[str, object]) -> None:
+        nonlocal response, body
+        if status != HTTPStatus.OK:
+            raise RuntimeError(f"benchmark route returned HTTP {int(status)}")
+        response = payload
+        body = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+
+    action(cache, capture)
+    metadata = response.get("query_cache")
+    cache_status = str(metadata.get("status")) if isinstance(metadata, dict) else "missing"
+    return response, body, cache_status
+
+
+def _raise_route_error(status: HTTPStatus, message: str) -> None:
+    raise RuntimeError(f"benchmark route returned HTTP {int(status)}: {message}")
+
+
+def _raise_route_exception(prefix: str, exc: BaseException) -> None:
+    raise RuntimeError(f"{prefix}: {exc}") from exc
 
 
 def _benchmark_route(

@@ -74,6 +74,8 @@ def _run_recommendations(args: argparse.Namespace) -> int:
         db_path=args.db,
         pricing_path=args.pricing,
         allowance_path=args.allowance,
+        rate_card_path=args.rate_card,
+        thresholds_path=args.thresholds,
         projects_path=args.projects,
         since=args.since,
         until=args.until,

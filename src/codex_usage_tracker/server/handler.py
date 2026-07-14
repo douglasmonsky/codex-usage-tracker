@@ -50,6 +50,7 @@ from codex_usage_tracker.server.open_investigator import (
     OpenInvestigatorRequestError,
     open_investigator_payload,
 )
+from codex_usage_tracker.server.query_cache import AggregateQueryCache
 from codex_usage_tracker.server.recommendations import handle_recommendations_request
 from codex_usage_tracker.server.reports import handle_reports_pack_request
 from codex_usage_tracker.server.request_guards import (
@@ -97,6 +98,7 @@ class _UsageDashboardHandler(
         refresh_jobs: server_usage_refresh.RefreshJobRegistry | None = None,
         analysis_jobs: AnalysisJobRegistry | None = None,
         compression_jobs: compression_routes.CompressionJobRegistry | None = None,
+        query_cache: AggregateQueryCache | None = None,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: ContextApiState | None = None,
@@ -130,6 +132,7 @@ class _UsageDashboardHandler(
         self._refresh_jobs = refresh_jobs or server_usage_refresh.RefreshJobRegistry()
         self._analysis_jobs = analysis_jobs or AnalysisJobRegistry()
         self._compression_jobs = compression_jobs or compression_routes.CompressionJobRegistry()
+        self._query_cache = query_cache or AggregateQueryCache()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
@@ -274,6 +277,7 @@ class _UsageDashboardHandler(
             pricing_path=self._pricing_path,
             projects_path=self._projects_path,
             privacy_mode=self._privacy_mode,
+            query_cache=self._query_cache,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,
@@ -285,8 +289,11 @@ class _UsageDashboardHandler(
             db_path=self._db_path,
             pricing_path=self._pricing_path,
             allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
+            thresholds_path=self._thresholds_path,
             projects_path=self._projects_path,
             privacy_mode=self._privacy_mode,
+            query_cache=self._query_cache,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,

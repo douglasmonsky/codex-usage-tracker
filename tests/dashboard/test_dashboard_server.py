@@ -624,10 +624,20 @@ def test_dashboard_history_scope_excludes_archived_rows_by_default(tmp_path: Pat
 
 def test_dashboard_payload_cache_identity_is_stable_across_data_scopes(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
+    pricing_path = tmp_path / "pricing.json"
+    allowance_path = tmp_path / "allowance.json"
+    rate_card_path = tmp_path / "rate-card.json"
+    thresholds_path = tmp_path / "thresholds.json"
+    projects_path = tmp_path / "projects.json"
     active_payload = dashboard_payload(
         db_path=db_path,
         api_token="test-token",
         limit=500,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
+        projects_path=projects_path,
     )
     scoped_payload = dashboard_payload(
         db_path=db_path,
@@ -635,11 +645,30 @@ def test_dashboard_payload_cache_identity_is_stable_across_data_scopes(tmp_path:
         include_archived=True,
         limit=500,
         since="2026-07-04T00:00:00Z",
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
+        projects_path=projects_path,
     )
 
-    assert active_payload["payload_cache_version"] == 2
-    assert scoped_payload["payload_cache_version"] == 2
+    assert active_payload["payload_cache_version"] == 3
+    assert scoped_payload["payload_cache_version"] == 3
     assert active_payload["payload_cache_key"] == scoped_payload["payload_cache_key"]
+
+    thresholds_path.write_text('{"high_cost_usd": 2.0}\n', encoding="utf-8")
+    changed_payload = dashboard_payload(
+        db_path=db_path,
+        api_token="test-token",
+        limit=500,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
+        projects_path=projects_path,
+    )
+
+    assert changed_payload["payload_cache_key"] != active_payload["payload_cache_key"]
 
 
 def test_dashboard_server_usage_api_switches_history_scope(tmp_path: Path) -> None:

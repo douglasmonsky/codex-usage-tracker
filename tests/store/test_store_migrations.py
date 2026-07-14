@@ -68,9 +68,9 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(str(source_rows[0]["source_record_hash"])) == 64
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 21
+    assert state["schema_version"] == 22
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == list(range(1, 22))
+    assert [row["version"] for row in state["migrations"]] == list(range(1, 23))
     with connect(db_path) as conn:
         init_db(conn)
         facts = conn.execute("SELECT COUNT(*) AS count FROM call_diagnostic_facts").fetchone()
@@ -106,7 +106,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "21"
+    assert metadata["schema_version"] == "22"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -151,14 +151,35 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
             row["name"]
             for row in conn.execute("PRAGMA index_list(recommendation_facts)").fetchall()
         }
+        diagnostic_indexes = {
+            row["name"]
+            for row in conn.execute("PRAGMA index_list(call_diagnostic_facts)").fetchall()
+        }
+        diagnostic_lookup_plan = [
+            str(row["detail"])
+            for row in conn.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT record_id
+                FROM call_diagnostic_facts
+                WHERE fact_type = ? AND fact_name = ?
+                """,
+                ("tool", "rg"),
+            ).fetchall()
+        ]
 
-    assert versions == list(range(1, 22))
-    assert user_version == 21
+    assert versions == list(range(1, 23))
+    assert user_version == 22
     assert "idx_usage_source_file_line" in usage_indexes
     assert {
         "idx_recommendation_facts_rank_active",
         "idx_recommendation_facts_rank_all",
     } <= recommendation_indexes
+    assert "idx_call_diagnostic_facts_lookup" in diagnostic_indexes
+    assert any(
+        "USING COVERING INDEX idx_call_diagnostic_facts_lookup" in detail
+        for detail in diagnostic_lookup_plan
+    )
     assert {
         "parsed_prefix_tail_hash",
         "parsed_row_count",
