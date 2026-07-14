@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 import codex_usage_tracker.store.compression_schema as compression_schema
+import codex_usage_tracker.store.recommendation_schema as recommendation_schema
 import codex_usage_tracker.store.schema_source_index as schema_source_index
 from codex_usage_tracker.core.schema import (
     USAGE_EVENT_COLUMN_NAMES,
@@ -15,7 +16,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -32,6 +33,7 @@ MIGRATION_NAMES = {
     13: "create normalized content index tables",
     14: "persist investigation run summaries",
     **compression_schema.MIGRATION_NAMES,
+    **recommendation_schema.MIGRATION_NAMES,
     18: "index usage events by source file and line",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
@@ -105,6 +107,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         *compression_schema.schema_migrations(),
         (18, schema_source_index.migrate_source_file_line_index),
         (19, compression_schema.add_candidate_record_metadata),
+        (20, recommendation_schema.create_recommendation_fact_tables),
     )
 
 

@@ -76,6 +76,7 @@ from codex_usage_tracker.store.diagnostic_queries import (
 )
 from codex_usage_tracker.store.exports import export_usage_csv as export_usage_csv
 from codex_usage_tracker.store.investigation_runs import insert_investigation_run
+from codex_usage_tracker.store.recommendation_schema import clear_recommendation_fact_tables
 from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
 from codex_usage_tracker.store.rows import (
     row_to_dict as _row_to_dict,
@@ -196,6 +197,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         deleted_rows = int(row["count"] if row is not None else 0)
         clear_content_index_rows(conn)
         clear_compression_detector_facts(conn)
+        clear_recommendation_fact_tables(conn)
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM allowance_observations")
