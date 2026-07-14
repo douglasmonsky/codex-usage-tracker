@@ -62,6 +62,7 @@ describe('Cache and Context focused evidence', () => {
           contextRuntime={{ ...fixtureModel.contextRuntime, apiToken: 'local-token', fileMode: false }}
           includeArchived={false}
           focusedEndpointsEnabled
+          sourceKey="fixture-source"
           sourceRevision="revision-1"
           onOpenInvestigator={vi.fn()}
           onCopyCallLink={vi.fn()}
@@ -70,6 +71,9 @@ describe('Cache and Context focused evidence', () => {
     );
 
     expect(screen.getByRole('progressbar', { name: 'Loading cache and context evidence' })).toBeInTheDocument();
+    expect(screen.getByText('Usage summary loading')).toBeInTheDocument();
+    expect(screen.getByText('Thread summaries loading')).toBeInTheDocument();
+    expect(screen.getByText('Selected thread calls loading')).toBeInTheDocument();
     expect((await screen.findAllByText('scope-thread')).length).toBeGreaterThan(0);
     expect(screen.getByText('1,200')).toBeInTheDocument();
     expect(screen.getAllByText('80.0%').length).toBeGreaterThan(0);

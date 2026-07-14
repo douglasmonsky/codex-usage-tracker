@@ -5,6 +5,11 @@ import { buildOverviewSeriesFromDailyValues } from '../../api/overviewSeries';
 import type { CallRow, ContextRuntime, DashboardModel, HeatmapRow, MetricCard, Series, ThreadRow } from '../../api/types';
 import { threadCallsQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
 import { overviewSummaryQueryOptions } from '../../data/overviewQueries';
+import {
+  dashboardModuleProgress,
+  deriveDashboardModuleState,
+  type DashboardModuleState,
+} from '../../data/dashboardQueryRegistry';
 import { formatCompact, formatNumber, pct } from '../shared/format';
 import { threadSummaryToRow, type ExploreThreadRow } from '../threads/threadSummaryAdapter';
 
@@ -14,6 +19,7 @@ type CacheContextEvidenceRequest = {
   includeArchived: boolean;
   scopeSince?: string | null;
   selectedThreadName: string | null;
+  sourceKey?: string;
   sourceRevision: string;
   enabled: boolean;
 };
@@ -32,6 +38,7 @@ export type CacheContextEvidence = {
     completed: number;
     total: number;
     error: string | null;
+    modules: Array<{ label: string; status: DashboardModuleState }>;
     updating: boolean;
   };
 };
@@ -43,6 +50,7 @@ export function useCacheContextEvidence(request: CacheContextEvidenceRequest): C
       runtime: request.runtime,
       includeArchived: request.includeArchived,
       since: request.scopeSince ?? undefined,
+      sourceKey: request.sourceKey,
       sourceRevision: request.sourceRevision,
     }),
     enabled: focused,
@@ -52,6 +60,7 @@ export function useCacheContextEvidence(request: CacheContextEvidenceRequest): C
     ...threadsInfiniteQueryOptions({
       runtime: request.runtime,
       includeArchived: request.includeArchived,
+      sourceKey: request.sourceKey,
       sourceRevision: request.sourceRevision,
       sort: 'tokens',
       direction: 'desc',
@@ -85,6 +94,7 @@ export function useCacheContextEvidence(request: CacheContextEvidenceRequest): C
     ...threadCallsQueryOptions({
       runtime: request.runtime,
       includeArchived: request.includeArchived,
+      sourceKey: request.sourceKey,
       sourceRevision: request.sourceRevision,
       threadKey: selectedThreadKey,
     }),
@@ -93,11 +103,16 @@ export function useCacheContextEvidence(request: CacheContextEvidenceRequest): C
   });
   const summary = summaryQuery.data;
   const selectedCallsRequired = Boolean(selectedThreadKey);
-  const completedModules = Number(Boolean(summary))
-    + Number(Boolean(threadsQuery.data))
-    + Number(!selectedCallsRequired || Boolean(selectedCallsQuery.data));
-  const totalModules = selectedCallsRequired ? 3 : 2;
+  const modules = [
+    moduleState('Usage summary', focused, summaryQuery),
+    moduleState('Thread summaries', focused, threadsQuery),
+    ...(selectedCallsRequired
+      ? [moduleState('Selected thread calls', focused, selectedCallsQuery)]
+      : []),
+  ];
+  const moduleProgress = dashboardModuleProgress(modules.map(module => module.status));
   const queryError = summaryQuery.error ?? threadsQuery.error ?? selectedCallsQuery.error;
+  const unavailableModule = modules.find(module => module.status === 'error');
   return {
     cacheSeries: summary ? cacheSeriesFromSummary(summary.rows) : request.model.cacheSeries,
     cards: summary ? cacheCardsFromSummary(summary.rows) : request.model.cards.slice(2, 5),
@@ -111,11 +126,31 @@ export function useCacheContextEvidence(request: CacheContextEvidenceRequest): C
     usingFocusedEndpoints,
     progress: {
       active: focused && (summaryQuery.isFetching || threadsQuery.isFetching || selectedCallsQuery.isFetching),
-      completed: Math.min(completedModules, totalModules),
-      total: totalModules,
-      error: queryError ? queryErrorMessage(queryError) : null,
-      updating: completedModules > 0,
+      completed: moduleProgress.ready,
+      total: moduleProgress.total,
+      error: queryError
+        ? `${unavailableModule?.label ?? 'Focused evidence'} unavailable: ${queryErrorMessage(queryError)}`
+        : null,
+      modules,
+      updating: modules.some(module => module.status === 'updating'),
     },
+  };
+}
+
+function moduleState(
+  label: string,
+  enabled: boolean,
+  query: { data: unknown; isError: boolean; isFetching: boolean; isPending: boolean },
+) {
+  return {
+    label,
+    status: deriveDashboardModuleState({
+      enabled,
+      hasData: Boolean(query.data),
+      isError: query.isError,
+      isFetching: query.isFetching,
+      isPending: query.isPending,
+    }),
   };
 }
 

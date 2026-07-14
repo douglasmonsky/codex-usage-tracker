@@ -30,6 +30,7 @@ export type ReportsPackRequest = {
   limit?: number;
   evidenceLimit?: number;
   includeArchived?: boolean;
+  signal?: AbortSignal;
 };
 
 export async function loadReportsPack(
@@ -58,6 +59,7 @@ export async function loadReportsPack(
       'X-Codex-Usage-Token': runtime.apiToken,
     },
     cache: 'no-store',
+    signal: options.signal,
   });
   const payload = (await readJsonResponse(response, 'Reports pack')) as ReportsPackPayload;
   if (payload.schema !== reportsPackSchema) {

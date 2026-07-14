@@ -23,6 +23,12 @@ test.describe('React dashboard rewrite smoke', () => {
     await page.getByRole('button', { name: /^Reports$/i }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
     await expect(page.getByText('Weekly Credits').first()).toBeVisible();
+
+    await page.getByRole('button', { name: /Cache And Context/i }).click();
+    await expect(page.getByRole('heading', { name: 'Cache And Context Lab' })).toBeVisible();
+    await page.getByRole('button', { name: /^Reports$/i }).click();
+    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+    await expect(page.getByText('Weekly Credits').first()).toBeVisible();
   });
 
   test('filters, sorts, drills into calls, and exports aggregate CSV', async ({ page }) => {
