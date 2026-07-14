@@ -57,7 +57,12 @@
     background: var(--signal-selection);
   }
 
-  .segmentLoading::after {
+  .segmentUpdating {
+    background: rgb(47 111 237 / 35%);
+  }
+
+  .segmentLoading::after,
+  .segmentUpdating::after {
     animation: page-progress 1.2s ease-in-out infinite;
     background: var(--signal-selection);
     border-radius: inherit;
@@ -129,6 +134,7 @@
   @media (prefers-reduced-motion: reduce) {
     .fill { transition: none; }
     .indeterminate,
-    .segmentLoading::after { animation: none; transform: translateX(0); }
+    .segmentLoading::after,
+    .segmentUpdating::after { animation: none; transform: translateX(0); }
   }
 }

@@ -66,6 +66,32 @@ describe('Overview focused evidence flow', () => {
     expect(recommendationCalls).toBe(2);
   });
 
+  it('reports cached modules as updating during a background refetch', async () => {
+    let summaryCalls = 0;
+    let resolveSummaryRefresh: ((response: Response) => void) | undefined;
+    const summaryRefresh = new Promise<Response>((resolve) => {
+      resolveSummaryRefresh = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (!String(input).startsWith('/api/summary')) {
+        return Promise.resolve(recommendationsResponse());
+      }
+      summaryCalls += 1;
+      return summaryCalls === 1 ? Promise.resolve(summaryResponse()) : summaryRefresh;
+    }));
+    const queryClient = createDashboardQueryClient();
+    renderOverview(queryClient);
+    await waitFor(() => expect(screen.getByText('Focused endpoints')).toBeInTheDocument());
+
+    const refresh = queryClient.invalidateQueries({
+      queryKey: ['dashboard', 'overview-summary'],
+    });
+    await waitFor(() => expect(screen.getByText('Usage summary updating')).toBeInTheDocument());
+
+    resolveSummaryRefresh?.(summaryResponse());
+    await refresh;
+  });
+
   it('keeps endpoint-backed summaries without duplicating investigation surfaces', async () => {
     const model = {
       ...fixtureModel,

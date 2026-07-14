@@ -64,8 +64,11 @@ reusable results.
 | PR 1C: Product refresh wiring | Merged | #244 / #249 / `3e569c6` | CLI/server wiring, architecture decision, and 38 focused refresh-path tests |
 | PR 2A: Indexed recommendations compatibility | Merged | #244 / #250 / `378a2d1` | Exact payload parity, freshness fallback, and public route/CLI/MCP wiring |
 | PR 2B: Bounded recommendation hydration | Merged | #244 / #251 / `d9085e6` | 400k legacy 29.96 s; indexed median 135 ms / p95 151 ms; baseline agent-perf `20260714T011721Z-58ac3b4a` |
-| PR 3A: Core frontend query registry | In progress | #244 | Central source/scope identity, data-class policy, module-state, and focused lifecycle tests |
-| PR 3B: Module query migration | Pending | #244 | Overview, Investigator, Cache and Context, and Reports lifecycle/browser tests |
+| PR 3A: Core frontend query registry | Merged | #244 / #252 / `3da6b29` | Central source/scope identity, data-class policy, module-state, coalescing, and focused lifecycle tests |
+| PR 3B1: Shared module progress | In progress | #244 | Updating-vs-loading state and Overview background-refresh coverage |
+| PR 3B2: Shell source identity | Pending | #244 | Stable non-secret source propagation and navigation cache preservation |
+| PR 3B3: Cache and Reports migration | Pending | #244 | Shared policies, module progress, cancellation, and browser tests |
+| PR 3B4: Investigator migration | Pending | #244 | Credential-free keys, request cancellation, module progress, and browser tests |
 | PR 3C: Diagnostics query migration | Pending | #244 | Diagnostics lifecycle and rapid route-switching browser tests |
 | PR 4: Heavy-route job migration | Pending | #244 | Branch, PR, async progress/cache tests |
 | PR 5: Query and cache hardening | Pending | #244 | Branch, PR, query plans and warm/cold budgets |
