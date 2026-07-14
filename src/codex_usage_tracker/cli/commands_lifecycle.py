@@ -19,12 +19,12 @@ from codex_usage_tracker.core.formatting import (
 )
 from codex_usage_tracker.diagnostics.api import run_doctor
 from codex_usage_tracker.pricing.api import update_pricing_from_openai_docs, write_pricing_template
-from codex_usage_tracker.reports.agentic_dogfood import build_agentic_dogfood_report
-from codex_usage_tracker.store.api import (
+from codex_usage_tracker.recommendation_engine.api import (
     rebuild_usage_index,
     refresh_usage_index,
-    reset_usage_database,
 )
+from codex_usage_tracker.reports.agentic_dogfood import build_agentic_dogfood_report
+from codex_usage_tracker.store.api import reset_usage_database
 
 
 def _run_setup(args: argparse.Namespace) -> int:

@@ -9,6 +9,7 @@ depends_on = [
     "//codex_usage_tracker.parser",
     "//codex_usage_tracker.pricing",
     "//codex_usage_tracker.reports",
+    "//codex_usage_tracker.recommendation_engine",
     "//codex_usage_tracker.server",
     "//codex_usage_tracker.store",
 ]

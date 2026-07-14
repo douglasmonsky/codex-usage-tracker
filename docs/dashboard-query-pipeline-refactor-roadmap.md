@@ -58,8 +58,10 @@ reusable results.
 | Slice | Status | Tracking | Completion evidence |
 | --- | --- | --- | --- |
 | Loading and cancellation repair | Merged | #243 / #245 / `39fdcea` | Independent module cache/progress and real-data navigation QA |
-| PR 0: Measurement and route inventory | Ready for PR | #244 / #246 | Route inventory, benchmark artifact, and agent-perf run `20260713T231301Z-4a032512` |
-| PR 1: Recommendation facts | Pending | #244 | Branch, PR, migration/backfill tests |
+| PR 0: Measurement and route inventory | Merged | #244 / #246 / `1c4685b` | Route inventory, benchmark artifact, and agent-perf run `20260713T231301Z-4a032512` |
+| PR 1A: Derived-fact refresh hook | Merged | #244 / #247 / `a5681ba` | Transactional full/append callback coverage and 807-test CI matrix |
+| PR 1B: Recommendation fact materialization | Merged | #244 / #248 / `f1dfc22` | Schema v20, parity/incremental/backfill tests, and agent-perf run `20260713T234304Z-bade89ff` |
+| PR 1C: Product refresh wiring | Ready for PR | #244 | CLI/server wiring, architecture decision, and 38 focused refresh-path tests |
 | PR 2: Indexed recommendations API | Pending | #244 | Branch, PR, parity and latency results |
 | PR 3: Frontend module query registry | Pending | #244 | Branch, PR, lifecycle/browser tests |
 | PR 4: Heavy-route job migration | Pending | #244 | Branch, PR, async progress/cache tests |
@@ -240,9 +242,10 @@ inputs and outputs needed to reproduce current recommendation rows:
 - recommended action key;
 - fact and configuration versions.
 
-The exact table name and column set should be finalized in the schema PR after
-query-plan prototypes. The table must support indexed ordering by scope,
-recommendation score, recency, and record ID.
+PR 1 resolves this as dedicated `recommendation_facts` and
+`recommendation_fact_state` tables. Their indexes support ordering by scope,
+recommendation score, recency, and record ID without introducing a generalized
+derived-facts framework.
 
 ### Compatibility adapter
 

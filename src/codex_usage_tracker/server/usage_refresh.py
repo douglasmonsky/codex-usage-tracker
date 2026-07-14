@@ -14,6 +14,7 @@ from urllib.parse import parse_qs
 
 from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.dashboard.api import dashboard_payload
+from codex_usage_tracker.recommendation_engine.api import refresh_usage_index
 from codex_usage_tracker.server.utils import (
     elapsed_ms,
     first_query_value,
@@ -23,7 +24,6 @@ from codex_usage_tracker.server.utils import (
     truthy_query_value,
     utc_now,
 )
-from codex_usage_tracker.store.api import refresh_usage_index
 
 
 class UsageRefreshAuthError(PermissionError):
