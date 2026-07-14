@@ -14,12 +14,12 @@ from codex_usage_tracker.core.formatting import (
     format_session,
 )
 from codex_usage_tracker.core.projects import apply_project_privacy_to_rows
+from codex_usage_tracker.recommendation_engine.query import build_recommendations_report
 from codex_usage_tracker.reports.api import (
     build_action_brief_report,
     build_expensive_calls_report,
     build_pricing_coverage_report,
     build_query_report,
-    build_recommendations_report,
     build_source_coverage_report,
     build_summary_report,
 )

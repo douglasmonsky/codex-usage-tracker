@@ -8,7 +8,7 @@ from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
-from codex_usage_tracker.reports.api import build_recommendations_report
+from codex_usage_tracker.recommendation_engine.query import build_recommendations_report
 from codex_usage_tracker.server.utils import (
     first_query_value,
     parse_optional_float,

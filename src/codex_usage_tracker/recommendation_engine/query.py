@@ -1,0 +1,250 @@
+"""Recommendation reports backed by materialized recommendation facts."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+from codex_usage_tracker.core.paths import DEFAULT_PROJECTS_PATH
+from codex_usage_tracker.core.projects import (
+    annotate_rows_with_project_identity,
+    apply_project_privacy_to_rows,
+    load_project_config,
+    validate_privacy_mode,
+)
+from codex_usage_tracker.core.threads import annotate_thread_attachments
+from codex_usage_tracker.pricing.allowance import (
+    annotate_rows_with_allowance,
+    load_allowance_config,
+)
+from codex_usage_tracker.pricing.api import annotate_rows_with_efficiency, load_pricing_config
+from codex_usage_tracker.recommendation_engine.fact_config import (
+    RECOMMENDATION_ALGORITHM_VERSION,
+    RECOMMENDATION_FACTS_VERSION,
+    load_recommendation_fact_config,
+    recommendation_generation_fingerprint,
+)
+from codex_usage_tracker.reports.filters import query_row_matches
+from codex_usage_tracker.reports.query import (
+    RecommendationsReport,
+)
+from codex_usage_tracker.reports.query import (
+    build_recommendations_report as build_legacy_recommendations_report,
+)
+from codex_usage_tracker.reports.recommendation_builder import (
+    recommendation_sort_key,
+    thread_recommendation_rows,
+)
+from codex_usage_tracker.store.compression_schema import read_compression_source_generation
+from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.recommendation_queries import query_recommendation_fact_page
+
+
+def build_recommendations_report(
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path = DEFAULT_PROJECTS_PATH,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    project: str | None = None,
+    include_archived: bool = False,
+    min_score: float | None = None,
+    limit: int = 20,
+    source_limit: int | None = None,
+    privacy_mode: str = "normal",
+) -> RecommendationsReport:
+    """Use current indexed facts, falling back to the legacy report safely."""
+
+    if source_limit is None and _recommendation_facts_are_current(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+    ):
+        return build_indexed_recommendations_report(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            projects_path=projects_path,
+            since=since,
+            until=until,
+            model=model,
+            effort=effort,
+            thread=thread,
+            project=project,
+            include_archived=include_archived,
+            min_score=min_score,
+            limit=limit,
+            source_limit=source_limit,
+            privacy_mode=privacy_mode,
+        )
+    return build_legacy_recommendations_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        project=project,
+        include_archived=include_archived,
+        min_score=min_score,
+        limit=limit,
+        source_limit=source_limit,
+        privacy_mode=privacy_mode,
+    )
+
+
+def build_indexed_recommendations_report(
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+    projects_path: Path = DEFAULT_PROJECTS_PATH,
+    since: str | None = None,
+    until: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
+    thread: str | None = None,
+    project: str | None = None,
+    include_archived: bool = False,
+    min_score: float | None = None,
+    limit: int = 20,
+    source_limit: int | None = None,
+    privacy_mode: str = "normal",
+) -> RecommendationsReport:
+    """Build the legacy report contract from indexed actionable facts."""
+
+    privacy_mode = validate_privacy_mode(privacy_mode)
+    page = query_recommendation_fact_page(
+        db_path=db_path,
+        since=since,
+        until=until,
+        model=model,
+        effort=effort,
+        thread=thread,
+        include_archived=include_archived,
+        min_score=min_score,
+        limit=0,
+    )
+    rows = annotate_thread_attachments(page.rows)
+    rows = annotate_rows_with_allowance(
+        annotate_rows_with_efficiency(rows, load_pricing_config(pricing_path)),
+        load_allowance_config(allowance_path),
+    )
+    rows = [_restore_materialized_recommendations(row) for row in rows]
+    rows = annotate_rows_with_project_identity(rows, load_project_config(projects_path))
+    scored_rows = [row for row in rows if _matches_project(row, project)]
+    scored_rows.sort(key=recommendation_sort_key)
+    normalized_limit = None if limit <= 0 else limit
+    limited_rows = scored_rows if normalized_limit is None else scored_rows[:normalized_limit]
+    private_rows = apply_project_privacy_to_rows(limited_rows, privacy_mode=privacy_mode)
+    return RecommendationsReport(
+        {
+            "schema": "codex-usage-tracker-recommendations-v1",
+            "filters": {
+                "since": since,
+                "until": until,
+                "model": model,
+                "effort": effort,
+                "thread": thread,
+                "project": project,
+                "include_archived": include_archived,
+                "min_score": min_score,
+                "limit": normalized_limit,
+                "source_limit": source_limit,
+                "privacy_mode": privacy_mode,
+            },
+            "row_count": len(private_rows),
+            "total_matched_rows": len(scored_rows),
+            "truncated": normalized_limit is not None and len(scored_rows) > normalized_limit,
+            "threads": thread_recommendation_rows(
+                scored_rows,
+                limit=normalized_limit or 20,
+            ),
+            "rows": private_rows,
+        }
+    )
+
+
+def _restore_materialized_recommendations(row: dict[str, Any]) -> dict[str, Any]:
+    copy = dict(row)
+    recommendations = json.loads(str(copy.pop("fact_recommendations_json")))
+    copy.pop("fact_primary_recommendation_key", None)
+    copy.pop("fact_secondary_recommendation_keys_json", None)
+    copy["recommendation_score"] = float(copy.pop("fact_recommendation_score"))
+    copy["action_recommendations"] = recommendations
+    copy["primary_recommendation"] = recommendations[0] if recommendations else None
+    copy["secondary_recommendations"] = recommendations[1:]
+    copy["primary_signal"] = recommendations[0]["key"] if recommendations else None
+    copy["secondary_signals"] = [item["key"] for item in recommendations[1:]]
+    copy["recommended_action"] = (
+        recommendations[0]["action"]
+        if recommendations
+        else "No aggregate action is flagged; continue monitoring usage patterns."
+    )
+    copy["recommended_action_key"] = copy.pop("fact_recommended_action_key")
+    copy["flag_explanations"] = [item["why"] for item in recommendations]
+    copy["flag_explanation_keys"] = [item["why_key"] for item in recommendations]
+    return copy
+
+
+def _matches_project(row: dict[str, Any], project: str | None) -> bool:
+    return query_row_matches(
+        row,
+        until=None,
+        model=None,
+        effort=None,
+        thread=None,
+        project=project,
+        pricing_status=None,
+        credit_confidence=None,
+        min_tokens=None,
+        min_credits=None,
+    )
+
+
+def _recommendation_facts_are_current(
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    allowance_path: Path,
+) -> bool:
+    config = load_recommendation_fact_config(
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+    )
+    try:
+        with connect(db_path) as conn:
+            state = conn.execute(
+                "SELECT * FROM recommendation_fact_state WHERE singleton = 1"
+            ).fetchone()
+            if state is None:
+                return False
+            source_generation = read_compression_source_generation(conn)
+            expected_generation = recommendation_generation_fingerprint(
+                source_generation=source_generation,
+                config_fingerprint=config.fingerprint,
+            )
+            fact_count = int(
+                conn.execute("SELECT COUNT(*) FROM recommendation_facts").fetchone()[0]
+            )
+            usage_count = int(conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0])
+    except sqlite3.Error:
+        return False
+    return (
+        int(state["facts_version"]) == RECOMMENDATION_FACTS_VERSION
+        and int(state["algorithm_version"]) == RECOMMENDATION_ALGORITHM_VERSION
+        and int(state["source_generation"]) == source_generation
+        and str(state["generation_fingerprint"]) == expected_generation
+        and str(state["config_fingerprint"]) == config.fingerprint
+        and int(state["record_count"]) == fact_count == usage_count
+    )
