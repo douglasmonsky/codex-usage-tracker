@@ -41,6 +41,7 @@ import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
 import {
   cancelUsageQueries,
+  dashboardSourceIdentityFromPayload,
   dashboardQueryClient,
   isUsageQueryCancelled,
   queryUsageSnapshot,
@@ -98,8 +99,8 @@ const initialLiveLoadAttempted = useRef(false);
   const [loadWindow, setLoadWindow] = useState<LoadWindow>(() => initialLoadWindowFromPayload(initialPayload));
   const [historyScope, setHistoryScope] = useState<HistoryScope>(() => historyScopeFromUrl(historyScopeFromPayload(initialPayload)));
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
-  const [navigationRevision, setNavigationRevision] = useState(0);
 const canUseLiveApi = Boolean(dashboardPayload?.api_token);
+const sourceIdentity = useMemo(() => dashboardSourceIdentityFromPayload(dashboardPayload), [dashboardPayload]);
 const shellI18n = useMemo(() => createShellI18n(dashboardPayload, language), [dashboardPayload, language]);
 const contextRuntime = useMemo<ContextRuntime>(
 () => ({ ...model.contextRuntime, contextApiEnabled }),
@@ -191,7 +192,6 @@ useEffect(() => {
     setActivePreset(params.get('preset') ?? '');
     setHistoryScope(historyScopeFromUrl(historyScopeFromPayload(dashboardPayload), search));
     setLocationSearch(search);
-    setNavigationRevision(revision => revision + 1);
   }
 
   window.addEventListener('popstate', hydrateShellFromLocation);
@@ -681,7 +681,6 @@ aria-label="History scope"
       </header>
       <p className="sr-only" role="status" aria-live="polite">{refreshState}</p>
       <DashboardRouteView
-        key={navigationRevision}
         activeView={activeView}
         model={scopedModel} navigateView={setView}
         onRefresh={onRefresh}
@@ -700,6 +699,7 @@ aria-label="History scope"
         }
         backFromCallInvestigator={backFromCallInvestigator}
         dashboardPayload={dashboardPayload}
+        sourceIdentity={sourceIdentity}
         historyScope={historyScope}
         loadWindow={loadWindow}
         scopeSince={dashboardPayload?.since ?? sinceForLoadWindow(loadWindow)}
