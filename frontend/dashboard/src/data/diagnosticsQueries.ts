@@ -5,6 +5,7 @@ import {
   loadDiagnosticFactCalls,
   loadDiagnosticFactSource,
   loadDiagnosticSnapshot,
+  normalizeDiagnosticFactSortKey,
   type DiagnosticFactCallSortKey,
   type DiagnosticFactCallsResult,
   type DiagnosticFactRow,
@@ -53,7 +54,7 @@ export function diagnosticFactSourceQueryOptions(request: DiagnosticFactSourceQu
     ?? diagnosticFactSourceDefinitions[0];
   const limit = Math.max(1, Math.round(request.limit ?? definition.limit));
   const offset = Math.max(0, Math.round(request.offset ?? 0));
-  const sort = request.sort ?? 'uncached';
+  const sort = normalizeDiagnosticFactSortKey(request.sort ?? 'uncached');
   const direction = request.direction ?? 'desc';
   return queryOptions({
     queryKey: dashboardQueryKey(
@@ -69,6 +70,7 @@ export function diagnosticFactSourceQueryOptions(request: DiagnosticFactSourceQu
     queryFn: ({ signal }) => loadDiagnosticFactSource(request.factSourceKey, request.runtime, {
       cacheKey: request.sourceRevision,
       direction,
+      includeArchived: request.includeArchived,
       limit,
       offset,
       signal,
@@ -97,6 +99,7 @@ export function diagnosticFactCallsQueryOptions(request: DiagnosticFactCallsQuer
     queryFn: ({ pageParam, signal }) => loadDiagnosticFactCalls(request.fact, request.runtime, {
       cacheKey: request.sourceRevision,
       direction,
+      includeArchived: request.includeArchived,
       limit: pageSize,
       offset: pageParam,
       signal,

@@ -31,11 +31,19 @@ describe('diagnostics transport', () => {
     const sourceController = new AbortController();
     const callsController = new AbortController();
 
-    await loadDiagnosticFactSource('facts', runtime, { signal: sourceController.signal });
-    await loadDiagnosticFactCalls(fact, runtime, { signal: callsController.signal });
+    await loadDiagnosticFactSource('facts', runtime, {
+      includeArchived: true,
+      signal: sourceController.signal,
+    });
+    await loadDiagnosticFactCalls(fact, runtime, {
+      includeArchived: true,
+      signal: callsController.signal,
+    });
 
     expect(fetchMock.mock.calls[0][1]).toEqual(expect.objectContaining({ signal: sourceController.signal }));
     expect(fetchMock.mock.calls[1][1]).toEqual(expect.objectContaining({ signal: callsController.signal }));
+    expect(String(fetchMock.mock.calls[0][0])).toContain('include_archived=true');
+    expect(String(fetchMock.mock.calls[1][0])).toContain('include_archived=true');
   });
 
   it('separates compatibility cache entries by source revision', async () => {
@@ -45,8 +53,9 @@ describe('diagnostics transport', () => {
     await loadDiagnosticFactSource('facts', runtime, { cacheKey: 'revision-1' });
     await loadDiagnosticFactSource('facts', runtime, { cacheKey: 'revision-1' });
     await loadDiagnosticFactSource('facts', runtime, { cacheKey: 'revision-2' });
+    await loadDiagnosticFactSource('facts', runtime, { cacheKey: 'revision-2', includeArchived: true });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 

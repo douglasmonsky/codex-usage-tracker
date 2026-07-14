@@ -61,6 +61,24 @@ describe('diagnostics query options', () => {
       factSourceKey: 'facts',
       limit: 100,
     }).queryKey).not.toEqual(key);
+    expect(diagnosticFactSourceQueryOptions({
+      ...request,
+      factSourceKey: 'facts',
+      sort: 'total',
+    }).queryKey).toEqual(diagnosticFactSourceQueryOptions({
+      ...request,
+      factSourceKey: 'facts',
+      sort: 'tokens',
+    }).queryKey);
+    expect(diagnosticFactSourceQueryOptions({
+      ...request,
+      factSourceKey: 'facts',
+      sort: 'latest',
+    }).queryKey).toEqual(diagnosticFactSourceQueryOptions({
+      ...request,
+      factSourceKey: 'facts',
+      sort: 'time',
+    }).queryKey);
   });
 
   it('keys fact-call pages by fact identity and scan controls', () => {
