@@ -8,13 +8,13 @@ Which threads are draining the most, and what can we do so it does not keep happ
 
 ## Codex
 
-With Codex Usage Tracker, I refreshed the aggregate index, ran `usage_investigate(goal="workflow_churn")`, then checked `usage_threads` and supporting Calls rows for the top thread. I did not inspect raw context.
+With Codex Usage Tracker, I refreshed the aggregate index, started a Compression Lab run for workflow churn, polled status, read the profile, inspected the strongest selected candidate detail, and simulated that candidate. I then used `usage_threads` and supporting Calls rows for dashboard verification. I did not inspect raw context.
 
 ## Evidence
 
 - The top thread has repeated high-token calls and context-heavy investigation turns.
 - The Calls table shows high context-window percentage and a few low-cache rows.
-- The investigation report recommends checking shell churn and repeated file rediscovery before opening raw context.
+- Compression Lab ranks repeated workflow churn as the strongest local candidate and provides overlap-adjusted savings estimates with assumptions.
 
 ## Recommended Remediation
 
@@ -31,4 +31,5 @@ Open the dashboard and check:
 - Threads sorted by total tokens before and after the workflow change.
 - Calls filtered to the target thread, sorted by total tokens.
 - Call Investigator for one high-pressure call.
+- Compression Lab profile and simulation totals after the workflow change.
 - Diagnostics Notebook usage-drain evidence if weekly usage remains unexpectedly high.

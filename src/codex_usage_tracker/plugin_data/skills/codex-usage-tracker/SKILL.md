@@ -42,9 +42,11 @@ When the user wants ideas, suggest concrete aggregate investigations:
 - Check whether model or effort choice is wasting tokens.
 - Test my usage-waste hypotheses and say what was true, false, or inconclusive.
 - Compare repeated file rediscovery, shell churn, and large low-output calls.
+- Run Compression Lab to rank overlap-adjusted context and workflow waste candidates.
+- Simulate which candidate fixes would save the most future context.
 - Build a strict-privacy summary I can share.
 
-Route these through `usage_report_pack`, `usage_calls`, `usage_threads`, `usage_summary`, and `usage_call_detail` before considering raw context.
+Route broad waste and context-compression questions through `usage_compression_start`, `usage_compression_status`, `usage_compression_profile`, `usage_compression_candidates`, selected `usage_compression_candidate_detail`, and optionally `usage_compression_simulate`. Use `usage_investigate` and `usage_action_brief` as compact compatibility routers when the client needs one broad entrypoint. Use `usage_report_pack`, `usage_calls`, `usage_threads`, `usage_summary`, and `usage_call_detail` for dashboard-shaped follow-up before considering raw context.
 
 ## Remediation Recommendations
 
@@ -98,6 +100,7 @@ For experiment-style answers, use this structure:
 - Use `usage_call_detail` for the aggregate Call Investigator payload for one `record_id`. Use `usage_call_context` only for explicit raw-context requests.
 - Use `usage_threads` for the same aggregate Threads table rows as the dashboard.
 - Use `usage_report_pack` for dashboard report cards plus compact evidence rows when the user wants less cloudy "what should I inspect?" output.
+- Use the Compression Lab lifecycle for broad "look through my usage for token waste" questions: start or reuse the run, poll progress, read the profile, page candidates, inspect only selected candidate details with handles, and simulate proposed interventions.
 - Use `usage_dashboard_recommendations` when the dashboard-specific recommendation payload is more useful than the older markdown-oriented recommendation report.
 - Use `usage_recommendations` when the user asks what to inspect next or wants ranked action items by aggregate severity.
 - Use `usage_summary` presets `today`, `last-7-days`, `by-model`, `by-cwd`, `by-thread`, and `expensive` for common requests.

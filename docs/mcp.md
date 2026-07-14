@@ -50,9 +50,11 @@ The API skill should refresh the local index, use MCP JSON tools, state scope an
 
 Use `usage_suggest_investigations(...)` when the user wants ideas, is unsure what to inspect, or asks what the tracker can help with. It returns a short menu of related goal-led investigations such as token waste, allowance change, cache failure, workflow churn, and overview. Goal-specific requests still include adjacent useful investigations instead of a one-item answer.
 
-Use `usage_investigate(...)` as the first stop for broad requests such as "look through my usage for token waste" or "what should I change?" It returns normalized findings with compact evidence, evidence summaries, confidence, missing-access notes, recommended actions, verification tools, and caveats. Compact evidence is the default. Pass `detail_mode="full"` only when the caller needs the full underlying report rows.
+For broad requests such as "look through my usage for token waste" or "what should I change?", prefer the Compression Lab lifecycle: `usage_compression_start(...)`, `usage_compression_status(...)`, `usage_compression_profile(...)`, `usage_compression_candidates(...)`, selected `usage_compression_candidate_detail(...)`, and optional `usage_compression_simulate(...)`. This gives agents progress, a compact profile, ranked candidates, selected evidence, and estimated intervention impact without one cloudy nested response.
 
-Use `usage_action_brief(...)` when the user wants a concise "what should I actually do next?" answer. It converts aggregate diagnostics into action families with evidence, likely waste pattern, recommended workflow change, existing/custom tool ideas, verification steps, and next MCP tools. It is aggregate/shareable by default and does not include indexed snippets or raw fragments.
+Use `usage_investigate(...)` and `usage_action_brief(...)` as compatibility routers when the caller wants one broad entrypoint. For `overview`, `token_waste`, `cache_failure`, and `workflow_churn`, compact/default calls return `content_mode="compression_lab_router"` plus `compression_lab.next` and `recommended_next_tools`. `usage_investigate(detail_mode="full")` keeps the older aggregate diagnostic rows when full legacy evidence is explicitly needed.
+
+Use `usage_action_brief(...)` when the user wants a concise "what should I actually do next?" answer from the same router. It returns action families with evidence, likely waste pattern, recommended workflow change, existing/custom tool ideas, verification steps, and next MCP tools. It is shareable by default and does not include indexed snippets or raw fragments.
 
 Use `usage_test_hypotheses(...)` when the user frames the task as hypotheses, wants true/false/partial decisions, or asks for the "I'd like to / I will use / I'm missing / hypothesis result" structure. It tests supplied hypotheses or built-in defaults for token waste, cache failure, repeated file rediscovery, shell churn, effort/model choice, and allowance change. It uses aggregate and local-index signals but does not include raw fragments.
 
@@ -197,8 +199,14 @@ usage_compression_candidate_detail(candidate_id="cmp_...", evidence_mode="handle
 usage_compression_simulate(run_id="compression_...", candidate_ids=["cmp_..."])
 ```
 
+Broad compatibility routers use this same sequence. They start or reuse a run,
+return polling instructions when the run is active, then read the profile,
+candidate page, one selected candidate detail by default, and a small simulation
+when a completed profile is available. Agents should not expand every candidate
+detail unless the user asks for exhaustive evidence.
+
 - `usage_compression_start(...)` returns immediately. It reuses an exact
-  completed profile or an identical active request and otherwise launches one
+  completed profile or identical active request and otherwise launches one
   daemon worker. `refresh=true` forces a new analysis; it does not rescan source
   logs.
 - `usage_compression_status(run_id=...)` returns monotonic percent, stage,

@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from codex_usage_tracker.cli.mcp_compression_router import (
+    build_compression_action_router,
+    build_compression_investigation_router,
+    is_compression_router_goal,
+)
 from codex_usage_tracker.cli.mcp_discovery import _pattern_scan_payload
 from codex_usage_tracker.cli.mcp_runtime import mcp
 from codex_usage_tracker.core.paths import (
@@ -59,6 +64,17 @@ def usage_investigate(
     privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Run a goal-led aggregate usage investigation."""
+    if detail_mode == "compact" and is_compression_router_goal(goal):
+        return build_compression_investigation_router(
+            db_path=DEFAULT_DB_PATH,
+            goal=goal,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        )
     return build_agentic_investigation_report(
         db_path=DEFAULT_DB_PATH,
         pricing_path=DEFAULT_PRICING_PATH,
@@ -87,6 +103,17 @@ def usage_action_brief(
     privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Return compact aggregate remediation brief with concrete next actions."""
+    if is_compression_router_goal(goal):
+        return build_compression_action_router(
+            db_path=DEFAULT_DB_PATH,
+            goal=goal,
+            since=since,
+            until=until,
+            thread=thread,
+            include_archived=include_archived,
+            evidence_limit=evidence_limit,
+            privacy_mode=privacy_mode,
+        )
     return build_action_brief_report(
         db_path=DEFAULT_DB_PATH,
         pricing_path=DEFAULT_PRICING_PATH,
