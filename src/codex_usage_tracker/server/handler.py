@@ -368,6 +368,7 @@ class _UsageDashboardHandler(
             projects_path=self._projects_path,
             include_archived_default=self._include_archived,
             privacy_mode=self._privacy_mode,
+            query_cache=self._query_cache,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,

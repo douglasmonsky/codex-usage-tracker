@@ -5,7 +5,9 @@ status = "active"
 base_ref = "origin/main"
 expires = 2026-07-29
 allowed_paths = [
+  ".agent-maintainer/dashboard-source-baseline.json",
   ".agent-maintainer/change-plans/dashboard-query-pipeline-enforcement.md",
+  ".markdownlint-cli2.yaml",
   ".agent-maintainer/change-plans/dashboard-query-cache-hardening.md",
   ".codex/tasks.toml",
   ".github/workflows/ci.yml",
@@ -17,6 +19,16 @@ allowed_paths = [
   "docs/dashboard-route-inventory.md",
   "docs/development.md",
   "frontend/dashboard/src/data/**",
+  "frontend/dashboard/src/App.live-refresh.test.tsx",
+  "frontend/dashboard/src/App.tsx",
+  "frontend/dashboard/src/api/compressionLab.test.ts",
+  "frontend/dashboard/src/api/compressionLab.ts",
+  "frontend/dashboard/src/features/compression-lab/CompressionLabPage.test.tsx",
+  "frontend/dashboard/src/features/compression-lab/CompressionLabPage.tsx",
+  "frontend/dashboard/src/features/overview/OverviewMetrics.tsx",
+  "frontend/dashboard/src/features/overview/OverviewPage.test.tsx",
+  "frontend/dashboard/src/features/overview/overviewModel.test.ts",
+  "frontend/dashboard/src/features/overview/overviewModel.ts",
   "frontend/dashboard/src/features/diagnostics/DiagnosticsPage.tsx",
   "frontend/dashboard/src/features/diagnostics/DiagnosticsPage.query.test.tsx",
   "frontend/dashboard/src/features/diagnostics/useDiagnosticFactEvidence.ts",
@@ -31,14 +43,19 @@ allowed_paths = [
   "scripts/dashboard_route_benchmark_support.py",
   "src/codex_usage_tracker/cli/commands_lifecycle.py",
   "src/codex_usage_tracker/cli/dashboard.py",
+  "src/codex_usage_tracker/cli/mcp_investigations.py",
   "src/codex_usage_tracker/cli/mcp_server.py",
   "src/codex_usage_tracker/recommendation_engine/api.py",
   "src/codex_usage_tracker/recommendation_engine/materialization.py",
   "src/codex_usage_tracker/recommendation_engine/query.py",
+  "src/codex_usage_tracker/recommendation_engine/summary_materialization.py",
+  "src/codex_usage_tracker/reports/agentic.py",
   "src/codex_usage_tracker/allowance_intelligence/model.py",
   "src/codex_usage_tracker/allowance_intelligence/statistics.py",
   "src/codex_usage_tracker/plugin_data/dashboard/react/assets/**",
   "src/codex_usage_tracker/server/recommendations.py",
+  "src/codex_usage_tracker/server/compression_routes.py",
+  "src/codex_usage_tracker/server/investigations.py",
   "src/codex_usage_tracker/server/route_inventory.py",
   "src/codex_usage_tracker/server/usage_refresh.py",
   "src/codex_usage_tracker/server/allowance.py",
@@ -51,6 +68,9 @@ allowed_paths = [
   "src/codex_usage_tracker/store/schema_query_indexes.py",
   "src/codex_usage_tracker/store/thread_summaries.py",
   "src/codex_usage_tracker/store/query_sql.py",
+  "src/codex_usage_tracker/store/large_low_output.py",
+  "src/codex_usage_tracker/store/repeated_files.py",
+  "src/codex_usage_tracker/store/shell_churn.py",
   "src/codex_usage_tracker/store/usage_api_queries.py",
   "src/codex_usage_tracker/store/diagnostic_queries.py",
   "tests/cli/test_dashboard_route_benchmark.py",
@@ -60,6 +80,8 @@ allowed_paths = [
   "tests/reports/test_indexed_recommendations.py",
   "tests/allowance_intelligence/test_allowance_intelligence.py",
   "tests/server/test_route_inventory.py",
+  "tests/server/test_compression_routes.py",
+  "tests/server/test_server_investigations.py",
   "tests/server/test_server_recommendations.py",
   "tests/server/test_server_usage_refresh.py",
   "tests/server/test_server_allowance.py",
@@ -68,6 +90,7 @@ allowed_paths = [
   "tests/store/test_store_dashboard_queries.py",
   "tests/store/test_store_dashboard_mcp.py",
   "tests/store/test_store_migrations.py",
+  "tests/store/test_recommendation_queries.py",
   "tests/store/test_compression_runs.py",
   "tests/store/test_refresh_parallel.py",
 ]
@@ -93,6 +116,14 @@ The cleanup is safe only when the replacement behavior, frontend query identity,
 route classification, benchmark budgets, CI wiring, and maintainer documentation
 land together. Splitting enforcement from its contracts would leave a window where
 the architecture could regress without a failing gate.
+
+Live all-history verification also exposed adjacent request-path regressions that
+would make the enforced architecture unreliable in practice: stale recommendation
+facts, incomplete summary fallback, repeated full-summary refresh work, expensive
+investigation joins, Compression Lab writer contention, and unclear cost-first
+Overview reporting. Their bounded fixes and regression tests remain part of this
+same final enforcement slice because each validates the indexed query pipeline
+under the production-sized workload used for the acceptance audit.
 
 ## Why this should not be split smaller
 

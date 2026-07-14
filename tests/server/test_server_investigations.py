@@ -4,11 +4,12 @@ import sqlite3
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from codex_usage_tracker.server import investigations
+from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
 
 @dataclass
@@ -171,6 +172,40 @@ def test_handle_investigation_request_reports_bad_filter(
         (HTTPStatus.BAD_REQUEST, "min_occurrences must be a non-negative integer")
     ]
     assert senders.responses == []
+
+
+def test_investigation_requests_reuse_generation_keyed_payload(
+    paths: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    build_count = 0
+
+    def build_report(**_kwargs: Any) -> _Report:
+        nonlocal build_count
+        build_count += 1
+        return _Report({"schema": "test-investigation", "rows": []})
+
+    monkeypatch.setattr(investigations, "build_agentic_investigation_report", build_report)
+    cache = AggregateQueryCache()
+    senders = _Senders()
+    arguments = {
+        **paths,
+        "query_cache": cache,
+        "send_error": senders.send_error,
+        "send_exception": senders.send_exception,
+        "send_json": senders.send_json,
+    }
+
+    investigations.handle_investigation_request("agentic", "evidence_limit=8", **arguments)
+    investigations.handle_investigation_request("agentic", "evidence_limit=8", **arguments)
+
+    assert build_count == 1
+    assert [
+        cast(dict[str, object], response[1]["query_cache"])["status"]
+        for response in senders.responses
+    ] == [
+        "miss",
+        "hit",
+    ]
 
 
 def test_handle_investigation_request_reports_database_error(

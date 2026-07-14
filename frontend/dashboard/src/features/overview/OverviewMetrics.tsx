@@ -1,6 +1,6 @@
 import type { MetricCard as MetricCardModel } from '../../api/types';
 import { MetricCard } from '../../components/MetricCard';
-import { formatCompact, formatNumber, pct } from '../shared/format';
+import { formatCompact, formatNumber, money, pct } from '../shared/format';
 import type { OverviewLoadedMetrics } from './overviewModel';
 import styles from './OverviewPage.module.css';
 
@@ -9,6 +9,11 @@ type OverviewMetricsProps = {
   loadedCalls: number;
   availableCalls: number;
 };
+
+const creditFormat = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
 export function OverviewMetrics({ metrics, loadedCalls, availableCalls }: OverviewMetricsProps) {
   const scopeMetrics = metrics.basis === 'scope';
@@ -43,11 +48,14 @@ export function OverviewMetrics({ metrics, loadedCalls, availableCalls }: Overvi
       tone: metrics.cachePercent >= 80 ? 'green' : 'orange',
     },
     {
-      label: 'Estimated Credits',
-      value: metrics.estimatedCredits.toFixed(1),
+      label: 'Estimated Cost',
+      value: money(metrics.estimatedCostUsd),
       trend: scopeMetrics ? 'complete selected scope' : 'loaded calls only',
-      detail: 'calls with mapped credit rates',
+      detail: 'calls with mapped cost and credit rates',
       tone: 'orange',
+      breakdown: [
+        { label: 'Estimated credits', value: creditFormat.format(metrics.estimatedCredits) },
+      ],
     },
   ];
   return (

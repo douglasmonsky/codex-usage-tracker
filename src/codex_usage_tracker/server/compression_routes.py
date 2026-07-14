@@ -16,6 +16,7 @@ from codex_usage_tracker.compression.api import (
 )
 from codex_usage_tracker.compression.jobs import CompressionJobRegistry
 from codex_usage_tracker.compression.models import CompressionScope
+from codex_usage_tracker.compression.payloads import compression_error_payload
 from codex_usage_tracker.server.utils import (
     first_query_value,
     parse_bool_query_value,
@@ -136,6 +137,18 @@ def handle_compression_start_request(
         send_error(HTTPStatus.BAD_REQUEST, str(exc))
         return
     except sqlite3.Error as exc:
+        if _database_is_busy(exc):
+            payload = compression_error_payload(
+                kind="status",
+                code="compression_database_busy",
+                message=(
+                    "Usage data is refreshing; Compression Lab will retry when the index is ready."
+                ),
+                next_tool="usage_compression_start",
+            )
+            payload["next"]["poll_after_ms"] = 1_000
+            send_json(HTTPStatus.SERVICE_UNAVAILABLE, payload)
+            return
         send_exception("Database error while starting Compression Lab", exc)
         return
     send_json(HTTPStatus.ACCEPTED, payload)
@@ -228,3 +241,8 @@ def _compression_http_status(payload: dict[str, object]) -> HTTPStatus:
     if code == "compression_run_not_complete":
         return HTTPStatus.CONFLICT
     return HTTPStatus.BAD_REQUEST
+
+
+def _database_is_busy(exc: sqlite3.Error) -> bool:
+    message = str(exc).lower()
+    return "locked" in message or "busy" in message

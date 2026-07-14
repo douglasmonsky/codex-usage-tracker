@@ -25,7 +25,8 @@ def sync_thread_recommendation_summaries(
 ) -> int:
     """Refresh exact recommendation rollups for all or selected threads."""
     normalized = tuple(sorted({str(key) for key in thread_keys or () if key}))
-    selected = normalized if thread_keys is not None and _summaries_are_complete(conn) else None
+    initialized = _summaries_are_complete(conn) or _summaries_have_materialized_rows(conn)
+    selected = normalized if thread_keys is not None and initialized else None
     before = conn.total_changes
     _reset_summaries(conn, selected)
     for chunk in _thread_key_chunks(selected):
@@ -255,6 +256,18 @@ def _summaries_are_complete(conn: sqlite3.Connection) -> bool:
         "SELECT thread_summaries_complete FROM recommendation_fact_state WHERE singleton = 1"
     ).fetchone()
     return bool(row and row[0])
+
+
+def _summaries_have_materialized_rows(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM thread_summaries
+        WHERE recommendation_summary_json IS NOT NULL
+        LIMIT 1
+        """
+    ).fetchone()
+    return row is not None
 
 
 def _thread_label(thread_key: str) -> str:

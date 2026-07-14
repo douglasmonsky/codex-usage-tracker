@@ -7,8 +7,10 @@ from typing import Any
 
 import pytest
 
+from codex_usage_tracker.recommendation_engine import query as recommendation_query
 from codex_usage_tracker.recommendation_engine.materialization import (
     backfill_recommendation_facts,
+    sync_refresh_recommendation_facts,
 )
 from codex_usage_tracker.recommendation_engine.query import (
     RecommendationFactsUnavailableError,
@@ -126,6 +128,42 @@ def test_indexed_recommendations_match_legacy_payload(
     assert archived_indexed.payload == archived_legacy.payload
 
 
+def test_indexed_recommendations_bound_rows_when_thread_summaries_are_incomplete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path, pricing_path, allowance_path, projects_path = _materialize_actionable_event(tmp_path)
+    observed_limits: list[int | None] = []
+    original_query = recommendation_query.query_recommendation_fact_page
+
+    monkeypatch.setattr(
+        recommendation_query,
+        "query_recommendation_thread_summaries",
+        lambda **_kwargs: None,
+    )
+
+    def capture_page_limit(**kwargs: Any):
+        observed_limits.append(kwargs["limit"])
+        return original_query(**kwargs)
+
+    monkeypatch.setattr(
+        recommendation_query,
+        "query_recommendation_fact_page",
+        capture_page_limit,
+    )
+
+    report = build_indexed_recommendations_report(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        projects_path=projects_path,
+        limit=1,
+    )
+
+    assert report.payload["row_count"] == 1
+    assert observed_limits == [1]
+
+
 def test_recommendations_require_materialized_facts(
     tmp_path: Path,
 ) -> None:
@@ -170,6 +208,59 @@ def test_recommendations_use_current_materialized_facts(
     )
 
     assert report.payload["row_count"] == 1
+
+
+def test_incremental_refresh_repairs_missing_historical_recommendation_facts(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="present",
+            session_id="session-present",
+            thread_key="thread:present",
+            event_timestamp="2026-07-13T12:00:00Z",
+            cumulative_total_tokens=1_000,
+        ),
+        _usage_event(
+            record_id="missing",
+            session_id="session-missing",
+            thread_key="thread:missing",
+            event_timestamp="2026-07-13T12:01:00Z",
+            cumulative_total_tokens=2_000,
+        ),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+    with connect(db_path) as conn:
+        backfill_recommendation_facts(conn)
+        conn.execute("DELETE FROM recommendation_facts WHERE record_id = 'missing'")
+        conn.execute("UPDATE recommendation_fact_state SET record_count = 1 WHERE singleton = 1")
+        conn.executescript(
+            """
+            CREATE TRIGGER protect_present_recommendation_fact
+            BEFORE DELETE ON recommendation_facts
+            WHEN OLD.record_id = 'present'
+            BEGIN
+                SELECT RAISE(ABORT, 'valid historical fact was rebuilt');
+            END;
+            """
+        )
+
+        sync_refresh_recommendation_facts(
+            conn,
+            record_ids=(),
+            thread_keys=frozenset(),
+            full_rebuild=False,
+        )
+
+        fact_count = int(conn.execute("SELECT COUNT(*) FROM recommendation_facts").fetchone()[0])
+        state_count = int(
+            conn.execute(
+                "SELECT record_count FROM recommendation_fact_state WHERE singleton = 1"
+            ).fetchone()[0]
+        )
+
+    assert fact_count == state_count == 2
 
 
 def test_recommendations_require_refresh_when_config_changes(

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   loadCompressionProfile,
+  observeCompressionAnalysis,
   runCompressionAnalysis,
   type CompressionApiPayload,
 } from './compressionLab';
@@ -55,6 +56,74 @@ describe('Compression Lab dashboard transport', () => {
     expect(progress.map(payload => payload.progress?.percent)).toEqual([25, 100]);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(String(fetchMock.mock.calls[2][0])).toContain('run_id=compression-1');
+  });
+
+  it('retries a start request while a usage refresh owns the database writer', async () => {
+    const progress: CompressionApiPayload[] = [];
+    let startAttempts = 0;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.startsWith('/api/compression/start?')) {
+        startAttempts += 1;
+        if (startAttempts === 1) {
+          const busy = compressionPayload('status', 'error', 0);
+          busy.run_id = null;
+          busy.error = {
+            code: 'compression_database_busy',
+            message: 'Usage data is refreshing.',
+          };
+          busy.next = {
+            tool: 'usage_compression_start',
+            arguments: {},
+            poll_after_ms: 0,
+          };
+          return jsonResponse(busy, 503);
+        }
+        return jsonResponse(compressionPayload('status', 'completed', 100));
+      }
+      if (url.startsWith('/api/compression/profile?')) {
+        const profile = compressionPayload('profile', 'completed', 100);
+        profile.profile = { candidate_count: 7 };
+        return jsonResponse(profile);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const profile = await runCompressionAnalysis(runtime, scope, {
+      pollIntervalMs: 0,
+      onProgress: payload => progress.push(payload),
+    });
+
+    expect(profile.profile).toEqual({ candidate_count: 7 });
+    expect(startAttempts).toBe(2);
+    expect(progress[0].error?.code).toBe('compression_database_busy');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejoins an existing run without starting another analysis', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.startsWith('/api/compression/status?')) {
+        return jsonResponse(compressionPayload('status', 'completed', 100));
+      }
+      if (url.startsWith('/api/compression/profile?')) {
+        const profile = compressionPayload('profile', 'completed', 100);
+        profile.profile = { candidate_count: 7 };
+        return jsonResponse(profile);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const profile = await observeCompressionAnalysis(
+      runtime,
+      scope,
+      compressionPayload('status', 'running', 25),
+      { pollIntervalMs: 0 },
+    );
+
+    expect(profile.profile).toEqual({ candidate_count: 7 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/compression/start'))).toBe(false);
   });
 
   it('stops local polling on abort without issuing a server cancellation', async () => {

@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
+from codex_usage_tracker.recommendation_engine import (
+    summary_materialization as recommendation_summaries,
+)
 from codex_usage_tracker.recommendation_engine.materialization import (
     sync_recommendation_facts,
     sync_thread_recommendation_summaries,
@@ -186,6 +192,48 @@ def test_recommendation_thread_summaries_defer_noncanonical_threads(
         sync_recommendation_facts(conn, record_ids=[event.record_id])
 
     assert query_recommendation_thread_summaries(db_path=db_path) is None
+
+
+def test_incomplete_noncanonical_coverage_keeps_incremental_summary_scope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    canonical = _thread_events("first", "second")
+    noncanonical = replace(
+        _usage_event(
+            record_id="child",
+            session_id="child-session",
+            thread_key="session:child-session",
+            event_timestamp="2026-07-13T14:00:00Z",
+            cumulative_total_tokens=900_000,
+        ),
+        thread_name=None,
+        parent_session_id="parent-session",
+        parent_thread_name="parent",
+    )
+    upsert_usage_events([*canonical, noncanonical], db_path=db_path)
+    observed_scopes: list[tuple[str, ...] | None] = []
+    original_reset = recommendation_summaries._reset_summaries
+
+    with connect(db_path) as conn:
+        sync_recommendation_facts(
+            conn,
+            record_ids=[event.record_id for event in canonical],
+        )
+        sync_recommendation_facts(conn, record_ids=[noncanonical.record_id])
+
+        def capture_reset(
+            target_conn: sqlite3.Connection,
+            thread_keys: tuple[str, ...] | None,
+        ) -> None:
+            observed_scopes.append(thread_keys)
+            original_reset(target_conn, thread_keys)
+
+        monkeypatch.setattr(recommendation_summaries, "_reset_summaries", capture_reset)
+        sync_recommendation_facts(conn, record_ids=[canonical[0].record_id])
+
+    assert observed_scopes == [("thread:first",)]
 
 
 def _thread_events(*threads: str):

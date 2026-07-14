@@ -156,7 +156,7 @@ def build_indexed_recommendations_report(
         thread=thread,
         include_archived=include_archived,
         min_score=min_score,
-        limit=normalized_limit if thread_summaries is not None else 0,
+        limit=normalized_limit if project is None else 0,
     )
     rows = annotate_thread_attachments(page.rows)
     rows = annotate_rows_with_allowance(

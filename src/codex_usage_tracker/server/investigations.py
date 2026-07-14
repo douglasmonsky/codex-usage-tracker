@@ -9,12 +9,19 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import parse_qs
 
+from codex_usage_tracker.recommendation_engine.query import (
+    build_recommendations_report as build_indexed_recommendations_report,
+)
 from codex_usage_tracker.reports.api import (
     build_agentic_investigation_report,
     build_investigation_walk_report,
     build_large_low_output_report,
     build_repeated_file_rediscovery_report,
     build_shell_churn_report,
+)
+from codex_usage_tracker.server.query_cache import (
+    AggregateQueryCache,
+    cached_aggregate_payload,
 )
 from codex_usage_tracker.server.utils import (
     first_query_value,
@@ -34,6 +41,13 @@ ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
 
 _MAX_BOUNDED_FILTER = 10_000
+_INVESTIGATION_ROUTES: dict[InvestigationKind, str] = {
+    "agentic": "/api/investigations/agentic",
+    "large-low-output": "/api/investigations/large-low-output",
+    "repeated-file-rediscovery": "/api/investigations/repeated-files",
+    "shell-churn": "/api/investigations/shell-churn",
+    "walk": "/api/investigations/walk",
+}
 
 
 def handle_investigation_request(
@@ -46,21 +60,31 @@ def handle_investigation_request(
     projects_path: Path,
     include_archived_default: bool,
     privacy_mode: str,
+    query_cache: AggregateQueryCache | None = None,
     send_error: ErrorSender,
     send_exception: ExceptionSender,
     send_json: JsonSender,
 ) -> None:
     """Handle investigation route errors and response writing."""
     try:
-        payload = investigation_payload(
-            kind,
-            query,
+        payload = cached_aggregate_payload(
+            query_cache,
+            route=_INVESTIGATION_ROUTES[kind],
+            query=query,
             db_path=db_path,
-            pricing_path=pricing_path,
-            allowance_path=allowance_path,
-            projects_path=projects_path,
-            include_archived_default=include_archived_default,
             privacy_mode=privacy_mode,
+            dependencies=(pricing_path, allowance_path, projects_path),
+            semantic_inputs=(("include_archived_default", str(include_archived_default)),),
+            build=lambda: investigation_payload(
+                kind,
+                query,
+                db_path=db_path,
+                pricing_path=pricing_path,
+                allowance_path=allowance_path,
+                projects_path=projects_path,
+                include_archived_default=include_archived_default,
+                privacy_mode=privacy_mode,
+            ),
         )
     except ValueError as exc:
         send_error(HTTPStatus.BAD_REQUEST, str(exc))
@@ -181,6 +205,7 @@ def _agentic_investigation_payload(
             evidence_limit=_bounded_int(params, "evidence_limit", 5),
             detail_mode=first_query_value(params.get("detail_mode")) or "compact",
             privacy_mode=privacy_mode,
+            recommendation_report_builder=build_indexed_recommendations_report,
         ).payload
     )
 

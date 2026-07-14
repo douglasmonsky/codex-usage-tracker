@@ -61,6 +61,30 @@ describe('Compression Lab workspace', () => {
     expect(screen.queryByRole('progressbar', { name: 'Compression analysis progress' })).not.toBeInTheDocument();
   });
 
+  it('rejoins an active analysis after navigation and publishes its profile', async () => {
+    let profileReads = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/compression/profile?')) {
+        profileReads += 1;
+        return profileReads === 1
+          ? jsonResponse(incompletePayload(), 409)
+          : jsonResponse(profilePayload());
+      }
+      if (url.startsWith('/api/compression/status?')) {
+        return jsonResponse(statusPayload('completed', 100));
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+
+    expect(await screen.findByText('Stale Context detector')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('240K')).toBeInTheDocument());
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/compression/start'))).toBe(false);
+  });
+
   it('aborts only the browser observer when navigation leaves an active server job', async () => {
     let runSignal: AbortSignal | undefined;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -139,6 +163,16 @@ function missingPayload(): CompressionApiPayload {
     run_id: null,
     error: { code: 'compression_run_not_found', message: 'No profile.' },
   };
+}
+
+function incompletePayload(): CompressionApiPayload {
+  const payload = statusPayload('running', 25);
+  payload.kind = 'profile';
+  payload.error = {
+    code: 'compression_run_not_complete',
+    message: 'The exact-scope analysis is still running.',
+  };
+  return payload;
 }
 
 function statusPayload(status: 'running' | 'completed' | 'error', percent: number): CompressionApiPayload {

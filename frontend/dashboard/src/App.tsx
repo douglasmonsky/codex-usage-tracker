@@ -59,7 +59,7 @@ const keyboardShortcutViews: Record<string, ViewId> = {
   '3': 'threads',
   '4': 'diagnostics',
 };
-const autoRefreshSkippedViews = new Set<ViewId>(['call', 'diagnostics']);
+const autoRefreshSkippedViews = new Set<ViewId>(['call', 'compression-lab', 'diagnostics', 'investigator']);
 
 export function shouldAutoRefreshUsageView(view: ViewId): boolean {
   return !autoRefreshSkippedViews.has(view);
@@ -90,7 +90,7 @@ const [activePreset, setActivePreset] = useState(() => new URLSearchParams(windo
   const [refreshState, setRefreshState] = useState('Stored snapshot loaded just now');
   const [refreshProgress, setRefreshProgress] = useState<RefreshProgressPayload | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 const [showBackToTop, setShowBackToTop] = useState(false);
 const [language, setLanguage] = useState(() => initialDashboardLanguage(initialPayload));
 const initialLiveLoadAttempted = useRef(false);
@@ -437,7 +437,7 @@ function handleAutoRefreshChange(enabled: boolean) {
 setAutoRefreshEnabled(enabled);
 if (enabled) {
 if (!canAutoRefreshUsageRows) {
-setRefreshState('Auto refresh pauses on Call Investigator and Diagnostics');
+setRefreshState('Auto refresh pauses on this evidence-heavy view');
 return;
 }
 setRefreshState(`Auto refresh every ${autoRefreshIntervalMs / 1000}s`);
