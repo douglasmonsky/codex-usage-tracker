@@ -90,9 +90,11 @@ export type DiagnosticFactCallSortKey =
   | 'thread'
   | 'model'
   | 'effort';
-type DiagnosticSortDirection = 'asc' | 'desc';
+export type DiagnosticSortDirection = 'asc' | 'desc';
 
 export type DiagnosticFactsOptions = {
+  cacheKey?: string;
+  signal?: AbortSignal;
   limit?: number;
   offset?: number;
   sort?: DiagnosticFactSortKey;
@@ -100,6 +102,8 @@ export type DiagnosticFactsOptions = {
 };
 
 export type DiagnosticFactCallsOptions = {
+  cacheKey?: string;
+  signal?: AbortSignal;
   limit?: number;
   offset?: number;
   sort?: DiagnosticFactCallSortKey;
@@ -108,26 +112,11 @@ export type DiagnosticFactCallsOptions = {
 
 const diagnosticFactsCache = new Map<string, Promise<DiagnosticFactsPayload> | DiagnosticFactsPayload>();
 const diagnosticFactCallsCache = new Map<string, Promise<DiagnosticFactCallsResult> | DiagnosticFactCallsResult>();
-const diagnosticMergedFactCallsCache = new Map<string, DiagnosticFactCallsResult>();
 
 export function clearDiagnosticApiCache(): void {
   clearDiagnosticSnapshotCache();
   diagnosticFactsCache.clear();
   diagnosticFactCallsCache.clear();
-  diagnosticMergedFactCallsCache.clear();
-}
-
-export function cachedDiagnosticFactSource(
-  sourceKey: DiagnosticFactSourceKey,
-  runtime: ContextRuntime,
-  options: DiagnosticFactsOptions = {},
-): DiagnosticFactsPayload | null {
-  const definition = diagnosticFactSourceDefinitions.find(candidate => candidate.key === sourceKey) ?? diagnosticFactSourceDefinitions[0];
-  const sort = normalizeDiagnosticFactSortKey(options.sort ?? 'uncached');
-  const direction = options.direction ?? 'desc';
-  const limit = Math.max(1, Math.round(options.limit ?? definition.limit));
-  const offset = Math.max(0, Math.round(options.offset ?? 0));
-  return resolvedCachedValue(diagnosticFactsCache, factSourceCacheKey(definition.key, runtime, limit, offset, sort, direction));
 }
 
 export async function loadDiagnosticFactSource(
@@ -142,13 +131,12 @@ export async function loadDiagnosticFactSource(
   const direction = options.direction ?? 'desc';
   const limit = Math.max(1, Math.round(options.limit ?? definition.limit));
   const offset = Math.max(0, Math.round(options.offset ?? 0));
-  return cachedRequest(diagnosticFactsCache, factSourceCacheKey(definition.key, runtime, limit, offset, sort, direction), async () => {
+  const load = async () => {
     const params = new URLSearchParams({
       limit: String(limit),
       offset: String(offset),
       sort,
       direction,
-      _: String(Date.now()),
     });
     const response = await fetch(`${definition.path}?${params.toString()}`, {
       headers: {
@@ -156,53 +144,16 @@ export async function loadDiagnosticFactSource(
         'X-Codex-Usage-Token': runtime.apiToken,
       },
       cache: 'no-store',
+      signal: options.signal,
     });
     return (await readJsonResponse(response, definition.title)) as DiagnosticFactsPayload;
-  });
-}
-
-export function cachedDiagnosticFactCalls(
-  fact: DiagnosticFactRow,
-  runtime: ContextRuntime,
-  options: DiagnosticFactCallsOptions = {},
-): DiagnosticFactCallsResult | null {
-  const factType = String(fact.fact_type ?? '');
-  const factName = String(fact.fact_name ?? '');
-  if (!factType || !factName) return null;
-  const limit = Math.max(1, Math.round(options.limit ?? 8));
-  const offset = Math.max(0, Math.round(options.offset ?? 0));
-  const sort = options.sort ?? 'tokens';
-  const direction = options.direction ?? 'desc';
-  return resolvedCachedValue(diagnosticFactCallsCache, factCallsCacheKey(fact, runtime, limit, offset, sort, direction));
-}
-
-export function cachedMergedDiagnosticFactCalls(
-  fact: DiagnosticFactRow,
-  runtime: ContextRuntime,
-  options: DiagnosticFactCallsOptions = {},
-): DiagnosticFactCallsResult | null {
-  const factType = String(fact.fact_type ?? '');
-  const factName = String(fact.fact_name ?? '');
-  if (!factType || !factName) return null;
-  const limit = Math.max(1, Math.round(options.limit ?? 8));
-  const sort = options.sort ?? 'tokens';
-  const direction = options.direction ?? 'desc';
-  return diagnosticMergedFactCallsCache.get(mergedFactCallsCacheKey(fact, runtime, limit, sort, direction)) ?? null;
-}
-
-export function rememberMergedDiagnosticFactCalls(
-  fact: DiagnosticFactRow,
-  runtime: ContextRuntime,
-  result: DiagnosticFactCallsResult,
-  options: DiagnosticFactCallsOptions = {},
-): void {
-  const factType = String(fact.fact_type ?? '');
-  const factName = String(fact.fact_name ?? '');
-  if (!factType || !factName) return;
-  const limit = Math.max(1, Math.round(options.limit ?? 8));
-  const sort = options.sort ?? 'tokens';
-  const direction = options.direction ?? 'desc';
-  diagnosticMergedFactCallsCache.set(mergedFactCallsCacheKey(fact, runtime, limit, sort, direction), result);
+  };
+  if (options.signal) return load();
+  return cachedRequest(
+    diagnosticFactsCache,
+    factSourceCacheKey(definition.key, runtime, limit, offset, sort, direction, options.cacheKey),
+    load,
+  );
 }
 
 export async function loadDiagnosticFactCalls(
@@ -215,7 +166,7 @@ export async function loadDiagnosticFactCalls(
   const offset = Math.max(0, Math.round(options.offset ?? 0));
   const sort = options.sort ?? 'tokens';
   const direction = options.direction ?? 'desc';
-  return cachedRequest(diagnosticFactCallsCache, factCallsCacheKey(fact, runtime, limit, offset, sort, direction), async () => {
+  const load = async () => {
     const factType = String(fact.fact_type ?? '');
     const factName = String(fact.fact_name ?? '');
     if (!factType || !factName) {
@@ -228,7 +179,6 @@ export async function loadDiagnosticFactCalls(
       offset: String(offset),
       sort,
       direction,
-      _: String(Date.now()),
     });
     const response = await fetch(`/api/diagnostics/fact-calls?${params.toString()}`, {
       headers: {
@@ -236,23 +186,20 @@ export async function loadDiagnosticFactCalls(
         'X-Codex-Usage-Token': runtime.apiToken,
       },
       cache: 'no-store',
+      signal: options.signal,
     });
     const payload = (await readJsonResponse(response, 'Diagnostic fact calls')) as DiagnosticFactCallsPayload;
     return {
       calls: (payload.rows ?? []).map((row, index) => usageRowToCall(row, index)),
       rawPayload: payload,
     };
-  });
-}
-
-function resolvedCachedValue<T>(cache: Map<string, Promise<T> | T>, key: string): T | null {
-  const cached = cache.get(key);
-  if (cached === undefined || isPromise(cached)) return null;
-  return cached;
-}
-
-function isPromise<T>(value: Promise<T> | T): value is Promise<T> {
-  return typeof (value as Promise<T>).then === 'function';
+  };
+  if (options.signal) return load();
+  return cachedRequest(
+    diagnosticFactCallsCache,
+    factCallsCacheKey(fact, runtime, limit, offset, sort, direction, options.cacheKey),
+    load,
+  );
 }
 
 function cachedRequest<T>(cache: Map<string, Promise<T> | T>, key: string, load: () => Promise<T>): Promise<T> {
@@ -285,8 +232,9 @@ function factSourceCacheKey(
   offset: number,
   sort: DiagnosticFactSortKey,
   direction: DiagnosticSortDirection,
+  sourceRevision = '',
 ): string {
-  return ['facts', sourceKey, runtimeCacheKey(runtime), limit, offset, sort, direction].join(':');
+  return ['facts', sourceKey, runtimeCacheKey(runtime), sourceRevision, limit, offset, sort, direction].join(':');
 }
 
 function normalizeDiagnosticFactSortKey(sort: DiagnosticFactSortKey): DiagnosticFactSortKey {
@@ -302,32 +250,16 @@ function factCallsCacheKey(
   offset: number,
   sort: DiagnosticFactCallSortKey,
   direction: DiagnosticSortDirection,
+  sourceRevision = '',
 ): string {
   return [
     'fact-calls',
     runtimeCacheKey(runtime),
+    sourceRevision,
     String(fact.fact_type ?? ''),
     String(fact.fact_name ?? ''),
     limit,
     offset,
-    sort,
-    direction,
-  ].join(':');
-}
-
-function mergedFactCallsCacheKey(
-  fact: DiagnosticFactRow,
-  runtime: ContextRuntime,
-  limit: number,
-  sort: DiagnosticFactCallSortKey,
-  direction: DiagnosticSortDirection,
-): string {
-  return [
-    'fact-calls-merged',
-    runtimeCacheKey(runtime),
-    String(fact.fact_type ?? ''),
-    String(fact.fact_name ?? ''),
-    limit,
     sort,
     direction,
   ].join(':');

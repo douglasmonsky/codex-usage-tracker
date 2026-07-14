@@ -8,9 +8,10 @@ export type DashboardQueryModule =
   | 'threads'
   | 'thread-calls'
   | 'investigator-agentic'
-  | 'investigator-snapshot'
   | 'investigator-walk'
   | 'diagnostics-facts'
+  | 'diagnostics-fact-calls'
+  | 'diagnostics-snapshot'
   | 'reports';
 
 export type DashboardQuerySource = {

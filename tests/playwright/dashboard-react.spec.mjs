@@ -228,6 +228,86 @@ await page.getByRole('button', { name: 'Columns', exact: true }).click();
     expect(Object.fromEntries(requestCounts)).toEqual(initialCounts);
   });
 
+  test('retains completed Diagnostics modules and retries interrupted work', async ({ page }) => {
+    const requestCounts = new Map();
+    const commandWaiters = [];
+    let allowCommands = false;
+    await page.addInitScript(() => {
+      window.__CODEX_USAGE_BOOT__ = {
+        api_token: 'playwright-token',
+        context_api_enabled: true,
+        latest_refresh_at: '2026-07-14T06:30:00Z',
+        loaded_row_count: 1,
+        total_available_rows: 1,
+        rows: [{
+          record_id: 'diagnostics-return-call',
+          call_started_at: '2026-07-14T05:30:00Z',
+          thread_name: 'diagnostics-return-thread',
+          model: 'o5',
+          effort: 'high',
+          input_tokens: 1000,
+          cached_input_tokens: 800,
+          output_tokens: 100,
+          total_tokens: 1100,
+        }],
+      };
+    });
+    await page.route('**/api/diagnostics/**', async route => {
+      const path = new URL(route.request().url()).pathname;
+      countRequest(requestCounts, path);
+      if (['/api/diagnostics/facts', '/api/diagnostics/tools', '/api/diagnostics/compactions'].includes(path)) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            rows: [{ fact_type: 'cache', fact_name: 'large_uncached_input', associated_calls: 1 }],
+            total_matched_rows: 1,
+          }),
+        });
+      }
+      if (path === '/api/diagnostics/fact-calls') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ rows: [], total_matched_rows: 0 }),
+        });
+      }
+      if (path === '/api/diagnostics/commands' && !allowCommands) {
+        await new Promise(resolve => {
+          commandWaiters.push(resolve);
+        });
+      }
+      try {
+        return await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ready', section: path.split('/').at(-1) }),
+        });
+      } catch {
+        return undefined;
+      }
+    });
+
+    await page.goto('/?view=diagnostics');
+    const modules = page.getByLabel('Loading diagnostic snapshots modules');
+    await expect(modules.getByText('Overview ready')).toBeVisible();
+    await expect(modules.getByText('Commands loading')).toBeVisible();
+    await expect(page.getByRole('progressbar', { name: 'Loading diagnostic snapshots' }))
+      .toHaveAttribute('aria-valuenow', '9');
+    const completedOverviewRequests = requestCounts.get('/api/diagnostics/overview');
+    const pendingCommandRequests = requestCounts.get('/api/diagnostics/commands');
+
+    await page.getByRole('button', { name: /^Settings$/i }).click();
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await page.getByRole('button', { name: /Diagnostics Notebook/i }).click();
+    await expect.poll(() => requestCounts.get('/api/diagnostics/commands')).toBeGreaterThan(pendingCommandRequests);
+
+    expect(requestCounts.get('/api/diagnostics/overview')).toBe(completedOverviewRequests);
+    allowCommands = true;
+    commandWaiters.splice(0).forEach(release => release());
+    await expect(page.getByText('Live snapshots: 10')).toBeVisible();
+  });
+
   test('opens direct call investigator URLs', async ({ page }) => {
     await page.goto('/?view=call&record=fixture-call-2');
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();

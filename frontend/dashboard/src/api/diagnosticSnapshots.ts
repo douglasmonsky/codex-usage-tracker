@@ -64,10 +64,6 @@ export function clearDiagnosticSnapshotCache(): void {
   sectionCache.clear();
 }
 
-export function cachedDiagnosticSnapshots(runtime: ContextRuntime): DiagnosticSnapshotMap | null {
-  return resolvedCachedValue(snapshotCache, runtimeCacheKey(runtime));
-}
-
 export async function loadDiagnosticSnapshot(
   key: DiagnosticSnapshotKey,
   runtime: ContextRuntime,
@@ -83,23 +79,6 @@ export async function loadDiagnosticSnapshot(
     sectionCacheKey(key, runtime, options.cacheKey),
     () => readDiagnosticSnapshot(definition, runtime),
   );
-}
-
-export async function loadDiagnosticSnapshots(runtime: ContextRuntime): Promise<DiagnosticSnapshotMap> {
-  ensureDiagnosticsRuntime(runtime);
-  return cachedRequest(snapshotCache, runtimeCacheKey(runtime), async () => {
-    const entries = await Promise.all(
-      diagnosticSnapshotDefinitions.map(async definition => [
-        definition.key,
-        await readDiagnosticSnapshot(definition, runtime),
-      ] as const),
-    );
-    const sections = Object.fromEntries(entries) as DiagnosticSnapshotMap;
-    for (const [key, payload] of entries) {
-      sectionCache.set(sectionCacheKey(key, runtime), payload);
-    }
-    return sections;
-  });
 }
 
 export async function refreshDiagnosticSnapshots(runtime: ContextRuntime): Promise<DiagnosticSnapshotMap> {
@@ -143,16 +122,6 @@ export async function refreshDiagnosticSnapshot(
   snapshotCache.set(cacheKey, { ...current, [definition.key]: payload });
   sectionCache.set(sectionCacheKey(definition.key, runtime), payload);
   return payload;
-}
-
-function resolvedCachedValue<T>(cache: Map<string, Promise<T> | T>, key: string): T | null {
-  const cached = cache.get(key);
-  if (cached === undefined || isPromise(cached)) return null;
-  return cached;
-}
-
-function isPromise<T>(value: Promise<T> | T): value is Promise<T> {
-  return typeof (value as Promise<T>).then === 'function';
 }
 
 function cachedRequest<T>(cache: Map<string, Promise<T> | T>, key: string, load: () => Promise<T>): Promise<T> {

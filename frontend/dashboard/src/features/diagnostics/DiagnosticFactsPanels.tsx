@@ -5,13 +5,13 @@ import type {
   DiagnosticFactCallsResult,
   DiagnosticFactRow,
   DiagnosticFactSourceKey,
-  DiagnosticFactsPayload,
 } from '../../api/diagnostics';
 import type { CallRow } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { formatCompact, formatNumber, pct } from '../shared/format';
 import { stopRowActionKeyDown } from '../shared/rowActionEvents';
 import { diagnosticFactKey, factCallsHasMore, factCallsTotal } from './diagnosticFactCalls';
+import type { FactCallsState, FactLoadState, FactSourcePanelState } from './diagnosticFactStates';
 import {
 cachePctFromFact,
 defaultFactCallSortDirection,
@@ -32,25 +32,7 @@ defaultFactSortDirection,
 const FACT_PREVIEW_COUNT = 6;
 const FACT_VISIBLE_COUNT_STORAGE_KEY = 'codexUsageDiagnosticsFactVisibleCounts';
 
-export type FactLoadState =
-  | { status: 'idle'; message: string }
-  | { status: 'loading'; message: string }
-  | { status: 'loaded'; payload: DiagnosticFactsPayload }
-  | { status: 'error'; message: string };
-
-export type FactCallsState =
-  | { status: 'idle'; message: string }
-  | { status: 'loading'; message: string }
-  | { status: 'loaded'; result: DiagnosticFactCallsResult }
-  | { status: 'appending'; result: DiagnosticFactCallsResult }
-  | { status: 'error'; message: string; result?: DiagnosticFactCallsResult };
-
-export type FactSourcePanelState = {
-  key: DiagnosticFactSourceKey;
-  label: string;
-  title: string;
-  state: FactLoadState;
-};
+export type { FactCallsState, FactLoadState, FactSourcePanelState } from './diagnosticFactStates';
 
 export type DashboardRowLoadControls = {
   loadedRowCount: number;

@@ -1,9 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import {
-  loadDiagnosticSnapshot,
-  type DiagnosticSnapshotKey,
-} from '../api/diagnostics';
+import type { DiagnosticSnapshotKey } from '../api/diagnostics';
 import {
   loadAgenticInvestigation,
   loadInvestigationWalk,
@@ -14,6 +11,7 @@ import {
   dashboardQueryOptions,
   dashboardQuerySource,
 } from './dashboardQueryRegistry';
+import { diagnosticSnapshotQueryOptions } from './diagnosticsQueries';
 
 type InvestigatorQueryRequest = {
   runtime: ContextRuntime;
@@ -59,19 +57,7 @@ export function investigatorAgenticQueryOptions(request: InvestigatorAgenticQuer
 }
 
 export function investigatorSnapshotQueryOptions(request: InvestigatorSnapshotQueryRequest) {
-  return queryOptions({
-    queryKey: dashboardQueryKey(
-      'investigator-snapshot',
-      investigatorQuerySource(request),
-      investigatorQueryScope(request),
-      request.snapshotKey,
-    ),
-    queryFn: ({ signal }) => loadDiagnosticSnapshot(request.snapshotKey, request.runtime, {
-      cacheKey: request.sourceRevision,
-      signal,
-    }),
-    ...dashboardQueryOptions('aggregate'),
-  });
+  return diagnosticSnapshotQueryOptions(request);
 }
 
 export function investigatorWalkQueryOptions(request: InvestigatorWalkQueryRequest) {

@@ -1,27 +1,18 @@
 import { Copy, RefreshCw, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
-  cachedDiagnosticSnapshots,
   type DiagnosticSnapshotDefinition,
   type DiagnosticSnapshotKey,
   diagnosticSnapshotDefinitions,
-  loadDiagnosticSnapshots,
-  refreshDiagnosticSnapshot,
-  refreshDiagnosticSnapshots,
-  type DiagnosticSnapshotMap,
 } from '../../api/diagnostics';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { PageLoadProgress } from '../../design';
 import { snapshotCard, type SnapshotCard, type SnapshotRow } from './diagnosticSnapshotCards';
 import { fallbackDiagnosticSnapshots } from './diagnosticSnapshotFallbacks';
-
-type SnapshotState =
-  | { status: 'idle'; message: string; snapshots: DiagnosticSnapshotMap }
-  | { status: 'loading'; message: string; snapshots: DiagnosticSnapshotMap }
-  | { status: 'loaded'; message: string; snapshots: DiagnosticSnapshotMap }
-  | { status: 'error'; message: string; snapshots: DiagnosticSnapshotMap };
+import { useDiagnosticSnapshots } from './useDiagnosticSnapshots';
 
 type SectionRefreshStatus = 'refreshing' | 'ready' | 'error';
 
@@ -30,118 +21,71 @@ const compactSnapshotRowCount = 4;
 export function DiagnosticSnapshotMatrix({
   model,
   contextRuntime,
+  includeArchived,
+  sourceKey,
+  sourceRevision,
   onOpenInvestigator,
   onCopyCallLink,
 }: {
   model: DashboardModel;
   contextRuntime: ContextRuntime;
+  includeArchived: boolean;
+  sourceKey?: string;
+  sourceRevision: string;
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 }) {
   const fallbackSnapshots = useMemo(() => fallbackDiagnosticSnapshots(model), [model]);
   const canUseLiveDiagnostics = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
- const [snapshotState, setSnapshotState] = useState<SnapshotState>(() => initialSnapshotState(contextRuntime, canUseLiveDiagnostics));
- const [sectionRefreshStatuses, setSectionRefreshStatuses] = useState<Partial<Record<DiagnosticSnapshotKey, SectionRefreshStatus>>>({});
- const [expandedCards, setExpandedCards] = useState<Partial<Record<DiagnosticSnapshotKey, boolean>>>({});
-const hasLiveSnapshots = Object.keys(snapshotState.snapshots).length > 0;
-const snapshots = canUseLiveDiagnostics && hasLiveSnapshots ? snapshotState.snapshots : fallbackSnapshots;
-const statusLabel =
-snapshotState.status === 'loaded'
-? snapshotState.message
-: snapshotState.status === 'error'
-? hasLiveSnapshots
-? snapshotState.message
-: 'Static fallback snapshots'
-: canUseLiveDiagnostics
-? snapshotState.message
-: 'Static fallback snapshots';
-
-  useEffect(() => {
-    if (!canUseLiveDiagnostics) {
-      setSnapshotState({ status: 'idle', message: 'Static aggregate fallback', snapshots: {} });
-      setSectionRefreshStatuses({});
-      return;
-    }
-
-    const cached = cachedDiagnosticSnapshots(contextRuntime);
-    if (cached) {
-      setSnapshotState(liveSnapshotState(cached));
-      setSectionRefreshStatuses({});
-      return;
-    }
-
-    let cancelled = false;
-    setSnapshotState(current => ({
-      status: 'loading',
-      message: 'Loading diagnostic snapshots...',
-      snapshots: current.snapshots,
-    }));
-    loadDiagnosticSnapshots(contextRuntime)
-      .then(payload => {
-        if (!cancelled) {
-          setSnapshotState(liveSnapshotState(payload));
-          setSectionRefreshStatuses({});
-        }
-      })
-.catch(error => {
-if (!cancelled) {
-setSnapshotState(current => ({
-status: 'error',
-message: errorMessage(error),
-snapshots: current.snapshots,
-}));
-}
-});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canUseLiveDiagnostics, contextRuntime]);
+  const evidence = useDiagnosticSnapshots({
+    canUseLive: canUseLiveDiagnostics,
+    contextRuntime,
+    includeArchived,
+    sourceKey,
+    sourceRevision,
+  });
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const [sectionRefreshStatuses, setSectionRefreshStatuses] = useState<Partial<Record<DiagnosticSnapshotKey, SectionRefreshStatus>>>({});
+  const [expandedCards, setExpandedCards] = useState<Partial<Record<DiagnosticSnapshotKey, boolean>>>({});
+  const hasLiveSnapshots = Object.keys(evidence.snapshots).length > 0;
+  const snapshots = canUseLiveDiagnostics && hasLiveSnapshots ? evidence.snapshots : fallbackSnapshots;
+  const statusLabel = snapshotStatusLabel({
+    canUseLiveDiagnostics,
+    hasLiveSnapshots,
+    liveSnapshotCount: Object.keys(evidence.snapshots).length,
+    progressError: evidence.progressError,
+    refreshingAll,
+  });
+  const progressModules = refreshingAll
+    ? evidence.modules.map(module => ({ ...module, status: 'updating' as const }))
+    : evidence.modules;
 
   async function refreshSnapshots() {
-    if (!canUseLiveDiagnostics || snapshotState.status === 'loading') {
-      return;
-    }
-    setSnapshotState(current => ({
-      status: 'loading',
-      message: 'Refreshing diagnostic snapshots...',
-      snapshots: current.snapshots,
-    }));
+    if (!canUseLiveDiagnostics || evidence.loading || refreshingAll) return;
+    setRefreshingAll(true);
+    setRefreshError('');
     try {
-      const payload = await refreshDiagnosticSnapshots(contextRuntime);
-      setSnapshotState(liveSnapshotState(payload));
+      await evidence.refreshAll();
       setSectionRefreshStatuses({});
-} catch (error) {
-setSnapshotState(current => ({
-status: 'error',
-message: errorMessage(error),
-snapshots: current.snapshots,
-}));
-}
-}
+    } catch (error) {
+      setRefreshError(errorMessage(error));
+    } finally {
+      setRefreshingAll(false);
+    }
+  }
 
   async function refreshSnapshot(definition: DiagnosticSnapshotDefinition) {
-    if (!canUseLiveDiagnostics || snapshotState.status === 'loading' || sectionRefreshStatuses[definition.key] === 'refreshing') {
+    if (!canUseLiveDiagnostics || evidence.loading || refreshingAll || sectionRefreshStatuses[definition.key] === 'refreshing') {
       return;
     }
+    setRefreshError('');
     setSectionRefreshStatuses(current => ({ ...current, [definition.key]: 'refreshing' }));
     try {
-      const payload = await refreshDiagnosticSnapshot(definition, contextRuntime);
-      setSnapshotState(current => {
-        const snapshots = { ...current.snapshots, [definition.key]: payload };
-        return {
-          status: 'loaded',
-          message: `Live snapshots: ${Object.keys(snapshots).length}`,
-          snapshots,
-        };
-      });
+      await evidence.refreshOne(definition);
       setSectionRefreshStatuses(current => ({ ...current, [definition.key]: 'ready' }));
     } catch (error) {
-      setSnapshotState(current => ({
-        status: current.status === 'idle' ? 'error' : current.status,
-        message: `Snapshot refresh failed: ${errorMessage(error)}`,
-        snapshots: current.snapshots,
-      }));
+      setRefreshError(`Snapshot refresh failed: ${errorMessage(error)}`);
       setSectionRefreshStatuses(current => ({ ...current, [definition.key]: 'error' }));
     }
   }
@@ -156,12 +100,21 @@ snapshots: current.snapshots,
           className="toolbar-button"
           type="button"
           onClick={refreshSnapshots}
-          disabled={!canUseLiveDiagnostics || snapshotState.status === 'loading'}
+          disabled={!canUseLiveDiagnostics || evidence.loading || refreshingAll}
         >
-          <RefreshCw size={15} /> {snapshotState.status === 'loading' ? 'Loading' : 'Refresh snapshots'}
+          <RefreshCw size={15} /> {refreshingAll ? 'Refreshing' : 'Refresh snapshots'}
         </button>
       }
     >
+      <PageLoadProgress
+        active={canUseLiveDiagnostics && (evidence.loading || refreshingAll)}
+        completed={evidence.progress.ready}
+        total={evidence.progress.total}
+        label="Loading diagnostic snapshots"
+        error={canUseLiveDiagnostics ? refreshError || evidence.progressError : null}
+        modules={progressModules}
+        updating={refreshingAll || evidence.modules.some(module => module.status === 'updating')}
+      />
       <div className="diagnostics-snapshot-grid">
         {diagnosticSnapshotDefinitions.map(definition => (
           <SnapshotCardView
@@ -178,29 +131,30 @@ snapshots: current.snapshots,
             />
         ))}
       </div>
-      {snapshotState.status === 'error' ? (
-        <p className="context-state-note error">Live diagnostic snapshots unavailable: {snapshotState.message}</p>
+      {refreshError ? (
+        <p className="context-state-note error">Live diagnostic snapshots unavailable: {refreshError}</p>
       ) : null}
     </Panel>
   );
 }
 
-function initialSnapshotState(contextRuntime: ContextRuntime, canUseLiveDiagnostics: boolean): SnapshotState {
-  if (!canUseLiveDiagnostics) return staticSnapshotState();
-  const cached = cachedDiagnosticSnapshots(contextRuntime);
-  return cached ? liveSnapshotState(cached) : staticSnapshotState();
-}
-
-function staticSnapshotState(): SnapshotState {
-  return { status: 'idle', message: 'Static aggregate fallback', snapshots: {} };
-}
-
-function liveSnapshotState(snapshots: DiagnosticSnapshotMap): SnapshotState {
-  return {
-    status: 'loaded',
-    message: `Live snapshots: ${Object.keys(snapshots).length}`,
-    snapshots,
-  };
+function snapshotStatusLabel({
+  canUseLiveDiagnostics,
+  hasLiveSnapshots,
+  liveSnapshotCount,
+  progressError,
+  refreshingAll,
+}: {
+  canUseLiveDiagnostics: boolean;
+  hasLiveSnapshots: boolean;
+  liveSnapshotCount: number;
+  progressError: string | null;
+  refreshingAll: boolean;
+}): string {
+  if (refreshingAll) return 'Refreshing diagnostic snapshots...';
+  if (hasLiveSnapshots) return `Live snapshots: ${liveSnapshotCount}`;
+  if (progressError || !canUseLiveDiagnostics) return 'Static fallback snapshots';
+  return 'Loading diagnostic snapshots...';
 }
 
 function SnapshotCardView({
