@@ -7,6 +7,7 @@ from typing import Literal
 
 RouteMethod = Literal["GET", "POST"]
 RouteWorkload = Literal["interactive", "bounded_report", "heavy_analysis"]
+RouteExecution = Literal["synchronous", "async_start", "poll"]
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class DashboardRouteProfile:
     result_bound: str
     cache_behavior: str
     may_scan_all_history: bool
+    execution: RouteExecution
 
 
 def _profile(
@@ -35,6 +37,7 @@ def _profile(
     cache_behavior: str,
     *,
     may_scan_all_history: bool = False,
+    execution: RouteExecution = "synchronous",
 ) -> DashboardRouteProfile:
     return DashboardRouteProfile(
         method=method,
@@ -46,6 +49,7 @@ def _profile(
         result_bound=result_bound,
         cache_behavior=cache_behavior,
         may_scan_all_history=may_scan_all_history,
+        execution=execution,
     )
 
 
@@ -84,8 +88,9 @@ _SNAPSHOT_REFRESH_PROFILES = tuple(
         "heavy_analysis",
         "Recomputes the named diagnostic over the requested history scope.",
         "One persisted snapshot payload.",
-        "Refresh lock serializes work; result is persisted in SQLite.",
+        "Background worker persists the snapshot in SQLite.",
         may_scan_all_history=True,
+        execution="async_start",
     )
     for name in _PERSISTED_SNAPSHOT_ROUTES
 )
@@ -191,10 +196,10 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/recommendations",
         "_handle_recommendations",
         "server.recommendations",
-        "heavy_analysis",
-        "Loads and ranks all matching calls before applying the result limit.",
+        "bounded_report",
+        "Ranks persisted recommendation facts before bounded hydration.",
         "Default 20 ranked rows.",
-        "Recomputed per request; no persisted facts yet.",
+        "Source-generation keyed facts persisted in SQLite.",
         may_scan_all_history=True,
     ),
     _profile(
@@ -213,8 +218,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/allowance/diagnostics",
         "_handle_allowance_diagnostics",
         "server.allowance",
-        "heavy_analysis",
-        "Evaluates allowance evidence over the selected history scope.",
+        "bounded_report",
+        "Evaluates at most the configured observation window.",
         "Default 10,000 observations.",
         "Computed per request from SQLite and config.",
         may_scan_all_history=True,
@@ -246,8 +251,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/investigations/agentic",
         "_handle_investigation_agentic",
         "server.investigations",
-        "heavy_analysis",
-        "Runs an aggregate investigation over matching history.",
+        "bounded_report",
+        "Composes bounded indexed diagnostic reports over matching history.",
         "Default 5 evidence rows.",
         "Computed per request; no persisted run cache.",
         may_scan_all_history=True,
@@ -257,8 +262,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/investigations/repeated-files",
         "_handle_investigation_repeated_file_rediscovery",
         "server.investigations",
-        "heavy_analysis",
-        "Ranks repeated file rediscovery over matching history.",
+        "bounded_report",
+        "Ranks persisted file-event facts over matching history.",
         "Default 20 patterns and 3 samples.",
         "Computed per request.",
         may_scan_all_history=True,
@@ -268,8 +273,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/investigations/shell-churn",
         "_handle_investigation_shell_churn",
         "server.investigations",
-        "heavy_analysis",
-        "Ranks repeated shell command families over matching history.",
+        "bounded_report",
+        "Ranks persisted command facts over matching history.",
         "Default 20 patterns and 3 samples.",
         "Computed per request.",
         may_scan_all_history=True,
@@ -279,8 +284,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/investigations/large-low-output",
         "_handle_investigation_large_low_output",
         "server.investigations",
-        "heavy_analysis",
-        "Ranks high-input, low-output calls over matching history.",
+        "bounded_report",
+        "Ranks aggregate call rows with indexed token predicates.",
         "Default 20 rows.",
         "Computed per request.",
         may_scan_all_history=True,
@@ -290,8 +295,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/investigations/walk",
         "_handle_investigation_walk",
         "server.investigations",
-        "heavy_analysis",
-        "Walks aggregate diagnostic hypotheses over matching history.",
+        "bounded_report",
+        "Composes bounded indexed hypotheses over matching history.",
         "Default 5 evidence rows.",
         "Computed per request.",
         may_scan_all_history=True,
@@ -323,8 +328,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "/api/diagnostics/fact-calls",
         "_handle_diagnostics_fact_calls",
         "server.diagnostic_facts",
-        "heavy_analysis",
-        "Resolves supporting calls for selected diagnostic facts.",
+        "bounded_report",
+        "Resolves supporting calls for request-bounded diagnostic facts.",
         "Request-bounded evidence rows.",
         "Live SQLite query; no response cache.",
         may_scan_all_history=True,
@@ -383,6 +388,7 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "One job handle.",
         "Persists index changes; job state is in process.",
         may_scan_all_history=True,
+        execution="async_start",
     ),
     _profile(
         "GET",
@@ -393,6 +399,18 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "Reads one asynchronous refresh job.",
         "One compact job status.",
         "In-process registry for the server lifetime.",
+        execution="poll",
+    ),
+    _profile(
+        "GET",
+        "/api/diagnostics/refresh/status",
+        "_handle_diagnostics_refresh_status",
+        "server.diagnostic_jobs",
+        "interactive",
+        "Reads one diagnostic refresh job without touching persisted snapshots.",
+        "One compact job status.",
+        "Read-only in-process registry lookup.",
+        execution="poll",
     ),
     _profile(
         "POST",
@@ -401,9 +419,10 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "server.diagnostic_snapshots",
         "heavy_analysis",
         "Recomputes every diagnostic snapshot over the selected history.",
-        "One aggregate refresh result.",
-        "Refresh lock serializes and persists snapshots.",
+        "One asynchronous job handle.",
+        "Background worker serializes and persists snapshots.",
         may_scan_all_history=True,
+        execution="async_start",
     ),
     *_SNAPSHOT_REFRESH_PROFILES,
     _profile(
@@ -414,7 +433,8 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         "heavy_analysis",
         "Recomputes the usage-drain snapshot over history.",
         "One persisted snapshot payload.",
-        "Refresh lock serializes work; result is persisted in SQLite.",
+        "Background worker persists the snapshot in SQLite.",
         may_scan_all_history=True,
+        execution="async_start",
     ),
 )

@@ -135,14 +135,35 @@ describe('React dashboard diagnostics snapshot matrix', () => {
         model_count: 1,
       },
     });
-    let resolveRefresh!: (response: Response) => void;
-    const refreshPromise = new Promise<Response>(resolve => {
-      resolveRefresh = resolve;
+    let resolveRefreshStatus!: (response: Response) => void;
+    const refreshStatusPromise = new Promise<Response>(resolve => {
+      resolveRefreshStatus = resolve;
+    });
+    let refreshCompleted = false;
+    const refreshJob = (status: 'running' | 'completed', completed: number) => ({
+      schema: 'codex-usage-tracker-analysis-job-v1',
+      job_id: 'diagnostic-refresh-test',
+      job_kind: 'diagnostic-refresh',
+      status,
+      stage: status === 'completed' ? 'complete' : 'persisting_snapshots',
+      progress: {
+        completed_units: completed,
+        total_units: 10,
+        percent: completed * 10,
+        current_unit: status === 'completed' ? null : 'commands',
+      },
+      error: null,
+      next: status === 'completed'
+        ? { action: 'reload_persisted_results' }
+        : { action: 'poll', job_id: 'diagnostic-refresh-test', poll_after_ms: 0 },
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/api/diagnostics/refresh?')) {
-        return refreshPromise;
+        return jsonResponse(refreshJob('running', 2));
+      }
+      if (url.includes('/api/diagnostics/refresh/status?')) {
+        return refreshStatusPromise;
       }
       if (
         url.includes('/api/diagnostics/facts?') ||
@@ -155,7 +176,7 @@ describe('React dashboard diagnostics snapshot matrix', () => {
         return jsonResponse({ rows: [], row_count: 0, total_matched_rows: 0 });
       }
       if (url.includes('/api/diagnostics/overview?')) {
-        return jsonResponse(overviewPayload(11, 22_000));
+        return jsonResponse(refreshCompleted ? overviewPayload(44, 88_000, true) : overviewPayload(11, 22_000));
       }
       if (url.includes('/api/diagnostics/')) {
         return jsonResponse({ status: 'ready', refreshed: false, snapshot: { computed_at: '2026-07-02T10:00:00Z' } });
@@ -175,14 +196,12 @@ describe('React dashboard diagnostics snapshot matrix', () => {
 
     expect(screen.getByText('Refreshing diagnostic snapshots...')).toBeInTheDocument();
     expect(within(overviewCard).getByText('22K')).toBeInTheDocument();
+    const progress = await screen.findByRole('progressbar', { name: /Refreshing diagnostic snapshots/i });
+    expect(progress).toHaveAttribute('aria-valuenow', '2');
+    expect(progress).toHaveAttribute('aria-valuemax', '10');
 
-    resolveRefresh(
-      jsonResponse({
-        sections: {
-          overview: overviewPayload(44, 88_000, true),
-        },
-      }),
-    );
+    refreshCompleted = true;
+    resolveRefreshStatus(jsonResponse(refreshJob('completed', 10)));
     expect(await within(overviewCard).findByText('88K')).toBeInTheDocument();
   });
 

@@ -42,6 +42,7 @@ _._handle_diagnostics_summary
 _._handle_diagnostics_fact_calls
 _._handle_diagnostics_overview
 _._handle_diagnostics_refresh
+_._handle_diagnostics_refresh_status
 _._handle_diagnostics_overview_refresh
 _._handle_diagnostics_tool_output
 _._handle_diagnostics_tool_output_refresh

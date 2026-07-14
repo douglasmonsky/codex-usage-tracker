@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -44,6 +45,35 @@ class MonkeyPatch(Protocol):
 
 def _as_json_object(payload: dict[str, object]) -> JsonObject:
     return cast(JsonObject, payload)
+
+
+def _complete_diagnostic_refresh(
+    base_url: str,
+    refresh_path: str,
+) -> tuple[JsonObject, JsonObject]:
+    headers = {"X-Codex-Usage-Token": "test-token"}
+    started = _as_json_object(
+        _read_json(
+            f"{base_url}{refresh_path}",
+            headers=headers,
+            data=b"",
+            method="POST",
+        )
+    )
+    current = started
+    deadline = time.monotonic() + 5
+    while current["status"] in {"pending", "running"}:
+        assert time.monotonic() < deadline, "diagnostic refresh did not finish"
+        job_id = urllib.parse.quote(str(started["job_id"]))
+        current = _as_json_object(
+            _read_json(
+                f"{base_url}/api/diagnostics/refresh/status?job_id={job_id}",
+                headers=headers,
+            )
+        )
+        if current["status"] in {"pending", "running"}:
+            time.sleep(0.01)
+    return started, current
 
 
 def test_dashboard_server_forces_dashboard_asset_mime_types(
@@ -217,6 +247,7 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
 
 
 def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> None:
+    from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
     from codex_usage_tracker.server.api import _UsageDashboardHandler
 
     codex_home = _make_codex_home(tmp_path)
@@ -242,6 +273,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         api_token="test-token",
         context_api_enabled=True,
         refresh_lock=threading.Lock(),
+        analysis_jobs=AnalysisJobRegistry(),
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -274,49 +306,44 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             data=b"",
             method="POST",
         )
+        _, diagnostic_overview_job = _complete_diagnostic_refresh(
+            f"http://127.0.0.1:{server.server_port}",
+            "/api/diagnostics/overview/refresh",
+        )
         diagnostic_refresh_payload = _as_json_object(
-            _read_json(
-                f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview/refresh",
-                headers={"X-Codex-Usage-Token": "test-token"},
-                data=b"",
-                method="POST",
-            )
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview")
         )
-        diagnostic_batch_refresh_payload = _as_json_object(
-            _read_json(
-                f"http://127.0.0.1:{server.server_port}/api/diagnostics/refresh",
-                headers={"X-Codex-Usage-Token": "test-token"},
-                data=b"",
-                method="POST",
-            )
+        diagnostic_batch_started, diagnostic_batch_job = _complete_diagnostic_refresh(
+            f"http://127.0.0.1:{server.server_port}",
+            "/api/diagnostics/refresh",
         )
-        diagnostic_tool_output_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "toolOutput"
-        ]
-        diagnostic_commands_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "commands"
-        ]
-        diagnostic_git_interactions_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "gitInteractions"
-        ]
-        diagnostic_file_reads_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "fileReads"
-        ]
-        diagnostic_file_modifications_refresh_payload = diagnostic_batch_refresh_payload[
-            "sections"
-        ]["fileModifications"]
-        diagnostic_read_productivity_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "readProductivity"
-        ]
-        diagnostic_concentration_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "concentration"
-        ]
-        diagnostic_guided_summary_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "guidedSummary"
-        ]
-        diagnostic_usage_drain_refresh_payload = diagnostic_batch_refresh_payload["sections"][
-            "usageDrain"
-        ]
+        diagnostic_tool_output_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/tool-output")
+        )
+        diagnostic_commands_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/commands")
+        )
+        diagnostic_git_interactions_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/git-interactions")
+        )
+        diagnostic_file_reads_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/file-reads")
+        )
+        diagnostic_file_modifications_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/file-modifications")
+        )
+        diagnostic_read_productivity_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/read-productivity")
+        )
+        diagnostic_concentration_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/concentration")
+        )
+        diagnostic_guided_summary_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/guided-summary")
+        )
+        diagnostic_usage_drain_refresh_payload = _as_json_object(
+            _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/usage-drain")
+        )
         diagnostic_stored_payload = _as_json_object(
             _read_json(f"http://127.0.0.1:{server.server_port}/api/diagnostics/overview")
         )
@@ -399,15 +426,23 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert limited_payload["refresh_result"]["skipped_events"] == 0
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}
     assert diagnostic_overview_after_usage_refresh["status"] == "missing"
+    assert diagnostic_overview_job["status"] == "completed"
+    assert diagnostic_overview_job["progress"]["completed_units"] == 1
     assert diagnostic_refresh_payload["status"] == "ready"
-    assert diagnostic_refresh_payload["refreshed"] is True
+    assert diagnostic_refresh_payload["refreshed"] is False
     assert diagnostic_refresh_payload["overview"]["usage_rows"] == 4
     assert diagnostic_refresh_payload["overview"]["total_tokens"] == 400
-    assert diagnostic_batch_refresh_payload["schema"] == (
-        "codex-usage-tracker-diagnostic-snapshot-refresh-v1"
-    )
-    assert diagnostic_batch_refresh_payload["status"] == "ready"
-    assert diagnostic_batch_refresh_payload["meta"]["source_log_analysis_passes"] == 1
+    assert diagnostic_batch_started["schema"] == "codex-usage-tracker-analysis-job-v1"
+    assert diagnostic_batch_started["job_kind"] == "diagnostic-refresh"
+    assert diagnostic_batch_job["status"] == "completed"
+    assert diagnostic_batch_job["progress"] == {
+        "completed_units": 10,
+        "total_units": 10,
+        "percent": 100.0,
+        "current_unit": None,
+    }
+    assert len(diagnostic_batch_job["result"]["refreshed_sections"]) == 10
+    assert diagnostic_batch_job["next"] == {"action": "reload_persisted_results"}
     assert (
         diagnostic_tool_output_refresh_payload["schema"]
         == "codex-usage-tracker-diagnostic-tool-output-v1"

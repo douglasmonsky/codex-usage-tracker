@@ -23,6 +23,7 @@ from codex_usage_tracker.server.allowance import (
     handle_allowance_export_request,
     handle_allowance_history_request,
 )
+from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
 from codex_usage_tracker.server.call_detail import (
     handle_call_detail_request,
 )
@@ -105,6 +106,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
         api_token: str,
         refresh_lock: threading.Lock,
         refresh_jobs: server_usage_refresh.RefreshJobRegistry | None = None,
+        analysis_jobs: AnalysisJobRegistry | None = None,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: ContextApiState | None = None,
@@ -136,6 +138,7 @@ class _UsageDashboardHandler(DiagnosticRouteMixin, DashboardPageMixin):
         self._context_api_state = context_api_state or ContextApiState(context_api_enabled)
         self._refresh_lock = refresh_lock
         self._refresh_jobs = refresh_jobs or server_usage_refresh.RefreshJobRegistry()
+        self._analysis_jobs = analysis_jobs or AnalysisJobRegistry()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
