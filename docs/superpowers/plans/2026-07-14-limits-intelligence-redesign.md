@@ -41,7 +41,7 @@ assert [row["event_timestamp"] for row in rows] == ["2026-07-13T00:00:00Z", "202
 ```
 
 - [ ] Run `PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/store/test_allowance_observations.py -q`; expect FAIL because the current SQL limits an ascending scan.
-- [ ] Change the query to select the newest tail through an indexed descending inner query and return it ascending only when explicitly requested:
+- [ ] Change the query to select the newest tail through a descending inner query and return it in the requested display order. Task 2 adds the matching migration indexes before v2 exposure:
 
 ```sql
 SELECT * FROM (
@@ -53,7 +53,7 @@ SELECT * FROM (
 ORDER BY event_timestamp ASC, cumulative_total_tokens ASC, window_key ASC
 ```
 
-- [ ] Add `newest_first: bool = False` to the store query, with evidence callers using `True` and legacy history retaining chronological order.
+- [ ] Add `newest_first: bool = False` to the store query and test both orders: legacy history retains chronological order over the newest tail, while `newest_first=True` returns that tail descending. Task 5's evidence service becomes the first production caller of the descending form.
 - [ ] Add a failing large-sample confidence-interval test with at least 2,000 values and assert finite bounds, then replace direct `2.0 ** sample_size` probability construction with a recurrence/log-safe binomial calculation.
 - [ ] Add a server regression test that rejects `limit=0` for interactive allowance history and documents the finite maximum.
 - [ ] Run:
@@ -84,7 +84,7 @@ allowance_intervals
 allowance_analysis_snapshots
 ```
 
-- [ ] Assert indexes exist for latest cohort/window cycle status, cycle time ranges, descending interval evidence, source-revision lookup, and exact snapshot cache-key lookup.
+- [ ] Assert indexes exist for the non-archived allowance-observation newest-tail query (including its window-filtered form), latest cohort/window cycle status, cycle time ranges, descending interval evidence, source-revision lookup, and exact snapshot cache-key lookup. Verify the allowance-observation query plans avoid a full scan and temporary order sort.
 - [ ] Run the migration tests; expect FAIL because migration 26 is absent.
 - [ ] Implement `migrate_allowance_intelligence_v2(connection)` in the new focused module. Use structural columns only during migration; pricing-dependent estimates remain nullable until service/analysis enrichment.
 - [ ] Store source state as one row containing `source_revision`, `observation_count`, `latest_observed_at`, `model_version`, and `rebuilt_at`.
