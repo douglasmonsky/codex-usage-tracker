@@ -40,7 +40,7 @@ def query_large_low_output_calls(
     query_params = params if normalized_limit is None else [*params, normalized_limit]
     total_candidates = int(
         conn.execute(
-            f"SELECT COUNT(*) FROM usage_events u {where_sql}",
+            f"SELECT COUNT(*) FROM canonical_usage_events u {where_sql}",
             params,
         ).fetchone()[0]
     )
@@ -49,7 +49,7 @@ def query_large_low_output_calls(
         f"""
         WITH candidate_usage AS (
             SELECT u.*
-            FROM usage_events u
+            FROM canonical_usage_events u
             {where_sql}
             ORDER BY
                 u.total_tokens DESC,

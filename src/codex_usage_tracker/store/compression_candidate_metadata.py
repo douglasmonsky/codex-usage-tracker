@@ -23,7 +23,7 @@ def record_metadata_by_id(
                 "SELECT record_id, model,",
                 "       COALESCE(thread_key, thread_name, session_id) AS thread_key,",
                 "       event_timestamp",
-                "FROM usage_events",
+                "FROM canonical_usage_events",
                 "WHERE record_id IN (",
                 placeholders,
                 ")",

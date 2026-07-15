@@ -52,7 +52,7 @@ def sync_allowance_observations_for_record_ids(
     has_allowance_source = conn.execute(
         """
         SELECT 1
-        FROM usage_events
+        FROM canonical_usage_events
         WHERE rate_limit_primary_used_percent IS NOT NULL
            OR rate_limit_primary_window_minutes IS NOT NULL
            OR rate_limit_primary_resets_at IS NOT NULL
@@ -156,7 +156,7 @@ def _insert_observation_sql(window_key: str, *, record_filter: str = "") -> str:
             reasoning_output_tokens,
             total_tokens,
             cumulative_total_tokens
-        FROM usage_events
+        FROM canonical_usage_events
         WHERE (
             {used_col} IS NOT NULL
             OR {minutes_col} IS NOT NULL

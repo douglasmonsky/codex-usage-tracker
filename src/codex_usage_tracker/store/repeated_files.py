@@ -39,7 +39,7 @@ def query_repeated_file_rediscovery(
             FROM (
                 SELECT fe.path_hash
                 FROM file_events fe
-                JOIN usage_events u ON u.record_id = fe.record_id
+                JOIN canonical_usage_events u ON u.record_id = fe.record_id
                 {where_sql}
                 GROUP BY fe.path_hash
                 HAVING COUNT(*) >= ?
@@ -65,7 +65,7 @@ def query_repeated_file_rediscovery(
                 u.event_timestamp,
                 u.total_tokens
             FROM file_events fe
-            JOIN usage_events u ON u.record_id = fe.record_id
+            JOIN canonical_usage_events u ON u.record_id = fe.record_id
             {where_sql}
         ),
         sequenced AS (
@@ -221,7 +221,7 @@ def _trace_handles_for_path(
             MIN(u.event_timestamp) AS first_seen_at,
             MAX(u.event_timestamp) AS last_seen_at
         FROM file_events fe
-        JOIN usage_events u ON u.record_id = fe.record_id
+        JOIN canonical_usage_events u ON u.record_id = fe.record_id
         {where_sql}
         GROUP BY u.thread_key, thread_name, u.session_id
         ORDER BY call_count DESC, total_tokens DESC, last_seen_at DESC
