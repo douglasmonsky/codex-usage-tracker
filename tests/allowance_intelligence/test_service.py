@@ -55,3 +55,39 @@ def test_series_presets_validation_and_evidence_privacy(connection: sqlite3.Conn
     evidence = build_allowance_evidence(connection, privacy_mode="strict")
     assert evidence["schema"] == "codex-usage-tracker-allowance-evidence-v2"
     assert "end_record_id" not in evidence["rows"][0]
+
+
+def test_evidence_skips_nonmeaningful_rows_without_skipping_later_transition(
+    connection: sqlite3.Connection,
+) -> None:
+    connection.execute(
+        "INSERT INTO allowance_intervals (interval_id,cycle_id,window_kind,window_key,cohort_key,is_archived,end_observed_at,point_kind,source_revision) VALUES ('baseline','week','weekly','primary','codex',0,'2026-07-15T11:59:00+00:00','baseline','r1')"
+    )
+    evidence = build_allowance_evidence(connection, limit=1, privacy_mode="local")
+    assert [row["point_kind"] for row in evidence["rows"]] == ["positive"]
+
+
+def test_strict_evidence_has_no_stable_local_identifiers(connection: sqlite3.Connection) -> None:
+    evidence = build_allowance_evidence(connection, privacy_mode="strict")
+    forbidden = {"interval_id", "cycle_id", "cohort_key", "source_revision", "record_id", "session_id", "observation_id", "source_id"}
+    assert not (forbidden & set(evidence["rows"][0]))
+    assert evidence["revision"] == "r1"
+
+
+def test_status_cohort_diagnostics_and_reset_series_break(connection: sqlite3.Connection) -> None:
+    connection.execute("UPDATE allowance_cycles SET status = 'conflict', conflict_count = 1 WHERE cycle_id = 'week'")
+    connection.execute(
+        """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,is_archived,reset_at,first_observed_at,last_observed_at,latest_used_percent,observation_count,canonical_observation_count,canonical_tokens,status,cycle_state,source_revision) VALUES ('week-2','weekly','primary','alternate',0,1784232000,'2026-07-15T11:00:00+00:00','2026-07-15T11:59:00+00:00',5,1,1,1,'accepted','accepted','r1')"""
+    )
+    status = build_allowance_status(connection, now=NOW)
+    assert status["data_state"] == "partial"
+    assert status["cohorts"]["selected"]
+    assert status["cohorts"]["alternates"]
+    series = build_allowance_series(connection, now=NOW, range_preset="24h")
+    assert "reset" in [point["kind"] for point in series["points"]]
+
+
+@pytest.mark.parametrize("start_at,end_at", [("not-a-date", "2026-07-15T12:00:00+00:00"), ("2026-07-15T10:00:00", "2026-07-15T12:00:00+00:00"), ("2026-07-15T13:00:00+00:00", "2026-07-15T12:00:00+00:00")])
+def test_series_custom_range_requires_aware_ordered_timestamps(connection: sqlite3.Connection, start_at: str, end_at: str) -> None:
+    with pytest.raises(ValueError):
+        build_allowance_series(connection, now=NOW, range_preset="custom", start_at=start_at, end_at=end_at)
