@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.18.0 - 2026-07-15
+
+- Exclude exact historical calls copied by cloned Codex tasks from default dashboard, CLI, MCP, report, allowance, compression, recommendation, and export totals while retaining every physical source row for local provenance.
+- Add aggregate deduplication diagnostics across the CLI, MCP server, localhost API, and dashboard status strip, including physical, canonical, and excluded row/token counts with bounded provenance metadata.
+- Preserve new post-clone calls as normal usage, promote a surviving copy when an original source disappears, and migrate existing local indexes without losing usage history.
+- Restore large-history dashboard performance with canonical query indexes and explicit SQLite join/scan plans; the 100,000-row route budget now passes for summaries, recommendations, diagnostics, threads, and thread-call paging.
+
 ## 0.17.2 - 2026-07-09
 
 - Add GPT-5.6 Sol, Terra, and Luna API pricing and Codex credit-rate support, including the official `gpt-5.6` alias and compatibility with OpenAI's new cache-write pricing column.
