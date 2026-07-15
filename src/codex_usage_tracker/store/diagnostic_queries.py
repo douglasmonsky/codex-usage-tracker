@@ -70,6 +70,11 @@ def query_diagnostic_facts(
         fact_category=fact_category,
         table_alias="f",
     )
+    where_clause = (
+        f"{where_clause} AND usage_events.is_duplicate = 0"
+        if where_clause
+        else "WHERE usage_events.is_duplicate = 0"
+    )
     normalized_limit = normalize_limit(limit)
     limit_clause = ""
     query_params: list[Any] = list(params)
@@ -102,7 +107,7 @@ def query_diagnostic_facts(
                 MAX(f.last_source_line) AS last_source_line,
                 MAX(f.raw_content_included) AS raw_content_included,
                 NULL AS largest_record_id
-            FROM canonical_usage_events AS usage_events
+            FROM usage_events AS usage_events NOT INDEXED
             CROSS JOIN call_diagnostic_facts AS f ON f.record_id = usage_events.record_id
             {where_clause}
             GROUP BY f.fact_type, f.fact_name, f.fact_category
@@ -190,7 +195,8 @@ def _resolve_largest_record_ids(
             FROM diagnostic_fact_maxima AS maxima
             CROSS JOIN canonical_usage_events AS u
                 ON u.total_tokens = maxima.largest_call_tokens
-            JOIN call_diagnostic_facts AS f INDEXED BY idx_call_diagnostic_facts_lookup
+            CROSS JOIN call_diagnostic_facts AS f
+                INDEXED BY idx_call_diagnostic_facts_lookup
                 ON f.record_id = u.record_id
                 AND f.fact_type = maxima.fact_type
                 AND f.fact_name = maxima.fact_name

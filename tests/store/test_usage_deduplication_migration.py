@@ -32,6 +32,36 @@ def test_new_database_has_canonical_usage_schema_and_index(tmp_path: Path) -> No
                 ("usage-fingerprint-v2:test",),
             )
         ]
+        legacy_thread_plan = [
+            str(row["detail"])
+            for row in conn.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT record_id
+                FROM usage_events INDEXED BY idx_canonical_usage_legacy_thread
+                WHERE is_archived = 0
+                  AND is_duplicate = 0
+                  AND (thread_key IS NULL OR thread_key = '')
+                ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
+                LIMIT 100
+                """
+            )
+        ]
+        diagnostic_plan = [
+            str(row["detail"])
+            for row in conn.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT f.fact_type, COUNT(*)
+                FROM usage_events AS usage_events NOT INDEXED
+                CROSS JOIN call_diagnostic_facts AS f
+                    ON f.record_id = usage_events.record_id
+                WHERE usage_events.is_archived = 0
+                  AND usage_events.is_duplicate = 0
+                GROUP BY f.fact_type
+                """
+            )
+        ]
 
     assert {
         "upstream_usage_id",
@@ -45,9 +75,15 @@ def test_new_database_has_canonical_usage_schema_and_index(tmp_path: Path) -> No
         "idx_usage_canonical_record_id",
         "idx_usage_duplicate_reason",
         "idx_usage_canonical_fingerprint",
+        "idx_canonical_usage_archived_timestamp",
+        "idx_canonical_usage_legacy_thread",
+        "idx_canonical_usage_record_id",
     } <= indexes
+    assert "idx_usage_duplicate" not in indexes
     assert view is not None and "WHEREis_duplicate=0" in str(view["sql"]).replace(" ", "")
     assert any("idx_usage_" in detail for detail in plan)
+    assert any("idx_canonical_usage_legacy_thread" in detail for detail in legacy_thread_plan)
+    assert "SCAN usage_events" in diagnostic_plan[0]
 
 
 def test_v23_backfill_marks_copied_legacy_usage_duplicate(tmp_path: Path) -> None:
