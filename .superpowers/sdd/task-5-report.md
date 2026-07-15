@@ -11,3 +11,5 @@ Self-review: services only read Task 4 materialized queries, accept an injected 
 Verification (shared interpreter): `3 passed in 0.07s` for `tests/allowance_intelligence/test_service.py`; Ruff passed for all Task 5 source and test files. A fixture reset timestamp was corrected so the aging assertion does not cross reset, and service helpers were formatted to satisfy Ruff.
 
 Contract follow-up: added RED regression coverage for sparse meaningful evidence pagination, strict identifier removal, cohort conflict diagnostics, reset break points, and timezone-aware custom ranges. GREEN verification: `9 passed in 0.13s` for `tests/allowance_intelligence/test_service.py`; Ruff and `git diff --check` passed.
+
+Per-window cohort follow-up: normal Codex primaries are selected independently for weekly and five-hour windows; a stale weekly normal with a fresh eligible alternate remains selected and emits reconciliation/partial diagnostics. GREEN verification: `11 passed in 0.15s`; Ruff and `git diff --check` passed.

@@ -87,6 +87,31 @@ def test_status_cohort_diagnostics_and_reset_series_break(connection: sqlite3.Co
     assert "reset" in [point["kind"] for point in series["points"]]
 
 
+def test_normal_codex_primary_is_selected_independently_per_window(
+    connection: sqlite3.Connection,
+) -> None:
+    status = build_allowance_status(connection, now=NOW)
+    assert status["cohorts"]["selected"]["weekly"]["id"] == "codex"
+    assert status["cohorts"]["selected"]["five_hour"]["id"] == "codex"
+    assert not any(
+        cohort["id"] == "codex" and cohort["window_kind"] == "five_hour"
+        for cohort in status["cohorts"]["alternates"]
+    )
+
+
+def test_stale_weekly_normal_keeps_primary_and_reports_reconciliation(
+    connection: sqlite3.Connection,
+) -> None:
+    connection.execute("UPDATE allowance_cycles SET reset_at = 1 WHERE cycle_id = 'week'")
+    connection.execute(
+        """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,is_archived,reset_at,first_observed_at,last_observed_at,latest_used_percent,observation_count,canonical_observation_count,canonical_tokens,status,cycle_state,source_revision) VALUES ('weekly-alt','weekly','primary','alternate',0,1784232000,'2026-07-15T11:00:00+00:00','2026-07-15T11:59:00+00:00',5,3,3,1,'accepted','accepted','r1')"""
+    )
+    status = build_allowance_status(connection, now=NOW)
+    assert status["cohorts"]["selected"]["weekly"]["id"] == "codex"
+    assert status["data_state"] == "partial"
+    assert status["cohorts"]["reconciliation"]
+
+
 @pytest.mark.parametrize("start_at,end_at", [("not-a-date", "2026-07-15T12:00:00+00:00"), ("2026-07-15T10:00:00", "2026-07-15T12:00:00+00:00"), ("2026-07-15T13:00:00+00:00", "2026-07-15T12:00:00+00:00")])
 def test_series_custom_range_requires_aware_ordered_timestamps(connection: sqlite3.Connection, start_at: str, end_at: str) -> None:
     with pytest.raises(ValueError):

@@ -29,15 +29,15 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
     five_hour = query_latest_allowance_state(connection, window_kind="five_hour", include_archived=include_archived)
     windows = {"weekly": _window(weekly, now), "five_hour": _window(five_hour, now) if five_hour else None}
     states = [entry["freshness"] for entry in windows.values() if entry]
-    cohorts = _cohorts(connection, revision, include_archived)
-    partial = any(
+    cohorts = _cohorts(connection, revision, include_archived, now)
+    partial = bool(cohorts["reconciliation"]) or any(
         row["status"] in {"conflict", "reconciliation"}
         or row["cycle_state"] in {"conflict", "reconciliation"}
         or int(row["conflict_count"] or 0) > 0
         for row in cohorts["rows"]
     )
     data_state = "partial" if partial else _data_state(states)
-    return {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
+    return {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"], "reconciliation": cohorts["reconciliation"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
 
 
 def build_allowance_series(connection: sqlite3.Connection, *, now: datetime, range_preset: str = "7d", start_at: str | None = None, end_at: str | None = None, granularity: str = "auto", window_kind: str = "weekly", cohort_id: str | None = None, include_archived: bool = False) -> dict[str, Any]:
@@ -135,19 +135,46 @@ def _series_points(cycles: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return points
 
 
-def _cohorts(connection: sqlite3.Connection, revision: str | None, include_archived: bool) -> dict[str, Any]:
+def _cohorts(
+    connection: sqlite3.Connection,
+    revision: str | None,
+    include_archived: bool,
+    now: datetime,
+) -> dict[str, Any]:
     if revision is None:
-        return {"selected": None, "alternates": [], "rows": []}
+        return {"selected": {}, "alternates": [], "reconciliation": [], "rows": []}
     archive = "" if include_archived else "AND is_archived = 0"
     rows = [dict(row) for row in connection.execute(f"SELECT * FROM allowance_cycles WHERE source_revision = ? {archive} ORDER BY last_observed_at DESC, cycle_id DESC", (revision,))]
-    selected_row = next((row for row in rows if row["cohort_key"] == "codex" and row["window_kind"] == "weekly"), rows[0] if rows else None)
-    selected = _cohort(selected_row)
+    selected_rows: dict[str, dict[str, Any]] = {}
+    for kind in ("weekly", "five_hour"):
+        normal = next(
+            (row for row in rows if row["window_kind"] == kind and row["cohort_key"] == "codex"),
+            None,
+        )
+        fallback = next((row for row in rows if row["window_kind"] == kind), None)
+        if normal or fallback:
+            selected_rows[kind] = normal or fallback
+    selected = {kind: _cohort(row) for kind, row in selected_rows.items()}
     alternates = []
     seen = set()
     for row in rows:
         diagnostic = _cohort(row)
         key = (diagnostic["id"], diagnostic["window_kind"], diagnostic["window_key"], diagnostic["archived"])
-        if diagnostic != selected and key not in seen:
+        if row not in selected_rows.values() and key not in seen:
             alternates.append(diagnostic)
             seen.add(key)
-    return {"selected": selected, "alternates": alternates, "rows": rows}
+    reconciliation = []
+    weekly = selected_rows.get("weekly")
+    if weekly and weekly["cohort_key"] == "codex" and _window(weekly, now)["freshness"] == "stale":
+        eligible = [
+            row for row in rows
+            if row["window_kind"] == "weekly"
+            and row["cohort_key"] != "codex"
+            and row["status"] == "accepted"
+            and row["cycle_state"] == "accepted"
+            and int(row["observation_count"] or 0) >= 3
+            and _window(row, now)["freshness"] != "stale"
+        ]
+        if eligible:
+            reconciliation.append({"window_kind": "weekly", "normal": _cohort(weekly), "eligible_alternate": _cohort(eligible[0]), "state": "normal_stale_alternate_available"})
+    return {"selected": selected, "alternates": alternates, "reconciliation": reconciliation, "rows": rows}
