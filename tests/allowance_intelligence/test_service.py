@@ -35,7 +35,12 @@ def test_status_schema_freshness_and_matching_revision_are_compact(connection: s
     assert payload["weekly"]["freshness"] == "fresh"
     assert payload["five_hour"]["freshness"] == "fresh"
     assert payload["next"]["poll_after_seconds"] == 30
-    assert build_allowance_status(connection, now=NOW, since_revision="r1") == {"schema": payload["schema"], "revision": "r1", "changed": False}
+    assert build_allowance_status(connection, now=NOW, since_revision="r1") == {
+        "schema": payload["schema"],
+        "revision": "r1",
+        "changed": False,
+        "next": {"action": "poll_status", "poll_after_seconds": 60},
+    }
 
 
 def test_status_exposes_versioned_weekly_estimation_without_changing_observations(

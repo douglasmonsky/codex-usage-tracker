@@ -23,9 +23,14 @@ _AGING = {"weekly": 6 * 60 * 60, "five_hour": 15 * 60}
 
 def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, privacy_mode: str = "strict", include_archived: bool = False, since_revision: str | None = None) -> dict[str, Any]:
     """Return a constant-size current status; callers own connection lifetime."""
-    revision = _revision(connection)
+    revision = _revision(connection) or "missing"
     if since_revision is not None and since_revision == revision:
-        return {"schema": ALLOWANCE_STATUS_SCHEMA, "revision": revision, "changed": False}
+        return {
+            "schema": ALLOWANCE_STATUS_SCHEMA,
+            "revision": revision,
+            "changed": False,
+            "next": {"action": "poll_status", "poll_after_seconds": 60},
+        }
     weekly = query_latest_allowance_state(connection, window_kind="weekly", include_archived=include_archived)
     five_hour = query_latest_allowance_state(connection, window_kind="five_hour", include_archived=include_archived)
     windows = {"weekly": _window(weekly, now), "five_hour": _window(five_hour, now) if five_hour else None}
@@ -68,13 +73,13 @@ def build_allowance_series(connection: sqlite3.Connection, *, now: datetime, ran
     return {"schema": ALLOWANCE_SERIES_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "revision": _revision(connection), "requested_range": {"preset": range_preset, "start_at": start_at, "end_at": end_at}, "available_range": _available_range(cycles), "granularity": granularity, "truncated": False, "downsampled": False, "quality": {"observed_only": True}, "points": points, "cycles": [_cycle(row) for row in cycles]}
 
 
-def build_allowance_evidence(connection: sqlite3.Connection, *, now: datetime | None = None, privacy_mode: str = "strict", limit: int = 50, cursor: str | None = None, window_kind: str | None = None, cohort_id: str | None = None, include_archived: bool = False) -> dict[str, Any]:
+def build_allowance_evidence(connection: sqlite3.Connection, *, now: datetime | None = None, privacy_mode: str = "strict", limit: int = 50, cursor: str | None = None, window_kind: str | None = None, cohort_id: str | None = None, start_at: str | None = None, end_at: str | None = None, order: str = "desc", include_archived: bool = False) -> dict[str, Any]:
     """Return revision-bound local evidence, omitting identifiers in strict mode."""
     target = min(500, max(1, int(limit)))
     rows: list[dict[str, Any]] = []
     next_cursor = cursor
     while len(rows) < target:
-        page = query_allowance_evidence(connection, limit=1, cursor=next_cursor, window_kind=window_kind, cohort_id=cohort_id, include_archived=include_archived)
+        page = query_allowance_evidence(connection, limit=1, cursor=next_cursor, window_kind=window_kind, cohort_id=cohort_id, start_at=start_at, end_at=end_at, order=order, include_archived=include_archived)
         if not page.rows:
             next_cursor = None
             break

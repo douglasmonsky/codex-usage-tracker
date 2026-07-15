@@ -29,7 +29,7 @@ def build_allowance_analysis(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Return a semantically cached, aggregate-only change analysis."""
-    request = _analysis_request(
+    request = allowance_analysis_request(
         connection,
         rate_card_revision=rate_card_revision,
         archive_scope=archive_scope,
@@ -114,7 +114,7 @@ def read_allowance_analysis(
     parameters: dict[str, int] | None = None,
 ) -> dict[str, Any] | None:
     """Read a compatible persisted result without starting analysis work."""
-    request = _analysis_request(
+    request = allowance_analysis_request(
         connection,
         rate_card_revision=rate_card_revision,
         archive_scope=archive_scope,
@@ -126,7 +126,7 @@ def read_allowance_analysis(
     return _read_snapshot(connection, request["snapshot_id"])
 
 
-def _analysis_request(
+def allowance_analysis_request(
     connection: sqlite3.Connection,
     *,
     rate_card_revision: str | None,
@@ -184,6 +184,7 @@ def _analysis_request(
     return {
         "snapshot_id": snapshot_id,
         "source_revision": source_revision,
+        "model_version": DETECTOR_VERSION,
         "rate_card_revision": resolved_rate_revision,
         "data_as_of": data_as_of,
         "parameters": resolved,

@@ -29,6 +29,7 @@ class AnalysisJobRegistry:
         source_revision: str,
         total_units: int | None,
         work: AnalysisWork,
+        reload_endpoint: str | None = None,
     ) -> dict[str, object]:
         """Start work or reuse the active worker for an identical request."""
         with self._lock:
@@ -49,6 +50,7 @@ class AnalysisJobRegistry:
                 "progress": _progress_payload(0, total_units, None),
                 "result": None,
                 "error": None,
+                "_reload_endpoint": reload_endpoint,
             }
             self._jobs[job_id] = job
             self._active_by_request[request_key] = job_id
@@ -222,12 +224,15 @@ def _job_view(job: Mapping[str, object], *, request_reused: str) -> dict[str, ob
         payload["next"] = {
             "action": "poll",
             "job_id": payload["job_id"],
-            "poll_after_ms": 250,
+            "poll_after_ms": 500,
         }
     elif payload["status"] == "completed":
         payload["next"] = {"action": "reload_persisted_results"}
+        if reload_endpoint := payload.get("_reload_endpoint"):
+            payload["next"]["endpoint"] = reload_endpoint
     else:
         payload["next"] = {"action": "retry"}
+    payload.pop("_reload_endpoint", None)
     return payload
 
 
