@@ -136,8 +136,9 @@ def test_canonical_rebuild_discards_stale_allowance_intelligence(tmp_path: Path)
         init_db(conn)
         conn.execute(
             "INSERT INTO allowance_source_state "
-            "(state_id, source_revision, observation_count, latest_observed_at, model_version, rebuilt_at) "
-            "VALUES (1, 'stale', 1, '2026-07-15T00:00:00Z', 'v1', '2026-07-15T00:00:00Z')"
+            "(state_id, allowance_generation, source_revision, observation_count, "
+            "latest_observed_at, model_version, rebuilt_at) "
+            "VALUES (1, 1, 'stale', 1, '2026-07-15T00:00:00Z', 'v1', '2026-07-15T00:00:00Z')"
         )
         conn.execute(
             "INSERT INTO allowance_cycles "
@@ -146,8 +147,8 @@ def test_canonical_rebuild_discards_stale_allowance_intelligence(tmp_path: Path)
         )
         conn.execute(
             "INSERT INTO allowance_intervals "
-            "(interval_id, cycle_id, point_kind, source_revision) "
-            "VALUES ('stale-interval', 'stale-cycle', 'anchor', 'stale')"
+            "(interval_id, cycle_id, window_kind, window_key, cohort_key, point_kind, source_revision) "
+            "VALUES ('stale-interval', 'stale-cycle', 'primary', 'primary', 'codex', 'anchor', 'stale')"
         )
         _rebuild_canonical_derivatives(conn)
         counts = [
