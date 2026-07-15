@@ -24,9 +24,10 @@ def test_chinese_subcommand_help_keeps_command_contracts() -> None:
         action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
     )
     help_text = subparsers_action.choices["serve-dashboard"].format_help()
+    compact_help = "".join(help_text.split())
 
     assert help_text.startswith("用法：codex-usage-tracker serve-dashboard")
-    assert "生成并提供仪表盘前刷新 SQLite 索引" in help_text
+    assert "生成并提供仪表盘前刷新SQLite索引" in compact_help
     assert "--no-refresh" in help_text
     assert "--context-api" in help_text
 
