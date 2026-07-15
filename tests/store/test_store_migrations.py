@@ -182,6 +182,35 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
             row["name"]
             for row in conn.execute("PRAGMA table_info(allowance_intervals)").fetchall()
         }
+        allowance_cycle_archive_column = conn.execute(
+            "SELECT type, \"notnull\", dflt_value FROM pragma_table_info('allowance_cycles') "
+            "WHERE name = 'is_archived'"
+        ).fetchone()
+        allowance_interval_archive_column = conn.execute(
+            "SELECT type, \"notnull\", dflt_value FROM pragma_table_info('allowance_intervals') "
+            "WHERE name = 'is_archived'"
+        ).fetchone()
+        cycle_latest_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_cycles_latest_cohort_window') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
+        cycle_range_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_cycles_cohort_time_range') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
+        interval_evidence_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_intervals_cycle_evidence_desc') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
         diagnostic_lookup_plan = [
             str(row["detail"])
             for row in conn.execute(
@@ -243,6 +272,31 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
     assert "idx_allowance_intervals_cycle_evidence_desc" in interval_indexes
     assert "idx_allowance_intervals_source_revision" in interval_indexes
     assert "idx_allowance_analysis_snapshots_cache_key" in snapshot_indexes
+    assert allowance_cycle_archive_column is not None
+    assert tuple(allowance_cycle_archive_column) == ("INTEGER", 1, "0")
+    assert allowance_interval_archive_column is not None
+    assert tuple(allowance_interval_archive_column) == ("INTEGER", 1, "0")
+    assert cycle_latest_index_columns == [
+        "is_archived",
+        "window_kind",
+        "cohort_key",
+        "last_observed_at",
+        "cycle_id",
+    ]
+    assert cycle_range_index_columns == [
+        "is_archived",
+        "window_kind",
+        "cohort_key",
+        "first_observed_at",
+        "last_observed_at",
+    ]
+    assert interval_evidence_index_columns == [
+        "is_archived",
+        "window_kind",
+        "cohort_key",
+        "end_observed_at",
+        "interval_id",
+    ]
     assert {
         "allowance_generation",
         "source_revision",
@@ -277,6 +331,7 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
         "cycle_state",
         "source_revision",
         "model_version",
+        "is_archived",
     } <= allowance_cycle_columns
     assert {
         "interval_id",
@@ -314,6 +369,7 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
         "eligible_for_change_detection",
         "source_revision",
         "model_version",
+        "is_archived",
     } <= allowance_interval_columns
     assert any(
         "USING COVERING INDEX idx_call_diagnostic_facts_lookup" in detail
