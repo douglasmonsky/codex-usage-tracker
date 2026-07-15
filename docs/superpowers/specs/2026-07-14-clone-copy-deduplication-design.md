@@ -27,12 +27,12 @@ The existing `record_id` remains unchanged and continues to identify one physica
 
 ### Fingerprint precedence
 
-Fingerprint format is explicitly versioned as `usage-fingerprint-v1`.
+Fingerprint format is explicitly versioned as `usage-fingerprint-v2`.
 
 1. When the token-count envelope contains a recognized non-empty `usage_id`, `event_id`, or `call_id` in the envelope, payload, or aggregate `info` object, the fingerprint hashes the version, identifier key/path, and identifier value. A generic `id` is not accepted because it may be a session identifier.
 2. Otherwise, the fingerprint hashes a canonical JSON object containing:
-   - event timestamp;
-   - turn ID and turn timestamp, preserving nulls;
+   - the stable turn ID when present; cloned logs preserve this ID while rewriting imported event and turn timestamps;
+   - event and turn timestamps, preserving nulls, only when no stable turn ID is available;
    - model and effort, preserving nulls;
    - model context window;
    - input, cached-input, output, reasoning-output, and total tokens for the call;
@@ -45,7 +45,7 @@ The fallback excludes `session_id`, thread labels, parent-session metadata, `sou
 
 ## Storage And Canonicalization
 
-`usage_events` remains the physical table. Migration 24 adds the identity/status columns, backfills every existing row using the same production fingerprint function, selects one deterministic representative per fingerprint, and creates:
+`usage_events` remains the physical table. Migration 24 adds the identity/status columns. Migration 25 reclassifies existing rows with the clone-stable v2 fingerprint. Both use the same production fingerprint function, select one deterministic representative per fingerprint, and create:
 
 - an index on `usage_fingerprint`;
 - an index on `canonical_record_id`;

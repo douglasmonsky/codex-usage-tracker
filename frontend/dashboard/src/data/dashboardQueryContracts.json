@@ -60,6 +60,12 @@
     "schema": null
   },
   {
+    "id": "diagnostics-dedupe",
+    "endpoint": "/api/diagnostics/dedupe",
+    "dataClass": "aggregate",
+    "schema": "codex-usage-tracker-dedupe-diagnostics-v1"
+  },
+  {
     "id": "diagnostics-snapshot",
     "endpoint": "/api/diagnostics/{snapshot}",
     "dataClass": "aggregate",

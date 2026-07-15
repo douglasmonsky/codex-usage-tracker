@@ -371,6 +371,11 @@ it('surfaces legacy environment status chips in the shell', () => {
         missing_usage: 3,
         duplicate_cumulative_total: 99,
       },
+      dedupe: {
+        canonical_rows: 8,
+        physical_rows: 10,
+        excluded_copied_rows: 2,
+      },
       project_metadata_privacy: {
         mode: 'strict',
         cwd_redacted: true,
@@ -399,6 +404,10 @@ it('surfaces legacy environment status chips in the shell', () => {
       'Config error: missing allowance.json',
     );
     expect(within(status).getByText('Metadata strict')).toHaveAttribute('title', expect.stringContaining('cwd redacted'));
+    expect(within(status).getByText('Deduped · 2 copied excluded')).toHaveAttribute(
+      'title',
+      expect.stringContaining('10 physical source rows'),
+    );
     expect(within(status).getByText('Parser warnings')).toHaveAttribute(
       'title',
       expect.stringContaining('missing_usage=3'),

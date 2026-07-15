@@ -68,9 +68,9 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(str(source_rows[0]["source_record_hash"])) == 64
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 24
+    assert state["schema_version"] == 25
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == list(range(1, 25))
+    assert [row["version"] for row in state["migrations"]] == list(range(1, 26))
     with connect(db_path) as conn:
         init_db(conn)
         facts = conn.execute("SELECT COUNT(*) AS count FROM call_diagnostic_facts").fetchone()
@@ -106,7 +106,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "24"
+    assert metadata["schema_version"] == "25"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -147,26 +147,6 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
         usage_indexes = {
             row["name"] for row in conn.execute("PRAGMA index_list(usage_events)").fetchall()
         }
-        usage_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
-        }
-        usage_index_sql = {
-            row["name"]: row["sql"]
-            for row in conn.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type = 'index'"
-            ).fetchall()
-        }
-        canonical_view = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'view' AND name = 'canonical_usage_events'"
-        ).fetchone()
-        representative_plan = [
-            str(row["detail"])
-            for row in conn.execute(
-                "EXPLAIN QUERY PLAN SELECT record_id FROM usage_events "
-                "WHERE usage_fingerprint = ? AND is_duplicate = 0 LIMIT 1",
-                ("usage-fingerprint-v1:test",),
-            ).fetchall()
-        ]
         recommendation_indexes = {
             row["name"]
             for row in conn.execute("PRAGMA index_list(recommendation_facts)").fetchall()
@@ -188,31 +168,9 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
             ).fetchall()
         ]
 
-    assert versions == list(range(1, 25))
-    assert user_version == 24
+    assert versions == list(range(1, 26))
+    assert user_version == 25
     assert "idx_usage_source_file_line" in usage_indexes
-    assert {
-        "upstream_usage_id",
-        "usage_fingerprint",
-        "canonical_record_id",
-        "is_duplicate",
-        "duplicate_reason",
-    } <= usage_columns
-    assert {
-        "idx_usage_fingerprint",
-        "idx_usage_canonical_record_id",
-        "idx_usage_duplicate_reason",
-        "idx_usage_canonical_fingerprint",
-    } <= usage_indexes
-    assert canonical_view is not None
-    assert "WHEREis_duplicate=0" in str(canonical_view["sql"]).replace(" ", "")
-    assert "WHEREis_duplicate=0" in str(
-        usage_index_sql["idx_usage_canonical_fingerprint"]
-    ).replace(" ", "")
-    assert any(
-        "idx_usage_canonical_fingerprint" in detail or "idx_usage_fingerprint" in detail
-        for detail in representative_plan
-    )
     assert {
         "idx_recommendation_facts_rank_active",
         "idx_recommendation_facts_rank_all",
@@ -282,34 +240,6 @@ def test_init_db_does_not_rerun_applied_migrations(
 
     assert user_version == schema_module.SCHEMA_VERSION
     assert recorded_count == schema_module.SCHEMA_VERSION
-
-
-def test_v23_backfill_marks_copied_legacy_usage_duplicate(tmp_path: Path) -> None:
-    db_path = tmp_path / "usage.sqlite3"
-    _write_legacy_usage_database(db_path)
-    with sqlite3.connect(db_path) as raw:
-        raw.execute(
-            "INSERT INTO usage_events SELECT ?, ?, event_timestamp, ?, ?, input_tokens, "
-            "cached_input_tokens, output_tokens, reasoning_output_tokens, total_tokens, "
-            "cumulative_input_tokens, cumulative_cached_input_tokens, cumulative_output_tokens, "
-            "cumulative_reasoning_output_tokens, cumulative_total_tokens, uncached_input_tokens, "
-            "cache_ratio, reasoning_output_ratio, context_window_percent FROM usage_events",
-            ("copied-record", "copied-session", "/tmp/copied.jsonl", 99),
-        )
-    with connect(db_path) as conn:
-        init_db(conn)
-        rows = conn.execute(
-            "SELECT usage_fingerprint, canonical_record_id, is_duplicate, duplicate_reason "
-            "FROM usage_events ORDER BY record_id"
-        ).fetchall()
-        canonical = conn.execute("SELECT count(*) FROM canonical_usage_events").fetchone()[0]
-    assert len(rows) == 2
-    assert len({row["usage_fingerprint"] for row in rows}) == 1
-    assert len({row["canonical_record_id"] for row in rows}) == 1
-    assert canonical == 1
-    assert [row["duplicate_reason"] for row in rows if row["is_duplicate"]] == [
-        "copied_usage_fingerprint"
-    ]
 
 
 def test_csv_export_keeps_current_columns_after_legacy_migration(tmp_path: Path) -> None:

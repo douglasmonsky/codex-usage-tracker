@@ -17,7 +17,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -36,20 +36,15 @@ MIGRATION_NAMES = {
     **compression_schema.MIGRATION_NAMES,
     **recommendation_schema.MIGRATION_NAMES,
     **schema_query_indexes.MIGRATION_NAMES,
-    24: "add canonical usage identity and deduplication",
+    **deduplication_schema.MIGRATION_NAMES,
 }
-CALL_ORIGIN_REPAIR_COLUMNS = {
-    "call_initiator": "TEXT",
-    "call_initiator_reason": "TEXT",
-    "call_initiator_confidence": "TEXT",
-}
+CALL_ORIGIN_REPAIR_COLUMNS: dict[str, str] = dict.fromkeys(
+    ("call_initiator", "call_initiator_reason", "call_initiator_confidence"), "TEXT"
+)
 DASHBOARD_HELPER_REPAIR_COLUMNS = {
     "is_archived": "INTEGER NOT NULL DEFAULT 0",
-    "thread_key": "TEXT",
     "thread_call_index": "INTEGER",
-    "previous_record_id": "TEXT",
-    "next_record_id": "TEXT",
-}
+} | dict.fromkeys(("thread_key", "previous_record_id", "next_record_id"), "TEXT")
 REQUIRED_USAGE_EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 
 
@@ -114,6 +109,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (22, schema_query_indexes.add_diagnostic_lookup_index),
         (23, schema_query_indexes.add_diagnostic_aggregate_index),
         (24, deduplication_schema.migrate_usage_deduplication),
+        (25, deduplication_schema.migrate_clone_rewritten_usage),
     )
 
 

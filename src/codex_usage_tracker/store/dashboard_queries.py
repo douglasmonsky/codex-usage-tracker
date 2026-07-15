@@ -184,9 +184,7 @@ def query_usage_status(
     active_where, active_params = usage_where_clause(include_archived=False)
     with connect(db_path) as conn:
         init_db(conn)
-        total_row = conn.execute(
-            "SELECT COUNT(*) AS count FROM canonical_usage_events"
-        ).fetchone()
+        total_row = conn.execute("SELECT COUNT(*) AS count FROM canonical_usage_events").fetchone()
         active_row = conn.execute(
             f"SELECT COUNT(*) AS count FROM canonical_usage_events {active_where}",
             active_params,

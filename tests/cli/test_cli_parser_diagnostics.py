@@ -42,3 +42,11 @@ def test_diagnostics_cli_parser_keeps_nested_subcommand_arguments() -> None:
     assert calls.sort == "tokens"
     assert calls.direction == "asc"
     assert calls.limit == 5
+
+
+def test_dedupe_diagnostics_cli_parser_is_explicit_and_bounded() -> None:
+    args = build_parser().parse_args(["dedupe-diagnostics", "--limit", "25", "--json"])
+
+    assert args.command == "dedupe-diagnostics"
+    assert args.limit == 25
+    assert args.as_json is True

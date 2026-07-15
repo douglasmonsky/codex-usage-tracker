@@ -4,12 +4,16 @@ from dataclasses import replace
 from pathlib import Path
 
 from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.recommendation_engine.materialization import (
+    backfill_recommendation_facts,
+)
 from codex_usage_tracker.store.api import connect, upsert_usage_events
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count,
     query_dashboard_events,
     query_dashboard_token_summary,
 )
+from codex_usage_tracker.store.dedupe_queries import query_dedupe_diagnostics
 from codex_usage_tracker.store.summary_queries import query_summary
 from codex_usage_tracker.store.usage_api_queries import (
     query_usage_api_event_count,
@@ -20,8 +24,21 @@ from codex_usage_tracker.store.usage_record_queries import query_most_expensive_
 
 def test_clone_copy_is_physical_but_not_billable(tmp_path: Path) -> None:
     original = _event("original", "/original.jsonl")
-    copied = replace(original, record_id="clone", session_id="clone", source_file="/clone.jsonl")
-    new = replace(copied, record_id="new", event_timestamp="2026-07-14T12:01:00Z")
+    copied = replace(
+        original,
+        record_id="clone",
+        session_id="clone",
+        source_file="/clone.jsonl",
+        event_timestamp="2026-07-14T12:01:00Z",
+        turn_timestamp="2026-07-14T12:01:00Z",
+    )
+    new = replace(
+        copied,
+        record_id="new",
+        event_timestamp="2026-07-14T12:02:00Z",
+        turn_id="new-turn",
+        turn_timestamp="2026-07-14T12:02:00Z",
+    )
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events([original, copied, new], db_path)
     with connect(db_path) as conn:
@@ -36,15 +53,33 @@ def test_clone_copy_is_physical_but_not_billable(tmp_path: Path) -> None:
 
 
 def test_source_replacement_promotes_surviving_copy(tmp_path: Path) -> None:
-    original = _event("original", "/original.jsonl")
+    original = replace(
+        _event("original", "/original.jsonl"),
+        rate_limit_primary_used_percent=10.0,
+        rate_limit_primary_window_minutes=300,
+    )
     copied = replace(original, record_id="copy", session_id="copy", source_file="/copy.jsonl")
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events([original, copied], db_path)
+    with connect(db_path) as conn:
+        backfill_recommendation_facts(conn)
     upsert_usage_events([], db_path, replace_source_files=[Path("/original.jsonl")])
     with connect(db_path) as conn:
         assert conn.execute("SELECT count(*) FROM canonical_usage_events").fetchone()[0] == 1
         row = conn.execute("SELECT is_duplicate, duplicate_reason FROM usage_events").fetchone()
+        allowance_record_ids = {
+            value[0] for value in conn.execute("SELECT record_id FROM allowance_observations")
+        }
+        recommendation_record_ids = {
+            value[0] for value in conn.execute("SELECT record_id FROM recommendation_facts")
+        }
+        recommendation_state = conn.execute(
+            "SELECT COUNT(*) FROM recommendation_fact_state"
+        ).fetchone()[0]
     assert tuple(row) == (0, None)
+    assert allowance_record_ids == {"copy"}
+    assert recommendation_record_ids == set()
+    assert recommendation_state == 0
 
 
 def test_default_usage_surfaces_exclude_copied_clone_rows(tmp_path: Path) -> None:
@@ -53,11 +88,20 @@ def test_default_usage_surfaces_exclude_copied_clone_rows(tmp_path: Path) -> Non
         rate_limit_primary_used_percent=10.0,
         rate_limit_primary_window_minutes=300,
     )
-    copied = replace(original, record_id="clone", session_id="clone", source_file="/clone.jsonl")
+    copied = replace(
+        original,
+        record_id="clone",
+        session_id="clone",
+        source_file="/clone.jsonl",
+        event_timestamp="2026-07-14T12:01:00Z",
+        turn_timestamp="2026-07-14T12:01:00Z",
+    )
     new = replace(
         copied,
         record_id="new",
-        event_timestamp="2026-07-14T12:01:00Z",
+        event_timestamp="2026-07-14T12:02:00Z",
+        turn_id="new-turn",
+        turn_timestamp="2026-07-14T12:02:00Z",
         total_tokens=125,
     )
     db_path = tmp_path / "usage.sqlite3"
@@ -71,6 +115,7 @@ def test_default_usage_surfaces_exclude_copied_clone_rows(tmp_path: Path) -> Non
     assert query_summary(db_path, group_by="model")[0]["model_calls"] == 2
     assert len(query_most_expensive_calls(db_path)) == 2
     with connect(db_path) as conn:
+        recommendation_rows = backfill_recommendation_facts(conn)
         active_threads = conn.execute(
             """
             SELECT SUM(call_count), SUM(total_tokens)
@@ -78,11 +123,28 @@ def test_default_usage_surfaces_exclude_copied_clone_rows(tmp_path: Path) -> Non
             WHERE is_archived_scope = 'active'
             """
         ).fetchone()
-        allowance_rows = conn.execute(
-            "SELECT COUNT(*) FROM allowance_observations"
-        ).fetchone()[0]
+        allowance_rows = conn.execute("SELECT COUNT(*) FROM allowance_observations").fetchone()[0]
     assert tuple(active_threads) == (2, 225)
     assert allowance_rows == 2
+    assert recommendation_rows == 2
+
+    diagnostics = query_dedupe_diagnostics(db_path, limit=10)
+    assert diagnostics["summary"] == {
+        "dedupe_enabled": True,
+        "fingerprint_version": "usage-fingerprint-v2",
+        "physical_rows": 3,
+        "canonical_rows": 2,
+        "excluded_copied_rows": 1,
+        "duplicate_fingerprint_groups": 1,
+        "physical_total_tokens": 325,
+        "excluded_total_tokens": 100,
+        "canonical_total_tokens": 225,
+        "duplicate_reasons": {"copied_usage_fingerprint": 1},
+    }
+    assert diagnostics["row_count"] == 1
+    assert diagnostics["rows"][0]["record_id"] == "clone"
+    assert diagnostics["rows"][0]["duplicate_of_record_id"] == "original"
+    assert diagnostics["rows"][0]["source_file"] == "/clone.jsonl"
 
 
 def _event(record_id: str, source_file: str) -> UsageEvent:

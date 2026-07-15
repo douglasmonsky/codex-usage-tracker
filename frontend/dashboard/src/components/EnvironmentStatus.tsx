@@ -54,8 +54,21 @@ function environmentStatusItems(
     pricingStatusItem(payload, shellI18n),
     allowanceStatusItem(payload, shellI18n),
     privacyStatusItem(payload, shellI18n),
+    dedupeStatusItem(payload),
     ...(parserDiagnostics ? [parserDiagnostics] : []),
   ];
+}
+
+function dedupeStatusItem(payload: DashboardBootPayload | null): EnvironmentStatusItem {
+  const summary = payload?.dedupe;
+  const excluded = Number(summary?.excluded_copied_rows || 0);
+  const canonical = Number(summary?.canonical_rows || 0);
+  const physical = Number(summary?.physical_rows || 0);
+  return {
+    label: `Deduped · ${excluded.toLocaleString()} copied excluded`,
+    state: 'ready',
+    title: `Billable totals use ${canonical.toLocaleString()} canonical rows while preserving ${physical.toLocaleString()} physical source rows.`,
+  };
 }
 
 function pricingStatusItem(payload: DashboardBootPayload | null, shellI18n: ShellI18n): EnvironmentStatusItem {

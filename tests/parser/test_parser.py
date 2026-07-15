@@ -536,31 +536,6 @@ def test_session_index_join_and_archived_log_discovery(tmp_path: Path) -> None:
     assert with_archived == [archive_log, session_log]
 
 
-def test_parser_assigns_canonical_identity_to_copied_usage(tmp_path: Path) -> None:
-    original_id = "019e374d-c19f-7da3-a44f-8de043a7a64e"
-    clone_id = "019e374d-c19f-7da3-a44f-8de043a7a64f"
-    original_path = tmp_path / f"rollout-2026-05-17T14-58-23-{original_id}.jsonl"
-    clone_path = tmp_path / f"rollout-2026-05-17T14-58-23-{clone_id}.jsonl"
-    copied = _token_event(100, 100)
-    copied["event_id"] = "evt-123"
-    new_event = _token_event(150, 50)
-    new_event["timestamp"] = "2026-05-17T18:59:27.000Z"
-    _write_jsonl(original_path, [_entry("session_meta", {"id": original_id}), copied])
-    _write_jsonl(
-        clone_path,
-        [_entry("session_meta", {"id": clone_id}), copied, new_event],
-    )
-
-    [original] = parse_usage_events_from_file(original_path)
-    copied_clone, new_clone = parse_usage_events_from_file(clone_path)
-
-    assert original.record_id != copied_clone.record_id
-    assert original.usage_fingerprint == copied_clone.usage_fingerprint
-    assert original.canonical_record_id == copied_clone.canonical_record_id
-    assert original.usage_fingerprint != new_clone.usage_fingerprint
-    assert original.upstream_usage_id == "envelope.event_id:evt-123"
-
-
 def _token_event(cumulative_total: int, last_total: int) -> dict[str, object]:
     return _entry(
         "event_msg",

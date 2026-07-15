@@ -7,13 +7,10 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-FINGERPRINT_VERSION = "usage-fingerprint-v1"
+FINGERPRINT_VERSION = "usage-fingerprint-v2"
 CANONICAL_ID_VERSION = "canonical-usage-v1"
 
 STRICT_IDENTITY_FIELDS = (
-    "event_timestamp",
-    "turn_id",
-    "turn_timestamp",
     "model",
     "effort",
     "model_context_window",
@@ -60,11 +57,19 @@ def extract_upstream_usage_id(
 def usage_identity_from_values(
     values: Mapping[str, object], *, upstream_usage_id: str | None = None
 ) -> UsageIdentity:
-    basis = (
-        {"upstream_usage_id": upstream_usage_id}
-        if upstream_usage_id
-        else {name: values.get(name) for name in STRICT_IDENTITY_FIELDS}
-    )
+    if upstream_usage_id:
+        basis = {"upstream_usage_id": upstream_usage_id}
+    else:
+        turn_id = values.get("turn_id")
+        temporal_identity = (
+            {"turn_id": turn_id}
+            if isinstance(turn_id, str) and turn_id.strip()
+            else {
+                "event_timestamp": values.get("event_timestamp"),
+                "turn_timestamp": values.get("turn_timestamp"),
+            }
+        )
+        basis = temporal_identity | {name: values.get(name) for name in STRICT_IDENTITY_FIELDS}
     digest = _sha256_json({"version": FINGERPRINT_VERSION, "basis": basis})
     fingerprint = f"{FINGERPRINT_VERSION}:{digest}"
     canonical = hashlib.sha256(f"{CANONICAL_ID_VERSION}|{fingerprint}".encode()).hexdigest()

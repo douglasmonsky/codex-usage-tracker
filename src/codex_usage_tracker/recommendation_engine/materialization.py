@@ -188,9 +188,7 @@ def _incremental_refresh_targets(
         return None
 
     fact_count = int(conn.execute("SELECT COUNT(*) FROM recommendation_facts").fetchone()[0])
-    usage_count = int(
-        conn.execute("SELECT COUNT(*) FROM canonical_usage_events").fetchone()[0]
-    )
+    usage_count = int(conn.execute("SELECT COUNT(*) FROM canonical_usage_events").fetchone()[0])
     missing_count = usage_count - fact_count
     if missing_count < 0 or missing_count > _TARGETED_FACT_REPAIR_LIMIT:
         return None

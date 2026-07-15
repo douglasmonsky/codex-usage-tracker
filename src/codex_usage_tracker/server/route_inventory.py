@@ -91,6 +91,17 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
     ),
     _profile(
         "GET",
+        "/api/diagnostics/dedupe",
+        "_handle_dedupe_diagnostics",
+        "server.dedupe",
+        "bounded_report",
+        "Aggregates canonical and physical usage rows, then lists bounded duplicate provenance.",
+        "Default 100 physical duplicate rows.",
+        "Live SQLite query over indexed dedupe fields; no response cache.",
+        may_scan_all_history=True,
+    ),
+    _profile(
+        "GET",
         "/api/calls",
         "_handle_calls",
         "server.call_lists",

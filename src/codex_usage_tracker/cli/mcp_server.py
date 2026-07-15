@@ -34,6 +34,9 @@ from codex_usage_tracker.cli.mcp_dashboard import (
     usage_dashboard_recommendations as usage_dashboard_recommendations,
 )
 from codex_usage_tracker.cli.mcp_dashboard import (
+    usage_dedupe_diagnostics as usage_dedupe_diagnostics,
+)
+from codex_usage_tracker.cli.mcp_dashboard import (
     usage_report_pack as usage_report_pack,
 )
 from codex_usage_tracker.cli.mcp_dashboard import (
@@ -156,8 +159,7 @@ from codex_usage_tracker.reports.api import (
 from codex_usage_tracker.server.usage_refresh import RefreshJobRegistry
 from codex_usage_tracker.store import api as store_api
 
-_REFRESH_JOB_REGISTRY = RefreshJobRegistry()
-_REFRESH_JOB_LOCK = threading.Lock()
+_REFRESH_JOB_REGISTRY, _REFRESH_JOB_LOCK = RefreshJobRegistry(), threading.Lock()
 usage_allowance_diagnostics = _mcp_allowance.usage_allowance_diagnostics
 usage_allowance_export = _mcp_allowance.usage_allowance_export
 usage_allowance_history = _mcp_allowance.usage_allowance_history
