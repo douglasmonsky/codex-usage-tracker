@@ -48,3 +48,23 @@ Result: passed.
 ## Concerns
 
 - Sparse history remains descriptive/observed-only by design. The sufficient-history synthetic fixture exercises calculated pace scenarios, residual quantiles, MAE/RMSE, 50/80/95 coverage, all four baseline comparisons, and the validated gate.
+
+## Correctness fix wave RED/GREEN
+
+RED command:
+
+```bash
+PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/allowance_intelligence/test_estimation.py -q
+```
+
+Result: failed: an explicitly open cycle was counted as completed calibration evidence and completed-cycle test expectations failed.
+
+GREEN command:
+
+```bash
+PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/allowance_intelligence/test_estimation.py tests/allowance_intelligence/test_allowance_intelligence.py tests/allowance_intelligence/test_service.py -q
+```
+
+Result: `29 passed in 0.47s` before formatting-only cleanup.
+
+The fix requires explicit `status == "completed"` plus quality approval before a cycle may enter calibration. Dense/open cycles cannot influence the cycle-capped completed capacity summary.
