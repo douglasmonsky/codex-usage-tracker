@@ -70,7 +70,8 @@ def test_dashboard_compression_routes_share_persistent_application_job(
 
     assert forbidden["status"] == 403
     assert missing["schema"] == "codex-usage-tracker-compression-api-v1"
-    assert missing["error"]["code"] == "compression_run_not_found"
+    missing_error = cast(dict[str, object], missing["error"])
+    assert missing_error["code"] == "compression_run_not_found"
     assert started["schema"] == "codex-usage-tracker-compression-api-v1"
     assert started["kind"] == "status"
     assert completed["status"] in {"completed", "completed_with_warnings"}

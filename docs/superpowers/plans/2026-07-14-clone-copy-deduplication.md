@@ -136,7 +136,7 @@ Expected: collection fails because `codex_usage_tracker.core.usage_identity` doe
 Implement `UsageIdentity`, fixed `STRICT_IDENTITY_FIELDS`, recognized paths for only `usage_id`, `event_id`, and `call_id`, canonical JSON with `sort_keys=True` and compact separators, and SHA-256 helpers. The public implementation must follow this shape:
 
 ```python
-FINGERPRINT_VERSION = "usage-fingerprint-v1"
+FINGERPRINT_VERSION = "usage-fingerprint-v2"
 CANONICAL_ID_VERSION = "canonical-usage-v1"
 
 
@@ -425,7 +425,7 @@ Assert the summary payload equals this additive shape for the original/copy/new 
 ```python
 {
     "dedupe_enabled": True,
-    "fingerprint_version": "usage-fingerprint-v1",
+    "fingerprint_version": "usage-fingerprint-v2",
     "physical_rows": 3,
     "canonical_rows": 2,
     "excluded_copied_rows": 1,

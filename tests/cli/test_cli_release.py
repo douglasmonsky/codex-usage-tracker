@@ -74,6 +74,7 @@ MCP_TOOL_NAMES = {
     "usage_summary",
     "usage_query",
     "usage_status",
+    "usage_dedupe_diagnostics",
     "usage_calls",
     "usage_call_detail",
     "usage_threads",

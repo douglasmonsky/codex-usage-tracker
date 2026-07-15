@@ -108,9 +108,23 @@ rows?: UsageRow[];
   rate_card_configured?: boolean;
   rate_card_error?: string;
   parser_diagnostics?: Record<string, number>;
+  dedupe?: DedupeSummary;
   project_metadata_privacy?: ProjectMetadataPrivacy;
   privacy_mode?: string;
 shell_boot?: boolean;
+};
+
+export type DedupeSummary = {
+  dedupe_enabled?: boolean;
+  fingerprint_version?: string;
+  physical_rows?: number;
+  canonical_rows?: number;
+  excluded_copied_rows?: number;
+  duplicate_fingerprint_groups?: number;
+  physical_total_tokens?: number;
+  excluded_total_tokens?: number;
+  canonical_total_tokens?: number;
+  duplicate_reasons?: Record<string, number>;
 };
 
 export type DashboardLanguage = {

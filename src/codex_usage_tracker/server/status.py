@@ -18,6 +18,7 @@ from codex_usage_tracker.store.api import (
     query_usage_status,
     refresh_metadata,
 )
+from codex_usage_tracker.store.dedupe_queries import query_dedupe_diagnostics
 
 ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
@@ -64,6 +65,7 @@ def status_payload(
         db_path=db_path,
         include_archived=include_archived,
     )
+    dedupe = query_dedupe_diagnostics(db_path=db_path, limit=0)["summary"]
     metadata = refresh_metadata(db_path)
     parser_diagnostics = {
         key.removeprefix("parser_"): safe_int(value)
@@ -78,6 +80,7 @@ def status_payload(
         "row_counts": counts,
         "max_event_timestamp": counts.get("max_event_timestamp"),
         "observed_usage": observed_usage,
+        "dedupe": dedupe,
         "parser_adapter": metadata.get("parser_adapter"),
         "parser_diagnostics": parser_diagnostics,
     }

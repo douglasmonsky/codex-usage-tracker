@@ -89,6 +89,11 @@ def test_status_payload_normalizes_include_archived_and_metadata(
     monkeypatch.setattr(server_status, "query_latest_observed_usage", query_observed)
     monkeypatch.setattr(
         server_status,
+        "query_dedupe_diagnostics",
+        lambda **kwargs: {"summary": {"excluded_copied_rows": 2}},
+    )
+    monkeypatch.setattr(
+        server_status,
         "refresh_metadata",
         lambda db_path: {
             "latest_refresh_at": "2026-06-01T01:00:00Z",
@@ -112,6 +117,7 @@ def test_status_payload_normalizes_include_archived_and_metadata(
     assert payload["observed_usage"] == {"weekly_percent": 37}
     assert payload["parser_adapter"] == "jsonl"
     assert payload["parser_diagnostics"] == {"skipped_events": 3}
+    assert payload["dedupe"] == {"excluded_copied_rows": 2}
 
 
 def test_status_payload_uses_include_archived_default(
@@ -126,6 +132,11 @@ def test_status_payload_uses_include_archived_default(
 
     monkeypatch.setattr(server_status, "query_usage_status", query_status)
     monkeypatch.setattr(server_status, "query_latest_observed_usage", lambda **kwargs: {})
+    monkeypatch.setattr(
+        server_status,
+        "query_dedupe_diagnostics",
+        lambda **kwargs: {"summary": {"excluded_copied_rows": 0}},
+    )
     monkeypatch.setattr(server_status, "refresh_metadata", lambda db_path: {})
 
     payload = server_status.status_payload(

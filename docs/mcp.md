@@ -116,6 +116,7 @@ the highest-token thread summaries instead.
 - `usage_summary`
 - `usage_query`
 - `usage_status`
+- `usage_dedupe_diagnostics`
 - `usage_calls`
 - `usage_call_detail`
 - `usage_threads`
@@ -169,6 +170,7 @@ the highest-token thread summaries instead.
 Dashboard-shaped MCP tools return JSON dictionaries that reuse the same aggregate schemas as the local React dashboard API:
 
 - `usage_status()` mirrors `/api/status`.
+- `usage_dedupe_diagnostics(limit=100)` reports canonical versus physical rows and lists bounded aggregate/source provenance for copied clone rows excluded from totals. It never returns transcript content.
 - `usage_calls(...)` mirrors `/api/calls`, including filters, pagination, `total_matched_rows`, `has_more`, and `next_offset`.
 - `usage_call_detail(record_id=...)` mirrors `/api/call` for aggregate Call Investigator data without raw transcript context.
 - `usage_threads(...)` mirrors `/api/threads`.

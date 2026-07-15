@@ -12,9 +12,7 @@ from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker.core.i18n import normalize_language
-from codex_usage_tracker.core.paths import (
-    DEFAULT_RATE_CARD_PATH,
-)
+from codex_usage_tracker.core.paths import DEFAULT_RATE_CARD_PATH
 from codex_usage_tracker.server import allowance, compression_routes
 from codex_usage_tracker.server import context as server_context
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
@@ -34,6 +32,7 @@ from codex_usage_tracker.server.dashboard_pages import (
     _REACT_DASHBOARD_PATH,
     DashboardPageMixin,
 )
+from codex_usage_tracker.server.dedupe import DedupeRouteMixin
 from codex_usage_tracker.server.diagnostic_routes import DiagnosticRouteMixin
 from codex_usage_tracker.server.investigations import (
     InvestigationKind,
@@ -72,6 +71,7 @@ from codex_usage_tracker.server.threads import handle_threads_request
 class _UsageDashboardHandler(
     compression_routes.CompressionRouteMixin,
     DiagnosticRouteMixin,
+    DedupeRouteMixin,
     DashboardPageMixin,
 ):
     def __init__(

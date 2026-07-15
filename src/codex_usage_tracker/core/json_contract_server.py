@@ -105,6 +105,7 @@ SERVER_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "row_counts": dict,
             "max_event_timestamp": (str, NoneType),
             "parser_diagnostics": dict,
+            "dedupe": dict,
         }
     },
     "codex-usage-tracker-calls-v1": {

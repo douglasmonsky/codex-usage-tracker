@@ -8,6 +8,21 @@ from collections.abc import Iterable
 from codex_usage_tracker.core.usage_identity import usage_identity_from_values
 
 
+def fingerprints_for_source_files(conn: sqlite3.Connection, source_files: list[str]) -> set[str]:
+    """Return fingerprints that may need a new representative after replacement."""
+
+    if not source_files:
+        return set()
+    placeholders = ", ".join("?" for _ in source_files)
+    return {
+        str(row[0])
+        for row in conn.execute(
+            f"SELECT DISTINCT usage_fingerprint FROM usage_events WHERE source_file IN ({placeholders}) AND usage_fingerprint IS NOT NULL",  # nosec B608
+            source_files,
+        )
+    }
+
+
 def classify_usage_rows(
     conn: sqlite3.Connection, rows: list[dict[str, object]]
 ) -> list[dict[str, object]]:
@@ -37,7 +52,8 @@ def classify_usage_rows(
 
 def promote_orphaned_fingerprints(
     conn: sqlite3.Connection, fingerprints: Iterable[str]
-) -> set[str]:
+) -> tuple[set[str], set[str]]:
+    record_ids: set[str] = set()
     keys: set[str] = set()
     for fingerprint in set(fingerprints):
         representative = conn.execute(
@@ -58,8 +74,23 @@ def promote_orphaned_fingerprints(
                 "WHERE record_id = ?",
                 (row["record_id"],),
             )
+            record_ids.add(str(row["record_id"]))
             keys.add(str(row["thread_key"] or f"session:{row['session_id']}"))
-    return keys
+    if record_ids:
+        _sync_promoted_derivatives(conn, record_ids)
+    return record_ids, keys
+
+
+def _sync_promoted_derivatives(conn: sqlite3.Connection, record_ids: set[str]) -> None:
+    from codex_usage_tracker.store.allowance_observations import (
+        sync_allowance_observations_for_record_ids,
+    )
+    from codex_usage_tracker.store.recommendation_schema import (
+        invalidate_recommendation_fact_tables,
+    )
+
+    sync_allowance_observations_for_record_ids(conn, sorted(record_ids))
+    invalidate_recommendation_fact_tables(conn)
 
 
 def _string(value: object) -> str | None:

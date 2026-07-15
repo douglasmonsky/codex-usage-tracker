@@ -47,11 +47,23 @@ def test_strict_identity_ignores_physical_session_and_source_fields() -> None:
     assert original.usage_fingerprint.startswith(f"{FINGERPRINT_VERSION}:")
 
 
-def test_equal_tokens_with_different_timestamp_do_not_match() -> None:
+def test_clone_rewritten_timestamps_match_when_turn_id_is_stable() -> None:
     assert (
         usage_identity_from_values(_values()).usage_fingerprint
+        == usage_identity_from_values(
+            _values(
+                event_timestamp="2026-07-14T12:01:00Z",
+                turn_timestamp="2026-07-14T12:01:00Z",
+            )
+        ).usage_fingerprint
+    )
+
+
+def test_equal_tokens_with_different_timestamp_do_not_match_without_turn_id() -> None:
+    assert (
+        usage_identity_from_values(_values(turn_id=None)).usage_fingerprint
         != usage_identity_from_values(
-            _values(event_timestamp="2026-07-14T12:01:00Z")
+            _values(turn_id=None, event_timestamp="2026-07-14T12:01:00Z")
         ).usage_fingerprint
     )
 
