@@ -32,6 +32,81 @@ test.describe('overview evidence workspace', () => {
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
   });
 
+  test('keeps token-flow labels and virtual-row actions inside constrained desktop layouts', async ({ page }) => {
+    for (const viewport of [
+      { width: 1280, stacked: true },
+      { width: 1321, stacked: false },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: 900 });
+      await page.goto(`/?view=overview&qa=overview-layout-${viewport.width}`);
+      await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+
+      const charts = page.getByTestId('visualization-chart');
+      await expect(charts).toHaveCount(2);
+      const chartBounds = await charts.evaluateAll(elements => elements.map(element => {
+        const rect = element.getBoundingClientRect();
+        return { bottom: rect.bottom, height: rect.height, left: rect.left, right: rect.right, top: rect.top };
+      }));
+      if (viewport.stacked) {
+        expect(chartBounds[1].top).toBeGreaterThanOrEqual(chartBounds[0].bottom - 2);
+      } else {
+        expect(chartBounds[1].top).toBeLessThan(chartBounds[0].bottom - 2);
+        expect(chartBounds[1].left).toBeGreaterThanOrEqual(chartBounds[0].right - 2);
+      }
+    }
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const flowChart = page.getByTestId('visualization-chart').nth(1);
+    await expect(flowChart.locator('svg')).toBeVisible();
+    const flowContract = await flowChart.evaluate(element => {
+      const svg = element.querySelector('svg');
+      if (!svg) throw new Error('Token-flow SVG was not rendered.');
+      const svgBounds = svg.getBoundingClientRect();
+      const labels = [...svg.querySelectorAll('text')]
+        .map(label => {
+          const rect = label.getBoundingClientRect();
+          return { bottom: rect.bottom, left: rect.left, right: rect.right, text: label.textContent?.trim(), top: rect.top };
+        })
+        .filter(label => label.text);
+      const collisions = labels.flatMap((label, index) => labels.slice(index + 1).filter(other => (
+        Math.min(label.right, other.right) - Math.max(label.left, other.left) > 1
+        && Math.min(label.bottom, other.bottom) - Math.max(label.top, other.top) > 1
+      )).map(other => `${label.text}:${other.text}`));
+      return {
+        chartHeight: element.getBoundingClientRect().height,
+        collisions,
+        labelCount: labels.length,
+        labelsInsideSvg: labels.every(label => (
+          label.left >= svgBounds.left - 1
+          && label.right <= svgBounds.right + 1
+          && label.top >= svgBounds.top - 1
+          && label.bottom <= svgBounds.bottom + 1
+        )),
+      };
+    });
+    expect(flowContract.chartHeight).toBeGreaterThanOrEqual(319);
+    expect(flowContract.labelCount).toBeGreaterThan(1);
+    expect(flowContract.labelsInsideSvg).toBe(true);
+    expect(flowContract.collisions).toEqual([]);
+
+    const actionGroup = page.getByRole('table', { name: 'Overview calls' }).locator('.table-action-group').first();
+    await expect(actionGroup).toBeVisible();
+    const actionContract = await actionGroup.evaluate(element => {
+      const row = element.closest('tr');
+      if (!row) throw new Error('Action group is not inside a table row.');
+      const actions = element.getBoundingClientRect();
+      const rowBounds = row.getBoundingClientRect();
+      return {
+        actionBounds: { bottom: actions.bottom, height: actions.height, left: actions.left, right: actions.right, top: actions.top },
+        flexWrap: getComputedStyle(element).flexWrap,
+        insideRow: actions.right <= rowBounds.right + 1 && actions.top >= rowBounds.top - 1 && actions.bottom <= rowBounds.bottom + 1,
+        rowBounds: { bottom: rowBounds.bottom, height: rowBounds.height, left: rowBounds.left, right: rowBounds.right, top: rowBounds.top },
+      };
+    });
+    expect(actionContract.flexWrap).toBe('nowrap');
+    expect(actionContract.insideRow, JSON.stringify(actionContract)).toBe(true);
+  });
+
   test('places overview summary in the initial mobile viewport without document overflow', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?view=overview&qa=r5-mobile-answer');

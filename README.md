@@ -189,12 +189,12 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
-- `Overview`, `Investigate`, `Calls`, `Threads`, `Limits`, and `Diagnostics` dashboard views, including evidence-graded weekly allowance analysis and on-demand usage-drain report runs.
+- `Overview`, `Investigate`, `Calls`, `Threads`, `Limits`, and `Diagnostics` dashboard views, including responsive token-flow visualization, evidence-graded weekly allowance analysis, and on-demand usage-drain report runs.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
 - Companion Codex skills for operational setup and conversational usage analysis.
-- Optional local pricing, Codex credit, allowance, threshold, project alias, and privacy-mode configuration.
+- Optional local pricing, Codex credit, allowance, threshold, project alias, and privacy-mode configuration, including per-call long-context pricing above 272K input tokens for OpenAI service tiers that publish long-context rates.
 
 ## Dashboard Language
 

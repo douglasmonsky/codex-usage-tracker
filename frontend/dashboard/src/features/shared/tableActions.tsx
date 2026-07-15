@@ -38,7 +38,8 @@ export function callActionColumn({
   return {
     id: 'investigate',
     header: 'Investigate',
-    size: 260,
+    minSize: 276,
+    size: 276,
     enableSorting: false,
     cell: info => (
       <CallActionCell
@@ -58,7 +59,8 @@ export function threadActionColumn({
   return {
     id: 'investigate',
     header: 'Investigate',
-    size: 260,
+    minSize: 276,
+    size: 276,
     enableSorting: false,
     cell: info => (
       <ThreadActionCell

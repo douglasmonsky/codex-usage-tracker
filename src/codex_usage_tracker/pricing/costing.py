@@ -123,6 +123,11 @@ def estimate_cost_usd(
     if input_rate is None or cached_rate is None or output_rate is None:
         return None
 
+    input_multiplier, output_multiplier = _long_context_multipliers(row, rates)
+    input_rate *= input_multiplier
+    cached_rate *= input_multiplier
+    output_rate *= output_multiplier
+
     cached_input = _number(row.get("cached_input_tokens"))
     uncached_input = _number(row.get("uncached_input_tokens"))
     if uncached_input <= 0:
@@ -146,7 +151,28 @@ def estimate_cache_savings_usd(
     cached_rate = rates.get("cached_input_per_million")
     if input_rate is None or cached_rate is None or cached_rate >= input_rate:
         return None
+    input_multiplier, _ = _long_context_multipliers(row, rates)
+    input_rate *= input_multiplier
+    cached_rate *= input_multiplier
     return (_number(row.get("cached_input_tokens")) * (input_rate - cached_rate)) / 1_000_000
+
+
+def _long_context_multipliers(
+    row: dict[str, Any], rates: dict[str, float]
+) -> tuple[float, float]:
+    """Return official long-context multipliers for one concrete call row."""
+
+    threshold = rates.get("long_context_threshold_tokens")
+    if (
+        threshold is None
+        or "record_id" not in row
+        or _number(row.get("input_tokens")) <= threshold
+    ):
+        return 1.0, 1.0
+    return (
+        rates.get("long_context_input_multiplier", 1.0),
+        rates.get("long_context_output_multiplier", 1.0),
+    )
 
 
 def efficiency_flags(row: dict[str, Any]) -> list[str]:
