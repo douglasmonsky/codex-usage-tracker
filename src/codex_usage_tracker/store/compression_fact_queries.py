@@ -77,14 +77,14 @@ def fold_compression_detector_facts(
             return metadata
         _fold_query(
             conn,
-            _scoped_sql(_RECORD_FACTS_SQL, "r", scoped=scoped),
+            _fact_scope_sql(_RECORD_FACTS_SQL, "r", scoped=scoped),
             category="records",
             batch_size=batch_size,
             consumer=consumer,
         )
         _fold_query(
             conn,
-            _scoped_sql(_SEQUENCE_FACTS_SQL, "s", scoped=scoped),
+            _fact_scope_sql(_SEQUENCE_FACTS_SQL, "s", scoped=scoped),
             category="sequences",
             batch_size=batch_size,
             consumer=consumer,
@@ -105,6 +105,17 @@ def _fold_query(
         consumer(category, rows)
 
 
+def _fact_scope_sql(sql: str, alias: str, *, scoped: bool) -> str:
+    if scoped:
+        return _scoped_sql(sql, alias, scoped=True)
+    return sql.format(
+        scope_join=(
+            "JOIN canonical_usage_events AS canonical "
+            f"ON canonical.record_id = {alias}.record_id"
+        )
+    )
+
+
 def _fact_metadata(conn: sqlite3.Connection, *, scoped: bool) -> dict[str, Any]:
     expected_count = conn.execute(
         "SELECT COUNT(*) FROM compression_scope_records"
@@ -112,7 +123,7 @@ def _fact_metadata(conn: sqlite3.Connection, *, scoped: bool) -> dict[str, Any]:
         else "SELECT COUNT(*) FROM canonical_usage_events"
     ).fetchone()[0]
     row = conn.execute(
-        _scoped_sql(_COVERAGE_SQL, "r", scoped=scoped),
+        _fact_scope_sql(_COVERAGE_SQL, "r", scoped=scoped),
         (COMPRESSION_FACTS_VERSION,),
     ).fetchone()
     state = conn.execute(
