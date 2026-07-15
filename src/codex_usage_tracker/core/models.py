@@ -66,6 +66,11 @@ class UsageEvent:
     rate_limit_secondary_used_percent: float | None = None
     rate_limit_secondary_window_minutes: int | None = None
     rate_limit_secondary_resets_at: int | None = None
+    upstream_usage_id: str | None = None
+    usage_fingerprint: str | None = None
+    canonical_record_id: str | None = None
+    is_duplicate: int = 0
+    duplicate_reason: str | None = None
 
     @property
     def uncached_input_tokens(self) -> int:

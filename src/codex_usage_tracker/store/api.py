@@ -86,6 +86,7 @@ from codex_usage_tracker.store.schema import (
     SchemaMigrationError,
     init_db,
 )
+from codex_usage_tracker.store.deduplication import classify_usage_rows, promote_orphaned_fingerprints
 from codex_usage_tracker.store.source_records import (
     query_source_record_coverage as query_source_record_coverage,
 )
@@ -564,11 +565,13 @@ def _upsert_usage_events_in_connection(
     fact_rows = _diagnostic_fact_rows(diagnostic_facts)
     source_files_to_replace = _source_file_strings(replace_source_files)
     affected_thread_keys = _thread_keys_for_source_files(conn, source_files_to_replace)
+    replaced_fingerprints = _fingerprints_for_source_files(conn, source_files_to_replace)
     _delete_usage_events_for_source_files(
         conn,
         source_files_to_replace,
         sync_content_fts=sync_content_fts_on_replace,
     )
+    affected_thread_keys.update(promote_orphaned_fingerprints(conn, replaced_fingerprints))
     if not rows:
         _refresh_after_empty_source_replacement(
             conn,
@@ -677,6 +680,13 @@ def _usage_event_record_ids(rows: list[dict[str, object]]) -> list[str]:
     return [str(row["record_id"]) for row in rows]
 
 
+def _fingerprints_for_source_files(conn: sqlite3.Connection, source_files: list[str]) -> set[str]:
+    if not source_files:
+        return set()
+    placeholders = ", ".join("?" for _ in source_files)
+    return {str(row[0]) for row in conn.execute(f"SELECT DISTINCT usage_fingerprint FROM usage_events WHERE source_file IN ({placeholders}) AND usage_fingerprint IS NOT NULL", source_files)}
+
+
 def _usage_event_upsert_sql() -> str:
     placeholders = ", ".join("?" for _column in EVENT_COLUMNS)
     update_clause = ", ".join(
@@ -693,6 +703,7 @@ def _insert_usage_event_rows(
     conn: sqlite3.Connection,
     rows: list[dict[str, object]],
 ) -> None:
+    rows = classify_usage_rows(conn, rows)
     conn.executemany(
         _usage_event_upsert_sql(),
         [[row[column] for column in EVENT_COLUMNS] for row in rows],
