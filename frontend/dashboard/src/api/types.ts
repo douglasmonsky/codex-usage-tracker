@@ -487,6 +487,70 @@ export type AllowanceStatusWindow = {
   canonical_source_revision: string | null;
 };
 
+export type AllowanceCapacityEstimate = {
+  status: 'validated' | 'descriptive';
+  credits_per_percent: number | null;
+  total_ratio_credits_per_percent: number | null;
+  robust_median_credits_per_percent: number | null;
+  iqr_credits_per_percent: number | null;
+  completed_cycle_count: number;
+  eligible_interval_count: number;
+  price_coverage: number;
+  unexplained_movement_share: number | null;
+  prior_only_errors: Record<string, unknown>;
+  cycle_weight_cap: number;
+};
+
+export type AllowanceUsageEstimate = {
+  used_percent: number | null;
+  clipped: boolean;
+  reason: string | null;
+  observed_at?: string;
+  post_observation_credits?: number;
+};
+
+export type AllowanceForecastEstimate = {
+  used_percent: number | null;
+  reason: string | null;
+  sample_size?: number;
+  quantiles: { p10: number; p50: number; p90: number } | null;
+};
+
+export type AllowanceValidation = {
+  status: 'validated' | 'descriptive';
+  sample_size: number;
+  evaluation_horizon?: 'time_ordered_holdout';
+  calibration_window?: 'strictly_earlier_completed_cycles';
+  median_absolute_error: number | null;
+  mean_absolute_error: number | null;
+  rmse: number | null;
+  holdout: { sample_size: number; [key: string]: unknown };
+  [key: string]: unknown;
+};
+
+export type AllowancePaceScenarios = {
+  status: 'conditional' | 'observed_only';
+  reason: string | null;
+  if_current_pace_continues: number | null;
+  sample_count: number;
+  unit: 'percent_per_hour';
+  low?: number | null;
+  high?: number | null;
+  contributing_windows?: Record<string, unknown>;
+};
+
+export type AllowanceEstimation = {
+  model_version: 'reset-aware-v2';
+  window_kind: 'weekly';
+  capacity: AllowanceCapacityEstimate;
+  coverage_gaps: { missing_pricing_interval_count: number; eligible_interval_count: number };
+  reconstructions: Record<string, unknown>[];
+  weekly_estimate: AllowanceUsageEstimate;
+  forecast: AllowanceForecastEstimate;
+  validation: AllowanceValidation;
+  pace_scenarios: AllowancePaceScenarios;
+};
+
 export type AllowanceStatusPayload = {
   schema: 'codex-usage-tracker-allowance-status-v2';
   revision: string;
@@ -499,7 +563,7 @@ export type AllowanceStatusPayload = {
   data_state?: AllowanceDataState;
   weekly?: AllowanceStatusWindow | null;
   five_hour?: AllowanceStatusWindow | null;
-  estimation?: Record<string, unknown>;
+  estimation?: AllowanceEstimation;
   quality: AllowanceDedupeQuality;
   cohorts?: {
     selected: Record<string, unknown>;
@@ -584,6 +648,21 @@ export type AllowanceAnalysisPayload = {
   forecast_horizon?: number;
   parameters: { min_cycles_per_side: number; permutation_count: number };
   quality?: AllowanceDedupeQuality;
+  detector_version?: string;
+  selection_correction?: string;
+  eligible_cycle_count?: number;
+  excluded_cycle_count?: number;
+  candidate_count?: number;
+  reason?: string | null;
+  adjusted_p_value?: number | null;
+  effect_size?: {
+    median_before_credits_per_percent: number;
+    median_after_credits_per_percent: number;
+    median_shift_credits_per_percent: number;
+    cliffs_delta: number;
+  } | null;
+  confidence_interval?: { low: number; high: number; confidence_level?: number } | null;
+  caveats?: string[];
   next?: { action: 'start_analysis_job' };
   [key: string]: unknown;
 };

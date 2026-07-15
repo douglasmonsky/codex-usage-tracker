@@ -54,22 +54,39 @@ describe('Limits live evidence flow', () => {
     );
 
     expect(screen.getByRole('progressbar', { name: 'Loading allowance intelligence' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Canonical live status')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Canonical usage')).toBeInTheDocument());
     await waitFor(() => expect(
       screen.queryByRole('progressbar', { name: 'Loading allowance intelligence' }),
     ).not.toBeInTheDocument());
-    expect(screen.getByRole('heading', { name: 'No weekly regime change detected' })).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'Allowance evidence windows and linked calls' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '40%' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No supported capacity shift' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Latest-first allowance intelligence evidence' })).toBeInTheDocument();
 
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/history'))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/diagnostics'))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/series?range_preset=8w'))).toBe(true);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/evidence?limit=100'))).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh evidence' }));
+    fireEvent.click(screen.getAllByTitle('Open source call')[0]);
+    expect(openCall).toHaveBeenCalledWith('rec-new');
+    fireEvent.click(screen.getAllByTitle('Copy source call link')[0]);
+    expect(copyCall).toHaveBeenCalledWith('rec-new');
+
+    fireEvent.click(screen.getByRole('button', { name: '6m' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
+      String(input).includes('/api/allowance/series?range_preset=6m')
+    ))).toBe(true));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Granularity' }), { target: { value: 'day' } });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
+      String(input).includes('granularity=day')
+    ))).toBe(true));
+
+    const seriesCallsBeforeStatusCheck = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series')).length;
+    const evidenceCallsBeforeStatusCheck = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')).length;
+    fireEvent.click(screen.getByRole('button', { name: 'Check for new data' }));
     await waitFor(() => expect(screen.getByText('Allowance status checked')).toBeInTheDocument());
-    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series')).length).toBe(1);
-    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')).length).toBe(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series')).length).toBe(seriesCallsBeforeStatusCheck);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')).length).toBe(evidenceCallsBeforeStatusCheck);
 
     fireEvent.click(screen.getByRole('button', { name: 'Export evidence' }));
     await waitFor(() => expect(anchorClick).toHaveBeenCalledTimes(1));
@@ -111,7 +128,7 @@ describe('Limits live evidence flow', () => {
     await waitFor(() => expect(
       screen.queryByRole('progressbar', { name: 'Loading allowance intelligence' }),
     ).not.toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh evidence' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check for new data' }));
     await waitFor(() => expect(
       fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')),
     ).toHaveLength(2));
@@ -125,6 +142,22 @@ function statusPayload(revision = 'allowance-revision-1') {
     revision,
     changed: true,
     data_state: 'fresh',
+    data_as_of: '2026-07-15T10:00:00Z',
+    weekly: {
+      cohort_id: 'codex',
+      used_percent: 40,
+      remaining_percent: 60,
+      reset_at: null,
+      reset_countdown_seconds: null,
+      observed_at: '2026-07-15T10:00:00Z',
+      age_seconds: 7200,
+      freshness: 'fresh',
+      status: 'observed',
+      pricing_coverage: 1,
+      quality: 'good',
+      canonical_source_revision: revision,
+    },
+    five_hour: null,
     quality: { canonical: true, copied_rows_excluded: 2 },
     next: { action: 'poll_status', poll_after_seconds: 30 },
   };
@@ -154,7 +187,18 @@ function evidencePayload() {
     generated_at: '2026-07-10T12:00:00Z',
     revision: 'allowance-revision-1',
     privacy_mode: 'local',
-    rows: [],
+    rows: [
+      {
+        interval_id: 'older', cycle_id: 'cycle-1', window_kind: 'weekly', cohort_key: 'codex',
+        end_observed_at: '2026-07-01T00:00:00Z', end_used_percent: 20, point_kind: 'positive', censor_reason: null,
+        end_record_id: 'rec-old',
+      },
+      {
+        interval_id: 'newer', cycle_id: 'cycle-2', window_kind: 'weekly', cohort_key: 'codex',
+        end_observed_at: '2026-07-15T00:00:00Z', end_used_percent: 40, point_kind: 'positive', censor_reason: null,
+        end_record_id: 'rec-new',
+      },
+    ],
     next_cursor: null,
     copied_rows_excluded: 2,
     provenance: 'local',
