@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import codex_usage_tracker.store.compression_schema as compression_schema
 import codex_usage_tracker.store.recommendation_schema as recommendation_schema
 import codex_usage_tracker.store.schema_query_indexes as schema_query_indexes
+import codex_usage_tracker.store.deduplication_schema as deduplication_schema
 from codex_usage_tracker.core.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_CREATE_COLUMNS_SQL,
@@ -16,7 +17,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -35,6 +36,7 @@ MIGRATION_NAMES = {
     **compression_schema.MIGRATION_NAMES,
     **recommendation_schema.MIGRATION_NAMES,
     **schema_query_indexes.MIGRATION_NAMES,
+    24: "add canonical usage identity and deduplication",
 }
 CALL_ORIGIN_REPAIR_COLUMNS = {
     "call_initiator": "TEXT",
@@ -111,6 +113,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (21, recommendation_schema.add_recommendation_thread_summaries),
         (22, schema_query_indexes.add_diagnostic_lookup_index),
         (23, schema_query_indexes.add_diagnostic_aggregate_index),
+        (24, deduplication_schema.migrate_usage_deduplication),
     )
 
 
