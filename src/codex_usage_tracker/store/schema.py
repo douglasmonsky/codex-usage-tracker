@@ -7,9 +7,9 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 import codex_usage_tracker.store.compression_schema as compression_schema
+import codex_usage_tracker.store.deduplication_schema as deduplication_schema
 import codex_usage_tracker.store.recommendation_schema as recommendation_schema
 import codex_usage_tracker.store.schema_query_indexes as schema_query_indexes
-import codex_usage_tracker.store.deduplication_schema as deduplication_schema
 from codex_usage_tracker.core.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_CREATE_COLUMNS_SQL,
