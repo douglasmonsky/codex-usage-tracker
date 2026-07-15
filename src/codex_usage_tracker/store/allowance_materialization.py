@@ -47,10 +47,14 @@ def _materialize(conn: sqlite3.Connection, now: datetime) -> bool:
     changed = old is None or str(old[0]) != revision
     if not changed:
         return False
-    existing_epochs = [
-        row[0]
-        for row in conn.execute("SELECT reset_at FROM allowance_cycles WHERE reset_at IS NOT NULL")
-    ]
+    existing_epochs: dict[tuple[bool, str, str, str], list[int]] = {}
+    for row in conn.execute(
+        "SELECT is_archived, window_kind, window_key, cohort_key, reset_at "
+        "FROM allowance_cycles WHERE reset_at IS NOT NULL"
+    ):
+        existing_epochs.setdefault(
+            (bool(row[0]), str(row[1]), str(row[2]), str(row[3])), []
+        ).append(int(row[4]))
     cycles = []
     intervals = []
     for archived in (False, True):

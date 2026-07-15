@@ -96,3 +96,13 @@ def test_existing_reset_identity_and_missing_metadata_are_conservative():
     assert cycles[0].status == "ambiguous"
     assert intervals[0].censor_reason == "missing_reset_metadata"
     assert not intervals[0].eligible_for_interpolation
+
+
+def test_existing_epochs_are_scoped_by_archive_window_and_cohort():
+    rows = [_row("one", 10, 2_000_000_030, "2025-12-31T23:58:00Z")]
+    cycles, _ = derive_allowance_cycles(
+        rows,
+        now=NOW,
+        existing_reset_epochs={(True, "weekly", "primary", "codex"): [2_000_000_000]},
+    )
+    assert cycles[0].reset_at == 2_000_000_030

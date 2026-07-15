@@ -29,6 +29,13 @@ Result: `8 passed`.
 
 `git diff --check` passed.
 
+## Final boundary hardening
+
+Added a RED/GREEN regression proving existing reset epochs are scoped by exact
+archive/window/cohort identity, so nearby epochs from another scope cannot pin
+cycle identity. GREEN: focused Task 3 suite passed (`11 passed`), Ruff passed,
+and `git diff --check` passed.
+
 ## Self-review
 
 Reviewed changed source and tests. Derived rows are sourced only from

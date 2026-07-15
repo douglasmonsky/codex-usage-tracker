@@ -61,7 +61,7 @@ def select_allowance_cohort(
 
 
 def derive_allowance_cycles(
-    rows: Iterable[dict[str, Any]], *, now: datetime, existing_reset_epochs: Iterable[int] = ()
+    rows: Iterable[dict[str, Any]], *, now: datetime, existing_reset_epochs: Any = ()
 ) -> tuple[list[AllowanceCycle], list[AllowanceInterval]]:
     """Derive archive-safe cycles and positive/censored interval evidence."""
     selected = select_allowance_cohort(rows, now=now)
@@ -69,7 +69,13 @@ def derive_allowance_cycles(
         return [], []
     selected_rows = [dict(row) for row in rows if _matches(row, selected)]
     selected_rows.sort(key=_sort_key)
-    clustered = _cluster_resets(selected_rows, existing_reset_epochs)
+    scope = (selected.is_archived, selected.window_kind, selected.window_key, selected.key)
+    epochs = (
+        existing_reset_epochs.get(scope, ())
+        if isinstance(existing_reset_epochs, dict)
+        else existing_reset_epochs
+    )
+    clustered = _cluster_resets(selected_rows, epochs)
     buckets: list[list[dict[str, Any]]] = []
     current: list[dict[str, Any]] = []
     previous_reset: int | None = None
