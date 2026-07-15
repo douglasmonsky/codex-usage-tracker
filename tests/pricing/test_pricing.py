@@ -95,6 +95,26 @@ def test_parse_openai_pricing_markdown_uses_requested_tier() -> None:
     }
 
 
+def test_parse_openai_pricing_markdown_does_not_invent_priority_long_context_rates() -> None:
+    source = (
+        OPENAI_PRICING_FIXTURE
+        + """
+<TextTokenPricingTables
+  client:load
+  tier="priority"
+  rows={[
+    ["gpt-5.6-sol", 10, 1, 12.5, 60],
+    ["gpt-5.5 (<272K context length)", 12.5, 1.25, "-", 75],
+  ]}
+/>
+"""
+    )
+    models = parse_openai_pricing_markdown(source, tier="priority")
+
+    assert "long_context_threshold_tokens" not in models["gpt-5.6-sol"]
+    assert "long_context_input_multiplier" not in models["gpt-5.5"]
+
+
 def test_parse_openai_latest_model_id_reads_front_matter() -> None:
     assert parse_openai_latest_model_id(OPENAI_LATEST_MODEL_FIXTURE) == "gpt-5.6-sol"
     assert OPENAI_LATEST_MODEL_MD_URL.endswith("/latest-model.md")

@@ -142,7 +142,7 @@ def parse_openai_pricing_markdown(
             "cached_input_per_million": cached_rate,
             "output_per_million": output_rate,
         }
-        if _uses_long_context_pricing(match.group("model"), model):
+        if _uses_long_context_pricing(tier, match.group("model"), model):
             rates.update(
                 {
                     "long_context_threshold_tokens": _LONG_CONTEXT_THRESHOLD_TOKENS,
@@ -282,8 +282,10 @@ def _normalize_model_name(model: str) -> str:
     return re.sub(r"\s+\([^)]*context length[^)]*\)\s*$", "", model.strip(), flags=re.I)
 
 
-def _uses_long_context_pricing(source_label: str, normalized_model: str) -> bool:
-    return "context length" in source_label.lower() or normalized_model.startswith("gpt-5.6-")
+def _uses_long_context_pricing(tier: str, source_label: str, normalized_model: str) -> bool:
+    return tier in {"standard", "batch", "flex"} and (
+        "context length" in source_label.lower() or normalized_model.startswith("gpt-5.6-")
+    )
 
 
 def _parse_openai_price_value(value: str) -> float | None:

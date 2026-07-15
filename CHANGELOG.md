@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Apply the official GPT-5.6 long-context input and output price multipliers to concrete calls above 272K input tokens while keeping aggregate summaries from being incorrectly thresholded.
+- Apply official long-context input, cached-input, and output price multipliers to concrete calls above 272K input tokens when the selected OpenAI service tier publishes long-context rates, while keeping aggregate summaries from being incorrectly thresholded.
 
 ## 0.19.0 - 2026-07-15
 

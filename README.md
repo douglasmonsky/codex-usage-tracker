@@ -194,7 +194,7 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
 - Companion Codex skills for operational setup and conversational usage analysis.
-- Optional local pricing, Codex credit, allowance, threshold, project alias, and privacy-mode configuration, including per-call GPT-5.6 long-context pricing above 272K input tokens.
+- Optional local pricing, Codex credit, allowance, threshold, project alias, and privacy-mode configuration, including per-call long-context pricing above 272K input tokens for OpenAI service tiers that publish long-context rates.
 
 ## Dashboard Language
 
