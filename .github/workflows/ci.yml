@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  hardening:
-    name: Hardening gates
+  dashboard-quality:
+    name: Dashboard quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,21 +26,9 @@ jobs:
       - uses: actions/setup-node@v6.4.0
         with:
           node-version: "22"
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.25"
-      - name: Install tooling
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
-          python -m pip install --force-reinstall --no-deps \
-            "agent-maintainer @ git+https://github.com/douglasmonsky/agent-maintainer.git@1129570a725256dcc5f04bee33cdc32c35af911d"
-          npm ci
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-          go install github.com/zricethezav/gitleaks/v8@v8.30.1
-          cargo install taplo-cli --version 0.9.0 --locked
-      - name: Agent Maintainer guidance drift
-        run: python -m agent_maintainer guidance --check
+          cache: npm
+      - name: Install dashboard tooling
+        run: npm ci
       - name: Dashboard lint
         run: npm run dashboard:lint
       - name: Dashboard type check
@@ -53,24 +41,75 @@ jobs:
         run: npm run dashboard:governance
       - name: Dashboard bundle budget
         run: node scripts/check-dashboard-bundles.mjs
-      - name: Dashboard route performance budget
+
+  python-hardening:
+    name: Python hardening
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install Python tooling
+        env:
+          AGENT_MAINTAINER_SHA: 1129570a725256dcc5f04bee33cdc32c35af911d
+          AGENT_MAINTAINER_URL: git+https://github.com/douglasmonsky/agent-maintainer.git
         run: |
-          python scripts/benchmark_dashboard_routes.py \
-            --sizes 100000 \
-            --iterations 3 \
-            --skip-compression \
-            --enforce-thresholds \
-            --output-dir /tmp/dashboard-route-budget
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+          python -m pip install --force-reinstall --no-deps \
+            "agent-maintainer @ ${AGENT_MAINTAINER_URL}@${AGENT_MAINTAINER_SHA}"
+      - name: Agent Maintainer guidance drift
+        run: python -m agent_maintainer guidance --check
       - name: Whole-source Pyright
         run: python -m pyright --pythonpath "$(command -v python)" src
       - name: Dependency hygiene
         run: deptry .
       - name: Dead code
         run: vulture src tests config/vulture-whitelist.py
-      - name: Dependency vulnerabilities
-        run: pip-audit -r requirements/audit.txt
       - name: Python security
         run: python -m agent_maintainer.runners.bandit
+
+  repository-policy:
+    name: Repository policy and security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/go/bin/actionlint
+            ~/go/bin/gitleaks
+            ~/.cargo/bin/taplo
+          key: hardening-tools-actionlint-1.7.12-gitleaks-8.30.1-taplo-0.9.0
+      - name: Install policy tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+          npm ci
+          command -v actionlint >/dev/null || go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          command -v gitleaks >/dev/null || go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          command -v taplo >/dev/null || cargo install taplo-cli --version 0.9.0 --locked
+      - name: Dependency vulnerabilities
+        run: pip-audit -r requirements/audit.txt
       - name: Workflow security
         run: zizmor --offline --no-progress .github/workflows
       - name: GitHub Actions lint
@@ -93,6 +132,39 @@ jobs:
           check-jsonschema \
             --builtin-schema vendor.dependabot \
             .github/dependabot.yml
+
+  dashboard-route-budget:
+    name: Dashboard route budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install benchmark tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+      - name: Dashboard route performance budget
+        run: |
+          python scripts/benchmark_dashboard_routes.py \
+            --sizes 100000 \
+            --iterations 3 \
+            --skip-compression \
+            --enforce-thresholds \
+            --output-dir /tmp/dashboard-route-budget
+
+  hardening:
+    name: Hardening gates
+    needs: [dashboard-quality, python-hardening, repository-policy, dashboard-route-budget]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm hardening gates passed
+        run: echo "All parallel hardening gates passed."
 
   dashboard-visualization:
     name: Dashboard visualization contracts
