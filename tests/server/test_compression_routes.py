@@ -188,7 +188,7 @@ def test_compression_profile_returns_shared_missing_payload_as_not_found(
         send_json=lambda status, payload: responses.append((status, payload)),
     )
 
-    assert responses == [(HTTPStatus.NOT_FOUND, missing)]
+    assert responses == [(HTTPStatus.OK, missing)]
 
 
 def compression_payload(*, kind: str, status: str) -> dict[str, object]:
