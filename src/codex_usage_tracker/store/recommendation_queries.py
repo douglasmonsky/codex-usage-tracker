@@ -58,7 +58,9 @@ def query_recommendation_fact_page(
     normalized_limit = normalize_limit(limit)
     limit_clause = "" if normalized_limit is None else " LIMIT ?"
     row_params = [*params] if normalized_limit is None else [*params, normalized_limit]
-    from_clause = "recommendation_facts rf JOIN usage_events USING (record_id)"
+    from_clause = (
+        "recommendation_facts rf JOIN canonical_usage_events AS usage_events USING (record_id)"
+    )
     count_query = f"SELECT COUNT(*) FROM {from_clause} {where_clause}"  # nosec B608 - internal SQL templates; values remain bound
     row_query = f"""
         SELECT

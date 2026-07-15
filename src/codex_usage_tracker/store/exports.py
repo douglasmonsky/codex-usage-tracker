@@ -27,7 +27,7 @@ def export_usage_csv(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     privacy_mode = validate_privacy_mode(privacy_mode)
-    sql = "SELECT * FROM usage_events ORDER BY event_timestamp, cumulative_total_tokens"
+    sql = "SELECT * FROM canonical_usage_events ORDER BY event_timestamp, cumulative_total_tokens"
     params: tuple[int, ...] = ()
     normalized_limit = normalize_limit(limit)
     if normalized_limit is not None:

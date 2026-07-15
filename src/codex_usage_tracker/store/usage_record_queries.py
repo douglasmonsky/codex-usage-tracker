@@ -29,7 +29,7 @@ def query_session_usage(
             row = conn.execute(
                 """
                 SELECT session_id
-                FROM usage_events
+                FROM canonical_usage_events
                 GROUP BY session_id
                 ORDER BY MAX(event_timestamp) DESC
                 LIMIT 1
@@ -43,7 +43,7 @@ def query_session_usage(
             SELECT
                 usage_events.*,
                 {USAGE_TIMING_SELECT_SQL}
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             {USAGE_TIMING_JOIN_SQL}
             WHERE usage_events.session_id = ?
             ORDER BY usage_events.event_timestamp, usage_events.cumulative_total_tokens
@@ -69,7 +69,7 @@ def query_usage_record(
             SELECT
                 usage_events.*,
                 {USAGE_TIMING_SELECT_SQL}
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             {USAGE_TIMING_JOIN_SQL}
             WHERE usage_events.record_id = ?
             LIMIT 1
@@ -104,7 +104,7 @@ def query_most_expensive_calls(
             SELECT
                 usage_events.*,
                 {USAGE_TIMING_SELECT_SQL}
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             {USAGE_TIMING_JOIN_SQL}
             {where_clause}
             ORDER BY usage_events.total_tokens DESC, usage_events.event_timestamp DESC

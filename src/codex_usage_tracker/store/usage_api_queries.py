@@ -96,7 +96,7 @@ def query_usage_api_events(
             WHERE usage_events.record_id IN (
                 SELECT record_id FROM (
                     SELECT usage_events.record_id
-                    FROM usage_events
+                    FROM canonical_usage_events AS usage_events
                     $timing_join
                     $indexed_where
                     ORDER BY $order_expr $direction,
@@ -107,7 +107,7 @@ def query_usage_api_events(
                 UNION ALL
                 SELECT record_id FROM (
                     SELECT usage_events.record_id
-                    FROM usage_events
+                    FROM canonical_usage_events AS usage_events
                     $timing_join
                     $legacy_where
                     ORDER BY $order_expr $direction,
@@ -152,7 +152,7 @@ def query_usage_api_events(
                 usage_events.*,
                 $timing_select,
                 $parent_select
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             $timing_join
             $where_clause
             ORDER BY $order_expr $direction,
@@ -208,14 +208,14 @@ def query_usage_api_event_count(
                     thread_key_mode=mode,
                 )
                 row = conn.execute(
-                    f"SELECT COUNT(*) AS row_count FROM usage_events {where_clause}",
+                    f"SELECT COUNT(*) AS row_count FROM canonical_usage_events {where_clause}",
                     params,
                 ).fetchone()
                 total += int(row["row_count"] if row is not None else 0)
             return total
         where_clause, params = usage_api_where_clause(**filter_kwargs)
         row = conn.execute(
-            f"SELECT COUNT(*) AS row_count FROM usage_events {where_clause}",
+            f"SELECT COUNT(*) AS row_count FROM canonical_usage_events {where_clause}",
             params,
         ).fetchone()
     return int(row["row_count"] if row is not None else 0)

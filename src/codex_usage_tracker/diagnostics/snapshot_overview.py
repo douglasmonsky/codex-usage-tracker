@@ -71,14 +71,14 @@ def _compute_overview(
                 coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
                 coalesce(SUM(total_tokens), 0) AS total_tokens,
                 AVG(cache_ratio) AS avg_cache_ratio
-            FROM usage_events
+            FROM canonical_usage_events
             {usage_where}
             """  # nosec B608
         usage_row = conn.execute(usage_query).fetchone()
         facts_query = f"""
             SELECT COUNT(*) AS diagnostic_fact_rows
             FROM call_diagnostic_facts AS facts
-            JOIN usage_events ON usage_events.record_id = facts.record_id
+            JOIN canonical_usage_events AS usage_events ON usage_events.record_id = facts.record_id
             {usage_where}
             """  # nosec B608
         facts_row = conn.execute(facts_query).fetchone()

@@ -109,7 +109,7 @@ def _fact_metadata(conn: sqlite3.Connection, *, scoped: bool) -> dict[str, Any]:
     expected_count = conn.execute(
         "SELECT COUNT(*) FROM compression_scope_records"
         if scoped
-        else "SELECT COUNT(*) FROM usage_events"
+        else "SELECT COUNT(*) FROM canonical_usage_events"
     ).fetchone()[0]
     row = conn.execute(
         _scoped_sql(_COVERAGE_SQL, "r", scoped=scoped),

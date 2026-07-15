@@ -115,7 +115,7 @@ def _content_repetition_rows(
             MIN(u.event_timestamp) AS first_seen_at,
             MAX(u.event_timestamp) AS last_seen_at
         FROM content_fragments cf
-        JOIN usage_events u ON u.record_id = cf.record_id
+        JOIN canonical_usage_events u ON u.record_id = cf.record_id
         {where_sql}
         GROUP BY cf.content_hash, cf.fragment_kind, cf.role
         HAVING COUNT(*) >= ?
@@ -178,7 +178,7 @@ def _command_loop_rows(
             MIN(u.event_timestamp) AS first_seen_at,
             MAX(u.event_timestamp) AS last_seen_at
         FROM command_runs cr
-        JOIN usage_events u ON u.record_id = cr.record_id
+        JOIN canonical_usage_events u ON u.record_id = cr.record_id
         {where_sql}
         GROUP BY cr.command_root, cr.command_label, cr.status, cr.exit_code
         HAVING COUNT(*) >= ? OR COALESCE(cr.exit_code, 0) != 0
@@ -245,7 +245,7 @@ def _file_churn_rows(
             MIN(u.event_timestamp) AS first_seen_at,
             MAX(u.event_timestamp) AS last_seen_at
         FROM file_events fe
-        JOIN usage_events u ON u.record_id = fe.record_id
+        JOIN canonical_usage_events u ON u.record_id = fe.record_id
         {where_sql}
         GROUP BY fe.operation, fe.path_hash, fe.path_basename, fe.path_extension
         HAVING COUNT(*) >= ?
@@ -309,7 +309,7 @@ def _context_bloat_rows(
             COUNT(DISTINCT fe.file_event_key) AS file_event_count,
             MIN(u.event_timestamp) AS first_seen_at,
             MAX(u.event_timestamp) AS last_seen_at
-        FROM usage_events u
+        FROM canonical_usage_events u
         LEFT JOIN content_fragments cf ON cf.record_id = u.record_id
         LEFT JOIN tool_calls tc ON tc.record_id = u.record_id
         LEFT JOIN command_runs cr ON cr.record_id = u.record_id

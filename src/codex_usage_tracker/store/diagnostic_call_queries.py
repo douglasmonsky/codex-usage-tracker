@@ -84,7 +84,7 @@ def query_diagnostic_fact_calls(
                 f.evidence_scope AS diagnostic_evidence_scope,
                 f.raw_content_included AS raw_content_included
             FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
+            JOIN canonical_usage_events AS usage_events ON usage_events.record_id = f.record_id
             LEFT JOIN usage_events AS previous_usage
             ON previous_usage.record_id = usage_events.previous_record_id
             {where_clause}
@@ -130,7 +130,7 @@ def query_diagnostic_fact_call_count(
             f"""
             SELECT COUNT(DISTINCT usage_events.record_id) AS row_count
             FROM call_diagnostic_facts AS f
-            JOIN usage_events ON usage_events.record_id = f.record_id
+            JOIN canonical_usage_events AS usage_events ON usage_events.record_id = f.record_id
             {where_clause}
             """,
             params,

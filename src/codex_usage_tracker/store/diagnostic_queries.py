@@ -102,7 +102,7 @@ def query_diagnostic_facts(
                 MAX(f.last_source_line) AS last_source_line,
                 MAX(f.raw_content_included) AS raw_content_included,
                 NULL AS largest_record_id
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             CROSS JOIN call_diagnostic_facts AS f ON f.record_id = usage_events.record_id
             {where_clause}
             GROUP BY f.fact_type, f.fact_name, f.fact_category
@@ -188,7 +188,7 @@ def _resolve_largest_record_ids(
                     ORDER BY u.event_timestamp DESC, u.record_id
                 ) AS position
             FROM diagnostic_fact_maxima AS maxima
-            CROSS JOIN usage_events AS u INDEXED BY idx_usage_total_tokens
+            CROSS JOIN canonical_usage_events AS u
                 ON u.total_tokens = maxima.largest_call_tokens
             JOIN call_diagnostic_facts AS f INDEXED BY idx_call_diagnostic_facts_lookup
                 ON f.record_id = u.record_id
@@ -290,7 +290,7 @@ def query_diagnostic_summary(
                     usage_events.cache_ratio,
                     usage_events.event_timestamp
                 FROM call_diagnostic_facts AS f
-                JOIN usage_events ON usage_events.record_id = f.record_id
+                JOIN canonical_usage_events AS usage_events ON usage_events.record_id = f.record_id
                 {where_clause}
             ),
             type_counts AS (

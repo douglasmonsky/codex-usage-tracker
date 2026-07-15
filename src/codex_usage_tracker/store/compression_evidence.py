@@ -186,7 +186,7 @@ def _populate_scope_records(conn: sqlite3.Connection, scope: Mapping[str, Any]) 
         """
         INSERT INTO compression_scope_records(record_id)
         SELECT u.record_id
-        FROM usage_events AS u
+        FROM canonical_usage_events AS u
         WHERE (? = 1 OR u.is_archived = 0)
             AND (? IS NULL OR u.event_timestamp >= ?)
             AND (? IS NULL OR u.event_timestamp <= ?)
@@ -406,7 +406,7 @@ SELECT
     u.reasoning_output_tokens,
     u.cache_ratio,
     u.context_window_percent
-FROM usage_events AS u
+FROM canonical_usage_events AS u
 {scope_join}
 ORDER BY u.event_timestamp, u.record_id
 """

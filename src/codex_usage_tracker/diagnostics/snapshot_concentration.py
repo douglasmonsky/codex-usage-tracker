@@ -33,13 +33,13 @@ def compute_concentration(
                 source_file,
                 cwd,
                 total_tokens
-            FROM usage_events
+            FROM canonical_usage_events
             {where}
             ORDER BY event_timestamp, record_id
             """
         ).fetchall()
         source_row = conn.execute(
-            f"SELECT COUNT(DISTINCT source_file) AS source_logs_scanned FROM usage_events {where}"
+            f"SELECT COUNT(DISTINCT source_file) AS source_logs_scanned FROM canonical_usage_events {where}"
         ).fetchone()
 
     source_groups: dict[str, dict[str, Any]] = {}
