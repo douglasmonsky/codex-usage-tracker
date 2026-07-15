@@ -64,6 +64,12 @@ dev = [
   "zizmor>=1.26.1; python_version >= '3.11'",
 ]
 
+[dependency-groups]
+performance = [
+  "agent-perf @ git+https://github.com/douglasmonsky/agent-perf.git@132158e9e1848c6c1f04cbf309f9786603fb52b9; python_version >= '3.11'",
+  "scalene==2.3.0; python_version >= '3.11'",
+]
+
 [project.scripts]
 codex-usage-tracker = "codex_usage_tracker.cli:main"
 
