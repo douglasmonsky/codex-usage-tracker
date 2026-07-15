@@ -12,8 +12,8 @@ from codex_usage_tracker.allowance_intelligence.capacity_history import (
     load_capacity_cycles,
 )
 from codex_usage_tracker.allowance_intelligence.change_detection import (
-    DETECTOR_VERSION,
-    detect_cycle_change,
+    MULTI_DETECTOR_VERSION,
+    detect_cycle_changes,
 )
 from codex_usage_tracker.pricing.allowance_config import load_allowance_config
 
@@ -28,7 +28,7 @@ def build_allowance_analysis(
     window_kind: str = "weekly",
     cohort_key: str = "codex",
     forecast_horizon: int = 1,
-    parameters: dict[str, int] | None = None,
+    parameters: dict[str, int | float] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Return a semantically cached, aggregate-only change analysis."""
@@ -58,17 +58,18 @@ def build_allowance_analysis(
         window_kind=window_kind,
         cohort_key=cohort_key,
     )
-    detected = detect_cycle_change(
+    detected = detect_cycle_changes(
         cycles,
         semantic_key=snapshot_id,
-        min_cycles_per_side=resolved["min_cycles_per_side"],
-        permutation_count=resolved["permutation_count"],
+        min_cycles_per_regime=int(resolved["min_cycles_per_regime"]),
+        permutation_count=int(resolved["permutation_count"]),
+        familywise_alpha=float(resolved["familywise_alpha"]),
     )
     payload = {
         "schema": ANALYSIS_SCHEMA,
         "snapshot_id": snapshot_id,
         "source_revision": source_revision,
-        "model_version": DETECTOR_VERSION,
+        "model_version": MULTI_DETECTOR_VERSION,
         "rate_card_revision": resolved_rate_revision,
         "generated_at": generated_at,
         "data_as_of": data_as_of,
@@ -81,7 +82,7 @@ def build_allowance_analysis(
         **detected,
     }
     cache_model_version = (
-        f"{DETECTOR_VERSION}:{resolved_rate_revision}:"
+        f"{MULTI_DETECTOR_VERSION}:{resolved_rate_revision}:"
         f"{hashlib.sha256(json.dumps(resolved, sort_keys=True).encode()).hexdigest()[:16]}"
     )
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -115,7 +116,7 @@ def read_allowance_analysis(
     window_kind: str = "weekly",
     cohort_key: str = "codex",
     forecast_horizon: int = 1,
-    parameters: dict[str, int] | None = None,
+    parameters: dict[str, int | float] | None = None,
 ) -> dict[str, Any] | None:
     """Read a compatible persisted result without starting analysis work."""
     request = allowance_analysis_request(
@@ -139,7 +140,7 @@ def allowance_analysis_request(
     window_kind: str,
     cohort_key: str,
     forecast_horizon: int,
-    parameters: dict[str, int] | None,
+    parameters: dict[str, int | float] | None,
 ) -> dict[str, Any]:
     if archive_scope not in {"active", "all"}:
         raise ValueError("archive_scope must be active or all")
@@ -155,28 +156,47 @@ def allowance_analysis_request(
     resolved_rate_revision = rate_card_revision or _rate_card_revision()
     if not resolved_rate_revision.strip():
         raise ValueError("rate_card_revision must not be empty")
-    provided = parameters or {}
-    unknown = set(provided) - {"min_cycles_per_side", "permutation_count"}
+    provided = dict(parameters or {})
+    unknown = set(provided) - {
+        "min_cycles_per_regime",
+        "min_cycles_per_side",
+        "permutation_count",
+        "familywise_alpha",
+    }
     if unknown:
         raise ValueError(f"unknown analysis parameters: {', '.join(sorted(unknown))}")
+    if "min_cycles_per_regime" in provided and "min_cycles_per_side" in provided:
+        raise ValueError(
+            "use min_cycles_per_regime; do not provide the compatibility alias together"
+        )
+    if "min_cycles_per_side" in provided:
+        provided["min_cycles_per_regime"] = provided.pop("min_cycles_per_side")
     resolved = {
-        "min_cycles_per_side": 3,
+        "min_cycles_per_regime": 4,
         "permutation_count": 1_999,
+        "familywise_alpha": 0.05,
         **provided,
     }
-    minimum = resolved["min_cycles_per_side"]
+    minimum = resolved["min_cycles_per_regime"]
     permutations = resolved["permutation_count"]
+    alpha = resolved["familywise_alpha"]
     if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 2:
-        raise ValueError("min_cycles_per_side must be an integer of at least 2")
+        raise ValueError("min_cycles_per_regime must be an integer of at least 2")
     if (
         isinstance(permutations, bool)
         or not isinstance(permutations, int)
         or not 99 <= permutations <= 100_000
     ):
         raise ValueError("permutation_count must be an integer between 99 and 100000")
+    if (
+        isinstance(alpha, bool)
+        or not isinstance(alpha, int | float)
+        or not 0 < float(alpha) < 1
+    ):
+        raise ValueError("familywise_alpha must be between 0 and 1")
     semantic = {
         "source_revision": source_revision,
-        "model_version": DETECTOR_VERSION,
+        "model_version": MULTI_DETECTOR_VERSION,
         "rate_card_revision": resolved_rate_revision,
         "archive_scope": archive_scope,
         "window_kind": window_kind,
@@ -189,7 +209,7 @@ def allowance_analysis_request(
     return {
         "snapshot_id": snapshot_id,
         "source_revision": source_revision,
-        "model_version": DETECTOR_VERSION,
+        "model_version": MULTI_DETECTOR_VERSION,
         "rate_card_revision": resolved_rate_revision,
         "data_as_of": data_as_of,
         "parameters": resolved,

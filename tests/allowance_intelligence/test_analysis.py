@@ -11,7 +11,7 @@ from codex_usage_tracker.store.schema import init_db
 NOW = datetime(2026, 6, 12, tzinfo=timezone.utc)
 
 
-def _connection() -> sqlite3.Connection:
+def _connection(values: list[float] | None = None) -> sqlite3.Connection:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
     init_db(connection)
@@ -20,7 +20,7 @@ def _connection() -> sqlite3.Connection:
         "(1,1,'revision-1',12,'2026-06-12T00:00:00+00:00','reset-aware-v2',"
         "'2026-06-12T00:00:00+00:00')"
     )
-    for index, value in enumerate([10, 9, 11, 10, 30, 29, 31, 30]):
+    for index, value in enumerate(values or [10, 9, 11, 10, 30, 29, 31, 30]):
         cycle_id = f"cycle-{index:02d}"
         observed_at = f"2026-06-{index + 1:02d}T00:00:00+00:00"
         connection.execute(
@@ -81,24 +81,24 @@ def test_identical_semantic_key_reuses_persisted_snapshot(monkeypatch) -> None:
     assert analysis.read_allowance_analysis(
         connection,
         rate_card_revision="rate-card-1",
-        parameters={"min_cycles_per_side": 3, "permutation_count": 499},
+        parameters={"min_cycles_per_regime": 4, "permutation_count": 499},
     ) is None
     calls = 0
-    real_detect = analysis.detect_cycle_change
+    real_detect = analysis.detect_cycle_changes
 
     def counted(*args, **kwargs):
         nonlocal calls
         calls += 1
         return real_detect(*args, **kwargs)
 
-    monkeypatch.setattr(analysis, "detect_cycle_change", counted)
+    monkeypatch.setattr(analysis, "detect_cycle_changes", counted)
     request = {
         "rate_card_revision": "rate-card-1",
         "archive_scope": "active",
         "window_kind": "weekly",
         "cohort_key": "codex",
         "forecast_horizon": 1,
-        "parameters": {"min_cycles_per_side": 3, "permutation_count": 499},
+        "parameters": {"min_cycles_per_regime": 4, "permutation_count": 499},
         "now": NOW,
     }
     first = analysis.build_allowance_analysis(connection, **request)
@@ -107,7 +107,7 @@ def test_identical_semantic_key_reuses_persisted_snapshot(monkeypatch) -> None:
     assert analysis.read_allowance_analysis(
         connection,
         rate_card_revision="rate-card-1",
-        parameters={"min_cycles_per_side": 3, "permutation_count": 499},
+        parameters={"min_cycles_per_regime": 4, "permutation_count": 499},
     ) == first
     assert calls == 1
     assert connection.execute(
@@ -124,19 +124,19 @@ def test_rate_card_or_parameters_change_the_snapshot_key() -> None:
     first = analysis.build_allowance_analysis(
         connection,
         rate_card_revision="rate-card-1",
-        parameters={"min_cycles_per_side": 3, "permutation_count": 199},
+        parameters={"min_cycles_per_regime": 4, "permutation_count": 199},
         now=NOW,
     )
     second = analysis.build_allowance_analysis(
         connection,
         rate_card_revision="rate-card-2",
-        parameters={"min_cycles_per_side": 3, "permutation_count": 199},
+        parameters={"min_cycles_per_regime": 4, "permutation_count": 199},
         now=NOW,
     )
     third = analysis.build_allowance_analysis(
         connection,
         rate_card_revision="rate-card-2",
-        parameters={"min_cycles_per_side": 3, "permutation_count": 299},
+        parameters={"min_cycles_per_regime": 4, "permutation_count": 299},
         now=NOW,
     )
     assert len({first["snapshot_id"], second["snapshot_id"], third["snapshot_id"]}) == 3
@@ -148,16 +148,42 @@ def test_rate_card_or_parameters_change_the_snapshot_key() -> None:
 @pytest.mark.parametrize(
     "parameters",
     [
-        {"min_cycles_per_side": 1},
+        {"min_cycles_per_regime": 1},
         {"permutation_count": 98},
         {"permutation_count": 100_001},
+        {"familywise_alpha": 0},
+        {"familywise_alpha": 1},
         {"unknown": 1},
     ],
 )
-def test_analysis_parameters_are_bounded(parameters: dict[str, int]) -> None:
+def test_analysis_parameters_are_bounded(
+    parameters: dict[str, int | float],
+) -> None:
     with pytest.raises(ValueError):
         analysis.read_allowance_analysis(
             _connection(),
             rate_card_revision="rate-card-1",
             parameters=parameters,
         )
+
+
+def test_analysis_persists_multiple_boundaries_and_regimes() -> None:
+    connection = _connection(([300.0] * 8) + ([100.0] * 8) + ([220.0] * 8))
+
+    result = analysis.build_allowance_analysis(
+        connection,
+        rate_card_revision="rate-card-1",
+        parameters={"min_cycles_per_regime": 4, "permutation_count": 499},
+        now=NOW,
+    )
+    persisted = analysis.read_allowance_analysis(
+        connection,
+        rate_card_revision="rate-card-1",
+        parameters={"min_cycles_per_regime": 4, "permutation_count": 499},
+    )
+
+    assert len(result["boundaries"]) == 2
+    assert len(result["regimes"]) == 3
+    assert persisted is not None
+    assert persisted["boundaries"] == result["boundaries"]
+    assert result["selected_boundary"] is None
