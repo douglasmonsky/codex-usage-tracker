@@ -141,7 +141,7 @@ def _cycle_partition_rows(
     limit: int | None,
     newest_first: bool,
 ) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+    rows: list[list[dict[str, Any]]] = []
     direction = "DESC" if newest_first else "ASC"
     ordering = "last_observed_at" if newest_first else "first_observed_at"
     for is_archived in _archive_partitions(include_archived):
@@ -151,8 +151,10 @@ def _cycle_partition_rows(
             where.append("cohort_key = ?")
             params.append(cohort_id)
         if time_range is not None:
-            where.extend(("first_observed_at >= ?", "last_observed_at <= ?"))
-            params.extend(time_range)
+            where.extend(
+                ("first_observed_at >= ?", "first_observed_at <= ?", "last_observed_at <= ?")
+            )
+            params.extend((time_range[0], time_range[1], time_range[1]))
         limit_sql = " LIMIT ?" if limit is not None else ""
         if limit is not None:
             params.append(limit)
@@ -161,12 +163,13 @@ def _cycle_partition_rows(
             f"ORDER BY {ordering} {direction}, cycle_id {direction}{limit_sql}",
             params,  # nosec B608 - query fragments are selected from fixed enums
         ).fetchall()
-        rows.extend(_row_to_dict(row) for row in partition)
-    return sorted(
+        rows.append([_row_to_dict(row) for row in partition])
+    return _merge_partition_rows(
         rows,
         key=lambda row: (str(row[ordering] or ""), str(row["cycle_id"])),
         reverse=newest_first,
-    )[:limit]
+        limit=limit,
+    )
 
 
 def _evidence_partition_rows(
@@ -177,7 +180,7 @@ def _evidence_partition_rows(
     position: dict[str, str] | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+    rows: list[list[dict[str, Any]]] = []
     direction = "DESC" if scope["order"] == "desc" else "ASC"
     comparator = "<" if scope["order"] == "desc" else ">"
     for is_archived in _archive_partitions(bool(scope["include_archived"])):
@@ -204,16 +207,49 @@ def _evidence_partition_rows(
             f"ORDER BY end_observed_at {direction}, interval_id {direction} LIMIT ?",
             [*params, limit],  # nosec B608 - query fragments are selected from fixed enums
         ).fetchall()
-        rows.extend(_row_to_dict(row) for row in partition)
-    return sorted(
+        rows.append([_row_to_dict(row) for row in partition])
+    return _merge_partition_rows(
         rows,
         key=lambda row: (str(row["end_observed_at"]), str(row["interval_id"])),
         reverse=scope["order"] == "desc",
-    )[:limit]
+        limit=limit,
+    )
 
 
 def _archive_partitions(include_archived: bool) -> tuple[int, ...]:
     return (0, 1) if include_archived else (0,)
+
+
+def _merge_partition_rows(
+    partitions: list[list[dict[str, Any]]],
+    *,
+    key: Any,
+    reverse: bool,
+    limit: int | None,
+) -> list[dict[str, Any]]:
+    """Linearly merge the at-most-two ordered archive partitions."""
+
+    left = partitions[0] if partitions else []
+    right = partitions[1] if len(partitions) > 1 else []
+    left_index = right_index = 0
+    merged: list[dict[str, Any]] = []
+    while left_index < len(left) or right_index < len(right):
+        if right_index == len(right):
+            take_left = True
+        elif left_index == len(left):
+            take_left = False
+        else:
+            left_key, right_key = key(left[left_index]), key(right[right_index])
+            take_left = left_key >= right_key if reverse else left_key <= right_key
+        if take_left:
+            merged.append(left[left_index])
+            left_index += 1
+        else:
+            merged.append(right[right_index])
+            right_index += 1
+        if limit is not None and len(merged) >= limit:
+            break
+    return merged
 
 
 def _source_revision(connection: sqlite3.Connection) -> str | None:

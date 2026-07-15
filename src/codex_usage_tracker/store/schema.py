@@ -18,7 +18,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -113,6 +113,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (24, deduplication_schema.migrate_usage_deduplication),
         (25, deduplication_schema.migrate_clone_rewritten_usage),
         (26, allowance_schema.migrate_allowance_intelligence_v2),
+        (27, allowance_schema.migrate_allowance_query_indexes_v3),
     )
 
 

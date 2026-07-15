@@ -37,6 +37,13 @@ def test_latest_and_series_are_archive_aware_and_scoped() -> None:
         query_allowance_series(
             conn, start_at=None, end_at="2026-01-31T23:59:59Z", window_kind="weekly"
         )
+    assert query_allowance_series(
+        conn,
+        start_at="2026-01-01T00:00:00Z",
+        end_at="2026-01-02T12:00:00Z",
+        window_kind="weekly",
+        cohort_id="team-a",
+    ) == [rows[0]]
 
 
 def test_evidence_filters_orders_clamps_and_continues_without_overlap() -> None:
@@ -161,6 +168,41 @@ def test_common_query_plans_use_allowance_indexes_without_temp_ordering(
     assert any(series_index in detail for detail in series)
     assert any(evidence_index in detail for detail in evidence)
     assert not any("USE TEMP B-TREE" in detail for detail in latest + series + evidence)
+
+
+@pytest.mark.parametrize(
+    ("window_kind", "cohort_id", "index_name"),
+    [
+        ("weekly", "team-a", "idx_allowance_intervals_evidence_cohort_window"),
+        ("weekly", None, "idx_allowance_intervals_evidence_window"),
+        (None, "team-a", "idx_allowance_intervals_evidence_cohort"),
+        (None, None, "idx_allowance_intervals_evidence_global"),
+    ],
+)
+@pytest.mark.parametrize("is_archived", [0, 1])
+def test_evidence_scope_query_plans_use_partition_indexes(
+    window_kind: str | None, cohort_id: str | None, index_name: str, is_archived: int
+) -> None:
+    conn = seeded_connection()
+    where = ["is_archived = ?", "source_revision = ?", "end_observed_at IS NOT NULL"]
+    params: list[object] = [is_archived, "revision-1"]
+    if window_kind is not None:
+        where.append("window_kind = ?")
+        params.append(window_kind)
+    if cohort_id is not None:
+        where.append("cohort_key = ?")
+        params.append(cohort_id)
+    plan = [
+        row["detail"]
+        for row in conn.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM allowance_intervals "
+            f"WHERE {' AND '.join(where)} "
+            "ORDER BY end_observed_at DESC, interval_id DESC LIMIT 2",
+            params,
+        )
+    ]
+    assert any(index_name in detail for detail in plan)
+    assert not any("SCAN allowance_intervals" in detail or "USE TEMP B-TREE" in detail for detail in plan)
 
 
 def seeded_connection() -> sqlite3.Connection:

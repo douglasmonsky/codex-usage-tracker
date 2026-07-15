@@ -2,7 +2,10 @@
 
 import sqlite3
 
-MIGRATION_NAMES = {26: "add allowance intelligence storage"}
+MIGRATION_NAMES = {
+    26: "add allowance intelligence storage",
+    27: "repair allowance intelligence query indexes",
+}
 
 
 def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:
@@ -179,6 +182,60 @@ def rebuild_allowance_intelligence(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM allowance_intervals")
     conn.execute("DELETE FROM allowance_cycles")
     conn.execute("DELETE FROM allowance_source_state")
+
+
+def migrate_allowance_query_indexes_v3(conn: sqlite3.Connection) -> None:
+    """Repair revision-aware allowance indexes for databases already at v26."""
+
+    conn.executescript(
+        """
+        DROP INDEX IF EXISTS idx_allowance_cycles_latest_cohort_window;
+        DROP INDEX IF EXISTS idx_allowance_cycles_cohort_time_range;
+        DROP INDEX IF EXISTS idx_allowance_cycles_latest_window;
+        DROP INDEX IF EXISTS idx_allowance_cycles_series_cohort_window;
+        DROP INDEX IF EXISTS idx_allowance_cycles_series_window;
+        CREATE INDEX idx_allowance_cycles_latest_cohort_window
+        ON allowance_cycles(
+            is_archived, source_revision, window_kind, cohort_key,
+            last_observed_at DESC, cycle_id DESC
+        );
+        CREATE INDEX idx_allowance_cycles_latest_window
+        ON allowance_cycles(
+            is_archived, source_revision, window_kind, last_observed_at DESC, cycle_id DESC
+        );
+        CREATE INDEX idx_allowance_cycles_series_cohort_window
+        ON allowance_cycles(
+            is_archived, source_revision, window_kind, cohort_key, first_observed_at, cycle_id
+        );
+        CREATE INDEX idx_allowance_cycles_series_window
+        ON allowance_cycles(
+            is_archived, source_revision, window_kind, first_observed_at, cycle_id
+        );
+
+        DROP INDEX IF EXISTS idx_allowance_intervals_cycle_evidence_desc;
+        DROP INDEX IF EXISTS idx_allowance_intervals_evidence_cohort_window;
+        DROP INDEX IF EXISTS idx_allowance_intervals_evidence_window;
+        DROP INDEX IF EXISTS idx_allowance_intervals_evidence_cohort;
+        DROP INDEX IF EXISTS idx_allowance_intervals_evidence_global;
+        CREATE INDEX idx_allowance_intervals_evidence_cohort_window
+        ON allowance_intervals(
+            is_archived, source_revision, window_kind, cohort_key,
+            end_observed_at DESC, interval_id DESC
+        );
+        CREATE INDEX idx_allowance_intervals_evidence_window
+        ON allowance_intervals(
+            is_archived, source_revision, window_kind, end_observed_at DESC, interval_id DESC
+        );
+        CREATE INDEX idx_allowance_intervals_evidence_cohort
+        ON allowance_intervals(
+            is_archived, source_revision, cohort_key, end_observed_at DESC, interval_id DESC
+        );
+        CREATE INDEX idx_allowance_intervals_evidence_global
+        ON allowance_intervals(
+            is_archived, source_revision, end_observed_at DESC, interval_id DESC
+        );
+        """
+    )
 
 
 def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
