@@ -32,8 +32,8 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
     states = [entry["freshness"] for entry in windows.values() if entry]
     cohorts = _cohorts(connection, revision, include_archived, now)
     partial = bool(cohorts["reconciliation"]) or any(
-        row["status"] in {"conflict", "reconciliation"}
-        or row["cycle_state"] in {"conflict", "reconciliation"}
+        row["status"] in {"ambiguous", "conflict", "reconciliation"}
+        or row["cycle_state"] in {"ambiguous", "conflict", "reconciliation"}
         or int(row["conflict_count"] or 0) > 0
         for row in cohorts["rows"]
     )
@@ -117,7 +117,11 @@ def _aware_timestamp(value: str) -> datetime:
     return result
 def _data_state(states: list[str]) -> str: return "empty" if not states else ("stale" if all(s == "stale" for s in states) else ("aging" if "aging" in states else "fresh"))
 def _latest_at(windows: dict[str, Any]) -> str | None: return max((entry["observed_at"] for entry in windows.values() if entry), default=None)
-def _cohort(row: dict[str, Any] | None) -> dict[str, Any] | None: return None if row is None else {"id": row["cohort_key"], "window_kind": row["window_kind"], "window_key": row["window_key"], "archived": bool(row["is_archived"])}
+def _cohort(row: dict[str, Any]) -> dict[str, Any]: return {"id": row["cohort_key"], "window_kind": row["window_kind"], "window_key": row["window_key"], "archived": bool(row["is_archived"])}
+def _row_freshness(row: dict[str, Any], now: datetime) -> str:
+    window = _window(row, now)
+    assert window is not None
+    return str(window["freshness"])
 def _cycle(row: dict[str, Any]) -> dict[str, Any]: return {key: row.get(key) for key in ("cycle_id", "reset_at", "first_observed_at", "last_observed_at", "latest_used_percent", "status", "quality_grade")}
 def _available_range(rows: list[dict[str, Any]]) -> dict[str, str | None]: return {"start_at": rows[0]["first_observed_at"] if rows else None, "end_at": rows[-1]["last_observed_at"] if rows else None}
 def _copied_excluded(conn: sqlite3.Connection) -> int:
@@ -163,8 +167,9 @@ def _cohorts(
             None,
         )
         fallback = next((row for row in rows if row["window_kind"] == kind), None)
-        if normal or fallback:
-            selected_rows[kind] = normal or fallback
+        chosen = normal if normal is not None else fallback
+        if chosen is not None:
+            selected_rows[kind] = chosen
     selected = {kind: _cohort(row) for kind, row in selected_rows.items()}
     alternates = []
     seen = {
@@ -179,14 +184,14 @@ def _cohorts(
             seen.add(key)
     reconciliation = []
     weekly = selected_rows.get("weekly")
-    if weekly and weekly["cohort_key"] == "codex" and _window(weekly, now)["freshness"] == "stale":
+    if weekly and weekly["cohort_key"] == "codex" and _row_freshness(weekly, now) == "stale":
         eligible = [
             row for row in rows
             if row["window_kind"] == "weekly"
             and row["cohort_key"] != "codex"
-            and row["status"] == "accepted"
-            and row["cycle_state"] == "accepted"
-            and _window(row, now)["freshness"] != "stale"
+            and row["status"] in {"open", "completed"}
+            and row["cycle_state"] in {"open", "completed"}
+            and _row_freshness(row, now) != "stale"
             and _eligible_alternate(connection, row)
         ]
         if eligible:

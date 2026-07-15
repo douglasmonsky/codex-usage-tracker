@@ -171,7 +171,7 @@ def test_candidate_record_metadata_migration_backfills_existing_claims(
         conn.execute("PRAGMA user_version = 18")
     with connect(db_path) as conn:
         init_db(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 25
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 27
     with connect(db_path) as conn:
         conn.execute("DELETE FROM usage_events WHERE record_id = ?", ("record-cmp_old",))
 

@@ -122,3 +122,58 @@ PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/pytho
 Result: `29 passed in 0.47s` before formatting-only cleanup.
 
 The fix requires explicit `status == "completed"` plus quality approval before a cycle may enter calibration. Dense/open cycles cannot influence the cycle-capped completed capacity summary.
+
+## Direct completion and production-path audit
+
+The final direct review found that the isolated estimator tests were not enough:
+materialized intervals still had null pricing and disabled calibration flags, the
+materializer retained only one globally selected window/cohort, and interval token
+components represented only the endpoint call. Those defects would have left real
+dashboard data observed-only or incomplete even though the synthetic estimator
+tests passed.
+
+### Added RED coverage
+
+- `open`, `completed`, and `ambiguous` cycle states derived from reset chronology.
+- historical reconstruction invariance when later evidence is added or `now` advances.
+- cumulative-credit interpolation without fabricated timing when samples are absent.
+- reset/censor boundaries suppressing post-observation estimates.
+- recency, cycle quality, interval confidence, and pricing-coverage weighting.
+- one real comparable prior cycle and explicit per-window sample counts.
+- elapsed-time-normalized pace (`percent_per_hour`) with censored rows excluded.
+- all canonical calls between anchors contributing token components and credits.
+- unpriced intervals remaining ineligible below 95% coverage.
+- materialized pricing reaching the status estimator with no hard-coded capacity default.
+- weekly, five-hour, normal, and alternate cohorts all surviving materialization.
+
+### Production behavior
+
+- Rate-card enrichment is calculated from each canonical aggregate call between
+  allowance anchors. Pricing confidence and token coverage are persisted; calibration,
+  forecasting, and change-detection flags require at least 95% coverage and supported
+  confidence.
+- Capacity remains personal and data-derived. Synthetic ratios in tests are fixtures,
+  never production defaults or claims.
+- Calibration uses completed quality-approved weekly cycles only, one normalized
+  contribution per cycle, with recency and support weights capped at one.
+- Walk-forward reconstruction weights are evaluated at each historical endpoint, so
+  merely running the model later cannot rewrite prior estimates.
+- Pace is dimensionally consistent: both window rates and pace residuals use percentage
+  points per hour.
+
+### Final verification
+
+```text
+focused Task 6 gate: 47 passed
+materialization/dedup gate: 13 passed
+full pytest: 962 passed
+ruff: passed
+mypy: passed
+compileall: passed
+git diff --check: passed
+JetBrains ERROR inspections: 0 problems
+```
+
+The broad suite also exposed stale migration-version assertions and an obsolete
+`limit=0` benchmark request from earlier tasks; both were aligned with schema v27 and
+the finite 1000-row interactive maximum.

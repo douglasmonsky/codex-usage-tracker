@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from statistics import median
 from typing import Any
@@ -14,7 +15,7 @@ def build_weekly_estimation(
 ) -> dict[str, Any]:
     """Estimate weekly use without allowing an observation to train itself.
 
-    Completed accepted cycles are the calibration unit: a dense cycle therefore
+    Completed quality-approved cycles are the calibration unit: a dense cycle therefore
     has exactly one vote.  Every reconstructed interval sees only cycles that
     completed strictly before the interval ended.
     """
@@ -30,18 +31,28 @@ def build_weekly_estimation(
     by_id = {str(c.get("cycle_id")): c for c in cycles}
     cycle_capacity = _cycle_capacities(rows, by_id)
     completed = [
-        (str(c["cycle_id"]), _at(c.get("last_observed_at")), cycle_capacity[str(c["cycle_id"])])
+        (
+            str(c["cycle_id"]),
+            _at(c.get("last_observed_at")),
+            cycle_capacity[str(c["cycle_id"])][0],
+            cycle_capacity[str(c["cycle_id"])][1],
+        )
         for c in cycles
         if _completed_quality(c) and str(c.get("cycle_id")) in cycle_capacity
     ]
     reconstructions, missing, eligible = _walk_forward(rows, completed)
-    final_capacities = [value for _, _, value in completed]
-    capacity = _weighted_median(final_capacities)
+    final_capacities = [value for _, _, value, _ in completed]
+    capacity = _weighted_median(
+        [
+            (value, _recency_weight(base_weight, finished, now))
+            for _, finished, value, base_weight in completed
+        ]
+    )
     capacity_available = len(final_capacities) >= 2 and capacity is not None
     validation = _validation(reconstructions)
     capacity_status = "validated" if capacity_available and validation["status"] == "validated" else "descriptive"
     current = _current_estimate(cycles, rows, capacity if capacity_available else None)
-    scenarios = _pace_scenarios(rows, cycles, now, validation["residual_quantiles"])
+    scenarios = _pace_scenarios(rows, cycles, now, validation["pace_residual_quantiles"])
     return {
         "model_version": MODEL_VERSION,
         "window_kind": "weekly",
@@ -67,7 +78,9 @@ def build_weekly_estimation(
     }
 
 
-def _walk_forward(rows: list[dict[str, Any]], completed: list[tuple[str, str, float]]) -> tuple[list[dict[str, Any]], int, int]:
+def _walk_forward(
+    rows: list[dict[str, Any]], completed: list[tuple[str, str, float, float]]
+) -> tuple[list[dict[str, Any]], int, int]:
     output: list[dict[str, Any]] = []
     missing = eligible = 0
     for row in rows:
@@ -79,15 +92,30 @@ def _walk_forward(rows: list[dict[str, Any]], completed: list[tuple[str, str, fl
             missing += 1
             continue
         ended, cycle_id = _at(row.get("end_observed_at")), str(row.get("cycle_id"))
-        prior = [value for prior_id, finished, value in completed if prior_id != cycle_id and finished < ended]
+        prior = [
+            (value, _recency_weight(base_weight, finished, ended))
+            for prior_id, finished, value, base_weight in completed
+            if prior_id != cycle_id and finished < ended
+        ]
         cap = _weighted_median(prior)
         start, end = _number(row.get("start_used_percent")), _number(row.get("end_used_percent"))
         observed_delta = end - start if start is not None and end is not None else None
         explained = credits / cap if cap else None
+        # Only interpolate inside an interval when the producer supplied a
+        # canonical cumulative-credit sample.  Endpoint-only evidence must not
+        # invent a timing path.
+        cumulative = _number(row.get("cumulative_credits"))
+        estimated = (
+            start + explained * cumulative / credits
+            if start is not None and explained is not None and cumulative is not None
+            else None
+        )
         output.append({
             "cycle_id": cycle_id, "observed_at": row.get("end_observed_at"),
+            "interval_hours": _interval_hours(row),
             "prior_capacity_credits_per_percent": _round(cap),
-            "estimated_used_percent": _round(start + explained) if start is not None and explained is not None else None,
+            "estimated_used_percent": _round(estimated),
+            "representation": "interpolated" if estimated is not None else "endpoint_observed_only",
             "observed_delta": _round(observed_delta), "predicted_delta": _round(explained),
             "anchor_correction": _round(observed_delta - explained) if observed_delta is not None and explained is not None else None,
         })
@@ -101,6 +129,18 @@ def _validation(rows: list[dict[str, Any]]) -> dict[str, Any]:
     training, holdout = evaluated[:-holdout_n] if holdout_n else [], evaluated[-holdout_n:] if holdout_n else []
     residuals = [_number(r["anchor_correction"]) for r in training]
     quantiles = {"p10": _quantile(residuals, .10), "p50": _quantile(residuals, .50), "p90": _quantile(residuals, .90)}
+    pace_residuals = [
+        correction / hours
+        for row in training
+        if (correction := _number(row.get("anchor_correction"))) is not None
+        and (hours := _number(row.get("interval_hours"))) is not None
+        and hours > 0
+    ]
+    pace_quantiles = {
+        "p10": _quantile(pace_residuals, .10),
+        "p50": _quantile(pace_residuals, .50),
+        "p90": _quantile(pace_residuals, .90),
+    }
     coverage = {str(level): _coverage(holdout, residuals, level) for level in (50, 80, 95)}
     errors = [abs(_number(r["anchor_correction"]) or 0) for r in holdout]
     baselines = _baselines(evaluated, len(training))
@@ -114,6 +154,7 @@ def _validation(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "median_absolute_error": _round(median(errors)) if errors else None, "mean_absolute_error": _round(mae),
         "rmse": _round((sum(e * e for e in errors) / len(errors)) ** .5) if errors else None,
         "residual_quantiles": quantiles, "interval_coverage": coverage,
+        "pace_residual_quantiles": pace_quantiles,
         "segmented_errors": {"weekly": {"mean_absolute_error": _round(mae), "sample_size": len(errors)}},
         "baselines": baselines,
         "holdout": {"sample_size": len(holdout), "residual_quantiles": quantiles, "interval_coverage": coverage},
@@ -127,7 +168,11 @@ def _baselines(rows: list[dict[str, Any]], start: int) -> dict[str, dict[str, fl
         actual = _number(target.get("observed_delta"))
         if actual is None or not prior:
             continue
-        deltas = [_number(r.get("observed_delta")) for r in prior if _number(r.get("observed_delta")) is not None]
+        deltas = [
+            value
+            for row in prior
+            if (value := _number(row.get("observed_delta"))) is not None
+        ]
         previous = _number(prior[-1].get("observed_delta"))
         prior_cycle = [r for r in prior if r["cycle_id"] != target["cycle_id"]]
         cycle_delta = _number(prior_cycle[-1].get("observed_delta")) if prior_cycle else None
@@ -141,18 +186,19 @@ def _baselines(rows: list[dict[str, Any]], start: int) -> dict[str, dict[str, fl
 
 
 def _current_estimate(cycles: list[dict[str, Any]], rows: list[dict[str, Any]], capacity: float | None) -> dict[str, Any]:
-    accepted = [c for c in cycles if _quality(c)]
-    if capacity is None or not accepted:
+    quality_cycles = [c for c in cycles if _quality(c)]
+    if capacity is None or not quality_cycles:
         return {"used_percent": None, "clipped": False, "reason": "insufficient_prior_capacity"}
-    latest = max(accepted, key=lambda c: _at(c.get("last_observed_at")))
+    latest = max(quality_cycles, key=lambda c: _at(c.get("last_observed_at")))
     at, used, cycle_id = _at(latest.get("last_observed_at")), _number(latest.get("latest_used_percent")), str(latest.get("cycle_id"))
     post_all = [
         r
         for r in rows
         if str(r.get("cycle_id")) == cycle_id
         and _at(r.get("end_observed_at")) > at
-        and r.get("point_kind") == "positive"
     ]
+    if any(r.get("point_kind") != "positive" or r.get("censor_reason") for r in post_all):
+        return {"used_percent": None, "clipped": False, "reason": "post_observation_boundary"}
     post = [
         r
         for r in post_all
@@ -179,20 +225,57 @@ def _forecast(estimate: dict[str, Any], status: str, validation: dict[str, Any])
             "quantiles": {key: _round(min(100, max(0, center + q[key]))) for key in q}}
 
 
-def _pace_scenarios(rows: list[dict[str, Any]], cycles: list[dict[str, Any]], now: Any, residuals: dict[str, float]) -> dict[str, Any]:
+def _pace_scenarios(
+    rows: list[dict[str, Any]],
+    cycles: list[dict[str, Any]],
+    now: Any,
+    residuals: dict[str, float],
+) -> dict[str, Any]:
     if not rows:
-        return {"status": "observed_only", "reason": "insufficient_recent_pace_samples", "if_current_pace_continues": None, "sample_count": 0}
-    latest_id = max(cycles, key=lambda c: _at(c.get("last_observed_at"))).get("cycle_id") if cycles else None
-    groups = {"recent_6h": [r for r in rows if _age(r, now) <= 6], "trailing_24h": [r for r in rows if _age(r, now) <= 24], "current_cycle": [r for r in rows if r.get("cycle_id") == latest_id], "comparable_prior_cycle": [r for r in rows if r.get("cycle_id") != latest_id]}
-    windows = {name: _median_delta(items) for name, items in groups.items()}
-    values = [v for v in windows.values() if v is not None]
+        return {"status": "observed_only", "reason": "insufficient_recent_pace_samples", "if_current_pace_continues": None, "sample_count": 0, "unit": "percent_per_hour"}
+    latest = max(cycles, key=lambda c: _at(c.get("last_observed_at"))) if cycles else None
+    latest_id = latest.get("cycle_id") if latest else None
+    prior = [c for c in cycles if c.get("cycle_id") != latest_id and _completed_quality(c)]
+    comparable = max(prior, key=lambda c: _at(c.get("last_observed_at"))) if prior else None
+    pace_rows = [
+        row
+        for row in rows
+        if row.get("point_kind") == "positive"
+        and not row.get("censor_reason")
+        and _number(row.get("visible_percent_delta")) is not None
+    ]
+    groups = {
+        "recent_6h": [r for r in pace_rows if _age(r, now) <= 6],
+        "trailing_24h": [r for r in pace_rows if _age(r, now) <= 24],
+        "current_cycle": [r for r in pace_rows if r.get("cycle_id") == latest_id],
+        "comparable_prior_cycle": [
+            r
+            for r in pace_rows
+            if comparable and r.get("cycle_id") == comparable.get("cycle_id")
+        ],
+    }
+    windows = {
+        name: {
+            **_pace_window(items),
+            **(
+                {"cycle_id": str(comparable.get("cycle_id"))}
+                if name == "comparable_prior_cycle" and comparable
+                else {}
+            ),
+        }
+        for name, items in groups.items()
+    }
+    values = [float(item["value"]) for item in windows.values() if item["value"] is not None]
+    sample_count = sum(_interval_hours(row) is not None for row in pace_rows)
     if len(values) < 4:
-        return {"status": "observed_only", "reason": "insufficient_recent_pace_samples", "if_current_pace_continues": None, "contributing_windows": windows, "sample_count": len(values)}
+        return {"status": "observed_only", "reason": "insufficient_recent_pace_samples", "if_current_pace_continues": None, "contributing_windows": windows, "sample_count": sample_count, "unit": "percent_per_hour"}
     center, spread = median(values), [v - median(values) for v in values]
-    return {"status": "conditional", "reason": None, "if_current_pace_continues": _round(center), "contributing_windows": windows, "sample_count": len(values), "low": _round(center + _quantile(spread, .10) + residuals["p10"]), "high": _round(center + _quantile(spread, .90) + residuals["p90"])}
+    return {"status": "conditional", "reason": None, "if_current_pace_continues": _round(center), "contributing_windows": windows, "sample_count": sample_count, "unit": "percent_per_hour", "low": _round(center + _quantile(spread, .10) + residuals["p10"]), "high": _round(center + _quantile(spread, .90) + residuals["p90"])}
 
 
-def _cycle_capacities(rows: list[dict[str, Any]], cycles: dict[str, dict[str, Any]]) -> dict[str, float]:
+def _cycle_capacities(
+    rows: list[dict[str, Any]], cycles: dict[str, dict[str, Any]]
+) -> dict[str, tuple[float, float]]:
     result = {}
     for cycle_id, cycle in cycles.items():
         if not _completed_quality(cycle):
@@ -200,33 +283,86 @@ def _cycle_capacities(rows: list[dict[str, Any]], cycles: dict[str, dict[str, An
         selected = [r for r in rows if str(r.get("cycle_id")) == cycle_id and _eligible(r) and (_number(r.get("price_coverage")) or 0) > 0]
         credits, delta = sum(_number(r.get("estimated_credits")) or 0 for r in selected), sum(max(0, _number(r.get("visible_percent_delta")) or 0) for r in selected)
         if credits > 0 and delta > 0:
-            result[cycle_id] = credits / delta
+            support = sum(
+                (_number(row.get("price_coverage")) or 0) * _interval_quality(row)
+                for row in selected
+            ) / len(selected)
+            quality = 1.0 if cycle.get("quality_grade") == "high" else 0.6
+            result[cycle_id] = (credits / delta, min(1.0, quality * support))
     return result
 
 
-def _total_ratio(rows: list[dict[str, Any]], completed: list[tuple[str, str, float]]) -> float | None:
-    ids = {cycle_id for cycle_id, _, _ in completed}
+def _total_ratio(
+    rows: list[dict[str, Any]], completed: list[tuple[str, str, float, float]]
+) -> float | None:
+    ids = {cycle_id for cycle_id, _, _, _ in completed}
     selected = [r for r in rows if str(r.get("cycle_id")) in ids and _eligible(r) and (_number(r.get("price_coverage")) or 0) > 0]
     credits, delta = sum(_number(r.get("estimated_credits")) or 0 for r in selected), sum(max(0, _number(r.get("visible_percent_delta")) or 0) for r in selected)
     return credits / delta if delta else None
 
 
-def _quality(row: dict[str, Any]) -> bool: return row.get("quality_grade") in {"high", "medium"} and row.get("cycle_state") == "accepted"
-def _completed_quality(row: dict[str, Any]) -> bool: return _quality(row) and row.get("status") == "completed"
+def _quality(row: dict[str, Any]) -> bool:
+    return row.get("quality_grade") in {"high", "medium"} and row.get("status") in {"open", "completed"}
+def _completed_quality(row: dict[str, Any]) -> bool:
+    return _quality(row) and row.get("status") == "completed"
 def _eligible(row: dict[str, Any]) -> bool: return bool(row.get("eligible_for_calibration")) and row.get("point_kind") == "positive"
+def _interval_quality(row: dict[str, Any]) -> float:
+    confidence = _number(row.get("confidence"))
+    return min(1.0, max(0.0, confidence)) if confidence is not None else 1.0
+def _recency_weight(base_weight: float, observed_at: str, reference: Any) -> float:
+    observed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+    reference_at = (
+        reference
+        if isinstance(reference, datetime)
+        else datetime.fromisoformat(_at(reference).replace("Z", "+00:00"))
+    )
+    age_days = max(0.0, (reference_at - observed).total_seconds() / 86400)
+    return base_weight / (1.0 + age_days / 28.0)
 def _number(value: Any) -> float | None: return float(value) if isinstance(value, int | float) else None
 def _round(value: float | None) -> float | None: return round(value, 6) if value is not None else None
 def _at(value: Any) -> str: return str(value or "")
-def _weighted_median(values: list[float]) -> float | None: return median(values) if values else None
-def _median_delta(rows: list[dict[str, Any]]) -> float | None:
-    values = [_number(r.get("visible_percent_delta")) for r in rows]
-    return median([v for v in values if v is not None]) if any(v is not None for v in values) else None
+def _weighted_median(values: list[tuple[float, float]]) -> float | None:
+    weighted = sorted((value, max(0.0, weight)) for value, weight in values if weight > 0)
+    if not weighted:
+        return None
+    threshold = sum(weight for _, weight in weighted) / 2
+    cumulative = 0.0
+    for value, weight in weighted:
+        cumulative += weight
+        if cumulative >= threshold:
+            return value
+    return weighted[-1][0]
+def _pace_rate(rows: list[dict[str, Any]]) -> tuple[float | None, int]:
+    valid = [
+        (delta, hours)
+        for row in rows
+        if (delta := _number(row.get("visible_percent_delta"))) is not None
+        and (hours := _interval_hours(row)) is not None
+        and hours > 0
+    ]
+    total_hours = sum(hours for _, hours in valid)
+    return (
+        (sum(delta for delta, _ in valid) / total_hours if total_hours > 0 else None),
+        len(valid),
+    )
+def _pace_window(rows: list[dict[str, Any]]) -> dict[str, float | int | None]:
+    value, sample_count = _pace_rate(rows)
+    return {"value": _round(value), "sample_count": sample_count}
+def _interval_hours(row: dict[str, Any]) -> float | None:
+    start, end = _at(row.get("start_observed_at")), _at(row.get("end_observed_at"))
+    if not start or not end:
+        return None
+    seconds = (
+        datetime.fromisoformat(end.replace("Z", "+00:00"))
+        - datetime.fromisoformat(start.replace("Z", "+00:00"))
+    ).total_seconds()
+    return seconds / 3600 if seconds > 0 else None
 def _iqr(values: list[float]) -> float | None:
     if len(values) < 2:
         return None
     ordered = sorted(values)
     return median(ordered[len(ordered) // 2 :]) - median(ordered[: (len(ordered) + 1) // 2])
-def _quantile(values: list[float | None], p: float) -> float:
+def _quantile(values: Sequence[float | None], p: float) -> float:
     ordered = sorted(v for v in values if v is not None)
     return ordered[min(len(ordered)-1, int(p*(len(ordered)-1)))] if ordered else 0.0
 def _coverage(rows: list[dict[str, Any]], residuals: list[float | None], level: int) -> float | None:

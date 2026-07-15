@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 
 ALLOWANCE_STATUS_SCHEMA = "codex-usage-tracker-allowance-status-v2"
 ALLOWANCE_SERIES_SCHEMA = "codex-usage-tracker-allowance-series-v2"
 ALLOWANCE_EVIDENCE_SCHEMA = "codex-usage-tracker-allowance-evidence-v2"
 
 
-class AllowancePointKind(StrEnum):
+class AllowancePointKind(str, Enum):
     BASELINE = "baseline"
     POSITIVE = "positive"
     CENSORED = "censored"
     CONFLICT = "conflict"
 
 
-class AllowanceConfidence(StrEnum):
+class AllowanceConfidence(str, Enum):
     HIGH = "high"
     LOW = "low"
     AMBIGUOUS = "ambiguous"
@@ -38,7 +38,7 @@ class AllowanceCycle:
     cohort: AllowanceCohort
     reset_at: int | None
     observations: tuple[dict[str, object], ...]
-    status: str = "accepted"
+    status: str = "open"
 
 
 @dataclass(frozen=True)

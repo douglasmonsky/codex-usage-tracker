@@ -55,7 +55,7 @@ def test_conflicts_and_archive_scopes_never_join():
         _row("archive", 20, 2_000_000_000, "2025-12-31T23:59:00Z", is_archived=1),
     ]
     cycles, intervals = derive_allowance_cycles(rows, now=NOW)
-    assert cycles[0].status == "conflict"
+    assert cycles[0].status == "ambiguous"
     assert all(not cycle.cohort.is_archived for cycle in cycles)
     assert all(not interval.start.get("is_archived", False) for interval in intervals)
 
@@ -106,3 +106,12 @@ def test_existing_epochs_are_scoped_by_archive_window_and_cohort():
         existing_reset_epochs={(True, "weekly", "primary", "codex"): [2_000_000_000]},
     )
     assert cycles[0].reset_at == 2_000_000_030
+
+
+def test_weekly_cycle_states_come_from_reset_chronology():
+    rows = [
+        _row("past", 20, 1_767_225_000, "2025-12-31T22:00:00Z"),
+        _row("open", 2, 2_000_000_000, "2025-12-31T23:59:00Z"),
+    ]
+    cycles, _ = derive_allowance_cycles(rows, now=NOW)
+    assert [cycle.status for cycle in cycles] == ["completed", "open"]

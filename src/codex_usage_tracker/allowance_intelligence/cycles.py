@@ -26,16 +26,16 @@ def select_allowance_cohort(
         return None
     groups: dict[tuple[str, str, str, bool], list[dict[str, Any]]] = {}
     for row in observations:
-        key = (
+        group_key = (
             str(row.get("window_kind") or "unknown"),
             str(row.get("window_key") or "primary"),
             str(row.get("limit_id") or "codex"),
             bool(row.get("is_archived")),
         )
-        groups.setdefault(key, []).append(row)
+        groups.setdefault(group_key, []).append(row)
     candidates = []
     normal_stale = True
-    for (kind, key, limit, archived), group in groups.items():
+    for (kind, window_key, limit, archived), group in groups.items():
         newest = max(group, key=_sort_key)
         age = _age_seconds(newest, now)
         reset = newest.get("resets_at")
@@ -47,7 +47,16 @@ def select_allowance_cohort(
             normal_stale = normal_stale and stale
         viable_alt = _alternate_has_cycle_evidence(group)
         candidates.append(
-            (not stale, normal, viable_alt, _sort_key(newest), kind, key, limit, archived)
+            (
+                not stale,
+                normal,
+                viable_alt,
+                _sort_key(newest),
+                kind,
+                window_key,
+                limit,
+                archived,
+            )
         )
     # Prefer a non-stale normal codex group; ties deterministically retain primary.
     active_normal = [item for item in candidates if item[0] and item[1]]
@@ -56,15 +65,19 @@ def select_allowance_cohort(
     if not available:
         return None
     selected = max(available, key=lambda item: (not item[7], item[0], item[1], item[2], item[3]))
-    _, _, _, _, kind, key, limit, archived = selected
-    return AllowanceCohort(limit, kind, key, archived, True)
+    _, _, _, _, kind, window_key, limit, archived = selected
+    return AllowanceCohort(limit, kind, window_key, archived, True)
 
 
 def derive_allowance_cycles(
-    rows: Iterable[dict[str, Any]], *, now: datetime, existing_reset_epochs: Any = ()
+    rows: Iterable[dict[str, Any]],
+    *,
+    now: datetime,
+    existing_reset_epochs: Any = (),
+    cohort: AllowanceCohort | None = None,
 ) -> tuple[list[AllowanceCycle], list[AllowanceInterval]]:
     """Derive archive-safe cycles and positive/censored interval evidence."""
-    selected = select_allowance_cohort(rows, now=now)
+    selected = cohort or select_allowance_cohort(rows, now=now)
     if selected is None:
         return [], []
     selected_rows = [dict(row) for row in rows if _matches(row, selected)]
@@ -102,14 +115,16 @@ def derive_allowance_cycles(
             index,
         )
         conflict = _has_conflict(bucket)
+        reset_at = bucket[0].get("_cycle_reset")
+        # A cycle is historical only once its advertised reset has passed, or
+        # a later confirmed reset separates it from the currently open cycle.
+        completed = bool(reset_at is not None and (int(reset_at) <= int(now.timestamp()) or index < len(buckets) - 1))
         cycle = AllowanceCycle(
             cycle_id,
             selected,
-            bucket[0].get("_cycle_reset"),
+            reset_at,
             tuple(bucket),
-            "conflict"
-            if conflict
-            else ("ambiguous" if bucket[0].get("_cycle_reset") is None else "accepted"),
+            "ambiguous" if conflict or reset_at is None else ("completed" if completed else "open"),
         )
         cycles.append(cycle)
         intervals.extend(_intervals(cycle, conflict))
@@ -136,7 +151,7 @@ def _intervals(cycle: AllowanceCycle, conflict: bool) -> list[AllowanceInterval]
         if delta > 0:
             eligible = (
                 cycle.cohort.window_kind == "weekly"
-                and cycle.status == "accepted"
+                and cycle.status != "ambiguous"
                 and _tokens_between(anchor, row) > 0
             )
             result.append(
