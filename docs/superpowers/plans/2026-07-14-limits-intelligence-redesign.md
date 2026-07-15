@@ -71,6 +71,7 @@ Expected: PASS.
 **Files:**
 - Create: `src/codex_usage_tracker/store/allowance_schema.py`
 - Modify: `src/codex_usage_tracker/store/schema.py`
+- Modify: `src/codex_usage_tracker/store/deduplication_schema.py`
 - Modify: `tests/store/test_store_migrations.py`
 - Modify: `tests/store/test_usage_deduplication_migration.py`
 
@@ -83,13 +84,13 @@ allowance_intervals
 allowance_analysis_snapshots
 ```
 
-- [ ] Assert indexes exist for `(window_kind, observed_at)`, `(window_kind, cycle_started_at)`, revision lookup, and snapshot cache-key lookup.
+- [ ] Assert indexes exist for latest cohort/window cycle status, cycle time ranges, descending interval evidence, source-revision lookup, and exact snapshot cache-key lookup.
 - [ ] Run the migration tests; expect FAIL because migration 26 is absent.
 - [ ] Implement `migrate_allowance_intelligence_v2(connection)` in the new focused module. Use structural columns only during migration; pricing-dependent estimates remain nullable until service/analysis enrichment.
 - [ ] Store source state as one row containing `source_revision`, `observation_count`, `latest_observed_at`, `model_version`, and `rebuilt_at`.
 - [ ] Store cycles with window/cohort identity, reset bounds, observed start/end percentages, conflict count, canonical observation count, and source revision.
 - [ ] Store intervals with cycle id, endpoint observation ids, token components, nullable credits, coverage/confidence, point kind, and source revision.
-- [ ] Store analysis snapshots by a unique semantic key composed of source revision, model version, archive/rate-card revision, window, cohort, range, granularity, and forecast horizon.
+- [ ] Store analysis snapshots by a unique semantic key composed of source revision, model version, archive scope, window, cohort, and forecast horizon.
 - [ ] Register migration 26 without changing older migrations. Ensure canonical deduplication rebuild invokes derived allowance rebuild rather than preserving stale derived rows.
 - [ ] Run:
 
