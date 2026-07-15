@@ -1,0 +1,122 @@
+"""Deterministic reset-aware allowance cohort, cycle, and interval derivation."""
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import datetime, timezone
+from statistics import median
+from typing import Any, Iterable
+
+from .contracts import AllowanceCohort, AllowanceCycle, AllowanceInterval, AllowancePointKind
+
+MODEL_VERSION = "reset-aware-v2"
+RESET_JITTER_SECONDS = 60
+FRESH_SECONDS = 5 * 60
+AGING_SECONDS = {"weekly": 6 * 60 * 60, "five_hour": 15 * 60}
+
+
+def select_allowance_cohort(rows: Iterable[dict[str, Any]], *, now: datetime) -> AllowanceCohort | None:
+    """Select a normal cohort while fresh/aging, otherwise a proven alternate."""
+    observations = list(rows)
+    if not observations:
+        return None
+    groups: dict[tuple[str, str, str, bool], list[dict[str, Any]]] = {}
+    for row in observations:
+        key = (str(row.get("window_kind") or "unknown"), str(row.get("window_key") or "primary"),
+               str(row.get("limit_id") or "codex"), bool(row.get("is_archived")))
+        groups.setdefault(key, []).append(row)
+    candidates = []
+    for (kind, key, limit, archived), group in groups.items():
+        newest = max(group, key=_sort_key)
+        age = _age_seconds(newest, now)
+        reset = newest.get("resets_at")
+        stale = age > AGING_SECONDS.get(kind, 0) or (isinstance(reset, (int, float)) and reset < now.timestamp())
+        normal = limit == "codex"
+        viable_alt = len(group) >= 3 and len({row.get("used_percent") for row in group}) > 1
+        candidates.append((not stale, normal, viable_alt, _sort_key(newest), kind, key, limit, archived))
+    # Prefer a non-stale normal codex group; ties deterministically retain primary.
+    active_normal = [item for item in candidates if item[0] and item[1]]
+    selected = max(active_normal or [item for item in candidates if item[0] and item[2]] or candidates,
+                   key=lambda item: (not item[7], item[0], item[1], item[2], item[3]))
+    _, _, _, _, kind, key, limit, archived = selected
+    return AllowanceCohort(limit, kind, key, archived, True)
+
+
+def derive_allowance_cycles(rows: Iterable[dict[str, Any]], *, now: datetime) -> tuple[list[AllowanceCycle], list[AllowanceInterval]]:
+    """Derive archive-safe cycles and positive/censored interval evidence."""
+    selected = select_allowance_cohort(rows, now=now)
+    if selected is None:
+        return [], []
+    selected_rows = [dict(row) for row in rows if _matches(row, selected)]
+    selected_rows.sort(key=_sort_key)
+    clustered = _cluster_resets(selected_rows)
+    buckets: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    previous_reset: int | None = None
+    for row in selected_rows:
+        reset = clustered.get(str(row.get("observation_id")))
+        if current and reset != previous_reset:
+            buckets.append(current); current = []
+        row["_cycle_reset"] = reset
+        current.append(row); previous_reset = reset
+    if current: buckets.append(current)
+    cycles: list[AllowanceCycle] = []
+    intervals: list[AllowanceInterval] = []
+    for index, bucket in enumerate(buckets):
+        cycle_id = _id("cycle", selected.key, selected.window_kind, selected.window_key, selected.is_archived, bucket[0].get("_cycle_reset"), index)
+        conflict = _has_conflict(bucket)
+        cycle = AllowanceCycle(cycle_id, selected, bucket[0].get("_cycle_reset"), tuple(bucket), "conflict" if conflict else ("ambiguous" if bucket[0].get("_cycle_reset") is None else "accepted"))
+        cycles.append(cycle)
+        intervals.extend(_intervals(cycle, conflict))
+    return cycles, intervals
+
+
+def _intervals(cycle: AllowanceCycle, conflict: bool) -> list[AllowanceInterval]:
+    rows = cycle.observations
+    if not rows: return []
+    result: list[AllowanceInterval] = []
+    anchor = rows[0]
+    for row in rows[1:]:
+        delta = _number(row.get("used_percent")) - _number(anchor.get("used_percent"))
+        if conflict:
+            result.append(_interval(cycle, anchor, row, AllowancePointKind.CONFLICT, "conflict")); anchor = row; continue
+        if delta > 0:
+            eligible = cycle.cohort.window_kind == "weekly" and cycle.status == "accepted" and _tokens_between(anchor, row) > 0
+            result.append(_interval(cycle, anchor, row, AllowancePointKind.POSITIVE, None, eligible)); anchor = row
+        elif delta < 0 and cycle.cohort.window_kind == "weekly":
+            result.append(_interval(cycle, anchor, row, AllowancePointKind.CENSORED, "weekly_reversal")); anchor = row
+    return result
+
+
+def _interval(cycle: AllowanceCycle, start: dict[str, Any], end: dict[str, Any], kind: AllowancePointKind, reason: str | None, eligible: bool = False) -> AllowanceInterval:
+    return AllowanceInterval(_id("interval", cycle.cycle_id, start.get("observation_id"), end.get("observation_id")), cycle.cycle_id, start, end, kind, reason, eligible)
+
+
+def _cluster_resets(rows: list[dict[str, Any]]) -> dict[str, int | None]:
+    values = sorted({int(row["resets_at"]) for row in rows if isinstance(row.get("resets_at"), (int, float))})
+    clusters: list[list[int]] = []
+    for value in values:
+        if clusters and value - clusters[-1][-1] <= RESET_JITTER_SECONDS: clusters[-1].append(value)
+        else: clusters.append([value])
+    mapping = {value: int(median(cluster)) for cluster in clusters for value in cluster}
+    return {str(row.get("observation_id")): mapping.get(int(row["resets_at"])) if isinstance(row.get("resets_at"), (int, float)) else None for row in rows}
+
+
+def _has_conflict(rows: tuple[dict[str, object], ...] | list[dict[str, Any]]) -> bool:
+    seen: dict[str, object] = {}
+    for row in rows:
+        timestamp = str(row.get("event_timestamp")); used = row.get("used_percent")
+        if timestamp in seen and seen[timestamp] != used: return True
+        seen[timestamp] = used
+    return False
+
+
+def _matches(row: dict[str, Any], cohort: AllowanceCohort) -> bool:
+    return (str(row.get("window_kind") or "unknown"), str(row.get("window_key") or "primary"), str(row.get("limit_id") or "codex"), bool(row.get("is_archived"))) == (cohort.window_kind, cohort.window_key, cohort.key, cohort.is_archived)
+
+def _sort_key(row: dict[str, Any]) -> tuple[str, int, str]: return (str(row.get("event_timestamp") or ""), int(row.get("cumulative_total_tokens") or 0), str(row.get("observation_id") or ""))
+def _number(value: Any) -> float: return float(value) if value is not None else 0.0
+def _tokens_between(start: dict[str, Any], end: dict[str, Any]) -> int: return max(0, int(end.get("cumulative_total_tokens") or 0) - int(start.get("cumulative_total_tokens") or 0))
+def _age_seconds(row: dict[str, Any], now: datetime) -> float:
+    return (now - datetime.fromisoformat(str(row["event_timestamp"]).replace("Z", "+00:00"))).total_seconds()
+def _id(*parts: object) -> str: return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:32]

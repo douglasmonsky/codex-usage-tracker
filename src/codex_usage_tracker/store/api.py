@@ -28,6 +28,7 @@ from codex_usage_tracker.store.allowance_observations import (
 from codex_usage_tracker.store.allowance_observations import (
     sync_allowance_observations_for_record_ids,
 )
+from codex_usage_tracker.store.allowance_materialization import materialize_allowance_intelligence
 from codex_usage_tracker.store.compression_fact_sync import (
     clear_compression_detector_facts,
     sync_compression_detector_facts,
@@ -641,6 +642,7 @@ def _finalize_streamed_usage_event_upserts(
     unique_thread_keys = frozenset(affected_thread_keys)
     if unique_record_ids:
         sync_allowance_observations_for_record_ids(conn, list(unique_record_ids))
+        materialize_allowance_intelligence(conn)
         if maintain_source_records:
             sync_source_records(conn, record_ids=unique_record_ids)
     if stage_callback is not None:
