@@ -1,18 +1,50 @@
-name: CI
+# Parallel Hardening CI Implementation Plan
 
-on:
-  push:
-    branches: [main]
-  pull_request:
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-permissions:
-  contents: read
+**Goal:** Reduce the hardening critical path by splitting independent checks into parallel GitHub Actions jobs and caching pinned policy-tool binaries.
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+**Architecture:** Replace the serial `hardening` implementation with four worker jobs grouped by toolchain and responsibility. A lightweight aggregate job retains the `Hardening gates` name and fails unless every worker succeeds.
 
-jobs:
+**Tech Stack:** GitHub Actions YAML, Python 3.14, Node 22/npm, Go 1.25, Cargo, Actionlint, Gitleaks, Taplo, Zizmor, check-jsonschema.
+
+## Global Constraints
+
+- Preserve every existing hardening command and threshold.
+- Preserve `Hardening gates` as the aggregate visible status name.
+- Use only standard GitHub-hosted runners.
+- Keep Actionlint at `v1.7.12`, Gitleaks at `v8.30.1`, and Taplo CLI at `0.9.0`.
+- Keep the Agent Maintainer override pinned to commit `1129570a725256dcc5f04bee33cdc32c35af911d`.
+- Do not add third-party installer actions.
+- Treat run `29387911750` and its 6m56s hardening duration as the comparison baseline.
+
+---
+
+### Task 1: Split the hardening workers and add caches
+
+**Files:**
+- Modify: `.github/workflows/ci.yml:16-95`
+
+**Interfaces:**
+- Consumes: the existing npm scripts, Python benchmark command, development extra, audit requirements, and repository lint configuration.
+- Produces: worker job results named `hardening_dashboard`, `hardening_routes`, `hardening_python`, and `hardening_policy`.
+
+- [ ] **Step 1: Record the existing workflow baseline**
+
+Run:
+
+```bash
+gh run view 29387911750 --json jobs \
+  --jq '.jobs[] | select(.name == "Hardening gates") | {startedAt, completedAt, conclusion}'
+```
+
+Expected: conclusion `success`, start `2026-07-15T04:00:49Z`, and completion `2026-07-15T04:07:45Z`.
+
+- [ ] **Step 2: Replace the serial hardening job with four worker jobs**
+
+Replace the existing `hardening` block with the following job structure. Retain the existing commands exactly inside their assigned jobs.
+
+```yaml
   hardening_dashboard:
     name: Hardening / Dashboard quality
     runs-on: ubuntu-latest
@@ -163,7 +195,39 @@ jobs:
           check-jsonschema \
             --builtin-schema vendor.dependabot \
             .github/dependabot.yml
+```
 
+- [ ] **Step 3: Validate worker-job YAML and command availability**
+
+Run:
+
+```bash
+actionlint .github/workflows/*.yml
+zizmor --offline --no-progress .github/workflows
+check-jsonschema --builtin-schema vendor.github-workflows \
+  .github/workflows/ci.yml \
+  .github/workflows/pricing-compat.yml \
+  .github/workflows/publish.yml
+```
+
+Expected: all commands exit 0 with no workflow errors.
+
+---
+
+### Task 2: Add the stable aggregate gate and validate the branch
+
+**Files:**
+- Modify: `.github/workflows/ci.yml` immediately after the four hardening worker jobs.
+
+**Interfaces:**
+- Consumes: `needs.<worker>.result` for all four Task 1 worker jobs.
+- Produces: one visible `Hardening gates` status that exits 0 only when every worker result is `success`.
+
+- [ ] **Step 1: Add the aggregate hardening job**
+
+Add:
+
+```yaml
   hardening:
     name: Hardening gates
     if: ${{ always() }}
@@ -185,97 +249,87 @@ jobs:
           test "$ROUTES_RESULT" = success
           test "$PYTHON_RESULT" = success
           test "$POLICY_RESULT" = success
+```
 
-  dashboard-visualization:
-    name: Dashboard visualization contracts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v6.4.0
-        with:
-          node-version: "22"
-      - name: Install dashboard tooling
-        run: npm ci
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Visualization renderer budget
-        run: npm run dashboard:visualization-bundle
-      - name: Visualization browser contracts
-        run: npm run dashboard:visualization-smoke
-      - name: Upload visualization evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: dashboard-visualization-evidence
-          path: test-results/**/*.png
-          if-no-files-found: warn
-          retention-days: 14
+- [ ] **Step 2: Run repository validation**
 
-  test:
-    name: Test Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
-      - uses: actions/setup-node@v6.4.0
-        if: matrix.python-version == '3.14'
-        with:
-          node-version: "22"
-      - name: Ruff
-        if: matrix.python-version == '3.14'
-        run: python -m ruff check .
-      - name: Type check
-        if: matrix.python-version == '3.14'
-        run: python -m mypy
-      - name: Test
-        run: python -m pytest
-      - name: Coverage
-        if: matrix.python-version == '3.14'
-        run: python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
-      - name: Compile
-        run: python -m compileall src
-      - name: Dashboard JavaScript syntax
-        if: matrix.python-version == '3.14'
-        run: |
-          for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
-            node --check "$file"
-          done
-      - name: Release readiness
-        run: python scripts/check_release.py
-      - name: Whitespace
-        run: git diff --check
+Run:
 
-  package:
-    name: Build package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-      - name: Install build tooling
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]" twine
-      - name: Build wheel and sdist
-        run: python -m build
-      - name: Check distributions
-        run: python -m twine check dist/*
-      - name: Verify built wheel
-        run: python scripts/check_release.py --dist
+```bash
+python scripts/check_release.py
+git diff --check
+actionlint .github/workflows/*.yml
+zizmor --offline --no-progress .github/workflows
+yamllint .github .yamllint
+taplo fmt --check pyproject.toml tach.toml
+check-jsonschema --builtin-schema vendor.github-workflows \
+  .github/workflows/ci.yml \
+  .github/workflows/pricing-compat.yml \
+  .github/workflows/publish.yml
+check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml
+```
+
+Expected: every command exits 0. `git diff --check` prints no output.
+
+- [ ] **Step 3: Review and commit the workflow change**
+
+Run:
+
+```bash
+git diff --stat
+git diff -- .github/workflows/ci.yml
+git status --short --branch
+git add -- .github/workflows/ci.yml docs/superpowers/plans/2026-07-15-parallel-hardening-ci.md
+git commit -m "ci: parallelize hardening gates"
+```
+
+Expected: the commit contains only the workflow and implementation plan, with no generated benchmark output or local profiles.
+
+---
+
+### Task 3: Validate the real GitHub critical path
+
+**Files:**
+- No repository file changes expected.
+
+**Interfaces:**
+- Consumes: the pushed task branch and its pull-request workflow run.
+- Produces: measured worker durations and aggregate-gate status for the completion report.
+
+- [ ] **Step 1: Push the task branch and open a ready pull request**
+
+Run:
+
+```bash
+git push -u origin chore/parallel-hardening-ci
+gh pr create --base main --head chore/parallel-hardening-ci \
+  --title "ci: parallelize hardening gates" \
+  --body-file /tmp/codex-usage-tracker-parallel-hardening-pr.md
+```
+
+Expected: GitHub returns the new PR URL.
+
+- [ ] **Step 2: Watch all checks to completion**
+
+Resolve the new PR number and run the repository task wrapper:
+
+```bash
+PR_NUMBER="$(gh pr view --json number --jq .number)"
+/Users/Monsky/.codex/bin/codex-task pr-checks --json -- "$PR_NUMBER"
+```
+
+Expected: all worker jobs and `Hardening gates` pass.
+
+- [ ] **Step 3: Compare actual duration to the baseline**
+
+Run:
+
+```bash
+PR_NUMBER="$(gh pr view --json number --jq .number)"
+RUN_ID="$(gh run list --branch chore/parallel-hardening-ci --event pull_request \
+  --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh pr checks "$PR_NUMBER"
+gh run view "$RUN_ID" --json jobs
+```
+
+Expected: the four hardening worker jobs overlap in time, the aggregate job starts after them, and the measured hardening critical path is reported without claiming more improvement than the timestamps prove.
