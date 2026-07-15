@@ -9,6 +9,7 @@ from codex_usage_tracker.core.usage_identity import usage_identity_from_values
 MIGRATION_NAMES = {
     24: "add canonical usage identity and deduplication",
     25: "recognize clone-rewritten usage timestamps",
+    26: "optimize canonical usage query indexes",
 }
 
 _IDENTITY_COLUMNS = {
@@ -39,6 +40,15 @@ def migrate_clone_rewritten_usage(conn: sqlite3.Connection) -> None:
     ).fetchone()
     if canonical_view is not None:
         _rebuild_canonical_derivatives(conn)
+
+
+def migrate_canonical_query_indexes(conn: sqlite3.Connection) -> None:
+    """Replace the broad duplicate index with canonical query-path indexes."""
+
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(usage_events)")}
+    if not {"is_duplicate", "is_archived", "thread_key"} <= existing:
+        return
+    _create_dedupe_indexes(conn)
 
 
 def _ensure_identity_columns(conn: sqlite3.Connection, existing: set[str]) -> None:
@@ -72,13 +82,28 @@ def _create_dedupe_indexes(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_usage_canonical_record_id ON usage_events(canonical_record_id)"
     )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_duplicate ON usage_events(is_duplicate)")
+    conn.execute("DROP INDEX IF EXISTS idx_usage_duplicate")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_usage_duplicate_reason "
         "ON usage_events(is_duplicate, duplicate_reason)"
     )
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_canonical_fingerprint ON usage_events(usage_fingerprint) WHERE is_duplicate=0"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_canonical_usage_archived_timestamp "
+        "ON usage_events(is_archived, event_timestamp, cumulative_total_tokens) "
+        "WHERE is_duplicate=0"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_canonical_usage_record_id "
+        "ON usage_events(record_id) WHERE is_duplicate=0"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_canonical_usage_legacy_thread "
+        "ON usage_events(is_archived, thread_name, session_id, event_timestamp, "
+        "cumulative_total_tokens) "
+        "WHERE is_duplicate=0 AND (thread_key IS NULL OR thread_key='')"
     )
 
 

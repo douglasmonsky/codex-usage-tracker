@@ -81,6 +81,7 @@ Open `Overview` when you want a quick read on current aggregate usage before sor
 
 - Global dashboard filters narrow Overview and the secondary workspaces by model, reasoning effort, pricing/credit confidence, and time range using the same URL parameters as legacy dashboard links.
 - Metric cards summarize loaded aggregate rows without exposing prompts, assistant text, or raw tool output.
+- Default totals exclude only strict clone/copy fingerprint matches while preserving every physical source row in the local index. The environment status strip shows how many copied rows were excluded; hover it to compare canonical and physical row counts.
 - Time-series charts open on the most recent dates first and can scroll left for earlier history while keeping the value axis visible.
 - `Usage constellation` maps chronology, token volume, cache reuse, model family, waste pressure, and thread continuity in a lazy 3D view. Select a point to open Call Investigator, or switch to the synchronized evidence table for keyboard review and non-WebGL environments.
 - `Recent Calls` keeps the homepage modular: it shows the latest matching calls and lets any row open Call Investigator directly.
@@ -425,5 +426,7 @@ Use `--privacy-mode redacted` or `--privacy-mode strict` before sharing generate
 Remaining 5-hour and weekly allowance is not inferred from the logged-in account plan. When Codex writes local `token_count.rate_limits` snapshots, the dashboard can show the latest observed local-log percentages; otherwise add `~/.codex-usage-tracker/allowance.json` when you want copied allowance state. Local Codex logs may also omit usage from other ChatGPT agentic surfaces that share the same allowance.
 
 Archived sessions are excluded from dashboard payloads by default. The `All history` mode is an explicit opt-in because archived logs can make refreshes slower and can make current dashboards look inflated by older work.
+
+Clone/copy deduplication is independent of archive filtering. A copied historical call is excluded from both active and all-history totals only when its strict versioned fingerprint exactly matches another physical row. New calls made after cloning remain canonical and continue to appear normally. Use `codex-usage-tracker dedupe-diagnostics --json`, MCP `usage_dedupe_diagnostics()`, or `/api/diagnostics/dedupe` when you need the aggregate physical/canonical breakdown behind the dashboard status.
 
 Pricing and Codex credit estimates are source-stamped local calculations. Use `codex-usage-tracker pin-pricing --output <path>` when a report needs to keep the same USD pricing snapshot over time, and use `codex-usage-tracker update-rate-card` when you want an explicit local copy of the bundled Codex credit rate-card snapshot.

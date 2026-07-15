@@ -10,8 +10,9 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 
 - session id, thread name, cwd, source file, turn id, and timestamps
 - model, reasoning effort, context window, token counts, and derived efficiency ratios
-- logical usage fingerprints, canonical record pointers, duplicate reason, and
-  copied-clone exclusion state; physical rows remain stored for provenance
+- versioned usage fingerprints, canonical record pointers, exact-copy exclusion
+  reasons, and copied-clone exclusion state; physical rows remain stored for
+  local provenance while default totals use canonical rows
 - subagent source, role, nickname, parent session id, and parent thread name when present
 - call-origin category, reason, and confidence labels derived from event metadata during indexing
 - archived-session flag, conservative thread key, adjacent aggregate record ids, and materialized thread-level summaries
@@ -25,6 +26,8 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 - bounded local investigation run summaries, including run kind, schema id, content-mode flags, strict summary JSON, branch counts, evidence counts, and timestamps
 
 The content index is intended for local MCP/API exploration. It is not a hosted collection system and it does not change where the original Codex logs live. Normalized command and file-event rows store command roots/labels plus path hashes/basenames rather than full shell commands or full paths; bounded raw snippets remain confined to `content_fragments`.
+
+Cloned Codex tasks can copy historical calls into another local JSONL file. The tracker keeps every physical row and its source metadata in SQLite, but default dashboard, CLI, MCP, report, recommendation, allowance, compression, and export totals use one canonical representative for strict fingerprint matches. Similar calls are never excluded on fuzzy evidence. Deduplication diagnostics expose aggregate totals plus bounded provenance metadata for excluded rows; they never include prompt, response, tool-output, or raw-log content.
 
 ## Shareable Outputs
 

@@ -3,9 +3,9 @@
 import sqlite3
 
 MIGRATION_NAMES = {
-    26: "add allowance intelligence storage",
-    27: "repair allowance intelligence query indexes",
-    28: "persist allowance subscription plan provenance",
+    27: "add allowance intelligence storage",
+    28: "repair allowance intelligence query indexes",
+    29: "persist allowance subscription plan provenance",
 }
 
 

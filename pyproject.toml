@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-usage-tracking"
-version = "0.17.2"
+version = "0.18.0"
 description = "Unofficial local Codex plugin and dashboard for investigating aggregate token usage, costs, caching, and thread patterns."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -62,6 +62,12 @@ dev = [
   "wemake-python-styleguide>=1.6.2; python_version >= '3.11'",
   "yamllint>=1.38.0; python_version >= '3.11'",
   "zizmor>=1.26.1; python_version >= '3.11'",
+]
+
+[dependency-groups]
+performance = [
+  "agent-perf @ git+https://github.com/douglasmonsky/agent-perf.git@132158e9e1848c6c1f04cbf309f9786603fb52b9; python_version >= '3.11'",
+  "scalene==2.3.0; python_version >= '3.11'",
 ]
 
 [project.scripts]

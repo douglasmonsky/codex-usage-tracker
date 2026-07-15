@@ -2,15 +2,19 @@
 
 ## Unreleased
 
-- Add conservative logical usage deduplication so copied clone history is excluded
-  from dashboard, report, recommendation, diagnostic, thread, API, and MCP totals
-  by default while physical source provenance remains available as an opt-in.
 - Redesign Limits Intelligence around weekly credits-per-percentage capacity
   history, a compact current-status row, automatic revision analysis, and zero,
   one, or multiple family-wise-controlled capacity changes. Rejected split
   statistics stay hidden, five-hour usage remains observed context, and the v2
   API/MCP contracts expose capacity points, regimes, provenance, and copied-row
   diagnostics by default.
+
+## 0.18.0 - 2026-07-15
+
+- Exclude exact historical calls copied by cloned Codex tasks from default dashboard, CLI, MCP, report, allowance, compression, recommendation, and export totals while retaining every physical source row for local provenance.
+- Add aggregate deduplication diagnostics across the CLI, MCP server, localhost API, and dashboard status strip, including physical, canonical, and excluded row/token counts with bounded provenance metadata.
+- Preserve new post-clone calls as normal usage, promote a surviving copy when an original source disappears, and migrate existing local indexes without losing usage history.
+- Restore large-history dashboard performance with canonical query indexes and explicit SQLite join/scan plans; the 100,000-row route budget now passes for summaries, recommendations, diagnostics, threads, and thread-call paging.
 
 ## 0.17.2 - 2026-07-09
 
