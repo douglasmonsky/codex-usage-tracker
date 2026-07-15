@@ -17,8 +17,8 @@
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",
-      "nonblank": 411,
-      "physical": 436
+      "nonblank": 424,
+      "physical": 450
     },
     "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": {
       "group": "source",
@@ -39,6 +39,11 @@
       "group": "source",
       "nonblank": 413,
       "physical": 445
+    },
+    "frontend/dashboard/src/features/limits/LimitsPage.tsx": {
+      "group": "source",
+      "nonblank": 648,
+      "physical": 700
     },
     "frontend/dashboard/src/features/shared/tables.tsx": {
       "group": "source",

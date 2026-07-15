@@ -3,7 +3,7 @@ import type {
   AllowanceAnalysisPayload,
   AllowanceCapacityBoundary,
 } from '../../api/allowanceIntelligenceTypes';
-import styles from './LimitsIntelligence.module.css';
+import styles from './AllowanceCapacity.module.css';
 
 type AllowanceCapacityChangeTimelineProps = {
   analysis: AllowanceAnalysisPayload | undefined;

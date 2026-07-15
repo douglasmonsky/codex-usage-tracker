@@ -143,7 +143,7 @@ type AllowanceCycleSummary = {
   quality_grade: string | null;
 };
 
-export type AllowanceCapacityPoint = {
+type AllowanceCapacityPoint = {
   cycle_id: string;
   completed_at: string;
   credits_per_percent: number;
@@ -155,7 +155,7 @@ export type AllowanceCapacityPoint = {
   regime_id: string | null;
 };
 
-export type AllowanceCapacityEffect = {
+type AllowanceCapacityEffect = {
   median_before_credits_per_percent: number;
   median_after_credits_per_percent: number;
   median_shift_credits_per_percent: number;
@@ -177,7 +177,7 @@ export type AllowanceCapacityBoundary = {
   seed?: number | null;
 };
 
-export type AllowanceCapacityRegime = {
+type AllowanceCapacityRegime = {
   regime_id: string;
   start_at: string;
   end_at: string;
@@ -189,7 +189,7 @@ export type AllowanceCapacityRegime = {
   price_coverage: number;
 };
 
-export type AllowanceCapacityHistory = {
+type AllowanceCapacityHistory = {
   status: 'ready' | 'insufficient_completed_cycles' | 'unsupported_window_model';
   unit: 'credits_per_percent';
   points: AllowanceCapacityPoint[];

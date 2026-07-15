@@ -1,6 +1,6 @@
 import { StatusBadge } from '../../design';
 import type { AllowanceReadout, MetricReadout } from './allowanceIntelligenceModel';
-import styles from './LimitsIntelligence.module.css';
+import styles from './AllowanceCapacity.module.css';
 
 type AllowanceCapacityStatusRowProps = {
   readout: Pick<AllowanceReadout, 'weekly' | 'fiveHour' | 'reset' | 'capacity'>;
