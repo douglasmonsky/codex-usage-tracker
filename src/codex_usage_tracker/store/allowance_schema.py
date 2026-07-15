@@ -122,24 +122,41 @@ def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:
         ) WHERE is_archived = 0;
 
         DROP INDEX IF EXISTS idx_allowance_cycles_latest_cohort_window;
+        DROP INDEX IF EXISTS idx_allowance_cycles_cohort_time_range;
         CREATE INDEX idx_allowance_cycles_latest_cohort_window
         ON allowance_cycles(
-            is_archived, window_kind, cohort_key, last_observed_at DESC, cycle_id DESC
+            is_archived, source_revision, window_kind, cohort_key,
+            last_observed_at DESC, cycle_id DESC
         );
 
-        DROP INDEX IF EXISTS idx_allowance_cycles_cohort_time_range;
-        CREATE INDEX idx_allowance_cycles_cohort_time_range
+        CREATE INDEX IF NOT EXISTS idx_allowance_cycles_latest_window
         ON allowance_cycles(
-            is_archived, window_kind, cohort_key, first_observed_at, last_observed_at
+            is_archived, source_revision, window_kind, last_observed_at DESC, cycle_id DESC
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_cycles_series_cohort_window
+        ON allowance_cycles(
+            is_archived, source_revision, window_kind, cohort_key, first_observed_at, cycle_id
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_cycles_series_window
+        ON allowance_cycles(
+            is_archived, source_revision, window_kind, first_observed_at, cycle_id
         );
 
         CREATE INDEX IF NOT EXISTS idx_allowance_cycles_source_revision
         ON allowance_cycles(source_revision);
 
         DROP INDEX IF EXISTS idx_allowance_intervals_cycle_evidence_desc;
-        CREATE INDEX idx_allowance_intervals_cycle_evidence_desc
+        CREATE INDEX IF NOT EXISTS idx_allowance_intervals_evidence_cohort_window
         ON allowance_intervals(
-            is_archived, window_kind, cohort_key, end_observed_at DESC, interval_id DESC
+            is_archived, source_revision, window_kind, cohort_key,
+            end_observed_at DESC, interval_id DESC
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_intervals_evidence_window
+        ON allowance_intervals(
+            is_archived, source_revision, window_kind, end_observed_at DESC, interval_id DESC
         );
 
         CREATE INDEX IF NOT EXISTS idx_allowance_intervals_source_revision

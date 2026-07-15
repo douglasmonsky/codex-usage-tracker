@@ -197,17 +197,24 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
                 "ORDER BY seqno"
             ).fetchall()
         ]
-        cycle_range_index_columns = [
+        cycle_latest_window_index_columns = [
             row["name"]
             for row in conn.execute(
-                "SELECT name FROM pragma_index_info('idx_allowance_cycles_cohort_time_range') "
+                "SELECT name FROM pragma_index_info('idx_allowance_cycles_latest_window') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
+        cycle_series_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_cycles_series_cohort_window') "
                 "ORDER BY seqno"
             ).fetchall()
         ]
         interval_evidence_index_columns = [
             row["name"]
             for row in conn.execute(
-                "SELECT name FROM pragma_index_info('idx_allowance_intervals_cycle_evidence_desc') "
+                "SELECT name FROM pragma_index_info('idx_allowance_intervals_evidence_cohort_window') "
                 "ORDER BY seqno"
             ).fetchall()
         ]
@@ -266,10 +273,15 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
     } <= allowance_observation_indexes
     assert {
         "idx_allowance_cycles_latest_cohort_window",
-        "idx_allowance_cycles_cohort_time_range",
+        "idx_allowance_cycles_latest_window",
+        "idx_allowance_cycles_series_cohort_window",
+        "idx_allowance_cycles_series_window",
         "idx_allowance_cycles_source_revision",
     } <= cycle_indexes
-    assert "idx_allowance_intervals_cycle_evidence_desc" in interval_indexes
+    assert {
+        "idx_allowance_intervals_evidence_cohort_window",
+        "idx_allowance_intervals_evidence_window",
+    } <= interval_indexes
     assert "idx_allowance_intervals_source_revision" in interval_indexes
     assert "idx_allowance_analysis_snapshots_cache_key" in snapshot_indexes
     assert allowance_cycle_archive_column is not None
@@ -278,20 +290,30 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
     assert tuple(allowance_interval_archive_column) == ("INTEGER", 1, "0")
     assert cycle_latest_index_columns == [
         "is_archived",
+        "source_revision",
         "window_kind",
         "cohort_key",
         "last_observed_at",
         "cycle_id",
     ]
-    assert cycle_range_index_columns == [
+    assert cycle_latest_window_index_columns == [
         "is_archived",
+        "source_revision",
+        "window_kind",
+        "last_observed_at",
+        "cycle_id",
+    ]
+    assert cycle_series_index_columns == [
+        "is_archived",
+        "source_revision",
         "window_kind",
         "cohort_key",
         "first_observed_at",
-        "last_observed_at",
+        "cycle_id",
     ]
     assert interval_evidence_index_columns == [
         "is_archived",
+        "source_revision",
         "window_kind",
         "cohort_key",
         "end_observed_at",
