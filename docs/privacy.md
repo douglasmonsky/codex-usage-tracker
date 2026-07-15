@@ -23,7 +23,7 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 
 The content index is intended for local MCP/API exploration. It is not a hosted collection system and it does not change where the original Codex logs live. Normalized command and file-event rows store command roots/labels plus path hashes/basenames rather than full shell commands or full paths; bounded raw snippets remain confined to `content_fragments`.
 
-Cloned Codex tasks can copy historical calls into another local JSONL file. The tracker keeps every physical row and its source metadata in SQLite, but default dashboard, CLI, MCP, report, recommendation, allowance, compression, and export totals use one canonical representative for strict fingerprint matches. Similar calls are never excluded on fuzzy evidence. Deduplication diagnostics expose aggregate row and token counts only; they do not add prompt, response, tool-output, or raw-log content to shareable surfaces.
+Cloned Codex tasks can copy historical calls into another local JSONL file. The tracker keeps every physical row and its source metadata in SQLite, but default dashboard, CLI, MCP, report, recommendation, allowance, compression, and export totals use one canonical representative for strict fingerprint matches. Similar calls are never excluded on fuzzy evidence. Deduplication diagnostics expose aggregate totals plus bounded provenance metadata for excluded rows; they never include prompt, response, tool-output, or raw-log content.
 
 ## Shareable Outputs
 
