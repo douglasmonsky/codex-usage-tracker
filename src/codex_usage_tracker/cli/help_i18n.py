@@ -8,6 +8,8 @@ from collections.abc import Sequence
 from codex_usage_tracker.core.i18n import normalize_language
 
 _ZH_HANS = "zh-Hans"
+_ARGPARSE_DEFAULT_SUFFIX = " (default: %(default)s)"
+_ZH_HANS_DEFAULT_SUFFIX = "（默认值：%(default)s）"
 
 _ZH_HANS_HELP: dict[str, str] = {
     "show this help message and exit": "显示此帮助信息并退出",
@@ -156,6 +158,11 @@ def localized_cli_error_prefix(language: str | None) -> str:
 def _translate(value: str | None) -> str | None:
     if value is None:
         return None
+    if value.endswith(_ARGPARSE_DEFAULT_SUFFIX):
+        base_value = value[: -len(_ARGPARSE_DEFAULT_SUFFIX)]
+        translated = _ZH_HANS_HELP.get(base_value)
+        if translated is not None:
+            return translated + _ZH_HANS_DEFAULT_SUFFIX
     return _ZH_HANS_HELP.get(value, value)
 
 
