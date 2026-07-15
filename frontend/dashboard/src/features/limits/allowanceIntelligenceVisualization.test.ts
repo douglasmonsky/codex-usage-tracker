@@ -1,26 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AllowanceSeriesPayload, AllowanceStatusPayload } from '../../api/types';
 import { buildAllowanceIntelligenceVisualization } from './allowanceIntelligenceVisualization';
+import type { AllowanceSeriesPayload, AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
 
 describe('allowance intelligence visualization', () => {
-  it('keeps observations distinct from reconstructed and validated values', () => {
-    const spec = buildAllowanceIntelligenceVisualization(seriesPayload(), statusPayload(), 'weekly');
+  it('renders weekly capacity instead of usage percentage history', () => {
+    const spec = buildAllowanceIntelligenceVisualization(
+      seriesPayload(),
+      statusPayload(),
+      'weekly',
+      { showFullRange: false },
+    );
 
-    expect(spec.data.rows.map(row => row.observed)).toEqual([10, 20, null, 30, null]);
-    expect(spec.data.rows.at(-1)?.reconstructed).toBe(34);
-    expect(spec.data.rows.at(-1)?.forecast).toBe(34);
-    expect(spec.series.map(series => series.id)).toEqual(['observed', 'reconstructed', 'validated-forecast']);
-    expect(spec.table.defaultSort).toEqual({ field: 'observedAt', direction: 'desc' });
+    expect(spec.title).toBe('Weekly limit capacity over time');
+    expect(spec.data.rows.map(row => row.creditsPerPercent)).toEqual([100, 120, 900, 110]);
+    expect(spec.series.map(series => series.id)).toEqual([
+      'cycle-capacity',
+      'rolling-median',
+      'interquartile-band',
+    ]);
+    expect(spec.axes.y.unit).toBe('credits_per_percent');
+    expect(spec.axes.y.max).toBe(200);
+    expect(spec.annotations).toHaveLength(1);
+    expect(spec.table.defaultSort).toEqual({ field: 'completedAt', direction: 'desc' });
     expect(spec.interactions?.zoom).toEqual({ axis: 'x', startPercent: 0, endPercent: 100 });
   });
 
-  it('does not draw forecast or reconstruction series when evidence is unavailable', () => {
-    const status = statusPayload();
-    status.estimation = undefined;
-    const spec = buildAllowanceIntelligenceVisualization(seriesPayload(), status, 'five_hour');
-    expect(spec.series.map(series => series.id)).toEqual(['observed']);
-    expect(spec.title).toBe('5-hour observed usage');
+  it('discloses robust-domain clipping and supports full range', () => {
+    const robust = buildAllowanceIntelligenceVisualization(
+      seriesPayload(), statusPayload(), 'weekly', { showFullRange: false },
+    );
+    const full = buildAllowanceIntelligenceVisualization(
+      seriesPayload(), statusPayload(), 'weekly', { showFullRange: true },
+    );
+
+    expect(robust.caveats?.join(' ')).toContain('1 capacity point outside the robust range');
+    expect(full.axes.y.max).toBeUndefined();
   });
 });
 
@@ -43,6 +58,52 @@ function seriesPayload(): AllowanceSeriesPayload {
       { kind: 'observed', cycle_id: 'c2', observed_at: '2026-07-15T10:00:00Z', reset_at: null, used_percent: 30 },
     ],
     cycles: [],
+    capacity_history: {
+      status: 'ready',
+      unit: 'credits_per_percent',
+      eligible_cycle_count: 4,
+      trailing_window_cycles: 8,
+      clipped_point_count: 1,
+      robust_domain: { mode: 'tukey_1_5_iqr', min: 80, max: 200 },
+      analysis_status: 'supported_changes',
+      points: [
+        capacityPoint('c1', '2026-06-01T00:00:00Z', 100, null),
+        capacityPoint('c2', '2026-06-08T00:00:00Z', 120, null),
+        capacityPoint('c3', '2026-06-15T00:00:00Z', 900, null),
+        capacityPoint('c4', '2026-06-22T00:00:00Z', 110, 115),
+      ],
+      buckets: [],
+      boundaries: [{
+        boundary_id: 'boundary-2', split_index: 2, before_cycle_id: 'c2', after_cycle_id: 'c3',
+        effective_at: '2026-06-15T00:00:00Z', alpha: 0.05, adjusted_p_value: 0.01,
+        effect_size: {
+          median_before_credits_per_percent: 110,
+          median_after_credits_per_percent: 505,
+          median_shift_credits_per_percent: 395,
+          cliffs_delta: 1,
+        },
+      }],
+      regimes: [],
+    },
+  };
+}
+
+function capacityPoint(
+  cycleId: string,
+  completedAt: string,
+  creditsPerPercent: number,
+  rollingMedian: number | null,
+) {
+  return {
+    cycle_id: cycleId,
+    completed_at: completedAt,
+    credits_per_percent: creditsPerPercent,
+    rolling_median: rollingMedian,
+    rolling_q1: rollingMedian === null ? null : 107.5,
+    rolling_q3: rollingMedian === null ? null : 315,
+    quality_grade: 'high',
+    price_coverage: 1,
+    regime_id: null,
   };
 }
 

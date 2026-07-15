@@ -1,92 +1,77 @@
-import type {
-  AllowanceSeriesPayload,
-  AllowanceStatusPayload,
-  AllowanceWindowKindV2,
-} from '../../api/types';
 import {
   visualizationSpecSchema,
   type CartesianVisualizationSpecV1,
   type VisualizationRecord,
 } from '../../visualization';
+import type {
+  AllowanceSeriesPayload,
+  AllowanceStatusPayload,
+  AllowanceWindowKindV2,
+} from '../../api/allowanceIntelligenceTypes';
+
+type CapacityVisualizationOptions = {
+  showFullRange?: boolean;
+};
 
 export function buildAllowanceIntelligenceVisualization(
   series: AllowanceSeriesPayload,
-  status: AllowanceStatusPayload | undefined,
+  _status: AllowanceStatusPayload | undefined,
   windowKind: AllowanceWindowKindV2,
+  options: CapacityVisualizationOptions = {},
 ): CartesianVisualizationSpecV1 {
-  const rows: VisualizationRecord[] = [...series.points]
-    .sort((left, right) => Date.parse(left.observed_at) - Date.parse(right.observed_at))
-    .map(point => ({
-      id: `${point.cycle_id}:${point.observed_at}:${point.kind}`,
-      observedAt: point.observed_at,
-      observed: point.kind === 'observed' ? point.used_percent ?? null : null,
-      reconstructed: null,
-      forecast: null,
-      forecastLow: null,
-      forecastHigh: null,
-      pointKind: point.kind,
-      cycleId: point.cycle_id,
-    }));
-  const estimation = windowKind === 'weekly' ? status?.estimation : undefined;
-  const reconstructed = estimation?.weekly_estimate.used_percent;
-  const forecast = estimation?.forecast;
-  if (reconstructed !== null && reconstructed !== undefined) {
-    rows.push({
-      id: 'current-reconstruction',
-      observedAt: status?.generated_at ?? series.generated_at,
-      observed: null,
-      reconstructed,
-      forecast: forecast?.used_percent ?? null,
-      forecastLow: forecast?.quantiles?.p10 ?? null,
-      forecastHigh: forecast?.quantiles?.p90 ?? null,
-      pointKind: forecast?.used_percent === null || forecast?.used_percent === undefined ? 'estimated' : 'forecast',
-      cycleId: status?.weekly?.cohort_id ?? 'weekly',
-    });
-  }
-  const title = windowKind === 'weekly' ? 'Weekly usage over time' : '5-hour observed usage';
-  const seriesSpecs: CartesianVisualizationSpecV1['series'] = [{
-    id: 'observed',
-    label: 'Observed usage',
-    mark: 'line',
-    xField: 'observedAt',
-    yField: 'observed',
-    color: '#16866b',
-    smooth: false,
-  }];
-  if (reconstructed !== null && reconstructed !== undefined) {
-    seriesSpecs.push({
-      id: 'reconstructed',
-      label: 'Reconstructed current use',
-      mark: 'point',
-      xField: 'observedAt',
-      yField: 'reconstructed',
-      color: '#2f6fed',
-    });
-  }
-  if (forecast?.used_percent !== null && forecast?.used_percent !== undefined && forecast.quantiles) {
-    seriesSpecs.push({
-      id: 'validated-forecast',
-      label: 'Validated estimate interval',
-      mark: 'point',
-      xField: 'observedAt',
-      yField: 'forecast',
-      lowerField: 'forecastLow',
-      upperField: 'forecastHigh',
-      color: '#7656a8',
-    });
-  }
+  const history = series.capacity_history;
+  const robustDomain = history.robust_domain;
+  const showFullRange = options.showFullRange ?? false;
+  const supportedWindow = windowKind === 'weekly' && history.status !== 'unsupported_window_model';
+  const rows: VisualizationRecord[] = supportedWindow
+    ? [...history.points]
+      .sort((left, right) => Date.parse(left.completed_at) - Date.parse(right.completed_at))
+      .map(point => {
+        const outsideRobustRange = !showFullRange && isOutsideRobustRange(
+          point.credits_per_percent,
+          robustDomain?.min,
+          robustDomain?.max,
+        );
+        return {
+          id: point.cycle_id,
+          completedAt: point.completed_at,
+          creditsPerPercent: point.credits_per_percent,
+          chartCreditsPerPercent: showFullRange
+            ? point.credits_per_percent
+            : clamp(point.credits_per_percent, robustDomain?.min, robustDomain?.max),
+          rollingMedian: point.rolling_median,
+          rollingQ1: point.rolling_q1,
+          rollingQ3: point.rolling_q3,
+          qualityGrade: point.quality_grade,
+          priceCoverage: point.price_coverage,
+          regimeId: point.regime_id,
+          outsideRobustRange,
+        };
+      })
+    : [];
+  const clippedCount = showFullRange ? 0 : history.clipped_point_count ?? 0;
+  const title = 'Weekly limit capacity over time';
+  const copiedRows = series.quality.copied_rows_excluded;
+  const clippedLabel = `${clippedCount} capacity ${clippedCount === 1 ? 'point' : 'points'} outside the robust range; exact values remain in the table.`;
   return {
     schema: visualizationSpecSchema,
-    id: `allowance-intelligence-${windowKind.replace('_', '-')}`,
+    id: 'allowance-capacity-weekly',
     title,
-    description: windowKind === 'weekly'
-      ? 'Observed weekly percentage used, with separately labeled personal reconstruction and validated interval when available.'
-      : 'Observed 5-hour rolling-window usage. Resets break the observed sequence.',
-    state: rows.length >= 2
+    description: supportedWindow
+      ? 'Estimated local credits corresponding to one visible weekly allowance percentage point, summarized with one vote per completed cycle.'
+      : 'The five-hour rolling window includes expiry and cannot use the monotonic weekly credits-per-percentage model.',
+    state: rows.length >= 1
       ? { kind: 'ready' }
-      : { kind: 'insufficient-data', message: 'At least two allowance observations are required.', requiredRows: 2, availableRows: rows.length },
+      : {
+          kind: 'insufficient-data',
+          message: supportedWindow
+            ? 'Capacity history begins after a quality-approved weekly cycle completes.'
+            : 'Five-hour capacity requires a separately validated rolling-decay model.',
+          requiredRows: 1,
+          availableRows: rows.length,
+        },
     scope: {
-      label: `${windowKind === 'weekly' ? 'Weekly' : '5-hour'} · ${series.requested_range.preset} · ${series.granularity}`,
+      label: `Weekly · ${series.requested_range.preset} · ${series.granularity}`,
       rowCount: rows.length,
       historyScope: 'active',
       filters: [],
@@ -96,39 +81,106 @@ export function buildAllowanceIntelligenceVisualization(
       sourceRevision: series.revision ?? 'missing',
     },
     caveats: [
-      'Observed percentages come from local Codex rate-limit snapshots.',
-      'Reconstructed and forecast values use personal priced-usage history and are never official allowance values.',
-      `${series.quality.copied_rows_excluded} copied clone rows were excluded from canonical usage.`,
+      'Credits per 1% is a personal local calibration proxy, not an official allowance total.',
+      ...(clippedCount > 0 ? [clippedLabel] : []),
+      `${copiedRows} copied clone rows were excluded from canonical usage.`,
     ],
     accessibility: {
-      summary: `${title}. ${series.points.length} source points; ${series.cycles.length} cycles. Observed and estimated values are separate series.`,
-      details: ['Reset rows interrupt the observed sequence.', 'Switch to table view for exact values and point kinds.'],
-      keyboardInstructions: 'Use left and right arrow keys to inspect points. Use the range and granularity controls above the chart to change scope.',
+      summary: `${title}. ${rows.length} eligible completed cycles; ${history.boundaries?.length ?? 0} supported changes; ${clippedCount} points outside the robust display range.`,
+      details: [
+        'Cycle points retain exact credits-per-percentage values in the table.',
+        'The rolling line and quartile band use the trailing eight eligible cycles after four cycles are available.',
+      ],
+      keyboardInstructions: 'Use left and right arrow keys to inspect completed cycles. Use the range controls above the chart to change scope.',
     },
     table: {
       caption: `${title} evidence`,
       columns: [
-        { field: 'observedAt', label: 'Observed at', type: 'time', align: 'left' },
-        { field: 'observed', label: 'Observed used', type: 'number', unit: 'percent', align: 'right' },
-        { field: 'reconstructed', label: 'Reconstructed used', type: 'number', unit: 'percent', align: 'right' },
-        { field: 'forecastLow', label: 'Validated low', type: 'number', unit: 'percent', align: 'right' },
-        { field: 'forecastHigh', label: 'Validated high', type: 'number', unit: 'percent', align: 'right' },
-        { field: 'pointKind', label: 'Point kind', type: 'text', align: 'left' },
+        { field: 'completedAt', label: 'Cycle completed', type: 'time', align: 'left' },
+        { field: 'creditsPerPercent', label: 'Credits / 1%', type: 'number', unit: 'credits_per_percent', align: 'right' },
+        { field: 'rollingMedian', label: 'Rolling median', type: 'number', unit: 'credits_per_percent', align: 'right' },
+        { field: 'rollingQ1', label: 'Rolling Q1', type: 'number', unit: 'credits_per_percent', align: 'right' },
+        { field: 'rollingQ3', label: 'Rolling Q3', type: 'number', unit: 'credits_per_percent', align: 'right' },
+        { field: 'qualityGrade', label: 'Quality', type: 'text', align: 'left' },
+        { field: 'priceCoverage', label: 'Price coverage', type: 'number', unit: 'ratio', align: 'right' },
       ],
-      defaultSort: { field: 'observedAt', direction: 'desc' },
+      defaultSort: { field: 'completedAt', direction: 'desc' },
     },
     interactions: {
-      selection: { keyField: 'id', labelField: 'observedAt' },
+      selection: { keyField: 'id', labelField: 'completedAt' },
       zoom: { axis: 'x', startPercent: 0, endPercent: 100 },
       brush: { axis: 'x' },
     },
-    annotations: [],
+    annotations: (history.boundaries ?? []).map(boundary => ({
+      id: boundary.boundary_id,
+      label: `Supported capacity change · ${formatCredits(boundary.effect_size.median_before_credits_per_percent)} to ${formatCredits(boundary.effect_size.median_after_credits_per_percent)} credits / 1%`,
+      kind: 'reference-line',
+      axis: 'x',
+      value: boundary.effective_at,
+      severity: 'info',
+    })),
     kind: 'cartesian',
     data: { rows },
     axes: {
-      x: { field: 'observedAt', label: 'Observed time', type: 'time', unit: 'timestamp' },
-      y: { field: 'observed', label: 'Allowance used', type: 'number', unit: 'percent', min: 0, max: 100 },
+      x: { field: 'completedAt', label: 'Cycle completion', type: 'time', unit: 'timestamp' },
+      y: {
+        field: 'chartCreditsPerPercent',
+        label: 'Weekly limit capacity',
+        type: 'number',
+        unit: 'credits_per_percent',
+        min: showFullRange ? undefined : robustDomain?.min ?? undefined,
+        max: showFullRange ? undefined : robustDomain?.max ?? undefined,
+      },
     },
-    series: seriesSpecs,
+    series: [
+      {
+        id: 'cycle-capacity',
+        label: 'Completed cycle capacity',
+        mark: 'point',
+        xField: 'completedAt',
+        yField: 'chartCreditsPerPercent',
+        color: '#2f6fed',
+      },
+      {
+        id: 'rolling-median',
+        label: 'Trailing 8-cycle median',
+        mark: 'line',
+        xField: 'completedAt',
+        yField: 'rollingMedian',
+        color: '#16866b',
+        smooth: false,
+      },
+      {
+        id: 'interquartile-band',
+        label: 'Trailing interquartile range',
+        mark: 'line',
+        xField: 'completedAt',
+        yField: 'rollingMedian',
+        lowerField: 'rollingQ1',
+        upperField: 'rollingQ3',
+        color: '#7656a8',
+      },
+    ],
   };
+}
+
+function isOutsideRobustRange(
+  value: number,
+  minimum: number | null | undefined,
+  maximum: number | null | undefined,
+): boolean {
+  return (minimum !== null && minimum !== undefined && value < minimum)
+    || (maximum !== null && maximum !== undefined && value > maximum);
+}
+
+function clamp(
+  value: number,
+  minimum: number | null | undefined,
+  maximum: number | null | undefined,
+): number {
+  return Math.min(maximum ?? value, Math.max(minimum ?? value, value));
+}
+
+function formatCredits(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
 }

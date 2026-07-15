@@ -15,6 +15,7 @@ export type VisualizationDataState =
 export type VisualizationUnit =
   | 'count'
   | 'credits'
+  | 'credits_per_percent'
   | 'percent'
   | 'ratio'
   | 'seconds'
