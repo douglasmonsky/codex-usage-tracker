@@ -87,9 +87,9 @@ allowance_analysis_snapshots
 - [ ] Assert indexes exist for the non-archived allowance-observation newest-tail query (including its window-filtered form), latest cohort/window cycle status, cycle time ranges, descending interval evidence, source-revision lookup, and exact snapshot cache-key lookup. Verify the allowance-observation query plans avoid a full scan and temporary order sort.
 - [ ] Run the migration tests; expect FAIL because migration 26 is absent.
 - [ ] Implement `migrate_allowance_intelligence_v2(connection)` in the new focused module. Use structural columns only during migration; pricing-dependent estimates remain nullable until service/analysis enrichment.
-- [ ] Store source state as one row containing `source_revision`, `observation_count`, `latest_observed_at`, `model_version`, and `rebuilt_at`.
-- [ ] Store cycles with window/cohort identity, reset bounds, observed start/end percentages, conflict count, canonical observation count, and source revision.
-- [ ] Store intervals with cycle id, endpoint observation ids, token components, nullable credits, coverage/confidence, point kind, and source revision.
+- [ ] Store source state as one row containing monotonic `allowance_generation`, `source_revision`, canonical `observation_count`, `latest_observed_at`, `model_version`, and last successful `rebuilt_at`.
+- [ ] Store cycles with cycle/window/cohort identity; normalized reset plus raw lower/upper bounds; first/last observation times; start/latest/peak percentages; observation/conflict/reversal/censored-interval counts; canonical token totals; nullable canonical/priced/unpriced credit totals; price coverage; quality grade; cycle state; source revision; and model version.
+- [ ] Store intervals with cycle/window/cohort identity; endpoint observation ids and physical record ids; endpoint times/percentages; visible percent delta and empirical percent resolution; canonical token components; nullable estimated credits; pricing coverage and confidence mix; interval kind and censor reason; simultaneous conflict count; explained/unexplained movement; interpolation/calibration/forecast/change-detection eligibility flags; source revision; and model version.
 - [ ] Store analysis snapshots by a unique semantic key composed of source revision, model version, archive scope, window, cohort, and forecast horizon.
 - [ ] Register migration 26 without changing older migrations. Ensure canonical deduplication rebuild invokes derived allowance rebuild rather than preserving stale derived rows.
 - [ ] Run:
