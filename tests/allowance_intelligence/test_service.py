@@ -106,10 +106,43 @@ def test_stale_weekly_normal_keeps_primary_and_reports_reconciliation(
     connection.execute(
         """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,is_archived,reset_at,first_observed_at,last_observed_at,latest_used_percent,observation_count,canonical_observation_count,canonical_tokens,status,cycle_state,source_revision) VALUES ('weekly-alt','weekly','primary','alternate',0,1784232000,'2026-07-15T11:00:00+00:00','2026-07-15T11:59:00+00:00',5,3,3,1,'accepted','accepted','r1')"""
     )
+    _insert_alternate_observations(connection, [0, 1, 2])
     status = build_allowance_status(connection, now=NOW)
     assert status["cohorts"]["selected"]["weekly"]["id"] == "codex"
     assert status["data_state"] == "partial"
     assert status["cohorts"]["reconciliation"]
+
+
+def test_older_selected_normal_cycle_is_not_an_alternate(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,is_archived,reset_at,first_observed_at,last_observed_at,latest_used_percent,observation_count,canonical_observation_count,canonical_tokens,status,cycle_state,source_revision) VALUES ('week-old','weekly','primary','codex',0,1784000000,'2026-07-14T10:00:00+00:00','2026-07-14T11:00:00+00:00',5,3,3,1,'accepted','accepted','r1')"""
+    )
+    status = build_allowance_status(connection, now=NOW)
+    assert not any(
+        cohort["id"] == "codex" and cohort["window_kind"] == "weekly"
+        for cohort in status["cohorts"]["alternates"]
+    )
+
+
+def test_constant_zero_alternate_observations_are_not_eligible(connection: sqlite3.Connection) -> None:
+    connection.execute("UPDATE allowance_cycles SET reset_at = 1 WHERE cycle_id = 'week'")
+    connection.execute(
+        """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,is_archived,reset_at,first_observed_at,last_observed_at,latest_used_percent,observation_count,canonical_observation_count,canonical_tokens,status,cycle_state,source_revision) VALUES ('weekly-flat','weekly','primary','flat',0,1784232000,'2026-07-15T11:00:00+00:00','2026-07-15T11:59:00+00:00',0,3,3,1,'accepted','accepted','r1')"""
+    )
+    _insert_alternate_observations(connection, [0, 0, 0], cohort="flat")
+    assert not build_allowance_status(connection, now=NOW)["cohorts"]["reconciliation"]
+
+
+def _insert_alternate_observations(
+    connection: sqlite3.Connection, values: list[float], cohort: str = "alternate"
+) -> None:
+    connection.executemany(
+        """INSERT INTO allowance_observations (observation_id,record_id,session_id,event_timestamp,line_number,source,window_key,window_kind,used_percent,resets_at,limit_id,is_archived) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)""",
+        [
+            (f"{cohort}-{index}", f"record-{cohort}-{index}", "session", f"2026-07-15T11:{50 + index:02d}:00+00:00", index, "test", "primary", "weekly", value, 1784232000, cohort)
+            for index, value in enumerate(values)
+        ],
+    )
 
 
 @pytest.mark.parametrize("start_at,end_at", [("not-a-date", "2026-07-15T12:00:00+00:00"), ("2026-07-15T10:00:00", "2026-07-15T12:00:00+00:00"), ("2026-07-15T13:00:00+00:00", "2026-07-15T12:00:00+00:00")])

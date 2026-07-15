@@ -156,11 +156,14 @@ def _cohorts(
             selected_rows[kind] = normal or fallback
     selected = {kind: _cohort(row) for kind, row in selected_rows.items()}
     alternates = []
-    seen = set()
+    seen = {
+        (row["cohort_key"], row["window_kind"], row["window_key"], bool(row["is_archived"]))
+        for row in selected_rows.values()
+    }
     for row in rows:
         diagnostic = _cohort(row)
         key = (diagnostic["id"], diagnostic["window_kind"], diagnostic["window_key"], diagnostic["archived"])
-        if row not in selected_rows.values() and key not in seen:
+        if key not in seen:
             alternates.append(diagnostic)
             seen.add(key)
     reconciliation = []
@@ -172,9 +175,32 @@ def _cohorts(
             and row["cohort_key"] != "codex"
             and row["status"] == "accepted"
             and row["cycle_state"] == "accepted"
-            and int(row["observation_count"] or 0) >= 3
             and _window(row, now)["freshness"] != "stale"
+            and _eligible_alternate(connection, row)
         ]
         if eligible:
             reconciliation.append({"window_kind": "weekly", "normal": _cohort(weekly), "eligible_alternate": _cohort(eligible[0]), "state": "normal_stale_alternate_available"})
     return {"selected": selected, "alternates": alternates, "reconciliation": reconciliation, "rows": rows}
+
+
+def _eligible_alternate(connection: sqlite3.Connection, row: dict[str, Any]) -> bool:
+    """Require Task 3's within-cycle, canonical observed movement evidence."""
+    reset_at = row.get("reset_at")
+    if not isinstance(reset_at, int):
+        return False
+    evidence = connection.execute(
+        """
+        SELECT COUNT(DISTINCT observation_id), COUNT(DISTINCT used_percent)
+        FROM allowance_observations
+        WHERE is_archived = ? AND window_kind = ? AND window_key = ?
+          AND limit_id = ? AND resets_at = ?
+        """,
+        (
+            int(bool(row["is_archived"])),
+            row["window_kind"],
+            row["window_key"],
+            row["cohort_key"],
+            reset_at,
+        ),
+    ).fetchone()
+    return evidence is not None and int(evidence[0]) >= 3 and int(evidence[1]) > 1
