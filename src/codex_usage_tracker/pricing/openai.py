@@ -23,6 +23,10 @@ OPENAI_PRICING_MD_URL = "https://developers.openai.com/api/docs/pricing.md"
 OPENAI_LATEST_MODEL_MD_URL = "https://developers.openai.com/api/docs/guides/latest-model.md"
 VALID_PRICING_TIERS = ("standard", "batch", "flex", "priority")
 
+_LONG_CONTEXT_THRESHOLD_TOKENS = 272_000
+_LONG_CONTEXT_INPUT_MULTIPLIER = 2.0
+_LONG_CONTEXT_OUTPUT_MULTIPLIER = 1.5
+
 _OFFICIAL_PRICING_ALIASES = {
     "gpt-5.6": "gpt-5.6-sol",
 }
@@ -133,11 +137,20 @@ def parse_openai_pricing_markdown(
             continue
         if cached_rate is None:
             cached_rate = input_rate
-        models[model] = {
+        rates = {
             "input_per_million": input_rate,
             "cached_input_per_million": cached_rate,
             "output_per_million": output_rate,
         }
+        if _uses_long_context_pricing(tier, match.group("model"), model):
+            rates.update(
+                {
+                    "long_context_threshold_tokens": _LONG_CONTEXT_THRESHOLD_TOKENS,
+                    "long_context_input_multiplier": _LONG_CONTEXT_INPUT_MULTIPLIER,
+                    "long_context_output_multiplier": _LONG_CONTEXT_OUTPUT_MULTIPLIER,
+                }
+            )
+        models[model] = rates
     if not models:
         raise PricingParseError(
             f"pricing source schema changed: tier {tier!r} rows block contained no "
@@ -267,6 +280,12 @@ def _find_matching_bracket(text: str, start_index: int) -> int:
 
 def _normalize_model_name(model: str) -> str:
     return re.sub(r"\s+\([^)]*context length[^)]*\)\s*$", "", model.strip(), flags=re.I)
+
+
+def _uses_long_context_pricing(tier: str, source_label: str, normalized_model: str) -> bool:
+    return tier in {"standard", "batch", "flex"} and (
+        "context length" in source_label.lower() or normalized_model.startswith("gpt-5.6-")
+    )
 
 
 def _parse_openai_price_value(value: str) -> float | None:

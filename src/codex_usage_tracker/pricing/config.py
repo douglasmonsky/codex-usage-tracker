@@ -171,11 +171,20 @@ def _parsed_model_rates(model: str, rates: object) -> dict[str, float] | None:
     input_rate = _required_rate(rates, "input_per_million", model)
     cached_rate = _optional_rate(rates, "cached_input_per_million")
     output_rate = _required_rate(rates, "output_per_million", model)
-    return {
+    parsed = {
         "input_per_million": float(input_rate),
         "cached_input_per_million": float(cached_rate if cached_rate is not None else input_rate),
         "output_per_million": float(output_rate),
     }
+    for key in (
+        "long_context_threshold_tokens",
+        "long_context_input_multiplier",
+        "long_context_output_multiplier",
+    ):
+        value = _optional_rate(rates, key)
+        if value is not None:
+            parsed[key] = float(value)
+    return parsed
 
 
 def _valid_model_name(model: object) -> TypeGuard[str]:
