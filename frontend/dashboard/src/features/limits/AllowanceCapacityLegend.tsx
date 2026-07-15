@@ -1,5 +1,5 @@
 import type { AllowanceSeriesPayload } from '../../api/allowanceIntelligenceTypes';
-import styles from './LimitsIntelligence.module.css';
+import styles from './AllowanceCapacityLegend.module.css';
 import {
   allowancePlanColor,
   allowancePlanLabel,

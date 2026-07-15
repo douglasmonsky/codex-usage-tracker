@@ -25,6 +25,14 @@ import { AllowanceCapacityMethodology } from './AllowanceCapacityMethodology';
 import { AllowanceCapacityStatusRow } from './AllowanceCapacityStatusRow';
 import { AllowanceEvidenceLedger } from './AllowanceEvidenceLedger';
 import { AllowanceIntelligenceEvidenceTable } from './AllowanceIntelligenceEvidenceTable';
+import {
+  capacityRatio,
+  gradeLabel,
+  gradeTone,
+  intervalStatus,
+  statistic,
+  unexplainedMovement,
+} from './allowanceDisplay';
 import { buildAllowanceReadout } from './allowanceIntelligenceModel';
 import { buildAllowanceIntelligenceVisualization } from './allowanceIntelligenceVisualization';
 import {
@@ -33,10 +41,10 @@ import {
   buildFallbackAllowanceExport,
   evaluateAllowanceHypothesis,
   type AllowanceHypothesis,
-  type AllowanceTone,
 } from './allowanceModel';
 import { buildAllowanceVisualizationSpec } from './allowanceVisualization';
 import { allowanceAnalysisPollInterval, allowanceStatusPollInterval, isPageVisible } from './allowancePolling';
+import { downloadJson, errorMessage } from './limitsPageActions';
 import baseStyles from './LimitsPage.module.css';
 import intelligenceStyles from './LimitsIntelligence.module.css';
 import type { AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
@@ -672,52 +680,4 @@ function syncLimitUrl(windowKind: AllowanceWindowKind, hypothesis: AllowanceHypo
   if (hypothesis === 'decreased') url.searchParams.delete('limit_hypothesis');
   else url.searchParams.set('limit_hypothesis', hypothesis);
   window.history.replaceState(null, '', url);
-}
-
-function capacityRatio(value: number | null | undefined): string {
-  return value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`;
-}
-
-function unexplainedMovement(value: number | null | undefined): string {
-  return value === null || value === undefined ? '—' : `${Math.round(value * 10) / 10}%`;
-}
-
-function statistic(value: number | null | undefined): string {
-  return value === null || value === undefined ? 'Not available' : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
-}
-
-function intervalStatus(workspace: ReturnType<typeof buildAllowanceWorkspace>): string {
-  const evidence = workspace.candidate?.statistical_evidence;
-  const before = evidence?.median_confidence_interval_before_95;
-  const after = evidence?.median_confidence_interval_after_95;
-  if (before?.available && after?.available) return 'Available for both regimes';
-  if (before?.available || after?.available) return 'Available for one regime; the other sample is too small';
-  return 'Unavailable at the current sample size';
-}
-
-function gradeTone(grade: string): AllowanceTone {
-  if (grade === 'strong_local_evidence') return 'risk';
-  if (grade === 'possible_regime_change' || grade === 'inconclusive_other_usage_possible') return 'caution';
-  if (grade === 'no_change_detected') return 'positive';
-  if (grade === 'counter_noise_likely') return 'context';
-  return 'neutral';
-}
-
-function gradeLabel(grade: string): string {
-  return grade.replaceAll('_', ' ');
-}
-
-function downloadJson(filename: string, payload: unknown): void {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

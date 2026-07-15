@@ -2,7 +2,7 @@ import type {
   AllowanceAnalysisPayload,
   AllowanceSeriesPayload,
 } from '../../api/allowanceIntelligenceTypes';
-import styles from './LimitsIntelligence.module.css';
+import styles from './AllowanceCapacityMethodology.module.css';
 
 type AllowanceCapacityMethodologyProps = {
   series: AllowanceSeriesPayload;

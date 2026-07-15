@@ -42,8 +42,8 @@
     },
     "frontend/dashboard/src/features/limits/LimitsPage.tsx": {
       "group": "source",
-      "nonblank": 648,
-      "physical": 700
+      "nonblank": 639,
+      "physical": 683
     },
     "frontend/dashboard/src/features/shared/tables.tsx": {
       "group": "source",
