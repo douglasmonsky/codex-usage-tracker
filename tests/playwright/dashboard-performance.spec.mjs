@@ -58,7 +58,8 @@ test.describe('dashboard release-candidate performance evidence', () => {
     await page.getByRole('button', { name: 'All time', exact: true }).click();
     await expect.poll(() => usageRequests).toBe(1);
     await expect(page.getByRole('button', { name: 'All time', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('region', { name: 'Data window' })).toContainText('500 loaded / 5,000 total');
+    await expect(page.getByRole('region', { name: 'Analysis scope' })).toContainText('5,000 calls analyzed');
+    await expect(page.getByRole('region', { name: 'Analysis scope' })).toContainText('500 detail rows cached');
     await expect(page.getByText('500 ranked evidence rows', { exact: true })).toBeVisible();
     const elapsedMs = performance.now() - startedAt;
 
@@ -146,7 +147,6 @@ test.describe('dashboard release-candidate performance evidence', () => {
     const startedAt = performance.now();
     await page.goto('./?view=calls&sort=cost&qa=r11-performance-cache');
     await expect(page.getByText('500 ranked evidence rows', { exact: true })).toBeVisible();
-    await expect(page.getByText(/Cache hit; loaded 500 of 5,000 calls from All time/i)).toBeVisible();
     const elapsedMs = performance.now() - startedAt;
 
     expect(usageRequests, 'Reload should restore the revision-matched IndexedDB snapshot without another /api/usage request.').toBe(1);
@@ -182,7 +182,9 @@ test.describe('dashboard release-candidate performance evidence', () => {
     await expect(page.getByText('5,000 ranked evidence rows', { exact: true })).toBeVisible();
 
     const startedAt = performance.now();
-    await page.getByRole('button', { name: 'Refresh all dashboard data' }).click();
+    const refreshButton = page.locator('[aria-label="Dashboard toolbar"]').getByRole('button', { name: 'Refresh' });
+    await expect(refreshButton).toBeEnabled({ timeout: 30_000 });
+    await refreshButton.click();
     await expect(page.getByText('5,001 ranked evidence rows', { exact: true })).toBeVisible();
     await page.getByPlaceholder('Search calls, cwd, projects, models...').fill('synthetic-appended-thread');
     await expect(page.getByText('synthetic-appended-thread', { exact: true }).first()).toBeVisible();

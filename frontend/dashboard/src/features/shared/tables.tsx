@@ -8,7 +8,12 @@ import { formatCompact, formatNumber, money, pct } from './format';
 import { stopRowActionKeyDown } from './rowActionEvents';
 
 export const callColumns: Array<ColumnDef<CallRow>> = [
-  { accessorKey: 'time', header: 'Time' },
+  {
+    id: 'time',
+    accessorFn: callTimestampMs,
+    header: 'Time',
+    cell: info => info.row.original.time,
+  },
   { accessorKey: 'thread', header: 'Thread' },
   { accessorKey: 'model', header: 'Model' },
   {
@@ -87,6 +92,11 @@ export const callColumns: Array<ColumnDef<CallRow>> = [
     cell: info => <CallSignalPucks call={info.row.original} />,
   },
 ];
+
+export function callTimestampMs(call: CallRow): number {
+  const parsed = Date.parse(call.eventTimestamp || call.callStartedAt || call.rawTime || call.time);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export const callCsvColumns: Array<CsvColumn<CallRow>> = [
   { header: 'timestamp', value: row => row.eventTimestamp || row.rawTime || row.time },

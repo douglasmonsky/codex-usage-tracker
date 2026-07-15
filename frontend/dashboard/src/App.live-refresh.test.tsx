@@ -74,14 +74,17 @@ it('auto refreshes live dashboards immediately and on interval', async () => {
 
   render(<App />);
   expect(screen.getByText('auto-before-thread')).toBeInTheDocument();
-  expect(screen.getByLabelText('Auto refresh')).toBeChecked();
+  const autoRefreshToggle = screen.getByLabelText('Auto refresh');
+  expect(autoRefreshToggle).not.toBeChecked();
 
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(10_000);
+    fireEvent.click(autoRefreshToggle);
+    await Promise.resolve();
+    await Promise.resolve();
   });
-
-  expect(screen.getByText('auto-first-thread')).toBeInTheDocument();
+  expect(autoRefreshToggle).toBeChecked();
   expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('auto-first-thread')).toBeInTheDocument();
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(10_000);
@@ -151,7 +154,13 @@ vi.stubGlobal('fetch', fetchMock);
 
 render(<App />);
 expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-expect(screen.getByLabelText('Auto refresh')).toBeChecked();
+const autoRefreshToggle = screen.getByLabelText('Auto refresh');
+expect(autoRefreshToggle).not.toBeChecked();
+await act(async () => {
+fireEvent.click(autoRefreshToggle);
+await Promise.resolve();
+});
+expect(autoRefreshToggle).toBeChecked();
 
 await act(async () => {
 await vi.advanceTimersByTimeAsync(20_000);

@@ -199,7 +199,8 @@ function liveWindowEvidence(
     .filter(row => row.window_kind === kind && matchesWindow(row, report))
     .sort(historySort);
   const spans = (report?.spans ?? diagnostics?.spans ?? [])
-    .filter(span => span.window_kind === kind && matchesWindow(span, report));
+    .filter(span => span.window_kind === kind && matchesWindow(span, report))
+    .sort(spanSort);
   const capacityPoints = kind === 'weekly' ? spans.flatMap((span, index) => spanPoint(span, index, report, candidate)) : [];
   const points = capacityPoints.length ? capacityPoints : rows.flatMap((row, index) => historyPoint(row, index, report));
   return {
@@ -263,7 +264,7 @@ function historyPoint(
 }
 
 function fallbackWorkspace(model: DashboardModel, sourceRevision: string): AllowanceWorkspace {
-  const weeklyPoints = model.weeklyWindows.map((window, index) => ({
+  const weeklyPoints = [...model.weeklyWindows].reverse().map((window, index) => ({
     id: `loaded-week-${index}`,
     label: window.week,
     timestamp: null,
@@ -390,7 +391,12 @@ function fallbackReadiness(reason: string): AllowanceResearchReadiness {
 }
 
 function historySort(left: AllowanceHistoryRow, right: AllowanceHistoryRow): number {
-  return Date.parse(left.observed_at ?? '') - Date.parse(right.observed_at ?? '');
+  return Date.parse(right.observed_at ?? '') - Date.parse(left.observed_at ?? '');
+}
+
+function spanSort(left: AllowanceSpan, right: AllowanceSpan): number {
+  return Date.parse(right.end_observed_at ?? right.end_observed_date ?? '')
+    - Date.parse(left.end_observed_at ?? left.end_observed_date ?? '');
 }
 
 function countResets(rows: AllowanceHistoryRow[]): number {

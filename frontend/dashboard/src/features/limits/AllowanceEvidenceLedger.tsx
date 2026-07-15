@@ -20,7 +20,7 @@ export function AllowanceEvidenceLedger({
   onCopyCallLink,
 }: AllowanceEvidenceLedgerProps) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_ROW_COUNT);
-  const rows = useMemo(() => [...window.points].reverse(), [window.points]);
+  const rows = useMemo(() => [...window.points], [window.points]);
   const visibleRows = rows.slice(0, visibleCount);
 
   useEffect(() => setVisibleCount(INITIAL_ROW_COUNT), [window.kind]);

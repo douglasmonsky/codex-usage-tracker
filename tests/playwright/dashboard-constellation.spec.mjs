@@ -1,129 +1,72 @@
 import { expect, test } from '@playwright/test';
-import { PNG } from 'pngjs';
 
-test.describe('usage constellation', () => {
-  test('renders nonblank responsive 3D evidence and opens a plotted call', async ({ page }, testInfo) => {
-    const mobile = testInfo.project.name === 'chromium-mobile';
-    await page.setViewportSize(mobile ? { width: 390, height: 844 } : { width: 1600, height: 900 });
-    if (mobile) await page.emulateMedia({ reducedMotion: 'reduce' });
+test.describe('overview visualization contract', () => {
+  test('renders nonblank overview visualizations without restoring the removed 3D section', async ({ page }) => {
     const browserIssues = collectBrowserIssues(page);
 
-    await page.goto('/?view=overview&qa=r11-usage-constellation');
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto('/?view=overview&qa=r11-overview-visualizations');
     await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
-    const section = page.getByTestId('usage-constellation');
-    await section.scrollIntoViewIfNeeded();
-    await expect(section).toBeVisible();
-    if (mobile) {
-      expect(await section.evaluate(element => element.getAnimations({ subtree: true }).length)).toBe(0);
+
+    await expect(page.getByTestId('usage-constellation')).toHaveCount(0);
+
+    const charts = page.getByTestId('visualization-chart');
+    await expect(charts).toHaveCount(2);
+
+    for (const chart of await charts.all()) {
+      await chart.scrollIntoViewIfNeeded();
+      await expect(chart.locator('svg')).toBeVisible();
+      const contract = await chart.evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        const svg = element.querySelector('svg');
+        const svgRect = svg?.getBoundingClientRect();
+        return {
+          documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          height: rect.height,
+          width: rect.width,
+          svgHeight: svgRect?.height ?? 0,
+          svgWidth: svgRect?.width ?? 0,
+          textLength: element.textContent?.trim().length ?? 0,
+        };
+      });
+      expect(contract.documentOverflow).toBeLessThanOrEqual(2);
+      expect(contract.width).toBeGreaterThan(240);
+      expect(contract.height).toBeGreaterThan(180);
+      expect(contract.svgWidth).toBeGreaterThan(200);
+      expect(contract.svgHeight).toBeGreaterThan(140);
+      expect(contract.textLength).toBeGreaterThan(20);
     }
 
-    let canvas = page.getByTestId('usage-constellation-canvas');
-    await expect(canvas).toHaveAttribute('data-rendered', 'true');
-    await expect(canvas).toHaveAttribute('data-point-count', '8');
-    const before = await canvas.screenshot({ animations: 'disabled' });
-    const pixels = pixelStats(before);
-    expect(pixels.nonBackground, 'constellation must render data pixels').toBeGreaterThan(1_000);
-    expect(pixels.colorBuckets, 'constellation must contain meaningful color variation').toBeGreaterThan(20);
-
-    const canvasBox = await canvas.boundingBox();
-    expect(canvasBox).not.toBeNull();
-    await page.mouse.move(canvasBox.x + (canvasBox.width * 0.55), canvasBox.y + (canvasBox.height * 0.55));
-    await page.mouse.down();
-    await page.mouse.move(canvasBox.x + (canvasBox.width * 0.7), canvasBox.y + (canvasBox.height * 0.48), { steps: 8 });
-    await page.mouse.up();
-    const rotated = await canvas.screenshot({ animations: 'disabled' });
-    expect(pixelDifference(before, rotated), 'dragging must move the 3D camera').toBeGreaterThan(1_000);
-
-    await page.getByRole('button', { name: 'Evidence table', exact: true }).click();
-    const tableRegion = page.getByRole('region', { name: 'Usage constellation evidence', exact: true });
-    await expect(tableRegion).toBeVisible();
-    const tableContract = await tableRegion.evaluate(element => ({
-      canScroll: element.scrollWidth > element.clientWidth,
-      stickyHeader: getComputedStyle(element.querySelector('thead th')).position,
-      openCallButtons: element.querySelectorAll('tbody button').length,
-    }));
-    expect(tableContract.stickyHeader).toBe('sticky');
-    expect(tableContract.openCallButtons).toBe(8);
-    if (mobile) expect(tableContract.canScroll).toBe(true);
-
-    await page.getByRole('button', { name: 'Constellation', exact: true }).click();
-    canvas = page.getByTestId('usage-constellation-canvas');
-    await expect(canvas).toHaveAttribute('data-rendered', 'true');
-    const hit = await canvas.evaluate(element => {
-      const rect = element.getBoundingClientRect();
-      return {
-        x: rect.left + Number(element.dataset.primaryHitX),
-        y: rect.top + Number(element.dataset.primaryHitY),
-      };
-    });
-    await page.mouse.click(hit.x, hit.y);
-    await expect(page).toHaveURL(/view=call/);
-    await expect(page).toHaveURL(/record=fixture-call-/);
-    await expect(page.getByRole('heading', { name: 'Call Investigator', exact: true })).toBeVisible();
-
     expect(browserIssues).toEqual([]);
-    await testInfo.attach(`usage-constellation-${mobile ? 'mobile' : 'desktop'}.png`, {
-      body: before,
-      contentType: 'image/png',
-    });
   });
 
-  test('falls back to the synchronized table when WebGL is unavailable', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'chromium-desktop', 'One browser project owns capability fallback coverage.');
-    await page.addInitScript(() => {
-      const getContext = HTMLCanvasElement.prototype.getContext;
-      HTMLCanvasElement.prototype.getContext = function patchedGetContext(type, ...args) {
-        if (String(type).startsWith('webgl')) return null;
-        return getContext.call(this, type, ...args);
-      };
-    });
-    await page.goto('/?view=overview&qa=r11-usage-constellation-no-webgl');
-    const section = page.getByTestId('usage-constellation');
-    await section.scrollIntoViewIfNeeded();
-    await expect(page.getByRole('region', { name: 'Usage constellation evidence', exact: true })).toBeVisible();
-    await expect(section).toContainText('3D rendering is unavailable');
-    await expect(page.getByRole('button', { name: 'Constellation', exact: true })).toBeDisabled();
+  test('keeps overview visual evidence contained on narrow desktop-style panes', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 450 });
+    await page.goto('/?view=overview&qa=r11-overview-visualizations-narrow');
+    await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+
+    const contract = await page.evaluate(() => ({
+      documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      charts: Array.from(document.querySelectorAll('[data-testid="visualization-chart"]')).map(element => {
+        const rect = element.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      }),
+    }));
+
+    expect(contract.documentOverflow).toBeLessThanOrEqual(2);
+    expect(contract.charts).toHaveLength(2);
+    for (const chart of contract.charts) {
+      expect(chart.width).toBeGreaterThan(200);
+      expect(chart.height).toBeGreaterThan(160);
+    }
   });
 });
-
-function pixelStats(buffer) {
-  const png = PNG.sync.read(buffer);
-  const buckets = new Set();
-  let nonBackground = 0;
-  for (let index = 0; index < png.data.length; index += 4) {
-    const red = png.data[index];
-    const green = png.data[index + 1];
-    const blue = png.data[index + 2];
-    const alpha = png.data[index + 3];
-    if (alpha < 8) continue;
-    const distance = Math.abs(red - 11) + Math.abs(green - 16) + Math.abs(blue - 22);
-    if (distance > 28) nonBackground += 1;
-    buckets.add(`${red >> 4}:${green >> 4}:${blue >> 4}`);
-  }
-  return { colorBuckets: buckets.size, nonBackground };
-}
-
-function pixelDifference(leftBuffer, rightBuffer) {
-  const left = PNG.sync.read(leftBuffer);
-  const right = PNG.sync.read(rightBuffer);
-  expect([right.width, right.height]).toEqual([left.width, left.height]);
-  let changed = 0;
-  for (let index = 0; index < left.data.length; index += 4) {
-    const distance = Math.abs(left.data[index] - right.data[index])
-      + Math.abs(left.data[index + 1] - right.data[index + 1])
-      + Math.abs(left.data[index + 2] - right.data[index + 2]);
-    if (distance > 36) changed += 1;
-  }
-  return changed;
-}
 
 function collectBrowserIssues(page) {
   const issues = [];
   page.on('console', message => {
-    const text = message.text();
-    const expectedPixelReadbackWarning = text.includes('GL Driver Message') && text.includes('ReadPixels');
-    if (!expectedPixelReadbackWarning && (message.type() === 'error' || message.type() === 'warning')) {
-      issues.push(`${message.type()}: ${text}`);
+    if (message.type() === 'error' || message.type() === 'warning') {
+      issues.push(`${message.type()}: ${message.text()}`);
     }
   });
   page.on('pageerror', error => issues.push(`pageerror: ${error.message}`));

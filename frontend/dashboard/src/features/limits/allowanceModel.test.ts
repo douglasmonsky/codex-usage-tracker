@@ -28,6 +28,9 @@ describe('allowance workspace model', () => {
     expect(evaluateAllowanceHypothesis(workspace, 'decreased').badge).toBe('Not supported');
     expect(validateVisualizationSpec(spec)).toEqual([]);
     expect(spec.scope.label).toContain('weekly primary signal');
+    expect(workspace.weekly.points.map(point => point.recordId)).toEqual(['rec-3', 'rec-2']);
+    expect(spec.axes.x.type).toBe('category');
+    expect(spec.table.defaultSort).toEqual({ field: 'window', direction: 'desc' });
   });
 
   it('labels the five-hour view as noisy secondary context', () => {

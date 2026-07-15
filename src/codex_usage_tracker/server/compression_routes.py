@@ -236,10 +236,8 @@ def _compression_http_status(payload: dict[str, object]) -> HTTPStatus:
     code = str(error.get("code") or "")
     if not code:
         return HTTPStatus.OK
-    if code == "compression_run_not_found":
-        return HTTPStatus.NOT_FOUND
-    if code == "compression_run_not_complete":
-        return HTTPStatus.CONFLICT
+    if code in {"compression_run_not_found", "compression_run_not_complete"}:
+        return HTTPStatus.OK
     return HTTPStatus.BAD_REQUEST
 
 

@@ -25,11 +25,11 @@ export function buildAllowanceVisualizationSpec(
   const values = window.points.flatMap(point => [point.estimate, point.low, point.high]).filter(isNumber);
   const ready = rows.length >= 2;
   const hasIntervals = window.points.some(point => point.low !== null && point.high !== null);
-  const xType = window.points.every(point => point.timestamp && Number.isFinite(Date.parse(point.timestamp)))
+  const xType = kind !== 'weekly' && window.points.every(point => point.timestamp && Number.isFinite(Date.parse(point.timestamp)))
     ? 'time'
     : 'category';
   const recentPointCount = Math.min(12, rows.length);
-  const startPercent = rows.length > recentPointCount ? Math.round(100 - (recentPointCount / rows.length) * 100) : 0;
+  const endPercent = rows.length > recentPointCount ? Math.round((recentPointCount / rows.length) * 100) : 100;
   const title = capacityMetric
     ? 'Weekly local capacity evidence'
     : kind === 'weekly' ? 'Observed weekly remaining' : '5-hour rolling context';
@@ -87,11 +87,11 @@ export function buildAllowanceVisualizationSpec(
         ] : []),
         { field: 'grade', label: 'Evidence grade', type: 'text', align: 'left' },
       ],
-      defaultSort: { field: 'window', direction: 'asc' },
+      defaultSort: { field: 'window', direction: 'desc' },
     },
     interactions: {
       selection: { keyField: 'id', labelField: 'window' },
-      zoom: { axis: 'x', startPercent, endPercent: 100 },
+      zoom: { axis: 'x', startPercent: 0, endPercent },
       brush: { axis: 'x' },
     },
     annotations,
@@ -157,8 +157,9 @@ function visualizationRow(point: AllowanceEvidencePoint): VisualizationRecord {
 }
 
 function resetAnnotations(rows: AllowanceHistoryRow[]): VisualizationAnnotation[] {
-  return rows.slice(1).flatMap((row, index) => {
-    const previous = rows[index];
+  const chronologicalRows = chronologicalHistoryRows(rows);
+  return chronologicalRows.slice(1).flatMap((row, index) => {
+    const previous = chronologicalRows[index];
     if (row.used_percent === null || previous.used_percent === null || row.used_percent >= previous.used_percent || !row.observed_at) return [];
     return [{
       id: `allowance-reset-${index}`,
@@ -173,9 +174,10 @@ function resetAnnotations(rows: AllowanceHistoryRow[]): VisualizationAnnotation[
 }
 
 function gapAnnotations(rows: AllowanceHistoryRow[], kind: AllowanceWindowKind): VisualizationAnnotation[] {
+  const chronologicalRows = chronologicalHistoryRows(rows);
   const threshold = (kind === 'weekly' ? 48 : 8) * 60 * 60 * 1000;
-  return rows.slice(1).flatMap((row, index) => {
-    const previous = rows[index];
+  return chronologicalRows.slice(1).flatMap((row, index) => {
+    const previous = chronologicalRows[index];
     const start = Date.parse(previous.observed_at ?? '');
     const end = Date.parse(row.observed_at ?? '');
     if (!Number.isFinite(start) || !Number.isFinite(end) || end - start <= threshold) return [];
@@ -189,6 +191,10 @@ function gapAnnotations(rows: AllowanceHistoryRow[], kind: AllowanceWindowKind):
       severity: 'neutral' as const,
     }];
   });
+}
+
+function chronologicalHistoryRows(rows: AllowanceHistoryRow[]): AllowanceHistoryRow[] {
+  return [...rows].sort((left, right) => Date.parse(left.observed_at ?? '') - Date.parse(right.observed_at ?? ''));
 }
 
 function chartSummary(
