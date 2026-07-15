@@ -12,7 +12,9 @@ from codex_usage_tracker.store.schema import init_db
 NOW = datetime(2026, 7, 15, 12, tzinfo=timezone.utc)
 
 
-def _cycles(values: list[float]) -> list[dict[str, object]]:
+def _cycles(
+    values: list[float], *, plan_types: list[str] | None = None
+) -> list[dict[str, object]]:
     return [
         {
             "cycle_id": f"cycle-{index}",
@@ -22,6 +24,7 @@ def _cycles(values: list[float]) -> list[dict[str, object]]:
             "quality_grade": "high",
             "price_coverage": 1.0,
             "conflict_count": 0,
+            "plan_type": plan_types[index] if plan_types else "pro",
         }
         for index, value in enumerate(values)
     ]
@@ -42,6 +45,31 @@ def test_capacity_history_gives_each_completed_cycle_one_vote() -> None:
     ]
     assert history["points"][-1]["rolling_median"] == 115.0
     assert history["eligible_cycle_count"] == 4
+    assert history["plan_types"] == ["pro"]
+
+
+def test_capacity_history_calculates_trailing_statistics_within_each_plan_type() -> None:
+    history = build_capacity_history(
+        _cycles(
+            [100.0, 10.0, 110.0, 20.0, 120.0, 30.0, 130.0, 40.0],
+            plan_types=["pro", "prolite", "pro", "prolite", "pro", "prolite", "pro", "prolite"],
+        ),
+        granularity="cycle",
+    )
+
+    assert history["plan_types"] == ["pro", "prolite"]
+    assert history["points"][-2]["rolling_median"] == 115.0
+    assert history["points"][-1]["rolling_median"] == 25.0
+    assert [row["plan_type"] for row in history["points"]] == [
+        "pro",
+        "prolite",
+        "pro",
+        "prolite",
+        "pro",
+        "prolite",
+        "pro",
+        "prolite",
+    ]
 
 
 def test_capacity_history_discloses_tukey_outliers_without_dropping_them() -> None:
@@ -76,10 +104,10 @@ def test_load_capacity_cycles_returns_one_aggregate_ratio_per_cycle() -> None:
     connection.execute(
         """INSERT INTO allowance_cycles
         (cycle_id,window_kind,window_key,cohort_key,is_archived,last_observed_at,
-         quality_grade,status,cycle_state,price_coverage,conflict_count,
+         quality_grade,status,cycle_state,price_coverage,conflict_count,plan_type,
          source_revision,model_version)
         VALUES ('cycle-1','weekly','primary','codex',0,?,'high','completed',
-                'completed',1.0,0,'revision-1','reset-aware-v2')""",
+                'completed',1.0,0,'pro','revision-1','reset-aware-v2')""",
         (NOW.isoformat(),),
     )
     for index, (movement, credits) in enumerate(((2.0, 200.0), (3.0, 450.0))):
@@ -115,3 +143,4 @@ def test_load_capacity_cycles_returns_one_aggregate_ratio_per_cycle() -> None:
 
     assert len(rows) == 1
     assert rows[0]["credits_per_percent"] == 130.0
+    assert rows[0]["plan_type"] == "pro"

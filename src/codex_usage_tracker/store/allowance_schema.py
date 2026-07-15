@@ -5,6 +5,7 @@ import sqlite3
 MIGRATION_NAMES = {
     26: "add allowance intelligence storage",
     27: "repair allowance intelligence query indexes",
+    28: "persist allowance subscription plan provenance",
 }
 
 
@@ -32,6 +33,7 @@ def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:
             window_kind TEXT NOT NULL,
             window_key TEXT NOT NULL,
             cohort_key TEXT NOT NULL,
+            plan_type TEXT,
             is_archived INTEGER NOT NULL DEFAULT 0,
             reset_at INTEGER,
             reset_lower_bound INTEGER,
@@ -236,6 +238,16 @@ def migrate_allowance_query_indexes_v3(conn: sqlite3.Connection) -> None:
         );
         """
     )
+
+
+def add_allowance_plan_provenance(conn: sqlite3.Connection) -> None:
+    """Add explicit observed subscription plan provenance to reset windows."""
+    columns = {
+        str(row["name"] if isinstance(row, sqlite3.Row) else row[1])
+        for row in conn.execute("PRAGMA table_info(allowance_cycles)").fetchall()
+    }
+    if "plan_type" not in columns:
+        conn.execute("ALTER TABLE allowance_cycles ADD COLUMN plan_type TEXT")
 
 
 def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:

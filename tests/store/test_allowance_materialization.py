@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from codex_usage_tracker.allowance_intelligence.cycles import MODEL_VERSION
 from codex_usage_tracker.allowance_intelligence.service import build_allowance_status
 from codex_usage_tracker.store import api as store_api
 from codex_usage_tracker.store.allowance_materialization import materialize_allowance_intelligence
@@ -19,6 +20,7 @@ def test_materialization_is_canonical_idempotent_and_archive_safe(tmp_path):
         thread_key="t",
         event_timestamp="2025-12-31T23:58:00Z",
         cumulative_total_tokens=10,
+        rate_limit_plan_type="pro",
         rate_limit_primary_used_percent=10.0,
         rate_limit_primary_window_minutes=10080,
         rate_limit_primary_resets_at=2_000_000_000,
@@ -30,6 +32,7 @@ def test_materialization_is_canonical_idempotent_and_archive_safe(tmp_path):
             thread_key="t2",
             event_timestamp="2025-12-31T23:59:00Z",
             cumulative_total_tokens=20,
+            rate_limit_plan_type="pro",
             rate_limit_primary_used_percent=20.0,
             rate_limit_primary_window_minutes=10080,
             rate_limit_primary_resets_at=2_000_000_000,
@@ -57,10 +60,23 @@ def test_materialization_is_canonical_idempotent_and_archive_safe(tmp_path):
             == 1
         )
         state = conn.execute(
-            "SELECT quality_grade, status, cycle_state FROM allowance_cycles "
+            "SELECT quality_grade, status, cycle_state, plan_type FROM allowance_cycles "
             "WHERE is_archived = 0"
         ).fetchone()
-        assert tuple(state) == ("high", "open", "open")
+        assert tuple(state) == ("high", "open", "open", "pro")
+        conn.execute(
+            "UPDATE allowance_source_state SET model_version = 'reset-aware-v2' WHERE state_id = 1"
+        )
+        assert materialize_allowance_intelligence(
+            conn, now=datetime(2026, 1, 1, tzinfo=timezone.utc)
+        )
+        generation, model_version = conn.execute(
+            "SELECT allowance_generation, model_version FROM allowance_source_state"
+        ).fetchone()
+        assert (generation, model_version) == (2, MODEL_VERSION)
+        assert not materialize_allowance_intelligence(
+            conn, now=datetime(2026, 1, 1, tzinfo=timezone.utc)
+        )
 
 
 def test_materialized_interval_sums_all_calls_between_allowance_anchors(tmp_path):
@@ -318,6 +334,7 @@ def _allowance_event(
         event_timestamp=event_timestamp,
         cumulative_total_tokens=total,
         rate_limit_limit_id="codex",
+        rate_limit_plan_type="pro",
         rate_limit_primary_used_percent=used_percent,
         rate_limit_primary_window_minutes=10080,
         rate_limit_primary_resets_at=2_000_000_000,

@@ -1,4 +1,5 @@
 import type { AllowanceEvidenceRow, AllowanceStatusPayload, AllowanceStatusWindow } from '../../api/allowanceIntelligenceTypes';
+import { allowancePlanLabel, normalizeAllowancePlanType } from './allowancePlanPresentation';
 
 type ReadoutKind = 'observed' | 'estimated' | 'unavailable';
 
@@ -44,7 +45,7 @@ export function buildAllowanceReadout(status: AllowanceStatusPayload | undefined
     ? {
         label: 'Personal calibration',
         value: `${number(capacity.credits_per_percent)} credits / 1%`,
-        detail: `Personal historical calibration from ${capacity.completed_cycle_count} completed cycles; ${percent(capacity.price_coverage * 100)} priced interval coverage.`,
+        detail: `Personal historical calibration from ${capacity.completed_cycle_count} completed reset windows; ${percent(capacity.price_coverage * 100)} priced interval coverage.`,
         grade: titleCase(capacity.status),
         kind: 'estimated',
       }
@@ -100,7 +101,7 @@ function windowReadout(label: string, window: AllowanceStatusWindow | null | und
   return {
     label,
     value: percent(window.used_percent),
-    detail: `${titleCase(window.freshness)} · observed ${timeLabel(window.observed_at)}`,
+    detail: `${allowancePlanLabel(normalizeAllowancePlanType(window.plan_type))} · ${titleCase(window.freshness)} · observed ${timeLabel(window.observed_at)}`,
     grade: titleCase(window.freshness),
     kind: 'observed',
   };

@@ -63,16 +63,24 @@ maximum of five minutes.
 ## Personal Calibration And Forecasts
 
 `credits_per_percent` is a personal, empirical calibration derived from local
-history. A value such as `105.11` means the user's eligible completed cycles
+history. A value such as `105.11` means the user's eligible completed reset windows
 imply approximately 105.11 locally estimated credits per one observed percentage
 point. It is not an official conversion, a hardcoded product rule, or the hidden
 allowance denominator.
 
-Calibration uses completed quality-approved weekly cycles as the unit of evidence,
-so a densely sampled cycle receives one vote rather than dominating the model.
-Weights include recency, interval quality, and price coverage, with each cycle's
-influence capped. At least two completed approved cycles are required before the
+Calibration uses completed quality-approved weekly reset identities as the unit of
+evidence. Interleaved observations carrying the same canonical reset timestamp are
+coalesced into one reset window, so concurrent sessions cannot fragment one window
+into many low-movement pseudo-cycles. Weights include recency, interval quality,
+and price coverage, with each reset window's influence capped. At least two
+completed approved reset windows are required before the
 capacity can move beyond a descriptive result.
+
+Each completed reset window also retains the explicitly logged subscription
+`plan_type`. Capacity points and trailing statistics are separated by plan, so a
+Pro Lite window cannot pull the Pro line up or down. Missing plan metadata is
+reported as `unknown`, and a reset window containing multiple explicit plans is
+reported as `mixed`; neither is guessed from its capacity value.
 
 Each reconstructed interval sees only cycles completed before that interval ended.
 Forecast validation is walk-forward and reports sample size, MAE, RMSE, empirical
@@ -84,8 +92,12 @@ capacity unavailable. The capacity-first Limits page does not foreground the
 percentage forecast or conditional pace.
 
 Missing price coverage is explicit. Change detection requires at least 95% priced
-credit coverage for each eligible cycle. Forecast and calibration payloads report
-their own coverage gaps and never substitute token-count similarity for pricing.
+credit coverage for each eligible reset window. Forecast and calibration payloads
+report their own coverage gaps and never substitute token-count similarity for
+pricing. The Limits chart keeps an open methodology panel beside the evidence: it
+states the ratio formula, explains every mark and filter, shows the observed plan
+color key, and reports the current eligible, excluded, tested, and supported
+counts rather than asking users to infer the method from the visualization.
 
 ## Change Analysis
 
@@ -100,7 +112,11 @@ permutation detector. The result is one of:
 A supported parent boundary may split the history into child segments. Each child
 receives half its parent's alpha budget, so the discovered tree controls
 family-wise false positives rather than treating recursive searches as independent
-tests. A boundary must also have an absolute Cliff's delta of at least `0.474`.
+tests. Histories are first split at every explicitly observed subscription-plan
+transition, and candidate boundaries are tested only within those continuous plan
+segments. The family-wise alpha budget is divided across analyzable plan segments,
+so a Pro Lite-to-Pro transition is visible provenance but can never itself become a
+capacity-change claim. A boundary must also have an absolute Cliff's delta of at least `0.474`.
 Exact permutations are used where bounded; otherwise the detector uses `1,999`
 deterministic Monte Carlo permutations and requires the upper 95% Monte Carlo
 uncertainty bound to clear the allocated alpha—not merely the point estimate.

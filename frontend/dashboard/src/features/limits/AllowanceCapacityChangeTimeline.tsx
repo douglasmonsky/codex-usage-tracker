@@ -39,7 +39,7 @@ export function AllowanceCapacityChangeTimeline({
       )}
 
       <dl className={styles.capacityChangeMeta}>
-        <div><dt>Eligible completed cycles</dt><dd>{analysis?.eligible_cycle_count ?? '—'}</dd></div>
+        <div><dt>Eligible reset windows</dt><dd>{analysis?.eligible_cycle_count ?? '—'}</dd></div>
         <div><dt>Last analyzed</dt><dd>{analysis?.generated_at ? formatDateTime(analysis.generated_at) : running ? 'In progress' : 'Not yet'}</dd></div>
       </dl>
     </Surface>
@@ -72,7 +72,7 @@ function timelineTitle(
   if (hasSupportedChanges) return analysis?.boundaries?.length === 1
     ? '1 reliable capacity change detected'
     : `${analysis?.boundaries?.length ?? 0} reliable capacity changes detected`;
-  if (analysis?.status === 'insufficient_evidence') return 'More completed cycles needed';
+  if (analysis?.status === 'insufficient_evidence') return 'More completed reset windows needed';
   if (analysis?.status === 'missing') return 'Capacity analysis is queued';
   return 'No reliable capacity change detected';
 }
@@ -81,7 +81,7 @@ function timelineExplanation(analysis: AllowanceAnalysisPayload | undefined, run
   if (running) return 'The aggregate-only detector is testing completed-cycle boundaries for this data revision.';
   if (!analysis || analysis.status === 'missing') return 'Analysis starts automatically when this data revision is available.';
   if (analysis.status === 'insufficient_evidence') {
-    return analysis.reason ?? 'There are not yet enough quality-approved completed cycles on both sides of a boundary.';
+    return analysis.reason ?? 'There are not yet enough quality-approved reset windows on both sides of a boundary.';
   }
   return 'No boundary passed both the family-wise significance gate and the strong-effect gate. Rejected candidate values are intentionally hidden.';
 }
@@ -89,7 +89,7 @@ function timelineExplanation(analysis: AllowanceAnalysisPayload | undefined, run
 function statusLabel(analysis: AllowanceAnalysisPayload | undefined): string {
   if (!analysis || analysis.status === 'missing') return 'Queued';
   if (analysis.status === 'insufficient_evidence') return 'Insufficient evidence';
-  return 'Stable within evidence';
+  return 'No supported change';
 }
 
 function formatCredits(value: number): string {

@@ -26,6 +26,7 @@ type AllowanceDedupeQuality = {
 
 export type AllowanceStatusWindow = {
   cohort_id: string;
+  plan_type?: string | null;
   used_percent: number | null;
   remaining_percent: number | null;
   reset_at: number | null;
@@ -141,6 +142,7 @@ type AllowanceCycleSummary = {
   latest_used_percent: number | null;
   status: string;
   quality_grade: string | null;
+  plan_type?: string | null;
 };
 
 type AllowanceCapacityPoint = {
@@ -153,6 +155,7 @@ type AllowanceCapacityPoint = {
   quality_grade: string;
   price_coverage: number;
   regime_id: string | null;
+  plan_type?: string | null;
 };
 
 type AllowanceCapacityEffect = {
@@ -198,6 +201,7 @@ type AllowanceCapacityHistory = {
   clipped_point_count?: number;
   eligible_cycle_count?: number;
   trailing_window_cycles?: number;
+  plan_types?: string[];
   analysis_status?: AllowanceAnalysisStatus;
   boundaries?: AllowanceCapacityBoundary[];
   regimes?: AllowanceCapacityRegime[];

@@ -134,6 +134,28 @@ def test_detector_suppresses_rejected_best_split_effect() -> None:
     assert result["effect_size"] is None
 
 
+def test_detector_never_calls_a_subscription_tier_transition_a_capacity_change() -> None:
+    cycles = _cycles(([40.0] * 8) + ([400.0] * 8))
+    for cycle in cycles[:8]:
+        cycle["plan_type"] = "prolite"
+    for cycle in cycles[8:]:
+        cycle["plan_type"] = "pro"
+
+    result = detect_cycle_changes(
+        cycles,
+        semantic_key="plan-transition",
+        permutation_count=499,
+    )
+
+    assert result["status"] == "no_supported_change"
+    assert result["boundaries"] == []
+    assert [regime["plan_type"] for regime in result["regimes"]] == [
+        "prolite",
+        "pro",
+    ]
+    assert "subscription_plan_segments_analyzed_independently" in result["caveats"]
+
+
 def test_monte_carlo_decision_requires_uncertainty_below_allocated_alpha() -> None:
     assert _monte_carlo_decision_supported(
         method="deterministic_monte_carlo",

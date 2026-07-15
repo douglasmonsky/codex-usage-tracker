@@ -30,9 +30,11 @@ def connection() -> sqlite3.Connection:
 
 
 def test_status_schema_freshness_and_matching_revision_are_compact(connection: sqlite3.Connection) -> None:
+    connection.execute("UPDATE allowance_cycles SET plan_type = 'pro' WHERE cycle_id = 'week'")
     payload = build_allowance_status(connection, now=NOW, privacy_mode="strict")
     assert payload["schema"] == "codex-usage-tracker-allowance-status-v2"
     assert payload["weekly"]["freshness"] == "fresh"
+    assert payload["weekly"]["plan_type"] == "pro"
     assert payload["five_hour"]["freshness"] == "fresh"
     assert payload["next"]["poll_after_seconds"] == 30
     assert build_allowance_status(connection, now=NOW, since_revision="r1") == {
@@ -95,10 +97,12 @@ def test_status_aging_and_reset_make_observation_stale(connection: sqlite3.Conne
 
 
 def test_series_presets_validation_and_evidence_privacy(connection: sqlite3.Connection) -> None:
+    connection.execute("UPDATE allowance_cycles SET plan_type = 'pro' WHERE cycle_id = 'week'")
     series = build_allowance_series(connection, now=NOW, range_preset="24h", granularity="hour")
     assert series["schema"] == "codex-usage-tracker-allowance-series-v2"
     assert [point["kind"] for point in series["points"]] == ["observed"]
     assert series["cycles"][0]["cycle_id"] == "week"
+    assert series["cycles"][0]["plan_type"] == "pro"
     with pytest.raises(ValueError):
         build_allowance_series(connection, now=NOW, range_preset="bad")
     evidence = build_allowance_evidence(connection, privacy_mode="strict")
@@ -133,6 +137,8 @@ def test_weekly_series_returns_chronological_capacity_history(
     assert history["points"] == sorted(
         history["points"], key=lambda row: row["completed_at"]
     )
+    assert history["plan_types"] == ["pro"]
+    assert {row["plan_type"] for row in history["points"]} == {"pro"}
     assert history["clipped_point_count"] == 1
 
 
@@ -252,15 +258,16 @@ def _insert_completed_capacity_cycles(
         observed_at = f"2026-06-{index:02d}T12:00:00+00:00"
         connection.execute(
             """INSERT INTO allowance_cycles
-            (cycle_id,window_kind,window_key,cohort_key,is_archived,
+            (cycle_id,window_kind,window_key,cohort_key,plan_type,is_archived,
              first_observed_at,last_observed_at,quality_grade,status,cycle_state,
              price_coverage,conflict_count,source_revision,model_version)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 cycle_id,
                 "weekly",
                 "primary",
                 "codex",
+                "pro",
                 0,
                 observed_at,
                 observed_at,

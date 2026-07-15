@@ -18,7 +18,7 @@ from codex_usage_tracker.allowance_intelligence.statistics import (
 )
 
 DETECTOR_VERSION = "maxstat-cycle-v1"
-MULTI_DETECTOR_VERSION = "hierarchical-maxstat-cycle-v2"
+MULTI_DETECTOR_VERSION = "hierarchical-maxstat-cycle-v3"
 _EXACT_PERMUTATION_LIMIT = 40_320
 _STRONG_EFFECT_THRESHOLD = 0.474
 
@@ -167,18 +167,40 @@ def detect_cycle_changes(
         ),
     )
     eligible, caveats = _eligible_cycles(ordered)
-    boundaries = _detect_segment(
-        eligible,
-        start=0,
-        end=len(eligible),
-        alpha=familywise_alpha,
-        semantic_key=semantic_key,
-        minimum=min_cycles_per_regime,
-        permutation_count=permutation_count,
-    )
+    plan_segments = _plan_segments(eligible)
+    analyzable_segments = [
+        segment
+        for segment in plan_segments
+        if segment[1] - segment[0] >= 2 * min_cycles_per_regime
+    ]
+    segment_alpha = familywise_alpha / max(1, len(analyzable_segments))
+    boundaries: list[dict[str, Any]] = []
+    for start, end, plan_type in analyzable_segments:
+        segment_key = (
+            semantic_key
+            if len(plan_segments) == 1
+            else f"{semantic_key}:plan:{plan_type}:{start}:{end}"
+        )
+        boundaries.extend(
+            _detect_segment(
+                eligible,
+                start=start,
+                end=end,
+                alpha=segment_alpha,
+                semantic_key=segment_key,
+                minimum=min_cycles_per_regime,
+                permutation_count=permutation_count,
+            )
+        )
     boundaries.sort(key=lambda row: int(row["split_index"]))
-    regimes = _capacity_regimes(eligible, boundaries)
+    forced_plan_splits = [start for start, _, _ in plan_segments[1:]]
+    regimes = _capacity_regimes(
+        eligible,
+        boundaries,
+        forced_splits=forced_plan_splits,
+    )
     singular = boundaries[0] if len(boundaries) == 1 else None
+    enough_evidence = bool(analyzable_segments)
     return {
         "detector_version": MULTI_DETECTOR_VERSION,
         "selection_correction": "hierarchical_max_statistic_cycle_block_permutation",
@@ -187,23 +209,29 @@ def detect_cycle_changes(
         "minimum_cycles_per_regime": min_cycles_per_regime,
         "eligible_cycle_count": len(eligible),
         "excluded_cycle_count": len(ordered) - len(eligible),
-        "candidate_count": max(
-            0, len(eligible) - (2 * min_cycles_per_regime) + 1
+        "candidate_count": sum(
+            max(0, end - start - (2 * min_cycles_per_regime) + 1)
+            for start, end, _ in plan_segments
         ),
         "status": "supported_changes" if boundaries else (
             "no_supported_change"
-            if len(eligible) >= 2 * min_cycles_per_regime
+            if enough_evidence
             else "insufficient_evidence"
         ),
         "reason": None if boundaries else (
             "selection_adjusted_evidence_below_threshold"
-            if len(eligible) >= 2 * min_cycles_per_regime
+            if enough_evidence
             else "insufficient_quality_approved_completed_cycles"
         ),
         "boundaries": boundaries,
         "regimes": regimes,
         "caveats": [
             *caveats,
+            *(
+                ["subscription_plan_segments_analyzed_independently"]
+                if len(plan_segments) > 1
+                else []
+            ),
             "familywise_error_controlled_by_hierarchical_alpha_spending",
             "unsupported_candidate_boundaries_suppressed",
         ],
@@ -215,6 +243,24 @@ def detect_cycle_changes(
             "deprecated_single_boundary" if singular else "not_applicable"
         ),
     }
+
+
+def _plan_segments(
+    cycles: list[dict[str, Any]],
+) -> list[tuple[int, int, str]]:
+    if not cycles:
+        return []
+    segments: list[tuple[int, int, str]] = []
+    start = 0
+    current = str(cycles[0].get("plan_type") or "unknown")
+    for index, cycle in enumerate(cycles[1:], 1):
+        plan_type = str(cycle.get("plan_type") or "unknown")
+        if plan_type == current:
+            continue
+        segments.append((start, index, current))
+        start, current = index, plan_type
+    segments.append((start, len(cycles), current))
+    return segments
 
 
 def _detect_segment(
@@ -380,9 +426,19 @@ def _permutation_result(
 
 
 def _capacity_regimes(
-    cycles: list[dict[str, Any]], boundaries: list[dict[str, Any]]
+    cycles: list[dict[str, Any]],
+    boundaries: list[dict[str, Any]],
+    *,
+    forced_splits: list[int] | None = None,
 ) -> list[dict[str, Any]]:
-    splits = [0, *(int(row["split_index"]) for row in boundaries), len(cycles)]
+    splits = sorted(
+        {
+            0,
+            *(int(row["split_index"]) for row in boundaries),
+            *(forced_splits or []),
+            len(cycles),
+        }
+    )
     regimes = []
     for index, (start, end) in enumerate(
         zip(splits, splits[1:], strict=False), 1
@@ -398,6 +454,7 @@ def _capacity_regimes(
                 "end_at": segment[-1].get("last_observed_at"),
                 "start_index": start,
                 "end_index": end,
+                "plan_type": str(segment[0].get("plan_type") or "unknown"),
                 "eligible_cycle_count": len(segment),
                 "median_credits_per_percent": _rounded(median(values)),
                 "iqr_credits_per_percent": _rounded(

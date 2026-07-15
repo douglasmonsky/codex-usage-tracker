@@ -11,10 +11,26 @@ from typing import Any
 
 from .contracts import AllowanceCohort, AllowanceCycle, AllowanceInterval, AllowancePointKind
 
-MODEL_VERSION = "reset-aware-v2"
+MODEL_VERSION = "reset-aware-v4"
 RESET_JITTER_SECONDS = 60
 FRESH_SECONDS = 5 * 60
 AGING_SECONDS = {"weekly": 6 * 60 * 60, "five_hour": 15 * 60}
+
+
+def observed_plan_type(rows: Iterable[dict[str, Any]]) -> str:
+    """Return one explicit normalized plan type, or a conservative sentinel."""
+    values = set()
+    for row in rows:
+        value = str(row.get("plan_type") or "").strip().lower()
+        if not value:
+            continue
+        normalized = value.replace("-", "_").replace(" ", "_")
+        values.add("prolite" if normalized == "pro_lite" else normalized)
+    if not values:
+        return "unknown"
+    if len(values) > 1:
+        return "mixed"
+    return values.pop()
 
 
 def select_allowance_cohort(
@@ -89,19 +105,29 @@ def derive_allowance_cycles(
         else existing_reset_epochs
     )
     clustered = _cluster_resets(selected_rows, epochs)
-    buckets: list[list[dict[str, Any]]] = []
-    current: list[dict[str, Any]] = []
-    previous_reset: int | None = None
+    reset_buckets: dict[int, list[dict[str, Any]]] = {}
+    unknown_buckets: list[list[dict[str, Any]]] = []
+    current_unknown: list[dict[str, Any]] | None = None
     for row in selected_rows:
         reset = clustered.get(str(row.get("observation_id")))
-        if current and reset != previous_reset:
-            buckets.append(current)
-            current = []
         row["_cycle_reset"] = reset
-        current.append(row)
-        previous_reset = reset
-    if current:
-        buckets.append(current)
+        if reset is None:
+            if current_unknown is None:
+                current_unknown = []
+                unknown_buckets.append(current_unknown)
+            current_unknown.append(row)
+            continue
+        current_unknown = None
+        reset_buckets.setdefault(reset, []).append(row)
+    buckets = [*reset_buckets.values(), *unknown_buckets]
+    buckets.sort(
+        key=lambda bucket: (
+            bucket[0].get("_cycle_reset") is None,
+            int(bucket[0].get("_cycle_reset") or 0),
+            _sort_key(bucket[0]),
+        )
+    )
+    known_resets = set(reset_buckets)
     cycles: list[AllowanceCycle] = []
     intervals: list[AllowanceInterval] = []
     for index, bucket in enumerate(buckets):
@@ -118,7 +144,13 @@ def derive_allowance_cycles(
         reset_at = bucket[0].get("_cycle_reset")
         # A cycle is historical only once its advertised reset has passed, or
         # a later confirmed reset separates it from the currently open cycle.
-        completed = bool(reset_at is not None and (int(reset_at) <= int(now.timestamp()) or index < len(buckets) - 1))
+        completed = bool(
+            reset_at is not None
+            and (
+                int(reset_at) <= int(now.timestamp())
+                or any(candidate > int(reset_at) for candidate in known_resets)
+            )
+        )
         cycle = AllowanceCycle(
             cycle_id,
             selected,

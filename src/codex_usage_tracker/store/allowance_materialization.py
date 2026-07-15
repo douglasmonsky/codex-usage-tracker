@@ -9,7 +9,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from codex_usage_tracker.allowance_intelligence.contracts import AllowanceCohort
-from codex_usage_tracker.allowance_intelligence.cycles import MODEL_VERSION, derive_allowance_cycles
+from codex_usage_tracker.allowance_intelligence.cycles import (
+    MODEL_VERSION,
+    derive_allowance_cycles,
+    observed_plan_type,
+)
 from codex_usage_tracker.pricing.allowance_config import load_allowance_config
 from codex_usage_tracker.pricing.allowance_usage import annotate_rows_with_allowance
 
@@ -46,9 +50,10 @@ def _materialize(conn: sqlite3.Connection, now: datetime) -> bool:
     ]
     revision = _revision(rows)
     old = conn.execute(
-        "SELECT source_revision, allowance_generation FROM allowance_source_state WHERE state_id=1"
+        "SELECT source_revision, allowance_generation, model_version "
+        "FROM allowance_source_state WHERE state_id=1"
     ).fetchone()
-    changed = old is None or str(old[0]) != revision
+    changed = old is None or str(old[0]) != revision or str(old[2]) != MODEL_VERSION
     if not changed:
         return False
     existing_epochs: dict[tuple[bool, str, str, str], list[int]] = {}
@@ -114,12 +119,13 @@ def _materialize(conn: sqlite3.Connection, now: datetime) -> bool:
         observations = cycle.observations
         cycle_pricing = _cycle_pricing(pricing_by_cycle.get(cycle.cycle_id, []))
         conn.execute(
-            """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,is_archived,reset_at,reset_lower_bound,reset_upper_bound,first_observed_at,last_observed_at,start_used_percent,end_used_percent,latest_used_percent,peak_used_percent,observation_count,conflict_count,reversal_count,censored_interval_count,canonical_observation_count,canonical_tokens,canonical_credits,priced_credits,unpriced_credits,price_coverage,quality_grade,status,cycle_state,source_revision,model_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,plan_type,is_archived,reset_at,reset_lower_bound,reset_upper_bound,first_observed_at,last_observed_at,start_used_percent,end_used_percent,latest_used_percent,peak_used_percent,observation_count,conflict_count,reversal_count,censored_interval_count,canonical_observation_count,canonical_tokens,canonical_credits,priced_credits,unpriced_credits,price_coverage,quality_grade,status,cycle_state,source_revision,model_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 cycle.cycle_id,
                 cycle.cohort.window_kind,
                 cycle.cohort.window_key,
                 cycle.cohort.key,
+                observed_plan_type(observations),
                 int(cycle.cohort.is_archived),
                 cycle.reset_at,
                 cycle.reset_at,

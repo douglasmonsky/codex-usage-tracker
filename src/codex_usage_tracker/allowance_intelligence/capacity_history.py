@@ -37,6 +37,7 @@ def build_capacity_history(
         "robust_domain": domain,
         "clipped_point_count": _clipped_count(points, domain),
         "eligible_cycle_count": len(points),
+        "plan_types": sorted({str(point["plan_type"]) for point in points}),
         "trailing_window_cycles": trailing_window,
         "regime_boundary_count": len(regime_boundaries),
     }
@@ -125,6 +126,7 @@ def _normalized_cycle(row: Mapping[str, Any]) -> dict[str, Any]:
         "credits_per_percent": round(float(row["credits_per_percent"]), 6),
         "quality_grade": str(row.get("quality_grade") or "unknown"),
         "price_coverage": round(float(row.get("price_coverage") or 0), 6),
+        "plan_type": str(row.get("plan_type") or "unknown"),
         "regime_id": None,
     }
 
@@ -133,10 +135,13 @@ def _rolling_points(
     cycles: list[dict[str, Any]], *, trailing_window: int
 ) -> list[dict[str, Any]]:
     points: list[dict[str, Any]] = []
-    for index, cycle in enumerate(cycles):
-        start = max(0, index - trailing_window + 1)
+    plan_history: dict[str, list[dict[str, Any]]] = {}
+    for cycle in cycles:
+        plan_cycles = plan_history.setdefault(str(cycle["plan_type"]), [])
+        plan_cycles.append(cycle)
+        start = max(0, len(plan_cycles) - trailing_window)
         values = [
-            float(row["credits_per_percent"]) for row in cycles[start : index + 1]
+            float(row["credits_per_percent"]) for row in plan_cycles[start:]
         ]
         enough = len(values) >= 4
         points.append(

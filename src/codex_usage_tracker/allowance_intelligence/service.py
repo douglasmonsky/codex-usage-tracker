@@ -190,7 +190,7 @@ def _window(row: dict[str, Any] | None, now: datetime) -> dict[str, Any] | None:
     )
     freshness = "stale" if stale else ("fresh" if age <= 300 else "aging")
     used = row.get("latest_used_percent")
-    return {"cohort_id": row["cohort_key"], "used_percent": used, "remaining_percent": None if used is None else max(0, 100 - float(used)), "reset_at": reset, "reset_countdown_seconds": max(0, int(reset - now.timestamp())) if isinstance(reset, (int, float)) else None, "observed_at": row["last_observed_at"], "age_seconds": age, "freshness": freshness, "status": row["status"], "pricing_coverage": row.get("price_coverage"), "quality": row.get("quality_grade"), "canonical_source_revision": row.get("source_revision")}
+    return {"cohort_id": row["cohort_key"], "plan_type": row.get("plan_type"), "used_percent": used, "remaining_percent": None if used is None else max(0, 100 - float(used)), "reset_at": reset, "reset_countdown_seconds": max(0, int(reset - now.timestamp())) if isinstance(reset, (int, float)) else None, "observed_at": row["last_observed_at"], "age_seconds": age, "freshness": freshness, "status": row["status"], "pricing_coverage": row.get("price_coverage"), "quality": row.get("quality_grade"), "canonical_source_revision": row.get("source_revision")}
 
 
 def _revision(conn: sqlite3.Connection) -> str | None:
@@ -214,7 +214,7 @@ def _row_freshness(row: dict[str, Any], now: datetime) -> str:
     window = _window(row, now)
     assert window is not None
     return str(window["freshness"])
-def _cycle(row: dict[str, Any]) -> dict[str, Any]: return {key: row.get(key) for key in ("cycle_id", "reset_at", "first_observed_at", "last_observed_at", "latest_used_percent", "status", "quality_grade")}
+def _cycle(row: dict[str, Any]) -> dict[str, Any]: return {key: row.get(key) for key in ("cycle_id", "reset_at", "first_observed_at", "last_observed_at", "latest_used_percent", "status", "quality_grade", "plan_type")}
 def _available_range(rows: list[dict[str, Any]]) -> dict[str, str | None]: return {"start_at": rows[0]["first_observed_at"] if rows else None, "end_at": rows[-1]["last_observed_at"] if rows else None}
 def _copied_excluded(conn: sqlite3.Connection, include_archived: bool) -> int:
     try:

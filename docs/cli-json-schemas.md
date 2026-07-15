@@ -295,12 +295,13 @@ disclosed in every applicable payload.
   "schema": "codex-usage-tracker-allowance-status-v2",
   "revision": "r-synthetic-42",
   "changed": true,
-  "model_version": "reset-aware-v2",
+  "model_version": "reset-aware-v4",
   "generated_at": "2026-07-15T12:00:00+00:00",
   "data_as_of": "2026-07-15T11:58:00+00:00",
   "data_state": "fresh",
   "weekly": {
     "cohort_id": "codex-pro",
+    "plan_type": "pro",
     "used_percent": 42.0,
     "remaining_percent": 58.0,
     "reset_at": 1784145600,
@@ -347,7 +348,7 @@ official conversion.
 ```json
 {
   "schema": "codex-usage-tracker-allowance-series-v2",
-  "model_version": "reset-aware-v2",
+  "model_version": "reset-aware-v4",
   "generated_at": "2026-07-15T12:00:00+00:00",
   "revision": "r-synthetic-42",
   "requested_range": {"preset": "8w", "start_at": "2026-05-20T12:00:00+00:00", "end_at": "2026-07-15T12:00:00+00:00"},
@@ -361,17 +362,18 @@ official conversion.
     {"kind": "reset", "cycle_id": "cycle-6", "observed_at": "2026-07-13T12:00:00+00:00", "reset_at": 1783972800}
   ],
   "cycles": [
-    {"cycle_id": "cycle-7", "reset_at": 1784145600, "first_observed_at": "2026-07-13T12:01:00+00:00", "last_observed_at": "2026-07-15T11:58:00+00:00", "latest_used_percent": 42.0, "status": "open", "quality_grade": "high"}
+    {"cycle_id": "cycle-7", "reset_at": 1784145600, "first_observed_at": "2026-07-13T12:01:00+00:00", "last_observed_at": "2026-07-15T11:58:00+00:00", "latest_used_percent": 42.0, "status": "open", "quality_grade": "high", "plan_type": "pro"}
   ],
   "capacity_history": {
     "status": "ready",
     "unit": "credits_per_percent",
     "eligible_cycle_count": 63,
+    "plan_types": ["pro", "prolite"],
     "trailing_window_cycles": 8,
     "robust_domain": {"mode": "tukey_1_5_iqr", "min": 51.2, "max": 181.7},
     "clipped_point_count": 2,
     "points": [
-      {"cycle_id": "cycle-6", "completed_at": "2026-07-13T12:00:00+00:00", "credits_per_percent": 105.11, "rolling_median": 101.8, "rolling_q1": 88.4, "rolling_q3": 116.9, "quality_grade": "high", "price_coverage": 1.0, "regime_id": "regime-2"}
+      {"cycle_id": "cycle-6", "completed_at": "2026-07-13T12:00:00+00:00", "credits_per_percent": 105.11, "rolling_median": 101.8, "rolling_q1": 88.4, "rolling_q3": 116.9, "quality_grade": "high", "price_coverage": 1.0, "plan_type": "pro", "regime_id": "regime-2"}
     ],
     "boundaries": [],
     "regimes": []
@@ -383,7 +385,9 @@ Supported presets are `24h`, `7d`, `8w`, `6m`, and `all`; custom ranges are
 bounded to 366 days. The `all` capacity view reads indexed aggregate cycle rows,
 not raw transcript content. Five-hour series return
 `capacity_history.status="unsupported_window_model"` because rolling expiry needs
-a different model.
+a different model. `capacity_history.plan_types` and each point's `plan_type` come
+from observed rate-limit metadata. Unknown or mixed plan windows remain explicit;
+clients must not infer a subscription plan from capacity values.
 
 ### Latest-first evidence
 
@@ -394,7 +398,7 @@ a different model.
 ```json
 {
   "schema": "codex-usage-tracker-allowance-evidence-v2",
-  "model_version": "reset-aware-v2",
+  "model_version": "reset-aware-v4",
   "generated_at": "2026-07-15T12:00:00+00:00",
   "revision": "r-synthetic-42",
   "privacy_mode": "normal",
@@ -432,7 +436,7 @@ returns the shared job envelope below.
   "window_kind": "weekly",
   "parameters": {"min_cycles_per_regime": 4, "permutation_count": 1999, "familywise_alpha": 0.05},
   "quality": {"canonical": true, "copied_rows_excluded": 17},
-  "detector_version": "hierarchical-maxstat-cycle-v2",
+  "detector_version": "hierarchical-maxstat-cycle-v3",
   "selection_correction": "hierarchical_max_statistic_cycle_block_permutation",
   "eligible_cycle_count": 63,
   "excluded_cycle_count": 2,
@@ -444,9 +448,9 @@ returns the shared job envelope below.
     {"boundary_id": "boundary-newer", "effective_at": "2026-06-15T00:00:00+00:00", "alpha": 0.025, "adjusted_p_value": 0.006, "effect_size": {"median_before_credits_per_percent": 101.0, "median_after_credits_per_percent": 78.0, "median_shift_credits_per_percent": -23.0, "cliffs_delta": -0.71}}
   ],
   "regimes": [
-    {"regime_id": "regime-1", "start_at": "2025-12-01T00:00:00+00:00", "end_at": "2026-02-22T00:00:00+00:00", "start_index": 0, "end_index": 20, "eligible_cycle_count": 20, "median_credits_per_percent": 142.0, "iqr_credits_per_percent": 18.0, "price_coverage": 1.0},
-    {"regime_id": "regime-2", "start_at": "2026-03-01T00:00:00+00:00", "end_at": "2026-06-08T00:00:00+00:00", "start_index": 20, "end_index": 45, "eligible_cycle_count": 25, "median_credits_per_percent": 101.0, "iqr_credits_per_percent": 13.0, "price_coverage": 1.0},
-    {"regime_id": "regime-3", "start_at": "2026-06-15T00:00:00+00:00", "end_at": "2026-07-13T00:00:00+00:00", "start_index": 45, "end_index": 63, "eligible_cycle_count": 18, "median_credits_per_percent": 78.0, "iqr_credits_per_percent": 9.0, "price_coverage": 1.0}
+    {"regime_id": "regime-1", "plan_type": "pro", "start_at": "2025-12-01T00:00:00+00:00", "end_at": "2026-02-22T00:00:00+00:00", "start_index": 0, "end_index": 20, "eligible_cycle_count": 20, "median_credits_per_percent": 142.0, "iqr_credits_per_percent": 18.0, "price_coverage": 1.0},
+    {"regime_id": "regime-2", "plan_type": "pro", "start_at": "2026-03-01T00:00:00+00:00", "end_at": "2026-06-08T00:00:00+00:00", "start_index": 20, "end_index": 45, "eligible_cycle_count": 25, "median_credits_per_percent": 101.0, "iqr_credits_per_percent": 13.0, "price_coverage": 1.0},
+    {"regime_id": "regime-3", "plan_type": "pro", "start_at": "2026-06-15T00:00:00+00:00", "end_at": "2026-07-13T00:00:00+00:00", "start_index": 45, "end_index": 63, "eligible_cycle_count": 18, "median_credits_per_percent": 78.0, "iqr_credits_per_percent": 9.0, "price_coverage": 1.0}
   ],
   "caveats": ["Local observed allowance only; outside usage may be missing."]
 }
@@ -455,7 +459,12 @@ returns the shared job envelope below.
 The detector may return zero, one, or multiple supported boundaries. It controls
 family-wise error with hierarchical alpha spending, requires a strong effect, and
 requires Monte Carlo uncertainty—not just the p-value point estimate—to clear the
-allocated alpha. A `no_supported_change` payload intentionally leaves deprecated
+allocated alpha. Explicit subscription-plan transitions split the history into
+independently analyzed continuous segments, with the family-wise alpha divided
+across analyzable segments; a tier transition is never itself a capacity-change
+candidate. Regimes disclose their observed `plan_type`, and the caveats include
+`subscription_plan_segments_analyzed_independently` when this safeguard applies.
+A `no_supported_change` payload intentionally leaves deprecated
 singular p-value and before/after median fields null; rejected candidates are not
 default report data.
 
