@@ -161,6 +161,7 @@ query_allowance_evidence(connection, *, limit=50, cursor=None, window_kind=None,
 
 **Files:**
 - Create: `src/codex_usage_tracker/allowance_intelligence/service.py`
+- Modify: `src/codex_usage_tracker/allowance_intelligence/contracts.py`
 - Modify: `src/codex_usage_tracker/allowance_intelligence/__init__.py`
 - Create: `tests/allowance_intelligence/test_service.py`
 
@@ -175,7 +176,9 @@ codex-usage-tracker-allowance-evidence-v2
 - [ ] Test freshness exactly: weekly is `fresh` through 5 minutes and `aging` through 6 hours; five-hour is `fresh` through 5 minutes and `aging` through 15 minutes; older values are `stale`, and passing the reported reset timestamp makes an older observation stale immediately.
 - [ ] Test range/granularity presets: Day=`24h`, Week=`7d`, Month=`8w`, six-month overview=`6m`, plus validated custom start/end and granularity.
 - [ ] Implement status with weekly first, optional five-hour, used/remaining, reset countdown, `observed_at`, freshness, cohort/conflict diagnostics, pricing coverage, canonical source revision, copied-row exclusion diagnostics, `changed`, and a compact `next` action. Accept `include_archived` and `since_revision`; matching revisions return `changed=false` without expanding the payload.
+- [ ] Keep status constant-size and include generated/data-as-of timestamps, model version, data state (`fresh`, `aging`, `stale`, `partial`, or `empty`), selected and alternate cohort diagnostics, quality, and canonical/dedupe status. Recommend 30-second polling for fresh/aging and 60 seconds for stale/empty; never give the five-hour rolling window a weekly monotonic forecast.
 - [ ] Implement reset-aware series with explicit point kinds `observed`, `estimated`, `forecast`, `reset`, `conflict`, and `anchor_correction`. Never connect points across cycle ids.
+- [ ] Return chronological points plus cycle summaries, requested/available ranges, truncation/downsampling disclosure, revision, model version, and quality. Preserve observed-only usefulness when estimates/forecasts are unavailable; do not fabricate later-task point kinds.
 - [ ] Implement evidence newest first, default 50 meaningful transitions, physical provenance fields when local privacy mode permits them, canonical/dedupe fields, strict-mode identifier removal, and revision-bound pagination. Keep full strict evidence export as an explicit offline action.
 - [ ] Run the service tests; expect PASS with exact payload snapshots.
 - [ ] Stage exact files and commit: `feat: expose allowance status series and evidence`.
