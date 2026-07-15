@@ -187,12 +187,16 @@ codex-usage-tracker-allowance-evidence-v2
 
 **Files:**
 - Create: `src/codex_usage_tracker/allowance_intelligence/estimation.py`
+- Modify: `src/codex_usage_tracker/allowance_intelligence/contracts.py`
+- Modify: `src/codex_usage_tracker/allowance_intelligence/cycles.py`
 - Modify: `src/codex_usage_tracker/allowance_intelligence/model.py`
 - Modify: `src/codex_usage_tracker/allowance_intelligence/service.py`
 - Create: `tests/allowance_intelligence/test_estimation.py`
+- Modify: `tests/allowance_intelligence/test_cycles.py`
 - Modify: `tests/allowance_intelligence/test_service.py`
 
 - [ ] Write failing tests proving historical estimates use only capacity available before each interval, future observations cannot change older estimates, missing pricing produces explicit coverage gaps, and endpoint mismatch becomes a signed `anchor_correction` rather than being spread backward.
+- [ ] Align production cycle states with the approved `open`, `completed`, and `ambiguous` contract. A weekly cycle becomes completed only after its reset boundary is passed or a later confirmed reset cycle exists; synthetic tests must use producer-derived state rather than fabricated estimator-only values.
 - [ ] Implement per-cycle reconstruction:
 
 ```python
@@ -212,7 +216,7 @@ anchor_correction = observed_delta - explained_delta
 - [ ] Run:
 
 ```bash
-PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/allowance_intelligence/test_estimation.py tests/allowance_intelligence/test_allowance_intelligence.py -q
+PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/allowance_intelligence/test_estimation.py tests/allowance_intelligence/test_cycles.py tests/allowance_intelligence/test_allowance_intelligence.py tests/allowance_intelligence/test_service.py -q
 ```
 
 Expected: PASS and no future-data leakage.
