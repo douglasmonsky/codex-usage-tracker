@@ -18,6 +18,7 @@ from codex_usage_tracker.allowance_intelligence.statistics import (
 )
 
 DETECTOR_VERSION = "maxstat-cycle-v1"
+MULTI_DETECTOR_VERSION = "hierarchical-maxstat-cycle-v2"
 _EXACT_PERMUTATION_LIMIT = 40_320
 _STRONG_EFFECT_THRESHOLD = 0.474
 
@@ -141,6 +142,295 @@ def detect_cycle_change(
             "strong_effect_threshold_abs_cliffs_delta": _STRONG_EFFECT_THRESHOLD,
         },
     }
+
+
+def detect_cycle_changes(
+    cycles: list[dict[str, Any]],
+    *,
+    semantic_key: str,
+    min_cycles_per_regime: int = 4,
+    permutation_count: int = 1_999,
+    familywise_alpha: float = 0.05,
+) -> dict[str, Any]:
+    """Detect zero or more supported capacity regimes with alpha spending."""
+    if min_cycles_per_regime < 2:
+        raise ValueError("min_cycles_per_regime must be at least 2")
+    if permutation_count < 99:
+        raise ValueError("permutation_count must be at least 99")
+    if not 0 < familywise_alpha < 1:
+        raise ValueError("familywise_alpha must be between 0 and 1")
+    ordered = sorted(
+        cycles,
+        key=lambda row: (
+            str(row.get("last_observed_at") or ""),
+            str(row.get("cycle_id") or ""),
+        ),
+    )
+    eligible, caveats = _eligible_cycles(ordered)
+    boundaries = _detect_segment(
+        eligible,
+        start=0,
+        end=len(eligible),
+        alpha=familywise_alpha,
+        semantic_key=semantic_key,
+        minimum=min_cycles_per_regime,
+        permutation_count=permutation_count,
+    )
+    boundaries.sort(key=lambda row: int(row["split_index"]))
+    regimes = _capacity_regimes(eligible, boundaries)
+    singular = boundaries[0] if len(boundaries) == 1 else None
+    return {
+        "detector_version": MULTI_DETECTOR_VERSION,
+        "selection_correction": "hierarchical_max_statistic_cycle_block_permutation",
+        "permutation_unit": "cycle",
+        "familywise_alpha": familywise_alpha,
+        "minimum_cycles_per_regime": min_cycles_per_regime,
+        "eligible_cycle_count": len(eligible),
+        "excluded_cycle_count": len(ordered) - len(eligible),
+        "candidate_count": max(
+            0, len(eligible) - (2 * min_cycles_per_regime) + 1
+        ),
+        "status": "supported_changes" if boundaries else (
+            "no_supported_change"
+            if len(eligible) >= 2 * min_cycles_per_regime
+            else "insufficient_evidence"
+        ),
+        "reason": None if boundaries else (
+            "selection_adjusted_evidence_below_threshold"
+            if len(eligible) >= 2 * min_cycles_per_regime
+            else "insufficient_quality_approved_completed_cycles"
+        ),
+        "boundaries": boundaries,
+        "regimes": regimes,
+        "caveats": [
+            *caveats,
+            "familywise_error_controlled_by_hierarchical_alpha_spending",
+            "unsupported_candidate_boundaries_suppressed",
+        ],
+        "selected_boundary": _compatibility_boundary(singular),
+        "adjusted_p_value": singular.get("adjusted_p_value") if singular else None,
+        "effect_size": singular.get("effect_size") if singular else None,
+        "confidence_interval": singular.get("confidence_interval") if singular else None,
+        "compatibility_status": (
+            "deprecated_single_boundary" if singular else "not_applicable"
+        ),
+    }
+
+
+def _detect_segment(
+    cycles: list[dict[str, Any]],
+    *,
+    start: int,
+    end: int,
+    alpha: float,
+    semantic_key: str,
+    minimum: int,
+    permutation_count: int,
+) -> list[dict[str, Any]]:
+    if end - start < 2 * minimum:
+        return []
+    tested = _test_segment(
+        cycles[start:end],
+        start=start,
+        end=end,
+        alpha=alpha,
+        semantic_key=semantic_key,
+        minimum=minimum,
+        permutation_count=permutation_count,
+    )
+    if not tested["supported"]:
+        return []
+    split = int(tested["split_index"])
+    child_alpha = alpha / 2
+    return [
+        *_detect_segment(
+            cycles,
+            start=start,
+            end=split,
+            alpha=child_alpha,
+            semantic_key=semantic_key,
+            minimum=minimum,
+            permutation_count=permutation_count,
+        ),
+        {key: value for key, value in tested.items() if key != "supported"},
+        *_detect_segment(
+            cycles,
+            start=split,
+            end=end,
+            alpha=child_alpha,
+            semantic_key=semantic_key,
+            minimum=minimum,
+            permutation_count=permutation_count,
+        ),
+    ]
+
+
+def _test_segment(
+    cycles: list[dict[str, Any]],
+    *,
+    start: int,
+    end: int,
+    alpha: float,
+    semantic_key: str,
+    minimum: int,
+    permutation_count: int,
+) -> dict[str, Any]:
+    values = [float(row["credits_per_percent"]) for row in cycles]
+    selected = _best_split(values, minimum)
+    assert selected is not None
+    local_split, observed_statistic = selected
+    adjusted_p, method, evaluated, seed, uncertainty = _permutation_result(
+        values,
+        observed_statistic=observed_statistic,
+        semantic_key=f"{semantic_key}:{start}:{end}:{alpha:.12g}",
+        minimum=minimum,
+        permutation_count=permutation_count,
+    )
+    before, after = values[:local_split], values[local_split:]
+    cliffs_delta = _cliffs_delta(before, after)
+    split = start + local_split
+    effect_size = {
+        "median_before_credits_per_percent": _rounded(median(before)),
+        "median_after_credits_per_percent": _rounded(median(after)),
+        "median_shift_credits_per_percent": _rounded(
+            median(after) - median(before)
+        ),
+        "cliffs_delta": _rounded(cliffs_delta),
+    }
+    return {
+        "supported": adjusted_p < alpha
+        and _monte_carlo_decision_supported(
+            method=method,
+            uncertainty=uncertainty,
+            alpha=alpha,
+        )
+        and abs(cliffs_delta or 0.0) >= _STRONG_EFFECT_THRESHOLD,
+        "boundary_id": f"boundary-{split}",
+        "split_index": split,
+        "before_cycle_id": str(cycles[local_split - 1]["cycle_id"]),
+        "after_cycle_id": str(cycles[local_split]["cycle_id"]),
+        "effective_at": cycles[local_split].get("last_observed_at"),
+        "segment_start_index": start,
+        "segment_end_index": end,
+        "alpha": _rounded(alpha),
+        "observed_max_statistic": _rounded(observed_statistic),
+        "adjusted_p_value": _rounded(adjusted_p),
+        "effect_size": effect_size,
+        "confidence_interval": _shift_confidence_interval(before, after),
+        "permutation_method": method,
+        "permutation_count": evaluated,
+        "seed": seed,
+        "monte_carlo_uncertainty": uncertainty,
+    }
+
+
+def _monte_carlo_decision_supported(
+    *, method: str, uncertainty: dict[str, Any], alpha: float
+) -> bool:
+    if method != "deterministic_monte_carlo":
+        return True
+    interval = uncertainty.get("confidence_interval_95")
+    return bool(
+        isinstance(interval, dict)
+        and isinstance(interval.get("high"), int | float)
+        and float(interval["high"]) < alpha
+    )
+
+
+def _permutation_result(
+    values: list[float],
+    *,
+    observed_statistic: float,
+    semantic_key: str,
+    minimum: int,
+    permutation_count: int,
+) -> tuple[float, str, int, int | None, dict[str, Any]]:
+    exact_space = _bounded_factorial(len(values), limit=_EXACT_PERMUTATION_LIMIT)
+    if exact_space <= _EXACT_PERMUTATION_LIMIT:
+        extreme = 0
+        evaluated = 0
+        for ordering in itertools.permutations(values):
+            permuted_best = _best_split(list(ordering), minimum)
+            assert permuted_best is not None
+            extreme += permuted_best[1] >= observed_statistic - 1e-12
+            evaluated += 1
+        return (
+            extreme / evaluated,
+            "exact_cycle_block_permutation",
+            evaluated,
+            None,
+            _unavailable_uncertainty(),
+        )
+    seed = int.from_bytes(hashlib.sha256(semantic_key.encode()).digest()[:8], "big")
+    generator = random.Random(seed)
+    extreme = 0
+    for _ in range(permutation_count):
+        permuted = list(values)
+        generator.shuffle(permuted)
+        permuted_best = _best_split(permuted, minimum)
+        assert permuted_best is not None
+        extreme += permuted_best[1] >= observed_statistic - 1e-12
+    return (
+        (extreme + 1) / (permutation_count + 1),
+        "deterministic_monte_carlo",
+        permutation_count,
+        seed,
+        _monte_carlo_uncertainty(extreme, permutation_count),
+    )
+
+
+def _capacity_regimes(
+    cycles: list[dict[str, Any]], boundaries: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    splits = [0, *(int(row["split_index"]) for row in boundaries), len(cycles)]
+    regimes = []
+    for index, (start, end) in enumerate(
+        zip(splits, splits[1:], strict=False), 1
+    ):
+        segment = cycles[start:end]
+        if not segment:
+            continue
+        values = [float(row["credits_per_percent"]) for row in segment]
+        regimes.append(
+            {
+                "regime_id": f"regime-{index}",
+                "start_at": segment[0].get("last_observed_at"),
+                "end_at": segment[-1].get("last_observed_at"),
+                "start_index": start,
+                "end_index": end,
+                "eligible_cycle_count": len(segment),
+                "median_credits_per_percent": _rounded(median(values)),
+                "iqr_credits_per_percent": _rounded(
+                    _quantile(values, 0.75) - _quantile(values, 0.25)
+                ),
+                "price_coverage": _rounded(
+                    sum(float(row["price_coverage"]) for row in segment)
+                    / len(segment)
+                ),
+            }
+        )
+    return regimes
+
+
+def _compatibility_boundary(
+    boundary: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if boundary is None:
+        return None
+    return {
+        "split_index": boundary["split_index"],
+        "before_cycle_id": boundary["before_cycle_id"],
+        "after_cycle_id": boundary["after_cycle_id"],
+    }
+
+
+def _quantile(values: list[float], fraction: float) -> float:
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * fraction
+    lower, upper = math.floor(position), math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    return ordered[lower] + ((ordered[upper] - ordered[lower]) * (position - lower))
 
 
 def _eligible_cycles(

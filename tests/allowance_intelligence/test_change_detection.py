@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from codex_usage_tracker.allowance_intelligence.change_detection import detect_cycle_change
+from codex_usage_tracker.allowance_intelligence.change_detection import (
+    _monte_carlo_decision_supported,
+    detect_cycle_change,
+    detect_cycle_changes,
+)
 from codex_usage_tracker.allowance_intelligence.statistics import (
     _bounded_factorial,
     _wilson_interval,
@@ -92,3 +96,57 @@ def test_combinatorics_and_uncertainty_stay_bounded_for_large_inputs() -> None:
     assert _bounded_factorial(100_000, limit=40_320) == 40_321
     low, high = _wilson_interval(50_000, 100_000)
     assert 0.49 < low < 0.5 < high < 0.51
+
+
+def test_detector_returns_multiple_supported_capacity_regimes() -> None:
+    result = detect_cycle_changes(
+        _cycles(([300.0] * 8) + ([100.0] * 8) + ([220.0] * 8)),
+        semantic_key="three-regimes",
+        permutation_count=499,
+    )
+
+    assert result["status"] == "supported_changes"
+    assert len(result["boundaries"]) == 2
+    assert [
+        round(regime["median_credits_per_percent"])
+        for regime in result["regimes"]
+    ] == [300, 100, 220]
+    assert result["selected_boundary"] is None
+    assert result["effect_size"] is None
+    assert {boundary["alpha"] for boundary in result["boundaries"]} == {
+        0.05,
+        0.025,
+    }
+
+
+def test_detector_suppresses_rejected_best_split_effect() -> None:
+    result = detect_cycle_changes(
+        _cycles([95.0, 110.0, 90.0, 105.0] * 4),
+        semantic_key="null-history",
+        permutation_count=499,
+    )
+
+    assert result["status"] == "no_supported_change"
+    assert result["boundaries"] == []
+    assert len(result["regimes"]) == 1
+    assert result["selected_boundary"] is None
+    assert result["adjusted_p_value"] is None
+    assert result["effect_size"] is None
+
+
+def test_monte_carlo_decision_requires_uncertainty_below_allocated_alpha() -> None:
+    assert _monte_carlo_decision_supported(
+        method="deterministic_monte_carlo",
+        uncertainty={"confidence_interval_95": {"low": 0.02, "high": 0.049}},
+        alpha=0.05,
+    )
+    assert not _monte_carlo_decision_supported(
+        method="deterministic_monte_carlo",
+        uncertainty={"confidence_interval_95": {"low": 0.02, "high": 0.051}},
+        alpha=0.05,
+    )
+    assert _monte_carlo_decision_supported(
+        method="exact_cycle_block_permutation",
+        uncertainty={"confidence_interval_95": None},
+        alpha=0.05,
+    )
