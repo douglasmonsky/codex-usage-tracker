@@ -88,8 +88,8 @@ allowance_analysis_snapshots
 - [ ] Run the migration tests; expect FAIL because migration 26 is absent.
 - [ ] Implement `migrate_allowance_intelligence_v2(connection)` in the new focused module. Use structural columns only during migration; pricing-dependent estimates remain nullable until service/analysis enrichment.
 - [ ] Store source state as one row containing monotonic `allowance_generation`, `source_revision`, canonical `observation_count`, `latest_observed_at`, `model_version`, and last successful `rebuilt_at`.
-- [ ] Store cycles with cycle/window/cohort identity; normalized reset plus raw lower/upper bounds; first/last observation times; start/latest/peak percentages; observation/conflict/reversal/censored-interval counts; canonical token totals; nullable canonical/priced/unpriced credit totals; price coverage; quality grade; cycle state; source revision; and model version.
-- [ ] Store intervals with cycle/window/cohort identity; endpoint observation ids and physical record ids; endpoint times/percentages; visible percent delta and empirical percent resolution; canonical token components; nullable estimated credits; pricing coverage and confidence mix; interval kind and censor reason; simultaneous conflict count; explained/unexplained movement; interpolation/calibration/forecast/change-detection eligibility flags; source revision; and model version.
+- [ ] Store cycles with cycle/window/cohort identity and `is_archived`; normalized reset plus raw lower/upper bounds; first/last observation times; start/latest/peak percentages; observation/conflict/reversal/censored-interval counts; canonical token totals; nullable canonical/priced/unpriced credit totals; price coverage; quality grade; cycle state; source revision; and model version.
+- [ ] Store intervals with cycle/window/cohort identity and `is_archived`; endpoint observation ids and physical record ids; endpoint times/percentages; visible percent delta and empirical percent resolution; canonical token components; nullable estimated credits; pricing coverage and confidence mix; interval kind and censor reason; simultaneous conflict count; explained/unexplained movement; interpolation/calibration/forecast/change-detection eligibility flags; source revision; and model version.
 - [ ] Store analysis snapshots by a unique semantic key composed of source revision, model version, archive scope, window, cohort, and forecast horizon.
 - [ ] Register migration 26 without changing older migrations. Ensure canonical deduplication rebuild invokes derived allowance rebuild rather than preserving stale derived rows.
 - [ ] Run:
@@ -114,7 +114,7 @@ Expected: PASS from a blank database and a version-25 database.
 - Create: `tests/store/test_allowance_materialization.py`
 
 - [ ] Define typed immutable contracts for `AllowanceCohort`, `AllowanceCycle`, `AllowanceInterval`, `AllowancePointKind`, and `AllowanceConfidence`.
-- [ ] Write failing cycle tests for: reset timestamps within 60 seconds coalescing; weekly reset boundaries; five-hour used-percent decreases; conflicting snapshots; an alternate constant-zero cohort not replacing a progressing primary cohort; and no interval crossing a reset.
+- [ ] Write failing cycle tests for: reset timestamps within 60 seconds coalescing; weekly reset boundaries; five-hour used-percent decreases; conflicting snapshots; an alternate constant-zero cohort not replacing a progressing primary cohort; and no interval crossing a reset or archive scope.
 - [ ] Write failing materialization tests proving copied physical usage rows cannot create duplicate allowance intervals and a canonical rebuild removes stale derived rows.
 - [ ] Test canonical reconciliation end to end: every stored observation joins to one `canonical_usage_events` row; stale/noncanonical observations and all dependent analysis snapshots are removed; physical `usage_events`, `source_records`, and dedupe provenance remain unchanged; rerunning is idempotent; and the monotonic allowance generation/revision advances only when the canonical allowance source changes.
 - [ ] Implement deterministic cohort selection from the newest valid canonical observation. A fresh/aging normal `codex` cohort remains primary; an alternate becomes explicitly selectable only when normal is stale and the alternate has at least three observations with more than one distinct percentage in one cycle. Same-timestamp ties prefer normal `codex`; constant-zero alternates remain diagnostic.
@@ -139,14 +139,14 @@ Expected: PASS with no cross-reset interval and no copied-row double counting.
 - Create: `src/codex_usage_tracker/store/allowance_intelligence.py`
 - Create: `tests/store/test_allowance_intelligence_queries.py`
 
-- [ ] Write failing tests for latest status lookup, bounded range lookup, latest-first evidence, cursor continuation, cursor revision mismatch, and query plans using the new indexes.
+- [ ] Write failing tests for latest status lookup, bounded range lookup, archive inclusion/exclusion, newest/oldest evidence ordering, cohort/range filtering, cursor continuation, cursor revision mismatch, and query plans using the new indexes.
 - [ ] Define an opaque cursor as URL-safe JSON containing `source_revision`, `observed_at`, and stable row id; reject malformed or stale-revision cursors with a typed `AllowanceCursorError`.
 - [ ] Implement O(log n + k) SQLite queries:
 
 ```python
-query_latest_allowance_state(connection, *, window_kind, cohort_id=None)
-query_allowance_series(connection, *, start_at, end_at, window_kind, cohort_id=None)
-query_allowance_evidence(connection, *, limit=50, cursor=None, window_kind=None)
+query_latest_allowance_state(connection, *, window_kind, cohort_id=None, include_archived=False)
+query_allowance_series(connection, *, start_at, end_at, window_kind, cohort_id=None, include_archived=False)
+query_allowance_evidence(connection, *, limit=50, cursor=None, window_kind=None, cohort_id=None, start_at=None, end_at=None, order="desc", include_archived=False)
 ```
 
 - [ ] Clamp evidence limit to 1–500 and return `next_cursor=None` at exhaustion.
