@@ -74,15 +74,7 @@ it('auto refreshes live dashboards immediately and on interval', async () => {
 
   render(<App />);
   expect(screen.getByText('auto-before-thread')).toBeInTheDocument();
-  const autoRefreshToggle = screen.getByLabelText('Auto refresh');
-  expect(autoRefreshToggle).not.toBeChecked();
-
-  await act(async () => {
-    fireEvent.click(autoRefreshToggle);
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-  expect(autoRefreshToggle).toBeChecked();
+  await enableAutoRefresh();
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(screen.getByText('auto-first-thread')).toBeInTheDocument();
 
@@ -154,13 +146,7 @@ vi.stubGlobal('fetch', fetchMock);
 
 render(<App />);
 expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-const autoRefreshToggle = screen.getByLabelText('Auto refresh');
-expect(autoRefreshToggle).not.toBeChecked();
-await act(async () => {
-fireEvent.click(autoRefreshToggle);
-await Promise.resolve();
-});
-expect(autoRefreshToggle).toBeChecked();
+await enableAutoRefresh();
 
 await act(async () => {
 await vi.advanceTimersByTimeAsync(20_000);
@@ -573,7 +559,7 @@ it('refreshes aggregate report evidence through the shell live usage API', async
   await waitFor(() => expect(usageCalls()).toHaveLength(1));
   const [usageInput, usageInit] = usageCalls()[0];
   expect(String(usageInput)).toContain('/api/usage?');
-  expect(String(usageInput)).toContain('refresh=1');
+expect(String(usageInput)).toContain('refresh=1');
   expect(String(usageInput)).toContain('limit=500');
   expect(usageInit).toEqual(
     expect.objectContaining({
@@ -584,4 +570,6 @@ it('refreshes aggregate report evidence through the shell live usage API', async
     }),
   );
 });
+
+async function enableAutoRefresh(): Promise<void> { const toggle = screen.getByLabelText('Auto refresh'); expect(toggle).not.toBeChecked(); await act(async () => { fireEvent.click(toggle); await Promise.resolve(); await Promise.resolve(); }); expect(toggle).toBeChecked(); }
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CallRow } from '../../api/types';
-import { callColumns, callCsvColumns, callSignalPucks, callTimestampMs } from './tables';
+import { callColumns, callCsvColumns, callSignalPucks } from './tables';
 import { rowsToCsv } from './exportCsv';
 
 describe('call CSV columns', () => {
@@ -120,7 +120,6 @@ describe('call table columns', () => {
     } as CallRow;
     const timeColumn = callColumns.find(column => column.id === 'time');
 
-    expect(callTimestampMs(eveningCall)).toBeGreaterThan(callTimestampMs(noonCall));
     expect(timeColumn).toBeDefined();
     expect(timeColumn && 'accessorFn' in timeColumn ? timeColumn.accessorFn?.(eveningCall, 0) : null).toBeGreaterThan(
       timeColumn && 'accessorFn' in timeColumn ? Number(timeColumn.accessorFn?.(noonCall, 0)) : Number.NaN,
