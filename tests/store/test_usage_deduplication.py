@@ -107,7 +107,11 @@ def test_copied_allowance_rows_do_not_contribute_intervals_or_generation(tmp_pat
         assert materialize_allowance_intelligence(
             conn, now=datetime(2026, 7, 14, tzinfo=timezone.utc)
         )
-        assert conn.execute("SELECT allowance_generation FROM allowance_source_state").fetchone()[0] == generation + 1
+        updated_generation, updated_revision = conn.execute(
+            "SELECT allowance_generation, source_revision FROM allowance_source_state"
+        ).fetchone()
+        assert updated_generation == generation + 1
+        assert updated_revision != revision
 
 
 def test_source_replacement_promotes_surviving_copy(tmp_path: Path) -> None:

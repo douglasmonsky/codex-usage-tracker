@@ -29,6 +29,12 @@ Result: `8 passed`.
 
 `git diff --check` passed.
 
+## Revision advancement assertion
+
+Added a direct assertion that a canonical allowance update changes
+`source_revision` as well as advancing `allowance_generation`; copied physical
+row changes remain asserted stable.
+
 ## Reconciliation safety test hardening
 
 ### RED
