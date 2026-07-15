@@ -987,6 +987,30 @@ piecewise regime model. The recent zero-ambiguity result is still useful, but it
 mostly says the current counter regime is stable, not that the hidden allowance
 formula has been solved.
 
+## Limits Intelligence V2 Interpretation
+
+The live Limits workspace now uses the reset-aware v2 materialized allowance
+model rather than treating the older usage-drain breakpoint report as its current
+truth source. The older diagnostics remain useful exploratory evidence, but they
+must not override the v2 gates:
+
+- physical copied-clone history is excluded from canonical usage before fitting;
+- resets break cycles and prevent interpolation across allowance boundaries;
+- calibration uses one weighted vote per completed quality-approved cycle;
+- every historical reconstruction is prior-only;
+- numerical forecasts require walk-forward holdout validation against simple
+  baselines and adequate interval coverage;
+- change claims use cycle-block permutations with best-split selection correction;
+  and
+- missing pricing, simultaneous conflicts, reversals, ambiguous cohorts, and
+  outside usage remain explicit uncertainty rather than being imputed away.
+
+Consequently, a `credits_per_percent` value is best read as a personal local
+calibration under the observed regime. It is not a fixed Codex conversion, and a
+value near four does not imply that OpenAI charges four credits for every account
+percentage point. The dashboard reports cycle count, price coverage, validation
+quality, and model status beside the number.
+
 ## Run It
 
 Refresh the aggregate index first, then run:

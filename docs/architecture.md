@@ -2,9 +2,10 @@
 
 Codex Usage Tracker is a local sidecar app. It reads Codex session JSONL logs, stores tracker-owned indexes in SQLite, and exposes usage data through CLI commands, MCP tools, CSV export, generated dashboards, and the localhost React dashboard.
 
-The current storage model has two layers:
+The current storage model has three layers:
 
 - Aggregate usage index: token counters, model/effort metadata, call origins, diagnostic labels, thread summaries, pricing/credit estimates, allowance snapshots, and safe report payloads.
+- Canonical/materialized intelligence: physical usage provenance plus logical usage fingerprints and canonical pointers, reset-aware allowance observations/cycles/intervals, source revisions, and persisted analysis snapshots/jobs. Default totals read canonical rows; physical rows remain available for bounded local diagnostics.
 - Local content index: normalized conversation turns, bounded content fragments, tool calls, command runs, file events, persisted investigation run summaries, and source provenance for explicit local MCP/API investigation.
 
 Shareable outputs remain aggregate-first and must omit indexed/raw content unless an export is explicitly documented as a local raw/content export.
@@ -17,6 +18,15 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 - `schema.py` owns persisted SQLite columns and migrations. Add columns or tables there before changing refresh, export, or MCP behavior.
 - `store.py` and `store/api.py` own SQLite setup, refresh, rebuild, query access, previous/next call links, materialized thread summaries, source-file refresh cursors, SQL-backed live dashboard API slices, and cleanup ordering.
 - `source_records.py` owns source-file provenance, parser coverage, incremental cursors, and replacement on source-file changes.
+- `dedupe.py` and store migrations own conservative logical identity. Indexed
+  fingerprint lookup is O(1) per parsed event; only high-confidence identical
+  events are linked to a canonical record. No raw-content or fuzzy token-count
+  scan participates in default exclusion.
+- `allowance_intelligence/` owns cohort selection, reset-aware cycle and interval
+  materialization, prior-only calibration/forecasting, selection-corrected change
+  detection, and the constant-size status/finite series/latest-first evidence
+  services. `server/analysis_jobs.py` owns bounded asynchronous execution and
+  revision-keyed persisted results.
 - `reports.py` is the application-service layer for summaries, expensive-call reports, recommendations, pricing coverage, source coverage, allowance reports, and filtered query payloads. CLI and MCP wrappers should call this layer instead of duplicating report assembly.
 - `api_payloads.py` owns stable JSON payload helpers shared by CLI and MCP. `json_contracts.py` owns lightweight contract checks for schema-versioned CLI/MCP payloads and localhost live API payloads.
 - `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows.
@@ -43,6 +53,9 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 11. Register each dashboard route in `server.route_inventory`. Interactive routes must be bounded and index-backed; unavoidable all-history detector work uses the shared asynchronous job lifecycle.
 12. Cache only immutable aggregate responses. Server keys include source generation and semantic/configuration inputs; browser persistence rejects raw or indexed content.
 13. Add or change a route budget only from repeatable synthetic evidence. Database indexes require an additive migration, query-plan or timing evidence, and focused migration coverage.
+14. Keep canonical usage as the default for dashboard, API, reports,
+    recommendations, diagnostics, thread summaries, and MCP. Any physical-row
+    surface must be explicitly labeled provenance/debugging and remain bounded.
 
 Normal aggregate responses use a 64-entry, 256-KiB-per-entry process cache.
 Allowance history and diagnostics use a separate four-entry, 8-MiB-per-entry

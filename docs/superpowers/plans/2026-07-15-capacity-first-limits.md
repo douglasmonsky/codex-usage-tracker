@@ -14,7 +14,7 @@
 - Capacity points use completed high/medium-quality cycles with at least `0.95` price coverage, no unresolved conflict, and a positive finite capacity; each cycle contributes one vote.
 - Rolling summaries use the trailing eight eligible cycles and appear after four eligible cycles.
 - Default y-domain uses Tukey `1.5 × IQR` fences, discloses clipped points, and offers **Show full range**.
-- Multi-change detection starts with family-wise alpha `0.05`, requires four cycles per regime, uses `1,999` deterministic Monte Carlo permutations when exact enumeration is unsafe, requires absolute Cliff's delta `>= 0.474`, and splits child alpha equally.
+- Multi-change detection starts with family-wise alpha `0.05`, requires four cycles per regime, uses `1,999` deterministic Monte Carlo permutations when exact enumeration is unsafe, requires the upper 95% Monte Carlo uncertainty bound to clear the allocated alpha, requires absolute Cliff's delta `>= 0.474`, and splits child alpha equally.
 - Across at least 1,000 deterministic no-change simulations, the upper 95% binomial confidence bound for family-wise false-positive rate must not exceed `0.05` before promotion.
 - Rejected candidate boundaries and their selected before/after medians never appear in default UI/API/MCP payloads.
 - Analysis runs automatically and idempotently per allowance source revision; no user-facing revision button remains.

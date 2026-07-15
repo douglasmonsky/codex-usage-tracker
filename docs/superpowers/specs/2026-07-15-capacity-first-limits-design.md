@@ -84,7 +84,7 @@ The detector may return zero, one, or multiple supported boundaries. It uses con
 
 1. Start with a family-wise alpha budget of `0.05`. Within the current segment, scan every eligible cycle boundary using the v1 detector’s balanced absolute mean-difference statistic: the absolute difference in segment means multiplied by `sqrt(n_left × n_right / n_total)`.
 2. Calibrate the selected maximum statistic with exact cycle-block permutation when bounded, otherwise `1,999` deterministic Monte Carlo permutations.
-3. Require both a selection-adjusted p-value below the segment’s allocated alpha and an absolute Cliff’s delta of at least `0.474`.
+3. Require both a selection-adjusted p-value below the segment's allocated alpha and an absolute Cliff's delta of at least `0.474`. For Monte Carlo results, the upper 95% simulation-uncertainty bound must also be below the allocated alpha.
 4. Only after a segment rejects its no-change hypothesis may the detector recurse into its left and right child segments.
 5. Divide the parent’s alpha budget equally between the children. This hierarchical alpha spending controls family-wise false positives across the discovered tree rather than treating recursive searches as independent tests.
 6. Stop when a segment is too small, fails its corrected test, fails quality gates, or has no strong effect.

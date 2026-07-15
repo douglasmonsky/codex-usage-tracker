@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add conservative logical usage deduplication so copied clone history is excluded
+  from dashboard, report, recommendation, diagnostic, thread, API, and MCP totals
+  by default while physical source provenance remains available as an opt-in.
+- Redesign Limits Intelligence around weekly credits-per-percentage capacity
+  history, a compact current-status row, automatic revision analysis, and zero,
+  one, or multiple family-wise-controlled capacity changes. Rejected split
+  statistics stay hidden, five-hour usage remains observed context, and the v2
+  API/MCP contracts expose capacity points, regimes, provenance, and copied-row
+  diagnostics by default.
+
 ## 0.17.2 - 2026-07-09
 
 - Add GPT-5.6 Sol, Terra, and Luna API pricing and Codex credit-rate support, including the official `gpt-5.6` alias and compatibility with OpenAI's new cache-write pricing column.
