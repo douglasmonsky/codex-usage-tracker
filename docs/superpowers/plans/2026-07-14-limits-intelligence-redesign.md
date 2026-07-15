@@ -37,7 +37,7 @@
 
 ```python
 rows = query_allowance_observations(db_path, limit=2)
-assert [row["observed_at"] for row in rows] == ["2026-07-13T00:00:00Z", "2026-07-14T00:00:00Z"]
+assert [row["event_timestamp"] for row in rows] == ["2026-07-13T00:00:00Z", "2026-07-14T00:00:00Z"]
 ```
 
 - [ ] Run `PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/store/test_allowance_observations.py -q`; expect FAIL because the current SQL limits an ascending scan.
@@ -47,10 +47,10 @@ assert [row["observed_at"] for row in rows] == ["2026-07-13T00:00:00Z", "2026-07
 SELECT * FROM (
     SELECT ... FROM allowance_observations
     WHERE ...
-    ORDER BY observed_at DESC, id DESC
+    ORDER BY event_timestamp DESC, cumulative_total_tokens DESC, window_key DESC
     LIMIT ?
 ) AS newest
-ORDER BY observed_at ASC, id ASC
+ORDER BY event_timestamp ASC, cumulative_total_tokens ASC, window_key ASC
 ```
 
 - [ ] Add `newest_first: bool = False` to the store query, with evidence callers using `True` and legacy history retaining chronological order.
