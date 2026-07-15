@@ -90,7 +90,7 @@ const [activePreset, setActivePreset] = useState(() => new URLSearchParams(windo
   const [refreshState, setRefreshState] = useState('Stored snapshot loaded just now');
   const [refreshProgress, setRefreshProgress] = useState<RefreshProgressPayload | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
 const [showBackToTop, setShowBackToTop] = useState(false);
 const [language, setLanguage] = useState(() => initialDashboardLanguage(initialPayload));
 const initialLiveLoadAttempted = useRef(false);

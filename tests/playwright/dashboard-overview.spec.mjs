@@ -1,45 +1,45 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('answer-first Overview', () => {
+test.describe('overview evidence workspace', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'This spec owns its responsive viewport checks.');
     page.on('pageerror', error => { throw error; });
   });
 
-  test('keeps loaded metrics and recent-call evidence directly actionable', async ({ page }) => {
+  test('keeps loaded metrics, visualizations, and recent-call evidence directly actionable', async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto('/?view=overview&qa=r5-overview');
     await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
-    await expect(page.locator('[aria-labelledby="overview-answer-title"]')).toBeVisible();
     await expect(page.getByLabel('Loaded usage metrics')).toContainText('cached');
-    await expect(page.getByLabel('Loaded usage metrics')).toContainText('reasoning');
+    await expect(page.getByLabel('Loaded usage metrics')).toContainText('Reasoning');
+    await expect(page.getByTestId('visualization-chart')).toHaveCount(2);
     await expect(page.getByTestId('visualization-chart').first().locator('svg')).toBeVisible();
 
-    const table = page.getByRole('table', { name: 'Recent calls' });
+    const table = page.getByRole('table', { name: 'Overview calls' });
     await expect(table).toBeVisible();
     const stickyContract = await table.evaluate(element => ({
       documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      firstColumn: getComputedStyle(element.querySelector('[role="columnheader"]')).position,
-      overflow: getComputedStyle(element).overflow,
+      firstColumn: getComputedStyle(element.querySelector('.sticky-column')).position,
+      overflow: getComputedStyle(element.closest('section')?.querySelector('[data-layout-scroll="true"]')).overflow,
     }));
     expect(stickyContract.documentOverflow).toBeLessThanOrEqual(2);
     expect(stickyContract.firstColumn).toBe('sticky');
     expect(stickyContract.overflow).toContain('auto');
 
-    await page.getByRole('row', { name: 'Open Call Investigator for thread-9f3a1c', exact: true }).click();
+    await page.getByRole('button', { name: /Open investigator for thread-9f3a1c codex-1/i }).first().click();
     await expect(page).toHaveURL(/view=call/);
     await expect(page).toHaveURL(/record=fixture-call-0/);
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
   });
 
-  test('places the first answer in the initial mobile viewport without document overflow', async ({ page }, testInfo) => {
+  test('places overview summary in the initial mobile viewport without document overflow', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?view=overview&qa=r5-mobile-answer');
     await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
-    const answer = page.locator('[aria-labelledby="overview-answer-title"]');
-    await expect(answer).toBeVisible();
+    const metrics = page.getByLabel('Loaded usage metrics');
+    await expect(metrics).toBeVisible();
 
-    const placement = await answer.evaluate(element => {
+    const placement = await metrics.evaluate(element => {
       const rect = element.getBoundingClientRect();
       return {
         documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -49,13 +49,13 @@ test.describe('answer-first Overview', () => {
     });
     expect(placement.documentOverflow).toBeLessThanOrEqual(2);
     expect(placement.top).toBeGreaterThanOrEqual(0);
-    expect(placement.visiblePixels).toBeGreaterThanOrEqual(80);
+    expect(placement.visiblePixels).toBeGreaterThanOrEqual(120);
 
     const screenshot = await page.screenshot({ animations: 'disabled' });
-    await testInfo.attach('overview-mobile-first-answer.png', { body: screenshot, contentType: 'image/png' });
+    await testInfo.attach('overview-mobile-summary.png', { body: screenshot, contentType: 'image/png' });
   });
 
-  test('keeps the fallback answer visible while focused endpoints load', async ({ page }) => {
+  test('keeps fallback overview evidence visible while focused endpoints load', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => {
       window.__CODEX_USAGE_BOOT__ = {
@@ -121,9 +121,10 @@ test.describe('answer-first Overview', () => {
     });
 
     await page.goto('/?view=overview&qa=r5-loading');
-    await expect(page.getByText('Loading evidence', { exact: true })).toBeVisible();
-    await expect(page.locator('[aria-labelledby="overview-answer-title"]')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'High context pressure is the clearest current signal' })).toBeVisible();
+    await expect(page.getByRole('progressbar', { name: 'Loading overview evidence' })).toBeVisible();
+    await expect(page.getByLabel('Loaded usage metrics')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
+    await expect(page.getByText('1 matching calls')).toBeVisible();
     await expect(page.getByText('Focused endpoints', { exact: true })).toBeVisible();
   });
 });

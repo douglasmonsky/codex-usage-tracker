@@ -60,7 +60,7 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self'; "
-            "style-src 'self'; connect-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; connect-src 'self'; "
             "img-src 'self' data:; object-src 'none'; base-uri 'none'",
         )
         super().end_headers()

@@ -8,7 +8,7 @@ import { formatCompact, formatNumber, money, pct } from './format';
 import { stopRowActionKeyDown } from './rowActionEvents';
 
 export const callColumns: Array<ColumnDef<CallRow>> = [
-  { accessorKey: 'time', header: 'Time' },
+  { id: 'time', accessorFn: call => Number(Date.parse(call.eventTimestamp || call.callStartedAt || call.rawTime || call.time)) || 0, header: 'Time', cell: info => info.row.original.time },
   { accessorKey: 'thread', header: 'Thread' },
   { accessorKey: 'model', header: 'Model' },
   {

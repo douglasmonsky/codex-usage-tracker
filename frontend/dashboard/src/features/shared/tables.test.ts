@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CallRow } from '../../api/types';
-import { callCsvColumns, callSignalPucks } from './tables';
+import { callColumns, callCsvColumns, callSignalPucks } from './tables';
 import { rowsToCsv } from './exportCsv';
 
 describe('call CSV columns', () => {
@@ -103,6 +103,27 @@ expect(header).toContain('model_context_window');
     expect(values).toContain('credit-estimated');
     expect(values).toContain('spawned child');
     expect(values).toContain('cache-drop|context-heavy');
+  });
+});
+
+describe('call table columns', () => {
+  it('sorts time by raw timestamps instead of formatted AM/PM labels', () => {
+    const noonCall = {
+      id: 'noon-call',
+      time: '12:00 PM',
+      rawTime: '2026-07-14T12:00:00-04:00',
+    } as CallRow;
+    const eveningCall = {
+      id: 'evening-call',
+      time: '7:00 PM',
+      rawTime: '2026-07-14T19:00:00-04:00',
+    } as CallRow;
+    const timeColumn = callColumns.find(column => column.id === 'time');
+
+    expect(timeColumn).toBeDefined();
+    expect(timeColumn && 'accessorFn' in timeColumn ? timeColumn.accessorFn?.(eveningCall, 0) : null).toBeGreaterThan(
+      timeColumn && 'accessorFn' in timeColumn ? Number(timeColumn.accessorFn?.(noonCall, 0)) : Number.NaN,
+    );
   });
 });
 

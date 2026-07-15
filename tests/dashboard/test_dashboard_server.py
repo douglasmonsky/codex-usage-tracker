@@ -535,7 +535,8 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert limited_payload["next_offset"] == 2
     assert content_security_policy is not None
     assert "connect-src 'self'" in content_security_policy
-    assert "unsafe-inline" not in content_security_policy
+    assert "script-src 'self'" in content_security_policy
+    assert "style-src 'self' 'unsafe-inline'" in content_security_policy
     assert referrer_policy == "no-referrer"
     assert len(all_payload["rows"]) == 4
     assert all_payload["loaded_row_count"] == 4
