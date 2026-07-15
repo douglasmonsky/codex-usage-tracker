@@ -22,17 +22,20 @@ afterEach(() => {
 });
 
 describe('Limits live evidence flow', () => {
-  it('uses allowance endpoints, opens linked calls, and exports the strict bundle', async () => {
+  it('uses revision-aware v2 allowance endpoints and keeps export as an explicit offline action', async () => {
     const openCall = vi.fn();
     const copyCall = vi.fn();
     const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
-      if (path.startsWith('/api/allowance/history')) return jsonResponse(historyPayload());
-      if (path.startsWith('/api/allowance/diagnostics')) return jsonResponse(diagnosticsPayload());
+      if (path.startsWith('/api/allowance/status')) return jsonResponse(statusPayload());
+      if (path.startsWith('/api/allowance/series')) return jsonResponse(seriesPayload());
+      if (path.startsWith('/api/allowance/evidence')) return jsonResponse(evidencePayload());
+      if (path.startsWith('/api/allowance/analysis')) return jsonResponse(analysisPayload());
       if (path.startsWith('/api/allowance/export')) return jsonResponse(exportPayload());
       return jsonResponse({ error: 'unknown path' }, 404);
-    }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('URL', Object.assign(URL, {
       createObjectURL: vi.fn(() => 'blob:allowance-export'),
       revokeObjectURL: vi.fn(),
@@ -50,19 +53,23 @@ describe('Limits live evidence flow', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole('progressbar', { name: 'Loading allowance history and detector' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Live detector payload')).toBeInTheDocument());
-    expect(screen.queryByRole('progressbar', { name: 'Loading allowance history and detector' })).not.toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Loading allowance intelligence' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Canonical live status')).toBeInTheDocument());
+    await waitFor(() => expect(
+      screen.queryByRole('progressbar', { name: 'Loading allowance intelligence' }),
+    ).not.toBeInTheDocument());
     expect(screen.getByRole('heading', { name: 'No weekly regime change detected' })).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Allowance evidence windows and linked calls' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByTitle('Open call')[0]);
-    expect(openCall).toHaveBeenCalledWith('rec-3');
-    fireEvent.click(screen.getAllByTitle('Copy call link')[0]);
-    expect(copyCall).toHaveBeenCalledWith('rec-3');
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/history'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/diagnostics'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/series?range_preset=8w'))).toBe(true);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/evidence?limit=100'))).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh evidence' }));
-    await waitFor(() => expect(screen.getByText('Allowance evidence refreshed')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Allowance status checked')).toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series')).length).toBe(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')).length).toBe(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Export evidence' }));
     await waitFor(() => expect(anchorClick).toHaveBeenCalledTimes(1));
@@ -71,22 +78,99 @@ describe('Limits live evidence flow', () => {
       expect.objectContaining({ cache: 'no-store' }),
     );
   });
+
+  it('reloads series and evidence only when the semantic revision changes', async () => {
+    let statusCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.startsWith('/api/allowance/status')) {
+        statusCalls += 1;
+        return jsonResponse(statusPayload(statusCalls === 1 ? 'allowance-revision-1' : 'allowance-revision-2'));
+      }
+      if (path.startsWith('/api/allowance/series')) return jsonResponse(seriesPayload());
+      if (path.startsWith('/api/allowance/evidence')) return jsonResponse(evidencePayload());
+      if (path.startsWith('/api/allowance/analysis')) return jsonResponse(analysisPayload());
+      return jsonResponse({ error: 'unknown path' }, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <QueryClientProvider client={createDashboardQueryClient()}>
+        <LimitsPage
+          model={fixtureModel}
+          contextRuntime={{ apiToken: 'local-token', contextApiEnabled: false, fileMode: false }}
+          onOpenInvestigator={vi.fn()}
+          onCopyCallLink={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')),
+    ).toHaveLength(1));
+    await waitFor(() => expect(
+      screen.queryByRole('progressbar', { name: 'Loading allowance intelligence' }),
+    ).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh evidence' }));
+    await waitFor(() => expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')),
+    ).toHaveLength(2));
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series'))).toHaveLength(2);
+  });
 });
 
-function historyPayload() {
+function statusPayload(revision = 'allowance-revision-1') {
   return {
-    schema: 'codex-usage-tracker-allowance-history-v1',
+    schema: 'codex-usage-tracker-allowance-status-v2',
+    revision,
+    changed: true,
+    data_state: 'fresh',
+    quality: { canonical: true, copied_rows_excluded: 2 },
+    next: { action: 'poll_status', poll_after_seconds: 30 },
+  };
+}
+
+function seriesPayload() {
+  return {
+    schema: 'codex-usage-tracker-allowance-series-v2',
+    model_version: 'allowance-v2',
     generated_at: '2026-07-10T12:00:00Z',
-    privacy_mode: 'normal',
-    include_archived: false,
-    window_kind: null,
-    row_count: 3,
-    rows: [
-      historyRow('2026-06-01T00:00:00Z', 10, 'rec-1'),
-      historyRow('2026-06-08T00:00:00Z', 11, 'rec-2'),
-      historyRow('2026-06-15T00:00:00Z', 12, 'rec-3'),
-    ],
-    notes: ['Local observations only.'],
+    revision: 'allowance-revision-1',
+    requested_range: { preset: '8w', start_at: '2026-05-01T00:00:00Z', end_at: '2026-07-10T12:00:00Z' },
+    available_range: { start_at: '2026-06-01T00:00:00Z', end_at: '2026-06-15T00:00:00Z' },
+    granularity: 'week',
+    truncated: false,
+    downsampled: false,
+    quality: { canonical: true, copied_rows_excluded: 2, observed_only: true },
+    points: [],
+    cycles: [],
+  };
+}
+
+function evidencePayload() {
+  return {
+    schema: 'codex-usage-tracker-allowance-evidence-v2',
+    model_version: 'allowance-v2',
+    generated_at: '2026-07-10T12:00:00Z',
+    revision: 'allowance-revision-1',
+    privacy_mode: 'local',
+    rows: [],
+    next_cursor: null,
+    copied_rows_excluded: 2,
+    provenance: 'local',
+    offline_export_action: 'build_allowance_export_report',
+  };
+}
+
+function analysisPayload() {
+  return {
+    schema: 'codex-usage-tracker-allowance-analysis-v2',
+    status: 'no_supported_change',
+    snapshot_id: 'snapshot-1',
+    source_revision: 'allowance-revision-1',
+    model_version: 'allowance-v2',
+    rate_card_revision: 'rates-1',
+    parameters: { min_cycles_per_side: 3, permutation_count: 2000 },
   };
 }
 
@@ -144,30 +228,6 @@ function exportPayload() {
     windows: [],
     change_candidates: [],
     notes: ['Identifiers omitted.'],
-  };
-}
-
-function historyRow(observedAt: string, usedPercent: number, recordId: string) {
-  return {
-    observed_at: observedAt,
-    observed_date: observedAt.slice(0, 10),
-    source: 'token_count.rate_limits',
-    window_key: 'secondary',
-    window_kind: 'weekly',
-    window_minutes: 10080,
-    used_percent: usedPercent,
-    remaining_percent: 100 - usedPercent,
-    resets_at: null,
-    plan_type: 'pro',
-    limit_id: 'codex',
-    model: 'gpt-5.4',
-    effort: 'high',
-    total_tokens: 100,
-    usage_credits: 100,
-    usage_credit_confidence: 'exact',
-    record_id: recordId,
-    session_id: 'local-session',
-    line_number: 1,
   };
 }
 
