@@ -15,6 +15,16 @@ def test_server_route_tables_cover_dashboard_api_paths() -> None:
     assert GET_ROUTE_METHODS["/api/allowance/history"] == "_handle_allowance_history"
     assert GET_ROUTE_METHODS["/api/allowance/diagnostics"] == ("_handle_allowance_diagnostics")
     assert GET_ROUTE_METHODS["/api/allowance/export"] == "_handle_allowance_export"
+    assert GET_ROUTE_METHODS["/api/allowance/status"] == "_handle_allowance_status_v2"
+    assert GET_ROUTE_METHODS["/api/allowance/series"] == "_handle_allowance_series_v2"
+    assert GET_ROUTE_METHODS["/api/allowance/evidence"] == "_handle_allowance_evidence_v2"
+    assert GET_ROUTE_METHODS["/api/allowance/analysis"] == "_handle_allowance_analysis_v2"
+    assert GET_ROUTE_METHODS["/api/allowance/analysis/jobs"] == (
+        "_handle_allowance_analysis_job_status_v2"
+    )
+    assert POST_ROUTE_METHODS["/api/allowance/analysis/jobs"] == (
+        "_handle_allowance_analysis_job_start_v2"
+    )
     assert GET_ROUTE_METHODS["/api/investigations/agentic"] == "_handle_investigation_agentic"
     assert GET_ROUTE_METHODS["/api/investigations/repeated-files"] == (
         "_handle_investigation_repeated_file_rediscovery"

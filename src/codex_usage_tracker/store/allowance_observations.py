@@ -110,8 +110,9 @@ def query_allowance_observations(
     include_archived: bool = False,
     window_kind: str | None = None,
     limit: int | None = 1000,
+    newest_first: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return normalized allowance observations ordered chronologically."""
+    """Return normalized allowance observations from the newest limited tail."""
 
     with connect(db_path) as conn:
         init_db(conn)
@@ -123,20 +124,34 @@ def query_allowance_observations(
             where.append("window_kind = ?")
             params.append(window_kind)
         where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-        limit_sql = ""
-        if limit is not None:
-            limit_sql = "LIMIT ?"
-            params.append(max(int(limit), 0))
-        rows = conn.execute(
-            f"""
-            SELECT {", ".join(ALLOWANCE_OBSERVATION_COLUMNS)}
-            FROM allowance_observations
-            {where_sql}
-            ORDER BY event_timestamp ASC, cumulative_total_tokens ASC, window_key ASC
-            {limit_sql}
-            """,
-            params,
-        ).fetchall()
+        columns = ", ".join(ALLOWANCE_OBSERVATION_COLUMNS)
+        ascending_order = "event_timestamp ASC, cumulative_total_tokens ASC, window_key ASC"
+        descending_order = "event_timestamp DESC, cumulative_total_tokens DESC, window_key DESC"
+        display_order = descending_order if newest_first else ascending_order
+        if limit is None:
+            rows = conn.execute(
+                f"""
+                SELECT {columns}
+                FROM allowance_observations
+                {where_sql}
+                ORDER BY {display_order}
+                """,
+                params,
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM (
+                    SELECT {columns}
+                    FROM allowance_observations
+                    {where_sql}
+                    ORDER BY {descending_order}
+                    LIMIT ?
+                ) AS newest
+                ORDER BY {display_order}
+                """,
+                [*params, max(int(limit), 0)],
+            ).fetchall()
     return [row_to_dict(row) for row in rows]
 
 

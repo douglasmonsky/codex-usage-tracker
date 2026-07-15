@@ -50,6 +50,10 @@ Tracked schema ids:
 | `codex-usage-tracker-action-brief-v1` | CLI `action-brief --json`, MCP `usage_action_brief(...)`; compact aggregate remediation brief |
 | `codex-usage-tracker-async-job-status-v1` | MCP `usage_dogfood_start(...)`, `usage_dogfood_status(...)`; async in-process job progress/status payload |
 | `codex-usage-tracker-analysis-job-v1` | Dashboard diagnostic refresh start/status lifecycle; shared aggregate progress envelope |
+| `codex-usage-tracker-allowance-status-v2` | Dashboard `/api/allowance/status`, MCP `usage_allowance_status(...)`; constant-size canonical polling snapshot |
+| `codex-usage-tracker-allowance-series-v2` | Dashboard `/api/allowance/series`, MCP `usage_allowance_series(...)`; finite reset-aware timeline |
+| `codex-usage-tracker-allowance-evidence-v2` | Dashboard `/api/allowance/evidence`, MCP `usage_allowance_evidence(...)`; latest-first cursor pagination |
+| `codex-usage-tracker-allowance-analysis-v2` | Dashboard `/api/allowance/analysis`, MCP `usage_allowance_analysis(...)`; persisted revision-keyed result |
 | `codex-usage-tracker-allowance-history-v1` | CLI `allowance-history --json`, MCP `usage_allowance_history(...)`, dashboard server `/api/allowance/history` |
 | `codex-usage-tracker-allowance-diagnostics-v1` | CLI `allowance-diagnostics --json`, MCP `usage_allowance_diagnostics(...)`, dashboard server `/api/allowance/diagnostics` |
 | `codex-usage-tracker-allowance-evidence-export-v1` | CLI `allowance-export --json`, MCP `usage_allowance_export(...)`, dashboard server `/api/allowance/export` |
@@ -275,79 +279,225 @@ Actions translate aggregate diagnostics into concrete workflow changes. Each act
 
 ## Allowance Intelligence
 
-Commands:
+V2 is the default dashboard and MCP contract family. The examples below are
+synthetic aggregate data and apply to both the localhost route and corresponding
+MCP tool. Copied clone rows are excluded from canonical totals by default and are
+disclosed in every applicable payload.
 
-```bash
-codex-usage-tracker allowance-history --window-kind weekly --json
-codex-usage-tracker allowance-diagnostics --window-kind weekly --json
-codex-usage-tracker allowance-export --output /tmp/codex-allowance-evidence.json
-```
+### Current status
 
-MCP:
-
-- `usage_allowance_history(...)`
-- `usage_allowance_diagnostics(...)`
-- `usage_allowance_export(...)`
-
-Server API:
-
-- `/api/allowance/history`
-- `/api/allowance/diagnostics`
-- `/api/allowance/export`
-
-Schemas:
-
-- `codex-usage-tracker-allowance-history-v1`
-- `codex-usage-tracker-allowance-diagnostics-v1`
-- `codex-usage-tracker-allowance-evidence-export-v1`
-
-Allowance intelligence normalizes observed 5-hour and weekly usage snapshots from aggregate token-count rows. Diagnostics compare visible usage movement with locally estimated Codex credits and grade the evidence. Weekly windows are the primary signal; 5-hour windows are treated as noisy rolling counters. Weekly change candidates include `nonparametric-v1` statistical evidence and a stricter `summary.research_readiness.ready_for_public_claim` flag. Strict export omits prompts, assistant text, tool output, file paths, thread names, session IDs, and record IDs.
-
-The localhost history and diagnostics routes may append the same `query_cache`
-transport metadata documented for diagnostic fact routes. They use a dedicated
-four-entry, 8-MiB aggregate cache because full allowance payloads are larger than
-normal dashboard summaries. Cache identity includes source revision, canonical
-query, privacy mode, allowance configuration, and rate-card configuration.
-
-HTTP report endpoints accept `limit=all`, `limit=0`, `limit=none`, and `limit=null` as all rows up to the endpoint safety cap.
+`GET /api/allowance/status` and `usage_allowance_status(...)` return
+`codex-usage-tracker-allowance-status-v2`. Pass `since_revision` to get a compact
+`changed=false` response when the source has not changed.
 
 ```json
 {
-  "schema": "codex-usage-tracker-allowance-diagnostics-v1",
-  "generated_at": "2026-06-01T00:00:00+00:00",
-  "privacy_mode": "strict",
-  "include_archived": false,
-  "window_kind": "weekly",
-  "summary": {
-    "observation_count": 4,
-    "primary_evidence_grade": "possible_regime_change",
-    "research_readiness": {
-      "detector_version": "nonparametric-v1",
-      "ready_for_public_claim": false,
-      "weekly_positive_span_count": 3,
-      "minimum_split_spans_for_public_claim": 6
-    }
+  "schema": "codex-usage-tracker-allowance-status-v2",
+  "revision": "r-synthetic-42",
+  "changed": true,
+  "model_version": "reset-aware-v4",
+  "generated_at": "2026-07-15T12:00:00+00:00",
+  "data_as_of": "2026-07-15T11:58:00+00:00",
+  "data_state": "fresh",
+  "weekly": {
+    "cohort_id": "codex-pro",
+    "plan_type": "pro",
+    "used_percent": 42.0,
+    "remaining_percent": 58.0,
+    "reset_at": 1784145600,
+    "reset_countdown_seconds": 172800,
+    "observed_at": "2026-07-15T11:58:00+00:00",
+    "age_seconds": 120,
+    "freshness": "fresh",
+    "status": "open",
+    "pricing_coverage": 0.98,
+    "quality": "high",
+    "canonical_source_revision": "r-synthetic-42"
   },
-  "windows": [],
-  "spans": [],
-  "change_candidates": [
-    {
-      "evidence_grade": "possible_regime_change",
-      "capacity_ratio": 0.72,
-      "outside_usage_possible": true,
-      "statistical_evidence": {
-        "detector_version": "nonparametric-v1",
-        "method": "exact_permutation_mean_shift",
-        "effect_size_cliffs_delta": -0.67,
-        "p_value_one_sided": 0.18,
-        "signal": "directional_effect_limited",
-        "public_claim_ready": false
-      }
-    }
-  ],
-  "notes": []
+  "five_hour": null,
+  "estimation": {
+    "model_version": "reset-aware-v2",
+    "window_kind": "weekly",
+    "capacity": {
+      "status": "descriptive",
+      "credits_per_percent": 105.11,
+      "completed_cycle_count": 63,
+      "eligible_interval_count": 622,
+      "price_coverage": 1.0
+    },
+    "weekly_estimate": {"used_percent": 42.4, "clipped": false, "reason": null},
+    "forecast": {"used_percent": null, "quantiles": null, "reason": "holdout_not_better_than_baseline"},
+    "validation": {"status": "descriptive", "sample_size": 207, "median_absolute_error": 3.7, "mean_absolute_error": 4.22, "rmse": 5.31, "holdout": {"sample_size": 207, "passed_baseline_gate": false}},
+    "pace_scenarios": {"status": "conditional", "reason": null, "if_current_pace_continues": 47.0, "sample_count": 6, "unit": "percent_per_hour"}
+  },
+  "quality": {"canonical": true, "copied_rows_excluded": 17},
+  "next": {"action": "poll_status", "poll_after_seconds": 30}
 }
 ```
+
+The synthetic `105.11` is explicitly a personal local calibration: estimated
+credits per one observed percentage point over eligible history. It is not an
+official conversion.
+
+### Finite series
+
+`GET /api/allowance/series?range_preset=8w&granularity=cycle` and
+`usage_allowance_series(range_preset="8w", granularity="cycle")` return
+`codex-usage-tracker-allowance-series-v2`.
+
+```json
+{
+  "schema": "codex-usage-tracker-allowance-series-v2",
+  "model_version": "reset-aware-v4",
+  "generated_at": "2026-07-15T12:00:00+00:00",
+  "revision": "r-synthetic-42",
+  "requested_range": {"preset": "8w", "start_at": "2026-05-20T12:00:00+00:00", "end_at": "2026-07-15T12:00:00+00:00"},
+  "available_range": {"start_at": "2026-05-28T09:00:00+00:00", "end_at": "2026-07-15T11:58:00+00:00"},
+  "granularity": "cycle",
+  "truncated": false,
+  "downsampled": true,
+  "quality": {"canonical": true, "copied_rows_excluded": 17, "observed_only": true},
+  "points": [
+    {"kind": "observed", "cycle_id": "cycle-7", "observed_at": "2026-07-15T11:58:00+00:00", "reset_at": 1784145600, "used_percent": 42.0},
+    {"kind": "reset", "cycle_id": "cycle-6", "observed_at": "2026-07-13T12:00:00+00:00", "reset_at": 1783972800}
+  ],
+  "cycles": [
+    {"cycle_id": "cycle-7", "reset_at": 1784145600, "first_observed_at": "2026-07-13T12:01:00+00:00", "last_observed_at": "2026-07-15T11:58:00+00:00", "latest_used_percent": 42.0, "status": "open", "quality_grade": "high", "plan_type": "pro"}
+  ],
+  "capacity_history": {
+    "status": "ready",
+    "unit": "credits_per_percent",
+    "eligible_cycle_count": 63,
+    "plan_types": ["pro", "prolite"],
+    "trailing_window_cycles": 8,
+    "robust_domain": {"mode": "tukey_1_5_iqr", "min": 51.2, "max": 181.7},
+    "clipped_point_count": 2,
+    "points": [
+      {"cycle_id": "cycle-6", "completed_at": "2026-07-13T12:00:00+00:00", "credits_per_percent": 105.11, "rolling_median": 101.8, "rolling_q1": 88.4, "rolling_q3": 116.9, "quality_grade": "high", "price_coverage": 1.0, "plan_type": "pro", "regime_id": "regime-2"}
+    ],
+    "boundaries": [],
+    "regimes": []
+  }
+}
+```
+
+Supported presets are `24h`, `7d`, `8w`, `6m`, and `all`; custom ranges are
+bounded to 366 days. The `all` capacity view reads indexed aggregate cycle rows,
+not raw transcript content. Five-hour series return
+`capacity_history.status="unsupported_window_model"` because rolling expiry needs
+a different model. `capacity_history.plan_types` and each point's `plan_type` come
+from observed rate-limit metadata. Unknown or mixed plan windows remain explicit;
+clients must not infer a subscription plan from capacity values.
+
+### Latest-first evidence
+
+`GET /api/allowance/evidence?limit=50` and
+`usage_allowance_evidence(limit=50)` return
+`codex-usage-tracker-allowance-evidence-v2`.
+
+```json
+{
+  "schema": "codex-usage-tracker-allowance-evidence-v2",
+  "model_version": "reset-aware-v4",
+  "generated_at": "2026-07-15T12:00:00+00:00",
+  "revision": "r-synthetic-42",
+  "privacy_mode": "normal",
+  "rows": [
+    {"window_kind": "weekly", "end_observed_at": "2026-07-15T11:58:00+00:00", "end_used_percent": 42.0, "point_kind": "positive", "censor_reason": null}
+  ],
+  "next_cursor": "2026-07-15T11:58:00+00:00|interval-synthetic-41",
+  "copied_rows_excluded": 17,
+  "provenance": "local_aggregate",
+  "offline_export_action": "build_allowance_export_report"
+}
+```
+
+Rows are newest first. Pass `next_cursor` as `cursor`; limits are 1–500. Normal
+and strict modes omit physical record identifiers. `privacy_mode="local"` is an
+explicit provenance/debug opt-in that may add bounded `start_record_id` and
+`end_record_id` fields.
+
+### Persisted change analysis
+
+`GET /api/allowance/analysis` and `usage_allowance_analysis(...)` return the
+persisted `codex-usage-tracker-allowance-analysis-v2` result for the exact source,
+model, rate-card, archive, cohort, and parameter key. When missing, POST/start
+returns the shared job envelope below.
+
+```json
+{
+  "schema": "codex-usage-tracker-allowance-analysis-v2",
+  "status": "supported_changes",
+  "snapshot_id": "analysis-synthetic-42",
+  "source_revision": "r-synthetic-42",
+  "model_version": "reset-aware-v2",
+  "rate_card_revision": "rates-synthetic-3",
+  "generated_at": "2026-07-15T12:00:02+00:00",
+  "window_kind": "weekly",
+  "parameters": {"min_cycles_per_regime": 4, "permutation_count": 1999, "familywise_alpha": 0.05},
+  "quality": {"canonical": true, "copied_rows_excluded": 17},
+  "detector_version": "hierarchical-maxstat-cycle-v3",
+  "selection_correction": "hierarchical_max_statistic_cycle_block_permutation",
+  "eligible_cycle_count": 63,
+  "excluded_cycle_count": 2,
+  "candidate_count": 56,
+  "reason": null,
+  "familywise_alpha": 0.05,
+  "boundaries": [
+    {"boundary_id": "boundary-older", "effective_at": "2026-03-01T00:00:00+00:00", "alpha": 0.025, "adjusted_p_value": 0.004, "effect_size": {"median_before_credits_per_percent": 142.0, "median_after_credits_per_percent": 101.0, "median_shift_credits_per_percent": -41.0, "cliffs_delta": -0.76}},
+    {"boundary_id": "boundary-newer", "effective_at": "2026-06-15T00:00:00+00:00", "alpha": 0.025, "adjusted_p_value": 0.006, "effect_size": {"median_before_credits_per_percent": 101.0, "median_after_credits_per_percent": 78.0, "median_shift_credits_per_percent": -23.0, "cliffs_delta": -0.71}}
+  ],
+  "regimes": [
+    {"regime_id": "regime-1", "plan_type": "pro", "start_at": "2025-12-01T00:00:00+00:00", "end_at": "2026-02-22T00:00:00+00:00", "start_index": 0, "end_index": 20, "eligible_cycle_count": 20, "median_credits_per_percent": 142.0, "iqr_credits_per_percent": 18.0, "price_coverage": 1.0},
+    {"regime_id": "regime-2", "plan_type": "pro", "start_at": "2026-03-01T00:00:00+00:00", "end_at": "2026-06-08T00:00:00+00:00", "start_index": 20, "end_index": 45, "eligible_cycle_count": 25, "median_credits_per_percent": 101.0, "iqr_credits_per_percent": 13.0, "price_coverage": 1.0},
+    {"regime_id": "regime-3", "plan_type": "pro", "start_at": "2026-06-15T00:00:00+00:00", "end_at": "2026-07-13T00:00:00+00:00", "start_index": 45, "end_index": 63, "eligible_cycle_count": 18, "median_credits_per_percent": 78.0, "iqr_credits_per_percent": 9.0, "price_coverage": 1.0}
+  ],
+  "caveats": ["Local observed allowance only; outside usage may be missing."]
+}
+```
+
+The detector may return zero, one, or multiple supported boundaries. It controls
+family-wise error with hierarchical alpha spending, requires a strong effect, and
+requires Monte Carlo uncertainty—not just the p-value point estimate—to clear the
+allocated alpha. Explicit subscription-plan transitions split the history into
+independently analyzed continuous segments, with the family-wise alpha divided
+across analyzable segments; a tier transition is never itself a capacity-change
+candidate. Regimes disclose their observed `plan_type`, and the caveats include
+`subscription_plan_segments_analyzed_independently` when this safeguard applies.
+A `no_supported_change` payload intentionally leaves deprecated
+singular p-value and before/after median fields null; rejected candidates are not
+default report data.
+
+### Analysis job
+
+`POST /api/allowance/analysis` or a missing-result
+`usage_allowance_analysis(...)` call returns
+`codex-usage-tracker-analysis-job-v1`. Poll the route/tool every 500 milliseconds
+only while `pending`, `queued`, or `running`, then reload the persisted analysis.
+
+```json
+{
+  "schema": "codex-usage-tracker-analysis-job-v1",
+  "job_id": "allowance-analysis-synthetic-42",
+  "job_kind": "allowance-analysis",
+  "status": "running",
+  "stage": "cycle_block_permutations",
+  "source_revision": "r-synthetic-42",
+  "progress": {"completed_units": 640, "total_units": 2000, "percent": 32.0, "current_unit": "permutation"},
+  "result": null,
+  "error": null,
+  "next": {"action": "poll_analysis_job", "job_id": "allowance-analysis-synthetic-42", "poll_after_ms": 500, "endpoint": "/api/allowance/analysis/jobs/allowance-analysis-synthetic-42"}
+}
+```
+
+### V1 compatibility
+
+`usage_allowance_history`, `usage_allowance_diagnostics`, and
+`usage_allowance_export` plus `/api/allowance/history`,
+`/api/allowance/diagnostics`, and `/api/allowance/export` remain compatibility and
+explicit offline-diagnostic surfaces. Their v1 schemas are unchanged. New
+dashboard/plugin/MCP integrations should use v2. V2 evidence rejects `limit=0`;
+full strict export is a separate deliberate offline action.
 
 ## Compression Lab
 

@@ -33,7 +33,7 @@ def test_allowance_history_payload_returns_normalized_rows(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize("limit_query", ["limit=0", "limit=None", "limit=none"])
-def test_allowance_payloads_accept_zero_and_none_limits(
+def test_allowance_diagnostics_and_export_accept_unbounded_limits(
     tmp_path: Path,
     limit_query: str,
 ) -> None:
@@ -45,11 +45,6 @@ def test_allowance_payloads_accept_zero_and_none_limits(
         "include_archived_default": False,
     }
 
-    history = server_allowance.allowance_history_payload(
-        f"window_kind=weekly&privacy_mode=strict&{limit_query}",
-        privacy_mode="strict",
-        **common,
-    )
     diagnostics = server_allowance.allowance_diagnostics_payload(
         f"window_kind=weekly&privacy_mode=strict&{limit_query}",
         privacy_mode="strict",
@@ -60,13 +55,24 @@ def test_allowance_payloads_accept_zero_and_none_limits(
         **common,
     )
 
-    assert history["row_count"] == 2
     diagnostics_summary = diagnostics["summary"]
     export_summary = export["summary"]
     assert isinstance(diagnostics_summary, dict)
     assert isinstance(export_summary, dict)
     assert diagnostics_summary["observation_count"] == 2
     assert export_summary["observation_count"] == 2
+
+
+def test_allowance_history_rejects_zero_limit_and_documents_maximum(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="limit must be between 1 and 1000"):
+        server_allowance.allowance_history_payload(
+            "window_kind=weekly&limit=0",
+            db_path=_allowance_db(tmp_path),
+            allowance_path=tmp_path / "allowance.json",
+            rate_card_path=tmp_path / "rate-card.json",
+            include_archived_default=False,
+            privacy_mode="strict",
+        )
 
 
 def test_allowance_diagnostics_payload_validates_window_kind(tmp_path: Path) -> None:
