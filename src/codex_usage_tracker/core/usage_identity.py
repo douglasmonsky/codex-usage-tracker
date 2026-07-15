@@ -57,6 +57,7 @@ def extract_upstream_usage_id(
 def usage_identity_from_values(
     values: Mapping[str, object], *, upstream_usage_id: str | None = None
 ) -> UsageIdentity:
+    basis: dict[str, object]
     if upstream_usage_id:
         basis = {"upstream_usage_id": upstream_usage_id}
     else:

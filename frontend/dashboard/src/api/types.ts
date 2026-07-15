@@ -114,7 +114,7 @@ rows?: UsageRow[];
 shell_boot?: boolean;
 };
 
-export type DedupeSummary = {
+type DedupeSummary = {
   dedupe_enabled?: boolean;
   fingerprint_version?: string;
   physical_rows?: number;
