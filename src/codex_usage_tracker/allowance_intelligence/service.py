@@ -12,6 +12,8 @@ from codex_usage_tracker.store.allowance_intelligence import (
     query_latest_allowance_state,
 )
 
+from .analysis import read_allowance_analysis
+from .capacity_history import build_capacity_history, load_capacity_cycles
 from .contracts import ALLOWANCE_EVIDENCE_SCHEMA, ALLOWANCE_SERIES_SCHEMA, ALLOWANCE_STATUS_SCHEMA
 from .cycles import MODEL_VERSION
 from .estimation import build_weekly_estimation
@@ -31,7 +33,7 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
             "changed": False,
             "quality": {
                 "canonical": True,
-                "copied_rows_excluded": _copied_excluded(connection),
+                "copied_rows_excluded": _copied_excluded(connection, include_archived),
             },
             "next": {"action": "poll_status", "poll_after_seconds": 60},
         }
@@ -48,7 +50,8 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
     )
     data_state = "partial" if partial else _data_state(states)
     estimation = _weekly_estimation(connection, revision, include_archived, now)
-    return {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "estimation": estimation, "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"], "reconciliation": cohorts["reconciliation"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
+    estimation["reconstructions"] = []
+    return {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "estimation": estimation, "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection, include_archived)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"], "reconciliation": cohorts["reconciliation"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
 
 
 def _weekly_estimation(connection: sqlite3.Connection, revision: str | None, include_archived: bool, now: datetime) -> dict[str, Any]:
@@ -61,20 +64,100 @@ def _weekly_estimation(connection: sqlite3.Connection, revision: str | None, inc
 
 
 def build_allowance_series(connection: sqlite3.Connection, *, now: datetime, range_preset: str = "7d", start_at: str | None = None, end_at: str | None = None, granularity: str = "auto", window_kind: str = "weekly", cohort_id: str | None = None, include_archived: bool = False) -> dict[str, Any]:
-    """Return observed cycle points only; estimates require later analysis services."""
+    """Return observed points plus aggregate weekly capacity history."""
     if granularity not in _GRANULARITIES:
         raise ValueError("granularity must be auto, raw, hour, day, week, month, or cycle")
-    if range_preset not in _PRESETS and not (range_preset == "custom" and start_at and end_at):
-        raise ValueError("range_preset must be 24h, 7d, 8w, 6m, or custom with start_at/end_at")
+    if range_preset not in {*_PRESETS, "all"} and not (
+        range_preset == "custom" and start_at and end_at
+    ):
+        raise ValueError(
+            "range_preset must be 24h, 7d, 8w, 6m, all, or custom with start_at/end_at"
+        )
     end_at = end_at or now.isoformat()
-    start_at = start_at or (now - _PRESETS[range_preset]).isoformat()
+    if range_preset == "all" and start_at is None:
+        archive_clause = "" if include_archived else "AND is_archived = 0"
+        cohort_clause = "" if cohort_id is None else "AND cohort_key = ?"
+        parameters: tuple[object, ...] = (
+            (window_kind,) if cohort_id is None else (window_kind, cohort_id)
+        )
+        first = connection.execute(
+            "SELECT MIN(first_observed_at) FROM allowance_cycles "
+            f"WHERE window_kind = ? {cohort_clause} {archive_clause}",
+            parameters,
+        ).fetchone()
+        start_at = (
+            str(first[0])
+            if first and first[0]
+            else (now - _PRESETS["8w"]).isoformat()
+        )
+    elif start_at is None:
+        start_at = (now - _PRESETS[range_preset]).isoformat()
     start, end = _aware_timestamp(start_at), _aware_timestamp(end_at)
     if start >= end:
         raise ValueError("start_at must be before end_at")
     start_at, end_at = start.isoformat(), end.isoformat()
     cycles = query_allowance_series(connection, start_at=start_at, end_at=end_at, window_kind=window_kind, cohort_id=cohort_id, include_archived=include_archived)
     points = _series_points(cycles)
-    return {"schema": ALLOWANCE_SERIES_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "revision": _revision(connection), "requested_range": {"preset": range_preset, "start_at": start_at, "end_at": end_at}, "available_range": _available_range(cycles), "granularity": granularity, "truncated": False, "downsampled": False, "quality": {"observed_only": True, "canonical": True, "copied_rows_excluded": _copied_excluded(connection)}, "points": points, "cycles": [_cycle(row) for row in cycles]}
+    revision = _revision(connection)
+    if window_kind != "weekly" or revision is None:
+        capacity_history = {
+            "status": "unsupported_window_model",
+            "unit": "credits_per_percent",
+            "points": [],
+        }
+    else:
+        archive_scope = "all" if include_archived else "active"
+        capacity_cycles = load_capacity_cycles(
+            connection,
+            source_revision=revision,
+            archive_scope=archive_scope,
+            window_kind="weekly",
+            cohort_key=cohort_id or "codex",
+            start_at=start_at,
+            end_at=end_at,
+        )
+        analysis = read_allowance_analysis(
+            connection,
+            archive_scope=archive_scope,
+            window_kind="weekly",
+            cohort_key=cohort_id or "codex",
+        )
+        boundaries = list(analysis.get("boundaries", [])) if analysis else []
+        capacity_history = build_capacity_history(
+            capacity_cycles,
+            granularity=(
+                granularity if granularity in {"cycle", "week", "month"} else "cycle"
+            ),
+            regime_boundaries=boundaries,
+        )
+        capacity_history["boundaries"] = boundaries
+        capacity_history["regimes"] = list(analysis.get("regimes", [])) if analysis else []
+        capacity_history["analysis_status"] = (
+            str(analysis.get("status")) if analysis else "missing"
+        )
+    return {
+        "schema": ALLOWANCE_SERIES_SCHEMA,
+        "model_version": MODEL_VERSION,
+        "generated_at": now.isoformat(),
+        "revision": revision,
+        "requested_range": {
+            "preset": range_preset,
+            "start_at": start_at,
+            "end_at": end_at,
+        },
+        "available_range": _available_range(cycles),
+        "granularity": granularity,
+        "truncated": False,
+        "downsampled": False,
+        "quality": {
+            "observed_only": True,
+            "canonical": True,
+            "copied_rows_excluded": _copied_excluded(connection, include_archived),
+        },
+        "points": points,
+        "cycles": [_cycle(row) for row in cycles],
+        "capacity_history": capacity_history,
+    }
 
 
 def build_allowance_evidence(connection: sqlite3.Connection, *, now: datetime | None = None, privacy_mode: str = "strict", limit: int = 50, cursor: str | None = None, window_kind: str | None = None, cohort_id: str | None = None, start_at: str | None = None, end_at: str | None = None, order: str = "desc", include_archived: bool = False) -> dict[str, Any]:
@@ -93,7 +176,7 @@ def build_allowance_evidence(connection: sqlite3.Connection, *, now: datetime | 
             rows.append(_evidence_row(raw, privacy_mode))
         if next_cursor is None:
             break
-    return {"schema": ALLOWANCE_EVIDENCE_SCHEMA, "model_version": MODEL_VERSION, "generated_at": (now or datetime.now(timezone.utc)).isoformat(), "revision": _revision(connection), "privacy_mode": privacy_mode, "rows": rows, "next_cursor": next_cursor, "copied_rows_excluded": _copied_excluded(connection), "provenance": "local" if privacy_mode != "strict" else "local_aggregate", "offline_export_action": "build_allowance_export_report"}
+    return {"schema": ALLOWANCE_EVIDENCE_SCHEMA, "model_version": MODEL_VERSION, "generated_at": (now or datetime.now(timezone.utc)).isoformat(), "revision": _revision(connection), "privacy_mode": privacy_mode, "rows": rows, "next_cursor": next_cursor, "copied_rows_excluded": _copied_excluded(connection, include_archived), "provenance": "local" if privacy_mode == "local" else "local_aggregate", "offline_export_action": "build_allowance_export_report"}
 
 
 def _window(row: dict[str, Any] | None, now: datetime) -> dict[str, Any] | None:
@@ -133,10 +216,13 @@ def _row_freshness(row: dict[str, Any], now: datetime) -> str:
     return str(window["freshness"])
 def _cycle(row: dict[str, Any]) -> dict[str, Any]: return {key: row.get(key) for key in ("cycle_id", "reset_at", "first_observed_at", "last_observed_at", "latest_used_percent", "status", "quality_grade")}
 def _available_range(rows: list[dict[str, Any]]) -> dict[str, str | None]: return {"start_at": rows[0]["first_observed_at"] if rows else None, "end_at": rows[-1]["last_observed_at"] if rows else None}
-def _copied_excluded(conn: sqlite3.Connection) -> int:
+def _copied_excluded(conn: sqlite3.Connection, include_archived: bool) -> int:
     try:
         return int(
-            conn.execute("SELECT count(*) FROM usage_events WHERE is_duplicate=1").fetchone()[0]
+            conn.execute(
+                "SELECT count(*) FROM usage_events WHERE is_duplicate=1"
+                + ("" if include_archived else " AND is_archived=0")
+            ).fetchone()[0]
         )
     except sqlite3.OperationalError:
         return 0
@@ -145,7 +231,7 @@ def _evidence_row(row: dict[str, Any], privacy_mode: str) -> dict[str, Any]:
     if privacy_mode == "strict":
         return {key: row.get(key) for key in ("window_kind", "end_observed_at", "end_used_percent", "point_kind", "censor_reason")}
     result = {key: row.get(key) for key in keys}
-    if privacy_mode != "strict":
+    if privacy_mode == "local":
         result.update({key: row.get(key) for key in ("start_record_id", "end_record_id")})
     return result
 

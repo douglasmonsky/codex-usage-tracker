@@ -54,6 +54,39 @@ def test_status_exposes_versioned_weekly_estimation_without_changing_observation
     assert payload["estimation"]["forecast"]["used_percent"] is None
 
 
+def test_status_omits_historical_reconstructions_from_polling_payload(
+    connection: sqlite3.Connection,
+) -> None:
+    connection.execute(
+        "UPDATE allowance_intervals SET eligible_for_calibration = 1, "
+        "estimated_credits = 4, price_coverage = 1, start_used_percent = 39 "
+        "WHERE interval_id = 'i1'"
+    )
+    payload = build_allowance_status(connection, now=NOW)
+
+    assert payload["estimation"]["reconstructions"] == []
+
+
+def test_copied_row_diagnostic_respects_archive_scope(connection: sqlite3.Connection) -> None:
+    values = (
+        "duplicate", "session", "2026-07-15T11:00:00+00:00", "/synthetic/log.jsonl",
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0, 1,
+    )
+    sql = """INSERT INTO usage_events (
+        record_id, session_id, event_timestamp, source_file, line_number,
+        input_tokens, cached_input_tokens, output_tokens, reasoning_output_tokens,
+        total_tokens, cumulative_input_tokens, cumulative_cached_input_tokens,
+        cumulative_output_tokens, cumulative_reasoning_output_tokens,
+        cumulative_total_tokens, uncached_input_tokens, cache_ratio,
+        reasoning_output_ratio, context_window_percent, is_duplicate, is_archived
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+    connection.execute(sql, (*values, 0))
+    connection.execute(sql, ("archived-duplicate", *values[1:], 1))
+
+    assert build_allowance_status(connection, now=NOW)["quality"]["copied_rows_excluded"] == 1
+    assert build_allowance_status(connection, now=NOW, include_archived=True)["quality"]["copied_rows_excluded"] == 2
+
+
 def test_status_aging_and_reset_make_observation_stale(connection: sqlite3.Connection) -> None:
     assert build_allowance_status(connection, now=datetime(2026, 7, 15, 17, tzinfo=timezone.utc))["weekly"]["freshness"] == "aging"
     assert build_allowance_status(connection, now=datetime(2026, 7, 15, 18, 1, tzinfo=timezone.utc))["weekly"]["freshness"] == "stale"
@@ -71,6 +104,53 @@ def test_series_presets_validation_and_evidence_privacy(connection: sqlite3.Conn
     evidence = build_allowance_evidence(connection, privacy_mode="strict")
     assert evidence["schema"] == "codex-usage-tracker-allowance-evidence-v2"
     assert "end_record_id" not in evidence["rows"][0]
+    normal_evidence = build_allowance_evidence(connection, privacy_mode="normal")
+    assert normal_evidence["provenance"] == "local_aggregate"
+    assert "start_record_id" not in normal_evidence["rows"][0]
+    assert "end_record_id" not in normal_evidence["rows"][0]
+
+
+def test_weekly_series_returns_chronological_capacity_history(
+    connection: sqlite3.Connection,
+) -> None:
+    _insert_completed_capacity_cycles(connection, [100.0, 120.0, 900.0, 110.0])
+
+    series = build_allowance_series(
+        connection,
+        now=NOW,
+        range_preset="all",
+        granularity="cycle",
+    )
+
+    history = series["capacity_history"]
+    assert history["unit"] == "credits_per_percent"
+    assert [row["credits_per_percent"] for row in history["points"]] == [
+        100.0,
+        120.0,
+        900.0,
+        110.0,
+    ]
+    assert history["points"] == sorted(
+        history["points"], key=lambda row: row["completed_at"]
+    )
+    assert history["clipped_point_count"] == 1
+
+
+def test_five_hour_series_refuses_weekly_capacity_math(
+    connection: sqlite3.Connection,
+) -> None:
+    series = build_allowance_series(
+        connection,
+        now=NOW,
+        range_preset="24h",
+        window_kind="five_hour",
+    )
+
+    assert series["capacity_history"] == {
+        "status": "unsupported_window_model",
+        "unit": "credits_per_percent",
+        "points": [],
+    }
 
 
 def test_evidence_skips_nonmeaningful_rows_without_skipping_later_transition(
@@ -162,6 +242,62 @@ def _insert_alternate_observations(
             for index, value in enumerate(values)
         ],
     )
+
+
+def _insert_completed_capacity_cycles(
+    connection: sqlite3.Connection, values: list[float]
+) -> None:
+    for index, value in enumerate(values, 1):
+        cycle_id = f"completed-{index}"
+        observed_at = f"2026-06-{index:02d}T12:00:00+00:00"
+        connection.execute(
+            """INSERT INTO allowance_cycles
+            (cycle_id,window_kind,window_key,cohort_key,is_archived,
+             first_observed_at,last_observed_at,quality_grade,status,cycle_state,
+             price_coverage,conflict_count,source_revision,model_version)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                cycle_id,
+                "weekly",
+                "primary",
+                "codex",
+                0,
+                observed_at,
+                observed_at,
+                "high",
+                "completed",
+                "completed",
+                1.0,
+                0,
+                "r1",
+                "reset-aware-v2",
+            ),
+        )
+        connection.execute(
+            """INSERT INTO allowance_intervals
+            (interval_id,cycle_id,window_kind,window_key,cohort_key,is_archived,
+             start_observed_at,end_observed_at,visible_percent_delta,
+             estimated_credits,price_coverage,point_kind,
+             eligible_for_change_detection,source_revision,model_version)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                f"completed-interval-{index}",
+                cycle_id,
+                "weekly",
+                "primary",
+                "codex",
+                0,
+                observed_at,
+                observed_at,
+                10.0,
+                value * 10,
+                1.0,
+                "positive",
+                1,
+                "r1",
+                "reset-aware-v2",
+            ),
+        )
 
 
 @pytest.mark.parametrize("start_at,end_at", [("not-a-date", "2026-07-15T12:00:00+00:00"), ("2026-07-15T10:00:00", "2026-07-15T12:00:00+00:00"), ("2026-07-15T13:00:00+00:00", "2026-07-15T12:00:00+00:00")])

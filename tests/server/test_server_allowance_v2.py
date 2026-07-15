@@ -39,7 +39,6 @@ def test_status_payload_is_constant_size_and_supports_revision_polling(tmp_path:
             "range_preset=custom&start_at=2025-01-01T00:00:00Z&end_at=2026-07-01T00:00:00Z",
             "custom range must not exceed 366 days",
         ),
-        ("range_preset=all", "range_preset must be 24h, 7d, 8w, 6m, or custom"),
     ],
 )
 def test_series_rejects_unbounded_ranges(tmp_path: Path, query: str, message: str) -> None:

@@ -196,8 +196,11 @@ def test_usage_allowance_v2_tools_default_to_canonical_bounded_usage(
 
     with pytest.raises(ValueError, match="limit must be between 1 and 500"):
         mcp_server.usage_allowance_evidence(limit=0)
-    with pytest.raises(ValueError, match="range_preset must be"):
-        mcp_server.usage_allowance_series(range_preset="all")
+    all_series = mcp_server.usage_allowance_series(
+        range_preset="all", granularity="cycle"
+    )
+    assert all_series["schema"] == "codex-usage-tracker-allowance-series-v2"
+    assert all_series["capacity_history"]["unit"] == "credits_per_percent"
 
     started = mcp_server.usage_allowance_analysis()
     assert started["schema"] == "codex-usage-tracker-analysis-job-v1"
@@ -216,7 +219,10 @@ def test_usage_allowance_v2_tools_default_to_canonical_bounded_usage(
         "insufficient_evidence",
         "no_supported_change",
         "supported_change",
+        "supported_changes",
     }
+    assert "boundaries" in persisted
+    assert "regimes" in persisted
     assert persisted["quality"]["canonical"] is True
     assert persisted["quality"]["copied_rows_excluded"] == 1
 
