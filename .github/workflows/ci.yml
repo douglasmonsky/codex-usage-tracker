@@ -126,6 +126,7 @@ jobs:
         run: |
           check-jsonschema \
             --builtin-schema vendor.github-workflows \
+            .github/workflows/allowance-statistical-calibration.yml \
             .github/workflows/ci.yml \
             .github/workflows/pricing-compat.yml \
             .github/workflows/publish.yml
