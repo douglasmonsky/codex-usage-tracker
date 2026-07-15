@@ -180,6 +180,11 @@
   cursor: pointer;
 }
 
+/* Virtual rows have a fixed height, so action buttons must never wrap across rows. */
+.table :global(.table-action-group) {
+  flex-wrap: nowrap;
+}
+
 .table tbody {
   position: relative;
   display: block;

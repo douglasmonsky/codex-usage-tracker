@@ -83,6 +83,7 @@ Open `Overview` when you want a quick read on current aggregate usage before sor
 - Metric cards summarize loaded aggregate rows without exposing prompts, assistant text, or raw tool output.
 - Default totals exclude only strict clone/copy fingerprint matches while preserving every physical source row in the local index. The environment status strip shows how many copied rows were excluded; hover it to compare canonical and physical row counts.
 - Time-series charts open on the most recent dates first and can scroll left for earlier history while keeping the value axis visible.
+- At constrained desktop widths, the analysis charts stack so the token-flow diagram keeps readable label spacing; fixed-height evidence rows keep their action buttons on one line.
 - `Usage constellation` maps chronology, token volume, cache reuse, model family, waste pressure, and thread continuity in a lazy 3D view. Select a point to open Call Investigator, or switch to the synchronized evidence table for keyboard review and non-WebGL environments.
 - `Recent Calls` keeps the homepage modular: it shows the latest matching calls and lets any row open Call Investigator directly.
 - Use `Investigate` or `Calls` when you need deeper ranking, filtering, or evidence review.
