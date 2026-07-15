@@ -29,6 +29,7 @@
 - Create: `tests/store/test_allowance_observations.py`
 - Modify: `src/codex_usage_tracker/store/allowance_observations.py`
 - Modify: `src/codex_usage_tracker/allowance_intelligence/statistics.py`
+- Modify: `src/codex_usage_tracker/server/allowance.py`
 - Modify: `tests/allowance_intelligence/test_statistics.py`
 - Modify: `tests/server/test_server_allowance.py`
 
