@@ -27,6 +27,13 @@ describe('ECharts visualization adapter', () => {
     expect(model.targetByKey.get('flow-3')).toEqual({ seriesIndex: 0, dataIndex: 2, dataType: 'edge' });
     expect(model.keyByTarget.get('0:2:edge')).toBe('flow-3');
     expect(series.right).toBeGreaterThanOrEqual(100);
+    expect(series).toMatchObject({
+      nodeGap: 32,
+      nodeWidth: 16,
+      top: 20,
+      bottom: 20,
+      label: { distance: 8, fontSize: 12, lineHeight: 16 },
+    });
   });
 
   it('builds heatmap categories and a bounded visual scale', () => {

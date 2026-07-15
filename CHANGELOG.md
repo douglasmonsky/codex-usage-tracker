@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Improve the Overview token-flow chart at constrained desktop widths with a taller single-column layout, larger Sankey node gaps, and label-safe padding; keep virtualized evidence-table actions on one row.
+
 ## 0.18.0 - 2026-07-15
 
 - Exclude exact historical calls copied by cloned Codex tasks from default dashboard, CLI, MCP, report, allowance, compression, recommendation, and export totals while retaining every physical source row for local provenance.

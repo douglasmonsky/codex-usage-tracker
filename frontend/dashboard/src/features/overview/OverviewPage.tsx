@@ -150,7 +150,7 @@ export function OverviewPage(props: OverviewPageProps) {
 
       <div className={styles.analysisGrid}>
         <Visualization spec={viewModel.pulseSpec} height={280} />
-        <Visualization spec={viewModel.tokenFlowSpec} height={280} />
+        <Visualization spec={viewModel.tokenFlowSpec} height={320} />
       </div>
 
       <OverviewRecentCalls
