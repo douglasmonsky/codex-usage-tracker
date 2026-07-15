@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from heapq import heappop, heappush
 from itertools import combinations
 from math import comb
@@ -163,18 +164,18 @@ def _median_confidence_interval(values: list[float]) -> dict[str, Any]:
     target_coverage = 0.95
     selected_rank: int | None = None
     achieved_coverage = _widest_median_interval_coverage(sample_size)
-    denominator = 2**sample_size
-    binomial_coefficient = 1
-    lower_tail_numerator = 0
+    log_target_tail = math.log(1.0 - target_coverage) - math.log(2.0)
+    log_binomial_probability = -sample_size * math.log(2.0)
+    log_lower_tail = -math.inf
 
     # Exact two-sided 95% coverage requires each binomial tail to be at most 1/40.
     for rank in range(1, (sample_size // 2) + 1):
-        lower_tail_numerator += binomial_coefficient
-        if 40 * lower_tail_numerator > denominator:
+        log_lower_tail = _log_add(log_lower_tail, log_binomial_probability)
+        if log_lower_tail > log_target_tail:
             break
         selected_rank = rank
-        achieved_coverage = 1.0 - (2.0 * lower_tail_numerator / denominator)
-        binomial_coefficient = binomial_coefficient * (sample_size - rank + 1) // rank
+        achieved_coverage = 1.0 - (2.0 * math.exp(log_lower_tail))
+        log_binomial_probability += math.log(sample_size - rank + 1) - math.log(rank)
 
     if selected_rank is None:
         return {
@@ -201,7 +202,18 @@ def _median_confidence_interval(values: list[float]) -> dict[str, Any]:
 def _widest_median_interval_coverage(sample_size: int) -> float:
     if sample_size <= 0:
         return 0.0
-    return max(0.0, 1.0 - (2.0 / (2**sample_size)))
+    return max(0.0, 1.0 - (2.0 * math.exp(-sample_size * math.log(2.0))))
+
+
+def _log_add(left: float, right: float) -> float:
+    """Return log(exp(left) + exp(right)) without overflow."""
+
+    if left == -math.inf:
+        return right
+    if right == -math.inf:
+        return left
+    larger, smaller = max(left, right), min(left, right)
+    return larger + math.log1p(math.exp(smaller - larger))
 
 
 def _credits_per_percent_values(spans: list[dict[str, Any]]) -> list[float]:
