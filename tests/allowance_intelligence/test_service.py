@@ -38,6 +38,16 @@ def test_status_schema_freshness_and_matching_revision_are_compact(connection: s
     assert build_allowance_status(connection, now=NOW, since_revision="r1") == {"schema": payload["schema"], "revision": "r1", "changed": False}
 
 
+def test_status_exposes_versioned_weekly_estimation_without_changing_observations(
+    connection: sqlite3.Connection,
+) -> None:
+    payload = build_allowance_status(connection, now=NOW)
+    assert payload["weekly"]["used_percent"] == 40
+    assert payload["estimation"]["model_version"] == "reset-aware-v2"
+    assert payload["estimation"]["window_kind"] == "weekly"
+    assert payload["estimation"]["forecast"]["used_percent"] is None
+
+
 def test_status_aging_and_reset_make_observation_stale(connection: sqlite3.Connection) -> None:
     assert build_allowance_status(connection, now=datetime(2026, 7, 15, 17, tzinfo=timezone.utc))["weekly"]["freshness"] == "aging"
     assert build_allowance_status(connection, now=datetime(2026, 7, 15, 18, 1, tzinfo=timezone.utc))["weekly"]["freshness"] == "stale"

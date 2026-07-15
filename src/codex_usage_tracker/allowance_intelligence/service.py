@@ -14,6 +14,7 @@ from codex_usage_tracker.store.allowance_intelligence import (
 
 from .contracts import ALLOWANCE_EVIDENCE_SCHEMA, ALLOWANCE_SERIES_SCHEMA, ALLOWANCE_STATUS_SCHEMA
 from .cycles import MODEL_VERSION
+from .estimation import build_weekly_estimation
 
 _PRESETS = {"24h": timedelta(hours=24), "7d": timedelta(days=7), "8w": timedelta(weeks=8), "6m": timedelta(days=183)}
 _GRANULARITIES = {"auto", "raw", "hour", "day", "week", "month", "cycle"}
@@ -37,7 +38,17 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
         for row in cohorts["rows"]
     )
     data_state = "partial" if partial else _data_state(states)
-    return {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"], "reconciliation": cohorts["reconciliation"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
+    estimation = _weekly_estimation(connection, revision, include_archived, now)
+    return {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "estimation": estimation, "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"], "reconciliation": cohorts["reconciliation"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
+
+
+def _weekly_estimation(connection: sqlite3.Connection, revision: str | None, include_archived: bool, now: datetime) -> dict[str, Any]:
+    if revision is None:
+        return build_weekly_estimation([], [], now=now)
+    archive = "" if include_archived else "AND is_archived = 0"
+    cycles = [dict(row) for row in connection.execute(f"SELECT * FROM allowance_cycles WHERE source_revision = ? {archive}", (revision,))]
+    intervals = [dict(row) for row in connection.execute(f"SELECT * FROM allowance_intervals WHERE source_revision = ? {archive}", (revision,))]
+    return build_weekly_estimation(cycles, intervals, now=now)
 
 
 def build_allowance_series(connection: sqlite3.Connection, *, now: datetime, range_preset: str = "7d", start_at: str | None = None, end_at: str | None = None, granularity: str = "auto", window_kind: str = "weekly", cohort_id: str | None = None, include_archived: bool = False) -> dict[str, Any]:
