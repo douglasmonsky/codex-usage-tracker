@@ -14,6 +14,7 @@ from codex_usage_tracker.pricing.api import (
     PricingParseError,
     annotate_rows_with_efficiency,
     efficiency_flags,
+    estimate_cost_usd,
     load_pricing_config,
     parse_openai_latest_model_id,
     parse_openai_pricing_markdown,
@@ -64,9 +65,14 @@ def test_parse_openai_pricing_markdown_for_selected_tier() -> None:
         "input_per_million": 5.0,
         "cached_input_per_million": 0.5,
         "output_per_million": 30.0,
+        "long_context_threshold_tokens": 272_000,
+        "long_context_input_multiplier": 2.0,
+        "long_context_output_multiplier": 1.5,
     }
     assert models["gpt-5.6-terra"]["output_per_million"] == 15
     assert models["gpt-5.6-luna"]["output_per_million"] == 6
+    assert models["gpt-5.6-terra"]["long_context_threshold_tokens"] == 272_000
+    assert models["gpt-5.6-luna"]["long_context_input_multiplier"] == 2
     assert models["gpt-5.5"]["input_per_million"] == 5
     assert models["gpt-5.5"]["cached_input_per_million"] == 0.5
     assert models["gpt-5.5"]["output_per_million"] == 30
@@ -82,8 +88,31 @@ def test_parse_openai_pricing_markdown_uses_requested_tier() -> None:
             "input_per_million": 2.5,
             "cached_input_per_million": 0.25,
             "output_per_million": 15.0,
+            "long_context_threshold_tokens": 272_000,
+            "long_context_input_multiplier": 2.0,
+            "long_context_output_multiplier": 1.5,
         }
     }
+
+
+def test_parse_openai_pricing_markdown_does_not_invent_priority_long_context_rates() -> None:
+    source = (
+        OPENAI_PRICING_FIXTURE
+        + """
+<TextTokenPricingTables
+  client:load
+  tier="priority"
+  rows={[
+    ["gpt-5.6-sol", 10, 1, 12.5, 60],
+    ["gpt-5.5 (<272K context length)", 12.5, 1.25, "-", 75],
+  ]}
+/>
+"""
+    )
+    models = parse_openai_pricing_markdown(source, tier="priority")
+
+    assert "long_context_threshold_tokens" not in models["gpt-5.6-sol"]
+    assert "long_context_input_multiplier" not in models["gpt-5.5"]
 
 
 def test_parse_openai_latest_model_id_reads_front_matter() -> None:
@@ -170,6 +199,45 @@ def test_update_pricing_from_openai_docs_can_skip_estimates(tmp_path: Path) -> N
     assert result.estimated_model_count == 0
     assert "codex-auto-review" not in raw["models"]
     assert "gpt-5.3-codex-spark" not in raw["models"]
+
+
+def test_estimate_cost_applies_long_context_pricing_to_individual_calls(tmp_path: Path) -> None:
+    pricing_path = tmp_path / "pricing.json"
+    update_pricing_from_openai_docs(
+        pricing_path,
+        fetch_text=lambda url: OPENAI_PRICING_FIXTURE,
+        include_estimates=False,
+    )
+    pricing = load_pricing_config(pricing_path)
+    row = {
+        "record_id": "call-long-context",
+        "model": "gpt-5.6-sol",
+        "input_tokens": 300_000,
+        "cached_input_tokens": 200_000,
+        "uncached_input_tokens": 100_000,
+        "output_tokens": 10_000,
+    }
+
+    assert estimate_cost_usd(row, pricing) == pytest.approx(1.65)
+
+
+def test_estimate_cost_does_not_apply_call_threshold_to_aggregate_rows(tmp_path: Path) -> None:
+    pricing_path = tmp_path / "pricing.json"
+    update_pricing_from_openai_docs(
+        pricing_path,
+        fetch_text=lambda url: OPENAI_PRICING_FIXTURE,
+        include_estimates=False,
+    )
+    pricing = load_pricing_config(pricing_path)
+    aggregate = {
+        "model": "gpt-5.6-sol",
+        "input_tokens": 300_000,
+        "cached_input_tokens": 200_000,
+        "uncached_input_tokens": 100_000,
+        "output_tokens": 10_000,
+    }
+
+    assert estimate_cost_usd(aggregate, pricing) == pytest.approx(0.9)
 
 
 def test_pricing_coverage_marks_internal_estimates(tmp_path: Path) -> None:

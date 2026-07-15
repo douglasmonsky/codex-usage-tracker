@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Apply official long-context input, cached-input, and output price multipliers to concrete calls above 272K input tokens when the selected OpenAI service tier publishes long-context rates, while keeping aggregate summaries from being incorrectly thresholded.
+
 ## 0.19.0 - 2026-07-15
 
 - Redesign Limits Intelligence around weekly credits-per-percentage capacity
