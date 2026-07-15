@@ -62,8 +62,18 @@ export type ShellI18n = {
   languages: DashboardLanguage[];
   t: (key: string, fallback?: string) => string;
   translateText: (value: string) => string;
+  formatText: (template: string, values: Readonly<Record<string, string | number>>) => string;
   navLabel: (view: ViewId, fallback: string) => string;
 };
+
+export type LocalizedText = {
+  template: string;
+  values: Readonly<Record<string, string | number>>;
+};
+
+export function formatLocalizedText(i18n: ShellI18n, value: string | LocalizedText): string {
+  return typeof value === 'string' ? i18n.translateText(value) : i18n.formatText(value.template, value.values);
+}
 
 export function createShellI18n(payload: DashboardBootPayload | null, language: string): ShellI18n {
   const languages = dashboardLanguages(payload);
@@ -87,21 +97,26 @@ export function createShellI18n(payload: DashboardBootPayload | null, language: 
   );
   const languageMeta = languages.find(entry => entry.code === normalized);
   const direction = languageMeta?.dir === 'rtl' || (!languageMeta && payload?.language_direction === 'rtl') ? 'rtl' : 'ltr';
+  const translateText = (value: string) => {
+    if (normalized === 'zh-Hans') {
+      return translateZhHansUiText(
+        value,
+        catalogLiteralTranslations,
+        catalogTemplateTranslations,
+      );
+    }
+    return catalogLiteralTranslations.get(value) ?? value;
+  };
   return {
     language: normalized,
     direction,
     languages,
     t: (key, fallback) => translations[key] ?? fallback ?? key,
-    translateText: value => {
-      if (normalized === 'zh-Hans') {
-        return translateZhHansUiText(
-          value,
-          catalogLiteralTranslations,
-          catalogTemplateTranslations,
-        );
-      }
-      return catalogLiteralTranslations.get(value) ?? value;
-    },
+    translateText,
+    formatText: (template, values) => translateText(template).replace(
+      /\{([A-Za-z][A-Za-z0-9_]*)\}/gu,
+      (token, key) => String(values[String(key)] ?? token),
+    ),
     navLabel: (view, fallback) => {
       const key = navTranslationKeys[view];
       return key ? translations[key] ?? fallback : fallback;

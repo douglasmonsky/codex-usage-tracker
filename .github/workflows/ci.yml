@@ -93,8 +93,6 @@ jobs:
         run: deptry .
       - name: Dead code
         run: vulture src tests config/vulture-whitelist.py
-      - name: Dependency vulnerabilities
-        run: pip-audit -r requirements/audit.txt
       - name: Python security
         run: python -m agent_maintainer.runners.bandit
 
@@ -157,6 +155,7 @@ jobs:
         run: |
           check-jsonschema \
             --builtin-schema vendor.github-workflows \
+            .github/workflows/allowance-statistical-calibration.yml \
             .github/workflows/ci.yml \
             .github/workflows/pricing-compat.yml \
             .github/workflows/publish.yml

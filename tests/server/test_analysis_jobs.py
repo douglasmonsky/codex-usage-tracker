@@ -37,6 +37,11 @@ def test_analysis_jobs_deduplicate_active_work_and_publish_monotonic_progress() 
 
     assert reused["job_id"] == first["job_id"]
     assert reused["cache"] == {"request_reused": "active"}
+    assert reused["next"] == {
+        "action": "poll",
+        "job_id": first["job_id"],
+        "poll_after_ms": 500,
+    }
     reused_progress = cast(dict[str, object], reused["progress"])
     assert reused_progress["completed_units"] == 2
     assert reused_progress["percent"] == 20.0

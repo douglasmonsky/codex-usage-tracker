@@ -21,7 +21,9 @@ from codex_usage_tracker.store.api import (
     refresh_metadata,
     refresh_usage_index,
     schema_state,
+    upsert_usage_events,
 )
+from tests.store.test_usage_deduplication import _event
 
 LEGACY_SESSION_ID = "019e3810-78be-7f32-a7d7-884d9bdba1fd"
 NEW_SESSION_ID = "019e3811-5715-7018-a7bb-2232b46a5671"
@@ -68,9 +70,9 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(str(source_rows[0]["source_record_hash"])) == 64
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 26
+    assert state["schema_version"] == 29
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == list(range(1, 27))
+    assert [row["version"] for row in state["migrations"]] == list(range(1, 30))
     with connect(db_path) as conn:
         init_db(conn)
         facts = conn.execute("SELECT COUNT(*) AS count FROM call_diagnostic_facts").fetchone()
@@ -106,7 +108,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "26"
+    assert metadata["schema_version"] == "29"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -155,6 +157,67 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
             row["name"]
             for row in conn.execute("PRAGMA index_list(call_diagnostic_facts)").fetchall()
         }
+        allowance_observation_indexes = {
+            row["name"]
+            for row in conn.execute("PRAGMA index_list(allowance_observations)").fetchall()
+        }
+        cycle_indexes = {
+            row["name"] for row in conn.execute("PRAGMA index_list(allowance_cycles)").fetchall()
+        }
+        interval_indexes = {
+            row["name"] for row in conn.execute("PRAGMA index_list(allowance_intervals)").fetchall()
+        }
+        snapshot_indexes = {
+            row["name"]
+            for row in conn.execute("PRAGMA index_list(allowance_analysis_snapshots)").fetchall()
+        }
+        allowance_source_state_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(allowance_source_state)").fetchall()
+        }
+        allowance_cycle_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(allowance_cycles)").fetchall()
+        }
+        allowance_interval_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(allowance_intervals)").fetchall()
+        }
+        allowance_cycle_archive_column = conn.execute(
+            "SELECT type, \"notnull\", dflt_value FROM pragma_table_info('allowance_cycles') "
+            "WHERE name = 'is_archived'"
+        ).fetchone()
+        allowance_interval_archive_column = conn.execute(
+            "SELECT type, \"notnull\", dflt_value FROM pragma_table_info('allowance_intervals') "
+            "WHERE name = 'is_archived'"
+        ).fetchone()
+        cycle_latest_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_cycles_latest_cohort_window') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
+        cycle_latest_window_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_cycles_latest_window') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
+        cycle_series_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_cycles_series_cohort_window') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
+        interval_evidence_index_columns = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM pragma_index_info('idx_allowance_intervals_evidence_cohort_window') "
+                "ORDER BY seqno"
+            ).fetchall()
+        ]
         diagnostic_lookup_plan = [
             str(row["detail"])
             for row in conn.execute(
@@ -167,9 +230,36 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
                 ("tool", "rg"),
             ).fetchall()
         ]
+        allowance_newest_plan = [
+            str(row["detail"])
+            for row in conn.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT observation_id
+                FROM allowance_observations
+                WHERE is_archived = 0
+                ORDER BY event_timestamp DESC, cumulative_total_tokens DESC, window_key DESC
+                LIMIT 100
+                """
+            ).fetchall()
+        ]
+        allowance_window_newest_plan = [
+            str(row["detail"])
+            for row in conn.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT observation_id
+                FROM allowance_observations
+                WHERE is_archived = 0 AND window_kind = ?
+                ORDER BY event_timestamp DESC, cumulative_total_tokens DESC, window_key DESC
+                LIMIT 100
+                """,
+                ("primary",),
+            ).fetchall()
+        ]
 
-    assert versions == list(range(1, 27))
-    assert user_version == 26
+    assert versions == list(range(1, 30))
+    assert user_version == 29
     assert "idx_usage_source_file_line" in usage_indexes
     assert {
         "idx_recommendation_facts_rank_active",
@@ -177,10 +267,146 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
     } <= recommendation_indexes
     assert "idx_call_diagnostic_facts_lookup" in diagnostic_indexes
     assert "idx_call_diagnostic_facts_aggregate" in diagnostic_indexes
+    assert {
+        "idx_allowance_observations_active_newest",
+        "idx_allowance_observations_active_window_newest",
+    } <= allowance_observation_indexes
+    assert {
+        "idx_allowance_cycles_latest_cohort_window",
+        "idx_allowance_cycles_latest_window",
+        "idx_allowance_cycles_series_cohort_window",
+        "idx_allowance_cycles_series_window",
+        "idx_allowance_cycles_source_revision",
+    } <= cycle_indexes
+    assert {
+        "idx_allowance_intervals_evidence_cohort_window",
+        "idx_allowance_intervals_evidence_window",
+    } <= interval_indexes
+    assert "idx_allowance_intervals_source_revision" in interval_indexes
+    assert "idx_allowance_analysis_snapshots_cache_key" in snapshot_indexes
+    assert allowance_cycle_archive_column is not None
+    assert tuple(allowance_cycle_archive_column) == ("INTEGER", 1, "0")
+    assert allowance_interval_archive_column is not None
+    assert tuple(allowance_interval_archive_column) == ("INTEGER", 1, "0")
+    assert cycle_latest_index_columns == [
+        "is_archived",
+        "source_revision",
+        "window_kind",
+        "cohort_key",
+        "last_observed_at",
+        "cycle_id",
+    ]
+    assert cycle_latest_window_index_columns == [
+        "is_archived",
+        "source_revision",
+        "window_kind",
+        "last_observed_at",
+        "cycle_id",
+    ]
+    assert cycle_series_index_columns == [
+        "is_archived",
+        "source_revision",
+        "window_kind",
+        "cohort_key",
+        "first_observed_at",
+        "cycle_id",
+    ]
+    assert interval_evidence_index_columns == [
+        "is_archived",
+        "source_revision",
+        "window_kind",
+        "cohort_key",
+        "end_observed_at",
+        "interval_id",
+    ]
+    assert {
+        "allowance_generation",
+        "source_revision",
+        "observation_count",
+        "latest_observed_at",
+        "model_version",
+        "rebuilt_at",
+    } <= allowance_source_state_columns
+    assert {
+        "cycle_id",
+        "window_kind",
+        "window_key",
+        "cohort_key",
+        "reset_at",
+        "reset_lower_bound",
+        "reset_upper_bound",
+        "first_observed_at",
+        "last_observed_at",
+        "start_used_percent",
+        "latest_used_percent",
+        "peak_used_percent",
+        "observation_count",
+        "conflict_count",
+        "reversal_count",
+        "censored_interval_count",
+        "canonical_tokens",
+        "canonical_credits",
+        "priced_credits",
+        "unpriced_credits",
+        "price_coverage",
+        "quality_grade",
+        "cycle_state",
+        "source_revision",
+        "model_version",
+        "is_archived",
+    } <= allowance_cycle_columns
+    assert {
+        "interval_id",
+        "cycle_id",
+        "window_kind",
+        "window_key",
+        "cohort_key",
+        "start_observation_id",
+        "end_observation_id",
+        "start_record_id",
+        "end_record_id",
+        "start_observed_at",
+        "end_observed_at",
+        "start_used_percent",
+        "end_used_percent",
+        "visible_percent_delta",
+        "percent_resolution",
+        "input_tokens",
+        "cached_input_tokens",
+        "uncached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "total_tokens",
+        "estimated_credits",
+        "price_coverage",
+        "confidence_mix",
+        "interval_kind",
+        "censor_reason",
+        "simultaneous_conflict_count",
+        "explained_movement",
+        "unexplained_movement",
+        "eligible_for_interpolation",
+        "eligible_for_calibration",
+        "eligible_for_forecasting",
+        "eligible_for_change_detection",
+        "source_revision",
+        "model_version",
+        "is_archived",
+    } <= allowance_interval_columns
     assert any(
         "USING COVERING INDEX idx_call_diagnostic_facts_lookup" in detail
         for detail in diagnostic_lookup_plan
     )
+    assert any(
+        "idx_allowance_observations_active_newest" in detail
+        for detail in allowance_newest_plan
+    )
+    assert any(
+        "idx_allowance_observations_active_window_newest" in detail
+        for detail in allowance_window_newest_plan
+    )
+    assert not any("USE TEMP B-TREE" in detail for detail in allowance_newest_plan)
+    assert not any("USE TEMP B-TREE" in detail for detail in allowance_window_newest_plan)
     assert {
         "parsed_prefix_tail_hash",
         "parsed_row_count",
@@ -208,10 +434,124 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
         "compression_record_facts",
         "compression_sequence_facts",
         "compression_thread_facts",
+        "allowance_source_state",
+        "allowance_cycles",
+        "allowance_intervals",
+        "allowance_analysis_snapshots",
     } <= tables
     assert content_feature is not None
     if int(content_feature["enabled"]):
         assert "content_fts" in tables
+
+
+def test_init_db_upgrades_v25_database_without_changing_physical_rows(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    event = _event("v25-record", "/synthetic/v25.jsonl")
+    upsert_usage_events([event], db_path)
+
+    with connect(db_path) as conn:
+        before_usage = conn.execute(
+            "SELECT record_id, source_file, line_number, event_timestamp FROM usage_events"
+        ).fetchall()
+        before_provenance = conn.execute(
+            "SELECT record_id, source_file_id, line_number, source_record_hash FROM source_records"
+        ).fetchall()
+        conn.execute("DROP TABLE allowance_analysis_snapshots")
+        conn.execute("DROP TABLE allowance_intervals")
+        conn.execute("DROP TABLE allowance_cycles")
+        conn.execute("DROP TABLE allowance_source_state")
+        conn.execute("DROP INDEX idx_allowance_observations_active_newest")
+        conn.execute("DROP INDEX idx_allowance_observations_active_window_newest")
+        conn.execute("DELETE FROM schema_migrations WHERE version IN (26, 27, 28, 29)")
+        conn.execute("PRAGMA user_version = 25")
+        versions_before = [
+            row[0]
+            for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version").fetchall()
+        ]
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        }
+        after_usage = conn.execute(
+            "SELECT record_id, source_file, line_number, event_timestamp FROM usage_events"
+        ).fetchall()
+        after_provenance = conn.execute(
+            "SELECT record_id, source_file_id, line_number, source_record_hash FROM source_records"
+        ).fetchall()
+        user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    assert versions_before == list(range(1, 26))
+    assert user_version == 29
+    assert {
+        "allowance_source_state",
+        "allowance_cycles",
+        "allowance_intervals",
+        "allowance_analysis_snapshots",
+    } <= tables
+    assert after_usage == before_usage
+    assert after_provenance == before_provenance
+
+
+def test_init_db_upgrades_v27_allowance_indexes_to_v28(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.executescript(
+            """
+            DROP INDEX idx_allowance_intervals_evidence_cohort;
+            DROP INDEX idx_allowance_intervals_evidence_global;
+            DELETE FROM schema_migrations WHERE version IN (28, 29);
+            PRAGMA user_version = 27;
+            """
+        )
+    with connect(db_path) as conn:
+        init_db(conn)
+        indexes = {
+            row["name"] for row in conn.execute("PRAGMA index_list(allowance_intervals)")
+        }
+        versions = [
+            row["version"]
+            for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version")
+        ]
+        user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    assert user_version == 29
+    assert versions == list(range(1, 30))
+    assert {
+        "idx_allowance_intervals_evidence_cohort",
+        "idx_allowance_intervals_evidence_global",
+    } <= indexes
+
+
+def test_init_db_upgrades_v28_with_allowance_plan_provenance(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.executescript(
+            """
+            ALTER TABLE allowance_cycles DROP COLUMN plan_type;
+            DELETE FROM schema_migrations WHERE version = 29;
+            PRAGMA user_version = 28;
+            """
+        )
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(allowance_cycles)")
+        }
+        versions = [
+            row["version"]
+            for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version")
+        ]
+        user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    assert user_version == 29
+    assert versions == list(range(1, 30))
+    assert "plan_type" in columns
 
 
 def test_init_db_does_not_rerun_applied_migrations(

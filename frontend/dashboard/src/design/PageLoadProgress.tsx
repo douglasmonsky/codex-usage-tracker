@@ -1,5 +1,4 @@
 import type { DashboardModuleState } from '../data/dashboardQueryRegistry';
-import { useShellI18n } from '../app/i18nContext';
 import styles from './PageLoadProgress.module.css';
 
 export type PageLoadProgressProps = {
@@ -26,14 +25,9 @@ export function PageLoadProgress({
   modules,
   updating = false,
 }: PageLoadProgressProps) {
-  const i18n = useShellI18n();
   if (!active && !error) return null;
   if (!active && error) {
-    return (
-      <div className={styles.error} role="alert">
-        {i18n.translateText(`Incomplete page evidence: ${error}`)}
-      </div>
-    );
+    return <div className={styles.error} role="alert">Incomplete page evidence: {error}</div>;
   }
 
   const determinate = typeof total === 'number' && total > 0;
@@ -43,15 +37,13 @@ export function PageLoadProgress({
   return (
     <section className={styles.root} aria-live="polite">
       <div className={styles.copy}>
-        <strong>{i18n.translateText(updating ? 'Updating page evidence' : label)}</strong>
-        {determinate
-          ? <span>{i18n.translateText(`${safeCompleted} of ${total} modules ready`)}</span>
-          : <span>{i18n.translateText('Working on full-scope evidence')}</span>}
+        <strong>{updating ? 'Updating page evidence' : label}</strong>
+        {determinate ? <span>{safeCompleted} of {total} modules ready</span> : <span>Working on full-scope evidence</span>}
       </div>
       <div
         className={`${styles.track} ${modules?.length ? styles.segmentedTrack : ''}`}
         role="progressbar"
-        aria-label={i18n.translateText(label)}
+        aria-label={label}
         aria-valuemin={determinate ? 0 : undefined}
         aria-valuemax={determinate ? total : undefined}
         aria-valuenow={determinate ? safeCompleted : undefined}
@@ -69,15 +61,15 @@ export function PageLoadProgress({
             />}
       </div>
       {modules?.length ? (
-        <div className={styles.modules} aria-label={i18n.translateText(`${i18n.translateText(label)} modules`)}>
+        <div className={styles.modules} aria-label={`${label} modules`}>
           {modules.map(module => (
             <span className={styles.module} key={module.label}>
-              {i18n.translateText(module.label)} {i18n.translateText(moduleStatusLabel(module.status))}
+              {module.label} {moduleStatusLabel(module.status)}
             </span>
           ))}
         </div>
       ) : null}
-      {error ? <div className={styles.inlineError} role="alert">{i18n.translateText(error)}</div> : null}
+      {error ? <div className={styles.inlineError} role="alert">{error}</div> : null}
     </section>
   );
 }

@@ -39,6 +39,8 @@ export function formatVisualizationValue(value: VisualizationValue, column: Visu
       return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
     case 'credits':
       return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    case 'credits_per_percent':
+      return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} credits / 1%`;
     default:
       return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   }

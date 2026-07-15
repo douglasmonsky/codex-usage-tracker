@@ -26,6 +26,7 @@ from codex_usage_tracker.server.utils import (
 ErrorSender = Callable[[HTTPStatus, str], None]
 ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
+_ALLOWANCE_HISTORY_MAX_LIMIT = 1_000
 
 
 def new_query_cache() -> AggregateQueryCache:
@@ -162,7 +163,7 @@ def allowance_history_payload(
         rate_card_path=rate_card_path,
         include_archived=_include_archived(params, include_archived_default),
         window_kind=first_query_value(params.get("window_kind")),
-        limit=parse_report_limit(first_query_value(params.get("limit")), 1000),
+        limit=_parse_history_limit(first_query_value(params.get("limit"))),
         privacy_mode=first_query_value(params.get("privacy_mode")) or privacy_mode,
     )
     return report.payload
@@ -219,3 +220,19 @@ def _include_archived(params: dict[str, list[str]], include_archived_default: bo
         first_query_value(params.get("include_archived")),
         include_archived_default,
     )
+
+
+def _parse_history_limit(value: str | None) -> int:
+    """Require an explicit finite bound for interactive allowance history."""
+
+    if value is None:
+        return _ALLOWANCE_HISTORY_MAX_LIMIT
+    try:
+        limit = int(value)
+    except ValueError as exc:
+        raise ValueError(
+            f"limit must be between 1 and {_ALLOWANCE_HISTORY_MAX_LIMIT}"
+        ) from exc
+    if not 1 <= limit <= _ALLOWANCE_HISTORY_MAX_LIMIT:
+        raise ValueError(f"limit must be between 1 and {_ALLOWANCE_HISTORY_MAX_LIMIT}")
+    return limit

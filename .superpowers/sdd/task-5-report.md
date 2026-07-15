@@ -1,0 +1,17 @@
+# Task 5 report
+
+RED: added deterministic service-contract tests before the service existed; collection was red because `allowance_intelligence.service` was absent.
+
+GREEN: implementation compiles and a direct in-memory SQLite status probe returns `fresh`. The configured system Python lacks pytest and this checkout has no `.venv`, so the pytest suite could not run here.
+
+Snapshots: tests assert exact v2 schema identifiers, the compact unchanged-revision status payload, freshness transitions, series observed-point shape, and strict evidence identifier removal.
+
+Self-review: services only read Task 4 materialized queries, accept an injected connection/clock/request bounds, keep status constant-size, avoid estimates and five-hour forecasts, and preserve revision-bound evidence pagination. The series emits observed points only until later estimation work exists.
+
+Verification (shared interpreter): `3 passed in 0.07s` for `tests/allowance_intelligence/test_service.py`; Ruff passed for all Task 5 source and test files. A fixture reset timestamp was corrected so the aging assertion does not cross reset, and service helpers were formatted to satisfy Ruff.
+
+Contract follow-up: added RED regression coverage for sparse meaningful evidence pagination, strict identifier removal, cohort conflict diagnostics, reset break points, and timezone-aware custom ranges. GREEN verification: `9 passed in 0.13s` for `tests/allowance_intelligence/test_service.py`; Ruff and `git diff --check` passed.
+
+Per-window cohort follow-up: normal Codex primaries are selected independently for weekly and five-hour windows; a stale weekly normal with a fresh eligible alternate remains selected and emits reconciliation/partial diagnostics. GREEN verification: `11 passed in 0.15s`; Ruff and `git diff --check` passed.
+
+Alternate validation follow-up: alternate diagnostics dedupe against selected cohort scopes across all cycles. Reconciliation eligibility now requires at least three canonical observations with more than one used percentage in the exact archive/window/window-key/cohort/reset scope. GREEN verification: `13 passed in 0.17s`; Ruff and `git diff --check` passed.

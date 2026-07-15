@@ -60,6 +60,9 @@ describe('Simplified Chinese React fallback translations', () => {
     expect(translateZhHansUiText('Cache And Context Lab')).toBe('缓存与上下文实验室');
     expect(translateZhHansUiText('Weekly evidence first, rolling-window context second, and no claim beyond the loaded local data.'))
       .toBe('以每周证据为主、滚动窗口上下文为辅，结论不超出已加载的本地数据。');
+    expect(translateZhHansUiText('Weekly limit capacity over time')).toBe('每周限额容量趋势');
+    expect(translateZhHansUiText('How to read and trust this chart')).toBe('如何阅读并判断此图的可信度');
+    expect(translateZhHansUiText('12 supported')).toBe('12 个受支持变化');
   });
 
   it('localizes chart accessibility labels and contract errors', () => {

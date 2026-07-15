@@ -75,6 +75,53 @@ SERVER_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "cache": {"request_reused": str},
         },
     },
+    "codex-usage-tracker-allowance-status-v2": {
+        "required": {
+            "revision": str,
+            "changed": bool,
+            "quality": dict,
+            "next": dict,
+        }
+    },
+    "codex-usage-tracker-allowance-series-v2": {
+        "required": {
+            "model_version": str,
+            "generated_at": str,
+            "revision": (str, NoneType),
+            "requested_range": dict,
+            "available_range": dict,
+            "granularity": str,
+            "truncated": bool,
+            "downsampled": bool,
+            "quality": dict,
+            "points": list,
+            "cycles": list,
+            "capacity_history": dict,
+        }
+    },
+    "codex-usage-tracker-allowance-evidence-v2": {
+        "required": {
+            "model_version": str,
+            "generated_at": str,
+            "revision": (str, NoneType),
+            "privacy_mode": str,
+            "rows": list,
+            "next_cursor": (str, NoneType),
+            "copied_rows_excluded": int,
+            "provenance": str,
+            "offline_export_action": str,
+        }
+    },
+    "codex-usage-tracker-allowance-analysis-v2": {
+        "required": {
+            "status": str,
+            "snapshot_id": str,
+            "source_revision": str,
+            "model_version": str,
+            "rate_card_revision": str,
+            "parameters": dict,
+        }
+    },
     "codex-usage-tracker-compression-api-v1": {
         "required": {
             "kind": str,

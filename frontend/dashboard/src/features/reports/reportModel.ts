@@ -11,6 +11,11 @@ export type ReportDetails = {
   chartLabel: string;
 };
 
+export type ReportBarData = {
+  bars: BarDatum[];
+  labelsAreUiText: boolean;
+};
+
 export function reportKey(report: ReportView | undefined): string {
   if (report?.key) return report.key;
   const text = reportText(report);
@@ -89,19 +94,25 @@ export function reportLineSeries(report: ReportView | undefined, model: Dashboar
   return model.weeklyCreditSeries;
 }
 
-export function reportBarData(report: ReportView | undefined, model: DashboardModel, calls: CallRow[]): BarDatum[] | null {
+export function reportBarData(report: ReportView | undefined, model: DashboardModel, calls: CallRow[]): ReportBarData | null {
   const text = reportText(report);
   if (text.includes('cost') || text.includes('thread')) {
-    return model.threads.slice(0, 10).map(thread => ({ label: thread.name, value: thread.cost }));
+    return {
+      bars: model.threads.slice(0, 10).map(thread => ({ label: thread.name, value: thread.cost })),
+      labelsAreUiText: false,
+    };
   }
   if (!text.includes('fast')) return null;
   const durations = calls.map(call => call.durationSeconds).filter(value => Number.isFinite(value) && value >= 0);
-  return [
-    { label: 'Under 5s', value: durations.filter(value => value < 5).length },
-    { label: '5-15s', value: durations.filter(value => value >= 5 && value < 15).length },
-    { label: '15-30s', value: durations.filter(value => value >= 15 && value < 30).length },
-    { label: '30s+', value: durations.filter(value => value >= 30).length },
-  ];
+  return {
+    bars: [
+      { label: 'Under 5s', value: durations.filter(value => value < 5).length },
+      { label: '5-15s', value: durations.filter(value => value >= 5 && value < 15).length },
+      { label: '15-30s', value: durations.filter(value => value >= 15 && value < 30).length },
+      { label: '30s+', value: durations.filter(value => value >= 30).length },
+    ],
+    labelsAreUiText: true,
+  };
 }
 
 export function callCredits(call: CallRow): number {

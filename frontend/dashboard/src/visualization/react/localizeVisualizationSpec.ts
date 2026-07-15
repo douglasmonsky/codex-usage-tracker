@@ -118,11 +118,6 @@ function localizeAnnotation(
   return { ...annotation, label: translate(annotation.label) };
 }
 
-const protectedDataFields = new Set([
-  'branch', 'command', 'cwd', 'date', 'file', 'id', 'key', 'model', 'name', 'observed',
-  'path', 'project', 'record_id', 'remote', 'session', 'source', 'thread', 'time', 'timestamp', 'window',
-]);
-
 function localizeRows(
   rows: VisualizationRecord[],
   table: VisualizationTableSpec,
@@ -131,7 +126,7 @@ function localizeRows(
   if (!rows.length) return rows;
   const localizableFields = new Set(
     table.columns
-      .filter(column => (column.type === 'category' || column.type === 'text') && !protectedDataFields.has(column.field))
+      .filter(column => column.localizeValues === true)
       .map(column => column.field),
   );
   if (!localizableFields.size) return rows;

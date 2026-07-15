@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import DEFAULT_RATE_CARD_PATH
-from codex_usage_tracker.server import allowance, compression_routes
+from codex_usage_tracker.server import allowance, allowance_v2, compression_routes
 from codex_usage_tracker.server import context as server_context
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
 from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
@@ -298,6 +298,64 @@ class _UsageDashboardHandler(
 
     def _handle_allowance_history(self, query: str) -> None:
         self._handle_allowance_report(query, diagnostics=False)
+
+    def _handle_allowance_status_v2(self, query: str) -> None:
+        allowance_v2.handle_allowance_status_request(
+            query,
+            db_path=self._db_path,
+            privacy_mode=self._privacy_mode,
+            include_archived_default=self._include_archived,
+            send_error=self._send_error,
+            send_json=self._send_json,
+        )
+
+    def _handle_allowance_series_v2(self, query: str) -> None:
+        allowance_v2.handle_allowance_series_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            send_error=self._send_error,
+            send_json=self._send_json,
+        )
+
+    def _handle_allowance_evidence_v2(self, query: str) -> None:
+        allowance_v2.handle_allowance_evidence_request(
+            query,
+            db_path=self._db_path,
+            privacy_mode=self._privacy_mode,
+            include_archived_default=self._include_archived,
+            send_error=self._send_error,
+            send_json=self._send_json,
+        )
+
+    def _handle_allowance_analysis_v2(self, query: str) -> None:
+        allowance_v2.handle_allowance_analysis_request(
+            query,
+            db_path=self._db_path,
+            include_archived_default=self._include_archived,
+            send_error=self._send_error,
+            send_json=self._send_json,
+        )
+
+    def _handle_allowance_analysis_job_start_v2(self, query: str) -> None:
+        allowance_v2.handle_allowance_analysis_job_start_request(
+            query,
+            db_path=self._db_path,
+            registry=self._analysis_jobs,
+            include_archived_default=self._include_archived,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_json=self._send_json,
+        )
+
+    def _handle_allowance_analysis_job_status_v2(self, query: str) -> None:
+        allowance_v2.handle_allowance_analysis_job_status_request(
+            query,
+            registry=self._analysis_jobs,
+            has_valid_api_token=self._has_valid_api_token,
+            send_error=self._send_error,
+            send_json=self._send_json,
+        )
 
     def _handle_allowance_diagnostics(self, query: str) -> None:
         self._handle_allowance_report(query, diagnostics=True)

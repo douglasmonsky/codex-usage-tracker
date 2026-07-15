@@ -1,0 +1,137 @@
+.methodology {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line-subtle);
+  border-radius: 12px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--signal-context);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.methodologyHeader {
+  display: flex;
+  gap: 24px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.methodologyHeader h3,
+.methodologyGrid h4 {
+  margin: 0;
+  color: var(--ink-strong);
+}
+
+.methodologyHeader h3 {
+  font-size: 18px;
+}
+
+.methodologyHeader > p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--ink-muted);
+  line-height: 1.5;
+}
+
+.methodologyGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.methodologyGrid > section {
+  min-width: 0;
+  padding: 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: 10px;
+}
+
+.methodologyGrid h4 {
+  font-size: 13px;
+}
+
+.methodologyGrid ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 18px;
+  margin: 12px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.methodologyGrid strong {
+  color: var(--ink-strong);
+}
+
+.methodologyEvidence {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: 10px;
+}
+
+.methodologyEvidence > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-right: 1px solid var(--line-subtle);
+}
+
+.methodologyEvidence > div:last-child {
+  border-right: 0;
+}
+
+.methodologyEvidence dt {
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.methodologyEvidence dd {
+  margin: 0;
+  color: var(--ink-strong);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) {
+  .methodologyGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .methodologyHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .methodologyEvidence {
+    grid-template-columns: 1fr;
+  }
+
+  .methodologyEvidence > div,
+  .methodologyEvidence > div:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+
+  .methodologyEvidence > div:last-child {
+    border-bottom: 0;
+  }
+}

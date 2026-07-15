@@ -5,7 +5,6 @@ import type {
   ReactNode,
 } from 'react';
 
-import { useShellI18n } from '../../app/i18nContext';
 import styles from './primitives.module.css';
 
 function classes(...values: Array<string | false | undefined>) {
@@ -19,15 +18,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { children, className, type = 'button', variant = 'secondary', ...props },
+  { className, type = 'button', variant = 'secondary', ...props },
   ref,
 ) {
-  const i18n = useShellI18n();
-  return (
-    <button ref={ref} type={type} className={classes(styles.button, styles[variant], className)} {...props}>
-      {localizedNode(children, i18n.translateText)}
-    </button>
-  );
+  return <button ref={ref} type={type} className={classes(styles.button, styles[variant], className)} {...props} />;
 });
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -35,20 +29,10 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { 'aria-label': ariaLabel, className, title, type = 'button', ...props },
+  { className, type = 'button', ...props },
   ref,
 ) {
-  const i18n = useShellI18n();
-  return (
-    <button
-      ref={ref}
-      type={type}
-      aria-label={i18n.translateText(ariaLabel)}
-      title={typeof title === 'string' ? i18n.translateText(title) : title}
-      className={classes(styles.iconButton, className)}
-      {...props}
-    />
-  );
+  return <button ref={ref} type={type} className={classes(styles.iconButton, className)} {...props} />;
 });
 
 type StatusTone = 'neutral' | 'positive' | 'caution' | 'risk' | 'context';
@@ -58,15 +42,10 @@ interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 export const StatusBadge = forwardRef<HTMLSpanElement, StatusBadgeProps>(function StatusBadge(
-  { children, className, tone = 'neutral', ...props },
+  { className, tone = 'neutral', ...props },
   ref,
 ) {
-  const i18n = useShellI18n();
-  return (
-    <span ref={ref} className={classes(styles.badge, styles[tone], className)} {...props}>
-      {localizedNode(children, i18n.translateText)}
-    </span>
-  );
+  return <span ref={ref} className={classes(styles.badge, styles[tone], className)} {...props} />;
 });
 
 interface SurfaceProps extends HTMLAttributes<HTMLDivElement> {
@@ -90,12 +69,11 @@ export const MetricReadout = forwardRef<HTMLDivElement, MetricReadoutProps>(func
   { className, detail, label, value, ...props },
   ref,
 ) {
-  const i18n = useShellI18n();
   return (
     <div ref={ref} className={classes(styles.metric, className)} {...props}>
-      <span className={styles.metricLabel}>{localizedNode(label, i18n.translateText)}</span>
+      <span className={styles.metricLabel}>{label}</span>
       <strong className={styles.metricValue}>{value}</strong>
-      {detail ? <span className={styles.metricDetail}>{localizedNode(detail, i18n.translateText)}</span> : null}
+      {detail ? <span className={styles.metricDetail}>{detail}</span> : null}
     </div>
   );
 });
@@ -122,9 +100,8 @@ export function SegmentedControl<T extends string>({
   value,
   ...props
 }: SegmentedControlProps<T>) {
-  const i18n = useShellI18n();
   return (
-    <div role="group" aria-label={i18n.translateText(label)} className={classes(styles.segments, className)} {...props}>
+    <div role="group" aria-label={label} className={classes(styles.segments, className)} {...props}>
       {options.map((option) => (
         <button
           key={option.value}
@@ -134,7 +111,7 @@ export function SegmentedControl<T extends string>({
           disabled={option.disabled}
           onClick={() => onValueChange(option.value)}
         >
-          {localizedNode(option.label, i18n.translateText)}
+          {option.label}
         </button>
       ))}
     </div>
@@ -152,7 +129,6 @@ export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(function
   { className, label, max = 100, showValue = true, value, ...props },
   ref,
 ) {
-  const i18n = useShellI18n();
   const labelId = useId();
   const safeMax = max > 0 ? max : 100;
   const safeValue = Math.min(Math.max(value, 0), safeMax);
@@ -161,7 +137,7 @@ export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(function
   return (
     <div ref={ref} className={classes(styles.progress, className)} {...props}>
       <div className={styles.progressHeader}>
-        <span id={labelId}>{localizedNode(label, i18n.translateText)}</span>
+        <span id={labelId}>{label}</span>
         {showValue ? <span aria-hidden="true">{percent}%</span> : null}
       </div>
       <div
@@ -177,7 +153,3 @@ export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(function
     </div>
   );
 });
-
-function localizedNode(node: ReactNode, translate: (value: string) => string): ReactNode {
-  return typeof node === 'string' ? translate(node) : node;
-}

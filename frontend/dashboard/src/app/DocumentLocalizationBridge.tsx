@@ -1,8 +1,10 @@
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 
-import { useShellI18n } from './i18nContext';
+import type { ShellI18n } from './i18n';
+import { ShellI18nProvider, useShellI18n } from './i18nContext';
 
 const translatedAttributes = ['aria-description', 'aria-label', 'aria-valuetext', 'title', 'placeholder', 'alt'] as const;
+const attributeOptIn = 'data-localization-attributes';
 const skippedElementNames = new Set(['CODE', 'KBD', 'PRE', 'SAMP', 'SCRIPT', 'STYLE', 'TEXTAREA']);
 
 type TextTranslationRecord = { source: string; translated: string };
@@ -10,6 +12,21 @@ type AttributeTranslationRecord = { source: string; translated: string };
 
 const textTranslations = new WeakMap<Text, TextTranslationRecord>();
 const attributeTranslations = new WeakMap<Element, Map<string, AttributeTranslationRecord>>();
+
+export function LocalizedShellI18nProvider({
+  value,
+  children,
+}: {
+  value: ShellI18n;
+  children: ReactNode;
+}) {
+  return (
+    <ShellI18nProvider value={value}>
+      <DocumentLocalizationBridge />
+      {children}
+    </ShellI18nProvider>
+  );
+}
 
 export function DocumentLocalizationBridge() {
   const i18n = useShellI18n();
@@ -106,8 +123,13 @@ function localizeTextNode(node: Text, translate: (value: string) => string) {
 
 function localizeElementAttributes(element: Element, translate: (value: string) => string) {
   if (shouldSkipElement(element)) return;
+  const enabledAttributes = new Set(
+    (element.getAttribute(attributeOptIn) ?? '').split(/[\s,]+/u).filter(Boolean),
+  );
+  if (!enabledAttributes.size) return;
   const records = attributeTranslations.get(element) ?? new Map<string, AttributeTranslationRecord>();
   for (const attribute of translatedAttributes) {
+    if (!enabledAttributes.has(attribute)) continue;
     const current = element.getAttribute(attribute);
     if (!current) continue;
     const previous = records.get(attribute);

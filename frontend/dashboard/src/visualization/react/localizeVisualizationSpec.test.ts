@@ -59,7 +59,7 @@ describe('localizeVisualizationSpec', () => {
       table: {
         ...fixture.table,
         columns: [
-          { field: 'finding', label: 'Finding', type: 'category' },
+          { field: 'finding', label: 'Finding', type: 'category', localizeValues: true },
           { field: 'thread', label: 'Thread', type: 'text' },
         ],
       },
@@ -73,6 +73,29 @@ describe('localizeVisualizationSpec', () => {
     if (localized.kind === 'cartesian') {
       expect(localized.data.rows[0].finding).toBe('工具输出压力');
       expect(localized.data.rows[0].thread).toBe('Overview');
+    }
+  });
+
+  it('localizes only explicitly marked table values', () => {
+    const categorical: CartesianVisualizationSpecV1 = {
+      ...fixture,
+      data: { rows: [{ id: 'one', bucket: 'Under 5s', label: 'Overview' }] },
+      table: {
+        ...fixture.table,
+        columns: [
+          { field: 'bucket', label: 'Bucket', type: 'category', localizeValues: true },
+          { field: 'label', label: 'Label', type: 'text' },
+        ],
+      },
+    };
+    const localized = localizeVisualizationSpec(categorical, value => ({
+      'Under 5s': '5秒以内',
+      Overview: '概览',
+    })[value] ?? value);
+
+    if (localized.kind === 'cartesian') {
+      expect(localized.data.rows[0].bucket).toBe('5秒以内');
+      expect(localized.data.rows[0].label).toBe('Overview');
     }
   });
 });

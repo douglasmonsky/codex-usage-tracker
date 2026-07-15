@@ -22,6 +22,7 @@ from codex_usage_tracker.parser.state import (
     PARSER_ADAPTER_VERSION,
     PARSER_DIAGNOSTIC_KEYS,
 )
+from codex_usage_tracker.store.allowance_materialization import materialize_allowance_intelligence
 from codex_usage_tracker.store.allowance_observations import (
     query_allowance_observations as query_allowance_observations,
 )
@@ -643,6 +644,7 @@ def _finalize_streamed_usage_event_upserts(
         sync_allowance_observations_for_record_ids(conn, list(unique_record_ids))
         if maintain_source_records:
             sync_source_records(conn, record_ids=unique_record_ids)
+    materialize_allowance_intelligence(conn)
     if stage_callback is not None:
         stage_callback("allowance_and_sources")
     _refresh_after_usage_event_upsert(

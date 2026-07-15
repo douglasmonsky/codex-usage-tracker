@@ -12,6 +12,7 @@ import {
 } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { useState } from 'react';
+import { formatLocalizedText, type LocalizedText } from '../app/i18n';
 import { useShellI18n } from '../app/i18nContext';
 
 type DataTableProps<T> = {
@@ -20,7 +21,7 @@ type DataTableProps<T> = {
   compact?: boolean;
   emptyLabel?: string;
   getRowId?: (row: T, index: number) => string;
-  getRowActionLabel?: (row: T) => string;
+  getRowActionLabel?: (row: T) => string | LocalizedText;
   selectedRowId?: string;
   onRowSelect?: (row: T) => void;
   onRowActivate?: (row: T) => void;
@@ -153,6 +154,9 @@ setInternalVisibleRowCount(nextVisibleRowCount);
                 const isInteractive = Boolean(onRowSelect || onRowActivate);
                 const clickActivates = Boolean(onRowActivate && (!onRowSelect || activateOnClick));
                 const rowActionLabel = getRowActionLabel?.(row.original);
+                const localizedRowActionLabel = rowActionLabel
+                  ? formatLocalizedText(i18n, rowActionLabel)
+                  : undefined;
                 const selectRow = () => onRowSelect?.(row.original);
                 const activateRow = () => (onRowActivate ?? onRowSelect)?.(row.original);
                 const clickRow = () => {
@@ -175,11 +179,11 @@ setInternalVisibleRowCount(nextVisibleRowCount);
                       onRowActivate ? 'is-activatable' : '',
                       isSelected ? 'selected-row' : '',
                     ].filter(Boolean).join(' ')}
-                    aria-label={rowActionLabel}
+                    aria-label={localizedRowActionLabel}
                     aria-selected={isSelected || undefined}
                     tabIndex={isInteractive ? 0 : undefined}
                     title={
-                      rowActionLabel ??
+                      localizedRowActionLabel ??
                       (onRowActivate
                         ? onRowSelect
                           ? activateOnClick

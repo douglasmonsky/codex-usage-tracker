@@ -12,14 +12,14 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronsRight } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
-import { useShellI18n } from '../../app/i18nContext';
+import { formatLocalizedText, type LocalizedText, useShellI18n } from '../../app/i18nContext';
 import styles from './EvidenceGrid.module.css';
 import type { EvidenceGridDensity } from './useEvidenceGridPreferences';
 
 type EvidenceGridMobilePresentation<TData> = {
   primary: (row: TData, rank: number) => ReactNode;
   secondary: (row: TData, rank: number) => ReactNode;
-  actionLabel: (row: TData, rank: number) => string;
+  actionLabel: (row: TData, rank: number) => string | LocalizedText;
 };
 
 export type EvidenceGridProps<TData> = {
@@ -273,7 +273,7 @@ export function EvidenceGrid<TData>({
                 <button
                   type="button"
                   className={selected ? styles.mobileRowSelected : styles.mobileRow}
-                  aria-label={mobile.actionLabel(row.original, rank)}
+                  aria-label={formatLocalizedText(i18n, mobile.actionLabel(row.original, rank))}
                   aria-pressed={selected}
                   data-row-index={virtualRow.index}
                   onClick={() => clickRow(row.original)}

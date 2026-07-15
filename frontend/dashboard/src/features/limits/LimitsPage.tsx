@@ -1,29 +1,55 @@
 import { useQuery } from '@tanstack/react-query';
 import { Download, FlaskConical, RefreshCw, ShieldCheck } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  loadAllowanceDiagnostics,
   loadAllowanceEvidenceExport,
-  loadAllowanceHistory,
   type AllowanceWindowKind,
 } from '../../api/allowance';
+import {
+  loadAllowanceAnalysis,
+  loadAllowanceAnalysisJob,
+  loadAllowanceEvidence,
+  loadAllowanceSeries,
+  loadAllowanceStatus,
+  startAllowanceAnalysis,
+  type AllowanceSeriesRequest,
+} from '../../api/allowanceIntelligence';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
-import { useShellI18n } from '../../app/i18nContext';
 import { Button, MetricReadout, PageLoadProgress, SegmentedControl, StatusBadge, Surface } from '../../design';
 import { Visualization } from '../../visualization';
 import { csvDateStamp } from '../shared/exportCsv';
+import { AllowanceCapacityChangeTimeline } from './AllowanceCapacityChangeTimeline';
+import { AllowanceCapacityLegend } from './AllowanceCapacityLegend';
+import { AllowanceCapacityMethodology } from './AllowanceCapacityMethodology';
+import { AllowanceCapacityStatusRow } from './AllowanceCapacityStatusRow';
 import { AllowanceEvidenceLedger } from './AllowanceEvidenceLedger';
+import { AllowanceIntelligenceEvidenceTable } from './AllowanceIntelligenceEvidenceTable';
+import {
+  capacityRatio,
+  gradeLabel,
+  gradeTone,
+  intervalStatus,
+  statistic,
+  unexplainedMovement,
+} from './allowanceDisplay';
+import { buildAllowanceReadout } from './allowanceIntelligenceModel';
+import { buildAllowanceIntelligenceVisualization } from './allowanceIntelligenceVisualization';
 import {
   allowanceEvidenceCallsForCurrentUrl,
   buildAllowanceWorkspace,
   buildFallbackAllowanceExport,
   evaluateAllowanceHypothesis,
   type AllowanceHypothesis,
-  type AllowanceTone,
 } from './allowanceModel';
 import { buildAllowanceVisualizationSpec } from './allowanceVisualization';
-import styles from './LimitsPage.module.css';
+import { allowanceAnalysisPollInterval, allowanceStatusPollInterval, isPageVisible } from './allowancePolling';
+import { downloadJson, errorMessage } from './limitsPageActions';
+import baseStyles from './LimitsPage.module.css';
+import intelligenceStyles from './LimitsIntelligence.module.css';
+import type { AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
+
+const styles = { ...baseStyles, ...intelligenceStyles };
 
 type LimitsPageProps = {
   model: DashboardModel;
@@ -36,7 +62,293 @@ type LimitsPageProps = {
 
 export { allowanceEvidenceCallsForCurrentUrl };
 
-export function LimitsPage({
+type RangePreset = NonNullable<AllowanceSeriesRequest['rangePreset']>;
+type Granularity = NonNullable<AllowanceSeriesRequest['granularity']>;
+
+export function LimitsPage(props: LimitsPageProps) {
+  const canUseLive = Boolean(props.contextRuntime.apiToken) && !props.contextRuntime.fileMode;
+  return canUseLive ? <LiveLimitsPage {...props} /> : <StaticLimitsPage {...props} />;
+}
+
+function LiveLimitsPage({
+  contextRuntime,
+  includeArchived = false,
+  onOpenInvestigator,
+  onCopyCallLink,
+}: LimitsPageProps) {
+  const windowKind: AllowanceWindowKind = 'weekly';
+  const [rangePreset, setRangePreset] = useState<RangePreset>('8w');
+  const [granularity, setGranularity] = useState<Granularity>('cycle');
+  const [showFullRange, setShowFullRange] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [evidenceCursors, setEvidenceCursors] = useState<(string | undefined)[]>([undefined]);
+  const [showPhysicalProvenance, setShowPhysicalProvenance] = useState(false);
+  const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState('Canonical allowance evidence ready');
+  const [exporting, setExporting] = useState(false);
+  const statusSnapshotRef = useRef<AllowanceStatusPayload | null>(null);
+  const automaticAnalysisRevisionRef = useRef<string | null>(null);
+  const queryScope = [contextRuntime.apiToken, includeArchived] as const;
+  const customStartAt = dateBoundary(customStart, false);
+  const customEndAt = dateBoundary(customEnd, true);
+  const customReady = rangePreset !== 'custom' || Boolean(customStartAt && customEndAt);
+  const evidenceBefore = evidenceCursors.at(-1);
+
+  const statusQuery = useQuery({
+    queryKey: ['allowance-v2', 'status', ...queryScope],
+    queryFn: async ({ signal }) => {
+      const previous = statusSnapshotRef.current;
+      const payload = await loadAllowanceStatus(contextRuntime, {
+        includeArchived,
+        sinceRevision: previous?.revision,
+      }, signal);
+      if (!payload.changed && previous) {
+        return { ...previous, changed: false, quality: payload.quality, next: payload.next };
+      }
+      statusSnapshotRef.current = payload;
+      return payload;
+    },
+    staleTime: 0,
+    refetchInterval: query => allowanceStatusPollInterval(
+      query.state.data?.data_state,
+      query.state.fetchFailureCount,
+      isPageVisible(),
+    ),
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  const allowanceRevision = statusQuery.data?.revision ?? '';
+  const seriesQuery = useQuery({
+    queryKey: ['allowance-v2', 'series', ...queryScope, allowanceRevision, windowKind, rangePreset, granularity, customStartAt, customEndAt],
+    queryFn: ({ signal }) => loadAllowanceSeries(contextRuntime, {
+      includeArchived,
+      rangePreset,
+      granularity,
+      windowKind,
+      startAt: customStartAt,
+      endAt: customEndAt,
+    }, signal),
+    enabled: Boolean(allowanceRevision) && customReady,
+    staleTime: Number.POSITIVE_INFINITY,
+    placeholderData: previous => previous,
+    retry: false,
+  });
+  const evidenceQuery = useQuery({
+    queryKey: ['allowance-v2', 'evidence', ...queryScope, allowanceRevision, windowKind, evidenceBefore, 50, showPhysicalProvenance],
+    queryFn: ({ signal }) => loadAllowanceEvidence(contextRuntime, {
+      includeArchived,
+      before: evidenceBefore,
+      limit: 50,
+      order: 'desc',
+      privacyMode: showPhysicalProvenance ? 'local' : 'normal',
+      windowKind,
+    }, signal),
+    enabled: Boolean(allowanceRevision),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+  const analysisQuery = useQuery({
+    queryKey: ['allowance-v2', 'analysis', ...queryScope, allowanceRevision, 'weekly'],
+    queryFn: ({ signal }) => loadAllowanceAnalysis(contextRuntime, { includeArchived }, signal),
+    enabled: Boolean(allowanceRevision),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+  const analysisJobQuery = useQuery({
+    queryKey: ['allowance-v2', 'analysis-job', contextRuntime.apiToken, analysisJobId],
+    queryFn: ({ signal }) => loadAllowanceAnalysisJob(contextRuntime, analysisJobId ?? '', signal),
+    enabled: Boolean(analysisJobId),
+    refetchInterval: query => allowanceAnalysisPollInterval(query.state.data?.status, isPageVisible()),
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  const refetchAnalysis = analysisQuery.refetch;
+  useEffect(() => {
+    setEvidenceCursors([undefined]);
+  }, [allowanceRevision, windowKind]);
+  useEffect(() => {
+    if (analysisJobQuery.data?.status === 'completed') {
+      setAnalysisJobId(null);
+      setStatusMessage('Allowance analysis completed');
+      void refetchAnalysis();
+    } else if (analysisJobQuery.data?.status === 'failed') {
+      setAnalysisJobId(null);
+      setStatusMessage('Allowance analysis failed');
+    }
+  }, [analysisJobQuery.data?.status, refetchAnalysis]);
+  useEffect(() => {
+    if (!allowanceRevision
+      || analysisQuery.isFetching
+      || analysisQuery.data?.status !== 'missing'
+      || analysisJobId
+      || automaticAnalysisRevisionRef.current === allowanceRevision) return;
+    automaticAnalysisRevisionRef.current = allowanceRevision;
+    setStatusMessage('Starting capacity analysis for new allowance data…');
+    void startAllowanceAnalysis(contextRuntime, { includeArchived })
+      .then(job => {
+        setAnalysisJobId(job.job_id);
+        setStatusMessage('Capacity analysis running');
+      })
+      .catch(analysisError => {
+        automaticAnalysisRevisionRef.current = null;
+        setStatusMessage(`Analysis failed: ${errorMessage(analysisError)}`);
+      });
+  }, [allowanceRevision, analysisJobId, analysisQuery.data?.status, analysisQuery.isFetching, contextRuntime, includeArchived]);
+
+  const readout = useMemo(() => buildAllowanceReadout(statusQuery.data), [statusQuery.data]);
+  const chartSpec = useMemo(() => seriesQuery.data
+    ? buildAllowanceIntelligenceVisualization(seriesQuery.data, statusQuery.data, windowKind, { showFullRange })
+    : null, [seriesQuery.data, statusQuery.data, windowKind, showFullRange]);
+  const rangeHasNoOlderData = Boolean(seriesQuery.data && (
+    rangePreset === 'all'
+    || (rangePreset === '6m'
+      && seriesQuery.data.available_range.start_at
+      && seriesQuery.data.requested_range.start_at
+      && Date.parse(seriesQuery.data.available_range.start_at) > Date.parse(seriesQuery.data.requested_range.start_at))
+  ));
+  const loading = statusQuery.isFetching || seriesQuery.isFetching || evidenceQuery.isFetching || analysisQuery.isFetching;
+  const error = statusQuery.error ?? seriesQuery.error ?? evidenceQuery.error ?? analysisQuery.error;
+  const completedModules = Number(Boolean(statusQuery.data)) + Number(Boolean(seriesQuery.data))
+    + Number(Boolean(evidenceQuery.data)) + Number(Boolean(analysisQuery.data));
+
+  function selectRange(next: RangePreset) {
+    setRangePreset(next);
+    syncIntelligenceUrl(windowKind, next, granularity);
+  }
+
+  function selectGranularity(next: Granularity) {
+    setGranularity(next);
+    syncIntelligenceUrl(windowKind, rangePreset, next);
+  }
+
+  async function refreshStatus() {
+    if (loading) return;
+    automaticAnalysisRevisionRef.current = null;
+    setStatusMessage('Checking for new allowance evidence…');
+    const result = await statusQuery.refetch();
+    setStatusMessage(result.isError ? 'Allowance status check failed' : 'Allowance status checked');
+  }
+
+  async function exportEvidence() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const payload = await loadAllowanceEvidenceExport(contextRuntime, { includeArchived, limit: null });
+      downloadJson(`codex-allowance-evidence-${csvDateStamp()}.json`, payload);
+      setStatusMessage('Strict allowance evidence exported');
+    } catch (exportError) {
+      setStatusMessage(`Export failed: ${errorMessage(exportError)}`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <div>
+          <p className={styles.eyebrow}>Allowance intelligence</p>
+          <h1>Limits</h1>
+          <p>Track how many priced local credits correspond to each weekly allowance percentage point, with supported changes and provenance kept visible.</p>
+        </div>
+        <div className={styles.headerActions}>
+          <Button onClick={exportEvidence} disabled={exporting}><Download />{exporting ? 'Exporting' : 'Export evidence'}</Button>
+          <Button variant="primary" onClick={refreshStatus} disabled={loading}><RefreshCw />{loading ? 'Updating' : 'Check for new data'}</Button>
+        </div>
+      </header>
+
+      <PageLoadProgress active={loading} completed={completedModules} total={4} label="Loading allowance intelligence" error={error ? errorMessage(error) : null} updating={completedModules > 0} />
+
+      <div className={styles.statusRow} role="status" aria-live="polite">
+        <StatusBadge tone={freshnessTone(statusQuery.data?.data_state)}>{freshnessLabel(statusQuery.data?.data_state)}</StatusBadge>
+        <StatusBadge tone="positive">Canonical usage</StatusBadge>
+        <StatusBadge tone="neutral">{statusQuery.data?.quality.copied_rows_excluded ?? 0} copied excluded</StatusBadge>
+        <span>{error ? `Live allowance data unavailable: ${errorMessage(error)}` : statusMessage}</span>
+      </div>
+
+      <AllowanceCapacityStatusRow readout={readout} />
+
+      <Surface className={styles.trendPanel}>
+        <div className={styles.modeBar}>
+          <div><p className={styles.eyebrow}>Capacity history</p><p>Each point is one quality-approved completed reset window. The line and band summarize recent capacity without letting extreme values flatten the chart.</p></div>
+          {(seriesQuery.data?.capacity_history.clipped_point_count ?? 0) > 0 ? (
+            <Button onClick={() => setShowFullRange(current => !current)}>
+              {showFullRange ? 'Use robust range' : 'Show full range'}
+            </Button>
+          ) : null}
+        </div>
+        <div className={styles.rangeControls}>
+          <SegmentedControl
+            label="History range"
+            options={[{ label: '8w', value: '8w' }, { label: '6m', value: '6m' }, { label: 'All', value: 'all' }, { label: 'Custom', value: 'custom' }]}
+            value={rangePreset}
+            onValueChange={selectRange}
+          />
+          <label className={styles.controlField}>Granularity
+            <select value={granularity} onChange={event => selectGranularity(event.target.value as Granularity)}>
+              <option value="cycle">By reset window</option><option value="week">Weekly</option><option value="month">Monthly</option>
+            </select>
+          </label>
+        </div>
+        {rangePreset === 'custom' ? (
+          <div className={styles.customRange}>
+            <label>Start date<input type="date" value={customStart} onChange={event => setCustomStart(event.target.value)} /></label>
+            <label>End date<input type="date" value={customEnd} onChange={event => setCustomEnd(event.target.value)} /></label>
+            {!customReady ? <span>Choose both dates to load the custom range.</span> : null}
+          </div>
+        ) : null}
+        {seriesQuery.data ? (
+          <p className={styles.rangeFeedback} role="status" aria-label="History range result" data-localization-attributes="aria-label">
+            <strong>{rangePreset === 'all' ? 'All history' : rangePreset} selected</strong>
+            {' · '}{seriesQuery.data.capacity_history.eligible_cycle_count} eligible reset windows loaded.
+            {rangeHasNoOlderData ? ' No older capacity history is available.' : ''}
+          </p>
+        ) : null}
+        {seriesQuery.data ? <AllowanceCapacityLegend series={seriesQuery.data} /> : null}
+        {chartSpec ? <Visualization spec={chartSpec} height={380} /> : <div className={styles.chartPlaceholder}>{seriesQuery.isFetching ? 'Loading capacity history…' : 'No completed-cycle capacity history for this range.'}</div>}
+        {seriesQuery.data ? (
+          <AllowanceCapacityMethodology
+            series={seriesQuery.data}
+            analysis={analysisQuery.data}
+          />
+        ) : null}
+      </Surface>
+
+      <AllowanceCapacityChangeTimeline analysis={analysisQuery.data} running={Boolean(analysisJobId)} />
+
+      <AllowanceIntelligenceEvidenceTable
+        rows={evidenceQuery.data?.rows ?? []}
+        page={evidenceCursors.length}
+        hasOlder={Boolean(evidenceQuery.data?.next_cursor)}
+        loading={evidenceQuery.isFetching}
+        showPhysicalProvenance={showPhysicalProvenance}
+        onTogglePhysicalProvenance={show => {
+          setEvidenceCursors([undefined]);
+          setShowPhysicalProvenance(show);
+        }}
+        onNewer={() => setEvidenceCursors(current => current.length > 1 ? current.slice(0, -1) : current)}
+        onOlder={() => evidenceQuery.data?.next_cursor && setEvidenceCursors(current => [...current, evidenceQuery.data?.next_cursor ?? undefined])}
+        onOpenCall={onOpenInvestigator}
+        onCopyCallLink={onCopyCallLink}
+      />
+
+      <details className={styles.caveats}>
+        <summary><ShieldCheck />Method, confidence, and boundaries</summary>
+        <ul>
+          <li>Observed percentages are local Codex rate-limit snapshots. They are not reconstructed from token totals.</li>
+          <li>Personal calibration uses completed, quality-approved reset windows with strict priced-usage coverage and one vote per reset identity.</li>
+          <li>The weekly percentage forecast remains available through the API only when it beats time-ordered baselines; this page does not treat a failed forecast as missing capacity data.</li>
+          <li>Change claims use a hierarchical cycle-block permutation test, control family-wise false positives, require a strong effect, and exclude low-quality reset windows.</li>
+          <li>Five-hour allowance status is shown as observed context only because expiry makes it a rolling window; weekly monotonic capacity math is not applied to it.</li>
+          <li>The tracker cannot read OpenAI's internal allowance or billing ledger.</li>
+        </ul>
+      </details>
+    </div>
+  );
+}
+
+function StaticLimitsPage({
   model,
   contextRuntime,
   includeArchived = false,
@@ -44,34 +356,84 @@ export function LimitsPage({
   onOpenInvestigator,
   onCopyCallLink,
 }: LimitsPageProps) {
-  const i18n = useShellI18n();
   const initialState = readLimitState();
   const [windowKind, setWindowKind] = useState<AllowanceWindowKind>(initialState.windowKind);
   const [hypothesis, setHypothesis] = useState<AllowanceHypothesis>(initialState.hypothesis);
   const [evaluatedHypothesis, setEvaluatedHypothesis] = useState<AllowanceHypothesis | null>(null);
+  const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('Stored allowance evidence ready');
   const [exporting, setExporting] = useState(false);
   const canUseLive = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
-  const queryScope = [contextRuntime.apiToken, includeArchived, sourceRevision] as const;
-  const historyQuery = useQuery({
-    queryKey: ['allowance', 'history', ...queryScope],
-    queryFn: () => loadAllowanceHistory(contextRuntime, { includeArchived, limit: 0 }),
+  const queryScope = [contextRuntime.apiToken, includeArchived] as const;
+  const statusQuery = useQuery({
+    queryKey: ['allowance-v2', 'status', ...queryScope],
+    queryFn: ({ signal }) => loadAllowanceStatus(contextRuntime, { includeArchived }, signal),
     enabled: canUseLive,
-    staleTime: 10 * 60_000,
+    staleTime: 0,
+    refetchInterval: query => allowanceStatusPollInterval(
+      query.state.data?.data_state,
+      query.state.fetchFailureCount,
+      isPageVisible(),
+    ),
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  const allowanceRevision = statusQuery.data?.revision ?? '';
+  const seriesQuery = useQuery({
+    queryKey: ['allowance-v2', 'series', ...queryScope, allowanceRevision, windowKind, '8w', 'auto'],
+    queryFn: ({ signal }) => loadAllowanceSeries(contextRuntime, {
+      includeArchived,
+      rangePreset: '8w',
+      granularity: 'auto',
+      windowKind,
+    }, signal),
+    enabled: canUseLive && Boolean(allowanceRevision),
+    staleTime: Number.POSITIVE_INFINITY,
     placeholderData: previous => previous,
     retry: false,
   });
-  const diagnosticsQuery = useQuery({
-    queryKey: ['allowance', 'diagnostics', ...queryScope],
-    queryFn: () => loadAllowanceDiagnostics(contextRuntime, { includeArchived, limit: 0 }),
-    enabled: canUseLive,
-    staleTime: 10 * 60_000,
+  const evidenceQuery = useQuery({
+    queryKey: ['allowance-v2', 'evidence', ...queryScope, allowanceRevision, windowKind, 100, 'local'],
+    queryFn: ({ signal }) => loadAllowanceEvidence(contextRuntime, {
+      includeArchived,
+      limit: 100,
+      order: 'desc',
+      privacyMode: 'local',
+      windowKind,
+    }, signal),
+    enabled: canUseLive && Boolean(allowanceRevision),
+    staleTime: Number.POSITIVE_INFINITY,
     placeholderData: previous => previous,
     retry: false,
   });
+  const analysisQuery = useQuery({
+    queryKey: ['allowance-v2', 'analysis', ...queryScope, allowanceRevision, 'weekly'],
+    queryFn: ({ signal }) => loadAllowanceAnalysis(contextRuntime, { includeArchived }, signal),
+    enabled: canUseLive && Boolean(allowanceRevision),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+  const analysisJobQuery = useQuery({
+    queryKey: ['allowance-v2', 'analysis-job', contextRuntime.apiToken, analysisJobId],
+    queryFn: ({ signal }) => loadAllowanceAnalysisJob(contextRuntime, analysisJobId ?? '', signal),
+    enabled: canUseLive && Boolean(analysisJobId),
+    refetchInterval: query => allowanceAnalysisPollInterval(query.state.data?.status, isPageVisible()),
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  useEffect(() => {
+    if (analysisJobQuery.data?.status === 'completed') {
+      setAnalysisJobId(null);
+      setStatusMessage('Allowance analysis completed');
+      void analysisQuery.refetch();
+    } else if (analysisJobQuery.data?.status === 'failed') {
+      setAnalysisJobId(null);
+      setStatusMessage('Allowance analysis failed');
+    }
+  }, [analysisJobQuery.data?.status, analysisQuery]);
   const workspace = useMemo(
-    () => buildAllowanceWorkspace(model, diagnosticsQuery.data, historyQuery.data, sourceRevision),
-    [diagnosticsQuery.data, historyQuery.data, model, sourceRevision],
+    () => buildAllowanceWorkspace(model, undefined, undefined, allowanceRevision || sourceRevision),
+    [allowanceRevision, model, sourceRevision],
   );
   const selectedWindow = windowKind === 'weekly' ? workspace.weekly : workspace.fiveHour;
   const chartSpec = useMemo(
@@ -81,9 +443,15 @@ export function LimitsPage({
   const hypothesisResult = evaluatedHypothesis
     ? evaluateAllowanceHypothesis(workspace, evaluatedHypothesis)
     : null;
-  const loading = historyQuery.isFetching || diagnosticsQuery.isFetching;
-  const error = historyQuery.error ?? diagnosticsQuery.error;
-  const completedModules = Number(Boolean(historyQuery.data)) + Number(Boolean(diagnosticsQuery.data));
+  const answerTitle = analysisQuery.data?.status === 'no_supported_change'
+    ? 'No weekly regime change detected'
+    : workspace.answer.title;
+  const loading = statusQuery.isFetching || seriesQuery.isFetching || evidenceQuery.isFetching || analysisQuery.isFetching;
+  const error = statusQuery.error ?? seriesQuery.error ?? evidenceQuery.error ?? analysisQuery.error;
+  const completedModules = Number(Boolean(statusQuery.data))
+    + Number(Boolean(seriesQuery.data))
+    + Number(Boolean(evidenceQuery.data))
+    + Number(Boolean(analysisQuery.data));
 
   function selectWindow(next: AllowanceWindowKind) {
     setWindowKind(next);
@@ -99,10 +467,9 @@ export function LimitsPage({
 
   async function refreshEvidence() {
     if (!canUseLive || loading) return;
-    setStatusMessage('Refreshing allowance evidence...');
-    const results = await Promise.all([historyQuery.refetch(), diagnosticsQuery.refetch()]);
-    const failed = results.some(result => result.isError);
-    setStatusMessage(failed ? 'Allowance refresh failed' : 'Allowance evidence refreshed');
+    setStatusMessage('Checking allowance status...');
+    const result = await statusQuery.refetch();
+    setStatusMessage(result.isError ? 'Allowance status check failed' : 'Allowance status checked');
   }
 
   async function exportEvidence() {
@@ -110,7 +477,7 @@ export function LimitsPage({
     setExporting(true);
     try {
       const payload = canUseLive
-        ? await loadAllowanceEvidenceExport(contextRuntime, { includeArchived, limit: 0 })
+        ? await loadAllowanceEvidenceExport(contextRuntime, { includeArchived, limit: null })
         : buildFallbackAllowanceExport(workspace);
       downloadJson(`codex-allowance-evidence-${csvDateStamp()}.json`, payload);
       setStatusMessage('Strict allowance evidence exported');
@@ -121,9 +488,20 @@ export function LimitsPage({
     }
   }
 
-  function testHypothesis() {
+  async function testHypothesis() {
     setEvaluatedHypothesis(hypothesis);
-    setStatusMessage('Weekly hypothesis evaluated against detector output');
+    if (canUseLive && analysisQuery.data?.status === 'missing') {
+      setStatusMessage('Starting allowance analysis...');
+      try {
+        const job = await startAllowanceAnalysis(contextRuntime, { includeArchived });
+        setAnalysisJobId(job.job_id);
+        setStatusMessage('Allowance analysis running');
+      } catch (analysisError) {
+        setStatusMessage(`Analysis failed: ${errorMessage(analysisError)}`);
+      }
+      return;
+    }
+    setStatusMessage('Weekly hypothesis evaluated against stored analysis');
   }
 
   return (
@@ -145,14 +523,17 @@ export function LimitsPage({
       <PageLoadProgress
         active={canUseLive && loading}
         completed={completedModules}
-        total={2}
-        label="Loading allowance history and detector"
+        total={4}
+        label="Loading allowance intelligence"
         error={canUseLive && error ? errorMessage(error) : null}
         updating={completedModules > 0}
       />
 
       <div className={styles.statusRow} role="status" aria-live="polite">
-        <StatusBadge tone={workspace.live ? 'positive' : 'neutral'}>{workspace.live ? 'Live detector payload' : 'Loaded aggregate fallback'}</StatusBadge>
+        <StatusBadge tone={statusQuery.data ? 'positive' : 'neutral'}>{statusQuery.data ? 'Canonical live status' : 'Loaded aggregate fallback'}</StatusBadge>
+        {statusQuery.data ? (
+          <StatusBadge tone="neutral">{statusQuery.data.quality.copied_rows_excluded} copied excluded</StatusBadge>
+        ) : null}
         <StatusBadge tone={workspace.readiness.ready_for_public_claim ? 'positive' : 'caution'}>
           {workspace.readiness.ready_for_public_claim ? 'Local claim threshold met' : 'Research caution'}
         </StatusBadge>
@@ -162,12 +543,12 @@ export function LimitsPage({
       <section className={styles.answerBand} data-tone={workspace.answer.tone} aria-labelledby="limits-answer-title">
         <div className={styles.answerCopy}>
           <span>{workspace.answer.label}</span>
-          <h2 id="limits-answer-title">{workspace.answer.title}</h2>
+          <h2 id="limits-answer-title">{answerTitle}</h2>
           <p>{workspace.answer.detail}</p>
         </div>
         <div className={styles.answerMeta}>
           <StatusBadge tone={workspace.answer.tone}>{workspace.answer.badge}</StatusBadge>
-          <span>{i18n.translateText(`${workspace.weekly.positiveSpanCount} weekly spans · ${workspace.readiness.detector_version}`)}</span>
+          <span>{workspace.weekly.positiveSpanCount} weekly spans · {workspace.readiness.detector_version}</span>
         </div>
       </section>
 
@@ -259,6 +640,30 @@ export function LimitsPage({
   );
 }
 
+function freshnessTone(state: string | undefined): 'positive' | 'caution' | 'neutral' {
+  return state === 'fresh' ? 'positive' : state === 'aging' || state === 'partial' ? 'caution' : 'neutral';
+}
+
+function freshnessLabel(state: string | undefined): string {
+  if (!state) return 'Awaiting status';
+  return state === 'partial' ? 'Partial evidence' : `${state[0].toUpperCase()}${state.slice(1)} data`;
+}
+
+function dateBoundary(value: string, end: boolean): string | undefined {
+  if (!value) return undefined;
+  const timestamp = Date.parse(`${value}T${end ? '23:59:59.999' : '00:00:00.000'}Z`);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
+}
+
+function syncIntelligenceUrl(windowKind: AllowanceWindowKind, range: RangePreset, granularity: Granularity) {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('limit_window', windowKind);
+  url.searchParams.set('limit_range', range);
+  url.searchParams.set('limit_granularity', granularity);
+  window.history.replaceState({}, '', `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+}
+
 function readLimitState(): { windowKind: AllowanceWindowKind; hypothesis: AllowanceHypothesis } {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -275,52 +680,4 @@ function syncLimitUrl(windowKind: AllowanceWindowKind, hypothesis: AllowanceHypo
   if (hypothesis === 'decreased') url.searchParams.delete('limit_hypothesis');
   else url.searchParams.set('limit_hypothesis', hypothesis);
   window.history.replaceState(null, '', url);
-}
-
-function capacityRatio(value: number | null | undefined): string {
-  return value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`;
-}
-
-function unexplainedMovement(value: number | null | undefined): string {
-  return value === null || value === undefined ? '—' : `${Math.round(value * 10) / 10}%`;
-}
-
-function statistic(value: number | null | undefined): string {
-  return value === null || value === undefined ? 'Not available' : value.toLocaleString(undefined, { maximumFractionDigits: 4 });
-}
-
-function intervalStatus(workspace: ReturnType<typeof buildAllowanceWorkspace>): string {
-  const evidence = workspace.candidate?.statistical_evidence;
-  const before = evidence?.median_confidence_interval_before_95;
-  const after = evidence?.median_confidence_interval_after_95;
-  if (before?.available && after?.available) return 'Available for both regimes';
-  if (before?.available || after?.available) return 'Available for one regime; the other sample is too small';
-  return 'Unavailable at the current sample size';
-}
-
-function gradeTone(grade: string): AllowanceTone {
-  if (grade === 'strong_local_evidence') return 'risk';
-  if (grade === 'possible_regime_change' || grade === 'inconclusive_other_usage_possible') return 'caution';
-  if (grade === 'no_change_detected') return 'positive';
-  if (grade === 'counter_noise_likely') return 'context';
-  return 'neutral';
-}
-
-function gradeLabel(grade: string): string {
-  return grade.replaceAll('_', ' ');
-}
-
-function downloadJson(filename: string, payload: unknown): void {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

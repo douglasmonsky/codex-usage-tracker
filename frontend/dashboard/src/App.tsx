@@ -5,8 +5,7 @@ import { currentViewCsvExport } from './app/currentViewExport';
 import { errorMessage, refreshProgressLabel, type RefreshOptions } from './app/dashboardRefresh';
 import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyScope';
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
-import { ShellI18nProvider } from './app/i18nContext';
-import { DocumentLocalizationBridge } from './app/DocumentLocalizationBridge';
+import { LocalizedShellI18nProvider } from './app/DocumentLocalizationBridge';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
 import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
 import { RowLimitControl } from './app/RowLimitControl';
@@ -526,8 +525,7 @@ function clearInvestigationPreset() {
   }
 
   return (
-    <ShellI18nProvider value={shellI18n}>
-      <DocumentLocalizationBridge />
+    <LocalizedShellI18nProvider value={shellI18n}>
       <div className="app-shell" data-dashboard-localization-root>
       <aside className="sidebar">
         <div className="brand">
@@ -732,7 +730,7 @@ aria-label="History scope"
         </button>
       ) : null}
       </div>
-    </ShellI18nProvider>
+    </LocalizedShellI18nProvider>
   );
 
   function onRefresh() {

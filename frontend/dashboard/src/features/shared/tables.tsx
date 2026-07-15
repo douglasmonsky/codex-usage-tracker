@@ -1,11 +1,11 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { Copy, Search } from 'lucide-react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ThreadRow } from '../../api/types';
 import type { ColumnChoice } from '../../components/ColumnChooser';
 import type { CsvColumn } from './exportCsv';
 import { formatCompact, formatNumber, money, pct } from './format';
-import { stopRowActionKeyDown } from './rowActionEvents';
+
+export { callActionColumn, callInvestigatorRowLabel, threadActionColumn, threadInvestigatorRowLabel } from './tableActions';
 
 export const callColumns: Array<ColumnDef<CallRow>> = [
   { id: 'time', accessorFn: call => Number(Date.parse(call.eventTimestamp || call.callStartedAt || call.rawTime || call.time)) || 0, header: 'Time', cell: info => info.row.original.time },
@@ -242,95 +242,6 @@ function signalPuckAbbreviation(signal: string): string {
     .toUpperCase();
 }
 
-type CallActionColumnOptions = {
-  onOpenInvestigator: (recordId: string) => void;
-  onCopyCallLink?: (recordId: string) => void;
-  labelPrefix?: string;
-};
-
-export function callInvestigatorRowLabel(call: CallRow, labelPrefix = ''): string {
-  return `Open call row in investigator for ${callActionTarget(call, labelPrefix)}`;
-}
-
-export function threadInvestigatorRowLabel(thread: ThreadRow): string {
-  return thread.latestCallId ? `Open thread row latest call in investigator for ${thread.name}` : `No loaded call available for ${thread.name}`;
-}
-
-export function callActionColumn({
-  onOpenInvestigator,
-  onCopyCallLink,
-  labelPrefix = '',
-}: CallActionColumnOptions): ColumnDef<CallRow> {
-  return {
-    id: 'investigate',
-    header: 'Investigate',
-    size: 260,
-    enableSorting: false,
-    cell: info => (
-      <CallActionCell
-        call={info.row.original}
-        labelPrefix={labelPrefix}
-        onCopyCallLink={onCopyCallLink}
-        onOpenInvestigator={onOpenInvestigator}
-      />
-    ),
-  };
-}
-
-function CallActionCell({
-  call,
-  labelPrefix,
-  onCopyCallLink,
-  onOpenInvestigator,
-}: {
-  call: CallRow;
-  labelPrefix: string;
-  onCopyCallLink?: (recordId: string) => void;
-  onOpenInvestigator: (recordId: string) => void;
-}) {
-  const shellI18n = useShellI18n();
-  const openInvestigatorLabel = shellI18n.t('button.open_investigator', 'Open investigator');
-  const copyLinkLabel = shellI18n.t('button.copy_link', 'Copy link');
-  const labelTarget = callActionTarget(call, labelPrefix);
-
-  return (
-    <div className="table-action-group">
-<button
-className="table-action-button"
-type="button"
-aria-label={`${openInvestigatorLabel} for ${labelTarget}`}
-onKeyDown={stopRowActionKeyDown}
-onClick={event => {
-event.stopPropagation();
-onOpenInvestigator(call.id);
-        }}
-      >
-        <Search size={14} />
-        {openInvestigatorLabel}
-      </button>
-      {onCopyCallLink ? (
-<button
-className="table-action-button"
-type="button"
-aria-label={`${copyLinkLabel} for ${labelTarget}`}
-onKeyDown={stopRowActionKeyDown}
-onClick={event => {
-event.stopPropagation();
-onCopyCallLink(call.id);
-          }}
-        >
-          <Copy size={14} />
-          {copyLinkLabel}
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function callActionTarget(call: CallRow, labelPrefix: string): string {
-  return `${labelPrefix} ${call.thread} ${call.model}`.trim();
-}
-
 export const threadColumns: Array<ColumnDef<ThreadRow>> = [
   { accessorKey: 'name', header: 'Thread' },
   { accessorKey: 'latestActivity', header: 'Latest' },
@@ -420,61 +331,6 @@ export const threadColumns: Array<ColumnDef<ThreadRow>> = [
     cell: info => <span className="score">{Number(info.getValue())}</span>,
   },
 ];
-
-type ThreadActionColumnOptions = {
-  onOpenInvestigator: (recordId: string) => void;
-  onCopyCallLink?: (recordId: string) => void;
-};
-
-export function threadActionColumn({ onOpenInvestigator, onCopyCallLink }: ThreadActionColumnOptions): ColumnDef<ThreadRow> {
-  return {
-    id: 'investigate',
-    header: 'Investigate',
-    size: 260,
-    enableSorting: false,
-    cell: info => {
-      const thread = info.row.original;
-      return (
-        <div className="table-action-group">
-          <button
-            className="table-action-button"
-            type="button"
-            aria-label={`Open investigator for latest call in ${thread.name}`}
- onKeyDown={stopRowActionKeyDown}
-            onClick={event => {
-              event.stopPropagation();
-              if (thread.latestCallId) {
-                onOpenInvestigator(thread.latestCallId);
-              }
-            }}
-            disabled={!thread.latestCallId}
-          >
-            <Search size={14} />
-            Open
-          </button>
-          {onCopyCallLink ? (
-            <button
-              className="table-action-button"
-              type="button"
- onKeyDown={stopRowActionKeyDown}
-              aria-label={`Copy link for latest call in ${thread.name}`}
-              onClick={event => {
-                event.stopPropagation();
-                if (thread.latestCallId) {
-                  onCopyCallLink(thread.latestCallId);
-                }
-              }}
-              disabled={!thread.latestCallId}
-            >
-              <Copy size={14} />
-              Copy
-            </button>
-          ) : null}
-        </div>
-      );
-    },
-  };
-}
 
 export const threadColumnChoices: ColumnChoice[] = [
   { id: 'name', label: 'Thread', locked: true },

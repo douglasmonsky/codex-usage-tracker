@@ -223,31 +223,50 @@ and token savings rather than a long detector dump.
 
 ## Limits View
 
-Use `Limits` when the question is whether observed allowance behavior changed,
-rather than which calls consumed the most tokens.
+Use `Limits` for current allowance state, personal weekly capacity history, and
+evidence about statistically supported capacity regimes.
 
-- The workspace reads `/api/allowance/history` and
-  `/api/allowance/diagnostics`, the same report contracts exposed by MCP
-  `usage_allowance_history(...)` and `usage_allowance_diagnostics(...)`.
-- Weekly evidence is always the primary analysis. The 5-hour segmented view is
-  labeled as noisy rolling-window context and is not promoted into an allowance
-  claim.
-- The weekly chart uses a local capacity proxy: estimated credits per 100
-  percentage points of observed movement. Candidate splits, resets, observation
-  gaps, and exact median intervals appear only when present in or derivable from
-  the shared evidence payloads.
-- The hypothesis check evaluates "allowance decreased" or "behavior stayed
-  stable" against the server's evidence grade and research-readiness result. It
-  does not run a second detector in the browser.
-- Supporting windows open linked calls in Call Investigator when the localhost
-  normal-privacy payload includes a record id. Static dashboards keep aggregate
-  evidence visible without fabricating call links.
-- `Export evidence` calls `/api/allowance/export`, which always returns the
-  strict local sharing contract. Static fallback exports omit local identifiers.
+- The live workspace polls the constant-size `/api/allowance/status` contract.
+  It polls every 30 seconds while fresh/aging, every 60 seconds while stale or
+  empty, stops in hidden tabs, and backs transient failures off to five minutes.
+- One compact row shows weekly observed use, 5-hour observed context, weekly
+  reset, and personal weekly capacity. The five-hour value stays current-status
+  context because expiry makes weekly monotonic capacity math invalid for it.
+- The default chart is weekly `credits / 1%` by completed reset window. It
+  coalesces interleaved observations sharing a reset identity, colors and connects
+  points by explicitly observed subscription plan, and calculates each plan's
+  eight-window rolling median independently. A one-plan view includes its
+  interquartile band. Clipped outliers are disclosed and exact values remain in
+  the table view.
+- Its two-part legend separates meanings: the plan key assigns the tier hue,
+  while the mark key shows thin, hollow-dot observed capacity versus the darker,
+  thick, marker-free trailing median. Other charts keep their normal legends.
+- An open methodology panel directly below the chart explains the per-window
+  formula, evidence-quality filters, canonical clone deduplication, subscription
+  plan color key, chart marks, and every statistical gate. Its current-evidence
+  row reports eligible and excluded reset windows, candidate boundaries tested,
+  and supported changes.
+- Range controls support 8 weeks, 6 months, all available aggregate cycles, and
+  custom ranges up to 366 days. Granularity is reset window, week, or month. The
+  page reports the selected range and says when a wider preset cannot add older
+  history.
+- `Personal calibration` is an empirical local proxy, not an official OpenAI
+  rate or a hardcoded conversion. A failed percentage forecast does not make
+  descriptive capacity unavailable.
+- Supporting evidence is newest first in bounded 50-row pages. Aggregate rows are
+  the default. **Show physical source links** explicitly opts into local record
+  identifiers for Call Investigator/provenance debugging.
+- Allowance change analysis starts automatically for a new revision. The browser
+  polls a pending job every 500 milliseconds, stops at a terminal state, and
+  reloads the persisted result. Zero, one, or multiple supported changes appear
+  newest first; rejected split medians and p-values are not shown. Candidate
+  changes are tested only within continuous observed-plan segments, so a recorded
+  subscription-tier switch is annotated but never treated as a capacity change.
 
-The tracker cannot read OpenAI's internal allowance ledger. Outside ChatGPT or
-Codex usage, sparse observations, and rolling-window resets remain explicit
-caveats.
+Static generated dashboards retain an aggregate fallback because they cannot poll
+localhost services or persistent analysis jobs. The tracker cannot read OpenAI's
+internal allowance ledger or usage from other agentic surfaces, so those limits
+remain explicit caveats.
 
 ## Diagnostics View
 

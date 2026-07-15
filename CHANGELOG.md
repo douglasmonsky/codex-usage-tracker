@@ -4,6 +4,15 @@
 
 - Complete the Simplified Chinese dashboard experience across React views, visualization metadata, tables, accessibility text, CLI help, and dashboard lifecycle messages while preserving user-provided data verbatim.
 
+## 0.19.0 - 2026-07-15
+
+- Redesign Limits Intelligence around weekly credits-per-percentage capacity
+  history, a compact current-status row, automatic revision analysis, and zero,
+  one, or multiple family-wise-controlled capacity changes. Rejected split
+  statistics stay hidden, five-hour usage remains observed context, and the v2
+  API/MCP contracts expose capacity points, regimes, provenance, and copied-row
+  diagnostics by default.
+
 ## 0.18.0 - 2026-07-15
 
 - Exclude exact historical calls copied by cloned Codex tasks from default dashboard, CLI, MCP, report, allowance, compression, recommendation, and export totals while retaining every physical source row for local provenance.

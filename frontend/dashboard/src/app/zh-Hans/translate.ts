@@ -5,6 +5,7 @@ import {
   diagnosticsReportsZhHansPatterns,
   diagnosticsReportsZhHansTranslations,
 } from './diagnosticsReports';
+import { limitsZhHansPatterns, limitsZhHansTranslations } from './limits';
 import type { ZhHansPattern } from './types';
 
 const supplementalTranslations: Readonly<Record<string, string>> = {
@@ -12,12 +13,14 @@ const supplementalTranslations: Readonly<Record<string, string>> = {
   ...corePagesZhHansTranslations,
   ...diagnosticsReportsZhHansTranslations,
   ...advancedPagesZhHansTranslations,
+  ...limitsZhHansTranslations,
 };
 
 const supplementalPatterns: ReadonlyArray<ZhHansPattern> = [
   ...corePagesZhHansPatterns,
   ...diagnosticsReportsZhHansPatterns,
   ...advancedPagesZhHansPatterns,
+  ...limitsZhHansPatterns,
   ...commonZhHansPatterns,
 ];
 
