@@ -188,7 +188,9 @@ codex-usage-tracker-allowance-evidence-v2
 **Files:**
 - Create: `src/codex_usage_tracker/allowance_intelligence/estimation.py`
 - Modify: `src/codex_usage_tracker/allowance_intelligence/model.py`
+- Modify: `src/codex_usage_tracker/allowance_intelligence/service.py`
 - Create: `tests/allowance_intelligence/test_estimation.py`
+- Modify: `tests/allowance_intelligence/test_service.py`
 
 - [ ] Write failing tests proving historical estimates use only capacity available before each interval, future observations cannot change older estimates, missing pricing produces explicit coverage gaps, and endpoint mismatch becomes a signed `anchor_correction` rather than being spread backward.
 - [ ] Implement per-cycle reconstruction:
@@ -200,8 +202,13 @@ anchor_correction = observed_delta - explained_delta
 ```
 
 - [ ] Weight calibration by cycle, recency, interval quality, and pricing coverage; cap any single cycle's influence.
+- [ ] Report total-ratio capacity, robust median/IQR, completed-cycle and eligible-interval counts, price coverage, unexplained-movement share, and prior-only errors. With fewer than two completed quality-approved cycles, capacity remains `descriptive` and cannot numerically forecast.
+- [ ] Estimate current weekly usage from the latest accepted observation plus canonical credits since that observation divided by prior capacity. Clip only to `[0, 100]` and disclose clipping; remain observed-only when capacity or quality is unavailable.
 - [ ] Produce forecast quantiles from walk-forward residuals only. Report sample size, evaluation horizon, median absolute error, interval coverage, and calibration window.
+- [ ] Build conditional weekly pace scenarios from sufficiently sampled recent 6-hour pace, trailing 24-hour pace, current-cycle pace, and comparable prior-cycle pace. Use their robust median centrally and residual/spread quantiles for low/high; return contributing windows/sample counts and `if_current_pace_continues`.
+- [ ] Walk-forward validation must also report mean absolute error, RMSE, empirical 50/80/95% interval coverage, segmented errors, and comparisons with unchanged-counter, previous-interval, recent-observed-pace, and previous-cycle-pace baselines. Mark `validated` only when a time-ordered holdout beats the relevant baseline and advertised coverage is adequate; otherwise remain `descriptive` or observed-only.
 - [ ] Suppress a numerical forecast when there is insufficient prior-cycle evidence; return a structured reason instead. Five-hour windows remain observed context and do not receive the weekly monotonic-capacity forecast.
+- [ ] Integrate the estimator through the v2 status/series service so validated weekly estimates and conditional forecasts appear without changing observed facts; later Task 7 analysis consumes the same versioned result rather than recomputing a separate model.
 - [ ] Run:
 
 ```bash
