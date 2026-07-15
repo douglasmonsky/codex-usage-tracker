@@ -57,9 +57,9 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
 def _weekly_estimation(connection: sqlite3.Connection, revision: str | None, include_archived: bool, now: datetime) -> dict[str, Any]:
     if revision is None:
         return build_weekly_estimation([], [], now=now)
-    archive = "" if include_archived else "AND is_archived = 0"
-    cycles = [dict(row) for row in connection.execute(f"SELECT * FROM allowance_cycles WHERE source_revision = ? {archive}", (revision,))]
-    intervals = [dict(row) for row in connection.execute(f"SELECT * FROM allowance_intervals WHERE source_revision = ? {archive}", (revision,))]
+    params = (revision, include_archived)
+    cycles = [dict(row) for row in connection.execute("SELECT * FROM allowance_cycles WHERE source_revision = ? AND (? OR is_archived = 0)", params)]
+    intervals = [dict(row) for row in connection.execute("SELECT * FROM allowance_intervals WHERE source_revision = ? AND (? OR is_archived = 0)", params)]
     return build_weekly_estimation(cycles, intervals, now=now)
 
 
@@ -75,15 +75,11 @@ def build_allowance_series(connection: sqlite3.Connection, *, now: datetime, ran
         )
     end_at = end_at or now.isoformat()
     if range_preset == "all" and start_at is None:
-        archive_clause = "" if include_archived else "AND is_archived = 0"
-        cohort_clause = "" if cohort_id is None else "AND cohort_key = ?"
-        parameters: tuple[object, ...] = (
-            (window_kind,) if cohort_id is None else (window_kind, cohort_id)
-        )
         first = connection.execute(
             "SELECT MIN(first_observed_at) FROM allowance_cycles "
-            f"WHERE window_kind = ? {cohort_clause} {archive_clause}",
-            parameters,
+            "WHERE window_kind = ? AND (? IS NULL OR cohort_key = ?) "
+            "AND (? OR is_archived = 0)",
+            (window_kind, cohort_id, cohort_id, include_archived),
         ).fetchone()
         start_at = (
             str(first[0])
@@ -212,7 +208,8 @@ def _latest_at(windows: dict[str, Any]) -> str | None: return max((entry["observ
 def _cohort(row: dict[str, Any]) -> dict[str, Any]: return {"id": row["cohort_key"], "window_kind": row["window_kind"], "window_key": row["window_key"], "archived": bool(row["is_archived"])}
 def _row_freshness(row: dict[str, Any], now: datetime) -> str:
     window = _window(row, now)
-    assert window is not None
+    if window is None:
+        raise ValueError("allowance row is required")
     return str(window["freshness"])
 def _cycle(row: dict[str, Any]) -> dict[str, Any]: return {key: row.get(key) for key in ("cycle_id", "reset_at", "first_observed_at", "last_observed_at", "latest_used_percent", "status", "quality_grade", "plan_type")}
 def _available_range(rows: list[dict[str, Any]]) -> dict[str, str | None]: return {"start_at": rows[0]["first_observed_at"] if rows else None, "end_at": rows[-1]["last_observed_at"] if rows else None}
@@ -220,8 +217,9 @@ def _copied_excluded(conn: sqlite3.Connection, include_archived: bool) -> int:
     try:
         return int(
             conn.execute(
-                "SELECT count(*) FROM usage_events WHERE is_duplicate=1"
-                + ("" if include_archived else " AND is_archived=0")
+                "SELECT count(*) FROM usage_events WHERE is_duplicate=1 "
+                "AND (? OR is_archived=0)",
+                (include_archived,),
             ).fetchone()[0]
         )
     except sqlite3.OperationalError:
@@ -253,8 +251,7 @@ def _cohorts(
 ) -> dict[str, Any]:
     if revision is None:
         return {"selected": {}, "alternates": [], "reconciliation": [], "rows": []}
-    archive = "" if include_archived else "AND is_archived = 0"
-    rows = [dict(row) for row in connection.execute(f"SELECT * FROM allowance_cycles WHERE source_revision = ? {archive} ORDER BY last_observed_at DESC, cycle_id DESC", (revision,))]
+    rows = [dict(row) for row in connection.execute("SELECT * FROM allowance_cycles WHERE source_revision = ? AND (? OR is_archived = 0) ORDER BY last_observed_at DESC, cycle_id DESC", (revision, include_archived))]
     selected_rows: dict[str, dict[str, Any]] = {}
     for kind in ("weekly", "five_hour"):
         normal = next(

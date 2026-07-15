@@ -64,8 +64,7 @@ def detect_cycle_change(
         }
 
     values = [float(row["credits_per_percent"]) for row in eligible]
-    selected = _best_split(values, min_cycles_per_side)
-    assert selected is not None
+    selected = _required_best_split(values, min_cycles_per_side)
     split, observed_statistic = selected
     exact_space = _bounded_factorial(len(values), limit=_EXACT_PERMUTATION_LIMIT)
     seed: int | None = None
@@ -73,8 +72,7 @@ def detect_cycle_change(
         extreme = 0
         evaluated = 0
         for ordering in itertools.permutations(values):
-            permuted_best = _best_split(list(ordering), min_cycles_per_side)
-            assert permuted_best is not None
+            permuted_best = _required_best_split(list(ordering), min_cycles_per_side)
             extreme += permuted_best[1] >= observed_statistic - 1e-12
             evaluated += 1
         adjusted_p = extreme / evaluated
@@ -82,13 +80,12 @@ def detect_cycle_change(
         uncertainty = _unavailable_uncertainty()
     else:
         seed = int.from_bytes(hashlib.sha256(semantic_key.encode()).digest()[:8], "big")
-        generator = random.Random(seed)
+        generator = random.Random(seed)  # nosec B311 - reproducible statistical sampling
         extreme = 0
         for _ in range(permutation_count):
             permuted = list(values)
             generator.shuffle(permuted)
-            permuted_best = _best_split(permuted, min_cycles_per_side)
-            assert permuted_best is not None
+            permuted_best = _required_best_split(permuted, min_cycles_per_side)
             extreme += permuted_best[1] >= observed_statistic - 1e-12
         evaluated = permutation_count
         adjusted_p = (extreme + 1) / (evaluated + 1)
@@ -322,8 +319,7 @@ def _test_segment(
     permutation_count: int,
 ) -> dict[str, Any]:
     values = [float(row["credits_per_percent"]) for row in cycles]
-    selected = _best_split(values, minimum)
-    assert selected is not None
+    selected = _required_best_split(values, minimum)
     local_split, observed_statistic = selected
     adjusted_p, method, evaluated, seed, uncertainty = _permutation_result(
         values,
@@ -396,8 +392,7 @@ def _permutation_result(
         extreme = 0
         evaluated = 0
         for ordering in itertools.permutations(values):
-            permuted_best = _best_split(list(ordering), minimum)
-            assert permuted_best is not None
+            permuted_best = _required_best_split(list(ordering), minimum)
             extreme += permuted_best[1] >= observed_statistic - 1e-12
             evaluated += 1
         return (
@@ -408,13 +403,12 @@ def _permutation_result(
             _unavailable_uncertainty(),
         )
     seed = int.from_bytes(hashlib.sha256(semantic_key.encode()).digest()[:8], "big")
-    generator = random.Random(seed)
+    generator = random.Random(seed)  # nosec B311 - reproducible statistical sampling
     extreme = 0
     for _ in range(permutation_count):
         permuted = list(values)
         generator.shuffle(permuted)
-        permuted_best = _best_split(permuted, minimum)
-        assert permuted_best is not None
+        permuted_best = _required_best_split(permuted, minimum)
         extreme += permuted_best[1] >= observed_statistic - 1e-12
     return (
         (extreme + 1) / (permutation_count + 1),
@@ -539,6 +533,13 @@ def _best_split(values: list[float], minimum: int) -> tuple[int, float] | None:
         balance = math.sqrt((split * after_count) / len(values))
         candidates.append((split, abs(mean_after - mean_before) * balance))
     return max(candidates, key=lambda item: (item[1], -item[0]), default=None)
+
+
+def _required_best_split(values: list[float], minimum: int) -> tuple[int, float]:
+    selected = _best_split(values, minimum)
+    if selected is None:
+        raise ValueError("change detection requires enough values on both sides")
+    return selected
 
 
 def _shift_confidence_interval(

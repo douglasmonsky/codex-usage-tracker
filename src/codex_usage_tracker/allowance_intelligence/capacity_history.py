@@ -56,46 +56,44 @@ def load_capacity_cycles(
     """Return one aggregate capacity ratio per allowance cycle."""
     if archive_scope not in {"active", "all"}:
         raise ValueError("archive_scope must be active or all")
-    cycle_conditions = [
-        "source_revision = ?",
-        "window_kind = ?",
-        "cohort_key = ?",
-    ]
-    cycle_parameters: list[object] = [source_revision, window_kind, cohort_key]
-    if archive_scope == "active":
-        cycle_conditions.append("is_archived = 0")
-    if start_at is not None:
-        cycle_conditions.append("last_observed_at >= ?")
-        cycle_parameters.append(start_at)
-    if end_at is not None:
-        cycle_conditions.append("last_observed_at <= ?")
-        cycle_parameters.append(end_at)
+    include_archived = archive_scope == "all"
+    cycle_parameters: tuple[object, ...] = (
+        source_revision,
+        window_kind,
+        cohort_key,
+        include_archived,
+        start_at,
+        start_at,
+        end_at,
+        end_at,
+    )
     cycles = [
         dict(row)
         for row in connection.execute(
-            "SELECT * FROM allowance_cycles WHERE "
-            + " AND ".join(cycle_conditions)
-            + " ORDER BY last_observed_at, cycle_id",
+            "SELECT * FROM allowance_cycles "
+            "WHERE source_revision = ? AND window_kind = ? AND cohort_key = ? "
+            "AND (? OR is_archived = 0) "
+            "AND (? IS NULL OR last_observed_at >= ?) "
+            "AND (? IS NULL OR last_observed_at <= ?) "
+            "ORDER BY last_observed_at, cycle_id",
             cycle_parameters,
         )
     ]
-    interval_conditions = [
-        "source_revision = ?",
-        "window_kind = ?",
-        "cohort_key = ?",
-        "eligible_for_change_detection = 1",
-        "point_kind = 'positive'",
-    ]
-    interval_parameters: list[object] = [source_revision, window_kind, cohort_key]
-    if archive_scope == "active":
-        interval_conditions.append("is_archived = 0")
+    interval_parameters: tuple[object, ...] = (
+        source_revision,
+        window_kind,
+        cohort_key,
+        include_archived,
+    )
     ratios = {
         str(row["cycle_id"]): float(row["credits"]) / float(row["movement"])
         for row in connection.execute(
             "SELECT cycle_id, SUM(estimated_credits) AS credits, "
-            "SUM(visible_percent_delta) AS movement FROM allowance_intervals WHERE "
-            + " AND ".join(interval_conditions)
-            + " GROUP BY cycle_id HAVING credits > 0 AND movement > 0",
+            "SUM(visible_percent_delta) AS movement FROM allowance_intervals "
+            "WHERE source_revision = ? AND window_kind = ? AND cohort_key = ? "
+            "AND eligible_for_change_detection = 1 AND point_kind = 'positive' "
+            "AND (? OR is_archived = 0) "
+            "GROUP BY cycle_id HAVING credits > 0 AND movement > 0",
             interval_parameters,
         )
     }

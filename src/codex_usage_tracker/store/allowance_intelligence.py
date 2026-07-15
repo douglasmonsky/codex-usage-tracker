@@ -159,9 +159,9 @@ def _cycle_partition_rows(
         if limit is not None:
             params.append(limit)
         partition = connection.execute(
-            f"SELECT * FROM allowance_cycles WHERE {' AND '.join(where)} "
+            f"SELECT * FROM allowance_cycles WHERE {' AND '.join(where)} "  # nosec B608 - fixed predicates and bound values
             f"ORDER BY {ordering} {direction}, cycle_id {direction}{limit_sql}",
-            params,  # nosec B608 - query fragments are selected from fixed enums
+            params,
         ).fetchall()
         rows.append([_row_to_dict(row) for row in partition])
     return _merge_partition_rows(
@@ -203,9 +203,9 @@ def _evidence_partition_rows(
             )
             params.extend((position["observed_at"], position["observed_at"], position["row_id"]))
         partition = connection.execute(
-            f"SELECT * FROM allowance_intervals WHERE {' AND '.join(where)} "
+            f"SELECT * FROM allowance_intervals WHERE {' AND '.join(where)} "  # nosec B608 - fixed predicates and bound values
             f"ORDER BY end_observed_at {direction}, interval_id {direction} LIMIT ?",
-            [*params, limit],  # nosec B608 - query fragments are selected from fixed enums
+            [*params, limit],
         ).fetchall()
         rows.append([_row_to_dict(row) for row in partition])
     return _merge_partition_rows(
