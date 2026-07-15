@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Apply the official GPT-5.6 long-context input and output price multipliers to concrete calls above 272K input tokens while keeping aggregate summaries from being incorrectly thresholded.
+
 ## 0.18.0 - 2026-07-15
 
 - Exclude exact historical calls copied by cloned Codex tasks from default dashboard, CLI, MCP, report, allowance, compression, recommendation, and export totals while retaining every physical source row for local provenance.
