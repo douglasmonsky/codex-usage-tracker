@@ -29,6 +29,48 @@ Result: `8 passed`.
 
 `git diff --check` passed.
 
+## Reconciliation safety test hardening
+
+### RED
+
+Added end-to-end coverage for canonical reconciliation with a noncanonical
+allowance observation and stale cycles, intervals, analysis snapshots, and
+source state; copied physical allowance rows; savepoint rollback on a real
+SQLite interval-insert trigger failure; and empty streamed-finalization source
+replacement. The first run could not collect the Task 3 tests because importing
+the materializer eagerly loaded allowance reports, which imported `store.api`
+back during initialization.
+
+### GREEN
+
+Preserved the public allowance report exports with lazy package resolution,
+breaking that import cycle without changing report callers. The tests prove
+reconciliation deletes noncanonical/stale derived evidence without mutating
+physical `usage_events`, `source_records`, or canonical/duplicate identity
+fields; only canonical rows contribute allowance tokens/intervals; copied-row
+changes leave source revision and generation stable; canonical allowance input
+advances generation; failed interval writes roll back observations, all derived
+rows, and source state; and an empty streamed source replacement materializes
+cleanup exactly once.
+
+Files changed:
+
+- `src/codex_usage_tracker/allowance_intelligence/__init__.py`
+- `tests/store/test_allowance_materialization.py`
+- `tests/store/test_usage_deduplication.py`
+
+Verification:
+
+`PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/allowance_intelligence/test_cycles.py tests/store/test_allowance_materialization.py tests/store/test_usage_deduplication.py -q`
+
+Result: `16 passed`.
+
+`/Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m ruff check src/codex_usage_tracker/allowance_intelligence/__init__.py tests/store/test_allowance_materialization.py tests/store/test_usage_deduplication.py`
+
+Result: `All checks passed!`.
+
+`git diff --check` passed.
+
 ## Final boundary hardening
 
 Added a RED/GREEN regression proving existing reset epochs are scoped by exact

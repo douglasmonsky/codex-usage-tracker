@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.recommendation_engine.materialization import (
     backfill_recommendation_facts,
 )
+from codex_usage_tracker.store.allowance_materialization import materialize_allowance_intelligence
 from codex_usage_tracker.store.api import connect, upsert_usage_events
 from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count,
@@ -50,6 +52,62 @@ def test_clone_copy_is_physical_but_not_billable(tmp_path: Path) -> None:
             ).fetchone()[0]
             == "copied_usage_fingerprint"
         )
+
+
+def test_copied_allowance_rows_do_not_contribute_intervals_or_generation(tmp_path: Path) -> None:
+    first = replace(
+        _event("first", "/first.jsonl"),
+        rate_limit_limit_id="codex",
+        rate_limit_primary_used_percent=10.0,
+        rate_limit_primary_window_minutes=10080,
+        rate_limit_primary_resets_at=2_000_000_000,
+        total_tokens=100,
+        cumulative_total_tokens=100,
+    )
+    second = replace(
+        first,
+        record_id="second",
+        turn_id="second-turn",
+        source_file="/second.jsonl",
+        event_timestamp="2026-07-14T12:01:00Z",
+        turn_timestamp="2026-07-14T12:01:00Z",
+        rate_limit_primary_used_percent=20.0,
+        total_tokens=200,
+        cumulative_total_tokens=300,
+    )
+    copied_first = replace(first, record_id="copied-first", session_id="copy", source_file="/copy-1.jsonl")
+    copied_second = replace(second, record_id="copied-second", session_id="copy", source_file="/copy-2.jsonl")
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events([first, second, copied_first, copied_second], db_path)
+
+    with connect(db_path) as conn:
+        assert materialize_allowance_intelligence(
+            conn, now=datetime(2026, 7, 14, tzinfo=timezone.utc)
+        )
+        assert conn.execute("SELECT COUNT(*) FROM allowance_observations").fetchone()[0] == 2
+        assert conn.execute("SELECT canonical_tokens FROM allowance_cycles").fetchone()[0] == 300
+        assert conn.execute("SELECT total_tokens FROM allowance_intervals").fetchone()[0] == 200
+        generation, revision = conn.execute(
+            "SELECT allowance_generation, source_revision FROM allowance_source_state"
+        ).fetchone()
+
+        conn.execute(
+            "UPDATE usage_events SET rate_limit_primary_used_percent=99 WHERE record_id='copied-second'"
+        )
+        assert not materialize_allowance_intelligence(conn, now=datetime(2026, 7, 14, tzinfo=timezone.utc))
+        assert tuple(
+            conn.execute(
+                "SELECT allowance_generation, source_revision FROM allowance_source_state"
+            ).fetchone()
+        ) == (generation, revision)
+
+    updated_second = replace(second, rate_limit_primary_used_percent=25.0)
+    upsert_usage_events([updated_second], db_path)
+    with connect(db_path) as conn:
+        assert materialize_allowance_intelligence(
+            conn, now=datetime(2026, 7, 14, tzinfo=timezone.utc)
+        )
+        assert conn.execute("SELECT allowance_generation FROM allowance_source_state").fetchone()[0] == generation + 1
 
 
 def test_source_replacement_promotes_surviving_copy(tmp_path: Path) -> None:
