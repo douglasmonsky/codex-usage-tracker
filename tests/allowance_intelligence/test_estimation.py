@@ -118,9 +118,11 @@ def test_sufficient_history_calculates_walk_forward_validation_and_pace_scenario
         "recent_observed_pace",
         "previous_cycle_pace",
     }
-    assert validation["status"] == "validated"
+    # Three walk-forward points leave only two strictly earlier residuals for
+    # the later holdout, so promotion remains deliberately descriptive.
+    assert validation["status"] == "descriptive"
     assert result["pace_scenarios"]["status"] == "conditional"
-    assert result["forecast"]["quantiles"] is not None
+    assert result["forecast"]["quantiles"] is None
 
 
 def test_open_cycle_never_calibrates_and_dense_cycle_cannot_dominate() -> None:
@@ -141,3 +143,58 @@ def test_open_cycle_never_calibrates_and_dense_cycle_cannot_dominate() -> None:
     assert result["capacity"]["completed_cycle_count"] == 2
     assert result["capacity"]["credits_per_percent"] == 3
     assert result["capacity"]["total_ratio_credits_per_percent"] == 3
+
+
+def test_current_estimate_starts_at_latest_observation_and_uses_only_later_credits() -> None:
+    cycles = [
+        _cycle("a", "2026-07-10T00:00:00+00:00"),
+        _cycle("b", "2026-07-11T00:00:00+00:00"),
+        _cycle("current", "2026-07-15T10:00:00+00:00", used=40, status="accepted"),
+    ]
+    intervals = [
+        _interval("a", "2026-07-09T00:00:00+00:00", start=0, end=10, credits=100),
+        _interval("b", "2026-07-10T00:00:00+00:00", start=0, end=10, credits=100),
+        _interval("current", "2026-07-15T09:00:00+00:00", start=30, end=40, credits=100),
+        _interval("current", "2026-07-15T11:00:00+00:00", start=40, end=50, credits=100),
+    ]
+    result = build_weekly_estimation(cycles, intervals, now=NOW)
+    assert result["weekly_estimate"] == {
+        "used_percent": 50,
+        "clipped": False,
+        "reason": None,
+        "observed_at": "2026-07-15T10:00:00+00:00",
+        "post_observation_credits": 100,
+    }
+
+
+def test_walk_forward_holdout_does_not_use_its_own_residual_band() -> None:
+    cycles = [_cycle(f"c{index}", f"2026-07-{index + 1:02d}T23:00:00+00:00") for index in range(5)]
+    intervals = [
+        _interval(f"c{index}", f"2026-07-{index + 1:02d}T22:00:00+00:00", start=0, end=10, credits=100)
+        for index in range(4)
+    ] + [_interval("c4", "2026-07-05T22:00:00+00:00", start=0, end=90, credits=100)]
+    result = build_weekly_estimation(cycles, intervals, now=NOW)
+    holdout = result["validation"]["holdout"]
+    assert holdout["sample_size"] == 1
+    assert holdout["interval_coverage"]["50"] == 0
+    assert holdout["residual_quantiles"]["p90"] == 0
+    assert result["validation"]["status"] == "descriptive"
+
+
+def test_missing_post_observation_pricing_keeps_the_current_estimate_observed_only() -> None:
+    cycles = [
+        _cycle("a", "2026-07-10T00:00:00+00:00"),
+        _cycle("b", "2026-07-11T00:00:00+00:00"),
+        _cycle("current", "2026-07-15T10:00:00+00:00", used=40, status="accepted"),
+    ]
+    intervals = [
+        _interval("a", "2026-07-09T00:00:00+00:00", start=0, end=10, credits=100),
+        _interval("b", "2026-07-10T00:00:00+00:00", start=0, end=10, credits=100),
+        _interval("current", "2026-07-15T11:00:00+00:00", start=40, end=50, credits=None, coverage=None),
+    ]
+    result = build_weekly_estimation(cycles, intervals, now=NOW)
+    assert result["weekly_estimate"] == {
+        "used_percent": None,
+        "clipped": False,
+        "reason": "missing_post_observation_coverage",
+    }
