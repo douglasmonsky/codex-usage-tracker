@@ -95,6 +95,7 @@ For experiment-style answers, use this structure:
 - Use `usage_status` for dashboard/index freshness, active/scoped/total row counts, latest refresh timestamp, and observed allowance windows.
 - Use `usage_allowance_history` normalized observed allowance snapshots when user needs rows behind weekly or 5-hour movement.
 - Use `usage_allowance_diagnostics` for evidence-graded allowance-change questions; weekly is primary, five-hour is noisy rolling-window context.
+- Use `usage_dedupe_diagnostics` to explain copied clone rows excluded from canonical totals while preserving aggregate/source provenance.
 - Use `usage_allowance_export` for strict-privacy local allowance evidence bundles intended for manual sharing.
 - Use `usage_calls` for the same aggregate Calls table rows as the React dashboard, including pagination, filters, derived pricing status, and credit confidence.
 - Use `usage_call_detail` for the aggregate Call Investigator payload for one `record_id`. Use `usage_call_context` only for explicit raw-context requests.

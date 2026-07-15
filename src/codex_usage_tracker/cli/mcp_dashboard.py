@@ -17,6 +17,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.dashboard.api import generate_dashboard
+from codex_usage_tracker.diagnostics.dedupe import build_dedupe_diagnostics
 from codex_usage_tracker.pricing.allowance import write_allowance_template
 from codex_usage_tracker.pricing.api import (
     update_pricing_from_openai_docs,
@@ -103,6 +104,13 @@ def usage_status(include_archived: bool = False) -> dict[str, Any]:
         db_path=DEFAULT_DB_PATH,
         include_archived_default=include_archived,
     )
+
+
+@mcp.tool()
+def usage_dedupe_diagnostics(limit: int = 100) -> dict[str, Any]:
+    """Return dedupe totals and bounded physical provenance for excluded clone copies."""
+
+    return build_dedupe_diagnostics(db_path=DEFAULT_DB_PATH, limit=limit)
 
 
 @mcp.tool()

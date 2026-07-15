@@ -27,6 +27,7 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
         "/api/investigations/large-low-output": "_handle_investigation_large_low_output",
         "/api/investigations/walk": "_handle_investigation_walk",
         "/api/diagnostics/summary": "_handle_diagnostics_summary",
+        "/api/diagnostics/dedupe": "_handle_dedupe_diagnostics",
         "/api/diagnostics/facts": "_handle_diagnostics_facts",
         "/api/diagnostics/fact-calls": "_handle_diagnostics_fact_calls",
         "/api/diagnostics/overview": "_handle_diagnostics_overview",

@@ -277,7 +277,9 @@ def _recommendation_facts_are_current(
             fact_count = int(
                 conn.execute("SELECT COUNT(*) FROM recommendation_facts").fetchone()[0]
             )
-            usage_count = int(conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0])
+            usage_count = int(
+                conn.execute("SELECT COUNT(*) FROM canonical_usage_events").fetchone()[0]
+            )
     except sqlite3.Error:
         return False
     return (

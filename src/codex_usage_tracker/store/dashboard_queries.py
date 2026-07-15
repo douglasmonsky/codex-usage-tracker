@@ -67,7 +67,7 @@ def query_dashboard_events(
                 usage_events.*,
                 {USAGE_TIMING_SELECT_SQL},
                 {usage_parent_select_sql(include_archived=include_archived)}
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             {USAGE_TIMING_JOIN_SQL}
             {where_clause}
             ORDER BY usage_events.event_timestamp DESC, usage_events.cumulative_total_tokens DESC
@@ -104,7 +104,7 @@ def query_dashboard_event_count(
         row = conn.execute(
             f"""
             SELECT COUNT(*) AS row_count
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             {where_clause}
             """,
             params,
@@ -135,7 +135,7 @@ def query_dashboard_token_summary(
                 coalesce(SUM(output_tokens), 0) AS output_tokens,
                 coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
                 coalesce(SUM(total_tokens), 0) AS total_tokens
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             {where_clause}
             """,
             params,
@@ -153,7 +153,7 @@ def query_dashboard_token_summary(
                     coalesce(SUM(output_tokens), 0) AS output_tokens,
                     coalesce(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
                     coalesce(SUM(total_tokens), 0) AS total_tokens
-                FROM usage_events
+                FROM canonical_usage_events AS usage_events
                 {where_clause}
                 GROUP BY coalesce(model, 'Unknown model')
                 """,
@@ -184,17 +184,17 @@ def query_usage_status(
     active_where, active_params = usage_where_clause(include_archived=False)
     with connect(db_path) as conn:
         init_db(conn)
-        total_row = conn.execute("SELECT COUNT(*) AS count FROM usage_events").fetchone()
+        total_row = conn.execute("SELECT COUNT(*) AS count FROM canonical_usage_events").fetchone()
         active_row = conn.execute(
-            f"SELECT COUNT(*) AS count FROM usage_events {active_where}",
+            f"SELECT COUNT(*) AS count FROM canonical_usage_events {active_where}",
             active_params,
         ).fetchone()
         scoped_row = conn.execute(
-            f"SELECT COUNT(*) AS count FROM usage_events {scoped_where}",
+            f"SELECT COUNT(*) AS count FROM canonical_usage_events {scoped_where}",
             scoped_params,
         ).fetchone()
         max_row = conn.execute(
-            f"SELECT MAX(event_timestamp) AS max_event_timestamp FROM usage_events {scoped_where}",
+            f"SELECT MAX(event_timestamp) AS max_event_timestamp FROM canonical_usage_events {scoped_where}",
             scoped_params,
         ).fetchone()
     return {
@@ -236,7 +236,7 @@ def query_latest_observed_usage(
                 rate_limit_secondary_used_percent,
                 rate_limit_secondary_window_minutes,
                 rate_limit_secondary_resets_at
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             {scoped_where}
             ORDER BY
                 CASE WHEN rate_limit_limit_id = 'codex' THEN 0 ELSE 1 END,
@@ -313,7 +313,7 @@ def _recent_observed_usage_rows(
         for row in conn.execute(
             f"""
             SELECT record_id, event_timestamp, rate_limit_plan_type, rate_limit_limit_id
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
 
             {scoped_where}
 

@@ -16,6 +16,8 @@ Local-first dashboard, Codex plugin, and companion skill for understanding where
 
 Codex Usage Tracker reads the JSONL logs already written by Codex, indexes aggregate usage counters plus local content/tool/command/file-event evidence into SQLite, and gives you a dashboard, CLI, and MCP tools for investigating real usage patterns. The content index stays on your machine; CSV exports, generated dashboard HTML, support bundles, and shareable reports omit indexed content by default. Use `refresh --aggregate-only` or `rebuild-index --aggregate-only` when you want the older aggregate-only SQLite posture.
 
+Cloned Codex tasks can copy historical usage rows into a new local log. The tracker preserves those physical rows for provenance but excludes only strict, high-confidence fingerprint matches from default dashboard, API, MCP, summary, recommendation, allowance, and export totals. New calls made inside the clone remain billable. Inspect the exclusion count with `codex-usage-tracker dedupe-diagnostics --json`, MCP `usage_dedupe_diagnostics()`, or `/api/diagnostics/dedupe`.
+
 Built for developers using Codex locally who want to know which threads, models, subagents, and long chats are driving usage without uploading logs anywhere. The public PyPI package is [`codex-usage-tracking`](https://pypi.org/project/codex-usage-tracking/), and it installs the `codex-usage-tracker` command.
 
 After install, you get a localhost dashboard, a local SQLite usage index, CLI reports, MCP tools, and a companion Codex skill for asking questions like "what drove my usage this week?"

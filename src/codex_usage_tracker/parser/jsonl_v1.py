@@ -14,6 +14,7 @@ from codex_usage_tracker.core.call_origin import (
     event_flags_from_envelope,
 )
 from codex_usage_tracker.core.models import DiagnosticFact, SessionInfo, UsageEvent
+from codex_usage_tracker.core.usage_identity import extract_upstream_usage_id
 from codex_usage_tracker.diagnostics.facts import (
     add_diagnostic_fact,
     assign_record_id_to_diagnostic_facts,
@@ -239,6 +240,7 @@ def _handle_decoded_jsonl_entry(
         state=state,
         line_number=line_number,
         timestamp=timestamp,
+        envelope=envelope,
         payload=payload,
         stats=stats,
     )
@@ -266,6 +268,7 @@ def _handle_token_count_event(
     state: _JsonlParseState,
     line_number: int,
     timestamp: str,
+    envelope: dict[str, Any],
     payload: dict[str, Any],
     stats: MutableMapping[str, int] | None,
 ) -> None:
@@ -289,6 +292,7 @@ def _handle_token_count_event(
         path=path,
         line_number=line_number,
         timestamp=timestamp,
+        envelope=envelope,
         session_id=effective_session_id,
         session_info=state.session_info,
         session_meta=state.session_meta,
@@ -423,6 +427,7 @@ def _build_token_count_event(
     path: Path,
     line_number: int,
     timestamp: str,
+    envelope: dict[str, Any],
     session_id: str,
     session_info: SessionInfo | None,
     session_meta: dict[str, str | None],
@@ -452,6 +457,7 @@ def _build_token_count_event(
             last_usage=last_usage,
             total_usage=total_usage,
             rate_limits=payload.get("rate_limits"),
+            upstream_usage_id=extract_upstream_usage_id(envelope, payload, info),
             stats=stats,
         )
     except ValueError:

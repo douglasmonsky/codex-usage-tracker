@@ -24,6 +24,8 @@ cumulative_input_tokens
 cumulative_cached_input_tokens
 cumulative_output_tokens
 cumulative_reasoning_output_tokens
+is_duplicate
+duplicate_reason
 evidence_scope
 total_credits
 remaining_credits
@@ -69,6 +71,7 @@ _._handle_context
 _._handle_context_settings
 _._handle_open_investigator
 _._handle_status
+_._handle_dedupe_diagnostics
 _._handle_calls
 _._handle_call
 _._handle_threads

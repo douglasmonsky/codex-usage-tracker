@@ -140,7 +140,7 @@ def _latest_record_id_expression(*, include_archived: bool) -> str:
         coalesce(
             (
                 SELECT u.record_id
-                FROM usage_events AS u
+                FROM canonical_usage_events AS u
                 WHERE u.thread_key = t.thread_key
                 $active_usage_filter
                 ORDER BY
@@ -151,7 +151,7 @@ def _latest_record_id_expression(*, include_archived: bool) -> str:
             ),
             (
                 SELECT u.record_id
-                FROM usage_events AS u
+                FROM canonical_usage_events AS u
                 WHERE (u.thread_key IS NULL OR u.thread_key = '')
                     AND $legacy_thread_key = t.thread_key
                 $active_usage_filter
@@ -398,7 +398,7 @@ def _insert_thread_summary_scope(
             SUM(CASE WHEN coalesce(is_archived, 0) != 0 THEN 1 ELSE 0 END)
                 AS archived_call_count,
             ? AS updated_at
-        FROM usage_events
+        FROM canonical_usage_events
         {where_clause}
         GROUP BY {thread_key_expr}
         """,

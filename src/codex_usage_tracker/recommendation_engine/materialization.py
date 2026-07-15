@@ -56,7 +56,7 @@ def backfill_recommendation_facts(
     drop_recommendation_fact_indexes(conn)
     try:
         conn.execute("DELETE FROM recommendation_facts")
-        cursor = conn.execute("SELECT * FROM usage_events ORDER BY record_id")
+        cursor = conn.execute("SELECT * FROM canonical_usage_events ORDER BY record_id")
         count = _insert_cursor_facts(conn, cursor, config=config, generation=generation)
     finally:
         create_recommendation_fact_indexes(conn)
@@ -92,7 +92,7 @@ def sync_recommendation_facts(
             SELECT thread_key FROM recommendation_facts
             WHERE record_id IN (SELECT record_id FROM recommendation_fact_targets)
             UNION
-            SELECT thread_key FROM usage_events
+            SELECT thread_key FROM canonical_usage_events
             WHERE record_id IN (SELECT record_id FROM recommendation_fact_targets)
             """
         ).fetchall()
@@ -108,7 +108,7 @@ def sync_recommendation_facts(
     cursor = conn.execute(
         """
         SELECT usage_events.*
-        FROM usage_events
+        FROM canonical_usage_events AS usage_events
         JOIN recommendation_fact_targets USING(record_id)
         ORDER BY usage_events.record_id
         """
@@ -188,7 +188,7 @@ def _incremental_refresh_targets(
         return None
 
     fact_count = int(conn.execute("SELECT COUNT(*) FROM recommendation_facts").fetchone()[0])
-    usage_count = int(conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0])
+    usage_count = int(conn.execute("SELECT COUNT(*) FROM canonical_usage_events").fetchone()[0])
     missing_count = usage_count - fact_count
     if missing_count < 0 or missing_count > _TARGETED_FACT_REPAIR_LIMIT:
         return None
@@ -200,7 +200,7 @@ def _incremental_refresh_targets(
         for row in conn.execute(
             """
             SELECT usage_events.record_id
-            FROM usage_events
+            FROM canonical_usage_events AS usage_events
             LEFT JOIN recommendation_facts USING(record_id)
             WHERE recommendation_facts.record_id IS NULL
             ORDER BY usage_events.record_id

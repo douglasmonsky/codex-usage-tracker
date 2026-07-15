@@ -80,6 +80,7 @@ def query_usage_api_events(
     direction_sql = normalize_sort_direction(direction)
     normalized_limit = normalize_limit(limit)
     normalized_offset = normalize_offset(offset)
+    usage_source = "canonical_usage_events AS usage_events"
     limit_clause = ""
     if thread_key and normalized_limit is not None:
         candidate_limit = normalized_limit + normalized_offset
@@ -96,9 +97,11 @@ def query_usage_api_events(
             WHERE usage_events.record_id IN (
                 SELECT record_id FROM (
                     SELECT usage_events.record_id
-                    FROM usage_events
+                    FROM usage_events AS usage_events
+                        INDEXED BY idx_usage_thread_key_timestamp
                     $timing_join
                     $indexed_where
+                        AND usage_events.is_duplicate = 0
                     ORDER BY $order_expr $direction,
                         usage_events.event_timestamp DESC,
                         usage_events.cumulative_total_tokens DESC
@@ -107,9 +110,11 @@ def query_usage_api_events(
                 UNION ALL
                 SELECT record_id FROM (
                     SELECT usage_events.record_id
-                    FROM usage_events
+                    FROM usage_events AS usage_events
+                        INDEXED BY idx_canonical_usage_legacy_thread
                     $timing_join
                     $legacy_where
+                        AND usage_events.is_duplicate = 0
                     ORDER BY $order_expr $direction,
                         usage_events.event_timestamp DESC,
                         usage_events.cumulative_total_tokens DESC
@@ -124,6 +129,11 @@ def query_usage_api_events(
                 "order_expr": order_expr,
                 "direction": direction_sql,
             },
+        )
+        where_clause += "\nAND usage_events.is_duplicate = 0"
+        usage_source = (
+            "usage_events AS usage_events "
+            "INDEXED BY idx_canonical_usage_record_id"
         )
         query_params = [
             *indexed_params,
@@ -152,7 +162,7 @@ def query_usage_api_events(
                 usage_events.*,
                 $timing_select,
                 $parent_select
-            FROM usage_events
+            FROM $usage_source
             $timing_join
             $where_clause
             ORDER BY $order_expr $direction,
@@ -163,6 +173,7 @@ def query_usage_api_events(
             {
                 "timing_select": USAGE_TIMING_SELECT_SQL,
                 "parent_select": usage_parent_select_sql(include_archived=include_archived),
+                "usage_source": usage_source,
                 "timing_join": USAGE_TIMING_JOIN_SQL,
                 "where_clause": where_clause,
                 "order_expr": order_expr,
@@ -207,15 +218,25 @@ def query_usage_api_event_count(
                     **filter_kwargs,
                     thread_key_mode=mode,
                 )
+                if mode == "indexed":
+                    usage_source = (
+                        "usage_events INDEXED BY idx_usage_thread_key_timestamp"
+                    )
+                    where_clause += " AND is_duplicate = 0"
+                else:
+                    usage_source = (
+                        "usage_events INDEXED BY idx_canonical_usage_legacy_thread"
+                    )
+                    where_clause += " AND is_duplicate = 0"
                 row = conn.execute(
-                    f"SELECT COUNT(*) AS row_count FROM usage_events {where_clause}",
+                    f"SELECT COUNT(*) AS row_count FROM {usage_source} {where_clause}",
                     params,
                 ).fetchone()
                 total += int(row["row_count"] if row is not None else 0)
             return total
         where_clause, params = usage_api_where_clause(**filter_kwargs)
         row = conn.execute(
-            f"SELECT COUNT(*) AS row_count FROM usage_events {where_clause}",
+            f"SELECT COUNT(*) AS row_count FROM canonical_usage_events {where_clause}",
             params,
         ).fetchone()
     return int(row["row_count"] if row is not None else 0)

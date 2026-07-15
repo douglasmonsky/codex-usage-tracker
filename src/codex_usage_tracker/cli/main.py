@@ -10,6 +10,7 @@ from codex_usage_tracker.cli.commands_data import (
     _run_allowance_diagnostics,
     _run_allowance_export,
     _run_allowance_history,
+    _run_dedupe_diagnostics,
     _run_export,
     _run_support_bundle,
 )
@@ -122,6 +123,7 @@ _COMMAND_HANDLERS = {
     "allowance-history": _run_allowance_history,
     "allowance-diagnostics": _run_allowance_diagnostics,
     "allowance-export": _run_allowance_export,
+    "dedupe-diagnostics": _run_dedupe_diagnostics,
     "export": _run_export,
     "init-pricing": run_init_pricing,
     "update-pricing": run_update_pricing,

@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import MutableMapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.models import SessionInfo, UsageEvent
+from codex_usage_tracker.core.usage_identity import usage_identity_from_values
 from codex_usage_tracker.parser.state import optional_str
 
 SESSION_ID_RE = re.compile(
@@ -29,6 +31,7 @@ def build_usage_event(
     last_usage: dict[str, Any],
     total_usage: dict[str, Any],
     rate_limits: object = None,
+    upstream_usage_id: str | None = None,
     stats: MutableMapping[str, int] | None = None,
 ) -> UsageEvent:
     input_tokens = required_usage_int(last_usage, "input_tokens", stats=stats)
@@ -50,7 +53,7 @@ def build_usage_event(
         cumulative_total_tokens=cumulative_total_tokens,
         total_tokens=total_tokens,
     )
-    return UsageEvent(
+    event = UsageEvent(
         record_id=record_id,
         session_id=session_id,
         thread_name=session_info.thread_name if session_info else None,
@@ -100,6 +103,13 @@ def build_usage_event(
         ),
         cumulative_total_tokens=cumulative_total_tokens,
         **observed_usage,
+    )
+    identity = usage_identity_from_values(event.to_row(), upstream_usage_id=upstream_usage_id)
+    return replace(
+        event,
+        upstream_usage_id=identity.upstream_usage_id,
+        usage_fingerprint=identity.usage_fingerprint,
+        canonical_record_id=identity.canonical_record_id,
     )
 
 

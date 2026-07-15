@@ -131,6 +131,35 @@ def clear_recommendation_fact_tables(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM recommendation_fact_state")
 
 
+def invalidate_recommendation_fact_tables(conn: sqlite3.Connection) -> None:
+    """Prevent stale recommendation reads until the next derived-fact refresh."""
+
+    clear_recommendation_fact_tables(conn)
+    _reset_thread_recommendation_columns(conn)
+
+
+def reconcile_recommendation_facts_with_canonical_usage(conn: sqlite3.Connection) -> None:
+    """Drop newly noncanonical facts and force safe fact-page summary fallback."""
+
+    conn.execute(
+        "DELETE FROM recommendation_facts WHERE record_id NOT IN "
+        "(SELECT record_id FROM canonical_usage_events)"
+    )
+    conn.execute(
+        "UPDATE recommendation_fact_state SET record_count="
+        "(SELECT COUNT(*) FROM recommendation_facts), thread_summaries_complete=0"
+    )
+    _reset_thread_recommendation_columns(conn)
+
+
+def _reset_thread_recommendation_columns(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "UPDATE thread_summaries SET recommendation_score=0, "
+        "recommendation_total_tokens=0, recommendation_summary_json=NULL, "
+        "max_recommendation_score=0, primary_recommendation=NULL"
+    )
+
+
 def create_recommendation_fact_indexes(conn: sqlite3.Connection) -> None:
     for statement in _INDEX_STATEMENTS:
         conn.execute(statement)

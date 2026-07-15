@@ -79,7 +79,7 @@ def _aggregate_summaries(
                 rf.recommendation_score, rf.recommendations_json,
                 rf.primary_recommendation_key, usage_events.session_id
             FROM recommendation_facts AS rf
-            JOIN usage_events USING(record_id)
+            JOIN canonical_usage_events AS usage_events USING(record_id)
             JOIN scopes AS s ON s.include_archived = 1 OR rf.is_archived = 0
             WHERE json_array_length(rf.recommendations_json) > 0
             {filter_sql}
@@ -217,7 +217,7 @@ def _update_completeness(
         f"""
         SELECT 1
         FROM recommendation_facts AS rf
-        JOIN usage_events USING(record_id)
+        JOIN canonical_usage_events AS usage_events USING(record_id)
         WHERE json_array_length(rf.recommendations_json) > 0
             AND (
                 nullif(usage_events.thread_name, '') IS NULL

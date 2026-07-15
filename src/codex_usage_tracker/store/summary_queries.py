@@ -49,7 +49,7 @@ def query_summary(
             AVG(reasoning_output_ratio) AS avg_reasoning_output_ratio,
             AVG(context_window_percent) AS avg_context_window_percent,
             MAX(event_timestamp) AS latest_event
-        FROM usage_events
+        FROM canonical_usage_events
         {where_clause}
         GROUP BY group_key
         ORDER BY total_tokens DESC

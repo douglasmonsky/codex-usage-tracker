@@ -62,7 +62,7 @@ def query_shell_churn(
             FROM (
                 SELECT cr.command_root
                 FROM command_runs cr
-                JOIN usage_events u ON u.record_id = cr.record_id
+                JOIN canonical_usage_events u ON u.record_id = cr.record_id
                 {where_sql}
                 GROUP BY cr.command_root
                 HAVING COUNT(*) >= ?
@@ -91,7 +91,7 @@ def query_shell_churn(
                 u.event_timestamp,
                 u.total_tokens
             FROM command_runs cr
-            JOIN usage_events u ON u.record_id = cr.record_id
+            JOIN canonical_usage_events u ON u.record_id = cr.record_id
             {where_sql}
         ),
         sequenced AS (
@@ -246,7 +246,7 @@ def _top_labels_for_root(
             COUNT(*) AS occurrences,
             COALESCE(SUM(cr.output_size_bytes), 0) AS output_size_bytes
         FROM command_runs cr
-        JOIN usage_events u ON u.record_id = cr.record_id
+        JOIN canonical_usage_events u ON u.record_id = cr.record_id
         {where_sql}
         GROUP BY cr.command_label, cr.status, cr.exit_code, cr.retry_group
         ORDER BY occurrences DESC, output_size_bytes DESC
@@ -297,7 +297,7 @@ def _trace_handles_for_root(
             MIN(u.event_timestamp) AS first_seen_at,
             MAX(u.event_timestamp) AS last_seen_at
         FROM command_runs cr
-        JOIN usage_events u ON u.record_id = cr.record_id
+        JOIN canonical_usage_events u ON u.record_id = cr.record_id
         {where_sql}
         GROUP BY u.thread_key, thread_name, u.session_id
         ORDER BY call_count DESC, total_tokens DESC, last_seen_at DESC

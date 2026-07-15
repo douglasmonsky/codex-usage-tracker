@@ -60,11 +60,14 @@ export function sourceHealthSummary(payload: DashboardBootPayload | null): Sourc
   const rateCardError = payload?.rate_card_error || '';
   const parserDiagnostics = parserDiagnosticsLabel(payload?.parser_diagnostics);
   const metadataPrivacy = projectMetadataPrivacyLabel(payload?.project_metadata_privacy, payload?.privacy_mode);
+  const dedupe = payload?.dedupe;
+  const dedupeLabel = `${formatNumber(Number(dedupe?.excluded_copied_rows || 0))} copied rows excluded; ${formatNumber(Number(dedupe?.physical_rows || 0))} physical rows preserved`;
   return [
     { label: 'Pricing snapshot', value: pricingWarning || (payload?.pricing_configured ? 'Configured' : 'Not configured'), issue: Boolean(pricingWarning) || !payload?.pricing_configured },
     { label: 'Allowance config', value: allowanceError ? `Config error: ${allowanceError}` : (payload?.allowance_configured ? 'Configured' : 'Not configured'), issue: Boolean(allowanceError) || !payload?.allowance_configured },
     { label: 'Rate card', value: rateCardError ? `Rate-card error: ${rateCardError}` : (payload?.rate_card_configured ? 'Loaded' : 'Not loaded'), issue: Boolean(rateCardError) || !payload?.rate_card_configured },
     { label: 'Parser diagnostics', value: parserDiagnostics, issue: parserDiagnostics !== 'No parser warnings' },
+    { label: 'Usage deduplication', value: dedupeLabel, issue: false },
     { label: 'Project metadata', value: metadataPrivacy, issue: metadataPrivacy !== 'Normal metadata' },
   ];
 }

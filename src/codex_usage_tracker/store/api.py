@@ -55,6 +55,11 @@ from codex_usage_tracker.store.dashboard_queries import (
 from codex_usage_tracker.store.dashboard_queries import (
     query_usage_status as query_usage_status,
 )
+from codex_usage_tracker.store.deduplication import (
+    classify_usage_rows,
+    fingerprints_for_source_files,
+    promote_orphaned_fingerprints,
+)
 from codex_usage_tracker.store.diagnostic_api import (
     query_large_low_output_calls as query_large_low_output_calls,
 )
@@ -564,11 +569,15 @@ def _upsert_usage_events_in_connection(
     fact_rows = _diagnostic_fact_rows(diagnostic_facts)
     source_files_to_replace = _source_file_strings(replace_source_files)
     affected_thread_keys = _thread_keys_for_source_files(conn, source_files_to_replace)
+    replaced_fingerprints = fingerprints_for_source_files(conn, source_files_to_replace)
     _delete_usage_events_for_source_files(
         conn,
         source_files_to_replace,
         sync_content_fts=sync_content_fts_on_replace,
     )
+    promotion = promote_orphaned_fingerprints(conn, replaced_fingerprints)
+    promoted_record_ids, promoted_thread_keys = promotion
+    affected_thread_keys.update(promoted_thread_keys)
     if not rows:
         _refresh_after_empty_source_replacement(
             conn,
@@ -581,20 +590,22 @@ def _upsert_usage_events_in_connection(
             if maintain_compression_facts:
                 sync_compression_detector_facts(
                     conn,
-                    record_ids=(),
+                    record_ids=promoted_record_ids,
                     affected_thread_keys=affected_thread_keys,
                 )
-        return _UsageEventUpsertResult(0, (), frozenset(affected_thread_keys))
+        promoted_ids = tuple(sorted(promoted_record_ids))
+        return _UsageEventUpsertResult(0, promoted_ids, frozenset(affected_thread_keys))
 
     affected_thread_keys.update(_thread_keys_for_usage_rows(rows))
-    record_ids = _usage_event_record_ids(rows)
-    _delete_diagnostic_facts_for_record_ids(conn, record_ids)
+    inserted_record_ids = _usage_event_record_ids(rows)
+    record_ids = list(dict.fromkeys([*promoted_record_ids, *inserted_record_ids]))
+    _delete_diagnostic_facts_for_record_ids(conn, inserted_record_ids)
     with _deferred_usage_event_indexes(conn, enabled=defer_usage_indexes):
         _insert_usage_event_rows(conn, rows)
     if maintain_allowance_observations:
         sync_allowance_observations_for_record_ids(conn, record_ids)
     if maintain_source_records:
-        sync_source_records(conn, record_ids=record_ids)
+        sync_source_records(conn, record_ids=inserted_record_ids)
     _insert_diagnostic_facts(conn, fact_rows)
     _refresh_after_usage_event_upsert(
         conn,
@@ -693,6 +704,7 @@ def _insert_usage_event_rows(
     conn: sqlite3.Connection,
     rows: list[dict[str, object]],
 ) -> None:
+    rows = classify_usage_rows(conn, rows)
     conn.executemany(
         _usage_event_upsert_sql(),
         [[row[column] for column in EVENT_COLUMNS] for row in rows],

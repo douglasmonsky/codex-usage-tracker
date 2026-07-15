@@ -7,6 +7,10 @@ The current storage model has two layers:
 - Aggregate usage index: token counters, model/effort metadata, call origins, diagnostic labels, thread summaries, pricing/credit estimates, allowance snapshots, and safe report payloads.
 - Local content index: normalized conversation turns, bounded content fragments, tool calls, command runs, file events, persisted investigation run summaries, and source provenance for explicit local MCP/API investigation.
 
+The aggregate index preserves every parsed row in `usage_events` for source provenance. A versioned strict fingerprint links exact copies of the same logged model call, and the `canonical_usage_events` view selects one physical representative for default totals. Only high-confidence fingerprint matches are excluded; ambiguous or merely similar calls remain canonical. If the original source disappears, the surviving physical copy is promoted without changing the logical call identity.
+
+Materialized facts may retain physical rows so source replacement and local evidence remain auditable. Unscoped aggregate and compression-fact reads join the canonical view, while explicit deduplication diagnostics report physical, canonical, and excluded counts separately.
+
 Shareable outputs remain aggregate-first and must omit indexed/raw content unless an export is explicitly documented as a local raw/content export.
 
 ## Boundaries
@@ -43,6 +47,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 11. Register each dashboard route in `server.route_inventory`. Interactive routes must be bounded and index-backed; unavoidable all-history detector work uses the shared asynchronous job lifecycle.
 12. Cache only immutable aggregate responses. Server keys include source generation and semantic/configuration inputs; browser persistence rejects raw or indexed content.
 13. Add or change a route budget only from repeatable synthetic evidence. Database indexes require an additive migration, query-plan or timing evidence, and focused migration coverage.
+14. Preserve physical usage rows for provenance, but route default usage totals and detector folds through `canonical_usage_events`. New physical-row investigation surfaces must be explicitly labeled and tested against an original/copy/new-call fixture.
 
 Normal aggregate responses use a 64-entry, 256-KiB-per-entry process cache.
 Allowance history and diagnostics use a separate four-entry, 8-MiB-per-entry

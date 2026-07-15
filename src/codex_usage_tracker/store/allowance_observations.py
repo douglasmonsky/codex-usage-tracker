@@ -40,6 +40,25 @@ ALLOWANCE_OBSERVATION_COLUMNS = (
 ALLOWANCE_SYNC_BATCH_SIZE = 500
 
 
+def rebuild_allowance_observations(conn: sqlite3.Connection) -> int:
+    """Rebuild normalized allowance rows from canonical usage only."""
+
+    conn.execute("DELETE FROM allowance_observations")
+    record_ids = [
+        str(row[0])
+        for row in conn.execute(
+            "SELECT record_id FROM canonical_usage_events WHERE "
+            "rate_limit_primary_used_percent IS NOT NULL OR "
+            "rate_limit_primary_window_minutes IS NOT NULL OR "
+            "rate_limit_primary_resets_at IS NOT NULL OR "
+            "rate_limit_secondary_used_percent IS NOT NULL OR "
+            "rate_limit_secondary_window_minutes IS NOT NULL OR "
+            "rate_limit_secondary_resets_at IS NOT NULL"
+        )
+    ]
+    return sync_allowance_observations_for_record_ids(conn, record_ids)
+
+
 def sync_allowance_observations_for_record_ids(
     conn: sqlite3.Connection,
     record_ids: list[str],
@@ -52,7 +71,7 @@ def sync_allowance_observations_for_record_ids(
     has_allowance_source = conn.execute(
         """
         SELECT 1
-        FROM usage_events
+        FROM canonical_usage_events
         WHERE rate_limit_primary_used_percent IS NOT NULL
            OR rate_limit_primary_window_minutes IS NOT NULL
            OR rate_limit_primary_resets_at IS NOT NULL
@@ -156,7 +175,7 @@ def _insert_observation_sql(window_key: str, *, record_filter: str = "") -> str:
             reasoning_output_tokens,
             total_tokens,
             cumulative_total_tokens
-        FROM usage_events
+        FROM canonical_usage_events
         WHERE (
             {used_col} IS NOT NULL
             OR {minutes_col} IS NOT NULL

@@ -56,6 +56,7 @@ from codex_usage_tracker.store.api import (
     query_latest_observed_usage,
     refresh_metadata,
 )
+from codex_usage_tracker.store.dedupe_queries import query_dedupe_diagnostics
 
 
 def dashboard_payload(
@@ -123,6 +124,7 @@ def dashboard_payload(
     )
     metadata = refresh_metadata(db_path)
     parser_diagnostics = _parser_diagnostics_payload(metadata)
+    dedupe = query_dedupe_diagnostics(db_path=db_path, limit=0)["summary"]
     row_count = len(annotated_rows)
     return {
         **dashboard_i18n_payload(language),
@@ -153,6 +155,7 @@ def dashboard_payload(
             total_available_rows=int(row_counts["total_available_rows"]),
         ),
         "parser_diagnostics": parser_diagnostics,
+        "dedupe": dedupe,
         "parser_adapter": metadata.get("parser_adapter"),
         "latest_refresh_at": metadata.get("latest_refresh_at"),
         "payload_cache_key": dashboard_payload_cache_key(

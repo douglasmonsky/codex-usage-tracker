@@ -19,6 +19,9 @@ from codex_usage_tracker.compression.streaming_evidence import (
 )
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.store.api import upsert_usage_events
+from codex_usage_tracker.store.compression_fact_queries import (
+    fold_compression_detector_facts,
+)
 from codex_usage_tracker.store.compression_fact_sync import (
     sync_content_plan_compression_facts,
 )
@@ -257,6 +260,58 @@ def test_partial_sequence_facts_fall_back_to_streaming_evidence(tmp_path: Path) 
     loaded = streaming_evidence_module.load_fact_compression_evidence(db_path, scope)
     assert loaded.snapshot == expected.snapshot
     assert loaded.record_manifest == expected.record_manifest
+
+
+def test_fact_fold_excludes_copied_rows_from_all_history(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = _usage_events()
+    copied = replace(
+        events[0],
+        record_id="call-copy",
+        session_id="session-copy",
+        source_file="/tmp/synthetic/copy.jsonl",
+    )
+    upsert_usage_events([*events, copied], db_path=db_path)
+    _seed_normalized_evidence(db_path)
+    with connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO tool_calls (
+                tool_call_key, record_id, turn_key, tool_name, status,
+                output_size_bytes, parser_adapter, parser_version, parse_warnings_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "tool-copy",
+                "call-copy",
+                "turn-0",
+                "exec",
+                "completed",
+                20_000,
+                "test",
+                "1",
+                "[]",
+            ),
+        )
+        backfill_compression_detector_facts(conn)
+
+    record_ids: list[str] = []
+    sequence_record_ids: list[str] = []
+
+    def collect(category: str, rows: list[Any]) -> None:
+        target = record_ids if category == "records" else sequence_record_ids
+        target.extend(str(row[0] if category == "records" else row[1]) for row in rows)
+
+    metadata = fold_compression_detector_facts(
+        db_path,
+        scope=CompressionScope(include_archived=True).as_dict(),
+        batch_size=2,
+        consumer=collect,
+    )
+
+    assert metadata["ready"] is True
+    assert record_ids == ["call-0", "call-1", "call-2"]
+    assert "call-copy" not in sequence_record_ids
 
 
 def _detected_candidates(snapshot: Any, scope: CompressionScope) -> list[dict[str, Any]]:

@@ -65,7 +65,7 @@ def _indexed_source_logs(
             f"SELECT source_file FROM source_files {where} ORDER BY source_file"
         ).fetchall()
         usage_row = conn.execute(
-            f"SELECT COUNT(*) AS usage_rows FROM usage_events {where}"
+            f"SELECT COUNT(*) AS usage_rows FROM canonical_usage_events {where}"
         ).fetchone()
     return [Path(str(row["source_file"])) for row in rows], int_value(usage_row["usage_rows"])
 
@@ -77,7 +77,7 @@ def _source_record_index(*, db_path: Path, include_archived: bool) -> SourceReco
         rows = conn.execute(
             f"""
             SELECT source_file, line_number, record_id
-            FROM usage_events
+            FROM canonical_usage_events
             {where}
             ORDER BY source_file, line_number
             """

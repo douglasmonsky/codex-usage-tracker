@@ -14,6 +14,10 @@ from codex_usage_tracker.cli.output import print_json
 from codex_usage_tracker.core.api_payloads import (
     path_payload,
 )
+from codex_usage_tracker.diagnostics.dedupe import (
+    build_dedupe_diagnostics,
+    render_dedupe_diagnostics,
+)
 from codex_usage_tracker.reports.support import (
     build_support_bundle,
     support_bundle_issue_guidance,
@@ -86,6 +90,15 @@ def _allowance_report_limit(limit: int | None) -> int | None:
     if limit is None or limit <= 0:
         return None
     return limit
+
+
+def _run_dedupe_diagnostics(args: argparse.Namespace) -> int:
+    payload = build_dedupe_diagnostics(db_path=args.db, limit=args.limit)
+    if args.as_json:
+        print_json(payload)
+        return 0
+    print(render_dedupe_diagnostics(payload))
+    return 0
 
 
 def _run_export(args: argparse.Namespace) -> int:

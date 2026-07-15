@@ -8,6 +8,32 @@ NoneType = type(None)
 Number = (int, float)
 
 DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
+    "codex-usage-tracker-dedupe-diagnostics-v1": {
+        "required": {
+            "summary": dict,
+            "row_count": int,
+            "limit": int,
+            "truncated": bool,
+            "rows": list,
+            "provenance": dict,
+        },
+        "nested": {
+            "summary": {
+                "dedupe_enabled": bool,
+                "fingerprint_version": str,
+                "physical_rows": int,
+                "canonical_rows": int,
+                "excluded_copied_rows": int,
+                "excluded_total_tokens": int,
+                "canonical_total_tokens": int,
+                "duplicate_reasons": dict,
+            },
+            "provenance": {
+                "physical_rows_preserved": bool,
+                "raw_content_included": bool,
+            },
+        },
+    },
     "codex-usage-tracker-diagnostics-v1": {
         "required": {
             "view": str,

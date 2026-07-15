@@ -115,6 +115,17 @@ def _add_expensive_parser(subparsers: argparse._SubParsersAction[argparse.Argume
     expensive.add_argument("--json", action="store_true", dest="as_json")
 
 
+def _add_dedupe_diagnostics_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    diagnostics = subparsers.add_parser(
+        "dedupe-diagnostics",
+        help="Show copied clone usage rows excluded from billable totals",
+    )
+    diagnostics.add_argument("--limit", type=int, default=100)
+    diagnostics.add_argument("--json", action="store_true", dest="as_json")
+
+
 def _add_pricing_coverage_parser(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:

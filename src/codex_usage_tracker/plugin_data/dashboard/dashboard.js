@@ -110,6 +110,7 @@
     let rateCardError = activeInitialPayload.rate_card_error || '';
     let projectMetadataPrivacy = activeInitialPayload.project_metadata_privacy || { mode: activeInitialPayload.privacy_mode || 'normal' };
     let parserDiagnostics = activeInitialPayload.parser_diagnostics || {};
+    let dedupeSummary = activeInitialPayload.dedupe || {};
     let apiToken = initialPayload.api_token || activeInitialPayload.api_token || '';
     let contextApiEnabled = Boolean(initialPayload.context_api_enabled || activeInitialPayload.context_api_enabled);
     let actionThresholds = activeInitialPayload.action_thresholds || {};
@@ -148,6 +149,7 @@
     const historyScopeEl = document.getElementById('historyScope');
     const languageSelectEl = document.getElementById('languageSelect');
     const liveStatusEl = document.getElementById('liveStatus');
+    const dedupeStatusEl = document.getElementById('dedupeStatus');
     const copyViewLinkEl = document.getElementById('copyViewLink');
     const exportVisibleEl = document.getElementById('exportVisible');
     const actionStatusEl = document.getElementById('actionStatus');
@@ -631,6 +633,12 @@
     }
     function updateParserDiagnosticsLine() {
       dashboardStatus.updateParserDiagnosticsLine();
+    }
+    function updateDedupeStatusLine() {
+      if (!dedupeStatusEl) return;
+      const excluded = Number(dedupeSummary.excluded_copied_rows || 0);
+      dedupeStatusEl.textContent = `Deduped · ${number.format(excluded)} copied rows excluded`;
+      dedupeStatusEl.title = `Billable totals use ${number.format(Number(dedupeSummary.canonical_rows || 0))} canonical rows while preserving ${number.format(Number(dedupeSummary.physical_rows || 0))} physical source rows.`;
     }
     function updatePrivacyModeLine() {
       dashboardStatus.updatePrivacyModeLine();
@@ -1332,6 +1340,7 @@
       observedUsage = nextPayload.observed_usage || { available: false, windows: [] };
       rateCardError = nextPayload.rate_card_error || '';
       parserDiagnostics = nextPayload.parser_diagnostics || {};
+      dedupeSummary = nextPayload.dedupe || dedupeSummary;
       projectMetadataPrivacy = nextPayload.project_metadata_privacy || { mode: nextPayload.privacy_mode || 'normal' };
       apiToken = nextPayload.api_token || apiToken;
       contextApiEnabled = Boolean(nextPayload.context_api_enabled);
@@ -1355,6 +1364,7 @@
       updateAllowanceSourceLine();
       updatePrivacyModeLine();
       updateParserDiagnosticsLine();
+      updateDedupeStatusLine();
       updateLoadLimitControl();
       updateHistoryScopeControl();
       render();
@@ -1543,6 +1553,7 @@
     updateAllowanceSourceLine();
     updatePrivacyModeLine();
     updateParserDiagnosticsLine();
+    updateDedupeStatusLine();
     updateLoadLimitControl();
     updateHistoryScopeControl();
     if (!liveRefreshSupported) {

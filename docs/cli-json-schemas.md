@@ -59,6 +59,7 @@ Tracked schema ids:
 | `codex-usage-tracker-visualization-suggestions-v1` | MCP `usage_visualization_suggest(...)`; ranked semantic visualization intents |
 | `codex-usage-tracker-visualization-result-v1` | MCP `usage_visualization_render(...)`; `VisualizationSpecV1`, compact table-equivalent evidence, narrative, and caveats |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
+| `codex-usage-tracker-dedupe-diagnostics-v1` | CLI `dedupe-diagnostics --json`, MCP `usage_dedupe_diagnostics(...)`, dashboard server `/api/diagnostics/dedupe`; aggregate summary plus bounded physical duplicate provenance, never raw content |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |
 | `codex-usage-tracker-diagnostic-tool-output-v1` | CLI `diagnostics tool-output --json`, dashboard server `/api/diagnostics/tool-output` |
 | `codex-usage-tracker-diagnostic-commands-v1` | CLI `diagnostics commands --json`, dashboard server `/api/diagnostics/commands` |

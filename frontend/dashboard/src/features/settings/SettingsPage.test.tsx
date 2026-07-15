@@ -54,6 +54,7 @@ describe('SettingsPage', () => {
     renderPage();
     expect(screen.getByText('Config error: invalid allowance file')).toBeInTheDocument();
     expect(screen.getByText('2 parser diagnostics: malformed_event=2')).toBeInTheDocument();
+    expect(screen.getByText('2 copied rows excluded; 10 physical rows preserved')).toBeInTheDocument();
     expect(screen.queryByText(/duplicate_cumulative_total=/)).not.toBeInTheDocument();
   });
 
@@ -100,6 +101,7 @@ const payload: DashboardBootPayload = {
     windows: [{ key: 'weekly', label: 'Weekly', used_percent: 25, window_minutes: 10_080 }],
   },
   parser_diagnostics: { malformed_event: 2, duplicate_cumulative_total: 7 },
+  dedupe: { canonical_rows: 8, physical_rows: 10, excluded_copied_rows: 2 },
   privacy_mode: 'strict',
   project_metadata_privacy: { mode: 'strict', cwd_redacted: true, project_names_redacted: true },
 };
