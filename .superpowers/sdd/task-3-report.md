@@ -36,3 +36,23 @@ Reviewed changed source and tests. Derived rows are sourced only from
 physical usage, source records, and dedupe provenance are not mutated. Cycles
 and intervals receive consistent archive scope, never span reset clusters, and
 all cost/calibration/forecast/change fields remain disabled for this task.
+
+## Review hardening RED/GREEN
+
+RED additions covered stale-normal alternate selection (including constant-zero
+and split-reset evidence), reuse of an existing reset epoch, and missing-reset
+metadata censoring. The review also required empty streamed finalization and
+savepoint rollback hardening; these are implemented in the materialization and
+stream-finalization paths.
+
+GREEN commands and results:
+
+`PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/allowance_intelligence/test_cycles.py tests/store/test_allowance_materialization.py tests/store/test_usage_deduplication.py -q`
+
+Result: `10 passed`.
+
+`/Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m ruff check src/codex_usage_tracker/allowance_intelligence/contracts.py src/codex_usage_tracker/allowance_intelligence/cycles.py src/codex_usage_tracker/store/allowance_materialization.py src/codex_usage_tracker/store/api.py tests/allowance_intelligence/test_cycles.py tests/store/test_allowance_materialization.py`
+
+Result: `All checks passed!`.
+
+`git diff --check` passed.
