@@ -8,6 +8,9 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from codex_usage_tracker.allowance_intelligence.capacity_history import (
+    load_capacity_cycles,
+)
 from codex_usage_tracker.allowance_intelligence.change_detection import (
     DETECTOR_VERSION,
     detect_cycle_change,
@@ -48,7 +51,7 @@ def build_allowance_analysis(
     snapshot_id = request["snapshot_id"]
     generated_at = (now or datetime.now(timezone.utc)).isoformat()
 
-    cycles = _analysis_cycles(
+    cycles = load_capacity_cycles(
         connection,
         source_revision=source_revision,
         archive_scope=archive_scope,
@@ -201,42 +204,6 @@ def _read_snapshot(
         (snapshot_id,),
     ).fetchone()
     return dict(json.loads(str(cached[0]))) if cached and cached[0] else None
-
-
-def _analysis_cycles(
-    connection: sqlite3.Connection,
-    *,
-    source_revision: str,
-    archive_scope: str,
-    window_kind: str,
-    cohort_key: str,
-) -> list[dict[str, Any]]:
-    archive = "" if archive_scope == "all" else "AND is_archived = 0"
-    cycles = [
-        dict(row)
-        for row in connection.execute(
-            f"""SELECT * FROM allowance_cycles
-            WHERE source_revision = ? AND window_kind = ? AND cohort_key = ? {archive}
-            ORDER BY last_observed_at, cycle_id""",
-            (source_revision, window_kind, cohort_key),
-        )
-    ]
-    ratios = {
-        str(row["cycle_id"]): float(row["credits"]) / float(row["movement"])
-        for row in connection.execute(
-            f"""SELECT cycle_id, SUM(estimated_credits) AS credits,
-            SUM(visible_percent_delta) AS movement
-            FROM allowance_intervals
-            WHERE source_revision = ? AND window_kind = ? AND cohort_key = ? {archive}
-              AND eligible_for_change_detection = 1 AND point_kind = 'positive'
-            GROUP BY cycle_id
-            HAVING credits > 0 AND movement > 0""",
-            (source_revision, window_kind, cohort_key),
-        )
-    }
-    for cycle in cycles:
-        cycle["credits_per_percent"] = ratios.get(str(cycle["cycle_id"]))
-    return cycles
 
 
 def _normalized_time(value: object) -> str:
