@@ -57,16 +57,24 @@ def build_allowance_evidence(connection: sqlite3.Connection, *, now: datetime | 
 
 
 def _window(row: dict[str, Any] | None, now: datetime) -> dict[str, Any] | None:
-    if row is None: return None
-    observed = _parse(row["last_observed_at"]); reset = row.get("reset_at")
-    age = max(0, int((now - observed).total_seconds())); stale = age > _AGING[row["window_kind"]] or (isinstance(reset, (int, float)) and reset < now.timestamp())
+    if row is None:
+        return None
+    observed = _parse(row["last_observed_at"])
+    reset = row.get("reset_at")
+    age = max(0, int((now - observed).total_seconds()))
+    stale = age > _AGING[row["window_kind"]] or (
+        isinstance(reset, (int, float)) and reset < now.timestamp()
+    )
     freshness = "stale" if stale else ("fresh" if age <= 300 else "aging")
     used = row.get("latest_used_percent")
     return {"cohort_id": row["cohort_key"], "used_percent": used, "remaining_percent": None if used is None else max(0, 100 - float(used)), "reset_at": reset, "reset_countdown_seconds": max(0, int(reset - now.timestamp())) if isinstance(reset, (int, float)) else None, "observed_at": row["last_observed_at"], "age_seconds": age, "freshness": freshness, "status": row["status"], "pricing_coverage": row.get("price_coverage"), "quality": row.get("quality_grade"), "canonical_source_revision": row.get("source_revision")}
 
 
 def _revision(conn: sqlite3.Connection) -> str | None:
-    row = conn.execute("SELECT source_revision FROM allowance_source_state WHERE state_id=1").fetchone(); return str(row[0]) if row else None
+    row = conn.execute(
+        "SELECT source_revision FROM allowance_source_state WHERE state_id=1"
+    ).fetchone()
+    return str(row[0]) if row else None
 def _parse(value: str) -> datetime: return datetime.fromisoformat(value.replace("Z", "+00:00"))
 def _data_state(states: list[str]) -> str: return "empty" if not states else ("stale" if all(s == "stale" for s in states) else ("aging" if "aging" in states else "fresh"))
 def _latest_at(windows: dict[str, Any]) -> str | None: return max((entry["observed_at"] for entry in windows.values() if entry), default=None)
@@ -74,10 +82,15 @@ def _cohort(row: dict[str, Any] | None) -> dict[str, Any] | None: return None if
 def _cycle(row: dict[str, Any]) -> dict[str, Any]: return {key: row.get(key) for key in ("cycle_id", "reset_at", "first_observed_at", "last_observed_at", "latest_used_percent", "status", "quality_grade")}
 def _available_range(rows: list[dict[str, Any]]) -> dict[str, str | None]: return {"start_at": rows[0]["first_observed_at"] if rows else None, "end_at": rows[-1]["last_observed_at"] if rows else None}
 def _copied_excluded(conn: sqlite3.Connection) -> int:
-    try: return int(conn.execute("SELECT count(*) FROM usage_events WHERE is_duplicate=1").fetchone()[0])
-    except sqlite3.OperationalError: return 0
+    try:
+        return int(
+            conn.execute("SELECT count(*) FROM usage_events WHERE is_duplicate=1").fetchone()[0]
+        )
+    except sqlite3.OperationalError:
+        return 0
 def _evidence_row(row: dict[str, Any], privacy_mode: str) -> dict[str, Any]:
     keys = ("interval_id", "cycle_id", "window_kind", "cohort_key", "end_observed_at", "end_used_percent", "point_kind", "censor_reason", "source_revision")
     result = {key: row.get(key) for key in keys}
-    if privacy_mode != "strict": result.update({key: row.get(key) for key in ("start_record_id", "end_record_id")})
+    if privacy_mode != "strict":
+        result.update({key: row.get(key) for key in ("start_record_id", "end_record_id")})
     return result

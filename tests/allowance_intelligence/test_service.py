@@ -23,7 +23,7 @@ def connection() -> sqlite3.Connection:
     conn.execute("INSERT INTO allowance_source_state VALUES (1, 1, 'r1', 2, '2026-07-15T11:58:00+00:00', 'reset-aware-v2', '2026-07-15T12:00:00+00:00')")
     conn.executemany(
         """INSERT INTO allowance_cycles (cycle_id,window_kind,window_key,cohort_key,is_archived,reset_at,first_observed_at,last_observed_at,latest_used_percent,observation_count,canonical_observation_count,canonical_tokens,price_coverage,quality_grade,status,cycle_state,source_revision,model_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        [("week", "weekly", "primary", "codex", 0, 1784131200, "2026-07-15T10:00:00+00:00", "2026-07-15T11:58:00+00:00", 40, 2, 2, 100, 0.8, "high", "accepted", "accepted", "r1", "reset-aware-v2"), ("five", "five_hour", "secondary", "codex", 0, 1784116800, "2026-07-15T11:57:00+00:00", "2026-07-15T11:58:00+00:00", 10, 2, 2, 50, None, "high", "accepted", "accepted", "r1", "reset-aware-v2")],
+        [("week", "weekly", "primary", "codex", 0, 1784145600, "2026-07-15T10:00:00+00:00", "2026-07-15T11:58:00+00:00", 40, 2, 2, 100, 0.8, "high", "accepted", "accepted", "r1", "reset-aware-v2"), ("five", "five_hour", "secondary", "codex", 0, 1784116800, "2026-07-15T11:57:00+00:00", "2026-07-15T11:58:00+00:00", 10, 2, 2, 50, None, "high", "accepted", "accepted", "r1", "reset-aware-v2")],
     )
     conn.execute("INSERT INTO allowance_intervals (interval_id,cycle_id,window_kind,window_key,cohort_key,is_archived,end_observed_at,end_used_percent,point_kind,source_revision,model_version) VALUES ('i1','week','weekly','primary','codex',0,'2026-07-15T11:58:00+00:00',40,'positive','r1','reset-aware-v2')")
     return conn

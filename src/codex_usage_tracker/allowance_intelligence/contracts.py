@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-
 ALLOWANCE_STATUS_SCHEMA = "codex-usage-tracker-allowance-status-v2"
 ALLOWANCE_SERIES_SCHEMA = "codex-usage-tracker-allowance-series-v2"
 ALLOWANCE_EVIDENCE_SCHEMA = "codex-usage-tracker-allowance-evidence-v2"
