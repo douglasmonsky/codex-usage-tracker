@@ -261,7 +261,7 @@ export function callActionColumn({
   return {
     id: 'investigate',
     header: 'Investigate',
-    enableSorting: false,
+    enableSorting: false, minSize: 276, size: 276,
     cell: info => (
       <CallActionCell
         call={info.row.original}

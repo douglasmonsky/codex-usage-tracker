@@ -10,12 +10,16 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
 
 - session id, thread name, cwd, source file, turn id, and timestamps
 - model, reasoning effort, context window, token counts, and derived efficiency ratios
-- versioned usage fingerprints, canonical record ids, and exact-copy exclusion reasons used to keep cloned log history out of default totals
+- versioned usage fingerprints, canonical record pointers, exact-copy exclusion
+  reasons, and copied-clone exclusion state; physical rows remain stored for
+  local provenance while default totals use canonical rows
 - subagent source, role, nickname, parent session id, and parent thread name when present
 - call-origin category, reason, and confidence labels derived from event metadata during indexing
 - archived-session flag, conservative thread key, adjacent aggregate record ids, and materialized thread-level summaries
 - source-file provenance such as path, path hash, file size, mtime, indexed line and byte offsets, latest aggregate record id, parser diagnostics, and last indexed time
 - observed Codex rate-limit snapshot metadata from local token-count logs, including plan type, limit id, 5-hour and weekly used percentages, window lengths, and reset times
+- materialized allowance cohorts, reset-aware cycles and intervals, aggregate
+  quality/coverage metrics, source revisions, and persisted statistical results
 - diagnostic fact labels tied to aggregate call records, safe event categories, payload type labels, counts, timestamps, and line ranges
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
 - normalized local content-index rows for local investigation, including conversation turns, bounded content fragments, tool calls, command runs, file events, source provenance, parser adapter metadata, parser warnings, and FTS5 search rows when SQLite supports FTS5
@@ -39,6 +43,15 @@ Default shareable outputs omit indexed or raw content. That includes:
 - source coverage reports
 
 Those outputs should not include prompts, assistant messages, tool output, pasted secrets, raw snippets, reconstructed transcript evidence, indexed fragments, or full JSONL records unless a future command is explicitly documented as a local raw/content export.
+
+Default totals and allowance intelligence use canonical usage rows. High-confidence
+copied clone history is excluded and the excluded count is disclosed. The original
+physical rows, source files, line numbers, and record ids stay in SQLite for local
+provenance. Normal/strict allowance evidence returns aggregate provenance;
+`privacy_mode=local` or the dashboard's **Show physical source links** control is
+an explicit bounded opt-in to physical record identifiers. Fingerprinting does not
+read or index transcript content, and fuzzy token-count similarity is diagnostic
+only.
 
 Privacy modes still affect metadata exposure. `normal` keeps local project metadata visible. `redacted` hides raw `cwd` and source paths, hides Git remote labels, and replaces unnamed projects with stable hashed labels such as `Project ab12cd34`. Configured project aliases are treated as explicit display opt-ins. `strict` also hides project-relative cwd, Git branch, and project tags.
 
@@ -130,6 +143,10 @@ Strict mode redacts local diagnostic path strings in bundle doctor details while
 Cost estimates are calculated only from aggregate token fields and your local pricing config. They are omitted when no matching model price is configured. Pricing refreshes pull only OpenAI's public pricing markdown and do not send local usage data anywhere.
 
 Codex credit estimates are calculated only from aggregate token fields and bundled or locally configured rate-card values. The optional allowance config stores only remaining percentages, reset times, and credit totals you manually enter. Observed rate-limit snapshots, when present in Codex token-count logs, store only structured percentages, window lengths, reset times, plan type, and limit id.
+
+Allowance calibration and forecasts use canonical aggregate credits and observed
+percentages. A displayed credits-per-percent value is a personal historical
+estimate with cycle count and price coverage, not an official product conversion.
 
 ## Sharing Checklist
 

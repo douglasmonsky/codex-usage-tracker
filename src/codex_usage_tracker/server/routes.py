@@ -20,6 +20,11 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
         "/api/allowance/history": "_handle_allowance_history",
         "/api/allowance/diagnostics": "_handle_allowance_diagnostics",
         "/api/allowance/export": "_handle_allowance_export",
+        "/api/allowance/status": "_handle_allowance_status_v2",
+        "/api/allowance/series": "_handle_allowance_series_v2",
+        "/api/allowance/evidence": "_handle_allowance_evidence_v2",
+        "/api/allowance/analysis": "_handle_allowance_analysis_v2",
+        "/api/allowance/analysis/jobs": "_handle_allowance_analysis_job_status_v2",
         "/api/reports/pack": "_handle_reports_pack",
         "/api/investigations/agentic": "_handle_investigation_agentic",
         "/api/investigations/repeated-files": ("_handle_investigation_repeated_file_rediscovery"),
@@ -59,6 +64,7 @@ GET_DIAGNOSTIC_FACT_ROUTES: Mapping[str, Mapping[str, str]] = MappingProxyType(
 POST_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
     {
         "/api/compression/start": "_handle_compression_start",
+        "/api/allowance/analysis/jobs": "_handle_allowance_analysis_job_start_v2",
         "/api/diagnostics/refresh": "_handle_diagnostics_refresh",
         "/api/diagnostics/overview/refresh": "_handle_diagnostics_overview_refresh",
         "/api/diagnostics/tool-output/refresh": "_handle_diagnostics_tool_output_refresh",

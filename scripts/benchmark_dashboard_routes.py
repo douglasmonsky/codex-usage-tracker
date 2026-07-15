@@ -195,7 +195,7 @@ def benchmark_fixture(
 
     def benchmark_allowance_history(cache: AggregateQueryCache, send_json: JsonSender) -> None:
         route_support.handle_allowance_history_request(
-            "limit=0&include_archived=true&privacy_mode=normal",
+            "limit=1000&include_archived=true&privacy_mode=normal",
             db_path=db_path,
             allowance_path=config["allowance_path"],
             rate_card_path=rate_card_path,

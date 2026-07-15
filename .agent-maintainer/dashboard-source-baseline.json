@@ -40,6 +40,11 @@
       "nonblank": 413,
       "physical": 445
     },
+    "frontend/dashboard/src/features/limits/LimitsPage.tsx": {
+      "group": "source",
+      "nonblank": 639,
+      "physical": 683
+    },
     "frontend/dashboard/src/features/shared/tables.tsx": {
       "group": "source",
       "nonblank": 487,

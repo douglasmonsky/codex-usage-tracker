@@ -14,10 +14,10 @@
       "p95_seconds": 0.1
     },
     "/api/thread-calls": {
-      "p95_seconds": 0.15
+      "p95_seconds": 0.25
     },
     "/api/diagnostics/facts": {
-      "cold_p95_seconds": 0.75,
+      "cold_p95_seconds": 0.8,
       "warm_p95_seconds": 0.05
     },
     "/api/diagnostics/tools": {

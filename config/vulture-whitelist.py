@@ -16,6 +16,11 @@ refresh_thread_summaries
 index_content_for_source_files
 flush_pending_event_rows
 write_usage_drain_spans_csv
+AllowanceConfidence
+_.BASELINE
+_.HIGH
+_.LOW
+_.AMBIGUOUS
 
 # Dataclass fields are consumed through serialization and attribute access.
 session_updated_at
@@ -81,6 +86,12 @@ _._handle_recommendations
 _._handle_allowance_history
 _._handle_allowance_diagnostics
 _._handle_allowance_export
+_._handle_allowance_status_v2
+_._handle_allowance_series_v2
+_._handle_allowance_evidence_v2
+_._handle_allowance_analysis_v2
+_._handle_allowance_analysis_job_start_v2
+_._handle_allowance_analysis_job_status_v2
 _._handle_reports_pack
 _._handle_investigation_agentic
 _._handle_investigation_repeated_file_rediscovery

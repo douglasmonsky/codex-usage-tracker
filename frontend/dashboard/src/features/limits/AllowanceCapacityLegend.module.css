@@ -1,0 +1,90 @@
+.capacityLegend {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: 10px;
+}
+
+.legendKey {
+  display: flex;
+  gap: 8px 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 4px;
+  margin: 0;
+  list-style: none;
+}
+
+.legendKey li {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--ink-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.legendKey .legendKeyLabel {
+  color: var(--ink-muted);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.observedMark,
+.medianMark {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 12px;
+}
+
+.observedMark::before,
+.medianMark::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  border-top: 2px solid var(--ink-muted);
+  content: '';
+  transform: translateY(-50%);
+}
+
+.observedMark::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  background: var(--surface-raised);
+  border: 2px solid var(--ink-muted);
+  border-radius: 999px;
+  content: '';
+  transform: translate(-50%, -50%);
+}
+
+.medianMark::before {
+  border-top-width: 4px;
+  border-top-color: var(--ink-strong);
+}
+
+.planSwatch {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--surface-raised);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--line-default);
+}
+
+@media (max-width: 720px) {
+  .capacityLegend {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

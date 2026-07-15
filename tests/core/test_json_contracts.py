@@ -11,7 +11,7 @@ from codex_usage_tracker.core.json_contracts import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATTERN = re.compile(r"codex-usage-tracker-[a-z0-9-]+-v1")
+SCHEMA_PATTERN = re.compile(r"codex-usage-tracker-[a-z0-9-]+-v[0-9]+")
 RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "api_payloads.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "cli" / "main.py",
@@ -53,6 +53,17 @@ def test_json_contract_validation_accepts_nested_query_contract() -> None:
     }
 
     assert validate_json_payload_contract(payload) == []
+
+
+def test_allowance_v2_contracts_are_tracked() -> None:
+    schemas = set(known_json_schemas())
+
+    assert {
+        "codex-usage-tracker-allowance-status-v2",
+        "codex-usage-tracker-allowance-series-v2",
+        "codex-usage-tracker-allowance-evidence-v2",
+        "codex-usage-tracker-allowance-analysis-v2",
+    } <= schemas
 
 
 def test_json_contract_validation_reports_schema_and_type_errors() -> None:

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CallRow } from '../../api/types';
-import { callColumns, callCsvColumns, callSignalPucks } from './tables';
+import { callActionColumn, callColumns, callCsvColumns, callSignalPucks } from './tables';
 import { rowsToCsv } from './exportCsv';
 
 describe('call CSV columns', () => {
@@ -124,6 +124,13 @@ describe('call table columns', () => {
     expect(timeColumn && 'accessorFn' in timeColumn ? timeColumn.accessorFn?.(eveningCall, 0) : null).toBeGreaterThan(
       timeColumn && 'accessorFn' in timeColumn ? Number(timeColumn.accessorFn?.(noonCall, 0)) : Number.NaN,
     );
+  });
+
+  it('reserves enough width for both non-wrapping row actions', () => {
+    const actionColumn = callActionColumn({ onOpenInvestigator: () => undefined });
+
+    expect(actionColumn.minSize).toBe(276);
+    expect(actionColumn.size).toBe(276);
   });
 });
 

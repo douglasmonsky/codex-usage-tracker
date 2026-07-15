@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from http import HTTPStatus
 from time import perf_counter
 from typing import Any, Protocol
@@ -36,6 +37,7 @@ def send_json_response(
     payload: dict[str, object],
     *,
     server_timing: str | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> None:
     body = json_response_body(payload)
     timing = server_timing or server_timing_header(
@@ -44,7 +46,9 @@ def send_json_response(
     )
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Cache-Control", "no-store")
+    response_headers = {"Cache-Control": "no-store", **dict(headers or {})}
+    for name, value in response_headers.items():
+        handler.send_header(name, value)
     if timing is not None:
         handler.send_header("Server-Timing", timing)
     handler.send_header("Content-Length", str(len(body)))

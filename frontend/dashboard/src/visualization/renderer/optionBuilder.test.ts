@@ -14,8 +14,9 @@ describe('ECharts visualization adapter', () => {
     expect(series[2].markArea).toBeTruthy();
     expect(series[2].markLine).toMatchObject({ data: [{ label: { width: 88, overflow: 'break' } }] });
     expect(series[2].markArea).toMatchObject({ label: { position: 'insideTopLeft', width: 80 } });
+    expect(option.grid).toMatchObject({ top: 92 });
     expect(option.dataZoom).toHaveLength(2);
-    expect(option.media).toEqual([{ query: { maxWidth: 520 }, option: { grid: { top: 88 } } }]);
+    expect(option.media).toEqual([{ query: { maxWidth: 520 }, option: { grid: { top: 124 } } }]);
     expect(model.targetByKey.get('week-07-07')).toEqual({ seriesIndex: 2, dataIndex: 7 });
   });
 
@@ -30,10 +31,29 @@ describe('ECharts visualization adapter', () => {
     expect(series).toMatchObject({
       nodeGap: 32,
       nodeWidth: 16,
+      right: 128,
       top: 20,
       bottom: 20,
       label: { distance: 8, fontSize: 12, lineHeight: 16 },
     });
+  });
+
+  it('suppresses legends only when a Cartesian spec opts out', () => {
+    const multiSeriesSpec = {
+      ...allowanceChangePointSpec,
+      series: [
+        ...allowanceChangePointSpec.series,
+        { ...allowanceChangePointSpec.series[0], id: 'comparison', label: 'Comparison' },
+      ],
+    };
+    const defaultOption = buildEChartsVisualizationModel(multiSeriesSpec).option as Record<string, unknown>;
+    const hiddenOption = buildEChartsVisualizationModel({
+      ...multiSeriesSpec,
+      showLegend: false,
+    }).option as Record<string, unknown>;
+
+    expect(defaultOption.legend).toBeTruthy();
+    expect(hiddenOption.legend).toBeUndefined();
   });
 
   it('builds heatmap categories and a bounded visual scale', () => {
