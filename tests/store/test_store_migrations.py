@@ -21,7 +21,9 @@ from codex_usage_tracker.store.api import (
     refresh_metadata,
     refresh_usage_index,
     schema_state,
+    upsert_usage_events,
 )
+from tests.store.test_usage_deduplication import _event
 
 LEGACY_SESSION_ID = "019e3810-78be-7f32-a7d7-884d9bdba1fd"
 NEW_SESSION_ID = "019e3811-5715-7018-a7bb-2232b46a5671"
@@ -362,6 +364,57 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
     assert content_feature is not None
     if int(content_feature["enabled"]):
         assert "content_fts" in tables
+
+
+def test_init_db_upgrades_v25_database_without_changing_physical_rows(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    event = _event("v25-record", "/synthetic/v25.jsonl")
+    upsert_usage_events([event], db_path)
+
+    with connect(db_path) as conn:
+        before_usage = conn.execute(
+            "SELECT record_id, source_file, line_number, event_timestamp FROM usage_events"
+        ).fetchall()
+        before_provenance = conn.execute(
+            "SELECT record_id, source_file_id, line_number, source_record_hash FROM source_records"
+        ).fetchall()
+        conn.execute("DROP TABLE allowance_analysis_snapshots")
+        conn.execute("DROP TABLE allowance_intervals")
+        conn.execute("DROP TABLE allowance_cycles")
+        conn.execute("DROP TABLE allowance_source_state")
+        conn.execute("DROP INDEX idx_allowance_observations_active_newest")
+        conn.execute("DROP INDEX idx_allowance_observations_active_window_newest")
+        conn.execute("DELETE FROM schema_migrations WHERE version = 26")
+        conn.execute("PRAGMA user_version = 25")
+        versions_before = [
+            row[0]
+            for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version").fetchall()
+        ]
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        }
+        after_usage = conn.execute(
+            "SELECT record_id, source_file, line_number, event_timestamp FROM usage_events"
+        ).fetchall()
+        after_provenance = conn.execute(
+            "SELECT record_id, source_file_id, line_number, source_record_hash FROM source_records"
+        ).fetchall()
+        user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    assert versions_before == list(range(1, 26))
+    assert user_version == 26
+    assert {
+        "allowance_source_state",
+        "allowance_cycles",
+        "allowance_intervals",
+        "allowance_analysis_snapshots",
+    } <= tables
+    assert after_usage == before_usage
+    assert after_provenance == before_provenance
 
 
 def test_init_db_does_not_rerun_applied_migrations(

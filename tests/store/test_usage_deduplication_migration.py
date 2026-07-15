@@ -150,10 +150,22 @@ def test_canonical_rebuild_discards_stale_allowance_intelligence(tmp_path: Path)
             "(interval_id, cycle_id, window_kind, window_key, cohort_key, point_kind, source_revision) "
             "VALUES ('stale-interval', 'stale-cycle', 'primary', 'primary', 'codex', 'anchor', 'stale')"
         )
+        conn.execute(
+            "INSERT INTO allowance_analysis_snapshots "
+            "(snapshot_id, source_revision, model_version, archive_scope, window_kind, cohort_key, "
+            "forecast_horizon, created_at) "
+            "VALUES ('stale-snapshot', 'stale', 'v1', 'active', 'primary', 'codex', 60, "
+            "'2026-07-15T00:00:00Z')"
+        )
         _rebuild_canonical_derivatives(conn)
         counts = [
             conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            for table in ("allowance_source_state", "allowance_cycles", "allowance_intervals")
+            for table in (
+                "allowance_source_state",
+                "allowance_cycles",
+                "allowance_intervals",
+                "allowance_analysis_snapshots",
+            )
         ]
 
-    assert counts == [0, 0, 0]
+    assert counts == [0, 0, 0, 0]
