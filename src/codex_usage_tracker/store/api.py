@@ -55,6 +55,10 @@ from codex_usage_tracker.store.dashboard_queries import (
 from codex_usage_tracker.store.dashboard_queries import (
     query_usage_status as query_usage_status,
 )
+from codex_usage_tracker.store.deduplication import (
+    classify_usage_rows,
+    promote_orphaned_fingerprints,
+)
 from codex_usage_tracker.store.diagnostic_api import (
     query_large_low_output_calls as query_large_low_output_calls,
 )
@@ -86,7 +90,6 @@ from codex_usage_tracker.store.schema import (
     SchemaMigrationError,
     init_db,
 )
-from codex_usage_tracker.store.deduplication import classify_usage_rows, promote_orphaned_fingerprints
 from codex_usage_tracker.store.source_records import (
     query_source_record_coverage as query_source_record_coverage,
 )
@@ -684,7 +687,13 @@ def _fingerprints_for_source_files(conn: sqlite3.Connection, source_files: list[
     if not source_files:
         return set()
     placeholders = ", ".join("?" for _ in source_files)
-    return {str(row[0]) for row in conn.execute(f"SELECT DISTINCT usage_fingerprint FROM usage_events WHERE source_file IN ({placeholders}) AND usage_fingerprint IS NOT NULL", source_files)}
+    return {
+        str(row[0])
+        for row in conn.execute(
+            f"SELECT DISTINCT usage_fingerprint FROM usage_events WHERE source_file IN ({placeholders}) AND usage_fingerprint IS NOT NULL",
+            source_files,
+        )
+    }
 
 
 def _usage_event_upsert_sql() -> str:

@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import MutableMapping
-from pathlib import Path
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.models import SessionInfo, UsageEvent
