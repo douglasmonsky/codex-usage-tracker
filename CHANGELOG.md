@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.19.0 - 2026-07-15
+
 - Redesign Limits Intelligence around weekly credits-per-percentage capacity
   history, a compact current-status row, automatic revision analysis, and zero,
   one, or multiple family-wise-controlled capacity changes. Rejected split
