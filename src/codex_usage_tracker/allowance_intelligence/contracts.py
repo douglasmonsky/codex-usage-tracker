@@ -1,4 +1,5 @@
 """Immutable structural evidence contracts for allowance intelligence."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
