@@ -73,7 +73,9 @@ USAGE_EVENT_COLUMNS = (
     UsageColumn("upstream_usage_id", "TEXT", "TEXT", repairable=True),
     UsageColumn("usage_fingerprint", "TEXT", "TEXT", repairable=True),
     UsageColumn("canonical_record_id", "TEXT", "TEXT", repairable=True),
-    UsageColumn("is_duplicate", "INTEGER NOT NULL DEFAULT 0", "INTEGER NOT NULL DEFAULT 0", repairable=True),
+    UsageColumn(
+        "is_duplicate", "INTEGER NOT NULL DEFAULT 0", "INTEGER NOT NULL DEFAULT 0", repairable=True
+    ),
     UsageColumn("duplicate_reason", "TEXT", "TEXT", repairable=True),
     UsageColumn("uncached_input_tokens", "INTEGER NOT NULL", "INTEGER"),
     UsageColumn("cache_ratio", "REAL NOT NULL", "REAL"),
