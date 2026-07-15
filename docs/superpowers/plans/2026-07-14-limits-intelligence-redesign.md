@@ -137,9 +137,11 @@ Expected: PASS with no cross-reset interval and no copied-row double counting.
 
 **Files:**
 - Create: `src/codex_usage_tracker/store/allowance_intelligence.py`
+- Modify: `src/codex_usage_tracker/store/allowance_schema.py`
 - Create: `tests/store/test_allowance_intelligence_queries.py`
+- Modify: `tests/store/test_store_migrations.py`
 
-- [ ] Write failing tests for latest status lookup, bounded range lookup, archive inclusion/exclusion, newest/oldest evidence ordering, cohort/range filtering, cursor continuation, cursor revision mismatch, and query plans using the new indexes.
+- [ ] Write failing tests for latest status lookup, bounded range lookup, archive inclusion/exclusion, newest/oldest evidence ordering, cohort/range filtering, nullable evidence timestamps, cursor continuation, malformed cursor shape, cursor revision mismatch, and query plans using the new indexes.
 - [ ] Define an opaque cursor as URL-safe JSON containing `source_revision`, `observed_at`, and stable row id; reject malformed or stale-revision cursors with a typed `AllowanceCursorError`.
 - [ ] Implement O(log n + k) SQLite queries:
 
@@ -150,6 +152,7 @@ query_allowance_evidence(connection, *, limit=50, cursor=None, window_kind=None,
 ```
 
 - [ ] Clamp evidence limit to 1–500 and return `next_cursor=None` at exhaustion.
+- [ ] Add exact v26 indexes for active/archive-partitioned latest, series, and evidence queries both with and without cohort filters. For `include_archived=True`, issue one indexed query per archive partition and merge the two bounded ordered results in memory; do not sacrifice index order to an optional predicate.
 - [ ] Run the new store test module; expect PASS and indexed query-plan assertions.
 - [ ] Stage exact files and commit: `feat: add indexed allowance intelligence queries`.
 
