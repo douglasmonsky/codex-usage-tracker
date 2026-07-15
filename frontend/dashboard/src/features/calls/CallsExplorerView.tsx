@@ -107,7 +107,7 @@ export function CallsExplorerView({ model, header, filters, table, inspector }: 
             getRowId={call => call.id}
             mobile={{
               primary: call => call.thread,
-              secondary: call => `${call.time} · ${call.model} · ${formatCompact(call.totalTokens)} tokens · ${pct(call.cachedPct)} cache`,
+              secondary: call => shellI18n.translateText(`${call.time} · ${call.model} · ${formatCompact(call.totalTokens)} tokens · ${pct(call.cachedPct)} cache`),
               actionLabel: call => callInvestigatorRowLabel(call),
             }}
             sorting={table.sorting}
@@ -127,7 +127,7 @@ export function CallsExplorerView({ model, header, filters, table, inspector }: 
             emptyLabel="No rows match current filters."
           />
           <div className={styles.gridFooter} aria-live="polite">
-            <span>{table.calls.length.toLocaleString()} loaded / {table.totalMatchedCalls.toLocaleString()} matched</span>
+            <span>{shellI18n.translateText(`${table.calls.length.toLocaleString()} loaded / ${table.totalMatchedCalls.toLocaleString()} matched`)}</span>
             {table.focused && table.hasNextPage ? (
               <button
                 className="toolbar-button"
@@ -159,7 +159,7 @@ export function CallsExplorerView({ model, header, filters, table, inspector }: 
           <Panel title="Cost by Model" subtitle="Estimated USD">
             <BarChart data={model.modelCosts} valueLabel={money} />
           </Panel>
-          <Panel title="Cache Hit Rate Over Time" subtitle="Daily">
+          <Panel title="Cache Hit Rate Over Time" subtitle={shellI18n.translateText('Daily')}>
             <LineChart
               series={model.cacheSeries}
               yLabel="Cache %"

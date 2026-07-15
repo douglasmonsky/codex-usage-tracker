@@ -9,6 +9,7 @@ import {
   type AllowanceWindowKind,
 } from '../../api/allowance';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
+import { useShellI18n } from '../../app/i18nContext';
 import { Button, MetricReadout, PageLoadProgress, SegmentedControl, StatusBadge, Surface } from '../../design';
 import { Visualization } from '../../visualization';
 import { csvDateStamp } from '../shared/exportCsv';
@@ -43,6 +44,7 @@ export function LimitsPage({
   onOpenInvestigator,
   onCopyCallLink,
 }: LimitsPageProps) {
+  const i18n = useShellI18n();
   const initialState = readLimitState();
   const [windowKind, setWindowKind] = useState<AllowanceWindowKind>(initialState.windowKind);
   const [hypothesis, setHypothesis] = useState<AllowanceHypothesis>(initialState.hypothesis);
@@ -165,7 +167,7 @@ export function LimitsPage({
         </div>
         <div className={styles.answerMeta}>
           <StatusBadge tone={workspace.answer.tone}>{workspace.answer.badge}</StatusBadge>
-          <span>{workspace.weekly.positiveSpanCount} weekly spans · {workspace.readiness.detector_version}</span>
+          <span>{i18n.translateText(`${workspace.weekly.positiveSpanCount} weekly spans · ${workspace.readiness.detector_version}`)}</span>
         </div>
       </section>
 

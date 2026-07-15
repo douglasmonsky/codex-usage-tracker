@@ -163,22 +163,25 @@ export function callSignalPucks(call: CallRow, maxVisible = 3): { visible: CallS
 }
 
 export function CallSignalPucks({ call }: { call: CallRow }) {
+  const i18n = useShellI18n();
   const { visible, hidden } = callSignalPucks(call);
   if (!visible.length) {
     return <span className="muted">None</span>;
   }
 
-  const hiddenLabel = hidden.map(puck => puck.label).join(', ');
+  const localizedPucks = visible.map(puck => ({ ...puck, label: i18n.translateText(puck.label), shortLabel: i18n.translateText(puck.shortLabel) }));
+  const localizedHidden = hidden.map(puck => ({ ...puck, label: i18n.translateText(puck.label), shortLabel: i18n.translateText(puck.shortLabel) }));
+  const hiddenLabel = localizedHidden.map(puck => puck.label).join('、');
   return (
-    <span className="flags compact-flags" aria-label={`Signals: ${[...visible, ...hidden].map(puck => puck.label).join(', ')}`}>
-      {visible.map(puck => (
+    <span className="flags compact-flags" aria-label={i18n.language === 'zh-Hans' ? `信号：${[...localizedPucks, ...localizedHidden].map(puck => puck.label).join('、')}` : `Signals: ${[...visible, ...hidden].map(puck => puck.label).join(', ')}`}>
+      {localizedPucks.map(puck => (
         <span key={puck.key} className="flag signal-puck" title={puck.label}>
           {puck.shortLabel}
         </span>
       ))}
-      {hidden.length ? (
+      {localizedHidden.length ? (
         <span className="flag signal-puck more" title={hiddenLabel}>
-          +{hidden.length}
+          +{localizedHidden.length}
         </span>
       ) : null}
     </span>
@@ -261,6 +264,7 @@ export function callActionColumn({
   return {
     id: 'investigate',
     header: 'Investigate',
+    size: 260,
     enableSorting: false,
     cell: info => (
       <CallActionCell
@@ -426,6 +430,7 @@ export function threadActionColumn({ onOpenInvestigator, onCopyCallLink }: Threa
   return {
     id: 'investigate',
     header: 'Investigate',
+    size: 260,
     enableSorting: false,
     cell: info => {
       const thread = info.row.original;

@@ -4,6 +4,7 @@ import { line } from 'd3-shape';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import type { Series } from '../api/types';
+import { useShellI18n } from '../app/i18nContext';
 
 type LineChartProps = {
   series: Series[];
@@ -15,6 +16,7 @@ type LineChartProps = {
 const dateLabelWidth = 38;
 
 export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, height = 280 }: LineChartProps) {
+  const i18n = useShellI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const labels = series[0]?.points.map(point => point.label) ?? [];
@@ -87,15 +89,15 @@ export function LineChart({ series, yLabel, valueFormatter = defaultFormatter, h
   }, [labels.length, width]);
 
   return (
-    <div className="line-chart-frame" role="img" aria-label={`${yLabel} line chart`}>
-      {hasScrollableHistory ? <div className="chart-scroll-cue">Recent dates shown. Scroll left for earlier dates.</div> : null}
+    <div className="line-chart-frame" role="img" aria-label={i18n.translateText(`${yLabel} line chart`)}>
+      {hasScrollableHistory ? <div className="chart-scroll-cue">{i18n.translateText('Recent dates shown. Scroll left for earlier dates.')}</div> : null}
       <div className="chart-scroll-shell">
         <div
           className="chart-scroll"
           ref={scrollRef}
           role="region"
           tabIndex={hasScrollableHistory ? 0 : undefined}
-          aria-label={`${yLabel} history. Recent dates are shown first; scroll left for earlier dates.`}
+          aria-label={i18n.translateText(`${yLabel} history. Recent dates are shown first; scroll left for earlier dates.`)}
         >
           <svg className="chart" viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
             {ticks.map(tick => (

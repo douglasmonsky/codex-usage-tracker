@@ -4,12 +4,15 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type ColumnDefTemplate,
+  type HeaderContext,
   type OnChangeFn,
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { useState } from 'react';
+import { useShellI18n } from '../app/i18nContext';
 
 type DataTableProps<T> = {
   columns: Array<ColumnDef<T>>;
@@ -37,6 +40,20 @@ type DataTableProps<T> = {
 
 const defaultVisibleRows = 250;
 const defaultVisibleRowsIncrement = 250;
+const userDataColumnIds = new Set([
+  'branch',
+  'command',
+  'cwd',
+  'file',
+  'model',
+  'name',
+  'path',
+  'project',
+  'record_id',
+  'remote',
+  'session',
+  'thread',
+]);
 
 export function DataTable<T>({
   columns,
@@ -61,6 +78,7 @@ export function DataTable<T>({
   visibleRowCount,
   onVisibleRowCountChange,
 }: DataTableProps<T>) {
+const i18n = useShellI18n();
 const [internalSorting, setInternalSorting] = useState<SortingState>([]);
 const [internalVisibleRowCount, setInternalVisibleRowCount] = useState(initialVisibleRows);
 const tableSorting = sorting ?? internalSorting;
@@ -94,7 +112,10 @@ setInternalVisibleRowCount(nextVisibleRowCount);
   return (
     <div className="table-window">
       <div className="table-scroll">
-        <table className={compact ? 'data-table compact' : 'data-table'} aria-label={ariaLabel}>
+        <table
+          className={compact ? 'data-table compact' : 'data-table'}
+          aria-label={ariaLabel ? i18n.translateText(ariaLabel) : undefined}
+        >
           <thead>
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
@@ -111,13 +132,13 @@ setInternalVisibleRowCount(nextVisibleRowCount);
                           className="sort-header"
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
-                          aria-label={`Sort by ${headerLabel(header.column.columnDef.header)}`}
+                          aria-label={i18n.translateText(`Sort by ${i18n.translateText(headerLabel(header.column.columnDef.header))}`)}
                         >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {localizedHeader(header.column.columnDef.header, header.getContext(), i18n.translateText)}
                           {sorted === 'asc' ? <ArrowUp size={13} /> : sorted === 'desc' ? <ArrowDown size={13} /> : <ChevronsUpDown size={13} />}
                         </button>
                       ) : (
-                        flexRender(header.column.columnDef.header, header.getContext())
+                        localizedHeader(header.column.columnDef.header, header.getContext(), i18n.translateText)
                       )}
                     </th>
                   );
@@ -162,9 +183,9 @@ setInternalVisibleRowCount(nextVisibleRowCount);
                       (onRowActivate
                         ? onRowSelect
                           ? activateOnClick
-                            ? 'Click opens full investigator. Hover or press Space previews details.'
-                            : 'Click to inspect details. Double-click or press Enter open full investigator.'
-                          : 'Click or press Enter open the full investigator.'
+                            ? i18n.translateText('Click opens full investigator. Hover or press Space previews details.')
+                            : i18n.translateText('Click to inspect details. Double-click or press Enter open full investigator.')
+                          : i18n.translateText('Click or press Enter open the full investigator.')
                         : undefined)
                     }
                     onClick={isInteractive ? clickRow : undefined}
@@ -190,7 +211,11 @@ setInternalVisibleRowCount(nextVisibleRowCount);
                     }
                   >
                 {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className={stickyColumnClass(cell.column.id)}>
+                  <td
+                    key={cell.id}
+                    className={stickyColumnClass(cell.column.id)}
+                    data-localization-skip={isUserDataColumn(cell.column.id) ? 'true' : undefined}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
@@ -200,7 +225,7 @@ setInternalVisibleRowCount(nextVisibleRowCount);
             ) : (
               <tr>
                 <td colSpan={Math.max(table.getVisibleLeafColumns().length, 1)} className="empty-cell">
-                  {emptyLabel}
+                  {i18n.translateText(emptyLabel)}
                 </td>
               </tr>
             )}
@@ -210,10 +235,10 @@ setInternalVisibleRowCount(nextVisibleRowCount);
       {hiddenRowCount ? (
         <div className="table-window-footer">
           <span>
-            Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} table rows
+            {i18n.translateText(`Showing ${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} table rows`)}
           </span>
           <button type="button" className="inline-button" onClick={showMoreRows}>
-            Show {Math.min(visibleRowsIncrement, hiddenRowCount).toLocaleString()} more rows
+            {i18n.translateText(`Show ${Math.min(visibleRowsIncrement, hiddenRowCount).toLocaleString()} more rows`)}
           </button>
         </div>
       ) : null}
@@ -223,6 +248,19 @@ setInternalVisibleRowCount(nextVisibleRowCount);
 
 function headerLabel(header: unknown): string {
   return typeof header === 'string' ? header : 'column';
+}
+
+function localizedHeader<TData, TValue>(
+  header: ColumnDefTemplate<HeaderContext<TData, TValue>> | undefined,
+  context: HeaderContext<TData, TValue>,
+  translate: (value: string) => string,
+) {
+  if (typeof header === 'string') return translate(header);
+  return header ? flexRender(header, context) : null;
+}
+
+function isUserDataColumn(columnId: string): boolean {
+  return userDataColumnIds.has(columnId);
 }
 
 function stickyColumnClass(columnId: string): string | undefined {

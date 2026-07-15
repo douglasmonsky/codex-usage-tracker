@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Complete the Simplified Chinese dashboard experience across React views, visualization metadata, tables, accessibility text, CLI help, and dashboard lifecycle messages while preserving user-provided data verbatim.
+
 ## 0.18.0 - 2026-07-15
 
 - Exclude exact historical calls copied by cloned Codex tasks from default dashboard, CLI, MCP, report, allowance, compression, recommendation, and export totals while retaining every physical source row for local provenance.

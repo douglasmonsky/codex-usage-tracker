@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
+import { useShellI18n } from '../../app/i18nContext';
 import { formatVisualizationValue, tableRowsForVisualization } from '../spec';
 import type { VisualizationSpecV1, VisualizationTableColumn } from '../spec';
 import styles from './VisualizationTable.module.css';
@@ -11,6 +12,7 @@ type VisualizationTableProps = {
 };
 
 export function VisualizationTable({ onSelectionChange, selectedKey, spec }: VisualizationTableProps) {
+  const i18n = useShellI18n();
   const rows = tableRowsForVisualization(spec);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [hasMoreRight, setHasMoreRight] = useState(false);
@@ -50,7 +52,7 @@ export function VisualizationTable({ onSelectionChange, selectedKey, spec }: Vis
         ref={scrollRef}
         className={styles.tableScroll}
         role="region"
-        aria-label={`${spec.title} table`}
+        aria-label={i18n.translateText(`${spec.title} table`)}
         tabIndex={0}
         onScroll={updateOverflowCue}
       >

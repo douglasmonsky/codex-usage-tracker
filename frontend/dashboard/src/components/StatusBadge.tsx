@@ -1,4 +1,5 @@
 import type { MetricTone } from '../api/types';
+import { useShellI18n } from '../app/i18nContext';
 
 type StatusBadgeProps = {
   label: string;
@@ -6,5 +7,6 @@ type StatusBadgeProps = {
 };
 
 export function StatusBadge({ label, tone = 'neutral' }: StatusBadgeProps) {
-  return <span className={`status-badge ${tone}`}>{label}</span>;
+  const i18n = useShellI18n();
+  return <span className={`status-badge ${tone}`}>{i18n.translateText(label)}</span>;
 }

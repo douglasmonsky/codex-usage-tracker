@@ -164,7 +164,7 @@ export function ThreadInspector({
           <span><strong>{selected.averageGap}</strong>Average gap</span>
           <span><strong>{selected.initiatorSummary}</strong>Initiated by</span>
           <span><strong>{selected.modelSummary}</strong>Models</span>
-          <span><strong>{selected.effortSummary}</strong>Effort mix</span>
+          <span><strong>{shellI18n.translateText(selected.effortSummary)}</strong>Effort mix</span>
           <span>
             <strong>{formatCompact(selected.cachedInput)} / {formatCompact(selected.uncachedInput)}</strong>
             Cached / uncached input
@@ -226,7 +226,7 @@ export function ThreadInspector({
             <span>
               <strong>
                 {lifecycle.firstExpensive
-                  ? `${lifecycle.firstExpensive.call.time} · Call ${lifecycle.firstExpensive.index + 1}`
+                  ? shellI18n.translateText(`${lifecycle.firstExpensive.call.time} · Call ${lifecycle.firstExpensive.index + 1}`)
                   : 'None'}
               </strong>
               First expensive turn
@@ -234,7 +234,7 @@ export function ThreadInspector({
             <span>
               <strong>
                 {lifecycle.largestJump
-                  ? `${formatCompact(lifecycle.largestJump.tokens)} at ${lifecycle.largestJump.call.time}`
+                  ? shellI18n.translateText(`${formatCompact(lifecycle.largestJump.tokens)} at ${lifecycle.largestJump.call.time}`)
                   : 'None'}
               </strong>
               Largest token jump
@@ -267,12 +267,12 @@ export function ThreadInspector({
             <span>{efficiencySignalCount ? `${efficiencySignalCount} signals` : 'Aggregate summary'}</span>
           </div>
           <div className="secondary-thread-grid">
-            <span><strong>{selected.latestActivity}</strong>Latest activity</span>
+            <span><strong>{shellI18n.translateText(selected.latestActivity)}</strong>Latest activity</span>
             <span><strong>{formatCompact(selected.totalTokens)}</strong>Total tokens</span>
             <span><strong>{calls.length}</strong>Loaded calls</span>
             <span><strong>{efficiencySignalCount}</strong>Efficiency signals</span>
             <span><strong>{selected.modelSummary}</strong>Model mix</span>
-            <span><strong>{selected.effortSummary}</strong>Effort mix</span>
+            <span><strong>{shellI18n.translateText(selected.effortSummary)}</strong>Effort mix</span>
           </div>
         </div>
       </Panel>
@@ -337,6 +337,7 @@ function ThreadCallRow({
   onOpenInvestigator(recordId: string): void;
   onCopyCallLink(recordId: string): void;
 }) {
+  const i18n = useShellI18n();
   const openLabel = `Open investigator for thread call ${call.thread} ${call.model}`;
   const copyLabel = `Copy link for thread call ${call.thread} ${call.model}`;
   return (
@@ -352,21 +353,21 @@ function ThreadCallRow({
         }
       }}
     >
-      <span>{call.time}</span>
-      <strong>{call.model} / {call.effort}</strong>
-      <em>{formatCompact(call.totalTokens)} tokens - {pct(call.cachedPct)} cache - {money(call.cost)}</em>
+      <span>{i18n.translateText(call.time)}</span>
+      <strong>{call.model} / {i18n.translateText(call.effort)}</strong>
+      <em>{i18n.translateText(`${formatCompact(call.totalTokens)} tokens - ${pct(call.cachedPct)} cache - ${money(call.cost)}`)}</em>
       <div className="thread-call-flags">
         <CallSignalPucks call={call} />
-        <span>Context {formatCallContextUse(call)}</span>
-        <span>{callPricingStatusText(call)}</span>
+        <span>{i18n.translateText(`Context ${formatCallContextUse(call)}`)}</span>
+        <span>{i18n.translateText(callPricingStatusText(call))}</span>
       </div>
       <div className="thread-call-meta">
         <span>{call.duration}</span>
-        <span>Prev {call.previousCallGap}</span>
-        <span>{call.initiator || 'unknown'} initiated</span>
-        <span>{formatCredits(call.credits)}</span>
+        <span>{i18n.translateText(`Prev ${call.previousCallGap}`)}</span>
+        <span>{i18n.translateText(`${call.initiator || 'unknown'} initiated`)}</span>
+        <span>{i18n.translateText(formatCredits(call.credits))}</span>
       </div>
-      {call.recommendation ? <p className="thread-call-recommendation">{call.recommendation}</p> : null}
+      {call.recommendation ? <p className="thread-call-recommendation">{i18n.translateText(call.recommendation)}</p> : null}
       <div className="thread-context-bar" role="img" aria-label={`Context use ${formatCallContextUse(call)}`}>
         <span
           className={timelineSeverityClass(call.contextWindowPct)}

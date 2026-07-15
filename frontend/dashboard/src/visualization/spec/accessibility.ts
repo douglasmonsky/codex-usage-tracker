@@ -1,12 +1,15 @@
 import { tableRowsForVisualization } from './table';
 import type { VisualizationSpecV1 } from './types';
 
-export function visualizationAriaDescription(spec: VisualizationSpecV1): string {
+export function visualizationAriaDescription(
+  spec: VisualizationSpecV1,
+  translateText: (value: string) => string = value => value,
+): string {
   const rows = tableRowsForVisualization(spec);
-  const parts = [spec.title, stateDescription(spec), spec.accessibility.summary];
-  if (rows.length) parts.push(`${rows.length.toLocaleString()} table rows available.`);
-  if (spec.caveats?.length) parts.push(`Caveats: ${spec.caveats.join(' ')}`);
-  if (spec.accessibility.keyboardInstructions) parts.push(spec.accessibility.keyboardInstructions);
+  const parts = [translateText(spec.title), translateText(stateDescription(spec)), translateText(spec.accessibility.summary)];
+  if (rows.length) parts.push(translateText(`${rows.length.toLocaleString()} table rows available.`));
+  if (spec.caveats?.length) parts.push(`${translateText('Caveats:')} ${spec.caveats.map(translateText).join(' ')}`);
+  if (spec.accessibility.keyboardInstructions) parts.push(translateText(spec.accessibility.keyboardInstructions));
   return parts.filter(Boolean).join(' ');
 }
 

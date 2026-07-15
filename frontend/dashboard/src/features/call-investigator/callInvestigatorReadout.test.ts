@@ -17,6 +17,7 @@ const shellI18n: ShellI18n = {
   direction: 'ltr',
   languages: [],
   t: (key, fallback) => fallback ?? key,
+  translateText: value => value,
   navLabel: (_view, fallback) => fallback,
 };
 

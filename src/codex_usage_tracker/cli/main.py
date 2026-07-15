@@ -52,6 +52,7 @@ from codex_usage_tracker.cli.dashboard import (
     run_serve_dashboard,
 )
 from codex_usage_tracker.cli.diagnostics import run_diagnostics
+from codex_usage_tracker.cli.help_i18n import localized_cli_error_prefix, requested_cli_language
 from codex_usage_tracker.cli.inspect_log_output import print_inspect_log_summary
 from codex_usage_tracker.cli.parser import build_parser
 from codex_usage_tracker.core.api_payloads import (
@@ -73,16 +74,18 @@ def main() -> int:
         ValueError,
         OSError,
     ) as exc:
-        print(f"Error: [{error_code(exc)}] {exc}", file=sys.stderr)
+        language = requested_cli_language(sys.argv[1:])
+        print(f"{localized_cli_error_prefix(language)}: [{error_code(exc)}] {exc}", file=sys.stderr)
         return 1
 
 
 def _main() -> int:
-    parser = build_parser()
+    language = requested_cli_language(sys.argv[1:])
+    parser = build_parser(language)
     args = parser.parse_args()
     handler = _COMMAND_HANDLERS.get(args.command)
     if handler is None:
-        parser.error("unknown command")
+        parser.error("未知命令" if language == "zh-Hans" else "unknown command")
         return 2
     return handler(args)
 

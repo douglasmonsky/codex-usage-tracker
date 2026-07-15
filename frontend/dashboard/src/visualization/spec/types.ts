@@ -44,6 +44,7 @@ export type VisualizationTableSpec = {
 
 export type VisualizationAccessibility = {
   summary: string;
+  description?: string;
   details?: string[];
   keyboardInstructions?: string;
 };

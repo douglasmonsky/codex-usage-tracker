@@ -29,7 +29,11 @@ def run_dashboard(args: argparse.Namespace) -> int:
             )
         )
     else:
-        print(f"Wrote dashboard to {output}")
+        print(
+            f"仪表盘已写入 {output}"
+            if _language(args) == "zh-Hans"
+            else f"Wrote dashboard to {output}"
+        )
     if args.open:
         webbrowser.open(output.resolve().as_uri())
     return 0
@@ -52,7 +56,11 @@ def run_open_dashboard(args: argparse.Namespace) -> int:
             }
         )
     else:
-        print(f"Opening dashboard at {output}")
+        print(
+            f"正在打开仪表盘：{output}"
+            if _language(args) == "zh-Hans"
+            else f"Opening dashboard at {output}"
+        )
     webbrowser.open(output.resolve().as_uri())
     return 0
 
