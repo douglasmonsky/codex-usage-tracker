@@ -10,7 +10,7 @@ jobs completed in less than 4 minutes.
 The measured hardening critical path was:
 
 | Work | Duration |
-|---|---:|
+| --- | ---: |
 | Combined tool installation | 3m 10s |
 | Dashboard tests | 1m 23s |
 | Dashboard route performance budget | 53s |
