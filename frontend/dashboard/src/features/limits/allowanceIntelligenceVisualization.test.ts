@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildAllowanceIntelligenceVisualization } from './allowanceIntelligenceVisualization';
 import type { AllowanceSeriesPayload, AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
+import { buildEChartsVisualizationModel } from '../../visualization/renderer/optionBuilder';
 
 describe('allowance intelligence visualization', () => {
   it('renders weekly capacity instead of usage percentage history', () => {
@@ -15,13 +16,42 @@ describe('allowance intelligence visualization', () => {
     expect(spec.title).toBe('Weekly limit capacity over time');
     expect(spec.data.rows.map(row => row.creditsPerPercent)).toEqual([100, 120, 900, 110]);
     expect(spec.series.map(series => series.id)).toEqual([
-      'cycle-capacity',
-      'rolling-median',
-      'interquartile-band',
+      'plan-pro-capacity',
+      'plan-pro-median',
+      'plan-prolite-capacity',
+      'plan-prolite-median',
     ]);
+    expect(spec.series.map(series => series.label)).toEqual([
+      'Pro reset-window capacity',
+      'Pro trailing median',
+      'Pro Lite reset-window capacity',
+      'Pro Lite trailing median',
+    ]);
+    expect(spec.showLegend).toBe(false);
+    expect(spec.series[0]).toMatchObject({
+      mark: 'line',
+      color: '#3b82f6',
+      lineWidth: 1.5,
+      pointStyle: 'hollow',
+      showPoints: true,
+    });
+    expect(spec.series[1]).toMatchObject({
+      mark: 'line',
+      color: '#1d4ed8',
+      lineWidth: 3,
+      pointStyle: 'none',
+      showPoints: false,
+    });
+    expect(spec.series[0].color).not.toBe(spec.series[1].color);
+    expect(spec.series[2].color).not.toBe(spec.series[3].color);
+    const renderedSeries = buildEChartsVisualizationModel(spec).option.series as Array<Record<string, unknown>>;
+    expect(renderedSeries[0]).toMatchObject({ symbol: 'emptyCircle', showSymbol: true, lineStyle: { color: '#3b82f6', width: 1.5 } });
+    expect(renderedSeries[1]).toMatchObject({ symbol: 'none', showSymbol: false, lineStyle: { color: '#1d4ed8', width: 3 } });
+    expect(buildEChartsVisualizationModel(spec).option.legend).toBeUndefined();
     expect(spec.axes.y.unit).toBe('credits_per_percent');
     expect(spec.axes.y.max).toBe(200);
-    expect(spec.annotations).toHaveLength(1);
+    expect(spec.annotations).toHaveLength(2);
+    expect(spec.annotations?.[0].label).toBe('Observed plan changed · Pro → Pro Lite');
     expect(spec.table.defaultSort).toEqual({ field: 'completedAt', direction: 'desc' });
     expect(spec.interactions?.zoom).toEqual({ axis: 'x', startPercent: 0, endPercent: 100 });
   });
@@ -67,10 +97,10 @@ function seriesPayload(): AllowanceSeriesPayload {
       robust_domain: { mode: 'tukey_1_5_iqr', min: 80, max: 200 },
       analysis_status: 'supported_changes',
       points: [
-        capacityPoint('c1', '2026-06-01T00:00:00Z', 100, null),
-        capacityPoint('c2', '2026-06-08T00:00:00Z', 120, null),
-        capacityPoint('c3', '2026-06-15T00:00:00Z', 900, null),
-        capacityPoint('c4', '2026-06-22T00:00:00Z', 110, 115),
+        capacityPoint('c1', '2026-06-01T00:00:00Z', 100, null, 'pro'),
+        capacityPoint('c2', '2026-06-08T00:00:00Z', 120, null, 'pro'),
+        capacityPoint('c3', '2026-06-15T00:00:00Z', 900, null, 'prolite'),
+        capacityPoint('c4', '2026-06-22T00:00:00Z', 110, 115, 'prolite'),
       ],
       buckets: [],
       boundaries: [{
@@ -93,6 +123,7 @@ function capacityPoint(
   completedAt: string,
   creditsPerPercent: number,
   rollingMedian: number | null,
+  planType: string,
 ) {
   return {
     cycle_id: cycleId,
@@ -104,6 +135,7 @@ function capacityPoint(
     quality_grade: 'high',
     price_coverage: 1,
     regime_id: null,
+    plan_type: planType,
   };
 }
 

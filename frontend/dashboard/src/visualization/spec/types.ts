@@ -108,6 +108,9 @@ export type CartesianSeriesSpec = {
   xField: string;
   yField: string;
   color?: string;
+  lineWidth?: number;
+  pointStyle?: 'filled' | 'hollow' | 'none';
+  showPoints?: boolean;
   stack?: string;
   smooth?: boolean;
   lowerField?: string;
@@ -119,6 +122,7 @@ export type CartesianVisualizationSpecV1 = VisualizationSpecBaseV1 & {
   data: { rows: VisualizationRecord[] };
   axes: { x: VisualizationAxis; y: VisualizationAxis };
   series: CartesianSeriesSpec[];
+  showLegend?: boolean;
 };
 
 export type HeatmapVisualizationSpecV1 = VisualizationSpecBaseV1 & {
