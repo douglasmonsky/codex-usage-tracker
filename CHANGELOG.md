@@ -4,6 +4,15 @@
 
 - Apply the official GPT-5.6 long-context input and output price multipliers to concrete calls above 272K input tokens while keeping aggregate summaries from being incorrectly thresholded.
 
+## 0.19.0 - 2026-07-15
+
+- Redesign Limits Intelligence around weekly credits-per-percentage capacity
+  history, a compact current-status row, automatic revision analysis, and zero,
+  one, or multiple family-wise-controlled capacity changes. Rejected split
+  statistics stay hidden, five-hour usage remains observed context, and the v2
+  API/MCP contracts expose capacity points, regimes, provenance, and copied-row
+  diagnostics by default.
+
 ## 0.18.0 - 2026-07-15
 
 - Exclude exact historical calls copied by cloned Codex tasks from default dashboard, CLI, MCP, report, allowance, compression, recommendation, and export totals while retaining every physical source row for local provenance.

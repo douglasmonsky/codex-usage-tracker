@@ -14,6 +14,7 @@ export function buildCartesianModel(spec: CartesianVisualizationSpecV1, animate:
   const selectionField = spec.interactions?.selection?.keyField;
 
   for (const seriesSpec of spec.series) {
+    const pointStyle = seriesSpec.pointStyle ?? 'filled';
     if (seriesSpec.lowerField && seriesSpec.upperField) {
       const confidenceStack = `confidence-${seriesSpec.id}`;
       series.push({
@@ -60,24 +61,32 @@ export function buildCartesianModel(spec: CartesianVisualizationSpecV1, animate:
       data,
       smooth: seriesSpec.smooth,
       stack: seriesSpec.stack,
-      symbolSize: seriesSpec.mark === 'point' ? 12 : 7,
-      showSymbol: seriesSpec.mark !== 'line' || spec.data.rows.length <= 24,
+      symbol: pointStyle === 'none' ? 'none' : pointStyle === 'hollow' ? 'emptyCircle' : undefined,
+      symbolSize: seriesSpec.mark === 'point' ? 12 : seriesSpec.showPoints ? 9 : 7,
+      showSymbol: pointStyle === 'none'
+        ? false
+        : seriesSpec.showPoints ?? (seriesSpec.mark !== 'line' || spec.data.rows.length <= 24),
       emphasis: { focus: 'series', scale: 1.35 },
-      lineStyle: seriesSpec.color ? { color: seriesSpec.color, width: 3 } : { width: 3 },
+      lineStyle: seriesSpec.color
+        ? { color: seriesSpec.color, width: seriesSpec.lineWidth ?? 3 }
+        : { width: seriesSpec.lineWidth ?? 3 },
       itemStyle: seriesSpec.color ? { color: seriesSpec.color } : undefined,
       ...annotationOptions(spec.annotations ?? []),
     });
   }
 
-  const legend = spec.series.length > 1 ? { top: 4, left: 8 } : null;
+  const legend = spec.showLegend !== false && spec.series.length > 1
+    ? { top: 4, left: 8 }
+    : null;
   const dataZoom = dataZoomOptions(spec);
   const brush = brushOptions(spec);
   const toolbox = toolboxOptions(spec);
+  const gridTop = hasXAxisReferenceLine(spec) ? 92 : 52;
   return {
     option: {
       ...baseOption(spec, animate),
       grid: {
-        top: 52,
+        top: gridTop,
         right: 28,
         bottom: spec.interactions?.zoom ? 78 : 48,
         left: 64,
@@ -117,7 +126,7 @@ function axisOption(axis: CartesianVisualizationSpecV1['axes']['x'], orientation
 
 function mobileCartesianOption(spec: CartesianVisualizationSpecV1) {
   const yIsCategory = spec.axes.y.type === 'category' || spec.axes.y.type === 'text';
-  if (!yIsCategory) return { grid: { top: 88 } };
+  if (!yIsCategory) return { grid: { top: hasXAxisReferenceLine(spec) ? 124 : 88 } };
   return {
     grid: { top: 52, right: 20, bottom: 56, left: 140, outerBoundsMode: 'none' },
     yAxis: {
@@ -125,6 +134,12 @@ function mobileCartesianOption(spec: CartesianVisualizationSpecV1) {
       axisLabel: { hideOverlap: true, width: 124, overflow: 'truncate' },
     },
   };
+}
+
+function hasXAxisReferenceLine(spec: CartesianVisualizationSpecV1) {
+  return (spec.annotations ?? []).some(annotation => (
+    annotation.kind === 'reference-line' && annotation.axis === 'x'
+  ));
 }
 
 function annotationOptions(annotations: VisualizationAnnotation[]) {

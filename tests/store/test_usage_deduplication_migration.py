@@ -11,6 +11,7 @@ from codex_usage_tracker.store.allowance_observations import (
     sync_allowance_observations_for_record_ids,
 )
 from codex_usage_tracker.store.api import connect, init_db, upsert_usage_events
+from codex_usage_tracker.store.deduplication_schema import _rebuild_canonical_derivatives
 from codex_usage_tracker.store.thread_summaries import rebuild_thread_summaries
 from tests.store.test_store_migrations import _write_legacy_usage_database
 from tests.store.test_usage_deduplication import _event
@@ -162,3 +163,45 @@ def test_v25_reclassifies_clone_rewritten_timestamps(tmp_path: Path) -> None:
     assert thread_calls == 1
     assert allowance_count == 1
     assert recommendation_count == 1
+
+
+def test_canonical_rebuild_discards_stale_allowance_intelligence(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        conn.execute(
+            "INSERT INTO allowance_source_state "
+            "(state_id, allowance_generation, source_revision, observation_count, "
+            "latest_observed_at, model_version, rebuilt_at) "
+            "VALUES (1, 1, 'stale', 1, '2026-07-15T00:00:00Z', 'v1', '2026-07-15T00:00:00Z')"
+        )
+        conn.execute(
+            "INSERT INTO allowance_cycles "
+            "(cycle_id, window_kind, window_key, cohort_key, source_revision) "
+            "VALUES ('stale-cycle', 'primary', 'primary', 'codex', 'stale')"
+        )
+        conn.execute(
+            "INSERT INTO allowance_intervals "
+            "(interval_id, cycle_id, window_kind, window_key, cohort_key, point_kind, source_revision) "
+            "VALUES ('stale-interval', 'stale-cycle', 'primary', 'primary', 'codex', 'anchor', 'stale')"
+        )
+        conn.execute(
+            "INSERT INTO allowance_analysis_snapshots "
+            "(snapshot_id, source_revision, model_version, archive_scope, window_kind, cohort_key, "
+            "forecast_horizon, created_at) "
+            "VALUES ('stale-snapshot', 'stale', 'v1', 'active', 'primary', 'codex', 60, "
+            "'2026-07-15T00:00:00Z')"
+        )
+        _rebuild_canonical_derivatives(conn)
+        counts = [
+            conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            for table in (
+                "allowance_source_state",
+                "allowance_cycles",
+                "allowance_intervals",
+                "allowance_analysis_snapshots",
+            )
+        ]
+
+    assert counts == [0, 0, 0, 0]

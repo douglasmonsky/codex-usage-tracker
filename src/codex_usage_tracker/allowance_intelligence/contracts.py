@@ -1,0 +1,52 @@
+"""Immutable structural evidence contracts for allowance intelligence."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+
+ALLOWANCE_STATUS_SCHEMA = "codex-usage-tracker-allowance-status-v2"
+ALLOWANCE_SERIES_SCHEMA = "codex-usage-tracker-allowance-series-v2"
+ALLOWANCE_EVIDENCE_SCHEMA = "codex-usage-tracker-allowance-evidence-v2"
+
+
+class AllowancePointKind(str, Enum):
+    BASELINE = "baseline"
+    POSITIVE = "positive"
+    CENSORED = "censored"
+    CONFLICT = "conflict"
+
+
+class AllowanceConfidence(str, Enum):
+    HIGH = "high"
+    LOW = "low"
+    AMBIGUOUS = "ambiguous"
+
+
+@dataclass(frozen=True)
+class AllowanceCohort:
+    key: str
+    window_kind: str
+    window_key: str
+    is_archived: bool
+    selected: bool = False
+
+
+@dataclass(frozen=True)
+class AllowanceCycle:
+    cycle_id: str
+    cohort: AllowanceCohort
+    reset_at: int | None
+    observations: tuple[dict[str, object], ...]
+    status: str = "open"
+
+
+@dataclass(frozen=True)
+class AllowanceInterval:
+    interval_id: str
+    cycle_id: str
+    start: dict[str, object] | None
+    end: dict[str, object] | None
+    point_kind: AllowancePointKind
+    censor_reason: str | None = None
+    eligible_for_interpolation: bool = False

@@ -39,6 +39,23 @@ tail_lines = 80
 max_tail_bytes = 12288
 pass_exit_codes = [0]
 
+[tasks.allowance-statistical-calibration]
+argv = [
+  "/usr/bin/env",
+  "PYTHONPATH=src",
+  "python3",
+  "scripts/calibrate_allowance_change_detector.py",
+  "--simulations",
+  "1000",
+  "--permutations",
+  "1999",
+  "--json",
+]
+timeout_seconds = 1200
+tail_lines = 40
+max_tail_bytes = 8192
+pass_exit_codes = [0]
+
 [tasks.pr-checks]
 argv = ["gh", "pr", "checks", "--watch"]
 timeout_seconds = 1800
