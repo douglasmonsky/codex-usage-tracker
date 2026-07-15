@@ -13,7 +13,6 @@ from .contracts import AllowanceCohort, AllowanceCycle, AllowanceInterval, Allow
 
 MODEL_VERSION = "reset-aware-v4"
 RESET_JITTER_SECONDS = 60
-FRESH_SECONDS = 5 * 60
 AGING_SECONDS = {"weekly": 6 * 60 * 60, "five_hour": 15 * 60}
 
 
